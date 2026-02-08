@@ -1,0 +1,25 @@
+{
+  "node_id": "b1000002",
+  "node_type": "phase",
+  "node_index": 2,
+  "label": "Phase-2",
+  "title": "Deploy-Everywhere + Plugin Framework",
+  "description": "Storage abstraction layer (S3 + local filesystem), plugin architecture, PyPI package, Docker image. Enables self-hosted deployments.",
+  "status": "deferred",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["deploy-everywhere", "plugins", "phase-2"],
+  "links": [
+    {
+      "link_type_id": "phase-of",
+      "verb": "phase-of",
+      "target_id": "a1000001",
+      "target_label": "Project-1"
+    }
+  ],
+  "properties": {
+    "source_documents": ["docs/_to_process/secure-send-roadmap.md", "docs/_to_process/secure-send-plugins-i18n-commercial.md"],
+    "depends_on_phase": "Phase-1"
+  }
+}

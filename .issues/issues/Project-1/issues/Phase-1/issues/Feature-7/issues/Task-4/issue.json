@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000064",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Implement rate limiting",
+  "description": "Basic rate limiting on public endpoints (/register-interest, /transfers/{id}/download). Per-IP, per-minute.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["security", "rate-limiting", "backend"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000007",
+      "target_label": "Feature-7"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "Excessive requests return 429. Normal usage unaffected.",
+    "stories": ["SEC-5"],
+    "role_assignment": "Development Team"
+  }
+}

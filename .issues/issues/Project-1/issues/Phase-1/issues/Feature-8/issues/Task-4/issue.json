@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000074",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Configure S3 buckets (prod)",
+  "description": "Same as dev but for prod tier: sgraph-send-prod-data, sgraph-send-prod-config.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["s3", "infrastructure", "prod"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000008",
+      "target_label": "Feature-8"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Prod buckets exist with same security config.",
+    "stories": ["(deployment)"],
+    "role_assignment": "Development Team"
+  }
+}

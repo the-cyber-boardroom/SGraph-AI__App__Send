@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000022",
+  "node_type": "task",
+  "node_index": 2,
+  "label": "Task-2",
+  "title": "Implement client-side AES-256-GCM decryption",
+  "description": "Downloads encrypted blob via pre-signed URL. Decrypts using entered key (Web Crypto API). Detects wrong key via GCM auth tag failure.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["decryption", "frontend", "web-crypto"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000003",
+      "target_label": "Feature-3"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Correct key produces decrypted file identical to original. Wrong key produces clear error (not corrupted download).",
+    "stories": ["SEC-3", "RCV-5"],
+    "role_assignment": "Development Team"
+  }
+}

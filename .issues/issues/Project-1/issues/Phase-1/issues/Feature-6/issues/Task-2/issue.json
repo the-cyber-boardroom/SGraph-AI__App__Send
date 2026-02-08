@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000052",
+  "node_type": "task",
+  "node_index": 2,
+  "label": "Task-2",
+  "title": "Implement text/secret sharing mode",
+  "description": "Text input area as alternative to file upload. Encrypts text as binary blob (same AES-256-GCM flow). Same download/decrypt flow for receiver.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["ui", "encryption", "text-sharing", "frontend"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000006",
+      "target_label": "Feature-6"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "Can enter text, encrypt, share link+key. Receiver decrypts and sees original text.",
+    "stories": ["SND-7"],
+    "role_assignment": "Development Team"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000076",
+  "node_type": "task",
+  "node_index": 6,
+  "label": "Task-6",
+  "title": "Set up static frontend hosting (dev)",
+  "description": "S3 bucket for static files + CloudFront distribution. dev-send.sgraph.ai DNS.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["s3", "cloudfront", "frontend", "hosting", "dev"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000008",
+      "target_label": "Feature-8"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Frontend loads at dev-send.sgraph.ai. HTTPS works.",
+    "stories": ["(deployment)"],
+    "role_assignment": "Development Team"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000034",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Return captured metadata in API responses",
+  "description": "Both /transfers/{id}/complete and /transfers/{id}/download must return transparency objects with your_ip, timestamp, stored_fields[], not_stored[].",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["api", "backend", "transparency"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000004",
+      "target_label": "Feature-4"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "API responses include transparency objects. IP address matches request origin.",
+    "stories": ["SEC-6"],
+    "role_assignment": "Development Team"
+  }
+}

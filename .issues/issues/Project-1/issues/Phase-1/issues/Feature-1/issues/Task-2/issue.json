@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000002",
+  "node_type": "task",
+  "node_index": 2,
+  "label": "Task-2",
+  "title": "Implement POST /transfers/{id}/complete endpoint",
+  "description": "Marks transfer as completed in meta.json. Returns download_link + transparency data (ip, timestamp, file_size, stored_fields, not_stored).",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["api", "backend"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000001",
+      "target_label": "Feature-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Status transitions pending to completed. Response includes transparency object. Invalid transfer_id returns 404.",
+    "stories": ["SND-2", "SND-6"],
+    "role_assignment": "Development Team"
+  }
+}

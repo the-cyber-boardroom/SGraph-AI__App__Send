@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000055",
+  "node_type": "task",
+  "node_index": 5,
+  "label": "Task-5",
+  "title": "Build register-interest page",
+  "description": "Simple form: email + optional message + submit. Confirmation message on success.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["ui", "waitlist", "frontend"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000006",
+      "target_label": "Feature-6"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "Form submits successfully. Confirmation shown. Data stored in S3.",
+    "stories": ["ADM-4"],
+    "role_assignment": "Development Team"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000077",
+  "node_type": "task",
+  "node_index": 7,
+  "label": "Task-7",
+  "title": "Set up GitHub Actions CI/CD",
+  "description": "Build, test, deploy pipeline. Separate workflows for dev/qa/prod. Auto-deploy to dev on push to dev branch.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["ci-cd", "github-actions", "deployment"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000008",
+      "target_label": "Feature-8"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Push to dev -> auto-deploy to dev environment. Tests run on PR.",
+    "stories": ["(deployment)"],
+    "role_assignment": "Development Team"
+  }
+}

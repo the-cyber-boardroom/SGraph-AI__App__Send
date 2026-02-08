@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000013",
+  "node_type": "task",
+  "node_index": 3,
+  "label": "Task-3",
+  "title": "Implement GET /tokens endpoint (admin)",
+  "description": "Lists all tokens with usage stats. Admin auth required.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["tokens", "api", "admin", "backend"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000002",
+      "target_label": "Feature-2"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Returns array of tokens with usage_count, last_used_at, status.",
+    "stories": ["ADM-1", "ADM-3"],
+    "role_assignment": "Development Team"
+  }
+}

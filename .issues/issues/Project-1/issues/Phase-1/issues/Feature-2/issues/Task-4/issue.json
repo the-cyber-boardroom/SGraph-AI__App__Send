@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000014",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Implement DELETE /tokens/{id} endpoint (admin)",
+  "description": "Revokes token (sets status=revoked). Admin auth required.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["tokens", "api", "admin", "backend"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000002",
+      "target_label": "Feature-2"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Token status changes to revoked. Revoked tokens rejected on subsequent /transfers calls.",
+    "stories": ["ADM-1", "SEC-7"],
+    "role_assignment": "Development Team"
+  }
+}

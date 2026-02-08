@@ -1,0 +1,50 @@
+{
+  "node_id": "c1000003",
+  "node_type": "feature",
+  "node_index": 3,
+  "label": "Feature-3",
+  "title": "Download & Decrypt",
+  "description": "Implement the download and decryption flow: API endpoint for generating pre-signed download URLs with event logging, client-side AES-256-GCM decryption, download page UI, and wrong-key error handling.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["download", "decryption", "s3", "api", "ui"],
+  "links": [
+    {
+      "link_type_id": "feature-of",
+      "verb": "feature-of",
+      "target_id": "b1000001",
+      "target_label": "Phase-1"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000021",
+      "target_label": "Task-1"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000022",
+      "target_label": "Task-2"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000023",
+      "target_label": "Task-3"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000024",
+      "target_label": "Task-4"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "stories": ["RCV-1", "RCV-5", "SEC-3"],
+    "role_assignment": "Development Team"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000001",
+  "node_type": "task",
+  "node_index": 1,
+  "label": "Task-1",
+  "title": "Implement POST /transfers endpoint",
+  "description": "Accepts token + file_size + content_type_hint. Validates token. Creates meta.json in S3. Generates pre-signed PUT URL (1hr expiry). Returns transfer_id + upload_url.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["api", "s3", "backend"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000001",
+      "target_label": "Feature-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Valid token returns 201 with transfer_id + pre-signed URL. Invalid token returns 401. Pre-signed URL works for PUT to S3.",
+    "stories": ["SND-1", "SND-2", "SEC-1"],
+    "role_assignment": "Development Team"
+  }
+}

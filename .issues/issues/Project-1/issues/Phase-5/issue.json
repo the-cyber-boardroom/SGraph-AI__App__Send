@@ -1,0 +1,31 @@
+{
+  "node_id": "b1000005",
+  "node_type": "phase",
+  "node_index": 5,
+  "label": "Phase-5",
+  "title": "Future Phases (6–22)",
+  "description": "Consolidation of all post-Phase-4 work: security intelligence, bot detection, retention/ephemeral, credit economics, GTM/launch, CLI/SDK, MCP server, one-time secrets, LLM integration, user accounts, browser extension, PWA, data rooms, P2P/WebRTC, multi-recipient, compliance/trust, warrant canary, notarisation, time-locked transfers, regulated verticals, cultural UX, enterprise features, revenue diversification.",
+  "status": "deferred",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["future", "phase-5-plus"],
+  "links": [
+    {
+      "link_type_id": "phase-of",
+      "verb": "phase-of",
+      "target_id": "a1000001",
+      "target_label": "Project-1"
+    }
+  ],
+  "properties": {
+    "source_documents": [
+      "docs/_to_process/secure-send-roadmap.md",
+      "docs/_to_process/secure-send-plugins-i18n-commercial.md",
+      "docs/_to_process/secure-send-llm-retention-compliance-gtm.md",
+      "docs/_to_process/secure-send-strategic-opportunities.md"
+    ],
+    "depends_on_phase": "Phase-4",
+    "note": "Will be broken into separate phases when active development begins. See docs/roadmap/phase-overview.md for the full phase breakdown."
+  }
+}

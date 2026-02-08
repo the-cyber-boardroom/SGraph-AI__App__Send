@@ -1,0 +1,50 @@
+{
+  "node_id": "c1000007",
+  "node_type": "feature",
+  "node_index": 7,
+  "label": "Feature-7",
+  "title": "Security Hardening",
+  "description": "Harden the security posture: S3 encryption at rest, server-side ciphertext validation, CORS configuration, and rate limiting on public endpoints.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["security", "s3", "cors", "rate-limiting", "validation"],
+  "links": [
+    {
+      "link_type_id": "feature-of",
+      "verb": "feature-of",
+      "target_id": "b1000001",
+      "target_label": "Phase-1"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000061",
+      "target_label": "Task-1"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000062",
+      "target_label": "Task-2"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000063",
+      "target_label": "Task-3"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000064",
+      "target_label": "Task-4"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "stories": ["SEC-4", "SEC-5"],
+    "role_assignment": "Development Team"
+  }
+}

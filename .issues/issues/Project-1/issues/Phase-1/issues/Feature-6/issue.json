@@ -1,0 +1,56 @@
+{
+  "node_id": "c1000006",
+  "node_type": "feature",
+  "node_index": 6,
+  "label": "Feature-6",
+  "title": "UI & UX Polish",
+  "description": "Polish the user experience: separate-channel sharing guidance, text/secret sharing mode, How-it-Works trust page, and register-interest waitlist functionality.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["ui", "ux", "trust", "text-sharing", "waitlist"],
+  "links": [
+    {
+      "link_type_id": "feature-of",
+      "verb": "feature-of",
+      "target_id": "b1000001",
+      "target_label": "Phase-1"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000051",
+      "target_label": "Task-1"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000052",
+      "target_label": "Task-2"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000053",
+      "target_label": "Task-3"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000054",
+      "target_label": "Task-4"
+    },
+    {
+      "link_type_id": "has-task",
+      "verb": "has-task",
+      "target_id": "d1000055",
+      "target_label": "Task-5"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "stories": ["SND-3", "SND-7", "RCV-3", "ADM-4"],
+    "role_assignment": "Development Team"
+  }
+}

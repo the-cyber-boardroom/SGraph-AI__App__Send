@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000006",
+  "node_type": "task",
+  "node_index": 6,
+  "label": "Task-6",
+  "title": "Build upload-complete page with link + key display",
+  "description": "Shows download link (with copy button), decryption key (with copy button), separate-channels guidance.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["ui", "frontend", "upload"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000001",
+      "target_label": "Feature-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Both link and key have working copy buttons. Key is displayed in base64url format.",
+    "stories": ["SND-2", "SND-6"],
+    "role_assignment": "Development Team"
+  }
+}

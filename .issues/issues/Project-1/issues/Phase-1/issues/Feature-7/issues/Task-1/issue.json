@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000061",
+  "node_type": "task",
+  "node_index": 1,
+  "label": "Task-1",
+  "title": "Enable S3 SSE-S3 encryption at rest",
+  "description": "Configure data bucket with default SSE-S3 encryption. Defence-in-depth: even though files are already client-encrypted, S3-level encryption adds another layer.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["security", "s3", "encryption", "infrastructure"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000007",
+      "target_label": "Feature-7"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "All S3 objects encrypted at rest. Encryption header visible on uploaded objects.",
+    "stories": ["SEC-4"],
+    "role_assignment": "Development Team"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000005",
+  "node_type": "task",
+  "node_index": 5,
+  "label": "Task-5",
+  "title": "Build upload page with file drop zone and token input",
+  "description": "Drag-and-drop zone, browse button, token input field with verify button, encrypt & upload button. Shows progress.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "system",
+  "tags": ["ui", "frontend", "upload"],
+  "links": [
+    {
+      "link_type_id": "task-of",
+      "verb": "task-of",
+      "target_id": "c1000001",
+      "target_label": "Feature-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Can drop a file, enter token, click upload. Shows encryption then upload progress. On completion shows result page.",
+    "stories": ["SND-1", "SND-6"],
+    "role_assignment": "Development Team"
+  }
+}
