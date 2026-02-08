@@ -1,0 +1,16 @@
+name: CI Pipeline - DEV
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy-dev:
+    uses: ./.github/workflows/ci-pipeline.yml
+    with:
+      git_branch          : 'dev'
+      release_type        : 'minor'
+      should_increment_tag: true
+      should_publish_pypi : false
+    secrets: inherit

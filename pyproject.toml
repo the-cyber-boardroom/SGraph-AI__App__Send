@@ -1,0 +1,18 @@
+[tool.poetry]
+name        = "sgraph_ai_app_send"
+version     = "v0.1.1"
+description = "SGraph-AI__App__Send"
+authors     = ["Dinis Cruz <dinis.cruz@owasp.org>"]
+license     = "Apache 2.0"
+readme      = "README.md"
+homepage    = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
+repository  = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
+
+[tool.poetry.dependencies]
+python            = "^3.12"
+osbot-utils       = "*"
+issues-fs-cli     = "*"
+
+[build-system]
+requires = ["poetry-core>=1.9.1"]
+build-backend = "poetry.core.masonry.api"

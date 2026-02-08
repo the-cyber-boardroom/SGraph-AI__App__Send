@@ -1,0 +1,6 @@
+osbot-utils
+issues-fs
+
+# for testing
+pytest
+pytest-cov

@@ -1,0 +1,62 @@
+name: CI Pipeline (Base)
+
+on:
+  workflow_call:
+    inputs:
+      git_branch:
+        required: true
+        type: string
+      release_type:
+        required: false
+        type: string
+        default: ""
+      should_increment_tag:
+        required: false
+        type: boolean
+        default: false
+      should_publish_pypi:
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PACKAGE_NAME: 'sgraph_ai_app_send'
+
+jobs:
+  run-tests:
+    name: "Run Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "run-tests"
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/pytest__run-tests@dev
+        with:
+          test_target: "tests/unit"
+
+  increment-tag:
+    name: Increment Tag
+    runs-on: ubuntu-latest
+    needs: [run-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Increment Tag
+        if: inputs.should_increment_tag
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__increment-tag@dev
+        with:
+          release_type: ${{ inputs.release_type }}
+
+  publish-to-pypi:
+    if: inputs.should_publish_pypi && needs.increment-tag.result == 'success'
+    name: "Publish to: PYPI"
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    needs: [increment-tag]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Git Update Current Branch
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__update_branch@dev
+      - name: publish-to-pypi
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/pypi__publish@dev

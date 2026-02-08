@@ -1,0 +1,16 @@
+name: CI Pipeline - MAIN
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-qa:
+    uses: ./.github/workflows/ci-pipeline.yml
+    with:
+      git_branch          : 'main'
+      release_type        : 'major'
+      should_increment_tag: true
+      should_publish_pypi : true
+    secrets: inherit
