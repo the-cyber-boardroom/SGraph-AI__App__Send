@@ -78,6 +78,71 @@
       ],
       "default_status": "active",
       "properties": []
+    },
+    {
+      "type_id": "b2f04a17",
+      "name": "project",
+      "display_name": "Project",
+      "description": "Top-level project container",
+      "icon": "",
+      "color": "#f59e0b",
+      "statuses": [
+        "planning",
+        "active",
+        "paused",
+        "completed",
+        "archived"
+      ],
+      "default_status": "planning",
+      "properties": []
+    },
+    {
+      "type_id": "c3a15b28",
+      "name": "phase",
+      "display_name": "Phase",
+      "description": "Development phase within a project",
+      "icon": "",
+      "color": "#06b6d4",
+      "statuses": [
+        "planned",
+        "active",
+        "completed",
+        "deferred"
+      ],
+      "default_status": "planned",
+      "properties": []
+    },
+    {
+      "type_id": "d4b26c39",
+      "name": "research",
+      "display_name": "Research",
+      "description": "Research task or investigation",
+      "icon": "",
+      "color": "#a855f7",
+      "statuses": [
+        "proposed",
+        "in-progress",
+        "completed",
+        "inconclusive"
+      ],
+      "default_status": "proposed",
+      "properties": []
+    },
+    {
+      "type_id": "e5c37d4a",
+      "name": "spike",
+      "display_name": "Spike",
+      "description": "Time-boxed technical investigation or proof-of-concept",
+      "icon": "",
+      "color": "#ec4899",
+      "statuses": [
+        "proposed",
+        "in-progress",
+        "completed",
+        "abandoned"
+      ],
+      "default_status": "proposed",
+      "properties": []
     }
   ]
 }
