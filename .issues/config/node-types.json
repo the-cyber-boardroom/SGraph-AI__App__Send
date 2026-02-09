@@ -1,0 +1,83 @@
+{
+  "types": [
+    {
+      "type_id": "1c0ede89",
+      "name": "git-repo",
+      "display_name": "GitRepo",
+      "description": "Git repository root - contains all issues",
+      "icon": "",
+      "color": "#6366f1",
+      "statuses": [
+        "active",
+        "archived"
+      ],
+      "default_status": "active",
+      "properties": []
+    },
+    {
+      "type_id": "3efb8840",
+      "name": "bug",
+      "display_name": "Bug",
+      "description": "Defect or error in the system",
+      "icon": "",
+      "color": "#ef4444",
+      "statuses": [
+        "backlog",
+        "confirmed",
+        "in-progress",
+        "testing",
+        "resolved",
+        "closed"
+      ],
+      "default_status": "backlog",
+      "properties": []
+    },
+    {
+      "type_id": "903431a9",
+      "name": "task",
+      "display_name": "Task",
+      "description": "Unit of work to be completed",
+      "icon": "",
+      "color": "#3b82f6",
+      "statuses": [
+        "backlog",
+        "todo",
+        "in-progress",
+        "review",
+        "done"
+      ],
+      "default_status": "backlog",
+      "properties": []
+    },
+    {
+      "type_id": "afc291b5",
+      "name": "feature",
+      "display_name": "Feature",
+      "description": "High-level capability",
+      "icon": "",
+      "color": "#22c55e",
+      "statuses": [
+        "proposed",
+        "approved",
+        "in-progress",
+        "released"
+      ],
+      "default_status": "proposed",
+      "properties": []
+    },
+    {
+      "type_id": "e293a04d",
+      "name": "person",
+      "display_name": "Person",
+      "description": "Human or agent identity",
+      "icon": "",
+      "color": "#8b5cf6",
+      "statuses": [
+        "active",
+        "inactive"
+      ],
+      "default_status": "active",
+      "properties": []
+    }
+  ]
+}
