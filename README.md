@@ -41,14 +41,23 @@ sgraph_ai_app_send__ui__user/    # User UI (static assets)
 tests/unit/                      # Tests (no mocks, real in-memory stack)
 
 .issues/                         # Issues FS (file-based issue tracking)
-roles/                           # Role-based review documents
-  architect/                     # API contracts, data models, system topology
-  cartographer/                  # System landscape maps
-  conductor/                     # Product owner reviews and decisions
-  dev/                           # Implementation plans and code reviews
-  devops/                        # Infrastructure and deployment reviews
-  librarian/                     # Knowledge base, Issues FS maintenance
-  qa/                            # Test strategy and security reviews
+library/                         # Specs, dependencies, guides, roadmap
+  docs/_to_process/              # Original specification documents
+  docs/specs/                    # Specs index
+  roadmap/phases/                # Phase overview and roadmap
+team/                            # Team roles, humans, reviews
+  roles/                         # Role-based review documents
+    architect/                   # API contracts, data models, system topology
+    cartographer/                # System landscape maps
+    conductor/                   # Product owner decisions
+    dev/                         # Implementation plans and code reviews
+    devops/                      # Infrastructure and deployment reviews
+    librarian/                   # Knowledge base, Issues FS maintenance
+    qa/                          # Test strategy and security reviews
+    appsec/                      # Application security reviews
+    historian/                   # Decision tracking
+    journalist/                  # Communications and content
+  humans/dinis_cruz/briefs/      # Conductor briefs and reviews
 ```
 
 ## Development
@@ -80,7 +89,7 @@ poetry run issues-fs list
 
 ## Status
 
-**v0.1.4** — Admin Lambda infrastructure scaffolded and tested. User Lambda in progress.
+**v0.2.1** — Admin Lambda infrastructure scaffolded and tested. Repo reorganised (roles, docs, team structure). User Lambda in progress.
 
 ## License
 

@@ -20,12 +20,12 @@
   ],
   "properties": {
     "source_documents": [
-      "docs/_to_process/secure-send-roadmap.md",
-      "docs/_to_process/secure-send-plugins-i18n-commercial.md",
-      "docs/_to_process/secure-send-llm-retention-compliance-gtm.md",
-      "docs/_to_process/secure-send-strategic-opportunities.md"
+      "library/docs/_to_process/secure-send-roadmap.md",
+      "library/docs/_to_process/secure-send-plugins-i18n-commercial.md",
+      "library/docs/_to_process/secure-send-llm-retention-compliance-gtm.md",
+      "library/docs/_to_process/secure-send-strategic-opportunities.md"
     ],
     "depends_on_phase": "Phase-4",
-    "note": "Will be broken into separate phases when active development begins. See docs/roadmap/phase-overview.md for the full phase breakdown."
+    "note": "Will be broken into separate phases when active development begins. See library/roadmap/phases/v0.1.1__phase-overview.md for the full phase breakdown."
   }
 }

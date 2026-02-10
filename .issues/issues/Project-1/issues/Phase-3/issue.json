@@ -19,7 +19,7 @@
     }
   ],
   "properties": {
-    "source_documents": ["docs/_to_process/secure-send-roadmap.md"],
+    "source_documents": ["library/docs/_to_process/secure-send-roadmap.md"],
     "depends_on_phase": "Phase-2"
   }
 }

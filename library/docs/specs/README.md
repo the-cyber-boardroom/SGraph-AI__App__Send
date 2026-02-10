@@ -1,7 +1,7 @@
 # SGraph Send — Specification Documents Index
 
 **Status:** Reference material (source of truth for requirements)
-**Location:** `docs/_to_process/` (originals)
+**Location:** `library/docs/_to_process/` (originals)
 
 ---
 

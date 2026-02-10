@@ -67,7 +67,7 @@
     }
   ],
   "properties": {
-    "source_document": "docs/_to_process/project - Secure Send Service brief.md",
+    "source_document": "library/docs/_to_process/project - Secure Send Service brief.md",
     "user_stories": ["ADM-1", "ADM-2", "ADM-4", "SND-1", "SND-2", "SND-3", "SND-4", "SND-5", "SND-6", "SND-7", "RCV-1", "RCV-2", "RCV-3", "RCV-5", "SEC-1", "SEC-2", "SEC-3", "SEC-4", "SEC-5", "SEC-6", "SEC-7"]
   }
 }
