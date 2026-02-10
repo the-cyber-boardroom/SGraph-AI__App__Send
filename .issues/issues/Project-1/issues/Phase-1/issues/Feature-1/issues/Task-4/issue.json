@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000004",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Implement direct-to-S3 upload via pre-signed PUT URL",
+  "description": "Browser PUTs encrypted blob directly to S3 using pre-signed URL. Progress indicator during upload.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["s3", "frontend", "upload"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000001",
+      "target_label": "Feature-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "File appears at transfers/{id}/payload.enc in S3. Upload works for files up to 100MB. Progress bar shows percentage.",
+    "stories": ["SND-1", "SND-2"],
+    "role_assignment": "Development Team"
+  }
+}

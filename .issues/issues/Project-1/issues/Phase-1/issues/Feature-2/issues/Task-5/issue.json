@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000015",
+  "node_type": "task",
+  "node_index": 5,
+  "label": "Task-5",
+  "title": "Implement token validation middleware",
+  "description": "Validates Bearer token on /transfers and /transfers/{id}/complete. Checks token exists, is active, is not expired. Increments usage_count.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["tokens", "middleware", "auth", "backend"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000002",
+      "target_label": "Feature-2"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Valid active token passes. Revoked/missing/expired token returns 401.",
+    "stories": ["SEC-7"],
+    "role_assignment": "Development Team"
+  }
+}

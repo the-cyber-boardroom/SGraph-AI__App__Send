@@ -1,0 +1,50 @@
+{
+  "node_id": "c1000004",
+  "node_type": "feature",
+  "node_index": 4,
+  "label": "Feature-4",
+  "title": "Transparency Panels",
+  "description": "Implement transparency panels: a reusable UI component showing captured and not-stored fields, integrated on both upload-complete and download pages, backed by transparency objects in API responses.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["transparency", "ui", "api", "privacy"],
+  "links": [
+    {
+      "link_type_id": "4f012705",
+      "verb": "feature-of",
+      "target_id": "b1000001",
+      "target_label": "Phase-1"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000031",
+      "target_label": "Task-1"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000032",
+      "target_label": "Task-2"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000033",
+      "target_label": "Task-3"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000034",
+      "target_label": "Task-4"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "stories": ["SND-4", "RCV-2", "SEC-6"],
+    "role_assignment": "Development Team"
+  }
+}

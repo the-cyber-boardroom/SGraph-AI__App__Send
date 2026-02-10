@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000051",
+  "node_type": "task",
+  "node_index": 1,
+  "label": "Task-1",
+  "title": "Add separate-channel sharing guidance",
+  "description": "Callout/banner on upload-complete page advising to share link and key via different channels (e.g. link via email, key via WhatsApp).",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["ui", "ux", "security-guidance", "frontend"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000006",
+      "target_label": "Feature-6"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "Guidance is visible, clear, and not alarming. Suggests specific channel combinations.",
+    "stories": ["SND-3"],
+    "role_assignment": "Development Team"
+  }
+}

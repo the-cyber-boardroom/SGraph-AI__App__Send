@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000011",
+  "node_type": "task",
+  "node_index": 1,
+  "label": "Task-1",
+  "title": "Design token data model",
+  "description": "tokens/{token_id}.json schema: token_id (tok_ prefix), status (active/revoked), created_at, usage_count, last_used_at. Stored in config S3 bucket.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["tokens", "data-model", "s3"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000002",
+      "target_label": "Feature-2"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Schema documented. Sample JSON created.",
+    "stories": ["ADM-1"],
+    "role_assignment": "Development Team"
+  }
+}

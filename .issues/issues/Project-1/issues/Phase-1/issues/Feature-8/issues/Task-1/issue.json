@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000071",
+  "node_type": "task",
+  "node_index": 1,
+  "label": "Task-1",
+  "title": "Set up FastAPI application skeleton",
+  "description": "FastAPI app with Mangum adapter for Lambda. Health check endpoint (GET /health). Structured logging. Error handling middleware.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["fastapi", "lambda", "mangum", "backend"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000008",
+      "target_label": "Feature-8"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "/health returns 200. App runs locally via uvicorn. App runs on Lambda via Mangum.",
+    "stories": ["(deployment)"],
+    "role_assignment": "Development Team"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000044",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Build admin dashboard page",
+  "description": "Shows aggregate usage stats from /admin/stats. Token list with usage. No file content or names visible.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["ui", "admin", "analytics", "frontend"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000005",
+      "target_label": "Feature-5"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "Dashboard loads with correct stats. No PII beyond token metadata visible.",
+    "stories": ["ADM-2"],
+    "role_assignment": "Development Team"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "node_id": "c1000002",
+  "node_type": "feature",
+  "node_index": 2,
+  "label": "Feature-2",
+  "title": "Token Management",
+  "description": "Implement the token management system: data model, CRUD API endpoints for admin token operations, and token validation middleware for securing transfer endpoints.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["tokens", "auth", "admin", "api"],
+  "links": [
+    {
+      "link_type_id": "4f012705",
+      "verb": "feature-of",
+      "target_id": "b1000001",
+      "target_label": "Phase-1"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000011",
+      "target_label": "Task-1"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000012",
+      "target_label": "Task-2"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000013",
+      "target_label": "Task-3"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000014",
+      "target_label": "Task-4"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "d1000015",
+      "target_label": "Task-5"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "stories": ["ADM-1", "ADM-3", "SEC-7"],
+    "role_assignment": "Development Team"
+  }
+}

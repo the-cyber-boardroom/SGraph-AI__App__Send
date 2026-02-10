@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000054",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Implement POST /register-interest endpoint",
+  "description": "Stores email + optional message in config S3 bucket (waitlist/ prefix). No auth required. Rate limited.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["api", "waitlist", "backend"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000006",
+      "target_label": "Feature-6"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "Submission stored in S3. Rate limit prevents spam (e.g. 5/hour per IP).",
+    "stories": ["ADM-4"],
+    "role_assignment": "Development Team"
+  }
+}

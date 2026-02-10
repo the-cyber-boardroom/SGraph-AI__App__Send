@@ -1,0 +1,129 @@
+{
+  "link_types": [
+    {
+      "link_type_id": "2c499e3c",
+      "verb": "blocks",
+      "inverse_verb": "blocked-by",
+      "description": "Prevents progress on target",
+      "source_types": [
+        "bug",
+        "task"
+      ],
+      "target_types": [
+        "task",
+        "feature"
+      ]
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "inverse_verb": "task-of",
+      "description": "Contains as sub-work",
+      "source_types": [
+        "feature",
+        "git-repo"
+      ],
+      "target_types": [
+        "task"
+      ]
+    },
+    {
+      "link_type_id": "c7930f64",
+      "verb": "assigned-to",
+      "inverse_verb": "assignee-of",
+      "description": "Work assigned to person_agent",
+      "source_types": [
+        "bug",
+        "task",
+        "feature"
+      ],
+      "target_types": [
+        "person"
+      ]
+    },
+    {
+      "link_type_id": "204908c3",
+      "verb": "depends-on",
+      "inverse_verb": "dependency-of",
+      "description": "Requires target to complete first",
+      "source_types": [
+        "task",
+        "feature"
+      ],
+      "target_types": [
+        "task",
+        "feature"
+      ]
+    },
+    {
+      "link_type_id": "4e0c1076",
+      "verb": "relates-to",
+      "inverse_verb": "relates-to",
+      "description": "General association (symmetric)",
+      "source_types": [
+        "bug",
+        "task",
+        "feature",
+        "git-repo"
+      ],
+      "target_types": [
+        "bug",
+        "task",
+        "feature",
+        "git-repo"
+      ]
+    },
+    {
+      "link_type_id": "98d1c9d8",
+      "verb": "contains",
+      "inverse_verb": "contained-by",
+      "description": "Parent contains child issue",
+      "source_types": [
+        "git-repo",
+        "feature",
+        "task"
+      ],
+      "target_types": [
+        "bug",
+        "task",
+        "feature"
+      ]
+    },
+    {
+      "link_type_id": "4f012701",
+      "verb": "has-project",
+      "inverse_verb": "project-of",
+      "description": "Git repo contains project",
+      "source_types": [
+        "git-repo"
+      ],
+      "target_types": [
+        "project"
+      ]
+    },
+    {
+      "link_type_id": "4f012703",
+      "verb": "has-phase",
+      "inverse_verb": "phase-of",
+      "description": "Project contains phase",
+      "source_types": [
+        "project"
+      ],
+      "target_types": [
+        "phase"
+      ]
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "inverse_verb": "feature-of",
+      "description": "Phase contains feature",
+      "source_types": [
+        "phase"
+      ],
+      "target_types": [
+        "feature"
+      ]
+    }
+  ]
+}

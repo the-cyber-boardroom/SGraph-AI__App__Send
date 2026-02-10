@@ -1,0 +1,73 @@
+{
+  "node_id": "b1000001",
+  "node_type": "phase",
+  "node_index": 1,
+  "label": "Phase-1",
+  "title": "MVP — Core Transfer Flow",
+  "description": "Ship the minimum viable product: encrypted file transfer with token auth, transparency panel, admin dashboard, and three deployment environments.",
+  "status": "in-progress",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["mvp", "phase-1"],
+  "links": [
+    {
+      "link_type_id": "4f012703",
+      "verb": "phase-of",
+      "target_id": "a1000001",
+      "target_label": "Project-1"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000001",
+      "target_label": "Feature-1"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000002",
+      "target_label": "Feature-2"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000003",
+      "target_label": "Feature-3"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000004",
+      "target_label": "Feature-4"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000005",
+      "target_label": "Feature-5"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000006",
+      "target_label": "Feature-6"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000007",
+      "target_label": "Feature-7"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000008",
+      "target_label": "Feature-8"
+    }
+  ],
+  "properties": {
+    "source_document": "docs/_to_process/project - Secure Send Service brief.md",
+    "user_stories": ["ADM-1", "ADM-2", "ADM-4", "SND-1", "SND-2", "SND-3", "SND-4", "SND-5", "SND-6", "SND-7", "RCV-1", "RCV-2", "RCV-3", "RCV-5", "SEC-1", "SEC-2", "SEC-3", "SEC-4", "SEC-5", "SEC-6", "SEC-7"]
+  }
+}

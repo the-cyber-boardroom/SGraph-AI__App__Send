@@ -1,0 +1,10 @@
+osbot-utils
+osbot_fast_api_serverless
+
+# for issue tracking
+issues-fs
+
+# for testing
+httpx
+pytest
+pytest-cov

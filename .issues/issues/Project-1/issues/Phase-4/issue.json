@@ -1,0 +1,25 @@
+{
+  "node_id": "b1000004",
+  "node_type": "phase",
+  "node_index": 4,
+  "label": "Phase-4",
+  "title": "Fingerprint + Accessibility + i18n + Themes",
+  "description": "IP enrichment, browser fingerprint transparency, WCAG 2.2 AA accessibility, language packs (8 languages), theme system.",
+  "status": "deferred",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["fingerprint", "accessibility", "i18n", "themes", "phase-4"],
+  "links": [
+    {
+      "link_type_id": "4f012703",
+      "verb": "phase-of",
+      "target_id": "a1000001",
+      "target_label": "Project-1"
+    }
+  ],
+  "properties": {
+    "source_documents": ["docs/_to_process/secure-send-roadmap.md", "docs/_to_process/secure-send-plugins-i18n-commercial.md"],
+    "depends_on_phase": "Phase-2"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000024",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Implement wrong-key error handling",
+  "description": "Catch DOMException from GCM auth tag failure. Display clear \"wrong key\" error message. Allow retry.",
+  "status": "backlog",
+  "created_at": 1739030400000,
+  "updated_at": 1739030400000,
+  "created_by": "c0000001",
+  "tags": ["error-handling", "frontend", "decryption"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000003",
+      "target_label": "Feature-3"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Wrong key shows user-friendly error. User can re-enter key and try again.",
+    "stories": ["RCV-5"],
+    "role_assignment": "Development Team"
+  }
+}
