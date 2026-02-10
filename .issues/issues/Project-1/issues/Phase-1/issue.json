@@ -12,55 +12,55 @@
   "tags": ["mvp", "phase-1"],
   "links": [
     {
-      "link_type_id": "phase-of",
+      "link_type_id": "4f012703",
       "verb": "phase-of",
       "target_id": "a1000001",
       "target_label": "Project-1"
     },
     {
-      "link_type_id": "has-feature",
+      "link_type_id": "4f012705",
       "verb": "has-feature",
       "target_id": "c1000001",
       "target_label": "Feature-1"
     },
     {
-      "link_type_id": "has-feature",
+      "link_type_id": "4f012705",
       "verb": "has-feature",
       "target_id": "c1000002",
       "target_label": "Feature-2"
     },
     {
-      "link_type_id": "has-feature",
+      "link_type_id": "4f012705",
       "verb": "has-feature",
       "target_id": "c1000003",
       "target_label": "Feature-3"
     },
     {
-      "link_type_id": "has-feature",
+      "link_type_id": "4f012705",
       "verb": "has-feature",
       "target_id": "c1000004",
       "target_label": "Feature-4"
     },
     {
-      "link_type_id": "has-feature",
+      "link_type_id": "4f012705",
       "verb": "has-feature",
       "target_id": "c1000005",
       "target_label": "Feature-5"
     },
     {
-      "link_type_id": "has-feature",
+      "link_type_id": "4f012705",
       "verb": "has-feature",
       "target_id": "c1000006",
       "target_label": "Feature-6"
     },
     {
-      "link_type_id": "has-feature",
+      "link_type_id": "4f012705",
       "verb": "has-feature",
       "target_id": "c1000007",
       "target_label": "Feature-7"
     },
     {
-      "link_type_id": "has-feature",
+      "link_type_id": "4f012705",
       "verb": "has-feature",
       "target_id": "c1000008",
       "target_label": "Feature-8"

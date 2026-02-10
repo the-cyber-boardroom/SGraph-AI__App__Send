@@ -88,6 +88,42 @@
         "task",
         "feature"
       ]
+    },
+    {
+      "link_type_id": "4f012701",
+      "verb": "has-project",
+      "inverse_verb": "project-of",
+      "description": "Git repo contains project",
+      "source_types": [
+        "git-repo"
+      ],
+      "target_types": [
+        "project"
+      ]
+    },
+    {
+      "link_type_id": "4f012703",
+      "verb": "has-phase",
+      "inverse_verb": "phase-of",
+      "description": "Project contains phase",
+      "source_types": [
+        "project"
+      ],
+      "target_types": [
+        "phase"
+      ]
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "inverse_verb": "feature-of",
+      "description": "Phase contains feature",
+      "source_types": [
+        "phase"
+      ],
+      "target_types": [
+        "feature"
+      ]
     }
   ]
 }

@@ -12,37 +12,37 @@
   "tags": ["tokens", "auth", "admin", "api"],
   "links": [
     {
-      "link_type_id": "4f0127ff",
+      "link_type_id": "4f012705",
       "verb": "feature-of",
       "target_id": "b1000001",
       "target_label": "Phase-1"
     },
     {
-      "link_type_id": "4f0127aa",
+      "link_type_id": "4f012722",
       "verb": "has-task",
       "target_id": "d1000011",
       "target_label": "Task-1"
     },
     {
-      "link_type_id": "4f0127aa",
+      "link_type_id": "4f012722",
       "verb": "has-task",
       "target_id": "d1000012",
       "target_label": "Task-2"
     },
     {
-      "link_type_id": "4f0127aa",
+      "link_type_id": "4f012722",
       "verb": "has-task",
       "target_id": "d1000013",
       "target_label": "Task-3"
     },
     {
-      "link_type_id": "4f0127aa",
+      "link_type_id": "4f012722",
       "verb": "has-task",
       "target_id": "d1000014",
       "target_label": "Task-4"
     },
     {
-      "link_type_id": "4f0127aa",
+      "link_type_id": "4f012722",
       "verb": "has-task",
       "target_id": "d1000015",
       "target_label": "Task-5"

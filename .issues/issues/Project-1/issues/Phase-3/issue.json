@@ -12,7 +12,7 @@
   "tags": ["billing", "cost-tracking", "phase-3"],
   "links": [
     {
-      "link_type_id": "phase-of",
+      "link_type_id": "4f012703",
       "verb": "phase-of",
       "target_id": "a1000001",
       "target_label": "Project-1"

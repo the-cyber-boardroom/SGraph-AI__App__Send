@@ -2,7 +2,7 @@
   "node_id": "00000001",
   "node_type": "git-repo",
   "node_index": 0,
-  "label": "SGraph-AI__App__Send",
+  "label": "Repo-1",
   "title": "SGraph Send — Zero-Knowledge Encrypted File Sharing",
   "description": "Privacy-first file sharing service with client-side AES-256-GCM encryption, pre-signed S3 URLs, and radical transparency.",
   "status": "active",
@@ -12,7 +12,7 @@
   "tags": ["sgraph", "send", "encryption", "zero-knowledge"],
   "links": [
     {
-      "link_type_id": "has-project",
+      "link_type_id": "4f012701",
       "verb": "has-project",
       "target_id": "a1000001",
       "target_label": "Project-1"

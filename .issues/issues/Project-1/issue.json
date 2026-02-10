@@ -12,37 +12,37 @@
   "tags": ["sgraph-send"],
   "links": [
     {
-      "link_type_id": "project-of",
+      "link_type_id": "4f012701",
       "verb": "project-of",
       "target_id": "00000001",
-      "target_label": "SGraph-AI__App__Send"
+      "target_label": "Repo-1"
     },
     {
-      "link_type_id": "has-phase",
+      "link_type_id": "4f012703",
       "verb": "has-phase",
       "target_id": "b1000001",
       "target_label": "Phase-1"
     },
     {
-      "link_type_id": "has-phase",
+      "link_type_id": "4f012703",
       "verb": "has-phase",
       "target_id": "b1000002",
       "target_label": "Phase-2"
     },
     {
-      "link_type_id": "has-phase",
+      "link_type_id": "4f012703",
       "verb": "has-phase",
       "target_id": "b1000003",
       "target_label": "Phase-3"
     },
     {
-      "link_type_id": "has-phase",
+      "link_type_id": "4f012703",
       "verb": "has-phase",
       "target_id": "b1000004",
       "target_label": "Phase-4"
     },
     {
-      "link_type_id": "has-phase",
+      "link_type_id": "4f012703",
       "verb": "has-phase",
       "target_id": "b1000005",
       "target_label": "Phase-5"
