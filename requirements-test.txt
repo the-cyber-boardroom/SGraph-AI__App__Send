@@ -2,5 +2,6 @@ osbot-utils
 issues-fs
 
 # for testing
+httpx
 pytest
 pytest-cov
