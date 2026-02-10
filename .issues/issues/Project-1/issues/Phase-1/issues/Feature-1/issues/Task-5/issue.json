@@ -8,11 +8,11 @@
   "status": "backlog",
   "created_at": 1739030400000,
   "updated_at": 1739030400000,
-  "created_by": "system",
+  "created_by": "c0000001",
   "tags": ["ui", "frontend", "upload"],
   "links": [
     {
-      "link_type_id": "task-of",
+      "link_type_id": "4f012722",
       "verb": "task-of",
       "target_id": "c1000001",
       "target_label": "Feature-1"

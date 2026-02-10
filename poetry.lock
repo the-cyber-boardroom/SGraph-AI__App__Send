@@ -30,17 +30,18 @@ files = [
 
 [[package]]
 name = "issues-fs"
-version = "0.4.0"
+version = "0.5.0"
 description = "Issues-FS"
 optional = false
 python-versions = "<4.0,>=3.12"
 groups = ["main"]
 files = [
-    {file = "issues_fs-0.4.0-py3-none-any.whl", hash = "sha256:2f720ef1294fb6dab6a6ea34cf6886916bd27035c15366e76f305b7d104c70c2"},
-    {file = "issues_fs-0.4.0.tar.gz", hash = "sha256:f7a906c7464b5a55e3d96b04a4389a82cd6942ce8ebfb41500b1e2a400364227"},
+    {file = "issues_fs-0.5.0-py3-none-any.whl", hash = "sha256:dc3198ab043f4e1f5bc31909b4d135c814199c90a010002078de8a392245faf5"},
+    {file = "issues_fs-0.5.0.tar.gz", hash = "sha256:9ccdaa51e0732cfabbcbb2fcb36ed473c522b36d8e90d6cf96a8842e37a71e00"},
 ]
 
 [package.dependencies]
+issues-fs-cli = "*"
 memory_fs = "*"
 osbot-utils = "*"
 
