@@ -1,0 +1,15 @@
+{
+  "node_id": "e1000002",
+  "node_type": "git-repo",
+  "node_index": 0,
+  "label": "Architect-1",
+  "title": "Architect Role — Issue Tracker",
+  "description": "API contracts, data models, technology decisions, and architecture tasks for SGraph Send.",
+  "status": "active",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["architect", "architecture"],
+  "links": [],
+  "properties": {}
+}

@@ -1,0 +1,15 @@
+{
+  "node_id": "e1000005",
+  "node_type": "git-repo",
+  "node_index": 0,
+  "label": "Dev-1",
+  "title": "Dev Role — Issue Tracker",
+  "description": "Implementation plans, code reviews, development tasks, and technical debt for SGraph Send.",
+  "status": "active",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["dev", "development"],
+  "links": [],
+  "properties": {}
+}

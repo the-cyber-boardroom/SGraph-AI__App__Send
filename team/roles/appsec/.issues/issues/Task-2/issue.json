@@ -1,0 +1,32 @@
+{
+  "node_id": "e1100002",
+  "node_type": "threat-model",
+  "node_index": 2,
+  "label": "Task-2",
+  "title": "Threat Model — MVP Plans",
+  "description": "Threat model for the planned MVP as defined in the infrastructure brief v0.1.4. Cover: encryption flow (AES-256-GCM), key management, transfer lifecycle, 7 deployment targets, Memory-FS storage backends, pre-signed URLs, admin auth, CI/CD pipeline security, PyPI supply chain. Must be completed AFTER Task-1.",
+  "status": "proposed",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["threat-model", "mvp", "encryption", "deployment"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    },
+    {
+      "link_type_id": "204908c3",
+      "verb": "depends-on",
+      "target_id": "e1100001",
+      "target_label": "Task-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Full STRIDE-based threat model covering all MVP components. No assumptions — create Question issues to other roles (Architect, Dev, DevOps) for any unclear areas.",
+    "role_assignment": "appsec"
+  }
+}

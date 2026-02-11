@@ -1,0 +1,26 @@
+{
+  "node_id": "e1100001",
+  "node_type": "security-review",
+  "node_index": 1,
+  "label": "Task-1",
+  "title": "Security Review — Current Deployed System",
+  "description": "Comprehensive security assessment of what currently exists and is deployed. List all known vulnerabilities, risks, and security concerns in the current setup including: admin Lambda, Lambda URL Functions, CI/CD pipelines, PyPI publishing, GitHub Actions, dependencies, auth model, CORS configuration.",
+  "status": "proposed",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["security-review", "current-state", "vulnerability-assessment"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Complete list of all known vulnerabilities and risks in current deployed infrastructure. No assumptions — ask questions to other roles for any unclear areas.",
+    "role_assignment": "appsec"
+  }
+}

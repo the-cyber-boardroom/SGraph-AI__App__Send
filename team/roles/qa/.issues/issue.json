@@ -1,0 +1,15 @@
+{
+  "node_id": "e100000a",
+  "node_type": "git-repo",
+  "node_index": 0,
+  "label": "Qa-1",
+  "title": "Qa Role — Issue Tracker",
+  "description": "Test strategy, security testing, quality assurance, and test automation tasks for SGraph Send.",
+  "status": "active",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["qa", "testing"],
+  "links": [],
+  "properties": {}
+}
