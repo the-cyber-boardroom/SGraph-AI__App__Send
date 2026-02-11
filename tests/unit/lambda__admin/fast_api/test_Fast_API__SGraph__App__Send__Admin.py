@@ -10,7 +10,7 @@ from tests.unit.lambda__admin.Fast_API__Test_Objs__SGraph__App__Send__Admin     
     setup__html_graph_service__fast_api_test_objs
 
 
-class test_Service__Fast_API__client(TestCase):
+class test_Fast_API__SGraph__App__Send__Admin(TestCase):
 
     @classmethod
     def setUpClass(cls):

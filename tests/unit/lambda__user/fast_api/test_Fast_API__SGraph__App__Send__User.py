@@ -7,7 +7,7 @@ from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User       
     setup__fast_api__user__test_objs
 
 
-class test_Service__Fast_API__client(TestCase):
+class test_Fast_API__SGraph__App__Send__User(TestCase):
 
     @classmethod
     def setUpClass(cls):
