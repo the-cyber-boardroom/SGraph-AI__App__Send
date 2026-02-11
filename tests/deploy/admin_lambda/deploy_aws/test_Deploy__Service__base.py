@@ -36,11 +36,7 @@ class test_Deploy__Service__base():     # Base class for deployment tests - over
     #     assert Temp_Aws_Roles().for_lambda_invocation__create()  == lambda_role_arn
 
     def test_4_create__lambda_function(self):
-        #assert self.deploy_fast_api.create() is True
-        #self.deploy_fast_api.create__lambda_function__url()
-        result = self.deploy_fast_api.lambda_function().function_url_create_with_public_access()
-        from osbot_utils.utils.Dev import pprint
-        pprint(result)
+        assert self.deploy_fast_api.create() is True
 
     def test_5__update_lambda_runtime__to_3_13(self):                                       # todo: add support to OSBot_AWS lambda deploy methods for configuring the version of the python runtime
         self.deploy_fast_api.lambda_function().configuration_update(Runtime='python3.13')
