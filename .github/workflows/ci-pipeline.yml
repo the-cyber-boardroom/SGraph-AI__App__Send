@@ -18,6 +18,9 @@ on:
         required: false
         type: boolean
         default: false
+      target_deploy:
+        required: true
+        type: string
     secrets:
       AWS_SECRET_ACCESS_KEY:
         required: false

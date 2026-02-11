@@ -11,6 +11,7 @@ jobs:
     with:
       git_branch          : 'dev'
       release_type        : 'minor'
+      target_deploy       : 'dev'
       should_increment_tag: true
       should_publish_pypi : false
     secrets: inherit
