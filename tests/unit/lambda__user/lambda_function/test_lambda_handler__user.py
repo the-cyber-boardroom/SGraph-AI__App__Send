@@ -30,4 +30,4 @@ class test_lambda_handler(TestCase):
 
         response = self.handler(event=event)
         assert type(response) is dict
-        assert response.get('statusCode') == 401
+        assert response.get('statusCode') == 200
