@@ -124,6 +124,18 @@
       "target_types": [
         "feature"
       ]
+    },
+    {
+      "link_type_id": "5a012801",
+      "verb": "asks",
+      "inverse_verb": "asked-by",
+      "description": "Role asks a question to another role",
+      "source_types": [
+        "question"
+      ],
+      "target_types": [
+        "person"
+      ]
     }
   ]
 }

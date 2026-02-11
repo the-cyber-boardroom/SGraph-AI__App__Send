@@ -1,0 +1,26 @@
+{
+  "node_id": "e1100003",
+  "node_type": "question",
+  "node_index": 3,
+  "label": "Task-3",
+  "title": "Questions to Architect — Current Security Boundaries",
+  "description": "Questions for the Architect role regarding current security boundaries:\n1. What is the exact auth mechanism for the admin Lambda URL Function? Is it AWS_IAM or a custom header?\n2. What CORS origins are currently configured?\n3. Is the Lambda execution role scoped to minimum permissions or using a broad role?\n4. Are there any network-level controls (VPC, security groups) on the Lambda functions?\n5. How are admin credentials currently managed (env var, Secrets Manager, hardcoded)?",
+  "status": "open",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["question", "architect", "security-boundaries"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "role_assignment": "appsec",
+    "target_role": "architect"
+  }
+}

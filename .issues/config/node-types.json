@@ -143,6 +143,39 @@
       ],
       "default_status": "proposed",
       "properties": []
+    },
+    {
+      "type_id": "f6d48e5b",
+      "name": "security-review",
+      "display_name": "Security Review",
+      "description": "Security review assessment of code, configuration, or architecture",
+      "icon": "",
+      "color": "#dc2626",
+      "statuses": ["proposed", "in-progress", "completed", "accepted"],
+      "default_status": "proposed",
+      "properties": []
+    },
+    {
+      "type_id": "f7e59f6c",
+      "name": "threat-model",
+      "display_name": "Threat Model",
+      "description": "Threat analysis for a feature, component, or system",
+      "icon": "",
+      "color": "#b91c1c",
+      "statuses": ["proposed", "in-progress", "completed", "accepted"],
+      "default_status": "proposed",
+      "properties": []
+    },
+    {
+      "type_id": "f8f6a07d",
+      "name": "question",
+      "display_name": "Question",
+      "description": "Question from one role to another requiring a response",
+      "icon": "",
+      "color": "#7c3aed",
+      "statuses": ["open", "answered", "closed"],
+      "default_status": "open",
+      "properties": []
     }
   ]
 }

@@ -1,0 +1,26 @@
+{
+  "node_id": "e1100004",
+  "node_type": "question",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Questions to DevOps — Pipeline and Deployment Security",
+  "description": "Questions for the DevOps role regarding CI/CD and deployment security:\n1. What GitHub Actions permissions are set in the workflows? Are they using least-privilege?\n2. How is PyPI publishing authenticated? OIDC trusted publisher or API token?\n3. Are GitHub Actions pinned to specific SHA commits or using mutable tags?\n4. What secrets are currently stored in GitHub? Are any in plaintext env vars?\n5. Is there any dependency scanning (pip-audit, safety) in the CI pipeline?\n6. Are Lambda deployment credentials using IAM roles or static access keys?",
+  "status": "open",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["question", "devops", "pipeline-security"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "role_assignment": "appsec",
+    "target_role": "devops"
+  }
+}

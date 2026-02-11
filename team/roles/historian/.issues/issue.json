@@ -1,0 +1,15 @@
+{
+  "node_id": "e1000007",
+  "node_type": "git-repo",
+  "node_index": 0,
+  "label": "Historian-1",
+  "title": "Historian Role — Issue Tracker",
+  "description": "Decision tracking, architectural decision records, and historical documentation tasks for SGraph Send.",
+  "status": "active",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["historian", "decisions"],
+  "links": [],
+  "properties": {}
+}
