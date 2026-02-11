@@ -131,10 +131,14 @@ team/                            # Team structure
 
 ## Role System
 
-Each agent operates as a specific role. Roles produce review documents in their `team/roles/{role}/reviews/` folder. The Librarian maintains the master index. The Conductor (human) provides briefs in `team/humans/dinis_cruz/briefs/`.
+Each agent operates as a specific role. Roles produce review documents in their `team/roles/{role}/reviews/` folder. The Librarian maintains the master index.
+
+**Roles are agentic** — all 10 roles (Conductor, Architect, Dev, QA, DevOps, Librarian, Cartographer, AppSec, Historian, Journalist) are AI agent roles. The Conductor is an orchestration role like any other, responsible for workflow coordination, priority management, and task routing.
+
+**Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role (e.g., writing code as Dev, configuring CI as DevOps). His briefs drive the team's priorities.
 
 Before starting work, check:
-1. Latest Conductor brief in `team/humans/dinis_cruz/briefs/`
+1. Latest human brief in `team/humans/dinis_cruz/briefs/`
 2. Latest Librarian master index in `team/roles/librarian/reviews/`
 3. Your role's previous reviews in `team/roles/{your-role}/reviews/`
 
@@ -142,7 +146,7 @@ Before starting work, check:
 
 ## Current Sprint
 
-**Focus:** MVP Release Infrastructure (per Conductor brief v0.1.4)
+**Focus:** MVP Release Infrastructure (per Dinis Cruz brief v0.1.4)
 
 **Goal:** Get every deployment target working, every test level running, every storage mode exercised — then never touch infrastructure again.
 
