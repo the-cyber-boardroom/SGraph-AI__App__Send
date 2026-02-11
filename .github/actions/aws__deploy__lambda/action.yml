@@ -1,9 +1,12 @@
 name: "aws__deploy__lambda"
 description: "aws__deploy__lambda"
 inputs:
+  lambda_type:
+    description: "Lambda type (admin or user)"
   target:
     description: "Target deployment (dev, qa or prod)"
     required: true
+
 
 runs:
   using: "composite"
@@ -28,4 +31,4 @@ runs:
       shell: bash
       run: |                 
         echo "Running tests for environment: ${{ inputs.target }}"
-        pytest -rs ./tests/deploy_aws/test_Deploy__Service__to__${{ inputs.target }}.py
+        pytest -rs ./tests/deploy/${{ inputs.lambda_type }}/deploy_aws/test_Deploy__Service__to__${{ inputs.target }}.py
