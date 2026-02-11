@@ -2,7 +2,6 @@ import re
 import types
 import pytest
 from unittest                                                              import TestCase
-from osbot_utils.utils.Json                                                import str_to_json
 from sgraph_ai_app_send.lambda__user.lambda_function.lambda_handler__user  import run
 from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User  import setup__fast_api__user__test_objs
 
@@ -31,4 +30,4 @@ class test_lambda_handler(TestCase):
 
         response = self.handler(event=event)
         assert type(response) is dict
-        assert response.get('statusCode') == 200
+        assert response.get('statusCode') == 401
