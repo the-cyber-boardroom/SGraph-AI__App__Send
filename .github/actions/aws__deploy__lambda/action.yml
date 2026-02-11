@@ -1,0 +1,31 @@
+name: "aws__deploy__lambda"
+description: "aws__deploy__lambda"
+inputs:
+  target:
+    description: "Target deployment (dev, qa or prod)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.12
+
+    - name: Install python dependencies
+      shell: bash
+      run: |
+        pip install -r requirements-test.txt
+        pip install -e .
+
+    - name: Git Update Current Branch
+      uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__update_branch@dev
+
+    - name: Deploy Service to lambda function
+      shell: bash
+      run: |                 
+        echo "Running tests for environment: ${{ inputs.target }}"
+        pytest -rs ./tests/deploy_aws/test_Deploy__Service__to__${{ inputs.target }}.py
