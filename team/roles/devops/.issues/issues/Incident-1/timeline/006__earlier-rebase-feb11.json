@@ -1,0 +1,9 @@
+{
+  "entry_id"  : "006",
+  "timestamp" : "2026-02-11T16:09:52Z",
+  "role"      : "dev",
+  "action"    : "Earlier rebase of feature branch onto dev (Feb 11)",
+  "finding"   : "The same pattern occurred on Feb 11. Four legitimate CI commits from dev were replayed onto the feature branch via rebase, all receiving CommitDate 2026-02-11T16:09:52Z. Mapping: afb65d4 -> 0f18d8d (AuthorDate 00:31:33), 88085ab -> f627cf3 (AuthorDate 01:07:51), c650a7a -> d694108 (AuthorDate 01:25:26), 8b8afad -> 650989d (AuthorDate 15:58:36). Two Dinis Cruz commits were also replayed in the same operation (cd0c02c, 8cc1a2e). This confirms rebase as a recurring Dev workflow, not a one-off event.",
+  "commit"    : null,
+  "branch"    : "claude/read-secure-send-brief-Mz6yN"
+}

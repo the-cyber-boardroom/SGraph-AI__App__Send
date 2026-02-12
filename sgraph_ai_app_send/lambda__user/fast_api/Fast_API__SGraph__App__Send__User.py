@@ -6,6 +6,8 @@ from osbot_fast_api_serverless.fast_api.Serverless__Fast_API                    
 from starlette.responses                                                            import RedirectResponse
 from starlette.staticfiles                                                          import StaticFiles
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import Routes__Transfers
+from sgraph_ai_app_send.lambda__user.service.Transfer__Service                      import Transfer__Service
+from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
@@ -13,19 +15,32 @@ ROUTES_PATHS__APP_SEND__STATIC__USER  = [f'/{APP_SEND__UI__USER__ROUTE__PATH__CO
 
 class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
+    send_config      : Send__Config      = None                                     # Storage configuration (auto-detects mode)
+    transfer_service : Transfer__Service  = None                                    # Shared transfer service instance
+
     def setup(self):
         with self.config as _:
             _.name           = APP__SEND__USER__FAST_API__TITLE
             _.version        = version__sgraph_ai_app_send
             _.description    = APP__SEND__USER__FAST_API__DESCRIPTION
             _.enable_api_key = False
+
+        if self.send_config is None:                                                # Auto-create config if not provided
+            self.send_config = Send__Config()
+
+        storage_fs = self.send_config.create_storage_backend()                      # Create storage backend (memory or S3)
+
+        if self.transfer_service is None:                                           # Auto-create transfer service if not provided
+            self.transfer_service = Transfer__Service(storage_fs=storage_fs)
+
         return super().setup()
 
 
     def setup_routes(self):
         self.setup_static_routes()
         self.add_routes(Routes__Info             )
-        self.add_routes(Routes__Transfers        )
+        self.add_routes(Routes__Transfers        ,
+                        transfer_service = self.transfer_service)
 
 
     # todo: refactor to separate class (focused on setting up this static route)

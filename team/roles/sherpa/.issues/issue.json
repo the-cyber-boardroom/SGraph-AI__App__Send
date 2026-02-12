@@ -1,0 +1,15 @@
+{
+  "node_id": "e2000002",
+  "node_type": "git-repo",
+  "node_index": 0,
+  "label": "Sherpa-1",
+  "title": "Sherpa Role — Issue Tracker",
+  "description": "User guidance, onboarding flows, friction logs, trail observations, and friendlies programme tasks for SGraph Send.",
+  "status": "active",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "c0000001",
+  "tags": ["sherpa", "user-guidance", "onboarding"],
+  "links": [],
+  "properties": {}
+}
