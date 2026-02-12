@@ -5,10 +5,11 @@
 
 from osbot_utils.type_safe.Type_Safe                                            import Type_Safe
 
+# todo: one schema class per file and refactor all use of raw primitives
 
 class Schema__Transfer__Create(Type_Safe):                                       # Request: create a new transfer
     file_size_bytes   : int
-    content_type_hint : str  = ""
+    content_type_hint : str  = ""                                               # todo: with Type_Safe this is not needed
 
 
 class Schema__Transfer__Initiated(Type_Safe):                                    # Response: transfer created

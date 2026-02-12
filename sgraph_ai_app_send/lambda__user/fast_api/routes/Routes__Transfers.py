@@ -10,11 +10,11 @@ from sgraph_ai_app_send.lambda__user.service.Transfer__Service                  
 
 TAG__ROUTES_TRANSFERS = 'transfers'
 
-ROUTES_PATHS__TRANSFERS = [f'/transfers/create'                  ,
-                           f'/transfers/upload/{{transfer_id}}'  ,
-                           f'/transfers/complete/{{transfer_id}}',
-                           f'/transfers/info/{{transfer_id}}'    ,
-                           f'/transfers/download/{{transfer_id}}']
+ROUTES_PATHS__TRANSFERS = [f'/{TAG__ROUTES_TRANSFERS}/create'                  ,
+                           f'/{TAG__ROUTES_TRANSFERS}/upload/{{transfer_id}}'  ,
+                           f'/{TAG__ROUTES_TRANSFERS}/complete/{{transfer_id}}',
+                           f'/{TAG__ROUTES_TRANSFERS}/info/{{transfer_id}}'    ,
+                           f'/{TAG__ROUTES_TRANSFERS}/download/{{transfer_id}}']
 
 
 class Routes__Transfers(Fast_API__Routes):                                       # Transfer workflow endpoints
@@ -38,8 +38,8 @@ class Routes__Transfers(Fast_API__Routes):                                      
         if success is False:
             raise HTTPException(status_code = 404,
                                 detail      = f'Transfer {transfer_id} not found or not in pending state')
-        return dict(status      = 'uploaded'   ,
-                    transfer_id = transfer_id  ,
+        return dict(status      = 'uploaded'   ,                                # todo: we shouldn't be creating new objects here
+                    transfer_id = transfer_id  ,                                # ideally the service should give us the objects to return
                     size        = len(body)    )
 
     def complete__transfer_id(self, transfer_id: str                            # POST /transfers/complete/{transfer_id}
@@ -50,6 +50,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = f'Transfer {transfer_id} not found or payload not uploaded')
         return result
 
+    # todo: as it stand this function is vulnerable to injection attacks, since the transfer_id is returned inside the HTTPException detail
     def info__transfer_id(self, transfer_id: str                                # GET /transfers/info/{transfer_id}
                          ) -> dict:
         result = self.transfer_service.get_transfer_info(transfer_id)
