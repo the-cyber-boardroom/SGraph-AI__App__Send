@@ -101,7 +101,7 @@ jobs:
 
   aws-deploy-lambda__admin:
     if: needs.check-aws-credentials.outputs.has-credentials == 'true'
-    name: Deploy to AWS Lambda
+    name: Admin - Deploy AWS Lambda
     runs-on: ubuntu-latest
     needs: [check-aws-credentials, increment-tag]  # Now this works because increment-tag always runs
     steps:
@@ -123,7 +123,7 @@ jobs:
 
   aws-deploy-lambda__user:
     if: needs.check-aws-credentials.outputs.has-credentials == 'true'
-    name: Deploy to AWS Lambda
+    name: User - Deploy AWS Lambda
     runs-on: ubuntu-latest
     needs: [ check-aws-credentials, increment-tag ]  # Now this works because increment-tag always runs
     steps:
