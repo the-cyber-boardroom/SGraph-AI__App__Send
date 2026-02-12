@@ -1,0 +1,32 @@
+{
+  "node_id": "f1000003",
+  "node_type": "vulnerability",
+  "node_index": 8,
+  "label": "Vuln-3",
+  "title": "No Upload Size Limits — Denial of Service via Memory Exhaustion",
+  "description": "The upload__transfer_id endpoint reads the entire request body into memory with `body = await request.body()` (line 35) with no size validation. Lambda functions have a fixed memory allocation (typically 128MB-10GB). An attacker can send a payload larger than the Lambda's memory allocation, causing an out-of-memory crash. Additionally, the file_size_bytes field declared in create_transfer is never validated against the actual upload size, so the declared size is purely decorative.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "dos", "resource-exhaustion", "high"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "severity": "High",
+    "owasp_category": "A05:2021 Security Misconfiguration",
+    "cwe": "CWE-770 (Allocation of Resources Without Limits or Throttling)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/fast_api/routes/Routes__Transfers.py",
+    "affected_lines": "35 (body = await request.body())",
+    "exploit_vector": "1. POST /transfers/create with file_size_bytes=100. 2. POST /transfers/upload/{id} with a 5GB body. The Lambda reads the entire body into memory, exceeding its allocation and crashing. Repeat to cause sustained denial of service. Lambda URL payloads can be up to 6MB (streaming) or 20MB (buffered), but even this can exhaust a small Lambda.",
+    "fix_recommendation": "1. Enforce a maximum upload size (e.g., 100MB) by checking Content-Length header before reading body. 2. Use streaming reads with size limits instead of request.body(). 3. Validate that uploaded payload size matches the declared file_size_bytes (within a tolerance for encryption overhead). 4. Set Lambda memory appropriately and configure Lambda URL payload size limits.",
+    "priority": "P0",
+    "role_assignment": "appsec"
+  }
+}

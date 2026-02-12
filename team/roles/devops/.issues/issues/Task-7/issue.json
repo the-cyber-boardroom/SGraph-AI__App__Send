@@ -1,0 +1,32 @@
+{
+  "node_id": "e1000107",
+  "node_type": "task",
+  "node_index": 7,
+  "label": "Task-7",
+  "title": "Implement CloudFront component class",
+  "description": "Create app__deploy__aws__cloudfront component class with full lifecycle. CloudFront distribution in front of Lambda Function URLs for CDN caching and custom domain support. Lifecycle: create() distribution with Lambda Function URL as origin, exists(), verify() distribution config and status, lock_down() restrict direct Function URL access, delete() disable then delete distribution, verify_deleted().",
+  "status": "backlog",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "e1000006",
+  "tags": ["cloudfront", "cdn", "lifecycle"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000006",
+      "target_label": "DevOps-1"
+    },
+    {
+      "link_type_id": "204908c3",
+      "verb": "depends-on",
+      "target_id": "e1000102",
+      "target_label": "Task-2"
+    }
+  ],
+  "properties": {
+    "priority": "P3",
+    "acceptance_criteria": "CloudFront distribution created pointing to Lambda Function URL. HTTPS works with CloudFront. Direct Function URL access can be restricted. Full lifecycle round-trip works.",
+    "role_assignment": "DevOps"
+  }
+}

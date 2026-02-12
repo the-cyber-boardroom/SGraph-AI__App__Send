@@ -7,9 +7,52 @@
   "description": "Infrastructure, deployment pipelines, CI/CD, and operational tasks for SGraph Send.",
   "status": "active",
   "created_at": 1739232000000,
-  "updated_at": 1739232000000,
+  "updated_at": 1739318400000,
   "created_by": "c0000001",
   "tags": ["devops", "infrastructure"],
-  "links": [],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "e1000101",
+      "target_label": "Task-1"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "e1000102",
+      "target_label": "Task-2"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "e1000103",
+      "target_label": "Task-3"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "e1000104",
+      "target_label": "Task-4"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "e1000105",
+      "target_label": "Task-5"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "e1000106",
+      "target_label": "Task-6"
+    },
+    {
+      "link_type_id": "4f012722",
+      "verb": "has-task",
+      "target_id": "e1000107",
+      "target_label": "Task-7"
+    }
+  ],
   "properties": {}
 }

@@ -5,9 +5,9 @@
   "label": "Task-5",
   "title": "Deploy FastAPI to Lambda (dev)",
   "description": "M-Graph / Mangum deployment to Lambda. API Gateway trigger. Environment variables for bucket names, admin key.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["lambda", "api-gateway", "deployment", "dev"],
   "links": [

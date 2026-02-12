@@ -5,9 +5,9 @@
   "label": "Feature-3",
   "title": "Download & Decrypt",
   "description": "Implement the download and decryption flow: API endpoint for generating pre-signed download URLs with event logging, client-side AES-256-GCM decryption, download page UI, and wrong-key error handling.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["download", "decryption", "s3", "api", "ui"],
   "links": [

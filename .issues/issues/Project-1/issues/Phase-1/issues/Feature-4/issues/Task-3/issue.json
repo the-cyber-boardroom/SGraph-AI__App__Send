@@ -5,9 +5,9 @@
   "label": "Task-3",
   "title": "Integrate transparency panel on download page",
   "description": "Display before and after download showing receiver's captured metadata. Data from /transfers/{id}/download response.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ui", "frontend", "transparency", "download"],
   "links": [

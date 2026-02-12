@@ -1,0 +1,38 @@
+{
+  "node_id": "f1000002",
+  "node_type": "vulnerability",
+  "node_index": 7,
+  "label": "Vuln-2",
+  "title": "No Input Validation on transfer_id Path Parameter",
+  "description": "All five route handlers in Routes__Transfers.py accept transfer_id as a bare str type with no validation. There is no regex pattern, no length constraint, and no character whitelist. Transfer IDs are generated as 12-character hex strings (secrets.token_hex(6)), but the routes accept any arbitrary string. This enables injection attacks (Vuln-1), log pollution, and potential path traversal if storage backends use the ID in file paths.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "input-validation", "high"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    },
+    {
+      "link_type_id": "204908c3",
+      "verb": "related-to",
+      "target_id": "f1000001",
+      "target_label": "Vuln-1"
+    }
+  ],
+  "properties": {
+    "severity": "High",
+    "owasp_category": "A03:2021 Injection",
+    "cwe": "CWE-20 (Improper Input Validation)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/fast_api/routes/Routes__Transfers.py",
+    "affected_lines": "32, 45, 54, 62 (all transfer_id parameters)",
+    "exploit_vector": "Pass any arbitrary string as transfer_id: SQL-like payloads, path traversal sequences (../../), extremely long strings (DoS), null bytes, Unicode characters. With future S3 backend, a crafted transfer_id could manipulate S3 key paths.",
+    "fix_recommendation": "1. Add a Transfer_Id type (extending Random_Guid or a validated type) that enforces ^[a-f0-9]{12}$ pattern. 2. Use FastAPI Path() parameter with regex validation: transfer_id: str = Path(pattern='^[a-f0-9]{12}$'). 3. Reject invalid IDs with 400 Bad Request before reaching service layer.",
+    "priority": "P0",
+    "role_assignment": "appsec"
+  }
+}

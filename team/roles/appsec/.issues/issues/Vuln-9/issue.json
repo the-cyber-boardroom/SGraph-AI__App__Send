@@ -1,0 +1,32 @@
+{
+  "node_id": "f1000009",
+  "node_type": "vulnerability",
+  "node_index": 14,
+  "label": "Vuln-9",
+  "title": "No Validation of content_type_hint and file_size_bytes in Schema__Transfer__Create",
+  "description": "Schema__Transfer__Create accepts content_type_hint as a bare str and file_size_bytes as a bare int with no validation. content_type_hint can contain arbitrary strings (including script tags, SQL injection payloads, or excessively long strings). file_size_bytes can be negative, zero, or astronomically large. These values are stored in transfer metadata and exposed via the info endpoint. If content_type_hint is ever used in a Content-Type header or rendered in UI, it becomes an injection vector.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "input-validation", "medium"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "severity": "Medium",
+    "owasp_category": "A04:2021 Insecure Design",
+    "cwe": "CWE-20 (Improper Input Validation)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/schemas/Schema__Transfer.py",
+    "affected_lines": "10-12 (Schema__Transfer__Create class)",
+    "exploit_vector": "1. POST /transfers/create with content_type_hint set to a script tag or excessively long string. 2. The value is stored in transfer metadata. 3. If admin UI renders this metadata, stored XSS executes. 4. Negative file_size_bytes could cause integer underflow in size calculations. 5. Very large file_size_bytes values could be used in size-based authorization bypass if size limits are added later.",
+    "fix_recommendation": "1. Validate content_type_hint against a regex matching valid MIME types (^[a-zA-Z0-9][a-zA-Z0-9!#$&\\-^_.+]*/[a-zA-Z0-9][a-zA-Z0-9!#$&\\-^_.+]*$). 2. Enforce file_size_bytes as positive integer with a maximum (e.g., 0 < size <= 500MB). 3. Use Type_Safe validation or FastAPI Field() constraints.",
+    "priority": "P1",
+    "role_assignment": "appsec"
+  }
+}

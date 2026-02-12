@@ -5,9 +5,9 @@
   "label": "Feature-8",
   "title": "Infrastructure & Deployment",
   "description": "Set up the foundational infrastructure and deployment pipeline: FastAPI application skeleton, S3 bucket configuration across environments, Lambda deployment, static frontend hosting, and CI/CD.",
-  "status": "backlog",
+  "status": "in-progress",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["infrastructure", "deployment", "s3", "lambda", "ci-cd", "cloudfront"],
   "links": [

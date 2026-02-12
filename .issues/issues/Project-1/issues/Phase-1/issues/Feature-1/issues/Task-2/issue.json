@@ -5,9 +5,9 @@
   "label": "Task-2",
   "title": "Implement POST /transfers/{id}/complete endpoint",
   "description": "Marks transfer as completed in meta.json. Returns download_link + transparency data (ip, timestamp, file_size, stored_fields, not_stored).",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["api", "backend"],
   "links": [

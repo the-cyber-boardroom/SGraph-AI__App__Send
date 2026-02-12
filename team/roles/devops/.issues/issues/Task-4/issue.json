@@ -1,0 +1,26 @@
+{
+  "node_id": "e1000104",
+  "node_type": "task",
+  "node_index": 4,
+  "label": "Task-4",
+  "title": "Automate IAM role lifecycle",
+  "description": "Create app__deploy__aws__iam component class with full lifecycle for the Lambda execution role. Currently IAM role creation is commented out in test_3__create_lambda_iam_user. Implement: create() for Lambda execution role with trust policy, exists() to check role exists, verify() to confirm attached policies are correct, lock_down() to apply least-privilege policy, delete() to remove role and policies, verify_deleted() to confirm removal.",
+  "status": "backlog",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "e1000006",
+  "tags": ["iam", "security", "lifecycle"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000006",
+      "target_label": "DevOps-1"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "IAM role created programmatically with correct trust policy and permissions. Full lifecycle works. Least-privilege policy applied. AppSec role reviews the IAM policy.",
+    "role_assignment": "DevOps"
+  }
+}
