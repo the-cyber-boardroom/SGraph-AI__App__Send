@@ -1,5 +1,6 @@
 from unittest                                                                       import TestCase
 from fastapi                                                                        import FastAPI
+from osbot_fast_api.api.routes.Routes__Set_Cookie import ROUTES_PATHS__SET_COOKIE
 from starlette.testclient                                                           import TestClient
 from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE, ROUTES_PATHS__INFO
 from sgraph_ai_app_send.lambda__user.fast_api.Fast_API__SGraph__App__Send__User     import Fast_API__SGraph__App__Send__User, ROUTES_PATHS__APP_SEND__STATIC__USER
@@ -37,7 +38,8 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
 
         raw_paths      = sorted(ROUTES_PATHS__INFO                    +
                                 ROUTES_PATHS__TRANSFERS               +
-                                ROUTES_PATHS__APP_SEND__STATIC__USER  )
+                                ROUTES_PATHS__APP_SEND__STATIC__USER  +
+                                ROUTES_PATHS__SET_COOKIE              )
 
         for fast_api_path in self.fast_api.routes_paths():
             fast_api_paths.append(str(fast_api_path))               # cast to str to make it easier compare

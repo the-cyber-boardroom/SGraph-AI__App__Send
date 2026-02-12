@@ -1,3 +1,4 @@
+from osbot_fast_api.api.routes.Routes__Set_Cookie import Routes__Set_Cookie
 from osbot_fast_api_serverless.fast_api.routes.Routes__Info import Routes__Info
 
 import sgraph_ai_app_send__ui__user
@@ -41,6 +42,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         self.add_routes(Routes__Info             )
         self.add_routes(Routes__Transfers        ,
                         transfer_service = self.transfer_service)
+        self.add_routes(Routes__Set_Cookie)
 
 
     # todo: refactor to separate class (focused on setting up this static route)
