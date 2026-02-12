@@ -5,6 +5,7 @@ from osbot_fast_api.api.decorators.route_path                                   
 from osbot_fast_api_serverless.fast_api.Serverless__Fast_API                        import Serverless__Fast_API
 from starlette.responses                                                            import RedirectResponse
 from starlette.staticfiles                                                          import StaticFiles
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import Routes__Transfers
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
@@ -17,13 +18,14 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             _.name           = APP__SEND__USER__FAST_API__TITLE
             _.version        = version__sgraph_ai_app_send
             _.description    = APP__SEND__USER__FAST_API__DESCRIPTION
-            _.enable_auth    = False
+            _.enable_api_key = False
         return super().setup()
 
 
     def setup_routes(self):
         self.setup_static_routes()
         self.add_routes(Routes__Info             )
+        self.add_routes(Routes__Transfers        )
 
 
     # todo: refactor to separate class (focused on setting up this static route)

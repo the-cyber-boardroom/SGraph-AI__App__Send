@@ -3,6 +3,7 @@ from fastapi                                                                    
 from starlette.testclient                                                           import TestClient
 from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE, ROUTES_PATHS__INFO
 from sgraph_ai_app_send.lambda__user.fast_api.Fast_API__SGraph__App__Send__User     import Fast_API__SGraph__App__Send__User, ROUTES_PATHS__APP_SEND__STATIC__USER
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import ROUTES_PATHS__TRANSFERS
 from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User           import Fast_API__Test_Objs__SGraph__App__Send__User, \
     setup__fast_api__user__test_objs
 
@@ -35,6 +36,7 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
         fast_api_paths = []
 
         raw_paths      = sorted(ROUTES_PATHS__INFO                    +
+                                ROUTES_PATHS__TRANSFERS               +
                                 ROUTES_PATHS__APP_SEND__STATIC__USER  )
 
         for fast_api_path in self.fast_api.routes_paths():
