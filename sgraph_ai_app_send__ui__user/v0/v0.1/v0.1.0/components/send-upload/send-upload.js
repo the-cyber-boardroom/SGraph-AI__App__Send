@@ -250,6 +250,17 @@ class SendUpload extends HTMLElement {
     async startUpload() {
         if (!this.selectedFile || this.state !== 'idle') return;
 
+        // Check crypto availability before attempting encryption
+        if (!SendCrypto.isAvailable()) {
+            this.errorMessage = 'Web Crypto API is not available. '
+                              + 'It requires a secure context (HTTPS or localhost). '
+                              + 'If running locally, use "localhost" instead of "127.0.0.1".';
+            this.state        = 'error';
+            this.render();
+            this.setupEventListeners();
+            return;
+        }
+
         try {
             // Step 1: Encrypt
             this.state = 'encrypting';

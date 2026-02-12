@@ -1,0 +1,11 @@
+SGraph Send -- Test File (Plain Text)
+======================================
+
+This is a small test file for QA testing of the SGraph Send upload flow.
+
+Purpose: Download this file, then drag it into the upload drop zone to test
+the encrypt-and-upload workflow without needing to find a separate file.
+
+Contents: Just a few lines of plain text.
+Size: Small (under 1 KB).
+Created: 2026-02-12
