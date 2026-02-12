@@ -1,0 +1,15 @@
+{
+  "node_id": "e2000001",
+  "node_type": "git-repo",
+  "node_index": 0,
+  "label": "Advocate-1",
+  "title": "Advocate Role — Issue Tracker",
+  "description": "User advocacy reviews, persona definitions, interview analyses, NPS tracking, and design decision reviews for SGraph Send.",
+  "status": "active",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "c0000001",
+  "tags": ["advocate", "user-advocacy", "personas"],
+  "links": [],
+  "properties": {}
+}
