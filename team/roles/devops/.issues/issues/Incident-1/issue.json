@@ -2,7 +2,7 @@
   "node_id"     : "f3000001",
   "title"       : "INC-001: Unknown GitHub Actions commit on feature branch",
   "type"        : "incident",
-  "status"      : "investigating",
+  "status"      : "resolved",
   "priority"    : "P3-actual / P1-exercise",
   "created"     : "2026-02-12T17:30:00Z",
   "owner"       : "devops",

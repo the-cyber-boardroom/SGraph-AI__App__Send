@@ -32,7 +32,6 @@ class Routes__Transfers(Fast_API__Routes):                                      
                     upload_url  = result['upload_url'] )
 
     # todo: transfer_id should be Transfer_Id type (not raw str)
-    # todo: injection vulnerability: transfer_id reflected in HTTPException detail
     async def upload__transfer_id(self, transfer_id : str    ,                  # POST /transfers/upload/{transfer_id}
                                         request     : Request
                                  ) -> dict:
@@ -41,32 +40,29 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                                        payload_bytes = body      )
         if success is False:
             raise HTTPException(status_code = 404,
-                                detail      = f'Transfer {transfer_id} not found or not in pending state') # todo: injection — transfer_id reflected
+                                detail      = 'Transfer not found or not in pending state')
         return dict(status      = 'uploaded'   ,                                # todo: we shouldn't be creating new objects here
                     transfer_id = transfer_id  ,                                # ideally the service should give us the objects to return
                     size        = len(body)    )
 
     # todo: return type should be Schema__Transfer__Complete_Response (not raw dict)
-    # todo: injection vulnerability: transfer_id reflected in HTTPException detail
     def complete__transfer_id(self, transfer_id: str                            # POST /transfers/complete/{transfer_id}
                              ) -> dict:                                          # todo: -> Schema__Transfer__Complete_Response
         result = self.transfer_service.complete_transfer(transfer_id)
         if result is None:
             raise HTTPException(status_code = 404,
-                                detail      = f'Transfer {transfer_id} not found or payload not uploaded') # todo: injection — transfer_id reflected
+                                detail      = 'Transfer not found or payload not uploaded')
         return result
 
-    # todo: as it stand this function is vulnerable to injection attacks, since the transfer_id is returned inside the HTTPException detail
     # todo: return type should be Schema__Transfer__Info (not raw dict)
     def info__transfer_id(self, transfer_id: str                                # GET /transfers/info/{transfer_id}
                          ) -> dict:                                              # todo: -> Schema__Transfer__Info
         result = self.transfer_service.get_transfer_info(transfer_id)
         if result is None:
             raise HTTPException(status_code = 404,
-                                detail      = f'Transfer {transfer_id} not found')  # todo: injection — transfer_id reflected
+                                detail      = 'Transfer not found')
         return result
 
-    # todo: injection vulnerability: transfer_id reflected in HTTPException detail
     def download__transfer_id(self, transfer_id : str        ,                  # GET /transfers/download/{transfer_id}
                                     request     : Request
                              ) -> Response:
@@ -75,7 +71,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                                              user_agent    = request.headers.get('user-agent', ''))
         if payload is None:
             raise HTTPException(status_code = 404,
-                                detail      = f'Transfer {transfer_id} not found or not available for download') # todo: injection — transfer_id reflected
+                                detail      = 'Transfer not found or not available for download')
         return Response(content    = payload                    ,
                         media_type = 'application/octet-stream')
 

@@ -1,0 +1,9 @@
+{
+  "entry_id"  : "005",
+  "timestamp" : "2026-02-12T18:30:00Z",
+  "role"      : "devops",
+  "action"    : "Root cause identified — git rebase, not CI run or author spoofing",
+  "finding"   : "Investigation confirmed: (1) CI pipelines ci-pipeline__dev.yml and ci-pipeline__main.yml only trigger on dev and main branches respectively. No CI ran on the feature branch. (2) Commit 956c37f is a rebase replay of legitimate CI commit f3b8a82 from dev. Evidence: identical Author (GitHub Actions), identical AuthorDate (2026-02-12T17:04:00Z), identical diff (v0.2.16 -> v0.2.17), identical commit message. Committer field differs: f3b8a82 has Committer=GitHub Actions, 956c37f has Committer=Claude. (3) This is standard git rebase behaviour — Author is preserved, Committer is set to whoever performs the rebase. (4) Pattern is not isolated: 5 total instances found (956c37f, 650989d, d694108, f627cf3, 0f18d8d), all from Dev agent rebasing feature branch onto dev. (5) No malicious intent — the Dev agent was keeping the feature branch up to date with dev, which is a reasonable workflow. The systemic issue is that no guidance, tooling, or detection existed to flag this.",
+  "commit"    : null,
+  "branch"    : "claude/read-secure-send-brief-Mz6yN"
+}
