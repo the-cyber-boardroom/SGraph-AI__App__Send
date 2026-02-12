@@ -50,46 +50,53 @@ class Transfer__Service(Type_Safe):                                             
         return True
 
     #todo: I'm going to stop adding comments on the issues I raised above
+    # todo: needs @type_safe decorator with typed parameters (transfer_id : Transfer_Id)
+    # todo: return type should be Schema__Transfer__Complete_Response (not raw dict)
     def complete_transfer(self, transfer_id):                                    # Mark transfer as completed
         if transfer_id not in self.transfers:
             return None
         meta = self.transfers[transfer_id]
         if transfer_id not in self.payloads:
             return None
-        meta['status'] = 'completed'
-        meta['events'].append(dict(action    = 'complete'                       ,
-                                   timestamp = datetime.now(timezone.utc).isoformat()))
-        download_url = f'/d/{transfer_id}'
-        transparency = dict(ip             = meta['sender_ip_hash']  ,
+        meta['status'] = 'completed'                                             # todo: should be Enum__Transfer__Status.COMPLETED
+        meta['events'].append(dict(action    = 'complete'                       ,# todo: event should be Type_Safe class (not raw dict)
+                                   timestamp = datetime.now(timezone.utc).isoformat())) # todo: should be Timestamp_Now()
+        download_url = f'/d/{transfer_id}'                                       # todo: hardcoded URL, caller should derive from transfer_id
+        transparency = dict(ip             = meta['sender_ip_hash']  ,           # todo: transparency should be a Type_Safe class
                             timestamp      = meta['created_at']      ,
                             file_size_bytes= meta['file_size_bytes'] ,
                             stored_fields  = ['ip_hash', 'file_size_bytes', 'created_at', 'content_type_hint'],
                             not_stored     = ['file_name', 'decryption_key', 'raw_ip'])
-        return dict(transfer_id  = transfer_id ,
+        return dict(transfer_id  = transfer_id ,                                 # todo: return Type_Safe class, not raw dict
                     download_url = download_url,
                     transparency = transparency)
 
+    # todo: needs @type_safe decorator with typed parameters (transfer_id : Transfer_Id)
+    # todo: return type should be Schema__Transfer__Info (not raw dict)
     def get_transfer_info(self, transfer_id):                                    # Get transfer metadata
         if transfer_id not in self.transfers:
             return None
         meta = self.transfers[transfer_id]
-        return dict(transfer_id    = meta['transfer_id']   ,
+        return dict(transfer_id    = meta['transfer_id']   ,                     # todo: return Type_Safe class, not raw dict
                     status         = meta['status']        ,
                     file_size_bytes= meta['file_size_bytes'],
                     created_at     = meta['created_at']    ,
                     download_count = meta['download_count'])
 
+    # todo: needs @type_safe decorator with typed parameters
+    # todo: transfer_id should be Transfer_Id, downloader_ip should be str or Safe_Str__IP_Address
+    # todo: user_agent should be Safe_Str or Safe_Str__Http__User_Agent
     def get_download_payload(self, transfer_id, downloader_ip, user_agent):      # Retrieve encrypted payload
         if transfer_id not in self.transfers:
             return None
         meta = self.transfers[transfer_id]
-        if meta['status'] != 'completed':
+        if meta['status'] != 'completed':                                        # todo: should compare with Enum__Transfer__Status.COMPLETED
             return None
         if transfer_id not in self.payloads:
             return None
-        meta['download_count'] += 1
-        meta['events'].append(dict(action       = 'download'                    ,
-                                   timestamp    = datetime.now(timezone.utc).isoformat(),
+        meta['download_count'] += 1                                              # todo: should use Safe_UInt for download_count
+        meta['events'].append(dict(action       = 'download'                    ,# todo: event should be Type_Safe class (not raw dict)
+                                   timestamp    = datetime.now(timezone.utc).isoformat(), # todo: should be Timestamp_Now()
                                    ip_hash      = self.hash_ip(downloader_ip)   ,
                                    user_agent   = user_agent or ''              ))
         return self.payloads[transfer_id]
