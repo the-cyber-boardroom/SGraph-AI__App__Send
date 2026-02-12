@@ -31,4 +31,4 @@ runs:
       shell: bash
       run: |                 
         echo "Running tests for environment: ${{ inputs.target }}"
-        pytest -rs ./tests/deploy/${{ inputs.lambda_type }}/deploy_aws/test_Deploy__Service__to__${{ inputs.target }}.py
+        pytest -rs ./tests/deploy/${{ inputs.lambda_type }}__Lambda/deploy_aws/test_Deploy__${{ inputs.lambda_type }}__Service__to__${{ inputs.target }}.py

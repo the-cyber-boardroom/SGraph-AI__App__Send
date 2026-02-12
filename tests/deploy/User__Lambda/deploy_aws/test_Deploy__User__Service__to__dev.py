@@ -1,11 +1,11 @@
-from unittest                                                        import TestCase
-from osbot_utils.utils.Env                                           import load_dotenv
-from osbot_utils.utils.Files                                         import path_combine, file_exists
-from tests.deploy.admin_lambda.deploy_aws.test_Deploy__Service__base import test_Deploy__Service__base
+from unittest                                                              import TestCase
+from osbot_utils.utils.Env                                                 import load_dotenv
+from osbot_utils.utils.Files                                               import path_combine, file_exists
+from tests.deploy.user_lambda.deploy_aws.test_Deploy__User__Service__base  import test_Deploy__User__Service__base
 
 
-class test_Deploy__Service__to__dev(test_Deploy__Service__base, TestCase):
-    stage = 'dev'
+class test_Deploy__User__Service__to__dev(test_Deploy__User__Service__base, TestCase):
+    stage = 'user-dev'
 
     # @classmethod
     # def setUpClass(cls):

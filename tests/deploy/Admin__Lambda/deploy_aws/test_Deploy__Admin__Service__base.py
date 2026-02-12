@@ -1,13 +1,13 @@
 import pytest
-# from osbot_aws.AWS_Config                                                   import AWS_Config
-# from osbot_aws.apis.test_helpers.Temp_Aws_Roles                             import Temp_Aws_Roles
+from osbot_aws.AWS_Config                                                   import AWS_Config
+from osbot_aws.apis.test_helpers.Temp_Aws_Roles                             import Temp_Aws_Roles
 from osbot_utils.utils.Misc                                                  import list_set
 from osbot_fast_api_serverless.deploy.Deploy__Serverless__Fast_API           import DEFAULT__ERROR_MESSAGE__WHEN_FAST_API_IS_OK
-from sgraph_ai_app_send.lambda__user.user__config                            import APP__SEND__USER__LAMBDA_DEPENDENCIES
-from sgraph_ai_app_send.lambda__user.lambda_function.deploy.Deploy__Service  import Deploy__Service
+from sgraph_ai_app_send.lambda__admin.admin__config                          import APP__SEND__ADMIN__LAMBDA_DEPENDENCIES
+from sgraph_ai_app_send.lambda__admin.lambda_function.deploy.Deploy__Service import Deploy__Service
 
 
-class test_Deploy__Service__base():     # Base class for deployment tests - override stage in subclasses
+class test_Deploy__Admin__Service__base():     # Base class for deployment tests - override stage in subclasses
 
     stage: str = None  # Must be set by subclass
 
@@ -27,7 +27,7 @@ class test_Deploy__Service__base():     # Base class for deployment tests - over
 
     def test_2__upload_dependencies(self):
         upload_results = self.deploy_fast_api.upload_lambda_dependencies_to_s3()
-        assert list_set(upload_results) == APP__SEND__USER__LAMBDA_DEPENDENCIES
+        assert list_set(upload_results) == APP__SEND__ADMIN__LAMBDA_DEPENDENCIES
 
     # def test_3__create_lambda_iam_user(self):
     #     aws_config      = AWS_Config()
