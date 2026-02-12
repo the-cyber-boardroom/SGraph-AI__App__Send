@@ -5,9 +5,9 @@
   "label": "Feature-4",
   "title": "Transparency Panels",
   "description": "Implement transparency panels: a reusable UI component showing captured and not-stored fields, integrated on both upload-complete and download pages, backed by transparency objects in API responses.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["transparency", "ui", "api", "privacy"],
   "links": [

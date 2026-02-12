@@ -5,9 +5,9 @@
   "label": "Feature-5",
   "title": "Status & Analytics",
   "description": "Implement transfer status tracking and admin analytics: status endpoint for transfer metadata, sender status page with auto-refresh, admin stats endpoint, and admin dashboard.",
-  "status": "backlog",
+  "status": "in-progress",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["status", "analytics", "admin", "api", "ui"],
   "links": [

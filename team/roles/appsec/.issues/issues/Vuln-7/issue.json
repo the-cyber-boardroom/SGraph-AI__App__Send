@@ -1,0 +1,38 @@
+{
+  "node_id": "f1000007",
+  "node_type": "vulnerability",
+  "node_index": 12,
+  "label": "Vuln-7",
+  "title": "Transfer ID Entropy Insufficient for Brute-Force Resistance Without Rate Limiting",
+  "description": "Transfer IDs are generated using secrets.token_hex(6), producing 12-character hex strings with 48 bits of entropy. While 48 bits is adequate for short-lived transfers with rate limiting, the combination of low entropy and no rate limiting (Vuln-4) means an attacker can enumerate valid transfer IDs. At 1000 requests/second, with 1000 active transfers and 48-bit ID space, a valid ID would be found in approximately 78 hours. The code itself contains a TODO noting this should be a full GUID/UUID.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "access-control", "enumeration", "medium"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    },
+    {
+      "link_type_id": "204908c3",
+      "verb": "related-to",
+      "target_id": "f1000004",
+      "target_label": "Vuln-4"
+    }
+  ],
+  "properties": {
+    "severity": "Medium",
+    "owasp_category": "A01:2021 Broken Access Control",
+    "cwe": "CWE-330 (Use of Insufficiently Random Values), CWE-340 (Generation of Predictable Numbers or Identifiers)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/service/Transfer__Service.py",
+    "affected_lines": "21 (transfer_id = secrets.token_hex(6))",
+    "exploit_vector": "1. Without rate limiting, script GET /transfers/info/{hex_id} for sequential hex values. 2. 200 response reveals a valid transfer. 3. Then GET /transfers/download/{id} to download the encrypted payload. 4. While the file is encrypted, the attacker now knows the transfer exists, its size, and creation time — metadata leakage.",
+    "fix_recommendation": "1. Increase Transfer ID to a full UUID4 (128 bits of entropy) using secrets.token_hex(16) or uuid4(). 2. Implement rate limiting (Vuln-4) as defense in depth. 3. Consider adding a per-transfer access token separate from the transfer ID.",
+    "priority": "P1",
+    "role_assignment": "appsec"
+  }
+}

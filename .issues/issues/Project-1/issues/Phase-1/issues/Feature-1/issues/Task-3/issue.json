@@ -5,9 +5,9 @@
   "label": "Task-3",
   "title": "Implement client-side AES-256-GCM encryption (Web Crypto API)",
   "description": "Generate 256-bit key via Web Crypto. Encrypt file producing ciphertext+IV+auth_tag bundled as payload.enc. Export key as base64url (44 chars).",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["encryption", "frontend", "web-crypto"],
   "links": [

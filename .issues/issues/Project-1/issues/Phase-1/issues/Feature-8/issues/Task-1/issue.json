@@ -5,9 +5,9 @@
   "label": "Task-1",
   "title": "Set up FastAPI application skeleton",
   "description": "FastAPI app with Mangum adapter for Lambda. Health check endpoint (GET /health). Structured logging. Error handling middleware.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["fastapi", "lambda", "mangum", "backend"],
   "links": [

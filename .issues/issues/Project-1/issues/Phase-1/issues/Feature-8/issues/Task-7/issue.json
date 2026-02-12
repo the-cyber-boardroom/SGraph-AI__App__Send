@@ -5,9 +5,9 @@
   "label": "Task-7",
   "title": "Set up GitHub Actions CI/CD",
   "description": "Build, test, deploy pipeline. Separate workflows for dev/qa/prod. Auto-deploy to dev on push to dev branch.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ci-cd", "github-actions", "deployment"],
   "links": [

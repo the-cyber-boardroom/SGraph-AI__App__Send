@@ -5,9 +5,9 @@
   "label": "Task-6",
   "title": "Set up static frontend hosting (dev)",
   "description": "S3 bucket for static files + CloudFront distribution. dev-send.sgraph.ai DNS.",
-  "status": "backlog",
+  "status": "in-progress",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["s3", "cloudfront", "frontend", "hosting", "dev"],
   "links": [

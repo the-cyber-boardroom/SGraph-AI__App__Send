@@ -1,0 +1,32 @@
+{
+  "node_id": "f1000005",
+  "node_type": "vulnerability",
+  "node_index": 10,
+  "label": "Vuln-5",
+  "title": "IP Address Hashing Without Salt — Trivially Reversible",
+  "description": "Transfer__Service.hash_ip() (line 97-100) uses unsalted SHA-256 to hash IP addresses. The IPv4 address space contains only ~4.3 billion addresses. A precomputed rainbow table of all IPv4 SHA-256 hashes can be generated in hours and stored in ~200GB. This means every 'hashed' IP stored in transfer metadata can be reversed to the original IP address, defeating the stated privacy goal of IP hashing. The briefing notes mention 'daily salt' but no salt is implemented in the code.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "cryptographic-failure", "privacy", "medium"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "severity": "Medium",
+    "owasp_category": "A02:2021 Cryptographic Failures",
+    "cwe": "CWE-328 (Use of Weak Hash without Salt)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/service/Transfer__Service.py",
+    "affected_lines": "97-100 (hash_ip method)",
+    "exploit_vector": "1. Obtain stored ip_hash values from transfer metadata (via /transfers/info or by accessing storage). 2. Generate a rainbow table of SHA-256(ip) for all 4.3B IPv4 addresses (~hours of compute). 3. Look up any ip_hash to recover the original IP address. This deanonymizes all senders and downloaders.",
+    "fix_recommendation": "1. Add a daily-rotating salt (as originally intended in the design spec). 2. Use HMAC-SHA256 with a server-side secret key instead of plain SHA-256. 3. Truncate the hash output to reduce precision while maintaining collision resistance. 4. Consider using a purpose-built privacy-preserving hash like BLAKE2 with a key.",
+    "priority": "P1",
+    "role_assignment": "appsec"
+  }
+}
