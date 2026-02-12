@@ -14,6 +14,35 @@ const SendCrypto = {
     KEY_LENGTH: 256,
     IV_LENGTH: 12,
 
+    // ─── Availability Check ─────────────────────────────────────────────────
+
+    /**
+     * Check whether the Web Crypto API (crypto.subtle) is available.
+     * crypto.subtle requires a secure context: HTTPS or localhost.
+     * Running on 127.0.0.1 (without HTTPS) will cause it to be undefined.
+     *
+     * @returns {boolean} true if crypto.subtle is available
+     */
+    isAvailable() {
+        return !!(window.crypto && window.crypto.subtle);
+    },
+
+    /**
+     * Assert that crypto.subtle is available; throw a descriptive error if not.
+     * Call this before any crypto operation to provide a clear message.
+     *
+     * @throws {Error} if crypto.subtle is unavailable
+     */
+    requireSecureContext() {
+        if (!this.isAvailable()) {
+            throw new Error(
+                'Web Crypto API is not available. ' +
+                'It requires a secure context (HTTPS or localhost). ' +
+                'If running locally, use "localhost" instead of "127.0.0.1".'
+            );
+        }
+    },
+
     // ─── Key Generation ────────────────────────────────────────────────────
 
     /**
@@ -21,6 +50,7 @@ const SendCrypto = {
      * @returns {Promise<CryptoKey>}
      */
     async generateKey() {
+        this.requireSecureContext();
         return window.crypto.subtle.generateKey(
             { name: this.ALGORITHM, length: this.KEY_LENGTH },
             true,       // extractable — needed for export
@@ -36,6 +66,7 @@ const SendCrypto = {
      * @returns {Promise<string>} base64url-encoded key (44 chars for 256-bit)
      */
     async exportKey(key) {
+        this.requireSecureContext();
         const raw    = await window.crypto.subtle.exportKey('raw', key);
         const bytes  = new Uint8Array(raw);
         return this.bytesToBase64url(bytes);
@@ -47,6 +78,7 @@ const SendCrypto = {
      * @returns {Promise<CryptoKey>}
      */
     async importKey(keyString) {
+        this.requireSecureContext();
         const bytes = this.base64urlToBytes(keyString);
         return window.crypto.subtle.importKey(
             'raw',
@@ -68,6 +100,7 @@ const SendCrypto = {
      * @returns {Promise<ArrayBuffer>}
      */
     async encryptFile(key, fileData) {
+        this.requireSecureContext();
         const iv         = window.crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
         const ciphertext = await window.crypto.subtle.encrypt(
             { name: this.ALGORITHM, iv: iv },
@@ -92,6 +125,7 @@ const SendCrypto = {
      * @throws {Error} "Wrong decryption key" on authentication failure
      */
     async decryptFile(key, encryptedData) {
+        this.requireSecureContext();
         const data       = new Uint8Array(encryptedData);
         const iv         = data.slice(0, this.IV_LENGTH);
         const ciphertext = data.slice(this.IV_LENGTH);

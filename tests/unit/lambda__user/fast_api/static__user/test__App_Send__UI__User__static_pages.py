@@ -36,3 +36,52 @@ class test__App_Send__UI__User__static_pages(TestCase):
         assert response__redirects.text        == file_contents(expected_file_path)                 # confirm contents match
         assert 'SGraph Send'                    in response__redirects.text                          # confirm real content is there
         assert '<send-upload>'                  in response__redirects.text                          # confirm Web Component is there
+
+    def test__upload_page__crypto_availability_check(self):
+        response = self.client.get('/send', follow_redirects=True)
+        assert response.status_code == 200
+        # Upload page must include the crypto.js script
+        assert 'js/crypto.js' in response.text
+
+        # Verify crypto.js itself contains the availability check
+        crypto_response = self.client.get('/send/v0/v0.1/v0.1.0/js/crypto.js')
+        assert crypto_response.status_code      == 200
+        assert 'isAvailable'                     in crypto_response.text                              # availability check method exists
+        assert 'requireSecureContext'             in crypto_response.text                              # guard method exists
+        assert 'crypto.subtle'                   in crypto_response.text                              # checks for crypto.subtle
+        assert 'secure context'                  in crypto_response.text.lower()                      # error message mentions secure context
+
+    def test__upload_page__send_upload_checks_crypto(self):
+        upload_js = self.client.get('/send/v0/v0.1/v0.1.0/components/send-upload/send-upload.js')
+        assert upload_js.status_code == 200
+        assert 'SendCrypto.isAvailable()'   in upload_js.text                                        # upload component checks availability before encryption
+        assert 'secure context'             in upload_js.text.lower()                                 # user-facing error mentions secure context
+
+    def test__download_page__send_download_checks_crypto(self):
+        download_js = self.client.get('/send/v0/v0.1/v0.1.0/components/send-download/send-download.js')
+        assert download_js.status_code == 200
+        assert 'SendCrypto.isAvailable()'   in download_js.text                                      # download component checks availability before decryption
+        assert 'secure context'             in download_js.text.lower()                               # user-facing error mentions secure context
+
+    def test__download_page__loads(self):
+        response = self.client.get('/send/v0/v0.1/v0.1.0/download.html')
+        assert response.status_code         == 200
+        assert '<send-download>'             in response.text                                         # download Web Component present
+        assert 'js/crypto.js'               in response.text                                         # crypto.js included on download page
+
+    def test__test_files__available(self):
+        response_txt  = self.client.get('/send/v0/v0.1/v0.1.0/test-files/test-text.txt')
+        response_json = self.client.get('/send/v0/v0.1/v0.1.0/test-files/test-data.json')
+
+        assert response_txt.status_code  == 200                                                      # text test file is served
+        assert 'SGraph Send'              in response_txt.text                                        # text file has expected content
+
+        assert response_json.status_code == 200                                                      # JSON test file is served
+        assert 'test_file'               in response_json.text                                       # JSON file has expected content
+
+    def test__upload_page__test_files_section(self):
+        response = self.client.get('/send', follow_redirects=True)
+        assert response.status_code == 200
+        assert 'Test Files'               in response.text                                           # test files section is present
+        assert 'test-text.txt'            in response.text                                           # text file link present
+        assert 'test-data.json'           in response.text                                           # JSON file link present

@@ -184,6 +184,17 @@ class SendDownload extends HTMLElement {
             return;
         }
 
+        // Check crypto availability before attempting decryption
+        if (!SendCrypto.isAvailable()) {
+            this.errorMessage = 'Web Crypto API is not available. '
+                              + 'It requires a secure context (HTTPS or localhost). '
+                              + 'If running locally, use "localhost" instead of "127.0.0.1".';
+            this.state        = 'error';
+            this.render();
+            this.setupEventListeners();
+            return;
+        }
+
         try {
             this.state = 'decrypting';
             this.render();
