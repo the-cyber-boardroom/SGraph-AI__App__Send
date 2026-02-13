@@ -5,6 +5,7 @@
 
 from fastapi                                                                     import HTTPException, Request, Response
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
+from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
 from osbot_utils.utils.Env                                                       import get_env
 from sgraph_ai_app_send.lambda__user.schemas.Schema__Transfer                    import Schema__Transfer__Create
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                   import Transfer__Service
@@ -45,8 +46,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
         return dict(transfer_id = result['transfer_id'],                         # todo: return Type_Safe class from service
                     upload_url  = result['upload_url'] )
 
-    # todo: transfer_id should be Transfer_Id type (not raw str)
-    async def upload__transfer_id(self, transfer_id : str    ,                  # POST /transfers/upload/{transfer_id}
+    async def upload__transfer_id(self, transfer_id : Safe_Str__Id ,             # POST /transfers/upload/{transfer_id} (todo: transfer_id should be Transfer_Id)
                                         request     : Request
                                  ) -> dict:
         check_access_token(request)
@@ -60,8 +60,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                     transfer_id = transfer_id  ,                                # ideally the service should give us the objects to return
                     size        = len(body)    )
 
-    # todo: return type should be Schema__Transfer__Complete_Response (not raw dict)
-    def complete__transfer_id(self, transfer_id: str,                            # POST /transfers/complete/{transfer_id}
+    def complete__transfer_id(self, transfer_id: Safe_Str__Id,                    # POST /transfers/complete/{transfer_id} (todo: should be Transfer_Id)
                                     request: Request
                              ) -> dict:                                          # todo: -> Schema__Transfer__Complete_Response
         check_access_token(request)
@@ -71,8 +70,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Transfer not found or payload not uploaded')
         return result
 
-    # todo: return type should be Schema__Transfer__Info (not raw dict)
-    def info__transfer_id(self, transfer_id: str                                # GET /transfers/info/{transfer_id}
+    def info__transfer_id(self, transfer_id: Safe_Str__Id                         # GET /transfers/info/{transfer_id} (todo: should be Transfer_Id)
                          ) -> dict:                                              # todo: -> Schema__Transfer__Info
         result = self.transfer_service.get_transfer_info(transfer_id)
         if result is None:
@@ -80,7 +78,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Transfer not found')
         return result
 
-    def download__transfer_id(self, transfer_id : str        ,                  # GET /transfers/download/{transfer_id}
+    def download__transfer_id(self, transfer_id : Safe_Str__Id,                  # GET /transfers/download/{transfer_id} (todo: should be Transfer_Id)
                                     request     : Request
                              ) -> Response:
         payload = self.transfer_service.get_download_payload(transfer_id  = transfer_id                    ,

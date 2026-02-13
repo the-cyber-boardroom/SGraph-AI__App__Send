@@ -2,6 +2,7 @@ from osbot_fast_api_serverless.fast_api.routes.Routes__Info import Routes__Info
 
 import sgraph_ai_app_send__ui__admin
 from osbot_fast_api.api.decorators.route_path                                       import route_path
+from osbot_utils.type_safe.primitives.core.Safe_UInt                                import Safe_UInt
 from osbot_fast_api.api.routes.Routes__Set_Cookie                                   import Routes__Set_Cookie
 from osbot_fast_api_serverless.fast_api.Serverless__Fast_API                        import Serverless__Fast_API
 from starlette.responses                                                            import RedirectResponse
@@ -51,7 +52,7 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         send_cache_client = self.send_cache_client
 
         @route_path(path='/health/pulse')
-        def pulse(window_minutes: int = 5):
+        def pulse(window_minutes: Safe_UInt = 5):
             return compute_pulse(
                 send_cache_client = send_cache_client ,
                 window_minutes    = window_minutes    )
