@@ -12,7 +12,8 @@ from sgraph_ai_app_send.lambda__user.storage.Send__Config                       
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
-ROUTES_PATHS__APP_SEND__STATIC__USER  = [f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}']
+ROUTES_PATHS__APP_SEND__STATIC__USER  = ['/',
+                                         f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}']
 
 class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
@@ -59,8 +60,13 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         path_latest_version = f"/{path_name}/{major_version}/{latest_version}/{start_page}.html"
         self.app().mount(path_static, StaticFiles(directory=path_static_folder), name=path_name)
 
+        @route_path(path='/')
+        def redirect_root():
+            return RedirectResponse(url=path_latest_version)
+
         @route_path(path=f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}')
         def redirect_to_latest():
             return RedirectResponse(url=path_latest_version)
 
+        self.add_route_get(redirect_root)
         self.add_route_get(redirect_to_latest)

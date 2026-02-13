@@ -59,6 +59,20 @@ class SendAccessGate extends HTMLElement {
                     Invalid or missing token. Please check and try again.
                 </div>
             </div>
+
+            <div class="card" style="margin-top: 1.5rem; text-align: center;">
+                <h3 style="font-size: var(--font-size-base); margin-bottom: 0.25rem;">Join the Early Access Program</h3>
+                <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 1rem;">
+                    Sign up to get notified when SGraph Send is available.
+                </p>
+                <form class="launchlist-form" action="https://getlaunchlist.com/s/zSa8gI" method="POST">
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
+                        <input name="name" type="text" class="input" placeholder="Name" style="flex: 1; min-width: 120px;">
+                        <input name="email" type="email" class="input" placeholder="Email" required style="flex: 1; min-width: 180px;">
+                        <button type="submit" class="btn btn-primary">Sign Up</button>
+                    </div>
+                </form>
+            </div>
         `;
 
         const input  = this.querySelector('#access-token-input');
