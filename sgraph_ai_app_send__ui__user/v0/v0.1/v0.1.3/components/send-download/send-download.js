@@ -1,10 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    SGraph Send — Download Web Component
-   v0.1.3 — i18n integration
+   v0.1.3 — i18n integration + auto-decrypt + history
 
    Changes from v0.1.2:
    - All user-facing strings use I18n.t() instead of hardcoded English
    - Listens for 'locale-changed' event and re-renders (when not mid-flow)
+   - Auto-decrypts when key is present in URL hash
+   - Stores received items in localStorage with privacy notice
+   - Extracts filename from SGMETA envelope if present
+   - "Send your own" link after download
 
    Inherits from v0.1.2: Text display, hash-fragment URLs, URL clearing
 
@@ -22,6 +26,7 @@ class SendDownload extends HTMLElement {
         this.hashKey          = null;
         this.decryptedText    = null;
         this.decryptedBytes   = null;
+        this.fileName         = null;
         this.state            = 'loading';
         this.errorMessage     = null;
         this._boundDecryptClick = null;
@@ -80,11 +85,47 @@ class SendDownload extends HTMLElement {
         }
         this.render();
         this.setupEventListeners();
+
+        // Auto-decrypt if key was in URL
+        if (this.state === 'ready' && this.hashKey) {
+            this.startDownload(this.hashKey);
+        }
     }
 
     isTextContent() {
         if (!this.transferInfo) return false;
         return (this.transferInfo.content_type_hint || '').toLowerCase().startsWith('text/');
+    }
+
+    // ─── SGMETA Envelope ────────────────────────────────────────────────
+
+    static SGMETA_MAGIC = [0x53, 0x47, 0x4D, 0x45, 0x54, 0x41, 0x00]; // "SGMETA\0"
+
+    extractMetadata(decryptedBuffer) {
+        const bytes = new Uint8Array(decryptedBuffer);
+        const magic = SendDownload.SGMETA_MAGIC;
+
+        if (bytes.length < magic.length + 4) return { metadata: null, content: decryptedBuffer };
+
+        for (let i = 0; i < magic.length; i++) {
+            if (bytes[i] !== magic[i]) return { metadata: null, content: decryptedBuffer };
+        }
+
+        const metaLen = (bytes[magic.length] << 24) | (bytes[magic.length + 1] << 16) |
+                        (bytes[magic.length + 2] << 8) | bytes[magic.length + 3];
+        const metaStart = magic.length + 4;
+        const contentStart = metaStart + metaLen;
+
+        if (contentStart > bytes.length) return { metadata: null, content: decryptedBuffer };
+
+        try {
+            const metaStr = new TextDecoder().decode(bytes.slice(metaStart, contentStart));
+            const metadata = JSON.parse(metaStr);
+            const content = decryptedBuffer.slice(contentStart);
+            return { metadata, content };
+        } catch (e) {
+            return { metadata: null, content: decryptedBuffer };
+        }
     }
 
     // ─── Rendering ───────────────────────────────────────────────────────
@@ -155,6 +196,14 @@ class SendDownload extends HTMLElement {
     renderComplete() {
         if (this.state !== 'complete') return '';
 
+        const sendAnotherHtml = `
+            <div style="margin-top: 1.5rem; text-align: center;">
+                <a href="${window.location.origin}/send/v0/v0.1/v0.1.3/index.html" class="btn btn-sm" style="color: var(--color-primary); text-decoration: none;">
+                    ${this.escapeHtml(this.t('download.result.send_another'))}
+                </a>
+            </div>
+        `;
+
         if (this.decryptedText !== null) {
             return `
                 <div class="status status--success">${this.escapeHtml(this.t('download.result.text_success'))}</div>
@@ -166,12 +215,14 @@ class SendDownload extends HTMLElement {
                     </div>
                 </div>
                 <send-transparency id="transparency-panel"></send-transparency>
+                ${sendAnotherHtml}
             `;
         }
 
         return `
             <div class="status status--success">${this.escapeHtml(this.t('download.result.file_success'))}</div>
             <send-transparency id="transparency-panel"></send-transparency>
+            ${sendAnotherHtml}
         `;
     }
 
@@ -203,7 +254,9 @@ class SendDownload extends HTMLElement {
 
         const downloadTextBtn = this.querySelector('#download-text-btn');
         if (downloadTextBtn) {
-            downloadTextBtn.addEventListener('click', () => { if (this.decryptedBytes) this.saveFile(this.decryptedBytes); });
+            downloadTextBtn.addEventListener('click', () => {
+                if (this.decryptedBytes) this.saveFile(this.decryptedBytes, this.fileName || 'download.txt');
+            });
         }
 
         // Set text content using textContent (XSS-safe)
@@ -218,9 +271,8 @@ class SendDownload extends HTMLElement {
 
     // ─── Download Flow ───────────────────────────────────────────────────
 
-    async startDownload() {
-        const keyInput  = this.querySelector('#key-input');
-        const keyString = keyInput ? keyInput.value.trim() : '';
+    async startDownload(keyOverride) {
+        const keyString = keyOverride || (this.querySelector('#key-input') ? this.querySelector('#key-input').value.trim() : '');
 
         if (!keyString) {
             this.errorMessage = this.t('download.error.no_key');
@@ -239,17 +291,26 @@ class SendDownload extends HTMLElement {
             const encrypted = await ApiClient.downloadPayload(this.transferId);
             const decrypted = await SendCrypto.decryptFile(key, encrypted);
 
-            this.decryptedBytes = decrypted;
+            // Check for SGMETA envelope (contains filename and other metadata)
+            const { metadata, content } = this.extractMetadata(decrypted);
+            if (metadata && metadata.filename) {
+                this.fileName = metadata.filename;
+            }
+
+            this.decryptedBytes = content;
 
             if (this.isTextContent()) {
-                this.decryptedText = new TextDecoder().decode(decrypted);
+                this.decryptedText = new TextDecoder().decode(content);
             } else {
-                this.saveFile(decrypted);
+                this.saveFile(content, this.fileName || 'download');
             }
 
             if (window.location.hash) {
                 history.replaceState(null, '', window.location.pathname + window.location.search);
             }
+
+            // Save to localStorage history
+            this.saveToHistory(content);
 
             this.transparencyData = {
                 download_timestamp: new Date().toISOString(),
@@ -266,17 +327,61 @@ class SendDownload extends HTMLElement {
             this.errorMessage = err.message || this.t('download.error.failed');
             this.state = 'ready'; this.render(); this.setupEventListeners();
             const nki = this.querySelector('#key-input');
-            if (nki) nki.value = keyString;
+            if (nki) nki.value = keyOverride || keyString;
         }
+    }
+
+    // ─── LocalStorage History ────────────────────────────────────────────
+
+    static HISTORY_KEY = 'sgraph-send-history';
+    static MAX_HISTORY = 20;
+    static MAX_TEXT_STORE = 50000; // ~50KB per text entry
+
+    saveToHistory(content) {
+        try {
+            const history = this.getHistory();
+            const isText = this.isTextContent();
+            const entry = {
+                transferId: this.transferId,
+                type:       isText ? 'text' : 'file',
+                timestamp:  new Date().toISOString(),
+                size:       content.byteLength,
+                fileName:   this.fileName || null,
+                contentType: this.transferInfo.content_type_hint || null,
+            };
+
+            // Store text content if small enough
+            if (isText && content.byteLength <= SendDownload.MAX_TEXT_STORE) {
+                entry.text = new TextDecoder().decode(content);
+            }
+
+            // Remove duplicate transfer IDs
+            const filtered = history.filter(h => h.transferId !== this.transferId);
+            filtered.unshift(entry);
+
+            // Trim to max
+            const trimmed = filtered.slice(0, SendDownload.MAX_HISTORY);
+            localStorage.setItem(SendDownload.HISTORY_KEY, JSON.stringify(trimmed));
+        } catch (e) { /* localStorage full or unavailable */ }
+    }
+
+    getHistory() {
+        try {
+            return JSON.parse(localStorage.getItem(SendDownload.HISTORY_KEY) || '[]');
+        } catch (e) { return []; }
+    }
+
+    clearHistory() {
+        localStorage.removeItem(SendDownload.HISTORY_KEY);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────
 
-    saveFile(data) {
+    saveFile(data, filename) {
         const blob = new Blob([data]);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'download';
+        a.href = url; a.download = filename || 'download';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }

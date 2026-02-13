@@ -9,7 +9,7 @@
 <body>
     <header>
         <h1>SGraph Send</h1>
-        <p>Zero-knowledge encrypted file sharing</p>
+        <p data-i18n="app.subtitle">Zero-knowledge encrypted file sharing</p>
         <div id="locale-selector" style="position: absolute; top: 1rem; right: 1rem;"></div>
     </header>
     <main>
@@ -45,7 +45,7 @@
             if (sel) {
                 sel.innerHTML = I18n.availableLocales.map(l =>
                     `<button class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; ${l.code === I18n.locale ? 'font-weight: 700;' : 'opacity: 0.6;'}"
-                             onclick="I18n.setLocale('${l.code}')">${l.name}</button>`
+                             onclick="I18n.setLocale('${l.code}')">${l.flag || ''} ${l.name}</button>`
                 ).join(' ');
             }
         });
