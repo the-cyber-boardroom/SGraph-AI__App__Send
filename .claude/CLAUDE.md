@@ -79,7 +79,8 @@ team/                            # Team structure
     journalist/                  # Communications, content
     librarian/                   # Knowledge base, Issues FS maintenance
     qa/                          # Test strategy, security testing
-  humans/dinis_cruz/briefs/      # Conductor briefs (date-bucketed)
+  humans/dinis_cruz/briefs/      # Human briefs (input — date-bucketed)
+  humans/dinis_cruz/debriefs/    # Team debriefs (output — date-bucketed, with relative links)
 
 .github/workflows/               # CI pipelines
 ```
@@ -110,8 +111,9 @@ team/                            # Team structure
 ### File Naming
 
 14. **Review files:** `team/roles/{role}/reviews/YY-MM-DD/{version}__{description}.md`
-15. **Version** comes from `sgraph_ai_app_send/version`
-16. **UI assets** use versioned paths: `v0/v0.1/v0.1.0/index.html`
+15. **Debrief files:** `team/humans/dinis_cruz/debriefs/MM/DD/{version}__debrief__{description}.md`
+16. **Version** comes from `sgraph_ai_app_send/version`
+17. **UI assets** use versioned paths: `v0/v0.1/v0.1.0/index.html`
 
 ### Testing
 
@@ -139,8 +141,19 @@ Each agent operates as a specific role. Roles produce review documents in their 
 
 Before starting work, check:
 1. Latest human brief in `team/humans/dinis_cruz/briefs/`
-2. Latest Librarian master index in `team/roles/librarian/reviews/`
-3. Your role's previous reviews in `team/roles/{your-role}/reviews/`
+2. Latest debrief in `team/humans/dinis_cruz/debriefs/`
+3. Latest Librarian master index in `team/roles/librarian/reviews/`
+4. Your role's previous reviews in `team/roles/{your-role}/reviews/`
+
+### Debriefs
+
+After completing a batch of work (e.g. all roles responding to a brief), the Librarian creates a **debrief** — a human-facing summary with relative links to every deliverable.
+
+- **Path:** `team/humans/dinis_cruz/debriefs/MM/DD/{version}__debrief__{topic}.md`
+- **Purpose:** Single document Dinis can read to see what was delivered, what decisions were made, and what to review
+- **Links:** All links to role reviews and other deliverables must be **relative** to the debrief file, so they work both locally and on GitHub
+- **When:** Create a debrief whenever a session produces multiple deliverables that need human review
+- **Content:** Executive summary, recommended reading order, key decisions needing awareness, what's next
 
 ---
 
@@ -163,6 +176,7 @@ Before starting work, check:
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
 | System landscape map | `team/roles/cartographer/v0.1.2/v0.1.2__system-landscape-map-revised.md` |
 | Architecture plans | `team/roles/architect/v0.1.1/` |
-| Current brief | `team/humans/dinis_cruz/briefs/2026-02-10/v0.1.4__briefs__focus-on-mvp-release-infrastructure.md` |
-| Master index (latest) | `team/roles/librarian/reviews/26-02-10/v0.2.1__master-index__infrastructure-brief-responses.md` |
+| Current brief | `team/humans/dinis_cruz/briefs/02/13/v0.2.16__daily-brief__sgraph-send-13-feb-2026.md` |
+| Latest debrief | `team/humans/dinis_cruz/debriefs/02/13/v0.2.32__debrief__daily-brief-responses-13-feb.md` |
+| Master index (latest) | `team/roles/librarian/reviews/26-02-13/v0.2.24__master-index__daily-brief-responses-13-feb.md` |
 | Issues FS | `.issues/` |
