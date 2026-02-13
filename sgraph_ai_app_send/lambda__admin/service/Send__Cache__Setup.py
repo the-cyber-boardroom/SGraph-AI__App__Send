@@ -12,18 +12,17 @@ from osbot_utils.helpers.cache.Cache__Hash__Generator                           
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client                                               import Send__Cache__Client
 
 
+# todo: note the formatting changes below
 def create_send_cache_client():                                            # Factory: create Send__Cache__Client with IN_MEMORY cache service
-    cache_service = Cache_Service__Fast_API()
+    cache_service                       = Cache_Service__Fast_API()
     cache_service.config.enable_api_key = False                            # No auth needed for in-process cache
     cache_service.setup()
 
-    config = Fast_API__Service__Registry__Client__Config(
-        mode         = Enum__Fast_API__Service__Registry__Client__Mode.IN_MEMORY ,
-        fast_api     = cache_service                                             ,
-        fast_api_app = cache_service.app()                                       )
-    fast_api__service__registry.register(
-        client_type = Cache__Service__Client ,
-        config      = config                 )
+    config = Fast_API__Service__Registry__Client__Config(mode         = Enum__Fast_API__Service__Registry__Client__Mode.IN_MEMORY ,
+                                                         fast_api     = cache_service                                             ,
+                                                         fast_api_app = cache_service.app()                                       )
+    fast_api__service__registry.register                (client_type  = Cache__Service__Client                                    ,
+                                                         config       = config                                                    )
 
     client         = Cache__Service__Client()
     hash_generator = Cache__Hash__Generator()

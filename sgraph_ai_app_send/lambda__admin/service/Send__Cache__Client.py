@@ -33,14 +33,10 @@ class Send__Cache__Client(Type_Safe):                                      # Cac
     # ═══════════════════════════════════════════════════════════════════════
 
     def analytics__record_event(self, event_data):                         # Record raw analytics event via TEMPORAL strategy
-        try:
-            return self.cache_client.store().store__json(
-                namespace = NS_ANALYTICS ,
-                strategy  = 'temporal'   ,
-                body      = event_data   )
-        except Exception:                                                  # Analytics failures must never affect user requests
-            return None
-
+        return self.cache_client.store().store__json(namespace = NS_ANALYTICS ,
+                                                     strategy  = 'temporal'   ,
+                                                     body      = event_data   )  # todo: no need to have try catch here, this will return None if save failed
+    
     def analytics__list_recent_files(self, path_prefix):                   # List files under analytics temporal path
         result = self.cache_client.admin_storage().files__all__path(
             path = f'{NS_ANALYTICS}/{path_prefix}')

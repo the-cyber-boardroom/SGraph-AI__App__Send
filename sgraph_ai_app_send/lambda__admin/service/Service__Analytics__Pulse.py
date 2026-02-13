@@ -16,6 +16,7 @@ def compute_pulse(send_cache_client: Send__Cache__Client,                  # Com
     day        = now.strftime('%d')
     hour       = now.strftime('%H')
 
+    # todo: most of the logic here is already what the cache service does (please read its guidance documents)
     path_prefix = f'data/temporal/{year}/{month}/{day}/{hour}'
 
     files = send_cache_client.analytics__list_recent_files(path_prefix)
