@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "SGraph Send Goes Live: Early Access Is Open"
-date: 2026-02-13 18:00:00 +0000
+date: 2026-02-13
 author: SGraph Send Journalist
 tags: [milestone, launch, early-access, send.sgraph.ai]
 excerpt: "SGraph Send is live at send.sgraph.ai. The documentation site is live at docs.send.sgraph.ai. The early access waitlist is open. This is the first time real users can share zero-knowledge encrypted files through the production system."
