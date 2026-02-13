@@ -1,0 +1,7 @@
+{
+  "entry_id"  : "001",
+  "timestamp" : "2026-02-13T12:00:00Z",
+  "role"      : "dinis_cruz",
+  "action"    : "Reported access token bypass",
+  "finding"   : "Project owner tested send.sgraph.ai with access token 'abc'. Upload succeeded, data stored in S3, download link functional. Screenshot captured showing localStorage with token value 'abc' and successful transfer."
+}

@@ -1,0 +1,8 @@
+{
+  "entry_id"  : "002",
+  "timestamp" : "2026-02-13T12:05:00Z",
+  "role"      : "appsec",
+  "action"    : "Root cause identified via code review",
+  "finding"   : "Routes__Transfers.py:22-29 — check_access_token() uses get_env(SGRAPH_SEND__ACCESS_TOKEN, '') with a fail-open guard: if the env var returns empty string, the function returns immediately without checking the provided token. This means: (a) if the env var is not configured on the Lambda, ALL requests are accepted regardless of token, or (b) if the env var is set to 'abc', the token matches. Scenario (a) is the most probable cause given the reporter describes 'abc' as a wrong token.",
+  "affected_code": "sgraph_ai_app_send/lambda__user/fast_api/routes/Routes__Transfers.py:22-29"
+}
