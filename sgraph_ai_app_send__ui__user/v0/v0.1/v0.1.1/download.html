@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGraph Send — Download</title>
+    <link rel="stylesheet" href="../v0.1.0/css/common.css">
+</head>
+<body>
+    <header>
+        <h1>SGraph Send</h1>
+        <p>Zero-knowledge encrypted file sharing</p>
+    </header>
+    <main>
+        <send-download></send-download>
+
+        <section class="card" style="margin-top: 1.5rem; text-align: center;">
+            <h3 style="font-size: 1rem; margin-bottom: 0.25rem;">Want to send files too?</h3>
+            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">
+                Join the early access program for SGraph Send.
+            </p>
+            <form class="launchlist-form" action="https://getlaunchlist.com/s/zSa8gI" method="POST">
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
+                    <input name="name" type="text" class="input" placeholder="Name" style="flex: 1; min-width: 120px;">
+                    <input name="email" type="email" class="input" placeholder="Email" required style="flex: 1; min-width: 180px;">
+                    <button type="submit" class="btn btn-primary">Sign Up</button>
+                </div>
+            </form>
+        </section>
+    </main>
+    <script src="https://getlaunchlist.com/js/widget-diy.js" defer></script>
+    <script src="../v0.1.0/js/crypto.js"></script>
+    <script src="../v0.1.0/js/api-client.js"></script>
+    <script src="components/send-download/send-download.js"></script>
+    <script src="../v0.1.0/components/send-transparency/send-transparency.js"></script>
+</body>
+</html>

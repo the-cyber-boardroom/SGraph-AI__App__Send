@@ -1,0 +1,70 @@
+{
+  "app.title":                        "SGraph Send",
+  "app.subtitle":                     "Zero-knowledge encrypted file sharing",
+
+  "upload.mode.file":                 "File",
+  "upload.mode.text":                 "Text",
+
+  "upload.drop_zone.label":           "Drop your file here",
+  "upload.drop_zone.hint":            "or click to browse",
+  "upload.drop_zone.encrypted_hint":  "Encrypted in your browser before upload",
+
+  "upload.text.placeholder":          "Type or paste your text here",
+  "upload.text.char_count":           "{count} characters",
+
+  "upload.button.encrypt_upload":     "Encrypt & Upload",
+  "upload.button.encrypt_send":       "Encrypt & Send",
+
+  "upload.progress.encrypting":       "Encrypting...",
+  "upload.progress.uploading":        "Uploading...",
+
+  "upload.result.file_success":       "Your file has been encrypted and uploaded.",
+  "upload.result.text_success":       "Your text has been encrypted and uploaded.",
+  "upload.result.share_link":         "Share this link",
+  "upload.result.copy_link":          "Copy link",
+  "upload.result.show_separate_key":  "Share key separately",
+  "upload.result.hide_key":           "Hide key",
+  "upload.result.link_only":          "Link only",
+  "upload.result.decryption_key":     "Decryption key",
+  "upload.result.copy":               "Copy",
+  "upload.guidance.split_channels":   "For best security, share the link and the key via <strong>different channels</strong> (e.g. link via email, key via messaging app).",
+
+  "upload.error.empty_text":          "Please enter some text to encrypt.",
+  "upload.error.upload_failed":       "Upload failed. Please try again.",
+
+  "download.loading":                 "Loading transfer info...",
+
+  "download.info.encrypted_file":     "Encrypted file",
+  "download.info.encrypted_text":     "Encrypted text",
+  "download.info.uploaded":           "Uploaded {timestamp}",
+  "download.info.download_count":     "Downloaded {count} time(s)",
+
+  "download.key.label":               "Decryption key",
+  "download.key.placeholder":         "Paste the decryption key here",
+  "download.button.decrypt_download": "Download & Decrypt",
+  "download.button.decrypt_view":     "Decrypt & View",
+
+  "download.progress.decrypting":     "Downloading and decrypting...",
+
+  "download.result.file_success":     "File decrypted and saved successfully.",
+  "download.result.text_success":     "Text decrypted successfully.",
+  "download.result.copy_text":        "Copy to clipboard",
+  "download.result.download_file":    "Download as file",
+
+  "download.error.no_id":             "No transfer ID found in URL. Please check your link.",
+  "download.error.not_ready":         "This transfer is not yet available for download.",
+  "download.error.not_found":         "Transfer not found. The link may have expired.",
+  "download.error.no_key":            "Please enter the decryption key.",
+  "download.error.failed":            "Download or decryption failed.",
+
+  "crypto.error.unavailable":         "Web Crypto API is not available. It requires a secure context (HTTPS or localhost). If running locally, use \"localhost\" instead of \"127.0.0.1\".",
+  "crypto.error.read_failed":         "Failed to read file",
+
+  "common.copied":                    "Copied!",
+
+  "test_files.title":                 "Test Files",
+  "test_files.description":           "Download a test file, then drag it into the upload zone above.",
+
+  "cta.title":                        "Want to send files too?",
+  "cta.description":                  "Join the early access program for SGraph Send."
+}
