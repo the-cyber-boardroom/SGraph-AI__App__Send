@@ -29,7 +29,7 @@ class test__App_Send__UI__User__static_pages(TestCase):
         expected_file_path         = path_combine(sgraph_ai_app_send__ui__user.path, expected_file_virtual_path)
         expected_redirect          = f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}/{expected_file_virtual_path}'
 
-        assert response__no_redirects.headers['location'] == '/send/v0/v0.1/v0.1.0/index.html'      # remove once we have more versions, but good to see what the path looks like
+        assert response__no_redirects.headers['location'] == '/send/v0/v0.1/v0.1.3/index.html'      # remove once we have more versions, but good to see what the path looks like
         assert response__no_redirects.headers['location'] == expected_redirect
         assert response__redirects.request.url            == f'http://testserver{expected_redirect}'
 

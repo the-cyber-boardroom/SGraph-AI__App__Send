@@ -10,6 +10,9 @@ from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers          
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                      import Transfer__Service
 from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE
+from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client                   import Send__Cache__Client
+from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                    import create_send_cache_client
+from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                  import Middleware__Analytics
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
 ROUTES_PATHS__APP_SEND__STATIC__USER  = ['/',
@@ -17,8 +20,9 @@ ROUTES_PATHS__APP_SEND__STATIC__USER  = ['/',
 
 class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
-    send_config      : Send__Config      = None                                     # Storage configuration (auto-detects mode)
-    transfer_service : Transfer__Service  = None                                    # Shared transfer service instance
+    send_config       : Send__Config       = None                                   # Storage configuration (auto-detects mode)
+    transfer_service  : Transfer__Service   = None                                  # Shared transfer service instance
+    send_cache_client : Send__Cache__Client = None                                  # Cache service client (IN_MEMORY mode)
 
     def setup(self):
         with self.config as _:
@@ -35,6 +39,12 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         if self.transfer_service is None:                                           # Auto-create transfer service if not provided
             self.transfer_service = Transfer__Service(storage_fs=storage_fs)
 
+        if self.send_cache_client is None:                                          # Auto-create cache client in IN_MEMORY mode
+            try:
+                self.send_cache_client = create_send_cache_client()
+            except Exception:                                                       # Cache setup failure must not block the user Lambda
+                self.send_cache_client = None
+
         return super().setup()
 
 
@@ -44,6 +54,10 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         self.add_routes(Routes__Transfers        ,
                         transfer_service = self.transfer_service)
         self.add_routes(Routes__Set_Cookie)
+
+        if self.send_cache_client is not None:                                      # Add analytics middleware if cache client available
+            self.app().add_middleware(Middleware__Analytics,
+                                     send_cache_client = self.send_cache_client)
 
 
     # todo: refactor to separate class (focused on setting up this static route)
