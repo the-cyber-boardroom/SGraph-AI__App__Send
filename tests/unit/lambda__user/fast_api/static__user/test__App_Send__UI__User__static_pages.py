@@ -14,7 +14,8 @@ class test__App_Send__UI__User__static_pages(TestCase):
             cls.client                     = cls.service_fast_api_test_objs.fast_api__client
 
     def test__root(self):
-        assert self.client.get('/'                                       ).status_code == 404          # not wired in
+        assert self.client.get('/'            , follow_redirects=False ).status_code == 307          # root redirects to send page
+        assert self.client.get('/'            , follow_redirects=True  ).status_code == 200          # root redirect lands on send page
         assert self.client.get('/docs'                                   ).status_code == 200          # default swagger page
         assert self.client.get('/openapi.json'                           ).status_code == 200          # openapi.json spec
         assert self.client.get('/send/index.html'                        ).status_code == 200          # confirm static route is working
