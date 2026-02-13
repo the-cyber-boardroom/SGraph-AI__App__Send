@@ -5,8 +5,10 @@
 
 from fastapi                                                                     import HTTPException, Request, Response
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
+from osbot_utils.utils.Env                                                       import get_env
 from sgraph_ai_app_send.lambda__user.schemas.Schema__Transfer                    import Schema__Transfer__Create
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                   import Transfer__Service
+from sgraph_ai_app_send.lambda__user.user__config                                import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_SEND__ACCESS_TOKEN
 
 TAG__ROUTES_TRANSFERS = 'transfers'
 
@@ -17,14 +19,26 @@ ROUTES_PATHS__TRANSFERS = [f'/{TAG__ROUTES_TRANSFERS}/create'                  ,
                            f'/{TAG__ROUTES_TRANSFERS}/download/{{transfer_id}}']
 
 
+def check_access_token(request: Request):                                          # Validate access token on protected routes
+    expected_token = get_env(ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, '')
+    if not expected_token:                                                         # No token configured — allow all (local dev)
+        return
+    provided_token = request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '')
+    if provided_token != expected_token:
+        raise HTTPException(status_code = 401,
+                            detail      = 'Access token required')
+
+
 class Routes__Transfers(Fast_API__Routes):                                       # Transfer workflow endpoints
     tag              : str = TAG__ROUTES_TRANSFERS
     transfer_service : Transfer__Service                                         # Auto-initialized by Type_Safe
 
     # todo: return type should be Schema__Transfer__Initiated (not raw dict)
     # todo: sender_ip should be extracted from Request object, not hardcoded empty string
-    def create(self, request: Schema__Transfer__Create                          # POST /transfers/create
+    def create(self, request: Schema__Transfer__Create,                           # POST /transfers/create
+                     raw_request: Request
               ) -> dict:                                                         # todo: -> Schema__Transfer__Initiated
+        check_access_token(raw_request)
         result = self.transfer_service.create_transfer(file_size_bytes   = request.file_size_bytes  ,
                                                        content_type_hint = request.content_type_hint,
                                                        sender_ip        = ''                        )
@@ -35,6 +49,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
     async def upload__transfer_id(self, transfer_id : str    ,                  # POST /transfers/upload/{transfer_id}
                                         request     : Request
                                  ) -> dict:
+        check_access_token(request)
         body    = await request.body()
         success = self.transfer_service.upload_payload(transfer_id  = transfer_id,
                                                        payload_bytes = body      )
@@ -46,8 +61,10 @@ class Routes__Transfers(Fast_API__Routes):                                      
                     size        = len(body)    )
 
     # todo: return type should be Schema__Transfer__Complete_Response (not raw dict)
-    def complete__transfer_id(self, transfer_id: str                            # POST /transfers/complete/{transfer_id}
+    def complete__transfer_id(self, transfer_id: str,                            # POST /transfers/complete/{transfer_id}
+                                    request: Request
                              ) -> dict:                                          # todo: -> Schema__Transfer__Complete_Response
+        check_access_token(request)
         result = self.transfer_service.complete_transfer(transfer_id)
         if result is None:
             raise HTTPException(status_code = 404,
