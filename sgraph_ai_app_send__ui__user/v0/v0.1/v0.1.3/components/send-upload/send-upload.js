@@ -173,6 +173,7 @@ class SendUpload extends HTMLElement {
                     <label>${this.escapeHtml(this.t('upload.result.share_link'))}</label>
                     <span class="value" id="combined-link">${this.escapeHtml(combinedUrl)}</span>
                     <button class="btn btn-copy btn-sm" data-copy="combined-link">${this.escapeHtml(this.t('upload.result.copy_link'))}</button>
+                    <a href="${this.escapeHtml(combinedUrl)}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration: none; margin-left: 0.25rem;">${this.escapeHtml(this.t('upload.result.open_tab'))}</a>
                 </div>
             </div>
             <div style="margin-top: 0.5rem; text-align: right;">
