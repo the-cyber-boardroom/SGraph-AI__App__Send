@@ -8,14 +8,43 @@
 
 ## How It Works
 
-1. **You select a file** in your browser and enter an access token
-2. **Your browser encrypts the file** using AES-256-GCM (Web Crypto API) — encryption happens entirely on your device
-3. **Only the encrypted ciphertext** is uploaded to the server — the decryption key never leaves your browser
-4. **You share two things separately:** the download link and the decryption key, through different channels
-5. **The recipient opens the link,** enters the key, and the file is decrypted in their browser
-6. **A transparency panel** shows exactly what the server stored and what it did not
+A complete walkthrough of the upload-to-download flow. The server never sees your plaintext, your file name, or your decryption key at any point.
 
-The server holds only encrypted bytes and anonymised metadata. No file names. No decryption keys. No plaintext. Ever.
+### Step 1: Select a file
+
+Drop a file into the upload zone or click to browse. No account required.
+
+<img width="600" alt="Upload page with drop zone and test files section" src="https://github.com/user-attachments/assets/f6a37952-fddf-4842-877a-4d59b9ee81ee" />
+
+### Step 2: Encrypt and upload
+
+Your file is shown with its size. Click "Encrypt & Upload" -- encryption happens entirely in your browser using AES-256-GCM before anything leaves your device.
+
+<img width="600" alt="File selected, showing test-data.json ready for encryption" src="https://github.com/user-attachments/assets/fb5e68b7-a741-4aff-a816-99974695a067" />
+
+### Step 3: Share the link and key separately
+
+After upload, you get two things: a download link and a decryption key, each with its own copy button. The security tip reminds you to share these through different channels. The transparency panel proves what was stored (encrypted file, size) and what was NOT stored (file name, decryption key, raw IP).
+
+<img width="600" alt="File sent with download link, decryption key, and transparency panel" src="https://github.com/user-attachments/assets/f5bcbf42-36d1-4c4d-abc0-83bc3083c48a" />
+
+### Step 4: Recipient opens the download link
+
+The recipient sees the encrypted file metadata and a field to paste the decryption key. The server never sees the key -- it is shared out-of-band between sender and recipient.
+
+<img width="600" alt="Download page showing encrypted file and decryption key input" src="https://github.com/user-attachments/assets/2bcf7574-8eb7-4456-9a0f-442bd5d7a644" />
+
+### Step 5: File decrypted locally
+
+The file is decrypted in the recipient's browser. The transparency panel confirms: file content was encrypted (the server could not read it), the decryption key was NOT stored (only you have it), and the file name was never sent to the server.
+
+<img width="600" alt="Download confirmation with transparency panel showing zero-knowledge proof" src="https://github.com/user-attachments/assets/a7e52ea7-d310-4f9a-8c77-8ca752dc77e0" />
+
+### Step 6: Original file, intact
+
+The downloaded file is identical to the original. The server only ever had encrypted bytes -- it could not read, modify, or inspect the contents at any point.
+
+<img width="600" alt="Original test-data.json opened in text editor, content intact" src="https://github.com/user-attachments/assets/2b8f882f-1526-4084-928d-90c9602227e5" />
 
 ---
 
