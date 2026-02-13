@@ -20,6 +20,8 @@ class Routes__Tokens(Fast_API__Routes):                                    # Tok
     tag             : str = TAG__ROUTES_TOKENS
     service_tokens  : Service__Tokens                                      # Injected token service
 
+    # todo: the body needs to be Type_Safe class which is supported by Fast_API
+    #       see add_route_post example in library/dependencies/osbot-fast-api/v0.24.2__osbot-fast-api__routes_development_guide.md
     def create(self, body: dict) -> dict:                                   # POST /tokens/create (JSON body)
         token_name  = body.get('token_name' , '')
         usage_limit = body.get('usage_limit', 0)
@@ -38,17 +40,18 @@ class Routes__Tokens(Fast_API__Routes):                                    # Tok
         if result is None:
             raise HTTPException(status_code=409, detail='Token name already exists')
         return result
-
+    # todo: token_name should be a type safe primitive
     def lookup__token_name(self, token_name: str) -> dict:                 # GET /tokens/lookup/{token_name}
         result = self.service_tokens.lookup(token_name)
         if result is None:
             raise HTTPException(status_code=404, detail='Token not found')
         return result
 
+    #todo: body should be a Type_Safe class
     def use__token_name(self, token_name: str, body: dict = None) -> dict: # POST /tokens/use/{token_name}
-        ip_hash     = body.get('ip_hash'    , '') if body else ''
+        ip_hash     = body.get('ip_hash'    , ''           ) if body else ''
         action      = body.get('action'     , 'page_opened') if body else 'page_opened'
-        transfer_id = body.get('transfer_id', '') if body else ''
+        transfer_id = body.get('transfer_id', ''           ) if body else ''
         return self.service_tokens.use(
             token_name  = token_name  ,
             ip_hash     = ip_hash     ,
