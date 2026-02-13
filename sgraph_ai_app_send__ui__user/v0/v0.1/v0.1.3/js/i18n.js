@@ -129,8 +129,10 @@ const I18n = {
     },
 
     availableLocales: [
-        { code: 'en', name: 'English',   flag: '\uD83C\uDDEC\uD83C\uDDE7' },
-        { code: 'pt', name: 'Português', flag: '\uD83C\uDDE7\uD83C\uDDF7' }
+        { code: 'en',    name: 'English',              flag: '\uD83C\uDDEC\uD83C\uDDE7' },
+        { code: 'pt',    name: 'Português (Brasil)',    flag: '\uD83C\uDDE7\uD83C\uDDF7' },
+        { code: 'pt-PT', name: 'Português (Portugal)',  flag: '\uD83C\uDDF5\uD83C\uDDF9' },
+        { code: 'tlh',   name: 'tlhIngan Hol',         flag: '\uD83D\uDD96' }
     ],
 
     // ─── Initialisation ────────────────────────────────────────────────────
