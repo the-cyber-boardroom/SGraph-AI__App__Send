@@ -59,6 +59,12 @@ const I18n = {
             'upload.result.copy':               'Copy',
             'upload.guidance.split_channels':   'For best security, share the link and the key via <strong>different channels</strong> (e.g. link via email, key via messaging app).',
 
+            // ─── Upload: Text Drop ────────────────────────────────────────
+            'upload.text.drop_hint':            'You can also drop a text file here',
+
+            // ─── Upload: Send Another ─────────────────────────────────────
+            'upload.result.send_another':       'Send another',
+
             // ─── Upload: Errors ─────────────────────────────────────────
             'upload.error.empty_text':          'Please enter some text to encrypt.',
             'upload.error.upload_failed':       'Upload failed. Please try again.',
@@ -87,6 +93,17 @@ const I18n = {
             'download.result.copy_text':        'Copy to clipboard',
             'download.result.download_file':    'Download as file',
 
+            // ─── Download: Send Another ───────────────────────────────────
+            'download.result.send_another':     'Send your own',
+
+            // ─── Download: History ────────────────────────────────────────
+            'download.history.title':           'Recent downloads',
+            'download.history.privacy':         'Stored in your browser. Anyone with access to this device can view these.',
+            'download.history.clear':           'Clear history',
+            'download.history.empty':           'No recent downloads.',
+            'download.history.text_preview':    'Text',
+            'download.history.file_label':      'File',
+
             // ─── Download: Errors ───────────────────────────────────────
             'download.error.no_id':             'No transfer ID found in URL. Please check your link.',
             'download.error.not_ready':         'This transfer is not yet available for download.',
@@ -112,8 +129,8 @@ const I18n = {
     },
 
     availableLocales: [
-        { code: 'en', name: 'English'    },
-        { code: 'pt', name: 'Português'  }
+        { code: 'en', name: 'English',   flag: '\uD83C\uDDEC\uD83C\uDDE7' },
+        { code: 'pt', name: 'Português', flag: '\uD83C\uDDE7\uD83C\uDDF7' }
     ],
 
     // ─── Initialisation ────────────────────────────────────────────────────
@@ -123,6 +140,10 @@ const I18n = {
         if (saved && saved !== 'en' && this.isSupported(saved)) {
             this.locale = saved;
             await this.loadLocale(saved);
+            // Fire event so web components re-render with loaded locale
+            document.dispatchEvent(new CustomEvent('locale-changed', {
+                detail: { locale: saved }
+            }));
         }
     },
 

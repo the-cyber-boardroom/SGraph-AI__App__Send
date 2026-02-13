@@ -31,6 +31,9 @@ class SendUpload extends HTMLElement {
     }
 
     connectedCallback() {
+        // Defensive: ensure properties are set even if constructor didn't run during upgrade
+        if (this.inputMode === undefined) this.inputMode = 'file';
+        if (this.state === undefined) this.state = 'idle';
         this.render();
         this.setupEventListeners();
         document.addEventListener('locale-changed', this._localeHandler);
@@ -101,6 +104,9 @@ class SendUpload extends HTMLElement {
                             ${this.state !== 'idle' ? 'disabled' : ''}>
                         ${this.t('upload.button.encrypt_send')}
                     </button>
+                </div>
+                <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: 0.5rem; text-align: center;">
+                    ${this.escapeHtml(this.t('upload.text.drop_hint'))}
                 </div>
             </div>
         `;
@@ -176,6 +182,11 @@ class SendUpload extends HTMLElement {
             </div>
             ${separateSection}
             ${transparency ? `<send-transparency id="transparency-panel"></send-transparency>` : ''}
+            <div style="margin-top: 1.5rem; text-align: center;">
+                <button class="btn btn-sm" id="send-another-btn" style="color: var(--color-primary);">
+                    ${this.escapeHtml(this.t('upload.result.send_another'))}
+                </button>
+            </div>
         `;
     }
 
@@ -218,6 +229,26 @@ class SendUpload extends HTMLElement {
                 const counter = this.querySelector('#text-char-count');
                 if (counter) counter.textContent = this.t('upload.text.char_count', { count: textInput.value.length });
             });
+            // Allow dropping text files into the textarea
+            textInput.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); textInput.style.borderColor = 'var(--color-primary)'; });
+            textInput.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); textInput.style.borderColor = ''; });
+            textInput.addEventListener('drop', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                textInput.style.borderColor = '';
+                const files = e.dataTransfer && e.dataTransfer.files;
+                if (files && files.length > 0) {
+                    const file = files[0];
+                    if (file.type.startsWith('text/') || /\.(txt|md|json|csv|xml|html|css|js|ts|py|yml|yaml|log|ini|cfg|conf|sh|bat)$/i.test(file.name)) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            textInput.value = reader.result;
+                            const counter = this.querySelector('#text-char-count');
+                            if (counter) counter.textContent = this.t('upload.text.char_count', { count: textInput.value.length });
+                        };
+                        reader.readAsText(file);
+                    }
+                }
+            });
         }
 
         this.setupDynamicListeners();
@@ -251,6 +282,22 @@ class SendUpload extends HTMLElement {
         if (transparencyPanel && this.result && this.result.transparency) {
             transparencyPanel.setData(this.result.transparency);
         }
+
+        const sendAnotherBtn = this.querySelector('#send-another-btn');
+        if (sendAnotherBtn) {
+            sendAnotherBtn.addEventListener('click', () => this.resetForNew());
+        }
+    }
+
+    resetForNew() {
+        this.selectedFile     = null;
+        this.inputMode        = 'file';
+        this.state            = 'idle';
+        this.result           = null;
+        this.errorMessage     = null;
+        this._showSeparateKey = false;
+        this.render();
+        this.setupEventListeners();
     }
 
     cleanup() {
@@ -309,12 +356,15 @@ class SendUpload extends HTMLElement {
 
         const isText = this.inputMode === 'text';
 
+        // Save text value BEFORE state change triggers re-render (which recreates the textarea empty)
+        let textValue = '';
         if (isText) {
             const ti = this.querySelector('#text-input');
             if (!ti || !ti.value.trim()) {
                 this.errorMessage = this.t('upload.error.empty_text');
                 this.state = 'error'; this.render(); this.setupEventListeners(); return;
             }
+            textValue = ti.value;
         } else if (!this.selectedFile) { return; }
 
         try {
@@ -322,14 +372,15 @@ class SendUpload extends HTMLElement {
 
             let plaintext, fileSizeBytes, contentType;
             if (isText) {
-                const text  = this.querySelector('#text-input')?.value || '';
-                plaintext     = new TextEncoder().encode(text).buffer;
+                plaintext     = new TextEncoder().encode(textValue).buffer;
                 fileSizeBytes = plaintext.byteLength;
                 contentType   = 'text/plain';
             } else {
-                plaintext     = await this.readFileAsArrayBuffer(this.selectedFile);
-                fileSizeBytes = this.selectedFile.size;
-                contentType   = this.selectedFile.type || 'application/octet-stream';
+                const rawContent = await this.readFileAsArrayBuffer(this.selectedFile);
+                contentType      = this.selectedFile.type || 'application/octet-stream';
+                // Wrap with SGMETA envelope to preserve filename
+                plaintext     = this.packageWithMetadata(rawContent, { filename: this.selectedFile.name });
+                fileSizeBytes = plaintext.byteLength;
             }
 
             const key       = await SendCrypto.generateKey();
@@ -358,6 +409,30 @@ class SendUpload extends HTMLElement {
             this.errorMessage = err.message || this.t('upload.error.upload_failed');
             this.state = 'error'; this.render(); this.setupEventListeners();
         }
+    }
+
+    // ─── SGMETA Envelope ─────────────────────────────────────────────────
+
+    static SGMETA_MAGIC = [0x53, 0x47, 0x4D, 0x45, 0x54, 0x41, 0x00]; // "SGMETA\0"
+
+    packageWithMetadata(contentBuffer, metadata) {
+        const magic = SendUpload.SGMETA_MAGIC;
+        const metaBytes = new TextEncoder().encode(JSON.stringify(metadata));
+        const metaLen = metaBytes.length;
+
+        const result = new Uint8Array(magic.length + 4 + metaLen + contentBuffer.byteLength);
+        // Magic bytes
+        result.set(magic, 0);
+        // 4-byte big-endian metadata length
+        result[magic.length]     = (metaLen >> 24) & 0xFF;
+        result[magic.length + 1] = (metaLen >> 16) & 0xFF;
+        result[magic.length + 2] = (metaLen >> 8)  & 0xFF;
+        result[magic.length + 3] = metaLen & 0xFF;
+        // Metadata JSON bytes
+        result.set(metaBytes, magic.length + 4);
+        // File content
+        result.set(new Uint8Array(contentBuffer), magic.length + 4 + metaLen);
+        return result.buffer;
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────
