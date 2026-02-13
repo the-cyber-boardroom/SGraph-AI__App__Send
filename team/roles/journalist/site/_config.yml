@@ -3,8 +3,8 @@
 
 title: SGraph Send
 description: "Zero-knowledge encrypted file sharing. Your files, encrypted in your browser, before they ever leave your device."
-url: "" # Set to your GitHub Pages URL when deployed
-baseurl: "" # Set to repo name if using project pages (e.g., /SGraph-AI__App__Send)
+url: "https://docs.send.sgraph.ai"
+baseurl: ""
 
 # Build
 markdown: kramdown
