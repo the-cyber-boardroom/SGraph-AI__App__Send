@@ -105,11 +105,12 @@ class Transfer__Service(Type_Safe):                                             
         if not self.has_transfer(transfer_id):
             return None
         meta = self.load_meta(transfer_id)
-        return dict(transfer_id    = meta['transfer_id']   ,                     # todo: return Type_Safe class, not raw dict
-                    status         = meta['status']        ,
-                    file_size_bytes= meta['file_size_bytes'],
-                    created_at     = meta['created_at']    ,
-                    download_count = meta['download_count'])
+        return dict(transfer_id      = meta['transfer_id']      ,                 # todo: return Type_Safe class, not raw dict
+                    status           = meta['status']           ,
+                    file_size_bytes  = meta['file_size_bytes']  ,
+                    content_type_hint= meta.get('content_type_hint', ''),
+                    created_at       = meta['created_at']       ,
+                    download_count   = meta['download_count']   )
 
     # todo: needs @type_safe decorator with typed parameters
     # todo: transfer_id should be Transfer_Id, downloader_ip should be str or Safe_Str__IP_Address
