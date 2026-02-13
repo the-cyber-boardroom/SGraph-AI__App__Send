@@ -4,13 +4,43 @@
 
    Simple fetch-based client for the SGraph Send backend API.
    All endpoints are relative to the current origin (same-origin).
+
+   Protected endpoints (create, upload, complete) require an access token
+   sent via the x-sgraph-access-token header. The token is read from
+   localStorage under the key 'sgraph-send-access-token'.
    ═══════════════════════════════════════════════════════════════════════════ */
+
+const STORAGE_KEY__ACCESS_TOKEN = 'sgraph-send-access-token';
+const HEADER__ACCESS_TOKEN      = 'x-sgraph-access-token';
 
 const ApiClient = {
 
     baseUrl: '',   // Same origin — no prefix needed
 
-    // ─── Transfer Lifecycle ────────────────────────────────────────────────
+    // ─── Access Token ────────────────────────────────────────────────────
+
+    getAccessToken() {
+        return localStorage.getItem(STORAGE_KEY__ACCESS_TOKEN) || '';
+    },
+
+    setAccessToken(token) {
+        localStorage.setItem(STORAGE_KEY__ACCESS_TOKEN, token);
+    },
+
+    clearAccessToken() {
+        localStorage.removeItem(STORAGE_KEY__ACCESS_TOKEN);
+    },
+
+    hasAccessToken() {
+        return !!this.getAccessToken();
+    },
+
+    authHeaders() {
+        const token = this.getAccessToken();
+        return token ? { [HEADER__ACCESS_TOKEN]: token } : {};
+    },
+
+    // ─── Transfer Lifecycle (protected — require access token) ───────────
 
     /**
      * Create a new transfer. Returns transfer_id and upload_url.
@@ -21,12 +51,17 @@ const ApiClient = {
     async createTransfer(fileSizeBytes, contentTypeHint) {
         const response = await fetch(`${this.baseUrl}/transfers/create`, {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json',
+                       ...this.authHeaders() },
             body:    JSON.stringify({
                 file_size_bytes:   fileSizeBytes,
                 content_type_hint: contentTypeHint || 'application/octet-stream'
             })
         });
+        if (response.status === 401) {
+            this.clearAccessToken();
+            throw new Error('ACCESS_TOKEN_INVALID');
+        }
         if (!response.ok) {
             throw new Error(`Create transfer failed: ${response.status}`);
         }
@@ -42,9 +77,14 @@ const ApiClient = {
     async uploadPayload(transferId, encryptedBlob) {
         const response = await fetch(`${this.baseUrl}/transfers/upload/${transferId}`, {
             method:  'POST',
-            headers: { 'Content-Type': 'application/octet-stream' },
+            headers: { 'Content-Type': 'application/octet-stream',
+                       ...this.authHeaders() },
             body:    encryptedBlob
         });
+        if (response.status === 401) {
+            this.clearAccessToken();
+            throw new Error('ACCESS_TOKEN_INVALID');
+        }
         if (!response.ok) {
             throw new Error(`Upload failed: ${response.status}`);
         }
@@ -59,15 +99,20 @@ const ApiClient = {
     async completeTransfer(transferId) {
         const response = await fetch(`${this.baseUrl}/transfers/complete/${transferId}`, {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json',
+                       ...this.authHeaders() }
         });
+        if (response.status === 401) {
+            this.clearAccessToken();
+            throw new Error('ACCESS_TOKEN_INVALID');
+        }
         if (!response.ok) {
             throw new Error(`Complete transfer failed: ${response.status}`);
         }
         return response.json();
     },
 
-    // ─── Transfer Info & Download ──────────────────────────────────────────
+    // ─── Transfer Info & Download (public — no auth needed) ──────────────
 
     /**
      * Get transfer metadata (status, size, created date, download count).

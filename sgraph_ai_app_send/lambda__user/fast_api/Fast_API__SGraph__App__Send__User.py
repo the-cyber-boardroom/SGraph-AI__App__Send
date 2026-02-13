@@ -24,7 +24,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             _.name           = APP__SEND__USER__FAST_API__TITLE
             _.version        = version__sgraph_ai_app_send
             _.description    = APP__SEND__USER__FAST_API__DESCRIPTION
-            _.enable_api_key = True
+            _.enable_api_key = False                                                  # Per-route access token replaces global middleware
 
         if self.send_config is None:                                                # Auto-create config if not provided
             self.send_config = Send__Config()

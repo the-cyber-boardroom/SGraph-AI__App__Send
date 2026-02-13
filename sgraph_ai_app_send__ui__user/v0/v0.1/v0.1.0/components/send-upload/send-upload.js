@@ -311,6 +311,10 @@ class SendUpload extends HTMLElement {
             }));
 
         } catch (err) {
+            if (err.message === 'ACCESS_TOKEN_INVALID') {
+                document.dispatchEvent(new CustomEvent('access-token-invalid'));
+                return;
+            }
             this.errorMessage = err.message || 'Upload failed. Please try again.';
             this.state        = 'error';
             this.render();

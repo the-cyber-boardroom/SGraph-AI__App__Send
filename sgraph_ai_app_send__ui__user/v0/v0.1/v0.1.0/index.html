@@ -12,21 +12,24 @@
         <p>Zero-knowledge encrypted file sharing</p>
     </header>
     <main>
-        <send-upload></send-upload>
+        <send-access-gate>
+            <send-upload></send-upload>
 
-        <section class="card" style="margin-top: 1.5rem; padding: 1.25rem;">
-            <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem;">Test Files</h3>
-            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0 0 0.75rem 0;">
-                Download a test file, then drag it into the upload zone above.
-            </p>
-            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-                <a href="test-files/test-text.txt" download class="btn btn-sm" style="text-decoration: none;">test-text.txt</a>
-                <a href="test-files/test-data.json" download class="btn btn-sm" style="text-decoration: none;">test-data.json</a>
-            </div>
-        </section>
+            <section class="card" style="margin-top: 1.5rem; padding: 1.25rem;">
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem;">Test Files</h3>
+                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0 0 0.75rem 0;">
+                    Download a test file, then drag it into the upload zone above.
+                </p>
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <a href="test-files/test-text.txt" download class="btn btn-sm" style="text-decoration: none;">test-text.txt</a>
+                    <a href="test-files/test-data.json" download class="btn btn-sm" style="text-decoration: none;">test-data.json</a>
+                </div>
+            </section>
+        </send-access-gate>
     </main>
     <script src="js/crypto.js"></script>
     <script src="js/api-client.js"></script>
+    <script src="components/send-access-gate/send-access-gate.js"></script>
     <script src="components/send-upload/send-upload.js"></script>
     <script src="components/send-transparency/send-transparency.js"></script>
 </body>
