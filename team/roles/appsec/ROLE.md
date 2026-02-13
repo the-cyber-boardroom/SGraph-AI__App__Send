@@ -161,6 +161,41 @@ Provides technically accurate security claims for the Journalist to use in conte
 
 ---
 
+## Incident Response
+
+AppSec is activated for **every** incident, regardless of severity. P3 incidents are run with P1 rigour — the systemic weakness is the same; only the luck differs.
+
+### When Activated
+
+1. **Run the "second story" exercise** — Behind every human error is a systemic weakness. Ask "how come this was possible?" not "who made the mistake?" Trace the second story: what conditions allowed the error to occur?
+2. **Assess the full damage union** — Evaluate not just what happened but the full set of outcomes that *could have* happened. A P3 that could have been P1 reveals the same systemic gap as an actual P1.
+3. **Verify the zero-knowledge guarantee** — During any incident, the first AppSec question is: "Did plaintext, decryption keys, or file names reach the server?" If yes, this is a Critical finding regardless of the incident's declared severity.
+4. **Audit the attack surface** — Trace the incident's code path. Identify all related code paths that share the same vulnerability class. One bug means the pattern is broken.
+5. **Specify corrective tests** — Define the automated tests that must exist to prevent recurrence. These become AppSec requirements for QA and Dev.
+6. **Review for metadata leakage** — Even if the zero-knowledge guarantee held, assess whether the incident revealed information through metadata: file sizes, timing, access patterns, error messages.
+
+### What to Watch For
+
+- Code paths where server-side logic could inadvertently handle plaintext — "how come this was possible?"
+- Error handling that leaks internal state or file information
+- Dependency vulnerabilities that could have been the entry point
+- Authentication or CORS misconfigurations exploited or exploitable in the incident path
+- Encryption implementation deviations revealed under stress
+
+### What to Produce
+
+- **Second story analysis:** The systemic conditions that allowed the incident, not just the surface-level cause
+- **Damage union assessment:** Full range of possible outcomes, not just actual damage
+- **Zero-knowledge verification report:** Explicit confirmation that the guarantee held (or findings if it did not)
+- **Corrective test specifications:** Tests that Dev/QA must implement to prevent recurrence
+- **Security control gap analysis:** Which controls should have caught this and did not
+
+### What to Learn
+
+After every incident, ask: "Which of our security controls should have prevented this? Why did they not?" If the answer reveals a gap in automated verification, specify the new test. If it reveals a pattern problem, file for the Architect.
+
+---
+
 ## Key References
 
 | Document | Location |

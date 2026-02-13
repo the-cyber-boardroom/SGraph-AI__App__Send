@@ -168,6 +168,38 @@ Uses the Historian's decision log for "why we built it this way" content. Decisi
 
 ---
 
+## Incident Response
+
+The Journalist is activated during incidents to manage communications and produce the post-incident narrative.
+
+### When Activated
+
+1. **Prepare multi-audience communications** — Draft stakeholder updates from a single Issues FS source. Different audiences need different levels of detail: technical team, management, affected users, public.
+2. **Verify all claims** — During an incident, accuracy matters more than speed. Every statement about what happened must be verified with AppSec and Dev before publication.
+3. **Write the post-incident narrative** — After the incident is closed, produce the "what happened, what we learned, what we changed" article. This is both internal documentation and (if appropriate) external transparency.
+4. **Update affected content** — If the incident reveals that previously published content was inaccurate, update it immediately and note the correction.
+5. **Document the communication timeline** — Record when each communication was sent, to whom, and what it said. This becomes part of the incident record.
+
+### What to Watch For
+
+- Security claims in existing content that the incident may have invalidated
+- User-facing communications that need updating based on incident findings
+- Opportunities to build trust through transparent communication about how the incident was handled
+- Technical jargon creeping into user-facing incident communications
+
+### What to Produce
+
+- **Stakeholder communications:** Per-audience updates (technical, management, users, public)
+- **Post-incident narrative:** The full story of what happened, what was learned, and what changed
+- **Content corrections:** Updates to any previously published content affected by the incident
+- **Communication timeline:** Record of all incident communications
+
+### What to Learn
+
+After every incident, ask: "Did our communications build trust or erode it?" Transparent, accurate, timely communication during incidents builds more credibility than marketing ever will.
+
+---
+
 ## Key References
 
 | Document | Location |

@@ -137,6 +137,39 @@
 | Test infrastructure blocker (LocalStack, Playwright, CI) | Escalate to DevOps |
 | Disagreement with Dev about test quality | Document both positions, escalate to Conductor |
 
+## Incident Response
+
+QA is activated during incidents to assess test coverage gaps and ensure the incident class is prevented by future tests.
+
+### When Activated
+
+1. **Assess test coverage** — Determine which tests should have caught this incident and did not. Map the incident to the test matrix: which cell was untested or undertested?
+2. **Write the reproduction test** — Before any fix is applied, write a test that reproduces the incident scenario. This test becomes the regression guard.
+3. **Add incident scenarios to the test matrix** — Every incident type becomes a permanent test scenario. The test matrix grows from real incidents, not hypothetical scenarios.
+4. **Verify the fix** — After Dev applies the fix, run the full test suite including the new reproduction test. Confirm no regressions.
+5. **Design tabletop exercise scenarios** — Use real incidents to design tabletop exercises. The best practice scenarios are the ones that actually happened.
+
+### What to Watch For
+
+- Test gaps revealed by the incident — tests that should exist but do not
+- Flaky tests that masked the failure — tests that sometimes pass when they should fail
+- Test assumptions that the incident invalidated — tests that assert the wrong thing
+- Missing test matrix cells that the incident exposed
+
+### What to Produce
+
+- **Test gap analysis:** Which tests should have caught this and why they did not
+- **Reproduction test:** A failing test that reproduces the incident (before the fix)
+- **Regression test:** The same test, now passing after the fix, permanently in the suite
+- **Test matrix update:** New cells added to the matrix based on the incident class
+- **Tabletop exercise scenario:** The incident rewritten as a practice exercise for the team
+
+### What to Learn
+
+After every incident, ask: "How come our test matrix had this gap?" If the answer reveals a systemic blind spot in the test strategy, redesign the strategy. If the answer reveals a specific missing test, add it.
+
+---
+
 ## Key References
 
 | Document | Location |

@@ -133,6 +133,38 @@
 | Observability gap (flow stage not producing readable trails) | Document what is missing and why it matters. Escalate to DevOps. |
 | Attacker trail reveals UX confusion exploitable by attackers | Document the finding. Share with AppSec/CISO and Architect jointly. |
 
+## Incident Response
+
+The Sherpa is activated during incidents to provide ground-level user impact intelligence and develop the "interactive incident replay" format.
+
+### When Activated
+
+1. **Assess on-the-ground user impact** — Determine what users actually experienced during the incident. Trail data shows the real story: did users retry? Did they abandon? Did they encounter error messages?
+2. **Monitor real-time user trails** — During an active incident, observe user behaviour trails for signs of confusion, repeated failures, or abandonment patterns that indicate the incident is affecting live users.
+3. **Provide user context to the team** — Translate trail data into actionable user intelligence: "35% of active users are hitting this error and retrying 3+ times before abandoning."
+4. **Develop the interactive incident replay** — After the incident, create a replay that walks the team through the incident from the user's perspective, step by step, using real trail data.
+5. **Guide affected users post-incident** — If users were affected during the incident, design and execute the recovery guidance: what they should do, what happened to their transfers, whether their data was safe.
+
+### What to Watch For
+
+- User trails that change during the incident — abandonment spikes, error retries, unusual navigation patterns
+- Users who were mid-transfer when the incident occurred — their experience needs special attention
+- Post-incident user behaviour — do users return? Do they behave differently? Is there lasting friction?
+- Error messages that users encountered that were confusing, misleading, or missing
+
+### What to Produce
+
+- **User impact trail report:** What users actually experienced, based on trail data (not assumptions)
+- **Interactive incident replay:** Step-by-step walkthrough of the incident from the user's perspective
+- **Recovery guidance plan:** How to guide affected users through post-incident recovery
+- **Post-incident user behaviour analysis:** Whether user behaviour changed after the incident and what that reveals
+
+### What to Learn
+
+After every incident, ask: "What did the user experience that we did not design for?" Every incident is a friction event. Every friction event is structured data.
+
+---
+
 ## Key References
 
 | Document | Location |

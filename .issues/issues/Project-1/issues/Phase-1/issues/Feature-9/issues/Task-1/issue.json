@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000078",
+  "node_type": "task",
+  "node_index": 1,
+  "label": "Task-1",
+  "title": "Update all ROLE.md files with Incident Response sections",
+  "description": "Add an ## Incident Response section to every ROLE.md file. Each section should define: when the role is activated during an incident, what to watch for, what to produce, and what to learn. Source: Document 2 (Practice).",
+  "status": "done",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "role-definition", "all-roles"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "Every ROLE.md has an ## Incident Response section with When Activated, What to Watch For, What to Produce, and What to Learn subsections.",
+    "role_assignment": "all-roles",
+    "source_document": "v0.2.23__briefs__incident-practice-running-p3-as-p1.md"
+  }
+}

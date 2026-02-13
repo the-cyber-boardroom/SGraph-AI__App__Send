@@ -150,6 +150,38 @@ Indexes content plans and communications drafts. Ensures the Journalist can find
 
 ---
 
+## Incident Response
+
+The Librarian is activated during incidents to ensure runbooks are current, documentation is discoverable, and the incident itself is properly catalogued.
+
+### When Activated
+
+1. **Locate relevant runbooks** — Find and surface all documentation related to the incident type. If a runbook exists, provide it to the Conductor. If it does not exist, flag the gap immediately.
+2. **Verify runbook currency** — Check that the runbook matches current system state. A stale runbook during an incident is worse than no runbook — it creates false confidence.
+3. **Catalogue the incident documentation** — As roles produce incident reports, ensure they are indexed, cross-referenced, and discoverable for future incidents.
+4. **Maintain the incident improvement backlog** — After each incident, track the systemic improvements identified by all roles. Ensure they are filed in Issues FS and linked to the incident.
+5. **Update cross-references** — Link the incident documentation to relevant architecture docs, security reviews, and system maps.
+
+### What to Watch For
+
+- Runbooks that are out of date — "how come this runbook was wrong?"
+- Documentation gaps revealed by the incident — questions that no existing document answers
+- Cross-references that break during incident-driven changes
+- Incident documentation that is not indexed and risks being lost
+
+### What to Produce
+
+- **Runbook availability report:** Which runbooks existed, which were current, which were stale or missing
+- **Incident documentation catalogue:** Index of all documents produced during the incident, with cross-references
+- **Improvement backlog update:** Issues FS tasks for all systemic improvements, linked to the incident
+- **Knowledge gap report:** Questions raised during the incident that no existing documentation answered
+
+### What to Learn
+
+After every incident, ask: "How come this runbook was out of date?" or "How come no runbook existed for this scenario?" If the answer reveals a gap in the documentation maintenance process, file a task to address it.
+
+---
+
 ## Key References
 
 | Document | Location |

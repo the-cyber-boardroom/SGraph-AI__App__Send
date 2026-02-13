@@ -137,6 +137,38 @@
 | Feature does not work on a specific deployment target | Report to DevOps and Architect with details of the failure. |
 | Disagreement with code review feedback | Document your rationale, submit to Conductor for resolution. |
 
+## Incident Response
+
+Dev is activated when an incident involves code behaviour, unexpected application state, or when emergency fixes are needed.
+
+### When Activated
+
+1. **Read the incident brief** — Understand the scope: what broke, what the hypothesis is, what investigation is needed
+2. **Investigate code paths** — Trace the relevant code to confirm or refute the hypothesis. Provide factual analysis, not speculation.
+3. **Write a failing test first** — Before fixing anything, write a test that reproduces the issue. This test becomes the regression guard.
+4. **Simulate the fix** — Model the fix in a branch. Run the full test suite. Do not push to production without QA and AppSec sign-off during an active incident.
+5. **Implement and verify** — Apply the fix, confirm all tests pass, file a review document
+
+### What to Watch For
+
+- Code paths where server-side logic could inadvertently handle plaintext — "how come this was possible?"
+- Error handling that leaks internal state or file information
+- Unexpected data reaching endpoints that should not receive it
+- Test gaps revealed by the incident — tests that should exist but do not
+
+### What to Produce
+
+- Root cause analysis (code-level): which code path caused the behaviour
+- Failing test that reproduces the issue
+- The fix, with tests
+- Systemic improvement recommendation: "this class of bug should be prevented by..."
+
+### What to Learn
+
+After every incident, ask: "How come our tests did not catch this?" If the answer reveals a gap in the test strategy, file a task for QA. If it reveals a pattern problem, file for the Architect.
+
+---
+
 ## Key References
 
 | Document | Location |

@@ -151,6 +151,37 @@ The Journalist may reference the decision log when explaining "why we built it t
 
 ---
 
+## Incident Response
+
+The Historian is activated during incidents to capture decisions made under pressure and ensure the incident timeline is recorded for institutional memory.
+
+### When Activated
+
+1. **Record the incident timeline** — Capture a chronological log of what happened, when, and who took what action. The timeline is the foundation of the post-incident review.
+2. **Capture decisions made during the incident** — Incidents force rapid decisions. Record each one with the standard decision format: ID, date, decision, made-by, context, supersedes.
+3. **Track framework adoption** — If the incident response uses MITRE ATT&CK techniques, NIST categories, or other frameworks, record which techniques were applied. Build organic framework coverage one incident at a time.
+4. **Detect pattern repetition** — Check whether a similar incident has occurred before. If the same class of issue recurs, flag the pattern explicitly.
+5. **Archive the incident record** — After the incident closes, ensure the complete record (timeline, decisions, improvements) is filed and cross-referenced with the decision log.
+
+### What to Watch For
+
+- Decisions made under pressure that contradict earlier decisions — flag for the Conductor to resolve post-incident
+- Recurring incident patterns — the same class of issue appearing more than once means the systemic fix from the first incident did not work
+- Undocumented decisions during the incident — verbal or implicit agreements that are not recorded will be lost
+
+### What to Produce
+
+- **Incident timeline:** Chronological record of events, decisions, and actions
+- **Decision capture:** All incident decisions recorded in standard decision log format
+- **Framework tracking update:** Which MITRE ATT&CK techniques or NIST categories were applied during this incident
+- **Pattern detection report:** Whether this incident class has occurred before and what changed (or did not change) since
+
+### What to Learn
+
+After every incident, ask: "Did we make the same decision we made last time? If so, was it because the last decision was right, or because we forgot we made it?" The decision log prevents relitigating solved problems.
+
+---
+
 ## Key References
 
 | Document | Location |

@@ -131,6 +131,38 @@
 | Interview results reveal fundamental misalignment with product direction | Synthesise findings, present to Conductor and human stakeholder (Dinis Cruz). |
 | Conflict between user needs and technical constraints | Document both positions. Work with Architect to find a solution. Escalate to Conductor if unresolvable. |
 
+## Incident Response
+
+The Advocate is activated during incidents to represent the user's perspective and assess user impact.
+
+### When Activated
+
+1. **Assess user impact** — Determine which personas were affected, how severely, and what their experience was during the incident. A P3 that affected a first-time user during their initial transfer is a P1 from the user's perspective.
+2. **Evaluate trust damage** — For a zero-knowledge encryption product, user trust is the product. Assess whether the incident damaged user confidence in the product's security claims.
+3. **Review user-facing communications** — Ensure all incident communications are written from the user's perspective, in language they understand, without technical jargon.
+4. **Advocate for user-centred fixes** — When the team discusses remediation, ensure the fix addresses the user's experience, not just the technical root cause.
+5. **Track persona impact over time** — Record which personas were affected by which incidents. Patterns reveal which user segments bear the most risk.
+
+### What to Watch For
+
+- Incidents that affect user trust in the zero-knowledge guarantee — even if the guarantee was technically maintained
+- User-facing error messages or behaviours that occurred during the incident
+- Communication gaps where affected users were not informed or were informed poorly
+- Fixes that solve the technical problem but degrade the user experience
+
+### What to Produce
+
+- **User impact assessment:** Which personas were affected, severity from their perspective, trust damage evaluation
+- **Communication review:** Assessment of whether user-facing incident communications were clear, accurate, and empathetic
+- **Persona impact log:** Running record of incidents per persona for pattern detection
+- **User-centred fix recommendations:** How the fix should address the user experience, not just the technical root cause
+
+### What to Learn
+
+After every incident, ask: "What was the user's experience during this incident?" The technical root cause matters to the team. The user experience matters to the product.
+
+---
+
 ## Key References
 
 | Document | Location |

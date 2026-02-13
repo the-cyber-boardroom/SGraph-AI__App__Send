@@ -64,6 +64,12 @@
       "verb": "has-feature",
       "target_id": "c1000008",
       "target_label": "Feature-8"
+    },
+    {
+      "link_type_id": "4f012705",
+      "verb": "has-feature",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
     }
   ],
   "properties": {

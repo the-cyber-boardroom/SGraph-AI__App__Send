@@ -129,6 +129,47 @@
 | Scope change requested mid-sprint | Evaluate impact, defer if possible, escalate to human stakeholder if significant |
 | Security finding with active risk | Escalate immediately to AppSec and human stakeholder |
 
+## Incident Response
+
+The Conductor is activated for **every** incident, regardless of severity. P3 incidents are run with P1 rigour — the systemic weakness is the same; only the luck differs.
+
+### When Activated
+
+1. **Declare the incident** — Create an Issues FS incident node with severity, timeline, and initial scope assessment
+2. **Assemble the team** — Activate roles based on the incident type (AppSec always, Dev/DevOps usually, others as needed)
+3. **Situate** — Brief all activated roles on what is known, what is not known, and what the initial hypothesis is
+4. **Coordinate investigation** — Route investigation tasks to the right roles. Do not investigate personally.
+5. **Run the simulation checkpoint** — Before any production action, ensure the team has modelled the response. "Simulate before acting."
+6. **Manage communications** — Draft multi-audience stakeholder updates from a single Issues FS source. Different audiences need different levels of detail.
+7. **Drive the close** — Ensure incident documentation is complete, improvements are filed as tasks, and the post-incident review happens
+
+### What to Watch For
+
+- CI/CD pipeline anomalies (unexpected authors, failed checks that previously passed)
+- Sudden changes in deployment patterns or access patterns
+- Any role reporting "this should not be possible"
+- Cross-role contradictions that suggest incomplete understanding
+
+### What to Produce
+
+- Incident declaration (Issues FS node)
+- Role activation roster
+- Timeline of events
+- Stakeholder communications (per audience)
+- Post-incident improvement tasks (routed to owning roles)
+- Sprint plan adjustments if the incident reveals priority changes
+
+### Preparation Spectrum
+
+Move each incident type rightward: **Unprepared → Practised → Operationalised → Automated**
+
+- Schedule monthly tabletop exercises
+- Maintain the incident template in Issues FS
+- After each real incident, schedule an improvement sprint (the 5x multiplier)
+- Track which incident types are rehearsed vs unrehearsed
+
+---
+
 ## Key References
 
 | Document | Location |

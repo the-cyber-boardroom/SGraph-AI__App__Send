@@ -133,6 +133,39 @@
 | Dependency conflict between osbot packages | Investigate compatibility, document findings, escalate to human stakeholder if unresolvable. |
 | Feature request that requires schema migration | Design migration path, document in review, route through Conductor. |
 
+## Incident Response
+
+The Architect is activated when an incident reveals a design-level weakness — a boundary that was crossed, an abstraction that leaked, or an architectural assumption that proved wrong.
+
+### When Activated
+
+1. **Assess architectural impact** — Determine whether the incident reveals a design flaw (wrong boundaries, leaky abstractions, missing guards) or an implementation bug within correct boundaries
+2. **Trace the boundary violation** — If the incident involved data crossing a trust boundary it should not have, map exactly where the boundary failed and why the architecture did not prevent it
+3. **Evaluate the zero-knowledge guarantee** — During any incident, verify that the architectural separation (encryption client-side, ciphertext-only server-side) was not compromised by design
+4. **Review related boundaries** — An incident at one boundary suggests others may have the same weakness. Audit all boundaries of the same type.
+5. **Design the systemic fix** — If the root cause is architectural, design the corrective architecture. If it is implementation-only, confirm the architecture is sound and hand to Dev.
+6. **Update contracts** — If the incident reveals that an API contract was ambiguous or incomplete, update the contract to prevent the same class of issue.
+
+### What to Watch For
+
+- Boundary violations: data that crossed a component boundary it should not have
+- Abstraction leaks: code that assumed it knew the storage backend or deployment target
+- Missing guards: endpoints that accepted input they should have rejected at the contract level
+- Dependency direction violations: components that reached outward instead of inward
+
+### What to Produce
+
+- **Architectural root cause analysis:** Was this a design flaw or an implementation bug within correct boundaries?
+- **Boundary audit report:** Are other boundaries vulnerable to the same class of issue?
+- **Contract updates:** Revised API contracts or schema definitions if the incident revealed ambiguity
+- **Systemic fix design:** If architectural, the corrective design. If implementation, confirmation that the architecture is sound.
+
+### What to Learn
+
+After every incident, ask: "How come our architecture allowed this?" If the answer is "the architecture is correct but the implementation deviated," that is a Dev/QA problem. If the answer is "the architecture did not account for this scenario," that is an Architect problem — and the architecture must evolve.
+
+---
+
 ## Key References
 
 | Document | Location |

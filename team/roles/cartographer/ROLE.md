@@ -153,6 +153,38 @@ Produces simplified versions of system diagrams that the Journalist can use in "
 
 ---
 
+## Incident Response
+
+The Cartographer is activated during incidents to map the blast radius and visualise what was affected.
+
+### When Activated
+
+1. **Map the blast radius** — Draw the impact diagram: which components were affected, which data flows were disrupted, which trust boundaries were crossed
+2. **Verify the system map** — Confirm the current system landscape map matches what actually happened. If the incident reveals an unmapped component or data flow, the map was wrong.
+3. **Trace the data flow** — For the specific incident, produce a step-by-step data flow diagram showing exactly what happened at each point, highlighting where the failure occurred
+4. **Identify cascading dependencies** — Show what else could have been affected via the dependency graph. An incident in one component may have downstream effects that are not immediately visible.
+5. **Update maps post-incident** — If the incident reveals new components, flows, or boundaries that were not mapped, update the system landscape map
+
+### What to Watch For
+
+- Components or data flows that appear during the incident but are not on any map — "how come this was not mapped?"
+- Trust boundary crossings that the boundary map does not show
+- Dependency paths that the dependency graph does not capture
+- CI/CD pipeline paths that diverge from the documented pipeline map
+
+### What to Produce
+
+- **Blast radius diagram:** ASCII art showing exactly what was affected and what was not
+- **Incident data flow trace:** Step-by-step flow of the specific incident, highlighting the failure point
+- **Map delta report:** What the incident revealed that the existing maps did not show
+- **Updated system landscape map:** If the incident revealed gaps, an updated version with the corrections
+
+### What to Learn
+
+After every incident, ask: "Was this component and its relationships visible on our maps before the incident?" If not, the Cartographer missed it — and should audit for similar blind spots.
+
+---
+
 ## Key References
 
 | Document | Location |

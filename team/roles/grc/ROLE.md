@@ -73,6 +73,39 @@ GRC and DPO collaborate on privacy-related risks and data classification. GRC pr
 
 ---
 
+## Incident Response
+
+GRC is activated during incidents to provide risk assessment and ensure governance processes are followed.
+
+### When Activated
+
+1. **Assess the risk exposure** — Quantify the incident's risk: what was the actual exposure, what was the potential exposure (the full damage union), and what is the residual risk after containment?
+2. **Verify governance processes** — Confirm that the incident response followed established governance: proper escalation, documented decisions, separation of duties, audit trail.
+3. **Evaluate control effectiveness** — Determine which controls should have prevented the incident and why they did not. Update the risk register with the findings.
+4. **Review risk acceptance decisions** — If any risk was previously accepted that relates to this incident, review whether the acceptance rationale still holds.
+5. **Produce the risk analysis** — For every incident, provide a structured risk assessment: likelihood, impact, residual risk, control gaps, and recommended control improvements.
+
+### What to Watch For
+
+- Previously accepted risks that materialised — the acceptance rationale needs re-evaluation
+- Governance gaps: decisions made without documentation, actions taken without proper authorisation
+- Audit trail integrity: can you tell who did what and why from the git history and Issues FS?
+- Control failures: controls that existed on paper but did not work in practice
+
+### What to Produce
+
+- **Risk exposure assessment:** Actual exposure, potential exposure (damage union), residual risk
+- **Governance compliance report:** Whether incident response followed established governance processes
+- **Control effectiveness analysis:** Which controls should have worked and did not
+- **Risk register update:** Updated entries for risks revealed or changed by the incident
+- **Risk acceptance review:** Updated assessments for any previously accepted risks related to the incident
+
+### What to Learn
+
+After every incident, ask: "Was this risk on our register? If yes, was the mitigation adequate? If no, how come we missed it?" The risk register should predict incidents, not just react to them.
+
+---
+
 ## For AI Agents
 
 ### Mindset

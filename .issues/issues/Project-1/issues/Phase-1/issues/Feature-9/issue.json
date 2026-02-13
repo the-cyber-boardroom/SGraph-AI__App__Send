@@ -1,0 +1,47 @@
+{
+  "node_id": "c1000009",
+  "node_type": "feature",
+  "node_index": 9,
+  "label": "Feature-9",
+  "title": "Incident Handling Integration",
+  "description": "Integrate the incident handling philosophy and practices from the 5-part incident series into the project. Covers ROLE.md updates, incident templates, tabletop exercises, communication templates, and the P3-as-P1 methodology.",
+  "status": "in-progress",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "p3-as-p1", "operational-readiness"],
+  "links": [
+    {
+      "link_type_id": "4f012705",
+      "verb": "feature-of",
+      "target_id": "b1000001",
+      "target_label": "Phase-1"
+    },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000078", "target_label": "Task-1" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000079", "target_label": "Task-2" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000080", "target_label": "Task-3" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000081", "target_label": "Task-4" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000082", "target_label": "Task-5" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000083", "target_label": "Task-6" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000084", "target_label": "Task-7" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000085", "target_label": "Task-8" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000086", "target_label": "Task-9" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000087", "target_label": "Task-10" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000088", "target_label": "Task-11" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000089", "target_label": "Task-12" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000090", "target_label": "Task-13" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000091", "target_label": "Task-14" },
+    { "link_type_id": "4f012722", "verb": "has-task", "target_id": "d1000092", "target_label": "Task-15" }
+  ],
+  "properties": {
+    "priority": "P1",
+    "source_documents": [
+      "team/humans/dinis_cruz/briefs/02/13/v0.2.23__briefs__incident-philosophy-p3-as-p1.md",
+      "team/humans/dinis_cruz/briefs/02/13/v0.2.23__briefs__incident-practice-running-p3-as-p1.md",
+      "team/humans/dinis_cruz/briefs/02/13/v0.2.23__briefs__incident-payoff-best-time-to-fix-things.md",
+      "team/humans/dinis_cruz/briefs/02/13/v0.2.23__briefs__incident-simulation-communication-escalation.md",
+      "team/humans/dinis_cruz/briefs/02/13/v0.2.23__briefs__incident-football-team-practice-and-preparation.md"
+    ],
+    "command_brief": "team/humans/dinis_cruz/briefs/02/13/for-claude-code/v0.2.23__command__incident-series-full-team-activation.md"
+  }
+}

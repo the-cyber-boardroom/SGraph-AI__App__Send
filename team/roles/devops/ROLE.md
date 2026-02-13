@@ -145,6 +145,41 @@
 | Cost spike from deployment targets | Report to Conductor and human stakeholder with cost data and recommended action. |
 | CI pipeline takes longer than 15 minutes | Investigate parallelisation opportunities, escalate to Conductor if infrastructure spend is needed. |
 
+## Incident Response
+
+DevOps is activated when an incident involves infrastructure, deployment pipeline integrity, or deployment-level anomalies.
+
+### When Activated
+
+1. **Secure the pipeline** — Verify CI/CD pipeline integrity: no unexpected authors, no failed checks that previously passed, no unauthorized deployment triggers
+2. **Check deployment state** — Confirm which version is deployed to each target. Compare against expected state from the last known-good deployment.
+3. **Preserve evidence** — Before making changes, capture logs, deployment artifacts, and pipeline run history. Evidence is needed for root cause analysis.
+4. **Simulate the fix** — Model the infrastructure response on a non-production target before applying to production. "Simulate before acting."
+5. **Apply and verify** — Deploy the fix, run the full smoke test suite (health, auth, CORS, no-plaintext), confirm all deployment targets are operational
+6. **Review pipeline for detection gaps** — After the incident, assess what pipeline checks should have caught the issue and add them
+
+### What to Watch For
+
+- CI/CD pipeline anomalies: unexpected authors, unusual timing, failed checks that previously passed
+- Sudden changes in deployment patterns or access patterns
+- Secrets management issues: leaked credentials, misconfigured environment variables
+- Container image integrity: unexpected changes to base images or dependencies
+- Lambda function URL configuration changes or permission modifications
+
+### What to Produce
+
+- **Infrastructure state report:** What was deployed where, and does it match expected state
+- **Pipeline integrity verification:** Confirmation that the CI/CD pipeline was not compromised
+- **Evidence preservation log:** What logs and artifacts were captured before remediation
+- **Detection improvement tasks:** New pipeline checks or monitoring to prevent recurrence
+- **Deployment smoke test results:** Post-fix verification across all affected targets
+
+### What to Learn
+
+After every incident, ask: "How come our pipeline did not detect this?" If the answer reveals a gap in CI/CD monitoring, add the check. If the answer reveals an infrastructure pattern problem, escalate to the Architect.
+
+---
+
 ## Key References
 
 | Document | Location |

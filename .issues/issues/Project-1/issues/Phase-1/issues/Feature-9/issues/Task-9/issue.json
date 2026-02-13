@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000086",
+  "node_type": "task",
+  "node_index": 9,
+  "label": "Task-9",
+  "title": "Create multi-audience communication templates",
+  "description": "Conductor creates multi-audience communication templates for incident response. Different audiences (technical team, management, affected users, public) need different levels of detail. All sourced from a single Issues FS incident node. Source: Document 4 (Simulation & Communication).",
+  "status": "pending",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "communication", "conductor"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "Communication templates exist for technical, management, user, and public audiences. Each references a single source of truth in Issues FS.",
+    "role_assignment": "conductor",
+    "source_document": "v0.2.23__briefs__incident-simulation-communication-escalation.md"
+  }
+}
