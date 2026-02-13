@@ -18,7 +18,7 @@ class SendUpload extends HTMLElement {
     constructor() {
         super();
         this.selectedFile      = null;
-        this.inputMode         = 'file';
+        this._mode             = 'file';       // NOT inputMode — that's a built-in HTMLElement property
         this.state             = 'idle';
         this._boundDragOver    = null;
         this._boundDragLeave   = null;
@@ -32,7 +32,7 @@ class SendUpload extends HTMLElement {
 
     connectedCallback() {
         // Defensive: ensure properties are set even if constructor didn't run during upgrade
-        if (this.inputMode === undefined) this.inputMode = 'file';
+        if (this._mode === undefined) this._mode = 'file';
         if (this.state === undefined) this.state = 'idle';
         this.render();
         this.setupEventListeners();
@@ -66,8 +66,8 @@ class SendUpload extends HTMLElement {
 
     renderModeTabs() {
         if (this.state === 'complete') return '';
-        const fileActive = this.inputMode === 'file' ? 'btn-primary' : '';
-        const textActive = this.inputMode === 'text' ? 'btn-primary' : '';
+        const fileActive = this._mode === 'file' ? 'btn-primary' : '';
+        const textActive = this._mode === 'text' ? 'btn-primary' : '';
         return `
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
                 <button class="btn btn-sm ${fileActive}" id="mode-file">${this.escapeHtml(this.t('upload.mode.file'))}</button>
@@ -77,7 +77,7 @@ class SendUpload extends HTMLElement {
     }
 
     renderDropZone() {
-        if (this.state === 'complete' || this.inputMode !== 'file') return '';
+        if (this.state === 'complete' || this._mode !== 'file') return '';
         const hidden = this.state === 'encrypting' || this.state === 'uploading' ? 'hidden' : '';
         return `
             <div class="drop-zone ${hidden}" id="drop-zone">
@@ -90,7 +90,7 @@ class SendUpload extends HTMLElement {
     }
 
     renderTextInput() {
-        if (this.state === 'complete' || this.inputMode !== 'text') return '';
+        if (this.state === 'complete' || this._mode !== 'text') return '';
         const hidden = this.state === 'encrypting' || this.state === 'uploading' ? 'hidden' : '';
         return `
             <div class="${hidden}">
@@ -113,7 +113,7 @@ class SendUpload extends HTMLElement {
     }
 
     renderFileInfo() {
-        if (!this.selectedFile || this.state === 'complete' || this.inputMode !== 'file') return '';
+        if (!this.selectedFile || this.state === 'complete' || this._mode !== 'file') return '';
         return `
             <div class="status status--info" style="display: flex; justify-content: space-between; align-items: center;">
                 <span><strong>${this.escapeHtml(this.selectedFile.name)}</strong> (${this.formatBytes(this.selectedFile.size)})</span>
@@ -291,7 +291,7 @@ class SendUpload extends HTMLElement {
 
     resetForNew() {
         this.selectedFile     = null;
-        this.inputMode        = 'file';
+        this._mode        = 'file';
         this.state            = 'idle';
         this.result           = null;
         this.errorMessage     = null;
@@ -321,8 +321,8 @@ class SendUpload extends HTMLElement {
     }
 
     switchMode(mode) {
-        if (this.inputMode === mode || this.state !== 'idle') return;
-        this.inputMode = mode;
+        if (this._mode === mode || this.state !== 'idle') return;
+        this._mode = mode;
         this.render();
         this.setupEventListeners();
     }
@@ -354,7 +354,7 @@ class SendUpload extends HTMLElement {
             this.state = 'error'; this.render(); this.setupEventListeners(); return;
         }
 
-        const isText = this.inputMode === 'text';
+        const isText = this._mode === 'text';
 
         // Save text value BEFORE state change triggers re-render (which recreates the textarea empty)
         let textValue = '';
