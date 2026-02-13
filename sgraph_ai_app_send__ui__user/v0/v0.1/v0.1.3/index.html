@@ -43,30 +43,26 @@
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 el.textContent = I18n.t(el.getAttribute('data-i18n'));
             });
-            // Render locale selector
-            const sel = document.getElementById('locale-selector');
-            if (sel) {
-                sel.innerHTML = I18n.availableLocales.map(l =>
-                    `<button class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; ${l.code === I18n.locale ? 'font-weight: 700;' : 'opacity: 0.6;'}"
-                             onclick="I18n.setLocale('${l.code}')">${l.flag || ''} ${l.name}</button>`
-                ).join(' ');
-            }
+            renderLocaleSelector();
         });
+
+        function renderLocaleSelector() {
+            const sel = document.getElementById('locale-selector');
+            if (!sel) return;
+            sel.innerHTML = I18n.availableLocales.map(l =>
+                `<button class="btn btn-sm" data-locale="${l.code}"
+                         style="font-size: 0.75rem; padding: 0.25rem 0.5rem; ${l.code === I18n.locale ? 'font-weight: 700;' : 'opacity: 0.6;'}"
+                         onclick="I18n.setLocale('${l.code}')">${l.flag || ''} ${l.name}</button>`
+            ).join(' ');
+        }
+
         // Re-render on locale change
         document.addEventListener('locale-changed', () => {
             document.documentElement.lang = I18n.locale;
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 el.textContent = I18n.t(el.getAttribute('data-i18n'));
             });
-            // Re-render locale selector active state
-            const sel = document.getElementById('locale-selector');
-            if (sel) {
-                sel.querySelectorAll('button').forEach(btn => {
-                    const isActive = btn.textContent === I18n.availableLocales.find(l => l.code === I18n.locale)?.name;
-                    btn.style.fontWeight = isActive ? '700' : '400';
-                    btn.style.opacity = isActive ? '1' : '0.6';
-                });
-            }
+            renderLocaleSelector();
         });
     </script>
 </body>
