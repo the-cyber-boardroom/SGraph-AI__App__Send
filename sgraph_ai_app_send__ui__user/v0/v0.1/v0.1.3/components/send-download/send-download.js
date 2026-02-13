@@ -43,11 +43,39 @@ class SendDownload extends HTMLElement {
         }
         this.loadTransferInfo();
         document.addEventListener('locale-changed', this._localeHandler);
+        this._boundHashChange = () => this.handleHashChange();
+        window.addEventListener('hashchange', this._boundHashChange);
     }
 
     disconnectedCallback() {
         this.cleanup();
         document.removeEventListener('locale-changed', this._localeHandler);
+        if (this._boundHashChange) {
+            window.removeEventListener('hashchange', this._boundHashChange);
+            this._boundHashChange = null;
+        }
+    }
+
+    handleHashChange() {
+        const oldTransferId = this.transferId;
+        this.transferId       = null;
+        this.transferInfo     = null;
+        this.transparencyData = null;
+        this.hashKey          = null;
+        this.decryptedText    = null;
+        this.decryptedBytes   = null;
+        this.fileName         = null;
+        this.state            = 'loading';
+        this.errorMessage     = null;
+
+        this.parseUrl();
+        if (!this.transferId) {
+            this.state        = 'error';
+            this.errorMessage = this.t('download.error.no_id');
+            this.render();
+            return;
+        }
+        this.loadTransferInfo();
     }
 
     // ─── Shorthand ─────────────────────────────────────────────────────────

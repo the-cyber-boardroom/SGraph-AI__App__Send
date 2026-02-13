@@ -27,6 +27,7 @@
   "upload.result.link_only":          "Apenas ligação",
   "upload.result.decryption_key":     "Chave de desencriptação",
   "upload.result.copy":               "Copiar",
+  "upload.result.open_tab":           "Abrir em novo separador",
   "upload.guidance.split_channels":   "Para maior segurança, partilhe a ligação e a chave por <strong>canais diferentes</strong> (ex: ligação por email, chave por aplicação de mensagens).",
 
   "upload.text.drop_hint":            "Também pode arrastar um ficheiro de texto para aqui",

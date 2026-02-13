@@ -27,6 +27,7 @@
   "upload.result.link_only":          "Apenas link",
   "upload.result.decryption_key":     "Chave de descriptografia",
   "upload.result.copy":               "Copiar",
+  "upload.result.open_tab":           "Abrir em nova aba",
   "upload.guidance.split_channels":   "Para maior segurança, compartilhe o link e a chave por <strong>canais diferentes</strong> (ex: link por email, chave por mensagem).",
 
   "upload.text.drop_hint":            "Você também pode arrastar um arquivo de texto aqui",

@@ -57,6 +57,7 @@ const I18n = {
             'upload.result.link_only':          'Link only',
             'upload.result.decryption_key':     'Decryption key',
             'upload.result.copy':               'Copy',
+            'upload.result.open_tab':           'Open in new tab',
             'upload.guidance.split_channels':   'For best security, share the link and the key via <strong>different channels</strong> (e.g. link via email, key via messaging app).',
 
             // ─── Upload: Text Drop ────────────────────────────────────────
