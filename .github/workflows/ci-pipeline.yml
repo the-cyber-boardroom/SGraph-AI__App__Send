@@ -34,6 +34,8 @@ on:
         required: false
       FAST_API__AUTH__API_KEY__VALUE:
         required: false
+      CACHE__SERVICE__BUCKET_NAME:
+        required: false
 
 env:
   PACKAGE_NAME: 'sgraph_ai_app_send'
@@ -117,6 +119,7 @@ jobs:
           FAST_API__AUTH__API_KEY__NAME                : ${{ secrets.FAST_API__AUTH__API_KEY__NAME                }}
           FAST_API__AUTH__API_KEY__VALUE               : ${{ secrets.FAST_API__AUTH__API_KEY__VALUE               }}
           URL__TARGET_SERVER__CACHE_SERVICE            : ${{ secrets.AUTH__TARGET_SERVER__CACHE_SERVICE__BASE_URL }}
+          CACHE__SERVICE__BUCKET_NAME                  : ${{ secrets.CACHE__SERVICE__BUCKET_NAME                  }}
         with:
           target      : ${{ inputs.target_deploy }}
           lambda_type : 'Admin'
@@ -139,6 +142,7 @@ jobs:
           FAST_API__AUTH__API_KEY__NAME                : ${{ secrets.FAST_API__AUTH__API_KEY__NAME                }}
           FAST_API__AUTH__API_KEY__VALUE               : ${{ secrets.FAST_API__AUTH__API_KEY__VALUE               }}
           URL__TARGET_SERVER__CACHE_SERVICE            : ${{ secrets.AUTH__TARGET_SERVER__CACHE_SERVICE__BASE_URL }}
+          CACHE__SERVICE__BUCKET_NAME                  : ${{ secrets.CACHE__SERVICE__BUCKET_NAME                  }}
         with:
           target     : ${{ inputs.target_deploy }}
           lambda_type: 'User'
