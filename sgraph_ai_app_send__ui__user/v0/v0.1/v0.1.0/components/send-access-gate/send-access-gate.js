@@ -86,15 +86,40 @@ class SendAccessGate extends HTMLElement {
         input.focus();
     }
 
-    submitToken() {
-        const input = this.querySelector('#access-token-input');
-        const error = this.querySelector('#access-token-error');
-        const token = (input.value || '').trim();
+    async submitToken() {
+        const input  = this.querySelector('#access-token-input');
+        const error  = this.querySelector('#access-token-error');
+        const submit = this.querySelector('#access-token-submit');
+        const token  = (input.value || '').trim();
 
         if (!token) {
             error.classList.remove('hidden');
             return;
         }
+
+        // Validate token against admin service before accepting
+        if (submit) submit.disabled = true;
+        try {
+            const result = await ApiClient.checkToken(token);
+            if (!result.valid) {
+                const reason = result.reason || result.status || '';
+                if (reason === 'not_found') {
+                    error.textContent = 'Token not found. Please check and try again.';
+                } else if (reason === 'exhausted' || result.status === 'exhausted') {
+                    error.textContent = 'This token has been fully used. Please request a new one.';
+                } else if (reason === 'revoked' || result.status === 'revoked') {
+                    error.textContent = 'This token has been revoked.';
+                } else {
+                    error.textContent = 'Invalid or missing token. Please check and try again.';
+                }
+                error.classList.remove('hidden');
+                if (submit) submit.disabled = false;
+                return;
+            }
+        } catch (e) {
+            // Token check endpoint unavailable — fall through (backwards compat with env-var mode)
+        }
+        if (submit) submit.disabled = false;
 
         ApiClient.setAccessToken(token);
         this.showContent();

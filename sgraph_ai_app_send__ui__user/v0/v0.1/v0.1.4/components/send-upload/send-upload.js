@@ -1,13 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    SGraph Send — Upload Web Component
-   v0.1.3 — i18n integration
+   v0.1.4 — osbot-* audit + IFD bump
 
-   Changes from v0.1.2:
-   - All user-facing strings use I18n.t() instead of hardcoded English
-   - Listens for 'locale-changed' event and re-renders
-   - Download URL points to v0.1.3/download.html
+   Changes from v0.1.3:
+   - IFD version bump (v0.1.3 locked)
+   - Download URL points to v0.1.4/download.html
 
-   Inherits from v0.1.2: File/Text mode, hash-fragment URLs, no GA
+   Inherits from v0.1.3: i18n, File/Text mode, hash-fragment URLs, no GA
 
    Usage:  <send-upload></send-upload>
    Emits:  'upload-complete' — { detail: { transferId, downloadUrl, key } }
@@ -450,11 +449,11 @@ class SendUpload extends HTMLElement {
 
     buildCombinedUrl(tid, key, token) {
         const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        return `${window.location.origin}/send/v0/v0.1/v0.1.3/download.html${tokenParam}#${tid}/${key}`;
+        return `${window.location.origin}/send/v0/v0.1/v0.1.4/download.html${tokenParam}#${tid}/${key}`;
     }
     buildLinkOnlyUrl(tid, token) {
         const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        return `${window.location.origin}/send/v0/v0.1/v0.1.3/download.html${tokenParam}#${tid}`;
+        return `${window.location.origin}/send/v0/v0.1/v0.1.4/download.html${tokenParam}#${tid}`;
     }
 
     async copyToClipboard(text, button) {

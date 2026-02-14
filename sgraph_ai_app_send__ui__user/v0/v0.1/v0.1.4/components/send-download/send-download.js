@@ -1,16 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    SGraph Send — Download Web Component
-   v0.1.3 — i18n integration + auto-decrypt + history
+   v0.1.4 — osbot-* audit + IFD bump
 
-   Changes from v0.1.2:
-   - All user-facing strings use I18n.t() instead of hardcoded English
-   - Listens for 'locale-changed' event and re-renders (when not mid-flow)
-   - Auto-decrypts when key is present in URL hash
-   - Stores received items in localStorage with privacy notice
-   - Extracts filename from SGMETA envelope if present
-   - "Send your own" link after download
+   Changes from v0.1.3:
+   - IFD version bump (v0.1.3 locked)
+   - "Send your own" link points to v0.1.4
 
-   Inherits from v0.1.2: Text display, hash-fragment URLs, URL clearing
+   Inherits from v0.1.3: i18n, auto-decrypt, history, SGMETA envelope
 
    Usage:  <send-download></send-download>
    Emits:  'download-complete' — { detail: { transferId } }
@@ -254,7 +250,7 @@ class SendDownload extends HTMLElement {
 
         const sendAnotherHtml = `
             <div style="margin-top: 1.5rem; text-align: center;">
-                <a href="${window.location.origin}/send/v0/v0.1/v0.1.3/index.html" class="btn btn-sm" style="color: var(--color-primary); text-decoration: none;">
+                <a href="${window.location.origin}/send/v0/v0.1/v0.1.4/index.html" class="btn btn-sm" style="color: var(--color-primary); text-decoration: none;">
                     ${this.escapeHtml(this.t('download.result.send_another'))}
                 </a>
             </div>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGraph Send — Download</title>
+    <link rel="stylesheet" href="../v0.1.0/css/common.css">
+</head>
+<body>
+    <header>
+        <h1>SGraph Send</h1>
+        <p data-i18n="app.subtitle">Zero-knowledge encrypted file sharing</p>
+        <div id="locale-selector" style="position: absolute; top: 1rem; right: 1rem;"></div>
+    </header>
+    <main>
+        <send-download></send-download>
+
+        <section class="card" style="margin-top: 1.5rem; text-align: center;">
+            <h3 style="font-size: 1rem; margin-bottom: 0.25rem;" data-i18n="cta.title">Want to send files too?</h3>
+            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;" data-i18n="cta.description">
+                Join the early access program for SGraph Send.
+            </p>
+            <form class="launchlist-form" action="https://getlaunchlist.com/s/zSa8gI" method="POST">
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
+                    <input name="name" type="text" class="input" placeholder="Name" style="flex: 1; min-width: 120px;">
+                    <input name="email" type="email" class="input" placeholder="Email" required style="flex: 1; min-width: 180px;">
+                    <button type="submit" class="btn btn-primary">Sign Up</button>
+                </div>
+            </form>
+        </section>
+    </main>
+    <script src="js/i18n.js"></script>
+    <script src="../v0.1.0/js/crypto.js"></script>
+    <script src="../v0.1.0/js/api-client.js"></script>
+    <script src="components/send-download/send-download.js"></script>
+    <script src="../v0.1.0/components/send-transparency/send-transparency.js"></script>
+    <script>
+        I18n.init().then(() => {
+            document.documentElement.lang = I18n.locale;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = I18n.t(el.getAttribute('data-i18n'));
+            });
+            renderLocaleSelector();
+        });
+
+        function renderLocaleSelector() {
+            const sel = document.getElementById('locale-selector');
+            if (!sel) return;
+            sel.innerHTML = I18n.availableLocales.map(l =>
+                `<button class="btn btn-sm" data-locale="${l.code}"
+                         style="font-size: 0.75rem; padding: 0.25rem 0.5rem; ${l.code === I18n.locale ? 'font-weight: 700;' : 'opacity: 0.6;'}"
+                         onclick="I18n.setLocale('${l.code}')">${l.flag || ''} ${l.name}</button>`
+            ).join(' ');
+        }
+
+        document.addEventListener('locale-changed', () => {
+            document.documentElement.lang = I18n.locale;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = I18n.t(el.getAttribute('data-i18n'));
+            });
+            renderLocaleSelector();
+        });
+    </script>
+</body>
+</html>
