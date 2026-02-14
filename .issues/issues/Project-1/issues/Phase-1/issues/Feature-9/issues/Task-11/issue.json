@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000088",
+  "node_type": "task",
+  "node_index": 11,
+  "label": "Task-11",
+  "title": "Track framework adoption per incident",
+  "description": "Historian tracks MITRE ATT&CK and NIST framework adoption per incident. After each incident, record which techniques/categories were used. Build organic framework coverage one incident at a time. Source: Document 4 (Simulation & Communication).",
+  "status": "pending",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "frameworks", "historian"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
+    }
+  ],
+  "properties": {
+    "priority": "P2",
+    "acceptance_criteria": "Framework tracking template added to Historian's incident documentation process. First entry populated from the git commit identity incident.",
+    "role_assignment": "historian",
+    "source_document": "v0.2.23__briefs__incident-simulation-communication-escalation.md"
+  }
+}

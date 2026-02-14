@@ -13,4 +13,5 @@ jobs:
       release_type        : 'major'
       should_increment_tag: true
       should_publish_pypi : true
+      target_deploy       : 'qa'
     secrets: inherit

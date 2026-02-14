@@ -1,0 +1,26 @@
+{
+  "node_id": "e1000106",
+  "node_type": "task",
+  "node_index": 6,
+  "label": "Task-6",
+  "title": "Add production deployment CI trigger",
+  "description": "Create ci-pipeline__prod.yml workflow for production deployments. Production test classes already exist (test_Deploy__*__Service__to__prod). Decide on trigger mechanism: manual dispatch only, or tag-based (e.g., release tags). Should include additional gates: approval step, smoke tests post-deploy, rollback capability.",
+  "status": "backlog",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "e1000006",
+  "tags": ["production", "ci", "deploy"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000006",
+      "target_label": "DevOps-1"
+    }
+  ],
+  "properties": {
+    "priority": "P2",
+    "acceptance_criteria": "Production deployment workflow exists. Requires manual approval. Deploys to admin-prod and user-prod stages. Smoke tests run after deploy. Rollback documented.",
+    "role_assignment": "DevOps"
+  }
+}

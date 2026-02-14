@@ -1,0 +1,5 @@
+from unittest                                                                import TestCase
+from tests.deploy.Admin__Lambda.deploy_aws.test_Deploy__Admin__Service__base import test_Deploy__Admin__Service__base
+
+class test_Deploy__Admin__Service__to__prod(test_Deploy__Admin__Service__base, TestCase):
+    stage = 'admin-prod'

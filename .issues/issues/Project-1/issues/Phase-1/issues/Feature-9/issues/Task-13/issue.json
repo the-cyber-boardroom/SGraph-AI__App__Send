@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000090",
+  "node_type": "task",
+  "node_index": 13,
+  "label": "Task-13",
+  "title": "Schedule monthly tabletop exercises",
+  "description": "Conductor schedules monthly tabletop exercises. The preparation spectrum: unprepared -> practised -> operationalised -> automated. Practice makes real incidents look like exercises. Source: Document 5 (Football Team).",
+  "status": "pending",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "tabletop", "conductor"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
+    }
+  ],
+  "properties": {
+    "priority": "P2",
+    "acceptance_criteria": "Monthly tabletop exercise schedule established. First exercise scheduled.",
+    "role_assignment": "conductor",
+    "source_document": "v0.2.23__briefs__incident-football-team-practice-and-preparation.md"
+  }
+}

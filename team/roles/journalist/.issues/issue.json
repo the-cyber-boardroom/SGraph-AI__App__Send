@@ -1,0 +1,15 @@
+{
+  "node_id": "e1000008",
+  "node_type": "git-repo",
+  "node_index": 0,
+  "label": "Journalist-1",
+  "title": "Journalist Role — Issue Tracker",
+  "description": "Communications, content creation, release notes, and documentation tasks for SGraph Send.",
+  "status": "active",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["journalist", "communications"],
+  "links": [],
+  "properties": {}
+}

@@ -5,9 +5,9 @@
   "label": "Task-3",
   "title": "Build download page with key input",
   "description": "Shows transfer metadata (file size, upload time, expiry). Key input field. Download & Decrypt button. Triggers browser Save As for decrypted file.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ui", "frontend", "download"],
   "links": [

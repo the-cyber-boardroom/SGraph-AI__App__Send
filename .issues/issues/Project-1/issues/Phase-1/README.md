@@ -2,7 +2,7 @@
 
 **Parent:** [Project-1](../../)
 **Status:** in-progress
-**Source:** [Project Brief](../../../../docs/_to_process/project%20-%20Secure%20Send%20Service%20brief.md)
+**Source:** [Project Brief](../../../../library/docs/_to_process/project%20-%20Secure%20Send%20Service%20brief.md)
 
 ---
 

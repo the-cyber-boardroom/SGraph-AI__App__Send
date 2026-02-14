@@ -1,0 +1,38 @@
+{
+  "node_id": "e1000103",
+  "node_type": "task",
+  "node_index": 3,
+  "label": "Task-3",
+  "title": "Create deployment orchestrator class",
+  "description": "Build a higher-level orchestrator class that sequences component creation and deletion in dependency order. Creation: IAM -> S3 -> Lambda -> CloudFront. Deletion (reverse): CloudFront -> Lambda -> S3 -> IAM. Each step calls create() then verify(). Orchestrator reports success/failure for each component. Supports partial deployment (e.g., skip CloudFront if not needed).",
+  "status": "backlog",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "e1000006",
+  "tags": ["orchestrator", "deploy", "architecture"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000006",
+      "target_label": "DevOps-1"
+    },
+    {
+      "link_type_id": "204908c3",
+      "verb": "depends-on",
+      "target_id": "e1000101",
+      "target_label": "Task-1"
+    },
+    {
+      "link_type_id": "204908c3",
+      "verb": "depends-on",
+      "target_id": "e1000102",
+      "target_label": "Task-2"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "Orchestrator deploys full stack (IAM + S3 + Lambda) in correct order. Orchestrator destroys full stack in reverse order. Full round-trip integration test passes.",
+    "role_assignment": "DevOps"
+  }
+}

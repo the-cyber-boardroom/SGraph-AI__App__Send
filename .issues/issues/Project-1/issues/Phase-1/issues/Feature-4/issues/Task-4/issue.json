@@ -5,9 +5,9 @@
   "label": "Task-4",
   "title": "Return captured metadata in API responses",
   "description": "Both /transfers/{id}/complete and /transfers/{id}/download must return transparency objects with your_ip, timestamp, stored_fields[], not_stored[].",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["api", "backend", "transparency"],
   "links": [

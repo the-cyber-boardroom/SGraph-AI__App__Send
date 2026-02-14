@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000089",
+  "node_type": "task",
+  "node_index": 12,
+  "label": "Task-12",
+  "title": "Design tabletop exercise scenarios",
+  "description": "QA designs tabletop exercise scenarios based on real and hypothetical incidents. Start with the 'total AWS compromise' scenario referenced in the command brief. Source: Document 5 (Football Team).",
+  "status": "pending",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "tabletop", "qa"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "At least one tabletop exercise scenario designed (total AWS compromise). Scenario includes: setup, injection points, expected role responses, success criteria.",
+    "role_assignment": "qa",
+    "source_document": "v0.2.23__briefs__incident-football-team-practice-and-preparation.md"
+  }
+}

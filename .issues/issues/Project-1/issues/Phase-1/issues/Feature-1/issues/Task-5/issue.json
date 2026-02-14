@@ -5,9 +5,9 @@
   "label": "Task-5",
   "title": "Build upload page with file drop zone and token input",
   "description": "Drag-and-drop zone, browse button, token input field with verify button, encrypt & upload button. Shows progress.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ui", "frontend", "upload"],
   "links": [

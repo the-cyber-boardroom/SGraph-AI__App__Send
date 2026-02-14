@@ -1,0 +1,87 @@
+{
+  "app.title":                        "SGraph Send",
+  "app.subtitle":                     "Compartilhamento de arquivos com criptografia zero-knowledge",
+
+  "upload.mode.file":                 "Arquivo",
+  "upload.mode.text":                 "Texto",
+
+  "upload.drop_zone.label":           "Arraste o arquivo para aqui",
+  "upload.drop_zone.hint":            "ou clique para procurar",
+  "upload.drop_zone.encrypted_hint":  "Criptografado no seu navegador antes do envio",
+
+  "upload.text.placeholder":          "Digite ou cole o seu texto aqui",
+  "upload.text.char_count":           "{count} caracteres",
+
+  "upload.button.encrypt_upload":     "Criptografar e Enviar",
+  "upload.button.encrypt_send":       "Criptografar e Enviar",
+
+  "upload.progress.encrypting":       "Criptografando...",
+  "upload.progress.uploading":        "Enviando...",
+
+  "upload.result.file_success":       "O seu arquivo foi criptografado e enviado.",
+  "upload.result.text_success":       "O seu texto foi criptografado e enviado.",
+  "upload.result.share_link":         "Compartilhe este link",
+  "upload.result.copy_link":          "Copiar link",
+  "upload.result.show_separate_key":  "Compartilhar chave separadamente",
+  "upload.result.hide_key":           "Ocultar chave",
+  "upload.result.link_only":          "Apenas link",
+  "upload.result.decryption_key":     "Chave de descriptografia",
+  "upload.result.copy":               "Copiar",
+  "upload.result.open_tab":           "Abrir em nova aba",
+  "upload.guidance.split_channels":   "Para maior segurança, compartilhe o link e a chave por <strong>canais diferentes</strong> (ex: link por email, chave por mensagem).",
+
+  "upload.text.drop_hint":            "Você também pode arrastar um arquivo de texto aqui",
+
+  "upload.result.send_another":       "Enviar outro",
+
+  "upload.error.empty_text":          "Por favor digite um texto para criptografar.",
+  "upload.error.upload_failed":       "O envio falhou. Por favor tente novamente.",
+
+  "download.loading":                 "Carregando informação da transferência...",
+
+  "download.info.encrypted_file":     "Arquivo criptografado",
+  "download.info.encrypted_text":     "Texto criptografado",
+  "download.info.uploaded":           "Enviado {timestamp}",
+  "download.info.download_count":     "Transferido {count} vez(es)",
+
+  "download.key.label":               "Chave de descriptografia",
+  "download.key.placeholder":         "Cole a chave de descriptografia aqui",
+  "download.button.decrypt_download": "Baixar e Descriptografar",
+  "download.button.decrypt_view":     "Descriptografar e Ver",
+
+  "download.progress.decrypting":     "Baixando e descriptografando...",
+
+  "download.result.file_success":     "Arquivo descriptografado e salvo com sucesso.",
+  "download.result.text_success":     "Texto descriptografado com sucesso.",
+  "download.result.copy_text":        "Copiar para a área de transferência",
+  "download.result.download_file":    "Baixar como arquivo",
+
+  "download.result.send_another":     "Envie o seu",
+
+  "download.history.title":           "Downloads recentes",
+  "download.history.privacy":         "Armazenado no seu navegador. Qualquer pessoa com acesso a este dispositivo pode ver estes itens.",
+  "download.history.clear":           "Limpar histórico",
+  "download.history.empty":           "Nenhum download recente.",
+  "download.history.text_preview":    "Texto",
+  "download.history.file_label":      "Arquivo",
+
+  "download.error.no_id":             "ID de transferência não encontrado no URL. Por favor verifique o link.",
+  "download.error.not_ready":         "Esta transferência ainda não está disponível para download.",
+  "download.error.not_found":         "Transferência não encontrada. O link pode ter expirado.",
+  "download.error.no_key":            "Por favor digite a chave de descriptografia.",
+  "download.error.failed":            "O download ou descriptografia falhou.",
+  "download.error.token_not_found":   "Este link não é válido. O token de acesso não foi encontrado.",
+  "download.error.token_exhausted":   "Este link expirou. O token de acesso foi totalmente utilizado.",
+  "download.error.token_revoked":     "Este link foi desativado. O token de acesso foi revogado.",
+
+  "crypto.error.unavailable":         "A Web Crypto API não está disponível. Requer um contexto seguro (HTTPS ou localhost).",
+  "crypto.error.read_failed":         "Falha ao ler o arquivo",
+
+  "common.copied":                    "Copiado!",
+
+  "test_files.title":                 "Arquivos de Teste",
+  "test_files.description":           "Baixe um arquivo de teste e arraste-o para a zona de envio acima.",
+
+  "cta.title":                        "Quer enviar arquivos também?",
+  "cta.description":                  "Junte-se ao programa de acesso antecipado do SGraph Send."
+}

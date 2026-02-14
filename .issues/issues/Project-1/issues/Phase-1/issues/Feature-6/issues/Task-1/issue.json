@@ -5,9 +5,9 @@
   "label": "Task-1",
   "title": "Add separate-channel sharing guidance",
   "description": "Callout/banner on upload-complete page advising to share link and key via different channels (e.g. link via email, key via WhatsApp).",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ui", "ux", "security-guidance", "frontend"],
   "links": [

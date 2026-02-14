@@ -1,0 +1,26 @@
+{
+  "node_id": "e1000102",
+  "node_type": "task",
+  "node_index": 2,
+  "label": "Task-2",
+  "title": "Complete Lambda lifecycle methods (exists/verify/delete/verify_deleted)",
+  "description": "Extend Deploy__Service (or create app__deploy__aws__lambda wrapper) with full lifecycle: exists() to check if function exists, verify() to confirm configuration correctness (runtime, handler, memory, layers, env vars, Function URL), lock_down() to restrict Function URL resource policy, delete() to destroy the function, verify_deleted() to confirm removal. Uncomment test_8__delete in deploy test bases and add round-trip test.",
+  "status": "backlog",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "e1000006",
+  "tags": ["lambda", "lifecycle", "deploy"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000006",
+      "target_label": "DevOps-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "acceptance_criteria": "All 6 lifecycle methods implemented and tested. Round-trip passes: create -> verify -> delete -> verify_deleted -> create -> verify. Works for both Admin and User Lambdas across dev/qa/prod stages.",
+    "role_assignment": "DevOps"
+  }
+}

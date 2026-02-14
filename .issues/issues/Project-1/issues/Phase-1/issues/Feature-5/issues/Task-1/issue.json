@@ -5,9 +5,9 @@
   "label": "Task-1",
   "title": "Implement GET /transfers/{id} endpoint",
   "description": "Returns transfer metadata: status, file_size, created_at, download_count, expires_at. Public (no auth).",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["api", "status", "backend"],
   "links": [

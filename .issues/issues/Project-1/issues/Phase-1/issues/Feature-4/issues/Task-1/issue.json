@@ -5,9 +5,9 @@
   "label": "Task-1",
   "title": "Build transparency panel UI component",
   "description": "Reusable component showing: captured fields (IP, timestamp, file size) with actual values, and NOT stored fields (file name, content, key) with X marks.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ui", "frontend", "transparency", "component"],
   "links": [

@@ -1,0 +1,26 @@
+{
+  "node_id": "e1100005",
+  "node_type": "question",
+  "node_index": 5,
+  "label": "Task-5",
+  "title": "Questions to Dev — Current Code Security",
+  "description": "Questions for the Dev role regarding current code security:\n1. What input validation exists on the FastAPI routes currently implemented?\n2. Are there any file upload size limits enforced?\n3. How is the admin auth key currently passed to the Lambda (env var, config file, hardcoded)?\n4. Does the static file serving have any path traversal protections beyond Starlette defaults?\n5. Are there any error handlers that might leak stack traces or internal details to clients?\n6. What dependencies are pinned vs floating in pyproject.toml?",
+  "status": "open",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["question", "dev", "code-security"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "priority": "P0",
+    "role_assignment": "appsec",
+    "target_role": "dev"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "node_id": "f1000001",
+  "node_type": "vulnerability",
+  "node_index": 6,
+  "label": "Vuln-1",
+  "title": "Reflected Input Injection in HTTPException Error Responses",
+  "description": "The transfer_id path parameter is reflected directly in HTTPException detail strings across all four error paths in Routes__Transfers.py. An attacker can inject arbitrary content into the JSON error response by crafting a malicious transfer_id. While FastAPI returns JSON by default (mitigating direct browser XSS), if error responses are ever rendered in an admin dashboard, log viewer, or any HTML context without escaping, this becomes a stored/reflected XSS vector. Even in JSON context, this constitutes improper input handling and violates defense-in-depth.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "injection", "xss", "critical"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "severity": "High",
+    "owasp_category": "A03:2021 Injection",
+    "cwe": "CWE-79 (Reflected XSS), CWE-116 (Improper Encoding or Escaping of Output)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/fast_api/routes/Routes__Transfers.py",
+    "affected_lines": "39-40, 49-50, 58-59, 69-70",
+    "exploit_vector": "Send GET /transfers/info/<script>alert(1)</script> or a crafted transfer_id containing JSON injection characters. The transfer_id is reflected verbatim in the HTTPException detail field. In JSON context: response body contains attacker-controlled strings. If rendered in HTML admin/log UI: XSS execution.",
+    "fix_recommendation": "1. Validate transfer_id against a strict regex pattern (^[a-f0-9]{12}$) before any processing. 2. Return a generic error message that does not reflect user input (e.g., 'Transfer not found'). 3. Add a centralized input validation layer for all path parameters.",
+    "priority": "P0",
+    "role_assignment": "appsec"
+  }
+}

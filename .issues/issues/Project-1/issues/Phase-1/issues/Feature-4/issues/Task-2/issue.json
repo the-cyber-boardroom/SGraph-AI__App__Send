@@ -5,9 +5,9 @@
   "label": "Task-2",
   "title": "Integrate transparency panel on upload-complete page",
   "description": "Display after successful upload showing sender's captured metadata. Data from /transfers/{id}/complete response.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ui", "frontend", "transparency", "upload"],
   "links": [

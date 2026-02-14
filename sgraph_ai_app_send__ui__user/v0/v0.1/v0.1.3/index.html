@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGraph Send — Zero-Knowledge Encrypted File Sharing</title>
+    <link rel="stylesheet" href="../v0.1.0/css/common.css">
+</head>
+<body>
+    <header>
+        <h1>SGraph Send</h1>
+        <p data-i18n="app.subtitle">Zero-knowledge encrypted file sharing</p>
+        <div id="locale-selector" style="position: absolute; top: 1rem; right: 1rem;"></div>
+    </header>
+    <main>
+        <send-access-gate>
+            <send-upload></send-upload>
+
+            <section class="card" style="margin-top: 1.5rem; padding: 1.25rem;">
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem;" data-i18n="test_files.title">Test Files</h3>
+                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0 0 0.75rem 0;" data-i18n="test_files.description">
+                    Download a test file, then drag it into the upload zone above.
+                </p>
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <a href="../v0.1.0/test-files/test-text.txt" download class="btn btn-sm" style="text-decoration: none;">test-text.txt</a>
+                    <a href="../v0.1.0/test-files/test-data.json" download class="btn btn-sm" style="text-decoration: none;">test-data.json</a>
+                </div>
+            </section>
+        </send-access-gate>
+    </main>
+    <script src="js/i18n.js"></script>
+    <script src="../v0.1.0/js/crypto.js"></script>
+    <script src="../v0.1.0/js/api-client.js"></script>
+    <script src="../v0.1.0/components/send-access-gate/send-access-gate.js"></script>
+    <script src="components/send-upload/send-upload.js"></script>
+    <script src="../v0.1.0/components/send-transparency/send-transparency.js"></script>
+    <script>
+        // Initialise i18n and render locale selector
+        I18n.init().then(() => {
+            document.documentElement.lang = I18n.locale;
+            // Update data-i18n elements
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = I18n.t(el.getAttribute('data-i18n'));
+            });
+            renderLocaleSelector();
+        });
+
+        function renderLocaleSelector() {
+            const sel = document.getElementById('locale-selector');
+            if (!sel) return;
+            sel.innerHTML = I18n.availableLocales.map(l =>
+                `<button class="btn btn-sm" data-locale="${l.code}"
+                         style="font-size: 0.75rem; padding: 0.25rem 0.5rem; ${l.code === I18n.locale ? 'font-weight: 700;' : 'opacity: 0.6;'}"
+                         onclick="I18n.setLocale('${l.code}')">${l.flag || ''} ${l.name}</button>`
+            ).join(' ');
+        }
+
+        // Re-render on locale change
+        document.addEventListener('locale-changed', () => {
+            document.documentElement.lang = I18n.locale;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = I18n.t(el.getAttribute('data-i18n'));
+            });
+            renderLocaleSelector();
+        });
+    </script>
+</body>
+</html>

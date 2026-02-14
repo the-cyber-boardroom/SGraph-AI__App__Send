@@ -1,0 +1,44 @@
+# SGraph Send — Project Site
+# Built with Jekyll, deployed via GitHub Pages
+
+title: SGraph Send
+description: "Zero-knowledge encrypted file sharing. Your files, encrypted in your browser, before they ever leave your device."
+url: "https://docs.send.sgraph.ai"
+baseurl: ""
+
+# Build
+markdown: kramdown
+permalink: /blog/:year/:month/:day/:title/
+future: true
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+
+# Collections
+collections:
+  pages:
+    output: true
+    permalink: /:title/
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "page"
+  - scope:
+      path: "_pages"
+      type: "pages"
+    values:
+      layout: "page"
+
+# Plugins
+plugins:
+  - jekyll-seo-tag

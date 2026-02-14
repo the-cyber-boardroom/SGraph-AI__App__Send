@@ -5,9 +5,9 @@
   "label": "Task-4",
   "title": "Implement direct-to-S3 upload via pre-signed PUT URL",
   "description": "Browser PUTs encrypted blob directly to S3 using pre-signed URL. Progress indicator during upload.",
-  "status": "backlog",
+  "status": "in-progress",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["s3", "frontend", "upload"],
   "links": [

@@ -1,0 +1,24 @@
+{
+  "node_id"     : "e1000010",
+  "title"       : "INC-002: Access Token Bypass — Upload succeeded with invalid token",
+  "type"        : "incident",
+  "status"      : "open",
+  "priority"    : "P3-actual / P1-exercise",
+  "created"     : "2026-02-13T12:00:00Z",
+  "owner"       : "appsec",
+  "reporter"    : "dinis_cruz",
+  "description" : "Project owner uploaded text via send.sgraph.ai using access token 'abc' (not a valid token). The upload succeeded, the data was stored in S3, and the download link worked. The server-side check_access_token() function has a fail-open guard clause: if the SGRAPH_SEND__ACCESS_TOKEN env var is not set, it skips validation entirely. This means the production Lambda's access gate is non-functional — any token (or no token) is accepted.",
+  "custom_fields": {
+    "severity"            : "P3",
+    "exercise_severity"   : "P1",
+    "affected_endpoint"   : "/transfers/create, /transfers/upload/{id}, /transfers/complete/{id}",
+    "affected_file"       : "sgraph_ai_app_send/lambda__user/fast_api/routes/Routes__Transfers.py",
+    "affected_function"   : "check_access_token()",
+    "affected_line"       : "22-29",
+    "root_cause"          : "fail-open guard clause skips token validation when env var is unset",
+    "env_var"             : "SGRAPH_SEND__ACCESS_TOKEN",
+    "evidence"            : "Screenshot shows localStorage key 'sgraph-send-access-token' = 'abc', successful upload and download link generation",
+    "data_exposure"       : "none — data is AES-256-GCM ciphertext, server never sees plaintext",
+    "roles_involved"      : ["appsec", "devops", "dev", "conductor", "architect"]
+  }
+}

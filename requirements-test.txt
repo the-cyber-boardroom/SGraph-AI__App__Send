@@ -3,6 +3,8 @@ osbot_fast_api_serverless
 
 # for issue tracking
 issues-fs
+mgraph-ai-service-cache
+mgraph-ai-service-cache-client
 
 # for testing
 httpx

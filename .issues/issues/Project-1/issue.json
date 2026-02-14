@@ -50,12 +50,12 @@
   ],
   "properties": {
     "spec_documents": [
-      "docs/_to_process/project - Secure Send Service brief.md",
-      "docs/_to_process/secure-send-roadmap.md",
-      "docs/_to_process/secure-send-plugins-i18n-commercial.md",
-      "docs/_to_process/secure-send-llm-retention-compliance-gtm.md",
-      "docs/_to_process/secure-send-strategic-opportunities.md",
-      "docs/_to_process/sgraph-ai-naming-branding-strategy.md"
+      "library/docs/_to_process/project - Secure Send Service brief.md",
+      "library/docs/_to_process/secure-send-roadmap.md",
+      "library/docs/_to_process/secure-send-plugins-i18n-commercial.md",
+      "library/docs/_to_process/secure-send-llm-retention-compliance-gtm.md",
+      "library/docs/_to_process/secure-send-strategic-opportunities.md",
+      "library/docs/_to_process/sgraph-ai-naming-branding-strategy.md"
     ]
   }
 }

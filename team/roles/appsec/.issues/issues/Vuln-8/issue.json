@@ -1,0 +1,32 @@
+{
+  "node_id": "f1000008",
+  "node_type": "vulnerability",
+  "node_index": 13,
+  "label": "Vuln-8",
+  "title": "Lambda Handler Leaks Exception Details to Callers",
+  "description": "Both Lambda handlers (lambda_handler__admin.py and lambda_handler__user.py) catch startup exceptions and store them in an error variable that is returned directly to callers via the run() function (lines 33-34, 36-38). The error message includes the exception class name and message: f'CRITICAL ERROR: Failed to start service with:\\n\\n{type(exc).__name__}: {exc}'. This leaks internal implementation details (package names, class names, import paths, configuration errors) to any caller, aiding reconnaissance.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "information-leakage", "low"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "severity": "Low",
+    "owasp_category": "A05:2021 Security Misconfiguration",
+    "cwe": "CWE-209 (Generation of Error Message Containing Sensitive Information)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/lambda_function/lambda_handler__user.py, sgraph_ai_app_send/lambda__admin/lambda_function/lambda_handler__admin.py",
+    "affected_lines": "33-34 (error message), 36-38 (run function returns error)",
+    "exploit_vector": "1. If the Lambda function fails to start (e.g., missing dependency, configuration error), every subsequent request returns the full exception details. 2. Attacker learns internal package names, Python version, import structure, and dependency versions — all useful for finding known CVEs in those dependencies.",
+    "fix_recommendation": "1. Return a generic error message to callers (e.g., 'Service temporarily unavailable'). 2. Log the detailed exception to CloudWatch only. 3. Use structured logging with severity levels to ensure operational visibility without client exposure.",
+    "priority": "P2",
+    "role_assignment": "appsec"
+  }
+}

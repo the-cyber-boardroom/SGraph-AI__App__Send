@@ -1,6 +1,6 @@
 [tool.poetry]
 name        = "sgraph_ai_app_send"
-version     = "v0.2.0"
+version     = "v0.2.46"
 description = "SGraph-AI__App__Send"
 authors     = ["Dinis Cruz <dinis.cruz@owasp.org>"]
 license     = "Apache 2.0"
@@ -9,10 +9,12 @@ homepage    = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
 repository  = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
 
 [tool.poetry.dependencies]
-python                      = "^3.12"
-osbot-utils                 = "*"
-issues-fs-cli               = "*"
-osbot-fast-api-serverless   = "*"
+python                         = "^3.12"
+osbot-utils                    = "*"
+issues-fs-cli                  = "*"
+osbot-fast-api-serverless      = "*"
+mgraph-ai-service-cache        = "*"
+mgraph-ai-service-cache-client = "*"
 
 [build-system]
 requires = ["poetry-core>=1.9.1"]

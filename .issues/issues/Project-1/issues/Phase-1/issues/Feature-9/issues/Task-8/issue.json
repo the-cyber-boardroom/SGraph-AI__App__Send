@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000085",
+  "node_type": "task",
+  "node_index": 8,
+  "label": "Task-8",
+  "title": "Maintain incident improvement backlog in Issues FS",
+  "description": "Librarian maintains the incident improvement backlog in Issues FS. Every systemic improvement identified during an incident becomes a tracked task linked to the originating incident. Source: Document 3 (Payoff).",
+  "status": "pending",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "issues-fs", "librarian"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
+    }
+  ],
+  "properties": {
+    "priority": "P2",
+    "acceptance_criteria": "Process established for incident improvements to be filed in Issues FS with links to originating incident.",
+    "role_assignment": "librarian",
+    "source_document": "v0.2.23__briefs__incident-payoff-best-time-to-fix-things.md"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "app.title":                        "SGraph ngeH",
+  "app.subtitle":                     "pagh Sovlu'bogh pegh ngaSbogh De' lI'",
+
+  "upload.mode.file":                 "De'wI' ghItlh",
+  "upload.mode.text":                 "ghItlh",
+
+  "upload.drop_zone.label":           "naDev De'wI' ghItlh yIchagh",
+  "upload.drop_zone.hint":            "pagh yIwIv",
+  "upload.drop_zone.encrypted_hint":  "ngeHpa' De'lIj peplu'",
+
+  "upload.text.placeholder":          "naDev ghItlh yIghItlh",
+  "upload.text.char_count":           "{count} Degh",
+
+  "upload.button.encrypt_upload":     "yIpegh 'ej yIngeH",
+  "upload.button.encrypt_send":       "yIpegh 'ej yIngeH",
+
+  "upload.progress.encrypting":       "peplu'...",
+  "upload.progress.uploading":        "ngeHlu'...",
+
+  "upload.result.file_success":       "De'wI' ghItlhlIj peplu' 'ej ngeHlu'.",
+  "upload.result.text_success":       "ghItlhlIj peplu' 'ej ngeHlu'.",
+  "upload.result.share_link":         "rarwI'vam yIlI'",
+  "upload.result.copy_link":          "rarwI' yIper",
+  "upload.result.show_separate_key":  "ngaSruq pIm yIlo'",
+  "upload.result.hide_key":           "ngaSruq yISo'",
+  "upload.result.link_only":          "rarwI' neH",
+  "upload.result.decryption_key":     "ngaSruq peghHa'wI'",
+  "upload.result.copy":               "yIper",
+  "upload.result.open_tab":           "QIn chu'Daq yIpoSmoH",
+  "upload.guidance.split_channels":   "QaplaH potlh: rarwI' 'ej ngaSruq <strong>He pIm</strong>Daq yIngeH (rarwI': QIn 'ol, ngaSruq: De'wI' QIn).",
+
+  "upload.text.drop_hint":            "naDev ghItlh De'wI' ghItlh je yIchagh",
+
+  "upload.result.send_another":       "latlh yIngeH",
+
+  "upload.error.empty_text":          "peghmeH ghItlh yIghItlh.",
+  "upload.error.upload_failed":       "luj ngeH. chaq yInIDqa'.",
+
+  "download.loading":                 "ngeH De' lajlu'...",
+
+  "download.info.encrypted_file":     "De'wI' ghItlh peplu'pu'bogh",
+  "download.info.encrypted_text":     "ghItlh peplu'pu'bogh",
+  "download.info.uploaded":           "ngeHlu' {timestamp}",
+  "download.info.download_count":     "{count}logh lajlu'pu'",
+
+  "download.key.label":               "ngaSruq peghHa'wI'",
+  "download.key.placeholder":         "naDev ngaSruq peghHa'wI' yIlan",
+  "download.button.decrypt_download": "yIlaj 'ej yIpeghHa'",
+  "download.button.decrypt_view":     "yIpeghHa' 'ej yIlegh",
+
+  "download.progress.decrypting":     "lajlu' 'ej peghHa'lu'...",
+
+  "download.result.file_success":     "De'wI' ghItlh peghHa'lu'pu' 'ej pollu'pu'.",
+  "download.result.text_success":     "ghItlh peghHa'lu'pu'.",
+  "download.result.copy_text":        "qawHaq yIper",
+  "download.result.download_file":    "De'wI' ghItlh yIlaj",
+
+  "download.result.send_another":     "De'lIj yIngeH",
+
+  "download.history.title":           "lajpu'bogh De' tIQ",
+  "download.history.privacy":         "De'wI'lIjDaq pollu'. jan lo'laHbogh vay' leghlaH.",
+  "download.history.clear":           "qawHaq yIDoQ",
+  "download.history.empty":           "lajpu'bogh De' tu'lu'be'.",
+  "download.history.text_preview":    "ghItlh",
+  "download.history.file_label":      "De'wI' ghItlh",
+
+  "download.error.no_id":             "ngeH ID rarwI'Daq tu'lu'be'. rarwI' yI'ol.",
+  "download.error.not_ready":         "ngeHvam lajlaHbe' wej.",
+  "download.error.not_found":         "ngeH tu'lu'be'. chaq Qanbe'choHpu' rarwI'.",
+  "download.error.no_key":            "ngaSruq peghHa'wI' yInob.",
+  "download.error.failed":            "laj peghHa' ghap lujpu'.",
+  "download.error.token_not_found":   "rarwI'vam Qapbe'. chaw' tu'lu'be'.",
+  "download.error.token_exhausted":   "rarwI'vam Qanbe'choHpu'. chaw' naQHa'choHpu'.",
+  "download.error.token_revoked":     "rarwI'vam QaHlu'pu'. chaw' qIllu'pu'.",
+
+  "crypto.error.unavailable":         "Web Crypto API Qapbe'. Hung buv (HTTPS pagh localhost) poQlu'.",
+  "crypto.error.read_failed":         "De'wI' ghItlh lajlaHbe'",
+
+  "common.copied":                    "perlu'pu'!",
+
+  "test_files.title":                 "De'wI' ghItlh ngoH",
+  "test_files.description":           "De'wI' ghItlh ngoH yIlaj, ghIq ngeHwI'Daq yIchagh.",
+
+  "cta.title":                        "De'wI' ghItlh DangeHqang'a'?",
+  "cta.description":                  "SGraph ngeH nab wa'DIch yIjeS."
+}

@@ -19,7 +19,7 @@
     }
   ],
   "properties": {
-    "source_documents": ["docs/_to_process/secure-send-roadmap.md", "docs/_to_process/secure-send-plugins-i18n-commercial.md"],
+    "source_documents": ["library/docs/_to_process/secure-send-roadmap.md", "library/docs/_to_process/secure-send-plugins-i18n-commercial.md"],
     "depends_on_phase": "Phase-2"
   }
 }

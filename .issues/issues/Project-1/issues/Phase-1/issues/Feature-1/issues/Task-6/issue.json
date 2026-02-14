@@ -5,9 +5,9 @@
   "label": "Task-6",
   "title": "Build upload-complete page with link + key display",
   "description": "Shows download link (with copy button), decryption key (with copy button), separate-channels guidance.",
-  "status": "backlog",
+  "status": "done",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ui", "frontend", "upload"],
   "links": [

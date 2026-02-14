@@ -5,9 +5,9 @@
   "label": "Feature-6",
   "title": "UI & UX Polish",
   "description": "Polish the user experience: separate-channel sharing guidance, text/secret sharing mode, How-it-Works trust page, and register-interest waitlist functionality.",
-  "status": "backlog",
+  "status": "in-progress",
   "created_at": 1739030400000,
-  "updated_at": 1739030400000,
+  "updated_at": 1770864297601,
   "created_by": "c0000001",
   "tags": ["ui", "ux", "trust", "text-sharing", "waitlist"],
   "links": [

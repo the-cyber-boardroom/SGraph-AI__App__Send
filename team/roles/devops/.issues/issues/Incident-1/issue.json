@@ -1,0 +1,19 @@
+{
+  "node_id"     : "f3000001",
+  "title"       : "INC-001: Unknown GitHub Actions commit on feature branch",
+  "type"        : "incident",
+  "status"      : "resolved",
+  "priority"    : "P3-actual / P1-exercise",
+  "created"     : "2026-02-12T17:30:00Z",
+  "owner"       : "devops",
+  "reporter"    : "dinis_cruz",
+  "description" : "Project lead observed a commit (956c37f) on feature branch claude/read-secure-send-brief-Mz6yN authored by 'GitHub Actions <actions@github.com>' with message 'Update release badge and version file'. CI pipelines only trigger on pushes to dev/main branches. Investigating how a GitHub Actions-authored commit appeared on a feature branch.",
+  "custom_fields": {
+    "severity"           : "P3",
+    "exercise_severity"  : "P1",
+    "triggering_commit"  : "956c37f",
+    "triggering_branch"  : "claude/read-secure-send-brief-Mz6yN",
+    "triggering_question": "Do non-dev branches trigger the CI pipeline that creates the version increase file changes?",
+    "roles_involved"     : ["devops", "appsec", "grc", "dpo", "journalist", "historian", "conductor"]
+  }
+}

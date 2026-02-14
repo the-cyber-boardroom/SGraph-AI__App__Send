@@ -1,0 +1,11 @@
+{
+    "test_file"    : true,
+    "purpose"      : "QA testing of SGraph Send upload flow",
+    "created"      : "2026-02-12",
+    "description"  : "Small JSON file for drag-and-drop upload testing",
+    "sample_data"  : {
+        "items"    : ["alpha", "bravo", "charlie"],
+        "count"    : 3,
+        "verified" : false
+    }
+}

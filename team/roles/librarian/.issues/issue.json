@@ -1,0 +1,15 @@
+{
+  "node_id": "e1000009",
+  "node_type": "git-repo",
+  "node_index": 0,
+  "label": "Librarian-1",
+  "title": "Librarian Role — Issue Tracker",
+  "description": "Knowledge base maintenance, Issues FS management, master index, and documentation organization tasks for SGraph Send.",
+  "status": "active",
+  "created_at": 1739232000000,
+  "updated_at": 1739232000000,
+  "created_by": "c0000001",
+  "tags": ["librarian", "knowledge-base"],
+  "links": [],
+  "properties": {}
+}

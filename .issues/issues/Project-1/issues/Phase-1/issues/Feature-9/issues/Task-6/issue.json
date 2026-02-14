@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000083",
+  "node_type": "task",
+  "node_index": 6,
+  "label": "Task-6",
+  "title": "Create incident detection checklist for CI/CD",
+  "description": "DevOps creates the incident detection checklist for CI/CD pipelines. Check for: unexpected authors, failed checks that previously passed, unusual timing, secrets exposure, deployment anomalies. Source: Document 2 (Practice).",
+  "status": "pending",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "ci-cd", "devops"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "acceptance_criteria": "CI/CD incident detection checklist documented and integrated into pipeline monitoring.",
+    "role_assignment": "devops",
+    "source_document": "v0.2.23__briefs__incident-practice-running-p3-as-p1.md"
+  }
+}

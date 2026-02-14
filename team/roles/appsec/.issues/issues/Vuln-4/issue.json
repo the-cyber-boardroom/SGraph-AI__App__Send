@@ -1,0 +1,32 @@
+{
+  "node_id": "f1000004",
+  "node_type": "vulnerability",
+  "node_index": 9,
+  "label": "Vuln-4",
+  "title": "No Rate Limiting on Public Endpoints",
+  "description": "Lambda Function URLs are directly exposed to the internet with no API Gateway, no WAF, and no rate limiting. All five transfer endpoints (create, upload, complete, info, download) can be called at unlimited rates. This enables: mass transfer creation (resource exhaustion and cost amplification), brute-force transfer ID enumeration, bandwidth-based DoS via repeated large downloads, and abuse of the service for malicious file distribution.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "dos", "rate-limiting", "high"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "severity": "High",
+    "owasp_category": "A05:2021 Security Misconfiguration",
+    "cwe": "CWE-770 (Allocation of Resources Without Limits or Throttling), CWE-799 (Improper Control of Interaction Frequency)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/fast_api/Fast_API__SGraph__App__Send__User.py",
+    "affected_lines": "All routes (entire application)",
+    "exploit_vector": "1. Script that calls POST /transfers/create in a loop: creates thousands of transfers, consuming Lambda concurrent execution quota and potentially exhausting storage. 2. Enumerate valid transfer_ids by calling GET /transfers/info/{id} with sequential hex values — 404 vs 200 reveals valid transfers. 3. Download the same transfer thousands of times to amplify bandwidth costs.",
+    "fix_recommendation": "1. Add API Gateway or CloudFront in front of Lambda URLs with WAF rate limiting rules. 2. Implement application-level rate limiting using IP hash-based sliding windows. 3. Add Lambda reserved concurrency limits. 4. Consider requiring a proof-of-work or CAPTCHA for transfer creation.",
+    "priority": "P0",
+    "role_assignment": "appsec"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "node_id": "d1000092",
+  "node_type": "task",
+  "node_index": 15,
+  "label": "Task-15",
+  "title": "Prepare incident communication drafts for each audience",
+  "description": "Journalist prepares communication draft templates for each audience: technical team, management, affected users, and public. Each template sourced from a single Issues FS incident node. Source: Document 4 (Simulation & Communication).",
+  "status": "pending",
+  "created_at": 1739462400000,
+  "updated_at": 1739462400000,
+  "created_by": "c0000001",
+  "tags": ["incident-handling", "communication", "journalist"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "c1000009",
+      "target_label": "Feature-9"
+    }
+  ],
+  "properties": {
+    "priority": "P2",
+    "acceptance_criteria": "Communication draft templates exist for all four audiences (technical, management, users, public).",
+    "role_assignment": "journalist",
+    "source_document": "v0.2.23__briefs__incident-simulation-communication-escalation.md"
+  }
+}

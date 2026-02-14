@@ -1,0 +1,32 @@
+{
+  "node_id": "f1000010",
+  "node_type": "vulnerability",
+  "node_index": 15,
+  "label": "Vuln-10",
+  "title": "Sender IP Not Captured in Transfer Creation Route",
+  "description": "In Routes__Transfers.create() (line 28), the sender_ip parameter is hardcoded to an empty string: sender_ip=''. The route does not extract the client IP from the Request object. This means all transfers are created with ip_hash = SHA-256('') — the same hash for every sender. The transparency model claims to store sender IP hashes for accountability, but this is never implemented. The Request object is not even accepted as a parameter in the create() method signature.",
+  "status": "open",
+  "created_at": 1739318400000,
+  "updated_at": 1739318400000,
+  "created_by": "appsec",
+  "tags": ["vulnerability", "logging-failure", "accountability", "medium"],
+  "links": [
+    {
+      "link_type_id": "4f012722",
+      "verb": "task-of",
+      "target_id": "e1000001",
+      "target_label": "AppSec-1"
+    }
+  ],
+  "properties": {
+    "severity": "Medium",
+    "owasp_category": "A09:2021 Security Logging and Monitoring Failures",
+    "cwe": "CWE-778 (Insufficient Logging)",
+    "affected_file": "sgraph_ai_app_send/lambda__user/fast_api/routes/Routes__Transfers.py",
+    "affected_lines": "24-30 (create method, specifically line 28: sender_ip='')",
+    "exploit_vector": "1. All transfers appear to come from the same 'sender' (hash of empty string). 2. Abuse tracking is impossible — cannot correlate malicious uploads with source IPs. 3. The transparency panel shows a meaningless sender_ip_hash. 4. Legal/compliance reporting on who uploaded content is not possible.",
+    "fix_recommendation": "1. Add Request parameter to the create() method signature. 2. Extract sender IP: request.client.host if request.client else ''. 3. Pass the real IP to transfer_service.create_transfer(). 4. Consider X-Forwarded-For header handling for proxied environments (Lambda URL, CloudFront).",
+    "priority": "P1",
+    "role_assignment": "appsec"
+  }
+}
