@@ -5,7 +5,6 @@
    System information display:
      - Service name, version
      - Health status indicator with latency
-     - Registered routes list
      - Refresh capability
 
    Usage:
@@ -13,7 +12,6 @@
 
    API calls:
      GET /info         — service metadata
-     GET /info/routes  — registered routes
      GET /info/health  — health check
    ============================================================================= */
 
@@ -23,7 +21,6 @@ class SystemInfo extends HTMLElement {
         super();
         this.attachShadow({ mode: 'open' });
         this._info      = null;
-        this._routes     = null;
         this._health     = null;
         this._latency    = null;
         this._loading    = false;
@@ -54,15 +51,13 @@ class SystemInfo extends HTMLElement {
 
         try {
             const start = performance.now();
-            const [info, routes, health] = await Promise.all([
+            const [info, health] = await Promise.all([
                 adminAPI.getInfo().catch(err => ({ error: err.message })),
-                adminAPI.getRoutes().catch(err => ({ error: err.message })),
                 adminAPI.getHealth().catch(err => ({ error: err.message }))
             ]);
             this._latency = Math.round(performance.now() - start);
 
             this._info    = info;
-            this._routes  = routes;
             this._health  = health;
             this._loading = false;
         } catch (err) {
@@ -126,7 +121,6 @@ class SystemInfo extends HTMLElement {
         el.innerHTML = `
             ${this._renderHealthCard()}
             ${this._renderInfoCard()}
-            ${this._renderRoutesCard()}
         `;
     }
 
@@ -202,48 +196,6 @@ class SystemInfo extends HTMLElement {
                 </div>
                 <div class="card__body">
                     <div class="info-grid">${items}</div>
-                </div>
-            </div>
-        `;
-    }
-
-    _renderRoutesCard() {
-        if (!this._routes || this._routes.error) {
-            return `
-                <div class="card">
-                    <div class="card__header">
-                        <span class="card__title">Registered Routes</span>
-                    </div>
-                    <div class="card__body">
-                        <div class="error-inline">
-                            ${this._routes?.error ? this._escapeHtml(this._routes.error) : 'Unable to load routes'}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Routes may come as { data: [...] } or { routes: [...] } or just an array
-        const data = this._routes.data || this._routes.routes || this._routes;
-        const routeList = Array.isArray(data) ? data : (typeof data === 'object' ? Object.keys(data) : []);
-
-        const rows = routeList.map(route => {
-            const path = typeof route === 'string' ? route : (route.path || route.route || JSON.stringify(route));
-            return `
-                <div class="route-item">
-                    <span class="route-path">${this._escapeHtml(path)}</span>
-                </div>
-            `;
-        }).join('');
-
-        return `
-            <div class="card">
-                <div class="card__header">
-                    <span class="card__title">Registered Routes</span>
-                    <span class="card__count">${routeList.length}</span>
-                </div>
-                <div class="card__body card__body--routes">
-                    ${rows || '<div class="empty-text">No routes found</div>'}
                 </div>
             </div>
         `;
@@ -407,12 +359,6 @@ class SystemInfo extends HTMLElement {
                 padding: 1rem 1.25rem;
             }
 
-            .card__body--routes {
-                padding: 0.5rem 0;
-                max-height: 400px;
-                overflow-y: auto;
-            }
-
             /* --- Health Indicator --- */
             .health-indicator {
                 display: inline-flex;
@@ -484,28 +430,6 @@ class SystemInfo extends HTMLElement {
 
             .info-value--error {
                 color: var(--admin-error);
-            }
-
-            /* --- Route List --- */
-            .route-item {
-                padding: 0.375rem 1.25rem;
-                transition: background var(--admin-transition);
-            }
-
-            .route-item:hover {
-                background: var(--admin-surface-hover);
-            }
-
-            .route-path {
-                font-family: var(--admin-font-mono);
-                font-size: var(--admin-font-size-xs);
-                color: var(--admin-text-secondary);
-            }
-
-            .empty-text {
-                padding: 1rem 1.25rem;
-                color: var(--admin-text-muted);
-                font-size: var(--admin-font-size-sm);
             }
 
             /* --- Responsive --- */

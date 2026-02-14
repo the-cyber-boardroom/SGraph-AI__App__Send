@@ -19,7 +19,6 @@
 
      System Info:
        GET  /info                   — service info (name, version)
-       GET  /info/routes            — all registered routes
        GET  /info/health            — health check
    ============================================================================= */
 
@@ -153,14 +152,6 @@ class AdminAPI {
      */
     getInfo() {
         return this._get('/info');
-    }
-
-    /**
-     * Get all registered routes.
-     * @returns {Promise<object>}
-     */
-    getRoutes() {
-        return this._get('/info/routes');
     }
 
     /**
