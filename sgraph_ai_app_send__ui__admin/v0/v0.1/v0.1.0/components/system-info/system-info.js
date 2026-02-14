@@ -11,7 +11,7 @@
      <system-info></system-info>
 
    API calls:
-     GET /info         — service metadata
+     GET /info/status  — service metadata
      GET /info/health  — health check
    ============================================================================= */
 
