@@ -5,15 +5,14 @@
 # ===============================================================================
 
 import secrets
+from osbot_utils.type_safe.Type_Safe                                           import Type_Safe
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client              import Send__Cache__Client
 
 
-class Service__Tokens:                                                     # Token lifecycle management
+class Service__Tokens(Type_Safe):                                          # Token lifecycle management
+    send_cache_client : Send__Cache__Client                                # Injected cache client
 
-    def __init__(self, send_cache_client: Send__Cache__Client):
-        self.send_cache_client = send_cache_client
-
-    def create(self, token_name, usage_limit, created_by='admin', metadata=None):  # Create a new token
+    def create(self, token_name, usage_limit=50, created_by='admin', metadata=None):  # Create a new token
         existing = self.send_cache_client.token__lookup(token_name)
         if existing is not None:
             return None                                                    # Token name already exists

@@ -10,6 +10,6 @@ from osbot_utils.type_safe.primitives.core.Safe_UInt                            
 
 class Schema__Token__Create__Request(Type_Safe):                             # POST /tokens/create request body
     token_name  : Safe_Str__Id                                               # Human-friendly token name: 'community-x'
-    usage_limit : Safe_UInt                                                  # Max uses (0 = unlimited)
+    usage_limit : Safe_UInt    = 50                                          # Max uses (0 = unlimited)
     created_by  : Safe_Str__Id  = 'admin'                                    # Admin identifier
     metadata    : dict                                                       # todo: should be Dict[Safe_Str__Key, Safe_Str__Text]
