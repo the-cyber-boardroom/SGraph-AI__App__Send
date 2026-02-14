@@ -9,10 +9,12 @@ homepage    = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
 repository  = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
 
 [tool.poetry.dependencies]
-python                      = "^3.12"
-osbot-utils                 = "*"
-issues-fs-cli               = "*"
-osbot-fast-api-serverless   = "*"
+python                         = "^3.12"
+osbot-utils                    = "*"
+issues-fs-cli                  = "*"
+osbot-fast-api-serverless      = "*"
+mgraph-ai-service-cache        = "*"
+mgraph-ai-service-cache-client = "*"
 
 [build-system]
 requires = ["poetry-core>=1.9.1"]
