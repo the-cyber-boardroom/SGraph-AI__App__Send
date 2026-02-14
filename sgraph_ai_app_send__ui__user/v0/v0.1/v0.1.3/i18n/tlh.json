@@ -70,6 +70,9 @@
   "download.error.not_found":         "ngeH tu'lu'be'. chaq Qanbe'choHpu' rarwI'.",
   "download.error.no_key":            "ngaSruq peghHa'wI' yInob.",
   "download.error.failed":            "laj peghHa' ghap lujpu'.",
+  "download.error.token_not_found":   "rarwI'vam Qapbe'. chaw' tu'lu'be'.",
+  "download.error.token_exhausted":   "rarwI'vam Qanbe'choHpu'. chaw' naQHa'choHpu'.",
+  "download.error.token_revoked":     "rarwI'vam QaHlu'pu'. chaw' qIllu'pu'.",
 
   "crypto.error.unavailable":         "Web Crypto API Qapbe'. Hung buv (HTTPS pagh localhost) poQlu'.",
   "crypto.error.read_failed":         "De'wI' ghItlh lajlaHbe'",

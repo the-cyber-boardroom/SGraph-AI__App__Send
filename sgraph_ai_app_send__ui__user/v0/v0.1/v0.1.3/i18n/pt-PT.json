@@ -70,6 +70,9 @@
   "download.error.not_found":         "Transferência não encontrada. A ligação pode ter expirado.",
   "download.error.no_key":            "Por favor introduza a chave de desencriptação.",
   "download.error.failed":            "A transferência ou desencriptação falhou.",
+  "download.error.token_not_found":   "Esta ligação não é válida. O token de acesso não foi encontrado.",
+  "download.error.token_exhausted":   "Esta ligação expirou. O token de acesso foi totalmente utilizado.",
+  "download.error.token_revoked":     "Esta ligação foi desativada. O token de acesso foi revogado.",
 
   "crypto.error.unavailable":         "A Web Crypto API não está disponível. Requer um contexto seguro (HTTPS ou localhost).",
   "crypto.error.read_failed":         "Falha ao ler o ficheiro",

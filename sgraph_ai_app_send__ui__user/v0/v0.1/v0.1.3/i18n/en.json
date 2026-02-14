@@ -57,6 +57,9 @@
   "download.error.not_found":         "Transfer not found. The link may have expired.",
   "download.error.no_key":            "Please enter the decryption key.",
   "download.error.failed":            "Download or decryption failed.",
+  "download.error.token_not_found":   "This link is not valid. The access token was not found.",
+  "download.error.token_exhausted":   "This link has expired. The access token has been fully used.",
+  "download.error.token_revoked":     "This link has been disabled. The access token was revoked.",
 
   "crypto.error.unavailable":         "Web Crypto API is not available. It requires a secure context (HTTPS or localhost). If running locally, use \"localhost\" instead of \"127.0.0.1\".",
   "crypto.error.read_failed":         "Failed to read file",

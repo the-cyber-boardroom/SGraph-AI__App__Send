@@ -112,6 +112,39 @@ const ApiClient = {
         return response.json();
     },
 
+    // ─── Token Validation ────────────────────────────────────────────────
+
+    /**
+     * Check if a token is valid (lookup only — no usage consumed).
+     * Used by the access gate to validate before storing.
+     * @param {string} tokenName
+     * @returns {Promise<{valid: boolean, status?: string, remaining?: number, reason?: string}>}
+     */
+    async checkToken(tokenName) {
+        const response = await fetch(`${this.baseUrl}/transfers/check-token/${encodeURIComponent(tokenName)}`);
+        if (!response.ok) {
+            throw new Error(`Token check failed: ${response.status}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * Validate a token and consume one use (for download page).
+     * Records the page view against the token's usage limit.
+     * @param {string} tokenName
+     * @returns {Promise<{success: boolean, usage_count?: number, remaining?: number, reason?: string}>}
+     */
+    async validateToken(tokenName) {
+        const response = await fetch(`${this.baseUrl}/transfers/validate-token/${encodeURIComponent(tokenName)}`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+            throw new Error(`Token validation failed: ${response.status}`);
+        }
+        return response.json();
+    },
+
     // ─── Transfer Info & Download (public — no auth needed) ──────────────
 
     /**

@@ -24,6 +24,7 @@ class SendDownload extends HTMLElement {
         this.transferInfo     = null;
         this.transparencyData = null;
         this.hashKey          = null;
+        this.tokenName        = null;
         this.decryptedText    = null;
         this.decryptedBytes   = null;
         this.fileName         = null;
@@ -62,6 +63,7 @@ class SendDownload extends HTMLElement {
         this.transferInfo     = null;
         this.transparencyData = null;
         this.hashKey          = null;
+        this.tokenName        = null;
         this.decryptedText    = null;
         this.decryptedBytes   = null;
         this.fileName         = null;
@@ -85,6 +87,9 @@ class SendDownload extends HTMLElement {
     // ─── URL Parsing ──────────────────────────────────────────────────────
 
     parseUrl() {
+        const params = new URLSearchParams(window.location.search);
+        this.tokenName = params.get('token') || null;
+
         const hash = window.location.hash.substring(1);
         if (hash) {
             const i = hash.indexOf('/');
@@ -92,7 +97,6 @@ class SendDownload extends HTMLElement {
             else        { this.transferId = hash; }
             return;
         }
-        const params = new URLSearchParams(window.location.search);
         this.transferId = params.get('id') || null;
     }
 
@@ -100,6 +104,21 @@ class SendDownload extends HTMLElement {
 
     async loadTransferInfo() {
         try {
+            // Validate token before allowing download (if token present in URL)
+            if (this.tokenName) {
+                try {
+                    const tokenResult = await ApiClient.validateToken(this.tokenName);
+                    if (!tokenResult.success) {
+                        this.state        = 'error';
+                        this.errorMessage = this.getTokenErrorMessage(tokenResult.reason);
+                        this.render();
+                        return;
+                    }
+                } catch (e) {
+                    // Token validation service unavailable — allow through (graceful degradation)
+                }
+            }
+
             this.transferInfo = await ApiClient.getTransferInfo(this.transferId);
             if (this.transferInfo.status !== 'completed') {
                 this.state        = 'error';
@@ -118,6 +137,15 @@ class SendDownload extends HTMLElement {
         if (this.state === 'ready' && this.hashKey) {
             this.startDownload(this.hashKey);
         }
+    }
+
+    getTokenErrorMessage(reason) {
+        const messages = {
+            'not_found': this.t('download.error.token_not_found'),
+            'exhausted': this.t('download.error.token_exhausted'),
+            'revoked':   this.t('download.error.token_revoked'),
+        };
+        return messages[reason] || this.t('download.error.token_not_found');
     }
 
     isTextContent() {

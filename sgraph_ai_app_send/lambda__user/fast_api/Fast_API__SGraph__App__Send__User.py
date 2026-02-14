@@ -61,7 +61,8 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         self.setup_static_routes()
         self.add_routes(Routes__Info             )
         self.add_routes(Routes__Transfers        ,
-                        transfer_service = self.transfer_service)
+                        transfer_service     = self.transfer_service     ,
+                        admin_service_client = self.admin_service_client )
         self.add_routes(Routes__Set_Cookie)
 
         if self.send_cache_client is not None:                                      # Add analytics middleware if cache client available
