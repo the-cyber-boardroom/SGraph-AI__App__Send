@@ -1,0 +1,177 @@
+/* =============================================================================
+   SGraph Send Admin Console — Styles
+   v0.1.0 — Base major version
+
+   Dark theme by default. CSS custom properties for theming.
+   Professional admin console layout with sidebar navigation.
+   ============================================================================= */
+
+/* --- CSS Custom Properties (Dark Theme) ------------------------------------ */
+:root {
+    --admin-bg:                 #0f1117;
+    --admin-surface:            #1a1d27;
+    --admin-surface-raised:     #232736;
+    --admin-surface-hover:      #2a2e3d;
+    --admin-border:             #2e3347;
+    --admin-border-subtle:      #252838;
+
+    --admin-text:               #e4e6ef;
+    --admin-text-secondary:     #8b8fa7;
+    --admin-text-muted:         #5e6280;
+
+    --admin-primary:            #4f8ff7;
+    --admin-primary-hover:      #3a7be8;
+    --admin-primary-bg:         rgba(79, 143, 247, 0.1);
+
+    --admin-success:            #34d399;
+    --admin-success-bg:         rgba(52, 211, 153, 0.1);
+    --admin-error:              #f87171;
+    --admin-error-bg:           rgba(248, 113, 113, 0.1);
+    --admin-warning:            #fbbf24;
+    --admin-warning-bg:         rgba(251, 191, 36, 0.1);
+
+    --admin-radius:             6px;
+    --admin-radius-lg:          10px;
+    --admin-shadow:             0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --admin-shadow-lg:          0 4px 12px rgba(0, 0, 0, 0.4);
+    --admin-transition:         150ms ease;
+
+    --admin-font:               -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --admin-font-mono:          'SF Mono', 'Cascadia Code', 'Consolas', 'Liberation Mono', monospace;
+    --admin-font-size-xs:       0.75rem;
+    --admin-font-size-sm:       0.8125rem;
+    --admin-font-size-base:     0.875rem;
+    --admin-font-size-lg:       1rem;
+    --admin-font-size-xl:       1.25rem;
+    --admin-font-size-2xl:      1.5rem;
+
+    --admin-sidebar-width:      240px;
+    --admin-header-height:      56px;
+}
+
+/* --- Reset & Base ---------------------------------------------------------- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    font-family: var(--admin-font);
+    font-size: var(--admin-font-size-base);
+    color: var(--admin-text);
+    background-color: var(--admin-bg);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Scrollbar (subtle) ---------------------------------------------------- */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--admin-border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--admin-text-muted);
+}
+
+/* --- Typography ------------------------------------------------------------ */
+h1, h2, h3, h4 {
+    color: var(--admin-text);
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+a {
+    color: var(--admin-primary);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* --- Loading Spinner ------------------------------------------------------- */
+@keyframes admin-spin {
+    to { transform: rotate(360deg); }
+}
+
+.admin-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--admin-border);
+    border-top-color: var(--admin-primary);
+    border-radius: 50%;
+    animation: admin-spin 0.6s linear infinite;
+}
+
+.admin-spinner--lg {
+    width: 32px;
+    height: 32px;
+    border-width: 3px;
+}
+
+/* --- Loading State --------------------------------------------------------- */
+.admin-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    color: var(--admin-text-secondary);
+    font-size: var(--admin-font-size-sm);
+}
+
+/* --- Empty State ----------------------------------------------------------- */
+.admin-empty {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--admin-text-muted);
+    font-size: var(--admin-font-size-sm);
+}
+
+.admin-empty__icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.5;
+}
+
+/* --- Error State ----------------------------------------------------------- */
+.admin-error {
+    padding: 1rem 1.25rem;
+    background: var(--admin-error-bg);
+    border: 1px solid rgba(248, 113, 113, 0.2);
+    border-radius: var(--admin-radius);
+    color: var(--admin-error);
+    font-size: var(--admin-font-size-sm);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.admin-error__retry {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* --- Responsive ------------------------------------------------------------ */
+@media (max-width: 768px) {
+    :root {
+        --admin-sidebar-width: 0px;
+    }
+}
