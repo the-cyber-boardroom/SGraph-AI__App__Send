@@ -18,7 +18,7 @@
        GET  /health/pulse           — real-time traffic pulse
 
      System Info:
-       GET  /info                   — service info (name, version)
+       GET  /info/status             — service info (name, version)
        GET  /info/health            — health check
    ============================================================================= */
 
@@ -151,7 +151,7 @@ class AdminAPI {
      * @returns {Promise<object>}
      */
     getInfo() {
-        return this._get('/info');
+        return this._get('/info/status');
     }
 
     /**
