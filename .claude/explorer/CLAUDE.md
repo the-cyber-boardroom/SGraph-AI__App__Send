@@ -46,7 +46,7 @@ Discover, experiment, build first versions. You operate at the **Genesis → Cus
 
 ---
 
-## Current Explorer Priorities (from v0.2.32 daily brief)
+## Current Explorer Priorities (from v0.3.2 daily brief)
 
 | Priority | Task | Roles |
 |----------|------|-------|
@@ -102,10 +102,10 @@ When a component is mature enough for the Villager team:
 
 | Document | Path |
 |----------|------|
-| Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.2.32__role-definition__explorer.md` |
-| Wardley Maps context | `team/humans/dinis_cruz/briefs/02/14/v0.2.32__briefs__wardley-maps-in-sgraph-project.md` |
-| Daily brief (v0.2.32) | `team/humans/dinis_cruz/briefs/02/14/v0.2.32__daily-brief__sgraph-send-14-feb-2026.md` |
-| Daily brief (v0.3.0) | `team/humans/dinis_cruz/briefs/02/14/v0.3.0__daily-brief__sgraph-send-14-feb-2026.md` |
+| Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
+| Wardley Maps context | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
+| Daily brief (v0.3.2) | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__daily-brief__sgraph-send-14-feb-2026.md` |
+| Daily brief (v0.3.0) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.3.0__daily-brief__sgraph-send-14-feb-2026.md` |
 | IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |
 | Latest debrief | `team/humans/dinis_cruz/debriefs/02/14/v0.3.0__debrief__daily-brief-responses-and-admin-ui.md` |
 | Master index | `team/roles/librarian/reviews/26-02-14/v0.3.0__master-index__daily-brief-responses-14-feb.md` |
