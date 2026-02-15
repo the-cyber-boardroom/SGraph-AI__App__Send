@@ -12,6 +12,7 @@ from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client               
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                    import create_send_cache_client
 from sgraph_ai_app_send.lambda__admin.service.Service__Tokens                       import Service__Tokens
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import Routes__Tokens
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser        import Routes__Cache__Browser
 from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                 import Middleware__Analytics
 from sgraph_ai_app_send.lambda__admin.service.Service__Analytics__Pulse             import compute_pulse
 from sgraph_ai_app_send.lambda__admin.admin__config                                 import METRICS__USE_STUB
@@ -59,6 +60,8 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         self.add_routes(Routes__Tokens           ,
                         service_tokens = self.service_tokens)
         self.add_routes(Routes__Set_Cookie       )
+        self.add_routes(Routes__Cache__Browser  ,
+                        send_cache_client = self.send_cache_client)
         if self.metrics_cache is not None:                                          # Only add metrics routes if configured
             self.add_routes(Routes__Metrics      ,
                             metrics_cache = self.metrics_cache)
