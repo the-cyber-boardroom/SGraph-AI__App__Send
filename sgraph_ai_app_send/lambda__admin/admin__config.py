@@ -21,13 +21,21 @@ APP_SEND__UI__ADMIN__LATEST__VERSION         = "v0.1.1"
 # Set these on the admin Lambda to enable the /metrics/* endpoints
 # ═══════════════════════════════════════════════════════════════════════════════
 
-METRICS__CLOUDFRONT_DISTRIBUTION_ID  = os.getenv('SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID' , '')
-METRICS__LAMBDA_USER_NAME            = os.getenv('SGRAPH_SEND__LAMBDA_USER_NAME'           , '')
-METRICS__LAMBDA_ADMIN_NAME           = os.getenv('SGRAPH_SEND__LAMBDA_ADMIN_NAME'          , '')
-METRICS__S3_TRANSFERS_BUCKET         = os.getenv('SGRAPH_SEND__S3_TRANSFERS_BUCKET'        , '')
-METRICS__S3_CACHE_BUCKET             = os.getenv('SGRAPH_SEND__S3_CACHE_BUCKET'            , '')
-METRICS__S3_FILTER_ID                = os.getenv('SGRAPH_SEND__S3_FILTER_ID'               , 'all-requests')
-METRICS__AWS_REGION                  = os.getenv('SGRAPH_SEND__AWS_REGION'                 , 'eu-west-2')
+ENV_VAR__SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID = 'SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID'
+ENV_VAR__SGRAPH_SEND__LAMBDA_USER_NAME           = 'SGRAPH_SEND__LAMBDA_USER_NAME'
+ENV_VAR__SGRAPH_SEND__LAMBDA_ADMIN_NAME          = 'SGRAPH_SEND__LAMBDA_ADMIN_NAME'
+ENV_VAR__SGRAPH_SEND__S3_TRANSFERS_BUCKET        = 'SGRAPH_SEND__S3_TRANSFERS_BUCKET'
+ENV_VAR__SGRAPH_SEND__S3_CACHE_BUCKET            = 'SGRAPH_SEND__S3_CACHE_BUCKET'
+ENV_VAR__SGRAPH_SEND__S3_FILTER_ID               = 'SGRAPH_SEND__S3_FILTER_ID'
+ENV_VAR__SGRAPH_SEND__AWS_REGION                 = 'SGRAPH_SEND__AWS_REGION'
+
+METRICS__CLOUDFRONT_DISTRIBUTION_ID  = os.getenv(ENV_VAR__SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID , '')
+METRICS__LAMBDA_USER_NAME            = os.getenv(ENV_VAR__SGRAPH_SEND__LAMBDA_USER_NAME           , '')
+METRICS__LAMBDA_ADMIN_NAME           = os.getenv(ENV_VAR__SGRAPH_SEND__LAMBDA_ADMIN_NAME          , '')
+METRICS__S3_TRANSFERS_BUCKET         = os.getenv(ENV_VAR__SGRAPH_SEND__S3_TRANSFERS_BUCKET        , '')
+METRICS__S3_CACHE_BUCKET             = os.getenv(ENV_VAR__SGRAPH_SEND__S3_CACHE_BUCKET            , '')
+METRICS__S3_FILTER_ID                = os.getenv(ENV_VAR__SGRAPH_SEND__S3_FILTER_ID               , 'all-requests')
+METRICS__AWS_REGION                  = os.getenv(ENV_VAR__SGRAPH_SEND__AWS_REGION                 , 'eu-west-2')
 METRICS__ENABLED                     = bool(METRICS__CLOUDFRONT_DISTRIBUTION_ID and
                                             METRICS__LAMBDA_USER_NAME           and
                                             METRICS__LAMBDA_ADMIN_NAME          and
