@@ -1,0 +1,8 @@
+# Villager Conductor — Productisation Pipeline
+Workstream-1 | in-progress | First IFD production release
+	Task-1 | todo | Receive and verify Explorer handover brief
+	Task-2 | todo | Decompose handover into role-specific hardening tasks
+	Task-3 | todo | Create release plan with gating criteria
+	Task-4 | todo | Coordinate QA, AppSec, and DevOps sign-offs
+	Task-5 | todo | Conduct release ceremony and deploy approval
+	Task-6 | todo | Post-deployment verification and monitoring check

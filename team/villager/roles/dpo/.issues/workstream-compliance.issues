@@ -1,0 +1,7 @@
+# Villager DPO — Production Compliance
+Workstream-1 | todo | Production data protection compliance
+	Task-1 | todo | Audit production personal data collection and processing
+	Task-2 | todo | Verify IP hash implementation in production
+	Task-3 | todo | Verify user-facing privacy claims match production reality
+	Task-4 | todo | Complete DPIA for production environment
+	Task-5 | todo | Document breach notification procedure

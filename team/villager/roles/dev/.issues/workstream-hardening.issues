@@ -1,0 +1,8 @@
+# Villager Dev — Code Hardening
+Workstream-1 | in-progress | Production code hardening
+	Task-1 | todo | Profile transfer upload path for performance bottlenecks
+	Task-2 | todo | Profile transfer download path for performance bottlenecks
+	Task-3 | todo | Add retry logic and graceful degradation to storage operations
+	Task-4 | todo | Harden error handling across all API endpoints
+	Task-5 | todo | Write performance benchmark tests for critical paths
+	Task-6 | todo | Verify all code paths handle timeouts gracefully

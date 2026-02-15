@@ -1,0 +1,10 @@
+# Villager QA — Production Quality Assurance
+Workstream-1 | in-progress | Production quality gate
+	Task-1 | todo | Establish regression test baseline (current 111+ tests)
+	Task-2 | todo | Define production load profile (users, request rate, file sizes)
+	Task-3 | todo | Set up load testing infrastructure
+	Task-4 | todo | Run load tests against staging environment
+	Task-5 | todo | Write edge case tests (large files, empty files, concurrent uploads)
+	Task-6 | todo | Verify all smoke tests cover production deployment targets
+	Task-7 | todo | Create release quality gate checklist
+	Task-8 | todo | Provide QA sign-off for first production release

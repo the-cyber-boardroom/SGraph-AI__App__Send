@@ -1,0 +1,10 @@
+# Villager DevOps — Production Deployment
+Workstream-1 | in-progress | Production environment setup
+	Task-1 | todo | Set up production AWS environment (separate from Explorer)
+	Task-2 | todo | Configure production CI/CD pipeline
+	Task-3 | todo | Set up production Lambda functions (user and admin)
+	Task-4 | todo | Configure production secrets and environment variables
+	Task-5 | todo | Set up monitoring and alerting (CloudWatch)
+	Task-6 | todo | Establish rollback procedure and test it
+	Task-7 | todo | Run full smoke test suite against production
+	Task-8 | todo | Document production deployment runbook
