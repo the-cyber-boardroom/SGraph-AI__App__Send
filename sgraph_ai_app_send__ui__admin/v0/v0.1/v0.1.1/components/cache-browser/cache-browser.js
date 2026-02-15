@@ -25,10 +25,14 @@ class CacheBrowser extends HTMLElement {
 
     connectedCallback() {
         this.render();
-        this.loadNamespaces();
+        // Don't eagerly load — wait until panel is activated (lazy loading)
     }
 
-    onActivated() { if (!this._folders.length && !this._files.length) this.loadNamespaces(); }
+    onActivated() {
+        if (!this._loading && !this._folders.length && !this._files.length) {
+            this.loadNamespaces();
+        }
+    }
 
     // ─── Data Loading ────────────────────────────────────────────────────
 
