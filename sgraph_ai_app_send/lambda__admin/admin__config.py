@@ -33,3 +33,4 @@ METRICS__ENABLED                     = bool(METRICS__CLOUDFRONT_DISTRIBUTION_ID 
                                             METRICS__LAMBDA_ADMIN_NAME          and
                                             METRICS__S3_TRANSFERS_BUCKET        and
                                             METRICS__S3_CACHE_BUCKET            )
+METRICS__USE_STUB                    = os.getenv('SGRAPH_SEND__METRICS_USE_STUB', '').lower() in ('1', 'true', 'yes')

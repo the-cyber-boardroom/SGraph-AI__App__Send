@@ -13,9 +13,10 @@ from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                
 from sgraph_ai_app_send.lambda__admin.service.Service__Tokens                       import Service__Tokens
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import Routes__Tokens
 from sgraph_ai_app_send.lambda__admin.service.Service__Analytics__Pulse             import compute_pulse
+from sgraph_ai_app_send.lambda__admin.admin__config                                 import METRICS__USE_STUB
 from sgraph_ai_app_send.lambda__admin.server_analytics.Routes__Metrics              import Routes__Metrics
 from sgraph_ai_app_send.lambda__admin.server_analytics.Service__Metrics__Cache      import Service__Metrics__Cache
-from sgraph_ai_app_send.lambda__admin.server_analytics.Metrics__Pipeline__Setup     import create_metrics_cache
+from sgraph_ai_app_send.lambda__admin.server_analytics.Metrics__Pipeline__Setup     import create_metrics_cache, create_metrics_cache_with_stub
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
 ROUTES_PATHS__ANALYTICS = ['/health/pulse']
@@ -41,8 +42,11 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         if self.service_tokens is None:                                             # Auto-create token service
             self.service_tokens = Service__Tokens(send_cache_client=self.send_cache_client)
 
-        if self.metrics_cache is None:                                              # Auto-create metrics pipeline (if env vars set)
-            self.metrics_cache = create_metrics_cache(self.send_cache_client)
+        if self.metrics_cache is None:                                              # Auto-create metrics pipeline
+            if METRICS__USE_STUB:                                                      # Local dev: stub data, no AWS calls
+                self.metrics_cache = create_metrics_cache_with_stub(self.send_cache_client)
+            else:                                                                      # Production: real CloudWatch (if env vars set)
+                self.metrics_cache = create_metrics_cache(self.send_cache_client)
 
         return super().setup()
 
