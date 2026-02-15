@@ -1,6 +1,7 @@
 {
   "app.title":                        "SGraph Send",
   "app.subtitle":                     "Compartilhamento de arquivos com criptografia zero-knowledge",
+  "app.disclaimer":                   "Este é um serviço beta. Não envie conteúdo confidencial ou ilegal.",
 
   "upload.mode.file":                 "Arquivo",
   "upload.mode.text":                 "Texto",

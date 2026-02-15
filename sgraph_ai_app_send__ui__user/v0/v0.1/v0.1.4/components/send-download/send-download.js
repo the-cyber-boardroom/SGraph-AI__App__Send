@@ -319,7 +319,17 @@ class SendDownload extends HTMLElement {
         if (panel && this.transparencyData) { panel.setData(this.transparencyData); }
     }
 
-    cleanup() { this._boundDecryptClick = null; }
+    cleanup() { this._boundDecryptClick = null; this._setBeforeUnload(false); }
+
+    _setBeforeUnload(active) {
+        if (active && !this._beforeUnloadHandler) {
+            this._beforeUnloadHandler = (e) => { e.preventDefault(); e.returnValue = ''; };
+            window.addEventListener('beforeunload', this._beforeUnloadHandler);
+        } else if (!active && this._beforeUnloadHandler) {
+            window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+            this._beforeUnloadHandler = null;
+        }
+    }
 
     // ─── Download Flow ───────────────────────────────────────────────────
 
@@ -337,7 +347,7 @@ class SendDownload extends HTMLElement {
         }
 
         try {
-            this.state = 'decrypting'; this.render();
+            this.state = 'decrypting'; this._setBeforeUnload(true); this.render();
 
             const key       = await SendCrypto.importKey(keyString);
             const encrypted = await ApiClient.downloadPayload(this.transferId);
@@ -364,6 +374,7 @@ class SendDownload extends HTMLElement {
             // Save to localStorage history
             this.saveToHistory(content);
 
+            this._setBeforeUnload(false);
             this.transparencyData = {
                 download_timestamp: new Date().toISOString(),
                 file_size_bytes:    this.transferInfo.file_size_bytes,
@@ -376,6 +387,7 @@ class SendDownload extends HTMLElement {
             }));
 
         } catch (err) {
+            this._setBeforeUnload(false);
             this.errorMessage = err.message || this.t('download.error.failed');
             this.state = 'ready'; this.render(); this.setupEventListeners();
             const nki = this.querySelector('#key-input');

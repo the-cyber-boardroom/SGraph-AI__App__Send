@@ -19,7 +19,7 @@
 class SendAccessGate extends HTMLElement {
 
     connectedCallback() {
-        this._onTokenInvalid = () => this.showGate();
+        this._onTokenInvalid = () => this.showGate('Your access token is no longer valid. Please enter a new token.');
         document.addEventListener('access-token-invalid', this._onTokenInvalid);
 
         if (ApiClient.hasAccessToken()) {
@@ -35,10 +35,14 @@ class SendAccessGate extends HTMLElement {
         }
     }
 
-    showGate() {
+    showGate(reason) {
         this._originalContent = this._originalContent || this.innerHTML;
+        const reasonHtml = reason
+            ? `<div class="status status--warning" style="margin-bottom: 1rem;">${reason}</div>`
+            : '';
         this.innerHTML = `
             <div class="card">
+                ${reasonHtml}
                 <div style="text-align: center; padding: 1rem 0;">
                     <div style="font-size: 2rem; margin-bottom: 0.5rem;">&#128274;</div>
                     <h2 style="font-size: var(--font-size-lg); margin-bottom: 0.25rem;">Beta Access</h2>

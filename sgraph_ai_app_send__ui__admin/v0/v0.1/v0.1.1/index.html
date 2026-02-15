@@ -12,11 +12,13 @@
         <token-manager        data-panel="tokens"></token-manager>
         <analytics-dashboard  data-panel="analytics"  hidden></analytics-dashboard>
         <metrics-dashboard    data-panel="metrics"     hidden></metrics-dashboard>
+        <cache-browser        data-panel="cache"       hidden></cache-browser>
         <system-info          data-panel="system"      hidden></system-info>
     </admin-shell>
 
     <!-- API client (must load before components) -->
     <script src="../v0.1.0/js/admin-api.js"></script>
+    <script src="js/admin-api-cache.js"></script>
 
     <!-- Web Components — base v0.1.0 -->
     <script src="components/admin-shell/admin-shell.js"></script>
@@ -26,5 +28,6 @@
 
     <!-- Web Components — v0.1.1 additions -->
     <script src="components/metrics-dashboard/metrics-dashboard.js"></script>
+    <script src="components/cache-browser/cache-browser.js"></script>
 </body>
 </html>
