@@ -12,6 +12,7 @@ from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client               
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                    import create_send_cache_client
 from sgraph_ai_app_send.lambda__admin.service.Service__Tokens                       import Service__Tokens
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import Routes__Tokens
+from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                 import Middleware__Analytics
 from sgraph_ai_app_send.lambda__admin.service.Service__Analytics__Pulse             import compute_pulse
 from sgraph_ai_app_send.lambda__admin.admin__config                                 import METRICS__USE_STUB
 from sgraph_ai_app_send.lambda__admin.server_analytics.Routes__Metrics              import Routes__Metrics
@@ -61,6 +62,10 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         if self.metrics_cache is not None:                                          # Only add metrics routes if configured
             self.add_routes(Routes__Metrics      ,
                             metrics_cache = self.metrics_cache)
+
+        if self.send_cache_client is not None:                                      # Record admin traffic for Analytics Pulse
+            self.app().add_middleware(Middleware__Analytics,
+                                     send_cache_client = self.send_cache_client)
 
     def setup_pulse_route(self):                                                  # Register /health/pulse directly (no tag prefix)
         send_cache_client = self.send_cache_client
