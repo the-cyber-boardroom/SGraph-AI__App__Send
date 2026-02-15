@@ -134,16 +134,17 @@ class AdminShell extends HTMLElement {
         const slot = this.shadowRoot.querySelector('.content__panels');
         if (!slot) return;
 
-        // Signal to slotted children
+        // Use style.display (not hidden attr) because Shadow DOM :host { display: block }
+        // overrides the HTML hidden attribute in child components
         this.querySelectorAll('[data-panel]').forEach(el => {
             if (el.dataset.panel === this._activePanel) {
-                el.removeAttribute('hidden');
+                el.style.display = '';
                 // Tell the panel it became active
                 if (typeof el.onActivated === 'function') {
                     el.onActivated();
                 }
             } else {
-                el.setAttribute('hidden', '');
+                el.style.display = 'none';
             }
         });
     }

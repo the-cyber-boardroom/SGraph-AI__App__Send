@@ -8,12 +8,12 @@
 </head>
 <body>
     <admin-shell>
-        <!-- Panels — shown/hidden by admin-shell via data-panel attribute -->
+        <!-- Panels — shown/hidden by admin-shell via style.display -->
         <token-manager        data-panel="tokens"></token-manager>
-        <analytics-dashboard  data-panel="analytics"  hidden></analytics-dashboard>
-        <metrics-dashboard    data-panel="metrics"     hidden></metrics-dashboard>
-        <cache-browser        data-panel="cache"       hidden></cache-browser>
-        <system-info          data-panel="system"      hidden></system-info>
+        <analytics-dashboard  data-panel="analytics"  style="display:none"></analytics-dashboard>
+        <metrics-dashboard    data-panel="metrics"     style="display:none"></metrics-dashboard>
+        <cache-browser        data-panel="cache"       style="display:none"></cache-browser>
+        <system-info          data-panel="system"      style="display:none"></system-info>
     </admin-shell>
 
     <!-- API client (must load before components) -->
