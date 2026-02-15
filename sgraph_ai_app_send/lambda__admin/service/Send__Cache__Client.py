@@ -120,9 +120,24 @@ class Send__Cache__Client(Type_Safe):                                      # Cac
             return result.updated_content
         return False
 
-    def token__list_all(self):                                             # List all files in the tokens namespace
+    def token__list_all(self):                                             # List unique token names from storage
         result = self.cache_client.admin_storage().files__all__path(
             path = NS_TOKENS)
         if result and hasattr(result, 'files'):
-            return result.files
+            token_names = []
+            seen        = set()
+            prefix      = f'{NS_TOKENS}/data/key-based/'
+            for file_path in result.files:
+                if not file_path.startswith(prefix):                     # Skip refs/, non-data files
+                    continue
+                if not file_path.endswith('.json'):                      # Skip .json.config, .json.metadata
+                    continue
+                relative = file_path[len(prefix):]                       # e.g. "abc/abc.json"
+                parts    = relative.split('/')
+                if len(parts) == 2:                                      # Must be {name}/{name}.json exactly
+                    token_name = parts[0]
+                    if token_name not in seen:
+                        seen.add(token_name)
+                        token_names.append(token_name)
+            return token_names
         return []

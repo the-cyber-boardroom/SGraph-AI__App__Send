@@ -67,8 +67,8 @@ class Routes__Tokens(Fast_API__Routes):                                    # Tok
         return dict(status='revoked', token_name=token_name)
 
     def list(self) -> dict:                                                # GET /tokens/list
-        files = self.service_tokens.list_tokens()
-        return dict(files=files)
+        token_names = self.service_tokens.list_tokens()
+        return dict(token_names=token_names)
 
     def setup_routes(self):                                                # Register all token endpoints
         self.add_route_post(self.create              )
