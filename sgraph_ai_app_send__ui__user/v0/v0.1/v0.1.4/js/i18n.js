@@ -45,8 +45,11 @@ const I18n = {
             'upload.button.encrypt_send':       'Encrypt & Send',
 
             // ─── Upload: Progress ───────────────────────────────────────
+            'upload.progress.reading':          'Reading file...',
             'upload.progress.encrypting':       'Encrypting...',
+            'upload.progress.creating':         'Preparing transfer...',
             'upload.progress.uploading':        'Uploading...',
+            'upload.progress.completing':       'Finalising...',
 
             // ─── Upload: Result ─────────────────────────────────────────
             'upload.result.file_success':       'Your file has been encrypted and uploaded.',
@@ -112,6 +115,9 @@ const I18n = {
             'download.error.not_found':         'Transfer not found. The link may have expired.',
             'download.error.no_key':            'Please enter the decryption key.',
             'download.error.failed':            'Download or decryption failed.',
+            'download.error.token_not_found':   'Access token not found. Please check your link or request a new token.',
+            'download.error.token_exhausted':   'This access token has been fully used. Please request a new one.',
+            'download.error.token_revoked':     'This access token has been revoked.',
 
             // ─── Crypto Errors ──────────────────────────────────────────
             'crypto.error.unavailable':         'Web Crypto API is not available. It requires a secure context (HTTPS or localhost). If running locally, use "localhost" instead of "127.0.0.1".',

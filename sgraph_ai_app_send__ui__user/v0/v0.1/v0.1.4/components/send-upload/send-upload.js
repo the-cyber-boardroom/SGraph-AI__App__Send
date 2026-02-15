@@ -40,6 +40,7 @@ class SendUpload extends HTMLElement {
 
     disconnectedCallback() {
         this.cleanup();
+        this._setBeforeUnload(false);
         document.removeEventListener('locale-changed', this._localeHandler);
     }
 
@@ -75,9 +76,11 @@ class SendUpload extends HTMLElement {
         `;
     }
 
+    _isUploading() { return !!SendUpload.PROGRESS_STAGES[this.state]; }
+
     renderDropZone() {
         if (this.state === 'complete' || this._mode !== 'file') return '';
-        const hidden = this.state === 'encrypting' || this.state === 'uploading' ? 'hidden' : '';
+        const hidden = this._isUploading() ? 'hidden' : '';
         return `
             <div class="drop-zone ${hidden}" id="drop-zone">
                 <div class="drop-zone__label">${this.escapeHtml(this.t('upload.drop_zone.label'))}</div>
@@ -90,7 +93,7 @@ class SendUpload extends HTMLElement {
 
     renderTextInput() {
         if (this.state === 'complete' || this._mode !== 'text') return '';
-        const hidden = this.state === 'encrypting' || this.state === 'uploading' ? 'hidden' : '';
+        const hidden = this._isUploading() ? 'hidden' : '';
         return `
             <div class="${hidden}">
                 <textarea class="input" id="text-input"
@@ -124,17 +127,24 @@ class SendUpload extends HTMLElement {
         `;
     }
 
+    static PROGRESS_STAGES = {
+        'reading':    { label: 'upload.progress.reading',    pct: 10 },
+        'encrypting': { label: 'upload.progress.encrypting', pct: 30 },
+        'creating':   { label: 'upload.progress.creating',   pct: 50 },
+        'uploading':  { label: 'upload.progress.uploading',  pct: 70 },
+        'completing': { label: 'upload.progress.completing', pct: 90 },
+    };
+
     renderProgress() {
-        if (this.state !== 'encrypting' && this.state !== 'uploading') return '';
-        const label = this.state === 'encrypting' ? this.t('upload.progress.encrypting') : this.t('upload.progress.uploading');
-        const pct   = this.state === 'encrypting' ? '33' : '66';
+        const stage = SendUpload.PROGRESS_STAGES[this.state];
+        if (!stage) return '';
         return `
             <div style="margin: 1rem 0;">
                 <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 0.5rem;">
-                    ${this.escapeHtml(label)}
+                    ${this.escapeHtml(this.t(stage.label))}
                 </div>
                 <div class="progress-bar">
-                    <div class="progress-bar__fill" style="width: ${pct}%;"></div>
+                    <div class="progress-bar__fill" style="width: ${stage.pct}%;"></div>
                 </div>
             </div>
         `;
@@ -346,6 +356,16 @@ class SendUpload extends HTMLElement {
 
     // ─── Upload Flow ───────────────────────────────────────────────────────
 
+    _setBeforeUnload(active) {
+        if (active && !this._beforeUnloadHandler) {
+            this._beforeUnloadHandler = (e) => { e.preventDefault(); e.returnValue = ''; };
+            window.addEventListener('beforeunload', this._beforeUnloadHandler);
+        } else if (!active && this._beforeUnloadHandler) {
+            window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+            this._beforeUnloadHandler = null;
+        }
+    }
+
     async startUpload() {
         if (this.state !== 'idle') return;
 
@@ -368,7 +388,8 @@ class SendUpload extends HTMLElement {
         } else if (!this.selectedFile) { return; }
 
         try {
-            this.state = 'encrypting'; this.render(); this.setupEventListeners();
+            this._setBeforeUnload(true);
+            this.state = 'reading'; this.render(); this.setupEventListeners();
 
             let plaintext, fileSizeBytes, contentType;
             if (isText) {
@@ -383,14 +404,22 @@ class SendUpload extends HTMLElement {
                 fileSizeBytes = plaintext.byteLength;
             }
 
+            this.state = 'encrypting'; this.render();
+
             const key       = await SendCrypto.generateKey();
             const keyString = await SendCrypto.exportKey(key);
             const encrypted = await SendCrypto.encryptFile(key, plaintext);
 
-            this.state = 'uploading'; this.render(); this.setupEventListeners();
+            this.state = 'creating'; this.render();
 
-            const createResult   = await ApiClient.createTransfer(fileSizeBytes, contentType);
+            const createResult = await ApiClient.createTransfer(fileSizeBytes, contentType);
+
+            this.state = 'uploading'; this.render();
+
             await ApiClient.uploadPayload(createResult.transfer_id, encrypted);
+
+            this.state = 'completing'; this.render();
+
             const completeResult = await ApiClient.completeTransfer(createResult.transfer_id);
 
             const tokenName   = completeResult.token_name || ApiClient.getAccessToken() || '';
@@ -398,6 +427,7 @@ class SendUpload extends HTMLElement {
             const linkOnlyUrl = this.buildLinkOnlyUrl(createResult.transfer_id, tokenName);
 
             this.result = { transferId: createResult.transfer_id, combinedUrl, linkOnlyUrl, keyString, isText, transparency: completeResult.transparency || null };
+            this._setBeforeUnload(false);
             this.state = 'complete'; this.render(); this.setupDynamicListeners();
 
             this.dispatchEvent(new CustomEvent('upload-complete', {
@@ -406,6 +436,7 @@ class SendUpload extends HTMLElement {
             }));
 
         } catch (err) {
+            this._setBeforeUnload(false);
             if (err.message === 'ACCESS_TOKEN_INVALID') { document.dispatchEvent(new CustomEvent('access-token-invalid')); return; }
             this.errorMessage = err.message || this.t('upload.error.upload_failed');
             this.state = 'error'; this.render(); this.setupEventListeners();
