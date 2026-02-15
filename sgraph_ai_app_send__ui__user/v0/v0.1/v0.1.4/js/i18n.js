@@ -25,6 +25,7 @@ const I18n = {
             // ─── App ────────────────────────────────────────────────────
             'app.title':                        'SGraph Send',
             'app.subtitle':                     'Zero-knowledge encrypted file sharing',
+            'app.disclaimer':                   'This is a beta service. Do not upload confidential or illegal content.',
 
             // ─── Upload: Mode ───────────────────────────────────────────
             'upload.mode.file':                 'File',

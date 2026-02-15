@@ -308,6 +308,15 @@ main {
     line-height: 1.5;
 }
 
+/* ─── Disclaimer Banner ────────────────────────────────────────────────── */
+.disclaimer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    padding: 1rem 1rem 0.5rem;
+    line-height: 1.4;
+}
+
 /* ─── Hidden Utility ────────────────────────────────────────────────────── */
 .hidden {
     display: none !important;
