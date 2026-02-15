@@ -3,7 +3,7 @@
 # REST endpoints for browsing the cache service (admin Lambda)
 # Provides namespace listing, folder browsing, and entry inspection
 # ===============================================================================
-
+from osbot_fast_api.api.decorators.route_path import route_path
 from osbot_fast_api.api.routes.Fast_API__Routes                                import Fast_API__Routes
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client              import Send__Cache__Client
 
@@ -22,6 +22,7 @@ class Routes__Cache__Browser(Fast_API__Routes):                                #
     def namespaces(self) -> dict:                                              # GET /cache/namespaces
         return dict(namespaces=['analytics', 'tokens', 'costs', 'transfers'])
 
+    @route_path("/folders/{path:path}")
     def folders__path(self, path: str = '') -> dict:                           # GET /cache/folders/{path}
         folders = self.send_cache_client.cache_client.admin_storage().folders(
             path             = path   ,
@@ -29,6 +30,7 @@ class Routes__Cache__Browser(Fast_API__Routes):                                #
             recursive        = False  ) or []
         return dict(path=path, folders=folders)
 
+    @route_path("/files/{path:path}")
     def files__path(self, path: str = '') -> dict:                             # GET /cache/files/{path}
         result = self.send_cache_client.cache_client.admin_storage().files__all__path(path=path)
         files  = []
