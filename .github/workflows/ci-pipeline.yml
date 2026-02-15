@@ -42,6 +42,20 @@ on:
         required: false
       SGRAPH_SEND__ADMIN__API_KEY__VALUE:
         required: false
+      SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID:
+        required: false
+      SGRAPH_SEND__LAMBDA_USER_NAME:
+        required: false
+      SGRAPH_SEND__LAMBDA_ADMIN_NAME:
+        required: false
+      SGRAPH_SEND__S3_TRANSFERS_BUCKET:
+        required: false
+      SGRAPH_SEND__S3_CACHE_BUCKET:
+        required: false
+      SGRAPH_SEND__S3_FILTER_ID:
+        required: false
+      SGRAPH_SEND__AWS_REGION:
+        required: false
 
 env:
   PACKAGE_NAME: 'sgraph_ai_app_send'
@@ -126,6 +140,13 @@ jobs:
           FAST_API__AUTH__API_KEY__VALUE               : ${{ secrets.FAST_API__AUTH__API_KEY__VALUE               }}
           URL__TARGET_SERVER__CACHE_SERVICE            : ${{ secrets.AUTH__TARGET_SERVER__CACHE_SERVICE__BASE_URL }}
           CACHE__SERVICE__BUCKET_NAME                  : ${{ secrets.CACHE__SERVICE__BUCKET_NAME                  }}
+          SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID      : ${{ secrets.SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID      }}
+          SGRAPH_SEND__LAMBDA_USER_NAME                : ${{ secrets.SGRAPH_SEND__LAMBDA_USER_NAME                }}
+          SGRAPH_SEND__LAMBDA_ADMIN_NAME               : ${{ secrets.SGRAPH_SEND__LAMBDA_ADMIN_NAME               }}
+          SGRAPH_SEND__S3_TRANSFERS_BUCKET             : ${{ secrets.SGRAPH_SEND__S3_TRANSFERS_BUCKET             }}
+          SGRAPH_SEND__S3_CACHE_BUCKET                 : ${{ secrets.SGRAPH_SEND__S3_CACHE_BUCKET                 }}
+          SGRAPH_SEND__S3_FILTER_ID                    : ${{ secrets.SGRAPH_SEND__S3_FILTER_ID                    }}
+          SGRAPH_SEND__AWS_REGION                      : ${{ secrets.SGRAPH_SEND__AWS_REGION                      }}
         with:
           target      : ${{ inputs.target_deploy }}
           lambda_type : 'Admin'
