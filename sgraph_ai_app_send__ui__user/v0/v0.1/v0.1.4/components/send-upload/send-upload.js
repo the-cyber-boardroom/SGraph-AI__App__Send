@@ -86,6 +86,7 @@ class SendUpload extends HTMLElement {
                 <div class="drop-zone__label">${this.escapeHtml(this.t('upload.drop_zone.label'))}</div>
                 <div class="drop-zone__hint">${this.escapeHtml(this.t('upload.drop_zone.hint'))}</div>
                 <div class="drop-zone__hint" style="margin-top: 0.5rem;">${this.escapeHtml(this.t('upload.drop_zone.encrypted_hint'))}</div>
+                <div class="drop-zone__hint" style="margin-top: 0.25rem; font-size: 0.75rem; opacity: 0.7;">${this.escapeHtml(this.t('upload.drop_zone.size_limit'))}</div>
                 <input type="file" id="file-input" style="display: none;">
             </div>
         `;
@@ -116,16 +117,22 @@ class SendUpload extends HTMLElement {
 
     renderFileInfo() {
         if (!this.selectedFile || this.state === 'complete' || this._mode !== 'file') return '';
+        const tooLarge = this.selectedFile.size > SendUpload.MAX_FILE_SIZE;
         return `
-            <div class="status status--info" style="display: flex; justify-content: space-between; align-items: center;">
-                <span><strong>${this.escapeHtml(this.selectedFile.name)}</strong> (${this.formatBytes(this.selectedFile.size)})</span>
+            <div class="status ${tooLarge ? 'status--error' : 'status--info'}" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>
+                    <strong>${this.escapeHtml(this.selectedFile.name)}</strong> (${this.formatBytes(this.selectedFile.size)})
+                    ${tooLarge ? '<br><small>' + this.escapeHtml(this.t('upload.error.file_too_large')) + '</small>' : ''}
+                </span>
                 <button class="btn btn-primary btn-sm" id="upload-btn"
-                        ${this.state !== 'idle' ? 'disabled' : ''}>
+                        ${(this.state !== 'idle' || tooLarge) ? 'disabled' : ''}>
                     ${this.t('upload.button.encrypt_upload')}
                 </button>
             </div>
         `;
     }
+
+    static MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
     static PROGRESS_STAGES = {
         'reading':    { label: 'upload.progress.reading',    pct: 10 },
@@ -385,7 +392,10 @@ class SendUpload extends HTMLElement {
                 this.state = 'error'; this.render(); this.setupEventListeners(); return;
             }
             textValue = ti.value;
-        } else if (!this.selectedFile) { return; }
+        } else if (!this.selectedFile) { return;
+        } else if (this.selectedFile.size > SendUpload.MAX_FILE_SIZE) {
+            this.errorMessage = this.t('upload.error.file_too_large');
+            this.state = 'error'; this.render(); this.setupEventListeners(); return;
 
         try {
             this._setBeforeUnload(true);

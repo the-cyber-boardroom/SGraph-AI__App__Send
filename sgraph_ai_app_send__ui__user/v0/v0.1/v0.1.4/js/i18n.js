@@ -35,6 +35,7 @@ const I18n = {
             'upload.drop_zone.label':           'Drop your file here',
             'upload.drop_zone.hint':            'or click to browse',
             'upload.drop_zone.encrypted_hint':  'Encrypted in your browser before upload',
+            'upload.drop_zone.size_limit':      'Maximum file size: 5 MB',
 
             // ─── Upload: Text Input ─────────────────────────────────────
             'upload.text.placeholder':          'Type or paste your text here',
@@ -73,6 +74,7 @@ const I18n = {
             // ─── Upload: Errors ─────────────────────────────────────────
             'upload.error.empty_text':          'Please enter some text to encrypt.',
             'upload.error.upload_failed':       'Upload failed. Please try again.',
+            'upload.error.file_too_large':      'File is too large. Maximum size is 5 MB.',
 
             // ─── Download: Loading ──────────────────────────────────────
             'download.loading':                 'Loading transfer info...',
@@ -99,7 +101,8 @@ const I18n = {
             'download.result.download_file':    'Download as file',
 
             // ─── Download: Send Another ───────────────────────────────────
-            'download.result.send_another':     'Send your own',
+            'download.result.send_another':     'Send a new File or Text',
+            'download.result.decrypted_message': 'Decrypted Message',
 
             // ─── Download: History ────────────────────────────────────────
             'download.history.title':           'Recent downloads',
@@ -108,6 +111,13 @@ const I18n = {
             'download.history.empty':           'No recent downloads.',
             'download.history.text_preview':    'Text',
             'download.history.file_label':      'File',
+
+            // ─── Download: Token Info ────────────────────────────────────
+            'download.token.uses_remaining':    '{remaining} uses remaining',
+
+            // ─── Access Gate ────────────────────────────────────────────
+            'access_gate.uses_remaining':       '{remaining} uses remaining',
+            'access_gate.change_token':         'Change Token',
 
             // ─── Download: Errors ───────────────────────────────────────
             'download.error.no_id':             'No transfer ID found in URL. Please check your link.',

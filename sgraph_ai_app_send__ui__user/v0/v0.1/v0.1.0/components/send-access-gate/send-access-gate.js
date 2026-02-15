@@ -132,13 +132,59 @@ class SendAccessGate extends HTMLElement {
     showContent() {
         if (this._originalContent) {
             this.innerHTML = this._originalContent;
+        } else {
+            this._originalContent = this.innerHTML;
         }
+
+        // Add token status bar (remaining uses + change token)
+        const bar = document.createElement('div');
+        bar.id = 'token-status-bar';
+        bar.style.cssText = 'margin-bottom: 1rem; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.875rem; background: var(--color-drop-zone-bg, #f8f9fa); border: 1px solid var(--color-border, #dee2e6); border-radius: var(--radius, 0.5rem);';
+        bar.innerHTML = '<span style="color: var(--color-text-secondary, #6c757d);">...</span>';
+        this.insertBefore(bar, this.firstChild);
+        this.loadTokenInfo();
+
         // Re-trigger custom element upgrades for slotted content
         this.querySelectorAll('send-upload').forEach(el => {
             if (!el._initialized) {
                 el._initialized = true;
             }
         });
+    }
+
+    async loadTokenInfo() {
+        const bar = this.querySelector('#token-status-bar');
+        if (!bar) return;
+
+        const token = ApiClient.getAccessToken();
+        if (!token) return;
+
+        let remaining = null;
+        try {
+            const result = await ApiClient.checkToken(token);
+            if (result.valid && result.remaining !== undefined) {
+                remaining = result.remaining;
+            }
+        } catch (e) {
+            // checkToken unavailable — show generic status
+        }
+
+        const infoText = remaining !== null
+            ? `<strong>${remaining}</strong> uses remaining`
+            : 'Token active';
+
+        bar.innerHTML = `
+            <span style="color: var(--color-text-secondary, #6c757d);">${infoText}</span>
+            <button class="btn btn-sm" id="reset-token-btn" style="font-size: 0.8rem;">Change Token</button>
+        `;
+
+        const btn = bar.querySelector('#reset-token-btn');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                ApiClient.clearAccessToken();
+                this.showGate();
+            });
+        }
     }
 }
 
