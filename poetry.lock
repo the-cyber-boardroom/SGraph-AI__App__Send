@@ -299,14 +299,14 @@ all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2
 
 [[package]]
 name = "issues-fs"
-version = "0.5.0"
+version = "0.7.0"
 description = "Issues-FS"
 optional = false
 python-versions = "<4.0,>=3.12"
 groups = ["main"]
 files = [
-    {file = "issues_fs-0.5.0-py3-none-any.whl", hash = "sha256:dc3198ab043f4e1f5bc31909b4d135c814199c90a010002078de8a392245faf5"},
-    {file = "issues_fs-0.5.0.tar.gz", hash = "sha256:9ccdaa51e0732cfabbcbb2fcb36ed473c522b36d8e90d6cf96a8842e37a71e00"},
+    {file = "issues_fs-0.7.0-py3-none-any.whl", hash = "sha256:6c61e09e8209b49a8a9005f3fb5a9640c1c5aee06a065925e8c3bcb5956d81e5"},
+    {file = "issues_fs-0.7.0.tar.gz", hash = "sha256:1f43af304f96fe0141a8d2d56f03ad8455a59800f71250974a0724b0cc6e616f"},
 ]
 
 [package.dependencies]
