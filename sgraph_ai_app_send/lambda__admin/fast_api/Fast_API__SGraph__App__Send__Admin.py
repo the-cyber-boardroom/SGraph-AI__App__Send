@@ -13,6 +13,9 @@ from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                
 from sgraph_ai_app_send.lambda__admin.service.Service__Tokens                       import Service__Tokens
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import Routes__Tokens
 from sgraph_ai_app_send.lambda__admin.service.Service__Analytics__Pulse             import compute_pulse
+from sgraph_ai_app_send.lambda__admin.server_analytics.Routes__Metrics              import Routes__Metrics
+from sgraph_ai_app_send.lambda__admin.server_analytics.Service__Metrics__Cache      import Service__Metrics__Cache
+from sgraph_ai_app_send.lambda__admin.server_analytics.Service__Metrics__Collector  import Service__Metrics__Collector
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
 ROUTES_PATHS__ANALYTICS = ['/health/pulse']
@@ -21,8 +24,9 @@ ROUTES_PATHS__APP_SEND__STATIC__ADMIN  = [f'/{APP_SEND__UI__ADMIN__ROUTE__PATH__
 
 class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
 
-    send_cache_client : Send__Cache__Client = None                                  # Cache service client (IN_MEMORY mode)
-    service_tokens    : Service__Tokens     = None                                  # Token lifecycle service
+    send_cache_client : Send__Cache__Client      = None                             # Cache service client (IN_MEMORY mode)
+    service_tokens    : Service__Tokens           = None                             # Token lifecycle service
+    metrics_cache     : Service__Metrics__Cache   = None                             # Metrics cache service
 
     def setup(self):
         with self.config as _:
@@ -47,6 +51,9 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         self.add_routes(Routes__Tokens           ,
                         service_tokens = self.service_tokens)
         self.add_routes(Routes__Set_Cookie       )
+        if self.metrics_cache is not None:                                          # Only add metrics routes if configured
+            self.add_routes(Routes__Metrics      ,
+                            metrics_cache = self.metrics_cache)
 
     def setup_pulse_route(self):                                                  # Register /health/pulse directly (no tag prefix)
         send_cache_client = self.send_cache_client
