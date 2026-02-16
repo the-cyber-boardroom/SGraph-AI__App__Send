@@ -8,3 +8,9 @@ Workstream-1 | in-progress | Production quality gate
 	Task-6 | todo | Verify all smoke tests cover production deployment targets
 	Task-7 | todo | Create release quality gate checklist
 	Task-8 | todo | Provide QA sign-off for first production release
+Workstream-2 | todo | Production environment integration tests (from 16-Feb brief, P2)
+	Task-9 | todo | Write automated test: verify website is up (all 3 subdomains)
+	Task-10 | todo | Write automated test: upload/download flow works end-to-end
+	Task-11 | todo | Write automated test: API responds correctly
+	Task-12 | todo | Write automated test: SSL certificates are valid
+	Task-13 | todo | Write pre/post deployment transition tests
