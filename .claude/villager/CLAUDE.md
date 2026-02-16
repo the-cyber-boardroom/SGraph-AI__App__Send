@@ -128,12 +128,42 @@ Explorer experimentation must **never** affect production. Production must **nev
 
 ---
 
+## Resolved Decisions (16 Feb 2026)
+
+These decisions are binding for all Villager agents. Full record: `team/villager/roles/historian/reviews/26-02-16/v0.4.4__decisions__villager-brief-clarifications-16-feb.md`
+
+| ID | Decision | Detail |
+|----|----------|--------|
+| D054 | Domain is `sgraph.ai` | `dev.send.sgraph.ai`, `qa.send.sgraph.ai`, `send.sgraph.ai` |
+| D055 | SA pipeline on Admin Lambda | No new Lambda — all `/api/sa/*` routes on existing Admin Lambda |
+| D056 | Direct Route 53 access | Same AWS account, DevOps can act directly |
+| D057 | CloudFront logs first | Start with logs in S3, not CloudWatch metrics. **Briefing pack is first deliverable.** |
+| D058 | API prefix `/api/sa/` | All SA endpoints use this prefix |
+| D059 | Architect co-designs | Focus on briefing pack quality and completeness |
+| D060 | Issues FS S3 — deferred | Not current priority |
+| D061 | Event automation — deferred | Build manual pipeline first |
+| D062 | IP verification via tests | Unit + integration + live tests prove no IP addresses in data |
+| D063 | Klingon — dropdown only | No Klingon string translations needed |
+| D064 | Evidence pack — Explorer | Not a Villager concern |
+
+---
+
+## Active Briefing Packs
+
+| Pack | Path | Status |
+|------|------|--------|
+| CloudFront Log Pipeline | `packs/cloudfront-log-pipeline/` | Ready for implementation session |
+
+---
+
 ## Key References
 
 | Document | Path |
 |----------|------|
 | **Current Villager daily brief** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__daily-brief__villager-team-16-feb-2026.md` |
 | **Briefing packs process** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__briefs__briefing-packs-for-agents.md` |
+| **Decision record (16 Feb)** | `team/villager/roles/historian/reviews/26-02-16/v0.4.4__decisions__villager-brief-clarifications-16-feb.md` |
+| **CloudFront LETS briefing pack** | `packs/cloudfront-log-pipeline/BRIEF.md` |
 | **DPO/AppSec/GRC evidence pack** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__briefs__dpo-appsec-grc-evidence-pack.md` |
 | **Translator role definition** | `team/humans/dinis_cruz/briefs/02/16/v0.4.3__role-definition__translator.md` |
 | Villager role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md` |
@@ -160,6 +190,14 @@ User Lambda (public)                    Admin Lambda (authenticated)
 +-- Static UI (v0.1.4)                  |   +-- GET  /tokens/list
 +-- Admin__Service__Client ------------ +-- Routes__Analytics
     (via Service Registry)              |   +-- GET  /health/pulse
+                                        +-- Routes__Metrics
+                                        |   +-- GET  /metrics/snapshot
+                                        +-- Routes__SA (D055, D058)
+                                        |   +-- POST /api/sa/cloudfront/ingest
+                                        |   +-- POST /api/sa/cloudfront/consolidate
+                                        |   +-- POST /api/sa/cloudfront/aggregate
+                                        |   +-- GET  /api/sa/cache/browse/{path}
+                                        |   +-- GET  /api/sa/traffic/summary
                                         +-- Send__Cache__Client
                                         |   +-- Memory-FS (S3 backend)
                                         +-- Service__Tokens
