@@ -22,12 +22,16 @@ class SendTransparency extends HTMLElement {
     }
 
     connectedCallback() {
+        this._onLocaleChanged = () => this.render();
+        document.addEventListener('locale-changed', this._onLocaleChanged);
         this.render();
         this.loadDataFromAttribute();
     }
 
     disconnectedCallback() {
-        // No listeners to clean up in this component
+        if (this._onLocaleChanged) {
+            document.removeEventListener('locale-changed', this._onLocaleChanged);
+        }
     }
 
     static get observedAttributes() {
@@ -70,6 +74,10 @@ class SendTransparency extends HTMLElement {
         }
     }
 
+    t(key, params) {
+        return (typeof I18n !== 'undefined') ? I18n.t(key, params) : key;
+    }
+
     render() {
         if (!this.transparencyData) {
             this.innerHTML = '';
@@ -79,11 +87,11 @@ class SendTransparency extends HTMLElement {
         const data = this.transparencyData;
         this.innerHTML = `
             <div class="transparency">
-                <div class="transparency__title">What we stored about this transfer</div>
+                <div class="transparency__title">${this.t('transparency.title')}</div>
                 ${this.renderStoredFields(data)}
                 ${this.renderNotStoredFields(data)}
                 <div class="transparency__footer">
-                    That's everything. Nothing else is captured.
+                    ${this.t('transparency.footer')}
                 </div>
             </div>
         `;
@@ -93,15 +101,15 @@ class SendTransparency extends HTMLElement {
         const fields = [];
 
         if (data.your_ip || data.ip_hash) {
-            fields.push({ label: 'Your IP address', value: data.your_ip || data.ip_hash });
+            fields.push({ label: this.t('transparency.ip_address'), value: data.your_ip || data.ip_hash });
         }
         if (data.upload_timestamp || data.download_timestamp) {
             const ts    = data.upload_timestamp || data.download_timestamp;
-            const label = data.upload_timestamp ? 'Upload time' : 'Download time';
+            const label = data.upload_timestamp ? this.t('transparency.upload_time') : this.t('transparency.download_time');
             fields.push({ label, value: this.formatTimestamp(ts) });
         }
         if (data.file_size_bytes) {
-            fields.push({ label: 'File size', value: this.formatBytes(data.file_size_bytes) });
+            fields.push({ label: this.t('transparency.file_size'), value: this.formatBytes(data.file_size_bytes) });
         }
 
         return fields.map(f => `
@@ -115,20 +123,22 @@ class SendTransparency extends HTMLElement {
     renderNotStoredFields(data) {
         const notStored = data.not_stored || ['file_name', 'file_content', 'decryption_key'];
         const labels    = {
-            file_name:      'File name',
-            file_content:   'File content',
-            decryption_key: 'Decryption key'
+            file_name:      this.t('transparency.label.file_name'),
+            file_content:   this.t('transparency.label.file_content'),
+            decryption_key: this.t('transparency.label.decryption_key'),
+            raw_ip:         this.t('transparency.label.raw_ip')
         };
         const descriptions = {
-            file_name:      'NOT stored',
-            file_content:   'Encrypted (we cannot read it)',
-            decryption_key: 'NOT stored (only you have it)'
+            file_name:      this.t('transparency.not_stored'),
+            file_content:   this.t('transparency.encrypted'),
+            decryption_key: this.t('transparency.key_not_stored'),
+            raw_ip:         this.t('transparency.not_stored')
         };
 
         return notStored.map(field => `
             <div class="transparency__row">
                 <span class="transparency__label">${labels[field] || field}</span>
-                <span class="transparency__value transparency__value--not-stored">${descriptions[field] || 'NOT stored'}</span>
+                <span class="transparency__value transparency__value--not-stored">${descriptions[field] || this.t('transparency.not_stored')}</span>
             </div>
         `).join('');
     }

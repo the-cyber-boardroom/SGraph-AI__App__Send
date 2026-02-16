@@ -34,8 +34,8 @@ class test__App_Send__UI__User__static_pages(TestCase):
 
         assert file_exists(expected_file_path) is True                                              # confirm file exists in disk
         assert response__redirects.text        == file_contents(expected_file_path)                 # confirm contents match
-        assert 'SGraph Send'                    in response__redirects.text                          # confirm real content is there
-        assert '<send-upload>'                  in response__redirects.text                          # confirm Web Component is there
+        assert 'Send'                          in response__redirects.text                          # confirm real content is there
+        assert '<send-upload>'                 in response__redirects.text                          # confirm Web Component is there
 
     def test__upload_page__crypto_availability_check(self):
         response = self.client.get('/send', follow_redirects=True)

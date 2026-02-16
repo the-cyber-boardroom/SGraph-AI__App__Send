@@ -1,6 +1,7 @@
 {
   "app.title":                        "SGraph Send",
   "app.subtitle":                     "Zero-knowledge encrypted file sharing",
+  "app.disclaimer":                   "This is a beta service. Do not upload confidential or illegal content.",
 
   "upload.mode.file":                 "File",
   "upload.mode.text":                 "Text",

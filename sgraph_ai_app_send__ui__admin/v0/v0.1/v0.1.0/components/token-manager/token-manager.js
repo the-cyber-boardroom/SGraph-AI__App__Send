@@ -58,12 +58,10 @@ class TokenManager extends HTMLElement {
         this._renderList();
 
         try {
-            const result = await adminAPI.listTokens();
-            // result.files is a list of file paths — extract token names and look up each
-            const files = result.files || [];
-            const tokens = [];
-            for (const filePath of files) {
-                const tokenName = this._extractTokenName(filePath);
+            const result     = await adminAPI.listTokens();
+            const tokenNames = result.token_names || [];
+            const tokens     = [];
+            for (const tokenName of tokenNames) {
                 if (tokenName) {
                     try {
                         const detail = await adminAPI.lookupToken(tokenName);
@@ -83,18 +81,6 @@ class TokenManager extends HTMLElement {
 
         this._renderList();
         this._startAutoRefresh();
-    }
-
-    _extractTokenName(filePath) {
-        // File paths look like: tokens/community-x.json or similar
-        // Extract the token name (key) from the path
-        const str = String(filePath);
-        const parts = str.replace(/\\/g, '/').split('/');
-        const filename = parts[parts.length - 1] || '';
-        if (filename.endsWith('.json')) {
-            return filename.slice(0, -5);
-        }
-        return filename || null;
     }
 
     async _loadTokenDetail(tokenName) {

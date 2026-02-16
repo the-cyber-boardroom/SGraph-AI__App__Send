@@ -62,4 +62,5 @@ class test_Routes__Tokens(TestCase):
         response = self.client.get('/tokens/list')
         assert response.status_code == 200
         data = response.json()
-        assert 'files' in data
+        assert 'token_names' in data
+        assert isinstance(data['token_names'], list)

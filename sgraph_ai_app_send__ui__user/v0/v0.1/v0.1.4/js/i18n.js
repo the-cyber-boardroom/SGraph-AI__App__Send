@@ -25,6 +25,7 @@ const I18n = {
             // ─── App ────────────────────────────────────────────────────
             'app.title':                        'SGraph Send',
             'app.subtitle':                     'Zero-knowledge encrypted file sharing',
+            'app.disclaimer':                   'This is a beta service. Do not upload confidential or illegal content.',
 
             // ─── Upload: Mode ───────────────────────────────────────────
             'upload.mode.file':                 'File',
@@ -34,6 +35,7 @@ const I18n = {
             'upload.drop_zone.label':           'Drop your file here',
             'upload.drop_zone.hint':            'or click to browse',
             'upload.drop_zone.encrypted_hint':  'Encrypted in your browser before upload',
+            'upload.drop_zone.size_limit':      'Maximum file size: 5 MB',
 
             // ─── Upload: Text Input ─────────────────────────────────────
             'upload.text.placeholder':          'Type or paste your text here',
@@ -44,8 +46,11 @@ const I18n = {
             'upload.button.encrypt_send':       'Encrypt & Send',
 
             // ─── Upload: Progress ───────────────────────────────────────
+            'upload.progress.reading':          'Reading file...',
             'upload.progress.encrypting':       'Encrypting...',
+            'upload.progress.creating':         'Preparing transfer...',
             'upload.progress.uploading':        'Uploading...',
+            'upload.progress.completing':       'Finalising...',
 
             // ─── Upload: Result ─────────────────────────────────────────
             'upload.result.file_success':       'Your file has been encrypted and uploaded.',
@@ -69,6 +74,7 @@ const I18n = {
             // ─── Upload: Errors ─────────────────────────────────────────
             'upload.error.empty_text':          'Please enter some text to encrypt.',
             'upload.error.upload_failed':       'Upload failed. Please try again.',
+            'upload.error.file_too_large':      'File is too large. Maximum size is 5 MB.',
 
             // ─── Download: Loading ──────────────────────────────────────
             'download.loading':                 'Loading transfer info...',
@@ -95,7 +101,8 @@ const I18n = {
             'download.result.download_file':    'Download as file',
 
             // ─── Download: Send Another ───────────────────────────────────
-            'download.result.send_another':     'Send your own',
+            'download.result.send_another':     'Send a new File or Text',
+            'download.result.decrypted_message': 'Decrypted Message',
 
             // ─── Download: History ────────────────────────────────────────
             'download.history.title':           'Recent downloads',
@@ -105,12 +112,22 @@ const I18n = {
             'download.history.text_preview':    'Text',
             'download.history.file_label':      'File',
 
+            // ─── Download: Token Info ────────────────────────────────────
+            'download.token.uses_remaining':    '{remaining} uses remaining',
+
+            // ─── Access Gate ────────────────────────────────────────────
+            'access_gate.uses_remaining':       '{remaining} uses remaining',
+            'access_gate.change_token':         'Change Token',
+
             // ─── Download: Errors ───────────────────────────────────────
             'download.error.no_id':             'No transfer ID found in URL. Please check your link.',
             'download.error.not_ready':         'This transfer is not yet available for download.',
             'download.error.not_found':         'Transfer not found. The link may have expired.',
             'download.error.no_key':            'Please enter the decryption key.',
             'download.error.failed':            'Download or decryption failed.',
+            'download.error.token_not_found':   'Access token not found. Please check your link or request a new token.',
+            'download.error.token_exhausted':   'This access token has been fully used. Please request a new one.',
+            'download.error.token_revoked':     'This access token has been revoked.',
 
             // ─── Crypto Errors ──────────────────────────────────────────
             'crypto.error.unavailable':         'Web Crypto API is not available. It requires a secure context (HTTPS or localhost). If running locally, use "localhost" instead of "127.0.0.1".',
@@ -159,7 +176,7 @@ const I18n = {
     async loadLocale(code) {
         if (this.strings[code]) return true;
         try {
-            const resp = await fetch(`i18n/${code}.json`);
+            const resp = await fetch(`../v0.1.4/i18n/${code}.json`);
             if (resp.ok) {
                 this.strings[code] = await resp.json();
                 return true;
