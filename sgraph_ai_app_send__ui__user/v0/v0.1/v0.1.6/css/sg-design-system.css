@@ -416,23 +416,79 @@ textarea.input {
     opacity: 0.7;
 }
 
-/* ─── Locale Selector (inside header-nav) ──────────────────────────────── */
+/* ─── Locale Dropdown ───────────────────────────────────────────────────── */
 
-#locale-selector {
-    display: contents;
+.locale-dropdown {
+    position: relative;
 }
 
-#locale-selector .btn {
-    background: transparent;
-    color: var(--color-text-secondary);
-    border: 1px solid transparent;
+.locale-dropdown__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: var(--font-family);
+    transition: color var(--transition), background var(--transition);
+    white-space: nowrap;
 }
 
-#locale-selector .btn:hover {
+.locale-dropdown__trigger:hover {
     color: var(--color-text);
     background: var(--accent-subtle);
+}
+
+.locale-dropdown__trigger svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.locale-dropdown__menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 140px;
+    background: var(--bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+    z-index: 100;
+    padding: var(--space-1) 0;
+}
+
+.locale-dropdown.open .locale-dropdown__menu {
+    display: block;
+}
+
+.locale-dropdown__item {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
+    font-family: var(--font-family);
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+}
+
+.locale-dropdown__item:hover {
+    color: var(--color-text);
+    background: var(--accent-subtle);
+}
+
+.locale-dropdown__item--active {
+    color: var(--accent);
+    font-weight: var(--weight-semibold);
 }
 
 /* ─── Link Styles ───────────────────────────────────────────────────────── */
