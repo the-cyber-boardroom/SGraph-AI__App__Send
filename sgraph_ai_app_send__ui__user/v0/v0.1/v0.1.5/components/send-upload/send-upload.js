@@ -70,21 +70,32 @@
         const { combinedUrl, linkOnlyUrl, keyString, transparency } = this.result;
         const successKey = this.result.isText ? 'upload.result.text_success' : 'upload.result.file_success';
 
+        const monoStyle = "font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; font-size: var(--font-size-sm);";
+        const valueBoxStyle = `${monoStyle} flex: 1; min-width: 0; background: white; border: 1px solid var(--color-border); border-radius: 4px; padding: 0.375rem 0.5rem; white-space: nowrap; overflow-x: auto;`;
+
         const separateSection = this._showSeparateKey ? `
-            <div class="result-panel" style="margin-top: 0.75rem;">
-                <div class="result-row">
-                    <label>${this.escapeHtml(this.t('upload.result.link_only'))}</label>
-                    <span class="value" id="link-only">${this.escapeHtml(linkOnlyUrl)}</span>
-                    <button class="btn btn-copy btn-sm" data-copy="link-only">${this.escapeHtml(this.t('upload.result.copy'))}</button>
+            <div style="margin-top: 0.75rem; padding: 1rem; background: var(--color-bg, #f8f9fa); border: 1px solid var(--color-border); border-radius: var(--radius, 0.5rem);">
+                <div style="margin-bottom: 0.75rem;">
+                    <label style="display: block; font-weight: 600; font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 0.25rem;">
+                        ${this.escapeHtml(this.t('upload.result.link_only'))}
+                    </label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <div style="${valueBoxStyle}" id="link-only">${this.escapeHtml(linkOnlyUrl)}</div>
+                        <button class="btn btn-copy btn-sm" data-copy="link-only">${this.escapeHtml(this.t('upload.result.copy'))}</button>
+                    </div>
                 </div>
-                <div class="result-row">
-                    <label>${this.escapeHtml(this.t('upload.result.decryption_key'))}</label>
-                    <span class="value" id="decryption-key">${this.escapeHtml(keyString)}</span>
-                    <button class="btn btn-copy btn-sm" data-copy="decryption-key">${this.escapeHtml(this.t('upload.result.copy'))}</button>
+                <div style="margin-bottom: 0.75rem;">
+                    <label style="display: block; font-weight: 600; font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 0.25rem;">
+                        ${this.escapeHtml(this.t('upload.result.decryption_key'))}
+                    </label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <div style="${valueBoxStyle}" id="decryption-key">${this.escapeHtml(keyString)}</div>
+                        <button class="btn btn-copy btn-sm" data-copy="decryption-key">${this.escapeHtml(this.t('upload.result.copy'))}</button>
+                    </div>
                 </div>
-            </div>
-            <div class="guidance">
-                ${this.t('upload.guidance.split_channels')}
+                <div class="guidance">
+                    ${this.t('upload.guidance.split_channels')}
+                </div>
             </div>
         ` : '';
 
@@ -101,18 +112,18 @@
                 ${this.escapeHtml(this.t(successKey))}
             </div>
             ${tokenUsageHtml}
-            <div class="result-panel">
-                <div class="result-row">
-                    <label>${this.escapeHtml(this.t('upload.result.share_link'))}</label>
-                    <span class="value" id="combined-link">${this.escapeHtml(combinedUrl)}</span>
-                    <button class="btn btn-copy btn-sm" data-copy="combined-link">${this.escapeHtml(this.t('upload.result.copy_link'))}</button>
-                    <a href="${this.escapeHtml(combinedUrl)}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration: none; margin-left: 0.25rem;">${this.escapeHtml(this.t('upload.result.open_tab'))}</a>
+            <div style="margin-top: 1rem;">
+                <label style="display: block; font-weight: 600; font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 0.5rem;">
+                    ${this.escapeHtml(this.t('upload.result.share_link'))}
+                </label>
+                <div style="background: var(--color-bg, #f8f9fa); border: 1px solid var(--color-border); border-radius: var(--radius, 0.5rem); padding: 0.5rem 0.75rem; ${monoStyle} white-space: nowrap; overflow-x: auto;" id="combined-link">${this.escapeHtml(combinedUrl)}</div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; align-items: center;">
+                    <button class="btn btn-primary btn-sm" data-copy="combined-link">${this.escapeHtml(this.t('upload.result.copy_link'))}</button>
+                    <a href="${this.escapeHtml(combinedUrl)}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration: none;">${this.escapeHtml(this.t('upload.result.open_tab'))}</a>
+                    <button class="btn btn-sm" id="toggle-separate-key" style="margin-left: auto; font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                        ${this.escapeHtml(this._showSeparateKey ? this.t('upload.result.hide_key') : this.t('upload.result.show_separate_key'))}
+                    </button>
                 </div>
-            </div>
-            <div style="margin-top: 0.5rem; text-align: right;">
-                <button class="btn btn-sm" id="toggle-separate-key" style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-                    ${this.escapeHtml(this._showSeparateKey ? this.t('upload.result.hide_key') : this.t('upload.result.show_separate_key'))}
-                </button>
             </div>
             ${separateSection}
             ${timingHtml}
