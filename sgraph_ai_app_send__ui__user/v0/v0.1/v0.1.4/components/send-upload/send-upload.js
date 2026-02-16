@@ -396,6 +396,7 @@ class SendUpload extends HTMLElement {
         } else if (this.selectedFile.size > SendUpload.MAX_FILE_SIZE) {
             this.errorMessage = this.t('upload.error.file_too_large');
             this.state = 'error'; this.render(); this.setupEventListeners(); return;
+        }
 
         try {
             this._setBeforeUnload(true);
