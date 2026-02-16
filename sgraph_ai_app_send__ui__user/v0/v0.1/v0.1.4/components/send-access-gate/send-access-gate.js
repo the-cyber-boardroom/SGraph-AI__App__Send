@@ -1,6 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    SGraph Send — Access Gate Web Component
-   v0.1.0 — Base major version
+   v0.1.4 — osbot-* audit + IFD bump
+
+   Changes from v0.1.0:
+   - Token status bar (uses remaining + Change Token) below send section
+   - i18n support via I18n.t()
+   - Locale-changed listener to re-render token bar
 
    Gates the send page behind an access token. If the token is not in
    localStorage, shows a form asking for it. Once entered, stores it
@@ -22,6 +27,14 @@ class SendAccessGate extends HTMLElement {
         this._onTokenInvalid = () => this.showGate('Your access token is no longer valid. Please enter a new token.');
         document.addEventListener('access-token-invalid', this._onTokenInvalid);
 
+        this._onLocaleChanged = () => {
+            const bar = this.querySelector('#token-status-bar');
+            if (bar) this.updateTokenBar(bar, this._cachedRemaining);
+        };
+        document.addEventListener('locale-changed', this._onLocaleChanged);
+
+        this._cachedRemaining = null;
+
         if (ApiClient.hasAccessToken()) {
             this.showContent();
         } else {
@@ -33,7 +46,14 @@ class SendAccessGate extends HTMLElement {
         if (this._onTokenInvalid) {
             document.removeEventListener('access-token-invalid', this._onTokenInvalid);
         }
+        if (this._onLocaleChanged) {
+            document.removeEventListener('locale-changed', this._onLocaleChanged);
+        }
     }
+
+    // ─── Shorthand ─────────────────────────────────────────────────────────
+
+    t(key, params) { return (typeof I18n !== 'undefined') ? I18n.t(key, params) : key; }
 
     showGate(reason) {
         this._originalContent = this._originalContent || this.innerHTML;
@@ -132,13 +152,71 @@ class SendAccessGate extends HTMLElement {
     showContent() {
         if (this._originalContent) {
             this.innerHTML = this._originalContent;
+        } else {
+            this._originalContent = this.innerHTML;
         }
+
+        // Add token status bar AFTER the send-upload element (below the send section)
+        const bar = document.createElement('div');
+        bar.id = 'token-status-bar';
+        bar.style.cssText = 'margin-top: 1rem; margin-bottom: 1rem; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.875rem; background: var(--color-drop-zone-bg, #f8f9fa); border: 1px solid var(--color-border, #dee2e6); border-radius: var(--radius, 0.5rem);';
+        bar.innerHTML = '<span style="color: var(--color-text-secondary, #6c757d);">...</span>';
+
+        const upload = this.querySelector('send-upload');
+        if (upload && upload.nextSibling) {
+            upload.parentNode.insertBefore(bar, upload.nextSibling);
+        } else {
+            this.appendChild(bar);
+        }
+
+        this.loadTokenInfo();
+
         // Re-trigger custom element upgrades for slotted content
         this.querySelectorAll('send-upload').forEach(el => {
             if (!el._initialized) {
                 el._initialized = true;
             }
         });
+    }
+
+    async loadTokenInfo() {
+        const bar = this.querySelector('#token-status-bar');
+        if (!bar) return;
+
+        const token = ApiClient.getAccessToken();
+        if (!token) return;
+
+        let remaining = null;
+        try {
+            const result = await ApiClient.checkToken(token);
+            if (result.valid && result.remaining !== undefined) {
+                remaining = result.remaining;
+            }
+        } catch (e) {
+            // checkToken unavailable — show generic status
+        }
+
+        this._cachedRemaining = remaining;
+        this.updateTokenBar(bar, remaining);
+    }
+
+    updateTokenBar(bar, remaining) {
+        const infoText = remaining !== null
+            ? `<strong>${remaining}</strong> ${this.t('access_gate.uses_remaining', { remaining: '' }).trim()}`
+            : 'Token active';
+
+        bar.innerHTML = `
+            <span style="color: var(--color-text-secondary, #6c757d);">${infoText}</span>
+            <button class="btn btn-sm" id="reset-token-btn" style="font-size: 0.8rem;">${this.t('access_gate.change_token')}</button>
+        `;
+
+        const btn = bar.querySelector('#reset-token-btn');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                ApiClient.clearAccessToken();
+                this.showGate();
+            });
+        }
     }
 }
 
