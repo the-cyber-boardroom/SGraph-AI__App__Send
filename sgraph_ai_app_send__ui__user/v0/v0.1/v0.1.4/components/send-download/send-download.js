@@ -24,6 +24,7 @@ class SendDownload extends HTMLElement {
         this.decryptedText    = null;
         this.decryptedBytes   = null;
         this.fileName         = null;
+        this.tokenRemaining   = undefined;
         this.state            = 'loading';
         this.errorMessage     = null;
         this._boundDecryptClick = null;
@@ -63,6 +64,7 @@ class SendDownload extends HTMLElement {
         this.decryptedText    = null;
         this.decryptedBytes   = null;
         this.fileName         = null;
+        this.tokenRemaining   = undefined;
         this.state            = 'loading';
         this.errorMessage     = null;
 
@@ -104,6 +106,9 @@ class SendDownload extends HTMLElement {
             if (this.tokenName) {
                 try {
                     const tokenResult = await ApiClient.validateToken(this.tokenName);
+                    if (tokenResult.remaining !== undefined) {
+                        this.tokenRemaining = tokenResult.remaining;
+                    }
                     if (!tokenResult.success) {
                         this.state        = 'error';
                         this.errorMessage = this.getTokenErrorMessage(tokenResult.reason);
@@ -210,6 +215,9 @@ class SendDownload extends HTMLElement {
                 ${this.transferInfo.download_count > 0
                     ? `<br><small>${this.escapeHtml(this.t('download.info.download_count', { count: this.transferInfo.download_count }))}</small>`
                     : ''}
+                ${this.tokenRemaining !== undefined
+                    ? `<br><small>${this.escapeHtml(this.t('download.token.uses_remaining', { remaining: this.tokenRemaining }))}</small>`
+                    : ''}
             </div>
         `;
     }
@@ -258,12 +266,23 @@ class SendDownload extends HTMLElement {
 
         if (this.decryptedText !== null) {
             return `
-                <div class="status status--success">${this.escapeHtml(this.t('download.result.text_success'))}</div>
+                <div class="status status--success" style="font-size: var(--font-size-sm); padding: 0.5rem 0.75rem;">
+                    ${this.escapeHtml(this.t('download.result.text_success'))}
+                </div>
                 <div style="margin-top: 1rem;">
-                    <pre id="decrypted-text" style="background: var(--color-drop-zone-bg); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem; white-space: pre-wrap; word-wrap: break-word; font-size: var(--font-size-sm); max-height: 400px; overflow-y: auto;"></pre>
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                        <button class="btn btn-primary btn-sm" id="copy-text-btn">${this.escapeHtml(this.t('download.result.copy_text'))}</button>
-                        <button class="btn btn-sm" id="download-text-btn">${this.escapeHtml(this.t('download.result.download_file'))}</button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--color-text, #1a1a1a);">
+                            ${this.escapeHtml(this.t('download.result.decrypted_message'))}
+                        </h3>
+                        <button class="btn btn-primary btn-sm" id="copy-text-btn">
+                            ${this.escapeHtml(this.t('download.result.copy_text'))}
+                        </button>
+                    </div>
+                    <pre id="decrypted-text" style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: var(--radius, 0.5rem); padding: 1.25rem; white-space: pre-wrap; word-wrap: break-word; font-size: 1rem; line-height: 1.6; max-height: 400px; overflow-y: auto; min-height: 60px; margin: 0;"></pre>
+                    <div style="text-align: right; margin-top: 0.5rem;">
+                        <button class="btn btn-sm" id="download-text-btn">
+                            ${this.escapeHtml(this.t('download.result.download_file'))}
+                        </button>
                     </div>
                 </div>
                 <send-transparency id="transparency-panel"></send-transparency>
@@ -319,7 +338,17 @@ class SendDownload extends HTMLElement {
         if (panel && this.transparencyData) { panel.setData(this.transparencyData); }
     }
 
-    cleanup() { this._boundDecryptClick = null; }
+    cleanup() { this._boundDecryptClick = null; this._setBeforeUnload(false); }
+
+    _setBeforeUnload(active) {
+        if (active && !this._beforeUnloadHandler) {
+            this._beforeUnloadHandler = (e) => { e.preventDefault(); e.returnValue = ''; };
+            window.addEventListener('beforeunload', this._beforeUnloadHandler);
+        } else if (!active && this._beforeUnloadHandler) {
+            window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+            this._beforeUnloadHandler = null;
+        }
+    }
 
     // ─── Download Flow ───────────────────────────────────────────────────
 
@@ -337,7 +366,7 @@ class SendDownload extends HTMLElement {
         }
 
         try {
-            this.state = 'decrypting'; this.render();
+            this.state = 'decrypting'; this._setBeforeUnload(true); this.render();
 
             const key       = await SendCrypto.importKey(keyString);
             const encrypted = await ApiClient.downloadPayload(this.transferId);
@@ -364,6 +393,7 @@ class SendDownload extends HTMLElement {
             // Save to localStorage history
             this.saveToHistory(content);
 
+            this._setBeforeUnload(false);
             this.transparencyData = {
                 download_timestamp: new Date().toISOString(),
                 file_size_bytes:    this.transferInfo.file_size_bytes,
@@ -376,6 +406,7 @@ class SendDownload extends HTMLElement {
             }));
 
         } catch (err) {
+            this._setBeforeUnload(false);
             this.errorMessage = err.message || this.t('download.error.failed');
             this.state = 'ready'; this.render(); this.setupEventListeners();
             const nki = this.querySelector('#key-input');

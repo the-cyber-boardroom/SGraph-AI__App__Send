@@ -13,9 +13,15 @@
         <div id="locale-selector" style="position: absolute; top: 1rem; right: 1rem;"></div>
     </header>
     <main>
+        <!-- Loading indicator: visible before JS loads, hidden by component -->
+        <div id="page-loading" class="card" style="text-align: center; padding: 2rem;">
+            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);" data-i18n="download.loading">Loading transfer info...</div>
+        </div>
+
         <send-download></send-download>
 
-        <section class="card" style="margin-top: 1.5rem; text-align: center;">
+        <!-- CTA section: hidden until JS determines what to show -->
+        <section id="cta-signup" class="card" style="margin-top: 1.5rem; text-align: center; display: none;">
             <h3 style="font-size: 1rem; margin-bottom: 0.25rem;" data-i18n="cta.title">Want to send files too?</h3>
             <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;" data-i18n="cta.description">
                 Join the early access program for SGraph Send.
@@ -28,6 +34,13 @@
                 </div>
             </form>
         </section>
+
+        <!-- Send-a-file CTA: shown when user already has a token -->
+        <section id="cta-send" class="card" style="margin-top: 1.5rem; text-align: center; display: none;">
+            <a href="index.html" class="btn btn-primary" style="text-decoration: none;" data-i18n="download.result.send_another">Send a new File or Text</a>
+        </section>
+
+        <p class="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
     </main>
     <script src="js/i18n.js"></script>
     <script src="../v0.1.0/js/crypto.js"></script>
@@ -35,6 +48,17 @@
     <script src="components/send-download/send-download.js"></script>
     <script src="../v0.1.0/components/send-transparency/send-transparency.js"></script>
     <script>
+        // Hide loading indicator once the download component renders
+        const _loading = document.getElementById('page-loading');
+        if (_loading) _loading.style.display = 'none';
+
+        // Show appropriate CTA based on whether user has a token
+        const _hasToken = typeof ApiClient !== 'undefined' && ApiClient.hasAccessToken();
+        const _ctaSignup = document.getElementById('cta-signup');
+        const _ctaSend   = document.getElementById('cta-send');
+        if (_hasToken && _ctaSend)   { _ctaSend.style.display = ''; }
+        else if (_ctaSignup)         { _ctaSignup.style.display = ''; }
+
         I18n.init().then(() => {
             document.documentElement.lang = I18n.locale;
             document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -59,6 +83,12 @@
                 el.textContent = I18n.t(el.getAttribute('data-i18n'));
             });
             renderLocaleSelector();
+        });
+
+        // Hide page-level CTA when download component shows its own "Send a new File or Text" link
+        document.addEventListener('download-complete', () => {
+            const ctaSend = document.getElementById('cta-send');
+            if (ctaSend) ctaSend.style.display = 'none';
         });
     </script>
 </body>

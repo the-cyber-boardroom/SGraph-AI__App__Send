@@ -120,9 +120,16 @@ class Send__Cache__Client(Type_Safe):                                      # Cac
             return result.updated_content
         return False
 
-    def token__list_all(self):                                             # List all files in the tokens namespace
-        result = self.cache_client.admin_storage().files__all__path(
-            path = NS_TOKENS)
-        if result and hasattr(result, 'files'):
-            return result.files
-        return []
+    def token__list_all(self):                                             # List unique token names from storage
+        return self.cache_client.admin_storage().folders(
+            path             = f'{NS_TOKENS}/data/key-based/' ,
+            return_full_path = False                           ,
+            recursive        = False                           ) or []
+
+    def token__list_data(self, token_name):                              # List data files for a specific token
+        cache_id = self.token__lookup_cache_id(token_name)
+        if cache_id is None:
+            return None
+        return self.cache_client.data().list().data__list(
+            cache_id  = cache_id   ,
+            namespace = NS_TOKENS  )

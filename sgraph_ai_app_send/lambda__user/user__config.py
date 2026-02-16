@@ -13,7 +13,7 @@ APP__SEND__USER__LAMBDA_DEPENDENCIES       = ['httpx==0.28.1'                   
 APP_SEND__UI__USER__ROUTE__PATH__CONSOLE    = 'send'
 APP_SEND__UI__USER__START_PAGE              = 'index'
 APP_SEND__UI__USER__MAJOR__VERSION          = "v0/v0.1"
-APP_SEND__UI__USER__LATEST__VERSION         = "v0.1.4"
+APP_SEND__UI__USER__LATEST__VERSION         = "v0.1.5"
 
 ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN          = 'SGRAPH_SEND__ACCESS_TOKEN'
 HEADER__SGRAPH_SEND__ACCESS_TOKEN           = 'x-sgraph-access-token'

@@ -1,6 +1,7 @@
 {
   "app.title":                        "SGraph Send",
   "app.subtitle":                     "Partilha de ficheiros com encriptação zero-knowledge",
+  "app.disclaimer":                   "Este é um serviço beta. Não envie conteúdo confidencial ou ilegal.",
 
   "upload.mode.file":                 "Ficheiro",
   "upload.mode.text":                 "Texto",
@@ -8,6 +9,7 @@
   "upload.drop_zone.label":           "Arraste o ficheiro para aqui",
   "upload.drop_zone.hint":            "ou clique para procurar",
   "upload.drop_zone.encrypted_hint":  "Encriptado no seu navegador antes do envio",
+  "upload.drop_zone.size_limit":      "Tamanho máximo do ficheiro: 5 MB",
 
   "upload.text.placeholder":          "Escreva ou cole o seu texto aqui",
   "upload.text.char_count":           "{count} caracteres",
@@ -36,6 +38,7 @@
 
   "upload.error.empty_text":          "Por favor escreva um texto para encriptar.",
   "upload.error.upload_failed":       "O envio falhou. Por favor tente novamente.",
+  "upload.error.file_too_large":      "Ficheiro demasiado grande. Tamanho máximo é 5 MB.",
 
   "download.loading":                 "A carregar informação da transferência...",
 
@@ -56,7 +59,13 @@
   "download.result.copy_text":        "Copiar para a área de transferência",
   "download.result.download_file":    "Descarregar como ficheiro",
 
-  "download.result.send_another":     "Envie o seu",
+  "download.result.send_another":     "Enviar novo Ficheiro ou Texto",
+  "download.result.decrypted_message": "Mensagem Desencriptada",
+
+  "download.token.uses_remaining":    "{remaining} utilizações restantes",
+
+  "access_gate.uses_remaining":       "{remaining} utilizações restantes",
+  "access_gate.change_token":         "Alterar Token",
 
   "download.history.title":           "Transferências recentes",
   "download.history.privacy":         "Armazenado no seu navegador. Qualquer pessoa com acesso a este dispositivo pode ver estes itens.",

@@ -95,6 +95,18 @@ class Routes__Transfers(Fast_API__Routes):                                      
             raise HTTPException(status_code = 404,
                                 detail      = 'Transfer not found or payload not uploaded')
         result['token_name'] = token_name or ''                                  # Include token name so UI can build share URL
+
+        # Record token usage on successful upload (the logical "send" event)
+        if token_name and self.admin_service_client is not None:
+            try:
+                ip_hash = hashlib.sha256((request.client.host if request.client else '').encode()).hexdigest()
+                self.admin_service_client.token_use(token_name  = token_name              ,
+                                                    ip_hash     = ip_hash                  ,
+                                                    action      = 'upload_completed'       ,
+                                                    transfer_id = str(transfer_id)         )
+            except Exception:
+                pass                                                             # Non-critical — don't fail the upload if usage tracking fails
+
         return result
 
     def info__transfer_id(self, transfer_id: Safe_Str__Id                         # GET /transfers/info/{transfer_id} (todo: should be Transfer_Id)

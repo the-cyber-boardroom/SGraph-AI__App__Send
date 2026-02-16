@@ -1,6 +1,7 @@
 {
   "app.title":                        "SGraph ngeH",
   "app.subtitle":                     "pagh Sovlu'bogh pegh ngaSbogh De' lI'",
+  "app.disclaimer":                   "beta tajvaj 'oH. pegh De' pagh chut latlh De' yIghoS.",
 
   "upload.mode.file":                 "De'wI' ghItlh",
   "upload.mode.text":                 "ghItlh",
@@ -8,6 +9,7 @@
   "upload.drop_zone.label":           "naDev De'wI' ghItlh yIchagh",
   "upload.drop_zone.hint":            "pagh yIwIv",
   "upload.drop_zone.encrypted_hint":  "ngeHpa' De'lIj peplu'",
+  "upload.drop_zone.size_limit":      "De'wI' ghItlh tInqu': 5 MB",
 
   "upload.text.placeholder":          "naDev ghItlh yIghItlh",
   "upload.text.char_count":           "{count} Degh",
@@ -36,6 +38,7 @@
 
   "upload.error.empty_text":          "peghmeH ghItlh yIghItlh.",
   "upload.error.upload_failed":       "luj ngeH. chaq yInIDqa'.",
+  "upload.error.file_too_large":      "De'wI' ghItlh tInqu'. 5 MB neH chaw'lu'.",
 
   "download.loading":                 "ngeH De' lajlu'...",
 
@@ -56,7 +59,13 @@
   "download.result.copy_text":        "qawHaq yIper",
   "download.result.download_file":    "De'wI' ghItlh yIlaj",
 
-  "download.result.send_another":     "De'lIj yIngeH",
+  "download.result.send_another":     "De'wI' ghItlh chu' ghap ghItlh yIngeH",
+  "download.result.decrypted_message": "QIn peghHa'lu'pu'bogh",
+
+  "download.token.uses_remaining":    "{remaining} lo'laH",
+
+  "access_gate.uses_remaining":       "{remaining} lo'laH",
+  "access_gate.change_token":         "chaw' yIchoH",
 
   "download.history.title":           "lajpu'bogh De' tIQ",
   "download.history.privacy":         "De'wI'lIjDaq pollu'. jan lo'laHbogh vay' leghlaH.",

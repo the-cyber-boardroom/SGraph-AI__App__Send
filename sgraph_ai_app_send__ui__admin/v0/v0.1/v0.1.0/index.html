@@ -1,1 +1,26 @@
-IFD version v0.1.0 will go here
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGraph Send — Admin Console</title>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <admin-shell>
+        <!-- Panels — shown/hidden by admin-shell via data-panel attribute -->
+        <token-manager        data-panel="tokens"></token-manager>
+        <analytics-dashboard  data-panel="analytics"  hidden></analytics-dashboard>
+        <system-info          data-panel="system"      hidden></system-info>
+    </admin-shell>
+
+    <!-- API client (must load before components) -->
+    <script src="js/admin-api.js"></script>
+
+    <!-- Web Components -->
+    <script src="components/admin-shell/admin-shell.js"></script>
+    <script src="components/token-manager/token-manager.js"></script>
+    <script src="components/analytics-dashboard/analytics-dashboard.js"></script>
+    <script src="components/system-info/system-info.js"></script>
+</body>
+</html>

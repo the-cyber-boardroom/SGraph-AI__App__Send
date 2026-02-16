@@ -10,6 +10,33 @@
 
 ---
 
+## Team Structure: Explorer and Villager
+
+As of v0.3.0, the project operates with **two teams** based on Wardley Maps methodology:
+
+| Team | Focus | Wardley Stage | Output |
+|------|-------|---------------|--------|
+| **Explorer** | Discover, experiment, build first versions | Genesis → Custom-Built | Minor versions (IFD) |
+| **Villager** | Stabilise, harden, deploy to production | Custom-Built → Product | Major versions (IFD releases) |
+
+**Session-specific instructions** live in `.claude/explorer/CLAUDE.md` and `.claude/villager/CLAUDE.md`. When starting a new Claude Code session, the human will indicate which team context applies. Read the team-specific CLAUDE.md for your session's rules.
+
+### Key Separation Rules
+
+1. **Villagers do NOT add features.** Functionality is frozen at the Explorer's final version.
+2. **Villagers do NOT fix bugs that change behaviour.** Bugs go back to Explorer.
+3. **Explorers do NOT deploy to production.** Production is Villager territory.
+4. **Explorers do NOT optimise for performance.** That's the Villager's job.
+5. **Distinct environments.** Explorer and Villager operate in separate infrastructure.
+
+### Role Definitions
+
+- **Explorer role definition:** `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md`
+- **Villager role definition:** `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md`
+- **Wardley Maps context:** `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md`
+
+---
+
 ## Project
 
 **SGraph Send** — zero-knowledge encrypted file sharing at [send.sgraph.ai](https://send.sgraph.ai).
@@ -82,6 +109,11 @@ team/                            # Team structure
   humans/dinis_cruz/briefs/      # Human briefs (input — date-bucketed)
   humans/dinis_cruz/debriefs/    # Team debriefs (output — date-bucketed, with relative links)
 
+.claude/                         # Claude Code session configuration
+  CLAUDE.md                      # This file — shared guidance for all sessions
+  explorer/CLAUDE.md             # Explorer team session instructions
+  villager/CLAUDE.md             # Villager team session instructions
+
 .github/workflows/               # CI pipelines
 ```
 
@@ -117,17 +149,17 @@ team/                            # Team structure
 
 ### Testing
 
-17. **No mocks, no patches** — full stack starts in-memory in ~100ms
-18. **LocalStack** for S3 integration tests (the only acceptable "fake")
-19. **Playwright** for E2E browser tests
-20. **Smoke tests** after every deployment (health, auth, CORS, no-plaintext)
+18. **No mocks, no patches** — full stack starts in-memory in ~100ms
+19. **LocalStack** for S3 integration tests (the only acceptable "fake")
+20. **Playwright** for E2E browser tests
+21. **Smoke tests** after every deployment (health, auth, CORS, no-plaintext)
 
 ### Git
 
-21. **Default branch:** `dev`
-22. **Feature branches** branch from `dev`
-23. **Branch naming:** `claude/{description}-{session-id}`
-24. **Always push with:** `git push -u origin {branch-name}`
+22. **Default branch:** `dev`
+23. **Feature branches** branch from `dev`
+24. **Branch naming:** `claude/{description}-{session-id}`
+25. **Always push with:** `git push -u origin {branch-name}`
 
 ---
 
@@ -135,9 +167,9 @@ team/                            # Team structure
 
 Each agent operates as a specific role. Roles produce review documents in their `team/roles/{role}/reviews/` folder. The Librarian maintains the master index.
 
-**Roles are agentic** — all 10 roles (Conductor, Architect, Dev, QA, DevOps, Librarian, Cartographer, AppSec, Historian, Journalist) are AI agent roles. The Conductor is an orchestration role like any other, responsible for workflow coordination, priority management, and task routing.
+**17 roles across two teams** — Conductor, Architect, Dev, QA, DevOps, Librarian, Cartographer, AppSec, Historian, Journalist, Designer, Advocate, Sherpa, Ambassador, CISO, DPO, GRC. Plus two meta-roles: Explorer (leads Explorer team) and Villager (leads Villager team).
 
-**Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role (e.g., writing code as Dev, configuring CI as DevOps). His briefs drive the team's priorities.
+**Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs and Villager briefs.
 
 Before starting work, check:
 1. Latest human brief in `team/humans/dinis_cruz/briefs/`
@@ -147,23 +179,23 @@ Before starting work, check:
 
 ### Debriefs
 
-After completing a batch of work (e.g. all roles responding to a brief), the Librarian creates a **debrief** — a human-facing summary with relative links to every deliverable.
+After completing a batch of work, the Librarian creates a **debrief** — a human-facing summary with relative links to every deliverable.
 
 - **Path:** `team/humans/dinis_cruz/debriefs/MM/DD/{version}__debrief__{topic}.md`
 - **Purpose:** Single document Dinis can read to see what was delivered, what decisions were made, and what to review
-- **Links:** All links to role reviews and other deliverables must be **relative** to the debrief file, so they work both locally and on GitHub
-- **When:** Create a debrief whenever a session produces multiple deliverables that need human review
-- **Content:** Executive summary, recommended reading order, key decisions needing awareness, what's next
+- **Links:** All links must be **relative** to the debrief file
+- **When:** Create a debrief whenever a session produces multiple deliverables
+- **Content:** Executive summary, recommended reading order, key decisions, what's next
 
 ---
 
-## Current Sprint
+## Current State (v0.3.0)
 
-**Focus:** MVP Release Infrastructure (per Dinis Cruz brief v0.1.4)
+**Milestone:** End-to-end MVP complete. Full transfer cycle works. Admin UI console shipped. 14 roles active. 111+ tests passing.
 
-**Goal:** Get every deployment target working, every test level running, every storage mode exercised — then never touch infrastructure again.
-
-**"Done" criteria:** Push commit → CI → tests → deploy to dev Lambda automatically. Full transfer cycle works (upload → encrypt → share → download → decrypt → verify). All deployment targets operational. Playwright E2E passing. PyPI install works in clean env.
+**Two parallel tracks now active:**
+1. **Explorer track:** Design agency brief, landing page, large file transfer research, Issues FS adoption, new features
+2. **Villager track:** IFD production release, deployment hardening, performance, monitoring, stability
 
 ---
 
@@ -176,7 +208,13 @@ After completing a batch of work (e.g. all roles responding to a brief), the Lib
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
 | System landscape map | `team/roles/cartographer/v0.1.2/v0.1.2__system-landscape-map-revised.md` |
 | Architecture plans | `team/roles/architect/v0.1.1/` |
-| Current brief | `team/humans/dinis_cruz/briefs/02/13/v0.2.16__daily-brief__sgraph-send-13-feb-2026.md` |
-| Latest debrief | `team/humans/dinis_cruz/debriefs/02/13/v0.2.33__debrief__v0.1.3-role-reviews-final.md` |
-| Master index (latest) | `team/roles/librarian/reviews/26-02-13/v0.2.24__master-index__daily-brief-responses-13-feb.md` |
+| Wardley Maps brief | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
+| Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
+| Villager role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md` |
+| Current brief (v0.3.2) | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__daily-brief__sgraph-send-14-feb-2026.md` |
+| Current brief (v0.3.0) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.3.0__daily-brief__sgraph-send-14-feb-2026.md` |
+| Decisions (14 Feb) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.2.41__brief__decisions-14-feb-2026.md` |
+| Latest debrief | `team/humans/dinis_cruz/debriefs/02/14/v0.3.0__debrief__daily-brief-responses-and-admin-ui.md` |
+| Master index (latest) | `team/roles/librarian/reviews/26-02-14/v0.3.0__master-index__daily-brief-responses-14-feb.md` |
 | Issues FS | `.issues/` |
+| IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |

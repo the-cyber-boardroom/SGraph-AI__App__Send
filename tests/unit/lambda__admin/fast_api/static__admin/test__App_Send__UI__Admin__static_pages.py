@@ -28,10 +28,10 @@ class test__App_Send__UI__Admin__static_pages(TestCase):
         expected_file_path         = path_combine(sgraph_ai_app_send__ui__admin.path, expected_file_virtual_path)
         expected_redirect          = f'/{APP_SEND__UI__ADMIN__ROUTE__PATH__CONSOLE}/{expected_file_virtual_path}'
 
-        assert response__no_redirects.headers['location'] == '/admin/v0/v0.1/v0.1.0/index.html'     # remove once we have more versions, but good to see what the path looks like
         assert response__no_redirects.headers['location'] == expected_redirect
         assert response__redirects.request.url            == f'http://testserver{expected_redirect}'
 
         assert file_exists(expected_file_path) is True                                              # confirm file exists in disk
         assert response__redirects.text        == file_contents(expected_file_path)                 # confirm contents match
-        assert response__redirects.text        == 'IFD version v0.1.0 will go here'                 # remove once we have the real content in there
+        assert 'SGraph Send'                   in response__redirects.text                           # confirm admin console content is present
+        assert '<admin-shell>'                 in response__redirects.text                           # confirm Web Components are used
