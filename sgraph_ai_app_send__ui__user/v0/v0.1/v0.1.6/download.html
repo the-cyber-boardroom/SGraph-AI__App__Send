@@ -33,7 +33,7 @@
     </header>
     <main>
         <!-- Loading indicator: visible before JS loads, hidden by component -->
-        <div id="page-loading" class="card" style="text-align: center; padding: var(--space-8);">
+        <div id="page-loading" class="card card-enter" style="text-align: center; padding: var(--space-8);">
             <div class="loading-slash">/</div>
             <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-3);" data-i18n="download.loading">Loading transfer info...</div>
         </div>
@@ -41,7 +41,7 @@
         <send-download></send-download>
 
         <!-- CTA section: hidden until JS determines what to show -->
-        <section id="cta-signup" class="card" style="margin-top: var(--space-6); text-align: center; display: none;">
+        <section id="cta-signup" class="card card-enter" style="margin-top: var(--space-6); text-align: center; display: none;">
             <h3 style="font-size: var(--text-body); margin-bottom: var(--space-1); font-weight: var(--weight-semibold);" data-i18n="cta.title">Want to send files too?</h3>
             <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-4);" data-i18n="cta.description">
                 Join the early access program for SG/Send.
@@ -56,7 +56,7 @@
         </section>
 
         <!-- Send-a-file CTA: shown when user already has a token -->
-        <section id="cta-send" class="card" style="margin-top: var(--space-6); text-align: center; display: none;">
+        <section id="cta-send" class="card card-enter" style="margin-top: var(--space-6); text-align: center; display: none;">
             <a href="index.html" class="btn btn-primary" style="text-decoration: none;" data-i18n="download.result.send_another">Send a new File or Text</a>
         </section>
 
