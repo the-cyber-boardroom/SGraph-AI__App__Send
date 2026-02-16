@@ -9,6 +9,7 @@
   "upload.drop_zone.label":           "Arraste o arquivo para aqui",
   "upload.drop_zone.hint":            "ou clique para procurar",
   "upload.drop_zone.encrypted_hint":  "Criptografado no seu navegador antes do envio",
+  "upload.drop_zone.size_limit":      "Tamanho máximo do arquivo: 5 MB",
 
   "upload.text.placeholder":          "Digite ou cole o seu texto aqui",
   "upload.text.char_count":           "{count} caracteres",
@@ -37,6 +38,7 @@
 
   "upload.error.empty_text":          "Por favor digite um texto para criptografar.",
   "upload.error.upload_failed":       "O envio falhou. Por favor tente novamente.",
+  "upload.error.file_too_large":      "Arquivo muito grande. Tamanho máximo é 5 MB.",
 
   "download.loading":                 "Carregando informação da transferência...",
 
@@ -57,7 +59,13 @@
   "download.result.copy_text":        "Copiar para a área de transferência",
   "download.result.download_file":    "Baixar como arquivo",
 
-  "download.result.send_another":     "Envie o seu",
+  "download.result.send_another":     "Enviar novo Arquivo ou Texto",
+  "download.result.decrypted_message": "Mensagem Descriptografada",
+
+  "download.token.uses_remaining":    "{remaining} usos restantes",
+
+  "access_gate.uses_remaining":       "{remaining} usos restantes",
+  "access_gate.change_token":         "Trocar Token",
 
   "download.history.title":           "Downloads recentes",
   "download.history.privacy":         "Armazenado no seu navegador. Qualquer pessoa com acesso a este dispositivo pode ver estes itens.",
