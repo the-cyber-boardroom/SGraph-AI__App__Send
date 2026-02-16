@@ -5,3 +5,9 @@ Workstream-1 | todo | Production data protection compliance
 	Task-3 | todo | Verify user-facing privacy claims match production reality
 	Task-4 | todo | Complete DPIA for production environment
 	Task-5 | todo | Document breach notification procedure
+Workstream-2 | todo | SA pipeline privacy review (from 16-Feb brief)
+	Task-6 | todo | Verify IP addresses NOT stored in CloudFront logs (empirically, not by assumption)
+	Task-7 | todo | Review data retention implications of log archival to Glacier
+	Task-8 | todo | Confirm GDPR lawful basis for log storage
+Workstream-3 | todo | DPO-AppSec-GRC evidence pack (from 16-Feb brief, P1)
+	Task-9 | todo | Contribute DPO evidence: privacy influence on project decisions
