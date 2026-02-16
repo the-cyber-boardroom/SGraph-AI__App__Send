@@ -1,0 +1,10 @@
+# Villager AppSec — Production Security Hardening
+Workstream-1 | in-progress | Production security clearance
+	Task-1 | todo | Audit production deployment configuration for security
+	Task-2 | todo | Verify no-plaintext guarantee in production environment
+	Task-3 | todo | Verify admin auth enforcement in production
+	Task-4 | todo | Audit production CORS configuration
+	Task-5 | todo | Run dependency vulnerability scan for production deps
+	Task-6 | todo | Verify secrets management for production
+	Task-7 | todo | Define security monitoring alerts
+	Task-8 | todo | Provide security clearance for first production release

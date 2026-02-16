@@ -1,0 +1,7 @@
+# Villager GRC — Production Risk and Governance
+Workstream-1 | todo | Production risk assessment
+	Task-1 | todo | Identify production-specific risks (availability, data loss, security)
+	Task-2 | todo | Assess risk impact and likelihood for each
+	Task-3 | todo | Verify governance controls in deployment pipeline
+	Task-4 | todo | Verify audit trail covers all production changes
+	Task-5 | todo | Provide GRC clearance for first production release

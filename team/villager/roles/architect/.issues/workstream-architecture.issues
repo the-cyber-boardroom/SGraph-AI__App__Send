@@ -1,0 +1,5 @@
+# Villager Architect — Architecture Consultation
+Workstream-1 | todo | Architecture verification for productisation
+	Task-1 | todo | Document Explorer design decisions for Villager team reference
+	Task-2 | todo | Review hardening changes for boundary compliance
+	Task-3 | todo | Validate production deployment matches designed architecture
