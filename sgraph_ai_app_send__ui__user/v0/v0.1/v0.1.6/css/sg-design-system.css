@@ -473,6 +473,9 @@ a:hover {
 }
 
 /* ─── Card Entrance Animation ───────────────────────────────────────────── */
+/* Only applied via explicit .card-enter class on static page elements.
+   NOT on .card itself — web components rebuild their .card on every render,
+   which would cause a flicker on each state change (e.g. File ↔ Text). */
 
 @keyframes card-enter {
     from {
@@ -485,7 +488,7 @@ a:hover {
     }
 }
 
-.card {
+.card-enter {
     animation: card-enter 0.3s ease forwards;
 }
 
