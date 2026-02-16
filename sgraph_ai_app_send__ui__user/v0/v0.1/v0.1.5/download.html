@@ -37,7 +37,7 @@
 
         <!-- Send-a-file CTA: shown when user already has a token -->
         <section id="cta-send" class="card" style="margin-top: 1.5rem; text-align: center; display: none;">
-            <a href="index.html" class="btn btn-primary" style="text-decoration: none;" data-i18n="download.result.send_another">Send your own</a>
+            <a href="index.html" class="btn btn-primary" style="text-decoration: none;" data-i18n="download.result.send_another">Send a new File or Text</a>
         </section>
 
         <p class="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
@@ -87,6 +87,12 @@
                 el.textContent = I18n.t(el.getAttribute('data-i18n'));
             });
             renderLocaleSelector();
+        });
+
+        // Hide page-level CTA when download component shows its own link
+        document.addEventListener('download-complete', () => {
+            const ctaSend = document.getElementById('cta-send');
+            if (ctaSend) ctaSend.style.display = 'none';
         });
     </script>
 </body>
