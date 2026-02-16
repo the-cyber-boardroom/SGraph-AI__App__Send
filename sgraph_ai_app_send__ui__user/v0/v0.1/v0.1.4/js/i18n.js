@@ -176,7 +176,7 @@ const I18n = {
     async loadLocale(code) {
         if (this.strings[code]) return true;
         try {
-            const resp = await fetch(`i18n/${code}.json`);
+            const resp = await fetch(`../v0.1.4/i18n/${code}.json`);
             if (resp.ok) {
                 this.strings[code] = await resp.json();
                 return true;
