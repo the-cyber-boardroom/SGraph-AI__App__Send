@@ -93,6 +93,7 @@ library/                         # Specs, guides, roadmap, dependencies
   docs/specs/                    # Specs index
   guides/                        # Development guides, IFD, agentic workflow
   roadmap/phases/                # Phase overview
+  sgraph-send/dev_packs/         # Briefing packs for agent sessions (D065)
 
 team/                            # Team structure
   roles/                         # Role-based review documents

@@ -152,7 +152,11 @@ These decisions are binding for all Villager agents. Full record: `team/villager
 
 | Pack | Path | Status |
 |------|------|--------|
-| CloudFront Log Pipeline | `packs/cloudfront-log-pipeline/` | Ready for implementation session |
+| CloudFront Log Pipeline | `library/sgraph-send/dev_packs/v0.4.5__cloudfront-log-pipeline/` | Ready for implementation session |
+
+### Pack Location Convention (D065)
+
+All dev packs live at `library/sgraph-send/dev_packs/{version}__{pack-name}/`. The version prefix uses the version at time of pack creation. Each pack is a self-contained folder with at minimum `BRIEF.md` and `.issues/tasks.issues`.
 
 ---
 
@@ -163,7 +167,7 @@ These decisions are binding for all Villager agents. Full record: `team/villager
 | **Current Villager daily brief** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__daily-brief__villager-team-16-feb-2026.md` |
 | **Briefing packs process** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__briefs__briefing-packs-for-agents.md` |
 | **Decision record (16 Feb)** | `team/villager/roles/historian/reviews/26-02-16/v0.4.4__decisions__villager-brief-clarifications-16-feb.md` |
-| **CloudFront LETS briefing pack** | `packs/cloudfront-log-pipeline/BRIEF.md` |
+| **CloudFront LETS briefing pack** | `library/sgraph-send/dev_packs/v0.4.5__cloudfront-log-pipeline/BRIEF.md` |
 | **DPO/AppSec/GRC evidence pack** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__briefs__dpo-appsec-grc-evidence-pack.md` |
 | **Translator role definition** | `team/humans/dinis_cruz/briefs/02/16/v0.4.3__role-definition__translator.md` |
 | Villager role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md` |
