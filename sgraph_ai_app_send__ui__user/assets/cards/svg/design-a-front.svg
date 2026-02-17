@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85 55" width="85mm" height="55mm">
+  <rect width="85" height="55" fill="white" stroke="#ccc" stroke-width="0.15"/>
+
+  <!-- Brand -->
+  <text x="7" y="20" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="8" font-weight="700" fill="#111">SG<tspan fill="#0d9488">/</tspan>Send</text>
+
+  <!-- Tagline -->
+  <text x="7" y="28" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.8" font-weight="600" fill="#333">Zero-knowledge encrypted file sharing.</text>
+  <text x="7" y="32" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.8" fill="#333">Your files are encrypted in your browser.</text>
+  <text x="7" y="36" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.8" fill="#333">The server can never read them.</text>
+
+  <!-- URL -->
+  <text x="7" y="46" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="3.5" font-weight="600" fill="#0d9488">send.sgraph.ai</text>
+</svg>

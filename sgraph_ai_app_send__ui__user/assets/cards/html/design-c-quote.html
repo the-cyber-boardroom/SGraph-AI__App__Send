@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SG/Send Card - Design C: The Quote</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+  h1 { font-size: 14px; color: #666; margin-bottom: 20px; font-weight: 400; }
+
+  .card { width: 85mm; height: 55mm; overflow: hidden; position: relative; margin: 5mm 0; }
+
+  /* --- FRONT --- */
+  .front { background: white; border: 0.5px solid #ccc; display: flex; flex-direction: column; justify-content: center; padding: 5mm 6mm; }
+  .front .quote-mark { font-size: 36pt; color: #0d9488; line-height: 0.5; margin-bottom: 1mm; font-family: Georgia, serif; }
+  .front .quote { font-size: 8.5pt; color: #1e293b; line-height: 1.55; font-style: italic; margin-bottom: 2mm; }
+  .front .attribution { font-size: 6.5pt; color: #64748b; margin-bottom: 4mm; }
+  .front .bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+  .front .brand { font-size: 14pt; font-weight: 700; color: #0f172a; }
+  .front .brand span { color: #0d9488; }
+  .front .url { font-size: 8pt; color: #0d9488; font-weight: 600; }
+
+  /* --- BACK --- */
+  .back { background: #fafafa; border: 0.5px solid #ccc; display: flex; flex-direction: column; padding: 5mm 6mm; }
+  .back .section-title { font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #0f172a; margin-bottom: 2mm; }
+  .back .description { font-size: 7pt; color: #475569; line-height: 1.6; margin-bottom: 3mm; }
+  .back .highlight { font-size: 7pt; font-weight: 600; color: #0f172a; margin-bottom: 3mm; }
+  .back .token-label { font-size: 6pt; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #64748b; margin-bottom: 1mm; }
+  .back .token-line { border-bottom: 1.5px solid #0f172a; height: 6mm; margin-bottom: 2mm; display: flex; align-items: flex-end; }
+  .back .token-line input { border: none; outline: none; font-size: 10pt; font-family: 'Courier New', monospace; width: 100%; background: transparent; }
+  .back .bottom-row { display: flex; justify-content: space-between; align-items: flex-end; flex: 1; }
+  .back .qr-placeholder { width: 13mm; height: 13mm; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; font-size: 5pt; color: #aaa; text-align: center; }
+
+  @media print {
+    body { background: white; padding: 0; }
+    h1, .instructions { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Design C: The Quote -- SG/Send Business Card (85 x 55 mm)</h1>
+
+<div class="instructions" style="max-width: 85mm; margin-bottom: 20px; font-size: 12px; color: #666; line-height: 1.5;">
+  <p>Social proof-led design. User A's quote as the hero.</p>
+</div>
+
+<!-- FRONT -->
+<div class="card front">
+  <div class="quote-mark">"</div>
+  <div class="quote">I can't tell you how many times I've needed something like this. If you use Signal, Proton, or whatever else, the other party needs the same tech.</div>
+  <div class="attribution">-- Beta user, security professional</div>
+  <div class="bottom">
+    <div class="brand">SG<span>/</span>Send</div>
+    <div class="url">send.sgraph.ai</div>
+  </div>
+</div>
+
+<!-- BACK -->
+<div class="card back">
+  <div class="section-title">Zero-knowledge encrypted file sharing</div>
+  <div class="description">
+    Your files are encrypted in your browser before they leave your device.
+    The server stores only encrypted bytes it cannot read.
+  </div>
+  <div class="highlight">No app. No sign-up. Just a browser.</div>
+  <div class="token-label">Your access code</div>
+  <div class="token-line"><input type="text" placeholder="" /></div>
+  <div class="bottom-row">
+    <div class="qr-placeholder">QR<br>CODE</div>
+  </div>
+</div>
+
+</body>
+</html>

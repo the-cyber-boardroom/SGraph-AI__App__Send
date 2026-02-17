@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85 55" width="85mm" height="55mm">
+  <rect width="85" height="55" fill="white" stroke="#ccc" stroke-width="0.15"/>
+
+  <!-- Section title -->
+  <text x="6" y="7" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2" font-weight="700" fill="#999" letter-spacing="0.5">HOW TO USE</text>
+
+  <!-- Steps -->
+  <text x="6" y="12" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" fill="#333">1. Go to <tspan font-weight="600">send.sgraph.ai</tspan></text>
+  <text x="6" y="16" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" fill="#333">2. Enter your access code (below)</text>
+  <text x="6" y="20" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" fill="#333">3. Drop a file -- it encrypts in your browser</text>
+  <text x="6" y="24" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" fill="#333">4. Share the link + key via separate channels</text>
+
+  <!-- Token label -->
+  <text x="6" y="30" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2" font-weight="700" fill="#999" letter-spacing="0.5">YOUR ACCESS CODE</text>
+
+  <!-- Token line -->
+  <line x1="6" y1="37" x2="60" y2="37" stroke="#111" stroke-width="0.4"/>
+
+  <!-- QR placeholder -->
+  <rect x="6" y="41" width="10" height="10" fill="none" stroke="#ddd" stroke-width="0.2"/>
+  <text x="11" y="47" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="1.5" fill="#aaa" text-anchor="middle">QR</text>
+
+  <!-- Footer -->
+  <text x="79" y="45" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.2" fill="#666" text-anchor="end">No app. No account.</text>
+  <text x="79" y="49" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.2" fill="#666" text-anchor="end">Just a browser.</text>
+</svg>

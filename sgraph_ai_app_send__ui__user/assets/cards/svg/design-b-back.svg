@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85 55" width="85mm" height="55mm">
+  <rect width="85" height="55" fill="white" stroke="#ccc" stroke-width="0.15"/>
+
+  <!-- URL -->
+  <text x="6" y="8" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="3" font-weight="600" fill="#0f172a">send.sgraph.ai</text>
+
+  <!-- QR placeholder -->
+  <rect x="66" y="3" width="14" height="14" fill="none" stroke="#e2e8f0" stroke-width="0.3"/>
+  <text x="73" y="11" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="1.8" fill="#aaa" text-anchor="middle">QR</text>
+
+  <!-- Token label -->
+  <text x="6" y="23" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="1.8" font-weight="700" fill="#64748b" letter-spacing="0.5">YOUR ACCESS CODE</text>
+
+  <!-- Token box -->
+  <rect x="6" y="25" width="73" height="7" fill="none" stroke="#0f172a" stroke-width="0.4" rx="0.5"/>
+
+  <!-- Footer text -->
+  <text x="6" y="40" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" font-weight="600" fill="#0f172a">The server can't read your files.</text>
+  <text x="6" y="44.5" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" fill="#64748b">No app needed. No account needed.</text>
+
+  <!-- Accent bar -->
+  <rect x="0" y="53.5" width="85" height="1.5" fill="#0d9488"/>
+</svg>
