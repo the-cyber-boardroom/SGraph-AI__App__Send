@@ -1,0 +1,11 @@
+P3-05 | Plaintext in localStorage
+---
+Task-001 | todo | Switch decrypted text storage from localStorage to sessionStorage        | Developer
+Task-002 | todo | Make history opt-in with clear privacy messaging                         | Developer
+Task-003 | todo | Remove plaintext access tokens from localStorage                         | Developer
+Task-004 | todo | Add clear-all-local-data button                                          | Developer
+Task-005 | todo | Review privacy implications of local storage approaches                  | DPO
+Task-006 | todo | Write test: no plaintext in localStorage by default after decryption     | QA
+Task-007 | todo | Write test: opt-in history flow works correctly                          | QA
+Task-008 | todo | Write test: clear-data removes all sensitive local storage               | QA
+Task-009 | todo | Validate no plaintext leaks remain after fix                             | AppSec

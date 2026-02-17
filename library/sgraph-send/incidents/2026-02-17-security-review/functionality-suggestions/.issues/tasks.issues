@@ -1,0 +1,6 @@
+Functionality Suggestions | Security Review + Beta Feedback
+---
+Task-001 | todo | Sequence feature suggestions against existing roadmap                   | Architect
+Task-002 | todo | Assess priority order change based on user feedback                     | Architect, Conductor
+Task-003 | todo | Add download notifications to roadmap (new item)                        | Conductor
+Task-004 | todo | TTL implementation (highest user demand — both User A and User B)       | Developer, Architect
