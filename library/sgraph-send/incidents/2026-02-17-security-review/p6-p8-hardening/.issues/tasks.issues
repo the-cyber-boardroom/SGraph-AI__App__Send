@@ -1,0 +1,7 @@
+P6-P8 | Low-Priority Hardening
+---
+Task-001 | todo | Add security headers to all responses (#12)                             | Developer
+Task-002 | todo | Sanitise filename from SGMETA (#18)                                     | Developer
+Task-003 | todo | Classify all P6-P8 findings as fix-later or risk-accepted               | GRC
+Task-004 | todo | Prepare risk acceptance statements for no-fix items                     | GRC
+Task-005 | todo | Human sign-off on risk acceptance                                       | Conductor (via human)

@@ -1,0 +1,32 @@
+INC-002 | Master Task List | First External Security Disclosure
+---
+Task-001 | todo      | Classify all 29 findings as known/accepted or unknown                     | AppSec, GRC
+Task-002 | todo      | 2nd/3rd story root cause analysis for unknown findings                    | AppSec, GRC
+Task-003 | todo      | Fix #4: Token validation fails closed at startup                          | Developer, AppSec
+Task-004 | todo      | Fix #5: localStorage — sessionStorage or encrypt, history opt-in          | Developer, AppSec
+Task-005 | todo      | Fix #1: Token race condition — atomic increment                           | Developer, Architect
+Task-006 | todo      | Write test: plaintext never reaches server                                | QA
+Task-007 | todo      | Write tests: auth edge cases (expired/revoked/exhausted tokens)           | QA
+Task-008 | todo      | Pin GitHub Actions to commit SHA (#2)                                     | DevOps
+Task-009 | todo      | Clear decryption key from URL hash immediately (#9)                       | Developer
+Task-010 | todo      | Add Content-Security-Policy to all pages (#10)                            | Developer, AppSec
+Task-011 | todo      | Fix path injection in admin cache browser (#14)                           | Developer
+Task-012 | todo      | Research: pre-signed URL size constraints (#3)                            | Architect, DevOps
+Task-013 | todo      | Markdown rendering on decryption page                                     | Developer, AppSec
+Task-014 | todo      | IP address decision: remove vs fingerprinting                             | DPO, AppSec, Sherpa
+Task-015 | todo      | Fix README: remove false claim about SHA-256 salted hashing               | GRC
+Task-016 | todo      | Define vulnerability classification framework (P0-P10)                    | GRC
+Task-017 | todo      | Prepare risk acceptance statements for no-fix items                       | GRC
+Task-018 | todo      | S3 public access block (#8)                                               | DevOps
+Task-019 | todo      | Rate limiting research (#13)                                              | Architect
+Task-020 | todo      | Create security.txt at well-known URI                                     | DevOps
+Task-021 | todo      | Create bug bounty page                                                    | Ambassador, AppSec
+Task-022 | todo      | Create security-report access token                                       | Developer
+Task-023 | todo      | Published vulnerability register                                          | GRC, Librarian
+Task-024 | todo      | Firefox Send research                                                     | Ambassador, AppSec, GRC
+Task-025 | todo      | Browser security / WebAuthn research                                      | Architect, AppSec
+Task-026 | todo      | Case study article: How Our First Security Review Went                    | Journalist, Historian
+Task-027 | todo      | User A voice interview                                                    | Journalist, Ambassador, Sherpa, AppSec, Advocate
+Task-028 | todo      | Share incident brief with User A                                          | Conductor (via human)
+Task-029 | todo      | Credit User A publicly (with consent)                                     | Ambassador, Journalist
+Task-030 | todo      | Notify User B when expiring links ship                                    | Sherpa
