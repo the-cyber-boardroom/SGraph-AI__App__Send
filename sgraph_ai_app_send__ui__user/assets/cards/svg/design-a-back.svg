@@ -17,9 +17,8 @@
   <!-- Token line -->
   <line x1="6" y1="37" x2="60" y2="37" stroke="#111" stroke-width="0.4"/>
 
-  <!-- QR placeholder -->
-  <rect x="6" y="41" width="10" height="10" fill="none" stroke="#ddd" stroke-width="0.2"/>
-  <text x="11" y="47" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="1.5" fill="#aaa" text-anchor="middle">QR</text>
+  <!-- Brand icon -->
+  <text x="6" y="49" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="5" font-weight="700" fill="#ccc">SG<tspan fill="#0d9488">/</tspan></text>
 
   <!-- Footer -->
   <text x="79" y="45" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.2" fill="#666" text-anchor="end">No app. No account.</text>

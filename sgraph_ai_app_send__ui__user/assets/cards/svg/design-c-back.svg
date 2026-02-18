@@ -17,7 +17,6 @@
   <text x="6" y="36" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="1.8" font-weight="700" fill="#64748b" letter-spacing="0.5">YOUR ACCESS CODE</text>
   <line x1="6" y1="42" x2="60" y2="42" stroke="#0f172a" stroke-width="0.4"/>
 
-  <!-- QR placeholder -->
-  <rect x="66" y="35" width="13" height="13" fill="none" stroke="#ddd" stroke-width="0.2"/>
-  <text x="72.5" y="43" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="1.8" fill="#aaa" text-anchor="middle">QR</text>
+  <!-- Brand icon -->
+  <text x="79" y="48" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="5" font-weight="700" fill="#ccc" text-anchor="end">SG<tspan fill="#0d9488">/</tspan></text>
 </svg>
