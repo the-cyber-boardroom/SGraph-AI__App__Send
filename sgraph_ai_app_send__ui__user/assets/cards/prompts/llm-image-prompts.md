@@ -25,7 +25,7 @@ Create a photorealistic mockup of the back of a business card, 85mm x 55mm, whit
 ### Front
 
 ```
-Create a photorealistic mockup of a business card, 85mm x 55mm, with a dark navy background (#0f172a). The card features the brand name "SG/Send" centred, in white, bold sans-serif, approximately 28pt. The forward slash "/" is in teal (#0d9488), slightly larger than the surrounding text, and lighter weight. Two subtle diagonal lines run from upper-left to lower-right across the entire card in teal with low opacity (one at 40% opacity, one at 20%), creating a dynamic slash motif behind the text. Below the brand name, "ZERO-KNOWLEDGE ENCRYPTED SHARING" in small uppercase letters, letter-spaced, in muted slate blue (#94a3b8). The overall aesthetic is premium, dark, modern -- like a fintech or cybersecurity company card. Show the card at a slight angle on a dark surface with dramatic lighting.
+Create a photorealistic mockup of a business card, 85mm x 55mm, with a dark navy background (#0f172a). The card features the brand name "SG/Send" centred, in white, bold sans-serif, approximately 28pt. The forward slash "/" is in teal (#0d9488), same weight and size as the surrounding text -- just the colour changes. Two subtle diagonal lines run from upper-left to lower-right across the entire card in teal with low opacity (one at 40% opacity, one at 20%), creating a dynamic slash motif behind the text. Below the brand name, "ZERO-KNOWLEDGE ENCRYPTED SHARING" in small uppercase letters, letter-spaced, in muted slate blue (#94a3b8). The overall aesthetic is premium, dark, modern -- like a fintech or cybersecurity company card. Show the card at a slight angle on a dark surface with dramatic lighting.
 ```
 
 ### Back

@@ -8,7 +8,7 @@
   <line x1="48" y1="-5" x2="38" y2="60" stroke="#0d9488" stroke-width="0.3" opacity="0.2"/>
 
   <!-- Brand -->
-  <text x="42.5" y="26" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="white" text-anchor="middle">SG<tspan fill="#0d9488" font-weight="300" font-size="12">/</tspan>Send</text>
+  <text x="42.5" y="26" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="white" text-anchor="middle">SG<tspan fill="#0d9488">/</tspan>Send</text>
 
   <!-- Subtitle -->
   <text x="42.5" y="35" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.2" fill="#94a3b8" text-anchor="middle" letter-spacing="0.7">ZERO-KNOWLEDGE ENCRYPTED SHARING</text>
