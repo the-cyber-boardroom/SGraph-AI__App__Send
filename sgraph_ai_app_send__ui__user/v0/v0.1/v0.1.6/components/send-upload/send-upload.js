@@ -140,14 +140,12 @@
 
     // ─── Update download URLs to v0.1.6 ──────────────────────────────
 
-    SendUpload.prototype.buildCombinedUrl = function(tid, key, token) {
-        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        return `${window.location.origin}/send/v0/v0.1/v0.1.6/download.html${tokenParam}#${tid}/${key}`;
+    SendUpload.prototype.buildCombinedUrl = function(tid, key) {
+        return `${window.location.origin}/send/v0/v0.1/v0.1.6/download.html#${tid}/${key}`;
     };
 
-    SendUpload.prototype.buildLinkOnlyUrl = function(tid, token) {
-        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        return `${window.location.origin}/send/v0/v0.1/v0.1.6/download.html${tokenParam}#${tid}`;
+    SendUpload.prototype.buildLinkOnlyUrl = function(tid) {
+        return `${window.location.origin}/send/v0/v0.1/v0.1.6/download.html#${tid}`;
     };
 
     console.log('[v0.1.6] SendUpload patched: dark-theme-aware result panel + v0.1.6 URLs');
