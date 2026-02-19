@@ -8,7 +8,7 @@
 ## User A — Security Reviewer
 
 **Profile:** Security professional with code review expertise
-**How they found us:** LinkedIn direct message with access token `linkedin-user`
+**How they found us:** LinkedIn direct message with access token `[REDACTED]`
 **What they did:** Full-stack security review across all IFD versions, delivered via SG/Send
 **Stakeholder status:** Key stakeholder — report back with resolution status
 
