@@ -1,0 +1,10 @@
+P4 | Grouped Should-Fix Findings
+---
+Task-001 | todo | Pin GitHub Actions to commit SHA (#2)                                    | DevOps
+Task-002 | todo | Research pre-signed URL size constraints (#3)                            | Architect, DevOps
+Task-003 | todo | Clear decryption key from URL hash immediately (#9)                      | Developer
+Task-004 | todo | Move inline JS to external files (#10)                                   | Developer
+Task-005 | todo | Add nonce-based CSP to all pages (#10)                                   | Developer, AppSec
+Task-006 | todo | Validate and reject path traversal in cache browser (#14)                | Developer
+Task-007 | todo | Write test: path traversal rejected in admin cache browser               | QA
+Task-008 | todo | Write test: CSP headers present on all responses                         | QA

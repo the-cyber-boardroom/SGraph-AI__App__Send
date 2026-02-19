@@ -1,0 +1,8 @@
+P3-01 | Token Auth Bypass via Race Condition
+---
+Task-001 | todo | Architecture decision: DynamoDB ADD vs S3 conditional write              | Architect
+Task-002 | todo | Implement atomic token usage increment                                   | Developer
+Task-003 | todo | Fix related race condition in upload/complete (#23)                      | Developer
+Task-004 | todo | Validate race condition is eliminated                                    | AppSec
+Task-005 | todo | Write concurrent request test for token usage limits                     | QA
+Task-006 | todo | Write concurrent request test for upload/complete                        | QA
