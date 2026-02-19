@@ -26,8 +26,8 @@ All security incidents, indexed by incident number. Each incident has a folder p
 
 ```
 INC-{NNN}__{YYYY-MM-DD}__{short-description}/
-  v{version}__debrief__{incident-name}.md   — Versioned debrief with summary and links to all source documents
-  {sub-packs}/                               — Optional sub-folders for grouped findings (e.g., INC-002)
+    v{version}__debrief__{incident-name}.md   — Versioned debrief with summary and links to all source documents
+    {sub-packs}/                               — Optional sub-folders for grouped findings (e.g., INC-002)
 ```
 
 ## Cross-References
