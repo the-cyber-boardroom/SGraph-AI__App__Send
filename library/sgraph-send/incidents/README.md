@@ -1,6 +1,6 @@
 # SGraph Send — Incident Register
 
-All security incidents, indexed by incident number. Each incident has a folder pack with a `BRIEF.md` and links to all related documents across the repo.
+All security incidents, indexed by incident number. Each incident has a folder pack with a versioned debrief and links to all related documents across the repo.
 
 ---
 
@@ -8,10 +8,10 @@ All security incidents, indexed by incident number. Each incident has a folder p
 
 | ID | Date | Description | Severity | Status | Folder |
 |----|------|-------------|----------|--------|--------|
-| INC-001 | 2026-02-12 | Commit author impersonation | HIGH | Resolved | [INC-001](INC-001__2026-02-12__commit-author-impersonation/BRIEF.md) |
+| INC-001 | 2026-02-12 | Commit author impersonation | HIGH | Resolved | [INC-001](INC-001__2026-02-12__commit-author-impersonation/v0.4.16__debrief__commit-author-impersonation.md) |
 | INC-002 | 2026-02-17 | First external security disclosure (29 findings) | P3-as-P1 | In progress | [INC-002](INC-002__2026-02-17__first-external-security-disclosure/BRIEF.md) |
-| INC-003 | 2026-02-19 | Access token leak in shareable URLs | P4-as-P1 | Resolved | [INC-003](INC-003__2026-02-19__access-token-leak-in-urls/BRIEF.md) |
-| INC-004 | 2026-02-19 | Documentation token leak (data breach) | P2-as-P1 | Closed | [INC-004](INC-004__2026-02-19__documentation-token-leak/BRIEF.md) |
+| INC-003 | 2026-02-19 | Access token leak in shareable URLs | P4-as-P1 | Resolved | [INC-003](INC-003__2026-02-19__access-token-leak-in-urls/v0.4.16__debrief__access-token-leak-in-urls.md) |
+| INC-004 | 2026-02-19 | Documentation token leak (data breach) | P2-as-P1 | Closed | [INC-004](INC-004__2026-02-19__documentation-token-leak/v0.4.16__debrief__documentation-token-leak.md) |
 
 ## Summary
 
@@ -26,8 +26,8 @@ All security incidents, indexed by incident number. Each incident has a folder p
 
 ```
 INC-{NNN}__{YYYY-MM-DD}__{short-description}/
-  BRIEF.md          — Master brief with summary and links to all source documents
-  {sub-packs}/      — Optional sub-folders for grouped findings (e.g., INC-002)
+  v{version}__debrief__{incident-name}.md   — Versioned debrief with summary and links to all source documents
+  {sub-packs}/                               — Optional sub-folders for grouped findings (e.g., INC-002)
 ```
 
 ## Cross-References
