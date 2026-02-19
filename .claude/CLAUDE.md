@@ -148,6 +148,13 @@ team/                            # Team structure
 16. **Version** comes from `sgraph_ai_app_send/version`
 17. **UI assets** use versioned paths: `v0/v0.1/v0.1.0/index.html`
 
+### Human Folders — Read-Only for Agents
+
+18. **`team/humans/dinis_cruz/briefs/` is HUMAN-ONLY.** Agents must NEVER create, modify, or move files into this folder. It is reserved exclusively for files that the human creates and uploads. This rule has no exceptions.
+19. **Agent session outputs** go to `team/humans/dinis_cruz/claude-code-web/MM/DD/` — this is the folder for decisions, observations, and documents produced during Claude Code sessions.
+20. **Debriefs** go to `team/humans/dinis_cruz/debriefs/MM/DD/` — summaries of session deliverables for human review.
+21. **Role reviews** go to `team/roles/{role}/reviews/YY-MM-DD/` — the standard output location for all role work.
+
 ### Testing
 
 18. **No mocks, no patches** — full stack starts in-memory in ~100ms
@@ -170,7 +177,7 @@ Each agent operates as a specific role. Roles produce review documents in their 
 
 **17 roles across two teams** — Conductor, Architect, Dev, QA, DevOps, Librarian, Cartographer, AppSec, Historian, Journalist, Designer, Advocate, Sherpa, Ambassador, CISO, DPO, GRC. Plus two meta-roles: Explorer (leads Explorer team) and Villager (leads Villager team).
 
-**Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs and Villager briefs.
+**Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs and Villager briefs. **IMPORTANT: The `briefs/` folder is read-only for agents.** Only the human creates files there. Agent outputs go to `team/humans/dinis_cruz/claude-code-web/` or `team/roles/{role}/reviews/`.
 
 Before starting work, check:
 1. Latest human brief in `team/humans/dinis_cruz/briefs/`
