@@ -1,12 +1,12 @@
 # INC-002: First External Security Disclosure — Master Brief
 
-**Incident ID:** INC-002
-**Declared:** 2026-02-17
-**Severity:** P1 (process rigour)
-**Type:** Externally reported vulnerability disclosure
-**Status:** OPEN
-**Incident lead:** Conductor
-**Technical lead:** AppSec
+**Incident ID:** INC-002  
+**Declared:** 2026-02-17  
+**Severity:** P1 (process rigour)  
+**Type:** Externally reported vulnerability disclosure  
+**Status:** OPEN  
+**Incident lead:** Conductor  
+**Technical lead:** AppSec  
 
 ---
 
