@@ -100,9 +100,9 @@ class test_Routes__Transfers__with_tokens(TestCase):
                                     json = dict(file_size_bytes=1024))
         assert response.status_code == 401
 
-    # --- complete returns token_name ---
+    # --- complete must NOT return token_name (security fix: token leak in shareable URLs) ---
 
-    def test__complete_returns_token_name(self):
+    def test__complete_does_not_return_token_name(self):
         headers = {HEADER__SGRAPH_SEND__ACCESS_TOKEN: self.test_token_name}
 
         create  = self.client.post('/transfers/create',
@@ -117,7 +117,7 @@ class test_Routes__Transfers__with_tokens(TestCase):
         response = self.client.post(f'/transfers/complete/{tid}', headers=headers)
         assert response.status_code == 200
         data = response.json()
-        assert data['token_name'] == self.test_token_name
+        assert 'token_name' not in data
 
     # --- full flow with token ---
 
@@ -140,7 +140,7 @@ class test_Routes__Transfers__with_tokens(TestCase):
                          headers = {**headers, 'content-type': 'application/octet-stream'})
 
         complete = self.client.post(f'/transfers/complete/{tid}', headers=headers).json()
-        assert complete['token_name'] == flow_token
+        assert 'token_name' not in complete
 
         # Validate token (simulates download page visit)
         validate = self.client.post(f'/transfers/validate-token/{flow_token}').json()

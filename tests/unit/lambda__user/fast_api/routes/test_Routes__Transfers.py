@@ -123,3 +123,26 @@ class test_Routes__Transfers(TestCase):
         # Download count incremented
         info     = self.client.get(f'/transfers/info/{tid}').json()
         assert info['download_count']            == 1
+
+    # --- Security: complete response must not leak sensitive data ---
+
+    def test__complete__does_not_leak_token(self):
+        """Regression test: shareable URLs must never contain access tokens (incident 19 Feb 2026)"""
+        create = self.client.post('/transfers/create',
+                                  json=dict(file_size_bytes=4)).json()
+        tid = create['transfer_id']
+        self.client.post(f'/transfers/upload/{tid}',
+                         content = b'\x00\x01\x02\x03',
+                         headers = {'content-type': 'application/octet-stream'})
+        response = self.client.post(f'/transfers/complete/{tid}')
+        data = response.json()
+
+        # token_name must never appear in complete response (it was leaking into shareable URLs)
+        assert 'token_name'    not in data
+        assert 'access_token'  not in data
+
+        # download_url must not contain token/key query parameters
+        if 'download_url' in data:
+            assert '?token='       not in data['download_url']
+            assert '&token='       not in data['download_url']
+            assert 'access_token=' not in data['download_url']

@@ -94,7 +94,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
         if result is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Transfer not found or payload not uploaded')
-        result['token_name'] = token_name or ''                                  # Include token name so UI can build share URL
+        # SECURITY FIX: token_name intentionally NOT returned to client (was leaking into shareable URLs)
 
         # Record token usage on successful upload (the logical "send" event)
         if token_name and self.admin_service_client is not None:
