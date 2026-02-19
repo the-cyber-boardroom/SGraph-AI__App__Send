@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85 55" width="85mm" height="55mm">
+  <rect width="85" height="55" fill="#fafafa" stroke="#ccc" stroke-width="0.15"/>
+
+  <!-- Section title -->
+  <text x="6" y="8" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" font-weight="700" fill="#0f172a" letter-spacing="0.3">ZERO-KNOWLEDGE ENCRYPTED FILE SHARING</text>
+
+  <!-- Description -->
+  <text x="6" y="14" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" fill="#475569">Your files are encrypted in your browser before</text>
+  <text x="6" y="18" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" fill="#475569">they leave your device. The server stores only</text>
+  <text x="6" y="22" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" fill="#475569">encrypted bytes it cannot read.</text>
+
+  <!-- Highlight -->
+  <text x="6" y="29" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.3" font-weight="600" fill="#0f172a">No app. No sign-up. Just a browser.</text>
+
+  <!-- Token -->
+  <text x="6" y="36" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="1.8" font-weight="700" fill="#64748b" letter-spacing="0.5">YOUR ACCESS CODE</text>
+  <line x1="6" y1="42" x2="60" y2="42" stroke="#0f172a" stroke-width="0.4"/>
+
+  <!-- Brand icon -->
+  <text x="79" y="48" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="5" font-weight="700" fill="#ccc" text-anchor="end">SG<tspan fill="#0d9488">/</tspan></text>
+</svg>

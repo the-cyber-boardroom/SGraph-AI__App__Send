@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85 55" width="85mm" height="55mm">
+  <!-- Dark background -->
+  <rect width="85" height="55" fill="#0f172a"/>
+
+  <!-- Diagonal slash lines -->
+  <line x1="45" y1="-5" x2="35" y2="60" stroke="#0d9488" stroke-width="0.6" opacity="0.4"/>
+  <line x1="48" y1="-5" x2="38" y2="60" stroke="#0d9488" stroke-width="0.3" opacity="0.2"/>
+
+  <!-- Brand -->
+  <text x="42.5" y="26" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="white" text-anchor="middle">SG<tspan fill="#0d9488">/</tspan>Send</text>
+
+  <!-- Subtitle -->
+  <text x="42.5" y="35" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="2.2" fill="#94a3b8" text-anchor="middle" letter-spacing="0.7">ZERO-KNOWLEDGE ENCRYPTED SHARING</text>
+</svg>
