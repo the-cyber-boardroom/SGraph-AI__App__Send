@@ -55,10 +55,7 @@ class PKIManager extends HTMLElement {
         const currentUrl  = location.href;
         const localhostUrl = currentUrl.replace(location.hostname, 'localhost');
         el.innerHTML = `
-            <div class="panel-header">
-                <h2 class="panel-header__title">PKI Key Management</h2>
-                <a href="index.html" class="btn btn--ghost btn--sm">Back to Admin</a>
-            </div>
+            ${this._renderHeader()}
             <section class="section">
                 <div class="insecure-context">
                     <div class="insecure-context__icon">
@@ -376,6 +373,76 @@ class PKIManager extends HTMLElement {
     }
 
     // =========================================================================
+    // Messages — Encrypt / Decrypt
+    // =========================================================================
+
+    async _handleMessageEncrypt(contactId, plaintext) {
+        const outputEl = this.shadowRoot.querySelector('#msg-encrypt-output');
+        if (!outputEl) return;
+
+        const contact = this._contacts.find(c => c.id === contactId);
+        if (!contact) { outputEl.textContent = 'No contact selected'; return; }
+
+        try {
+            const { wrappedKey, iv, encrypted } = await this._hybridEncrypt(contact.publicKey, plaintext);
+
+            const payload = JSON.stringify({
+                v: 1,
+                w: this._arrayBufToB64(wrappedKey),
+                i: this._arrayBufToB64(iv.buffer),
+                c: this._arrayBufToB64(encrypted),
+            });
+            const encoded = btoa(payload);
+
+            outputEl.textContent = encoded;
+            try {
+                await navigator.clipboard.writeText(encoded);
+                this._showToast('Encrypted payload copied to clipboard', 'success');
+            } catch (_) {
+                this._showToast('Encrypted. Select and copy the payload manually.', 'success');
+            }
+        } catch (err) {
+            outputEl.textContent = `Error: ${err.message}`;
+            this._showToast(`Encrypt failed: ${err.message}`, 'error');
+        }
+    }
+
+    async _handleMessageDecrypt(keyId, encodedPayload) {
+        const outputEl = this.shadowRoot.querySelector('#msg-decrypt-output');
+        if (!outputEl) return;
+
+        const keyRecord = this._keys.find(k => k.id === keyId);
+        if (!keyRecord) { outputEl.textContent = 'No key selected'; return; }
+
+        try {
+            const payload = JSON.parse(atob(encodedPayload));
+            if (payload.v !== 1) throw new Error('Unsupported payload version');
+
+            const wrappedKey = this._b64ToArrayBuf(payload.w);
+            const iv         = new Uint8Array(this._b64ToArrayBuf(payload.i));
+            const encrypted  = this._b64ToArrayBuf(payload.c);
+
+            const decrypted = await this._hybridDecrypt(keyRecord.privateKey, wrappedKey, iv, encrypted);
+            outputEl.innerHTML = `<span class="test-pass">${this._escapeHtml(decrypted)}</span>`;
+            this._showToast('Message decrypted successfully', 'success');
+        } catch (err) {
+            outputEl.innerHTML = `<span class="test-fail">Error: ${this._escapeHtml(err.message)}</span>`;
+            this._showToast(`Decrypt failed: ${err.message}`, 'error');
+        }
+    }
+
+    _arrayBufToB64(buf) {
+        return btoa(String.fromCharCode(...new Uint8Array(buf)));
+    }
+
+    _b64ToArrayBuf(b64) {
+        const bin = atob(b64);
+        const buf = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        return buf.buffer;
+    }
+
+    // =========================================================================
     // UI Helpers
     // =========================================================================
 
@@ -589,29 +656,41 @@ class PKIManager extends HTMLElement {
 
         if (this._loading) {
             el.innerHTML = `
-                <div class="panel-header">
-                    <h2 class="panel-header__title">PKI Key Management</h2>
-                </div>
+                ${this._renderHeader()}
                 <div class="loading"><span class="spinner"></span> Loading keys...</div>
             `;
             return;
         }
 
         el.innerHTML = `
-            <div class="panel-header">
-                <h2 class="panel-header__title">PKI Key Management</h2>
-                <a href="index.html" class="btn btn--ghost btn--sm">Back to Admin</a>
-            </div>
+            ${this._renderHeader()}
 
             <div class="layout-grid">
                 <div class="layout-grid__col">${this._renderMyKeys()}</div>
                 <div class="layout-grid__col">${this._renderContacts()}</div>
             </div>
+            ${this._renderMessages()}
             ${this._renderTest()}
             ${this._renderInfo()}
         `;
 
         this._wireEvents();
+    }
+
+    // --- Header with Brand ---
+
+    _renderHeader() {
+        return `
+            <div class="panel-header">
+                <div class="panel-header__brand">
+                    <h2 class="panel-header__title">
+                        <span class="brand">SG<span class="brand__slash">/</span>Send</span>
+                        <span class="panel-header__subtitle">PKI</span>
+                    </h2>
+                </div>
+                <a href="index.html" class="btn btn--ghost btn--sm">Back to Admin</a>
+            </div>
+        `;
     }
 
     // --- My Keys Section ---
@@ -664,8 +743,8 @@ class PKIManager extends HTMLElement {
             <section class="section">
                 <div class="section__header">
                     <h3 class="section__title">My Keys</h3>
-                    <button class="btn btn--primary btn--sm" id="btn-generate">
-                        ${this._generating ? '<span class="spinner"></span> Generating...' : '+ Generate New Key Pair'}
+                    <button class="btn btn--primary btn--xs" id="btn-generate">
+                        ${this._generating ? '<span class="spinner"></span> Generating...' : '+ Generate'}
                     </button>
                 </div>
                 ${keyCards}
@@ -701,11 +780,76 @@ class PKIManager extends HTMLElement {
         return `
             <section class="section">
                 <div class="section__header">
-                    <h3 class="section__title">Contacts (Others' Public Keys)</h3>
-                    <button class="btn btn--primary btn--sm" id="btn-import">+ Import Public Key</button>
+                    <h3 class="section__title">Contacts</h3>
+                    <button class="btn btn--primary btn--xs" id="btn-import">+ Import</button>
                 </div>
                 ${contactCards.length > 0 ? contactCards : '<div class="section__empty">No contacts imported yet</div>'}
             </section>
+        `;
+    }
+
+    // --- Messages Section ---
+
+    _renderMessages() {
+        const rsaKeys    = this._keys.filter(k => k.algorithm === 'RSA-OAEP');
+        const rsaContacts = this._contacts.filter(c => c.algorithm === 'RSA-OAEP');
+        if (rsaKeys.length === 0 && rsaContacts.length === 0) return '';
+
+        const contactOpts = rsaContacts.map(c =>
+            `<option value="${c.id}">${this._escapeHtml(c.label)}</option>`
+        ).join('');
+
+        const keyOpts = rsaKeys.map(k =>
+            `<option value="${k.id}">${this._escapeHtml(k.label)}</option>`
+        ).join('');
+
+        return `
+            <div class="layout-grid">
+                <div class="layout-grid__col">
+                    <section class="section">
+                        <div class="section__header">
+                            <h3 class="section__title">Encrypt</h3>
+                        </div>
+                        ${rsaContacts.length > 0 ? `
+                            <div class="msg-field">
+                                <label>To (contact's public key)</label>
+                                <select id="msg-encrypt-contact">${contactOpts}</select>
+                            </div>
+                            <div class="msg-field">
+                                <label>Message</label>
+                                <textarea id="msg-encrypt-plaintext" rows="3" placeholder="Type your message here..."></textarea>
+                            </div>
+                            <button class="btn btn--primary btn--sm" id="btn-msg-encrypt">Encrypt &amp; Copy</button>
+                            <div class="msg-field">
+                                <label>Encrypted payload</label>
+                                <div class="msg-output" id="msg-encrypt-output">—</div>
+                            </div>
+                        ` : '<div class="section__empty">Import a contact\'s public key to encrypt messages</div>'}
+                    </section>
+                </div>
+                <div class="layout-grid__col">
+                    <section class="section">
+                        <div class="section__header">
+                            <h3 class="section__title">Decrypt</h3>
+                        </div>
+                        ${rsaKeys.length > 0 ? `
+                            <div class="msg-field">
+                                <label>With (your key pair)</label>
+                                <select id="msg-decrypt-key">${keyOpts}</select>
+                            </div>
+                            <div class="msg-field">
+                                <label>Paste encrypted payload</label>
+                                <textarea id="msg-decrypt-payload" rows="3" placeholder="Paste the encrypted payload here..."></textarea>
+                            </div>
+                            <button class="btn btn--primary btn--sm" id="btn-msg-decrypt">Decrypt</button>
+                            <div class="msg-field">
+                                <label>Decrypted message</label>
+                                <div class="msg-output" id="msg-decrypt-output">—</div>
+                            </div>
+                        ` : '<div class="section__empty">Generate a key pair to decrypt messages</div>'}
+                    </section>
+                </div>
+            </div>
         `;
     }
 
@@ -840,6 +984,32 @@ class PKIManager extends HTMLElement {
                 this._handleTestEncryptDecrypt(keyId, plaintext);
             });
         }
+
+        // Message encrypt button
+        const btnMsgEncrypt = root.querySelector('#btn-msg-encrypt');
+        if (btnMsgEncrypt) {
+            btnMsgEncrypt.addEventListener('click', () => {
+                const select    = root.querySelector('#msg-encrypt-contact');
+                const textarea  = root.querySelector('#msg-encrypt-plaintext');
+                const contactId = Number(select.value);
+                const plaintext = textarea.value.trim();
+                if (!plaintext) { this._showToast('Type a message first', 'error'); return; }
+                this._handleMessageEncrypt(contactId, plaintext);
+            });
+        }
+
+        // Message decrypt button
+        const btnMsgDecrypt = root.querySelector('#btn-msg-decrypt');
+        if (btnMsgDecrypt) {
+            btnMsgDecrypt.addEventListener('click', () => {
+                const select  = root.querySelector('#msg-decrypt-key');
+                const textarea = root.querySelector('#msg-decrypt-payload');
+                const keyId   = Number(select.value);
+                const payload = textarea.value.trim();
+                if (!payload) { this._showToast('Paste an encrypted payload first', 'error'); return; }
+                this._handleMessageDecrypt(keyId, payload);
+            });
+        }
     }
 
     // =========================================================================
@@ -856,6 +1026,17 @@ class PKIManager extends HTMLElement {
                 position: relative;
             }
 
+            /* --- Brand --- */
+            .brand {
+                font-weight: 700;
+                letter-spacing: -0.01em;
+            }
+
+            .brand__slash {
+                color: #4ECDC4;
+                font-weight: 800;
+            }
+
             /* --- Panel Header --- */
             .panel-header {
                 display: flex;
@@ -864,11 +1045,26 @@ class PKIManager extends HTMLElement {
                 margin-bottom: 0.75rem;
             }
 
+            .panel-header__brand {
+                display: flex;
+                align-items: baseline;
+                gap: 0.5rem;
+            }
+
             .panel-header__title {
                 font-size: var(--admin-font-size-lg, 1.125rem);
                 font-weight: 600;
                 color: var(--admin-text, #e4e6ef);
                 margin: 0;
+                display: flex;
+                align-items: baseline;
+                gap: 0.5rem;
+            }
+
+            .panel-header__subtitle {
+                font-size: var(--admin-font-size-sm, 0.875rem);
+                font-weight: 500;
+                color: var(--admin-text-secondary, #8b8fa7);
             }
 
             /* --- Two-Column Grid --- */
@@ -876,6 +1072,7 @@ class PKIManager extends HTMLElement {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: 0.75rem;
+                margin-bottom: 0.75rem;
             }
 
             .layout-grid__col > .section {
@@ -902,6 +1099,7 @@ class PKIManager extends HTMLElement {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
+                gap: 0.5rem;
                 margin-bottom: 0.625rem;
             }
 
@@ -910,6 +1108,10 @@ class PKIManager extends HTMLElement {
                 font-weight: 600;
                 color: var(--admin-text, #e4e6ef);
                 margin: 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                min-width: 0;
             }
 
             .section__empty {
@@ -1290,6 +1492,62 @@ class PKIManager extends HTMLElement {
 
             .test-fail {
                 color: var(--admin-error, #f87171);
+            }
+
+            /* --- Message Fields --- */
+            .msg-field {
+                margin-bottom: 0.5rem;
+            }
+
+            .msg-field label {
+                display: block;
+                font-size: var(--admin-font-size-xs, 0.75rem);
+                font-weight: 500;
+                color: var(--admin-text-secondary, #8b8fa7);
+                margin-bottom: 0.25rem;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+            }
+
+            .msg-field select,
+            .msg-field textarea {
+                width: 100%;
+                padding: 0.4rem 0.5rem;
+                font-size: var(--admin-font-size-sm, 0.875rem);
+                font-family: var(--admin-font, sans-serif);
+                color: var(--admin-text, #e4e6ef);
+                background: var(--admin-bg, #0f1117);
+                border: 1px solid var(--admin-border, #2e3347);
+                border-radius: var(--admin-radius, 6px);
+                box-sizing: border-box;
+            }
+
+            .msg-field textarea {
+                font-family: var(--admin-font-mono, monospace);
+                font-size: var(--admin-font-size-xs, 0.75rem);
+                resize: vertical;
+            }
+
+            .msg-field select:focus,
+            .msg-field textarea:focus {
+                outline: none;
+                border-color: var(--admin-primary, #4f8ff7);
+            }
+
+            .msg-output {
+                margin-top: 0.5rem;
+                padding: 0.5rem 0.625rem;
+                background: var(--admin-bg, #0f1117);
+                border: 1px solid var(--admin-border-subtle, #252838);
+                border-radius: var(--admin-radius, 6px);
+                font-family: var(--admin-font-mono, monospace);
+                font-size: var(--admin-font-size-xs, 0.75rem);
+                color: var(--admin-text-muted, #5e6280);
+                word-break: break-all;
+                min-height: 1.25rem;
+                max-height: 6rem;
+                overflow-y: auto;
+                user-select: all;
             }
 
             /* --- Info Strip --- */
