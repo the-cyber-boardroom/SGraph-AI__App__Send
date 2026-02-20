@@ -603,8 +603,10 @@ class PKIManager extends HTMLElement {
                 <a href="index.html" class="btn btn--ghost btn--sm">Back to Admin</a>
             </div>
 
-            ${this._renderMyKeys()}
-            ${this._renderContacts()}
+            <div class="layout-grid">
+                <div class="layout-grid__col">${this._renderMyKeys()}</div>
+                <div class="layout-grid__col">${this._renderContacts()}</div>
+            </div>
             ${this._renderTest()}
             ${this._renderInfo()}
         `;
@@ -623,13 +625,13 @@ class PKIManager extends HTMLElement {
                     </div>
                     <div class="empty-state">
                         <div class="empty-state__icon">
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="40" height="40">
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="24" height="24">
                                 <path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd"/>
                             </svg>
                         </div>
                         <div class="empty-state__text">No keys yet</div>
-                        <div class="empty-state__hint">Generate your first key pair to start using PKI encryption.</div>
-                        <button class="btn btn--primary btn--sm" id="btn-generate-first">Generate My First Key Pair</button>
+                        <div class="empty-state__hint">Generate a key pair to start.</div>
+                        <button class="btn btn--primary btn--sm" id="btn-generate-first">Generate Key Pair</button>
                     </div>
                 </section>
             `;
@@ -732,7 +734,7 @@ class PKIManager extends HTMLElement {
                     </div>
                     <div class="test-area__field">
                         <label>Plaintext</label>
-                        <textarea id="test-plaintext" rows="3" placeholder="Hello, this is a test message."></textarea>
+                        <textarea id="test-plaintext" rows="2" placeholder="Hello, this is a test message."></textarea>
                     </div>
                     <button class="btn btn--primary btn--sm" id="btn-test-roundtrip">Encrypt with Public Key, then Decrypt with Private Key</button>
                     <div class="test-area__field">
@@ -757,30 +759,15 @@ class PKIManager extends HTMLElement {
         const contactCount = this._contacts.length;
 
         return `
-            <section class="section">
-                <div class="section__header">
-                    <h3 class="section__title">Info</h3>
-                </div>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="info-label">Web Crypto API</span>
-                        <span class="info-value">${hasWebCrypto ? '<span class="badge badge--secure">supported</span>' : '<span class="badge badge--error">not available</span>'}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">IndexedDB</span>
-                        <span class="info-value">${hasIndexedDB ? `<span class="badge badge--secure">available</span> (${keyCount} key pair${keyCount !== 1 ? 's' : ''}, ${contactCount} contact${contactCount !== 1 ? 's' : ''} stored)` : '<span class="badge badge--error">not available</span>'}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Private key security</span>
-                        <span class="info-value"><span class="badge badge--secure">non-extractable</span></span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Origin</span>
-                        <span class="info-value"><code>${this._escapeHtml(location.origin)}</code></span>
-                    </div>
+            <section class="section section--info">
+                <div class="info-strip">
+                    <span class="info-chip"><span class="info-chip__label">Crypto</span> ${hasWebCrypto ? '<span class="badge badge--secure">ok</span>' : '<span class="badge badge--error">no</span>'}</span>
+                    <span class="info-chip"><span class="info-chip__label">IndexedDB</span> ${hasIndexedDB ? `<span class="badge badge--secure">ok</span> <span class="info-chip__detail">${keyCount} key${keyCount !== 1 ? 's' : ''}, ${contactCount} contact${contactCount !== 1 ? 's' : ''}</span>` : '<span class="badge badge--error">no</span>'}</span>
+                    <span class="info-chip"><span class="info-chip__label">Private keys</span> <span class="badge badge--secure">non-extractable</span></span>
+                    <span class="info-chip"><span class="info-chip__label">Origin</span> <code>${this._escapeHtml(location.origin)}</code></span>
                 </div>
                 <div class="info-warning">
-                    Keys are stored in this browser only. Clearing browser data will delete your keys. There is no recovery — this is by design.
+                    Keys are stored in this browser only. Clearing data deletes keys permanently — by design.
                 </div>
             </section>
         `;
@@ -874,14 +861,28 @@ class PKIManager extends HTMLElement {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                margin-bottom: 1.5rem;
+                margin-bottom: 0.75rem;
             }
 
             .panel-header__title {
-                font-size: var(--admin-font-size-xl, 1.25rem);
+                font-size: var(--admin-font-size-lg, 1.125rem);
                 font-weight: 600;
                 color: var(--admin-text, #e4e6ef);
                 margin: 0;
+            }
+
+            /* --- Two-Column Grid --- */
+            .layout-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.75rem;
+            }
+
+            .layout-grid__col > .section {
+                margin-bottom: 0;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
             }
 
             /* --- Sections --- */
@@ -889,19 +890,23 @@ class PKIManager extends HTMLElement {
                 background: var(--admin-surface, #1a1d27);
                 border: 1px solid var(--admin-border, #2e3347);
                 border-radius: var(--admin-radius-lg, 10px);
-                padding: 1.25rem;
-                margin-bottom: 1.25rem;
+                padding: 0.875rem 1rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .section--info {
+                padding: 0.625rem 1rem;
             }
 
             .section__header {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                margin-bottom: 1rem;
+                margin-bottom: 0.625rem;
             }
 
             .section__title {
-                font-size: var(--admin-font-size-base, 1rem);
+                font-size: var(--admin-font-size-sm, 0.875rem);
                 font-weight: 600;
                 color: var(--admin-text, #e4e6ef);
                 margin: 0;
@@ -909,8 +914,8 @@ class PKIManager extends HTMLElement {
 
             .section__empty {
                 color: var(--admin-text-muted, #5e6280);
-                font-size: var(--admin-font-size-sm, 0.875rem);
-                padding: 1rem 0 0.25rem;
+                font-size: var(--admin-font-size-xs, 0.75rem);
+                padding: 0.5rem 0 0.25rem;
             }
 
             /* --- Key Cards --- */
@@ -918,8 +923,8 @@ class PKIManager extends HTMLElement {
                 background: var(--admin-bg, #0f1117);
                 border: 1px solid var(--admin-border-subtle, #252838);
                 border-radius: var(--admin-radius, 6px);
-                padding: 1rem;
-                margin-bottom: 0.75rem;
+                padding: 0.625rem 0.75rem;
+                margin-bottom: 0.5rem;
             }
 
             .key-card:last-child {
@@ -928,7 +933,7 @@ class PKIManager extends HTMLElement {
 
             .key-card__header {
                 display: flex;
-                gap: 0.75rem;
+                gap: 0.5rem;
                 align-items: flex-start;
             }
 
@@ -936,6 +941,11 @@ class PKIManager extends HTMLElement {
                 color: var(--admin-primary, #4f8ff7);
                 flex-shrink: 0;
                 margin-top: 0.125rem;
+            }
+
+            .key-card__icon svg {
+                width: 16px;
+                height: 16px;
             }
 
             .key-card__icon--contact {
@@ -949,28 +959,28 @@ class PKIManager extends HTMLElement {
 
             .key-card__label {
                 font-weight: 600;
-                font-size: var(--admin-font-size-base, 1rem);
+                font-size: var(--admin-font-size-sm, 0.875rem);
                 color: var(--admin-text, #e4e6ef);
-                margin-bottom: 0.25rem;
+                margin-bottom: 0.125rem;
             }
 
             .key-card__meta {
-                font-size: var(--admin-font-size-xs, 0.75rem);
+                font-size: 0.6875rem;
                 color: var(--admin-text-secondary, #8b8fa7);
-                line-height: 1.6;
+                line-height: 1.5;
             }
 
             .key-card__meta code {
                 font-family: var(--admin-font-mono, monospace);
-                font-size: var(--admin-font-size-xs, 0.75rem);
+                font-size: 0.6875rem;
                 color: var(--admin-text-muted, #5e6280);
             }
 
             .key-card__actions {
                 display: flex;
-                gap: 0.5rem;
-                margin-top: 0.75rem;
-                padding-top: 0.75rem;
+                gap: 0.375rem;
+                margin-top: 0.5rem;
+                padding-top: 0.5rem;
                 border-top: 1px solid var(--admin-border-subtle, #252838);
             }
 
@@ -998,24 +1008,24 @@ class PKIManager extends HTMLElement {
             /* --- Empty State --- */
             .empty-state {
                 text-align: center;
-                padding: 2rem;
+                padding: 1rem 0.5rem;
             }
 
             .empty-state__icon {
                 color: var(--admin-text-muted, #5e6280);
-                margin-bottom: 0.75rem;
+                margin-bottom: 0.375rem;
             }
 
             .empty-state__text {
-                font-size: var(--admin-font-size-base, 1rem);
+                font-size: var(--admin-font-size-sm, 0.875rem);
                 color: var(--admin-text-secondary, #8b8fa7);
-                margin-bottom: 0.25rem;
+                margin-bottom: 0.125rem;
             }
 
             .empty-state__hint {
-                font-size: var(--admin-font-size-sm, 0.875rem);
+                font-size: var(--admin-font-size-xs, 0.75rem);
                 color: var(--admin-text-muted, #5e6280);
-                margin-bottom: 1.25rem;
+                margin-bottom: 0.75rem;
             }
 
             /* --- Buttons --- */
@@ -1049,7 +1059,7 @@ class PKIManager extends HTMLElement {
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
-                padding: 2rem;
+                padding: 1rem;
                 justify-content: center;
                 color: var(--admin-text-secondary, #8b8fa7);
                 font-size: var(--admin-font-size-sm, 0.875rem);
@@ -1215,17 +1225,17 @@ class PKIManager extends HTMLElement {
 
             /* --- Test Area --- */
             .test-area {
-                padding: 0.25rem 0;
+                padding: 0.125rem 0;
             }
 
             .test-area__subtitle {
-                font-size: var(--admin-font-size-sm, 0.875rem);
+                font-size: var(--admin-font-size-xs, 0.75rem);
                 color: var(--admin-text-secondary, #8b8fa7);
-                margin: 0 0 1rem;
+                margin: 0 0 0.5rem;
             }
 
             .test-area__field {
-                margin-bottom: 0.75rem;
+                margin-bottom: 0.5rem;
             }
 
             .test-area__field label {
@@ -1263,7 +1273,7 @@ class PKIManager extends HTMLElement {
             }
 
             .test-area__output {
-                padding: 0.75rem;
+                padding: 0.5rem 0.625rem;
                 background: var(--admin-bg, #0f1117);
                 border: 1px solid var(--admin-border-subtle, #252838);
                 border-radius: var(--admin-radius, 6px);
@@ -1271,7 +1281,7 @@ class PKIManager extends HTMLElement {
                 font-size: var(--admin-font-size-xs, 0.75rem);
                 color: var(--admin-text-muted, #5e6280);
                 word-break: break-all;
-                min-height: 2rem;
+                min-height: 1.25rem;
             }
 
             .test-pass {
@@ -1282,46 +1292,48 @@ class PKIManager extends HTMLElement {
                 color: var(--admin-error, #f87171);
             }
 
-            /* --- Info Grid --- */
-            .info-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 0.75rem;
-            }
-
-            .info-item {
+            /* --- Info Strip --- */
+            .info-strip {
                 display: flex;
-                flex-direction: column;
+                flex-wrap: wrap;
+                gap: 0.5rem 1rem;
+                align-items: center;
+            }
+
+            .info-chip {
+                display: inline-flex;
+                align-items: center;
                 gap: 0.25rem;
-            }
-
-            .info-label {
                 font-size: var(--admin-font-size-xs, 0.75rem);
-                font-weight: 500;
-                text-transform: uppercase;
-                letter-spacing: 0.03em;
-                color: var(--admin-text-muted, #5e6280);
-            }
-
-            .info-value {
-                font-size: var(--admin-font-size-sm, 0.875rem);
                 color: var(--admin-text, #e4e6ef);
             }
 
-            .info-value code {
+            .info-chip__label {
+                color: var(--admin-text-muted, #5e6280);
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+            }
+
+            .info-chip__detail {
+                color: var(--admin-text-secondary, #8b8fa7);
+                font-size: 0.6875rem;
+            }
+
+            .info-chip code {
                 font-family: var(--admin-font-mono, monospace);
-                font-size: var(--admin-font-size-xs, 0.75rem);
+                font-size: 0.6875rem;
             }
 
             .info-warning {
-                margin-top: 1rem;
-                padding: 0.625rem 0.75rem;
+                margin-top: 0.5rem;
+                padding: 0.375rem 0.625rem;
                 background: var(--admin-warning-bg, rgba(251,191,36,0.1));
                 border: 1px solid rgba(251,191,36,0.15);
                 border-radius: var(--admin-radius, 6px);
-                font-size: var(--admin-font-size-sm, 0.875rem);
+                font-size: var(--admin-font-size-xs, 0.75rem);
                 color: var(--admin-warning, #fbbf24);
-                line-height: 1.5;
+                line-height: 1.4;
             }
 
             /* --- Insecure Context Error --- */
@@ -1380,8 +1392,13 @@ class PKIManager extends HTMLElement {
 
             /* --- Responsive --- */
             @media (max-width: 768px) {
-                .info-grid {
+                .layout-grid {
                     grid-template-columns: 1fr;
+                }
+
+                .info-strip {
+                    flex-direction: column;
+                    align-items: flex-start;
                 }
 
                 .key-card__header {
