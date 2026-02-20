@@ -461,10 +461,13 @@ class PKIManager extends HTMLElement {
 
             const encoded = btoa(JSON.stringify(payload));
 
-            outputEl.textContent = encoded;
+            outputEl.innerHTML = `<span>${encoded}</span>`;
+            if (!payload.s) {
+                outputEl.innerHTML += `<div class="verify verify--info" style="margin-top:0.375rem">Not signed — your key was created before signing was available. To enable signing, generate a new key pair.</div>`;
+            }
             try {
                 await navigator.clipboard.writeText(encoded);
-                const signed = payload.s ? ' (signed)' : ' (unsigned)';
+                const signed = payload.s ? ' (signed)' : '';
                 this._showToast(`Encrypted${signed} payload copied to clipboard`, 'success');
             } catch (_) {
                 this._showToast('Encrypted. Select and copy the payload manually.', 'success');
@@ -492,7 +495,7 @@ class PKIManager extends HTMLElement {
 
             const decrypted = await this._hybridDecrypt(keyRecord.privateKey, wrappedKey, iv, encrypted);
 
-            // Verify signature if present (v2 payload)
+            // Verify signature if present
             let verifyHtml = '';
             if (payload.s && payload.f) {
                 const senderContact = this._contacts.find(c => c.signingFingerprint === payload.f);
@@ -512,10 +515,10 @@ class PKIManager extends HTMLElement {
                         verifyHtml = `<div class="verify verify--fail">Signature verification error</div>`;
                     }
                 } else {
-                    verifyHtml = `<div class="verify verify--unknown">Signed (fingerprint: ${this._escapeHtml(payload.f)}) — sender not in contacts</div>`;
+                    verifyHtml = `<div class="verify verify--unknown">Signed (fingerprint: ${this._escapeHtml(payload.f)}) — sender not in your contacts</div>`;
                 }
             } else {
-                verifyHtml = `<div class="verify verify--unsigned">Unsigned message (v${payload.v}) — sender not authenticated</div>`;
+                verifyHtml = `<div class="verify verify--info">No signature — sender's key was created before signing was available. Confidentiality is intact.</div>`;
             }
 
             outputEl.innerHTML = `<span class="test-pass">${this._escapeHtml(decrypted)}</span>${verifyHtml}`;
@@ -1695,6 +1698,12 @@ class PKIManager extends HTMLElement {
                 background: var(--admin-surface-hover, #2a2e3d);
                 color: var(--admin-text-muted, #5e6280);
                 border: 1px solid var(--admin-border-subtle, #252838);
+            }
+
+            .verify--info {
+                background: var(--admin-primary-bg, rgba(79,143,247,0.1));
+                color: var(--admin-text-secondary, #8b8fa7);
+                border: 1px solid rgba(79,143,247,0.15);
             }
 
             /* --- Info Strip --- */
