@@ -1,8 +1,5 @@
 # SG/Send — Logo Generation Brief
 
-**Purpose:** This brief is designed for use with ChatGPT (with image generation) to create logo concepts for the SG/Send brand. It contains all the context, constraints, and specific prompts needed to generate high-quality logo explorations.
-
----
 
 ## Brand Context (Read This First)
 
@@ -189,7 +186,3 @@ From this exercise, we want to end up with:
 6. **Usage mockup** — the logo in a realistic web header context
 
 All as high-resolution images, ideally with transparent backgrounds where possible.
-
----
-
-*Brief prepared for ChatGPT image generation. All brand decisions per SG/Send Design Guidelines v0.3.5.*

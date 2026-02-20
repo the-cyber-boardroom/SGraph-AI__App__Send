@@ -1,0 +1,8 @@
+P5 | Defence-in-Depth Findings
+---
+Task-001 | todo | IP address decision: remove hashing vs browser fingerprinting (#6)      | DPO, AppSec, Sherpa
+Task-002 | todo | Fix README: remove false claim about salted hashing (#7)                 | GRC
+Task-003 | todo | Add S3 public access block (#8)                                          | DevOps
+Task-004 | todo | Rate limiting research (#13)                                             | Architect
+Task-005 | todo | Constrain dependency versions in pyproject.toml (#15)                    | Developer
+Task-006 | todo | Fix upload/complete race condition for S3 backend (#23)                  | Developer, Architect

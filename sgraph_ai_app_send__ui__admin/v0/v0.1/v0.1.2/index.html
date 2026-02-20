@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGraph Send — Admin Console</title>
+    <link rel="stylesheet" href="../v0.1.0/css/admin.css">
+</head>
+<body>
+    <admin-shell>
+        <!-- Panels — shown/hidden by admin-shell via style.display -->
+        <token-manager        data-panel="tokens"></token-manager>
+        <analytics-dashboard  data-panel="analytics"  style="display:none"></analytics-dashboard>
+        <metrics-dashboard    data-panel="metrics"     style="display:none"></metrics-dashboard>
+        <cache-browser        data-panel="cache"       style="display:none"></cache-browser>
+        <system-info          data-panel="system"      style="display:none"></system-info>
+    </admin-shell>
+
+    <!-- API client (must load before components) -->
+    <script src="../v0.1.0/js/admin-api.js"></script>
+    <script src="../v0.1.1/js/admin-api-cache.js"></script>
+
+    <!-- Web Components — v0.1.2 overlays (auto-refresh disabled) -->
+    <script src="components/admin-shell/admin-shell.js"></script>
+    <script src="components/token-manager/token-manager.js"></script>
+    <script src="components/analytics-dashboard/analytics-dashboard.js"></script>
+    <script src="../v0.1.0/components/system-info/system-info.js"></script>
+
+    <!-- Web Components — v0.1.1 additions -->
+    <script src="../v0.1.1/components/metrics-dashboard/metrics-dashboard.js"></script>
+    <script src="../v0.1.1/components/cache-browser/cache-browser.js"></script>
+</body>
+</html>

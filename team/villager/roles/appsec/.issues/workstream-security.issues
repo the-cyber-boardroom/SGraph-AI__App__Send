@@ -1,0 +1,17 @@
+# Villager AppSec — Production Security Hardening
+Workstream-1 | in-progress | Production security clearance
+	Task-1 | todo | Audit production deployment configuration for security
+	Task-2 | todo | Verify no-plaintext guarantee in production environment
+	Task-3 | todo | Verify admin auth enforcement in production
+	Task-4 | todo | Audit production CORS configuration
+	Task-5 | todo | Run dependency vulnerability scan for production deps
+	Task-6 | todo | Verify secrets management for production
+	Task-7 | todo | Define security monitoring alerts
+	Task-8 | todo | Provide security clearance for first production release
+Workstream-2 | todo | Production change risk assessment (from 16-Feb brief)
+	Task-9 | todo | Assess risk for every production infrastructure change (subdomain migration)
+	Task-10 | todo | Define rollback plans for each production change
+	Task-11 | todo | Review SA pipeline for security: confirm no PII in processed logs
+Workstream-3 | todo | DPO-AppSec-GRC evidence pack (from 16-Feb brief, P1)
+	Task-12 | todo | Contribute AppSec evidence: security influence on project decisions
+	Task-13 | todo | Verify IP address exclusion from CloudFront logs (empirically)

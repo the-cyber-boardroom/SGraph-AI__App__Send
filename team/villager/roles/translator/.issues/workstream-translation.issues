@@ -1,0 +1,13 @@
+# Villager Translator — Translation Pipeline
+Workstream-1 | in-progress | Website translation audit and fix
+	Task-1 | todo | Audit current website for untranslated English content on multilingual pages
+	Task-2 | todo | Produce pt-BR translations for all user-facing website text
+	Task-3 | todo | Produce pt-PT translations for all user-facing website text
+	Task-4 | todo | Coordinate human reviewer for pt-BR translations
+	Task-5 | todo | Coordinate human reviewer for pt-PT translations
+Workstream-2 | todo | Translation pipeline establishment
+	Task-6 | todo | Create glossary of key terms with approved translations per language
+	Task-7 | todo | Define translation pipeline workflow (trigger, review, approve, deploy)
+	Task-8 | todo | Set up SG/Send workflow for translator-reviewer file exchange
+	Task-9 | todo | Research language-specific LLM models with API access (OpenRouter, HuggingFace, etc.)
+	Task-10 | todo | Find native speakers for review (Brazilian Portuguese + European Portuguese)

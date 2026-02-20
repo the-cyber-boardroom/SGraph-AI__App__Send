@@ -1,0 +1,19 @@
+# Villager Dev — Code Hardening
+Workstream-1 | in-progress | Production code hardening
+	Task-1 | todo | Profile transfer upload path for performance bottlenecks
+	Task-2 | todo | Profile transfer download path for performance bottlenecks
+	Task-3 | todo | Add retry logic and graceful degradation to storage operations
+	Task-4 | todo | Harden error handling across all API endpoints
+	Task-5 | todo | Write performance benchmark tests for critical paths
+	Task-6 | todo | Verify all code paths handle timeouts gracefully
+Workstream-2 | todo | SA pipeline infrastructure (from 16-Feb brief, P1)
+	Task-7 | todo | Build CloudFront log pipeline: raw tab-delimited to typed JSON
+	Task-8 | todo | Build consolidation step: typed JSON to compressed summaries
+	Task-9 | todo | Implement temporal aggregation with finality tracking (30min/hourly/daily/monthly)
+	Task-10 | todo | Implement digital twin collectors (Route53, CloudFront, Firehose, Lambda, S3 configs)
+	Task-11 | todo | Design and implement SA REST API (all pipeline steps as endpoints)
+	Task-12 | todo | Implement Issues FS S3 storage adapter
+Workstream-3 | todo | Admin UI views (from 16-Feb brief, P2)
+	Task-13 | todo | Build cache service browser admin view
+	Task-14 | todo | Build digital twin visualisation admin view
+	Task-15 | todo | Build traffic dashboard admin view (GA replacement)

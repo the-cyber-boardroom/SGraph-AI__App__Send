@@ -1,0 +1,603 @@
+/* =============================================================================
+   SG/Send — Design System
+   v0.1.6 — Aurora theme (dark navy + teal accents)
+
+   Loaded AFTER v0.1.0/css/common.css to override all visual properties.
+   Implements the brand & design guidelines from v0.3.5.
+
+   Property mapping: redefines the SAME custom property names used in common.css
+   so all existing component code picks up new theme values automatically.
+   ============================================================================= */
+
+/* ─── Google Fonts preconnect is in <head> ──────────────────────────────── */
+
+/* ─── Design Tokens ─────────────────────────────────────────────────────── */
+
+:root {
+    /* ── Colour: Aurora palette ── */
+    --color-bg:               #1A1A2E;
+    --color-surface:          #1E2A4A;
+    --color-primary:          #4ECDC4;
+    --color-primary-hover:    #3DBDB4;
+    --color-text:             #E0E0E0;
+    --color-text-secondary:   #8892A0;
+    --color-border:           rgba(78, 205, 196, 0.15);
+    --color-success:          #4ECDC4;
+    --color-error:            #E94560;
+    --color-warning:          #E07C4F;
+    --color-drop-zone-bg:     #16213E;
+    --color-drop-zone-border: rgba(78, 205, 196, 0.25);
+    --color-drop-zone-active: #4ECDC4;
+
+    /* ── Extended palette ── */
+    --bg-primary:       #1A1A2E;
+    --bg-secondary:     #16213E;
+    --bg-surface:       #1E2A4A;
+    --accent:           #4ECDC4;
+    --accent-hover:     #3DBDB4;
+    --accent-subtle:    rgba(78, 205, 196, 0.12);
+    --danger:           #E94560;
+    --success:          #4ECDC4;
+
+    /* ── Typography ── */
+    --font-family:     'DM Sans', system-ui, -apple-system, sans-serif;
+    --font-display:    'DM Sans', system-ui, sans-serif;
+    --font-body:       'DM Sans', system-ui, sans-serif;
+    --font-mono:       'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
+
+    --text-display:    2.5rem;
+    --text-h1:         2rem;
+    --text-h2:         1.6rem;
+    --text-h3:         1.25rem;
+    --text-body:       1rem;
+    --text-small:      0.8rem;
+    --text-micro:      0.625rem;
+
+    --weight-regular:  400;
+    --weight-medium:   500;
+    --weight-semibold: 600;
+    --weight-bold:     700;
+
+    /* ── Spacing (4px base) ── */
+    --space-1:   4px;
+    --space-2:   8px;
+    --space-3:  12px;
+    --space-4:  16px;
+    --space-6:  24px;
+    --space-8:  32px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    /* ── Geometry ── */
+    --radius:         8px;
+    --radius-sm:      6px;
+    --radius-md:     12px;
+    --radius-lg:     20px;
+    --shadow:         0 4px 24px rgba(0, 0, 0, 0.3);
+    --shadow-lg:      0 8px 32px rgba(0, 0, 0, 0.4);
+    --transition:     150ms ease;
+
+    /* ── Backward compat aliases ── */
+    --border-radius:       8px;
+    --color-bg-secondary:  #16213E;
+}
+
+/* ─── Base Overrides ────────────────────────────────────────────────────── */
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--color-text);
+    font-family: var(--font-family);
+}
+
+/* ─── Header & Brand ────────────────────────────────────────────────────── */
+
+header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-6);
+    max-width: 720px;
+    margin: 0 auto;
+    text-align: left;
+    position: relative;
+}
+
+header h1 {
+    font-size: var(--text-h2);
+    font-weight: var(--weight-bold);
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+    margin: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Brand slash: teal accent */
+header h1 .brand-slash {
+    color: var(--accent);
+    font-weight: 800;
+}
+
+/* Product name: medium weight */
+header h1 .brand-product {
+    font-weight: var(--weight-medium);
+}
+
+/* Tagline: sits between logo and nav */
+header .header-tagline {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Right-hand nav: languages + external links */
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.header-nav .nav-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--color-border);
+    margin: 0 var(--space-1);
+}
+
+.header-nav .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: color var(--transition), background var(--transition);
+    white-space: nowrap;
+}
+
+.header-nav .nav-link:hover {
+    color: var(--color-text);
+    background: var(--accent-subtle);
+}
+
+.header-nav .nav-link svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+/* Main container */
+main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 var(--space-6) var(--space-6);
+}
+
+/* ─── Cards ─────────────────────────────────────────────────────────────── */
+
+.card {
+    background: var(--bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow);
+    padding: var(--space-6);
+    margin-bottom: var(--space-4);
+}
+
+/* ─── Drop Zone ─────────────────────────────────────────────────────────── */
+
+.drop-zone {
+    border: 2px dashed var(--color-drop-zone-border);
+    border-radius: var(--radius-md);
+    background: var(--color-drop-zone-bg);
+    padding: var(--space-12) var(--space-8);
+    transition: border-color var(--transition), background-color var(--transition), box-shadow var(--transition);
+}
+
+.drop-zone:hover {
+    border-color: var(--accent);
+    background: rgba(78, 205, 196, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(78, 205, 196, 0.1);
+}
+
+.drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(78, 205, 196, 0.1);
+    box-shadow: inset 0 0 0 2px rgba(78, 205, 196, 0.2);
+}
+
+.drop-zone__label {
+    font-size: var(--font-size-lg);
+    color: var(--color-text-secondary);
+    font-weight: var(--weight-medium);
+}
+
+.drop-zone__hint {
+    color: var(--color-text-secondary);
+}
+
+/* ─── Buttons ───────────────────────────────────────────────────────────── */
+
+.btn {
+    font-family: var(--font-family);
+    font-weight: var(--weight-semibold);
+    border-radius: var(--radius-sm);
+    transition: background-color var(--transition), transform 0.1s ease, box-shadow var(--transition);
+}
+
+.btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: var(--bg-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.btn-sm {
+    border-radius: var(--radius-sm);
+}
+
+.btn-copy {
+    background: var(--bg-secondary);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.btn-copy:hover:not(:disabled) {
+    background: var(--bg-surface);
+    border-color: var(--accent);
+}
+
+/* Secondary / ghost button */
+.btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+}
+
+/* ─── Form Elements ─────────────────────────────────────────────────────── */
+
+.input {
+    background: var(--bg-secondary);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.input::placeholder {
+    color: var(--color-text-secondary);
+    opacity: 0.7;
+}
+
+.input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+    outline: none;
+}
+
+textarea.input {
+    background: var(--bg-secondary);
+    color: var(--color-text);
+}
+
+/* ─── Progress Bar ──────────────────────────────────────────────────────── */
+
+.progress-bar {
+    background: var(--bg-secondary);
+    border-radius: 3px;
+}
+
+.progress-bar__fill {
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 300ms ease;
+}
+
+/* ─── Status Messages ───────────────────────────────────────────────────── */
+
+.status {
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+}
+
+.status--info {
+    background: rgba(78, 205, 196, 0.08);
+    color: var(--accent);
+    border-color: rgba(78, 205, 196, 0.15);
+}
+
+.status--success {
+    background: rgba(78, 205, 196, 0.1);
+    color: var(--accent);
+    border-color: rgba(78, 205, 196, 0.2);
+}
+
+.status--error {
+    background: rgba(233, 69, 96, 0.1);
+    color: var(--danger);
+    border-color: rgba(233, 69, 96, 0.2);
+}
+
+.status--warning {
+    background: rgba(224, 124, 79, 0.1);
+    color: var(--color-warning);
+    border-color: rgba(224, 124, 79, 0.2);
+}
+
+/* ─── Result Panel ──────────────────────────────────────────────────────── */
+
+.result-panel {
+    margin-top: var(--space-6);
+}
+
+.result-row {
+    gap: var(--space-2);
+}
+
+.result-row label {
+    color: var(--color-text-secondary);
+}
+
+.result-row .value {
+    font-family: var(--font-mono);
+    background: var(--bg-secondary);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+/* ─── Transparency Panel ────────────────────────────────────────────────── */
+
+.transparency {
+    background: var(--bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-6);
+}
+
+.transparency__title {
+    color: var(--color-text);
+    font-weight: var(--weight-semibold);
+}
+
+.transparency__label {
+    color: var(--color-text-secondary);
+}
+
+.transparency__value {
+    color: var(--color-text);
+}
+
+.transparency__value--not-stored {
+    color: var(--accent);
+}
+
+.transparency__footer {
+    border-top-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+
+/* ─── Guidance Callout ──────────────────────────────────────────────────── */
+
+.guidance {
+    background: rgba(224, 124, 79, 0.08);
+    border: 1px solid rgba(224, 124, 79, 0.2);
+    color: var(--color-warning);
+    border-radius: var(--radius-sm);
+}
+
+/* ─── Disclaimer ────────────────────────────────────────────────────────── */
+
+.disclaimer {
+    color: var(--color-text-secondary);
+    opacity: 0.7;
+}
+
+/* ─── Locale Dropdown ───────────────────────────────────────────────────── */
+
+.locale-dropdown {
+    position: relative;
+}
+
+.locale-dropdown__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: var(--font-family);
+    transition: color var(--transition), background var(--transition);
+    white-space: nowrap;
+}
+
+.locale-dropdown__trigger:hover {
+    color: var(--color-text);
+    background: var(--accent-subtle);
+}
+
+.locale-dropdown__trigger svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.locale-dropdown__menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 140px;
+    background: var(--bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+    z-index: 100;
+    padding: var(--space-1) 0;
+}
+
+.locale-dropdown.open .locale-dropdown__menu {
+    display: block;
+}
+
+.locale-dropdown__item {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
+    font-family: var(--font-family);
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+}
+
+.locale-dropdown__item:hover {
+    color: var(--color-text);
+    background: var(--accent-subtle);
+}
+
+.locale-dropdown__item--active {
+    color: var(--accent);
+    font-weight: var(--weight-semibold);
+}
+
+/* ─── Link Styles ───────────────────────────────────────────────────────── */
+
+a {
+    color: var(--accent);
+}
+
+a:hover {
+    color: var(--accent-hover);
+}
+
+/* ─── Selection ─────────────────────────────────────────────────────────── */
+
+::selection {
+    background: rgba(78, 205, 196, 0.3);
+    color: var(--color-text);
+}
+
+/* ─── Scrollbar (webkit) ────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+}
+
+/* ─── Card Entrance Animation ───────────────────────────────────────────── */
+/* Only applied via explicit .card-enter class on static page elements.
+   NOT on .card itself — web components rebuild their .card on every render,
+   which would cause a flicker on each state change (e.g. File ↔ Text). */
+
+@keyframes card-enter {
+    from {
+        opacity: 0;
+        transform: scale(0.98) translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.card-enter {
+    animation: card-enter 0.3s ease forwards;
+}
+
+/* ─── Slash Loading Animation ───────────────────────────────────────────── */
+
+@keyframes slash-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+.loading-slash {
+    display: inline-block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    animation: slash-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── Button hover lift ─────────────────────────────────────────────────── */
+
+@keyframes btn-press {
+    0%   { transform: translateY(0); }
+    50%  { transform: translateY(-1px); }
+    100% { transform: translateY(0); }
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+    header {
+        flex-wrap: wrap;
+        padding: var(--space-3) var(--space-4);
+        gap: var(--space-2);
+    }
+
+    header h1 {
+        font-size: var(--text-h3);
+    }
+
+    header .header-tagline {
+        display: none;
+    }
+
+    .header-nav {
+        gap: 2px;
+    }
+
+    main {
+        padding: 0 var(--space-4) var(--space-4);
+    }
+
+    .card {
+        padding: var(--space-4);
+        border-radius: var(--radius);
+    }
+}

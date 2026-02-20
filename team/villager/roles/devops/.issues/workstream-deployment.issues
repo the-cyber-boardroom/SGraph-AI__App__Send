@@ -1,0 +1,20 @@
+# Villager DevOps — Production Deployment
+Workstream-1 | in-progress | Production environment setup
+	Task-1 | todo | Set up production AWS environment (separate from Explorer)
+	Task-2 | todo | Configure production CI/CD pipeline
+	Task-3 | todo | Set up production Lambda functions (user and admin)
+	Task-4 | todo | Configure production secrets and environment variables
+	Task-5 | todo | Set up monitoring and alerting (CloudWatch)
+	Task-6 | todo | Establish rollback procedure and test it
+	Task-7 | todo | Run full smoke test suite against production
+	Task-8 | todo | Document production deployment runbook
+Workstream-2 | todo | Subdomain architecture (from 16-Feb brief, P1)
+	Task-9 | todo | Create environment mapping document: CloudFront distributions, Route53 records, S3 bucket mappings, Lambda configs per env
+	Task-10 | todo | Configure dev.send.sgraph.com CloudFront distribution and Route53
+	Task-11 | todo | Configure qa.send.sgraph.com CloudFront distribution and Route53
+	Task-12 | todo | Configure send.sgraph.com production CloudFront distribution and Route53
+	Task-13 | todo | Define transition tests for DNS/distribution changes
+	Task-14 | todo | Test rollback plan for each subdomain migration step
+Workstream-3 | todo | Log archive and cleanup (from 16-Feb brief, P2)
+	Task-15 | todo | Implement log archive workflow (move processed logs to Glacier/IA)
+	Task-16 | todo | Implement log cleanup from live logging bucket

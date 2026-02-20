@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SG/Send Card - Design B: The Slash</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+  h1 { font-size: 14px; color: #666; margin-bottom: 20px; font-weight: 400; }
+
+  .card { width: 85mm; height: 55mm; overflow: hidden; position: relative; margin: 5mm 0; }
+
+  /* --- FRONT --- */
+  .front { background: #0f172a; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .front .slash-line { position: absolute; top: -10mm; left: 50%; width: 2px; height: 80mm; background: #0d9488; transform: rotate(-25deg); transform-origin: top center; opacity: 0.4; }
+  .front .slash-line-2 { position: absolute; top: -10mm; left: 52%; width: 1px; height: 80mm; background: #0d9488; transform: rotate(-25deg); transform-origin: top center; opacity: 0.2; }
+  .front .brand { font-size: 28pt; font-weight: 700; letter-spacing: -1px; z-index: 1; }
+  .front .brand .sg { color: #fff; }
+  .front .brand .slash { color: #0d9488; }
+  .front .brand .send { color: #fff; }
+  .front .subtitle { font-size: 7.5pt; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; margin-top: 3mm; z-index: 1; }
+
+  /* --- BACK --- */
+  .back { background: white; border: 0.5px solid #ccc; display: flex; flex-direction: column; padding: 5mm 6mm; }
+  .back .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 3mm; }
+  .back .url { font-size: 9pt; font-weight: 600; color: #0f172a; }
+  .back .brand-icon { font-size: 14pt; font-weight: 700; color: #ccc; letter-spacing: -0.5px; }
+  .back .brand-icon span { color: #0d9488; }
+  .back .token-label { font-size: 6pt; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #64748b; margin-bottom: 1mm; }
+  .back .token-box { border: 1.5px solid #0f172a; border-radius: 1.5mm; height: 8mm; padding: 0 2mm; margin-bottom: 3mm; display: flex; align-items: center; }
+  .back .token-box input { border: none; outline: none; font-size: 10pt; font-family: 'Courier New', monospace; width: 100%; background: transparent; color: #0f172a; }
+  .back .footer { font-size: 6.5pt; color: #64748b; line-height: 1.5; }
+  .back .footer strong { color: #0f172a; }
+  .back .accent-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 1.5mm; background: #0d9488; }
+
+  @media print {
+    body { background: white; padding: 0; }
+    h1, .instructions { display: none; }
+    .card { border: 0.25px dashed #ccc; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Design B: The Slash -- SG/Send Business Card (85 x 55 mm)</h1>
+
+<div class="instructions" style="max-width: 85mm; margin-bottom: 20px; font-size: 12px; color: #666; line-height: 1.5;">
+  <p>Dark front with the slash motif. White functional back.</p>
+</div>
+
+<!-- FRONT -->
+<div class="card front">
+  <div class="slash-line"></div>
+  <div class="slash-line-2"></div>
+  <div class="brand">
+    <span class="sg">SG</span><span class="slash">/</span><span class="send">Send</span>
+  </div>
+  <div class="subtitle">Zero-knowledge encrypted sharing</div>
+</div>
+
+<!-- BACK -->
+<div class="card back">
+  <div class="top-row">
+    <div>
+      <div class="url">send.sgraph.ai</div>
+    </div>
+    <div class="brand-icon">SG<span>/</span></div>
+  </div>
+  <div class="token-label">Your access code</div>
+  <div class="token-box"><input type="text" placeholder="" /></div>
+  <div class="footer">
+    <strong>The server can't read your files.</strong><br>
+    No app needed. No account needed.
+  </div>
+  <div class="accent-bar"></div>
+</div>
+
+</body>
+</html>

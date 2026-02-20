@@ -1,0 +1,10 @@
+Test Gaps | Security Review
+---
+Task-001 | todo | Write test: plaintext never reaches server (P3)                         | QA
+Task-002 | todo | Write tests with real ciphertext, not literal strings (P4)              | QA
+Task-003 | todo | Write Playwright E2E for encryption round-trip (P4)                     | QA
+Task-004 | todo | Write auth edge case tests (expired/revoked/exhausted) (P4)             | QA
+Task-005 | todo | Write concurrent request tests (P4)                                     | QA
+Task-006 | todo | Write CORS verification tests (P5)                                      | QA
+Task-007 | todo | Write framework behaviour tests (P6)                                    | QA
+Task-008 | todo | Write S3 integration tests with LocalStack (P6)                         | QA

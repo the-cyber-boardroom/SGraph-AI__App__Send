@@ -1,0 +1,9 @@
+P3-04 | Token Validation Fails Open
+---
+Task-001 | todo | Raise exception at startup if admin config missing in production      | Developer
+Task-002 | todo | Replace silent exception catch with explicit error handling            | Developer
+Task-003 | todo | Audit all code paths for other fails-open patterns                    | AppSec
+Task-004 | todo | Write test: missing config = startup failure                          | QA
+Task-005 | todo | Write test: invalid token = request denied                            | QA
+Task-006 | todo | Write test: exception during auth = request denied (not bypassed)     | QA
+Task-007 | todo | Validate fix: confirm no code path skips auth silently                | AppSec

@@ -17,8 +17,11 @@
   "upload.button.encrypt_upload":     "yIpegh 'ej yIngeH",
   "upload.button.encrypt_send":       "yIpegh 'ej yIngeH",
 
+  "upload.progress.reading":          "De'wI' ghItlh lajlu'...",
   "upload.progress.encrypting":       "peplu'...",
+  "upload.progress.creating":         "ngeH qellu'...",
   "upload.progress.uploading":        "ngeHlu'...",
+  "upload.progress.completing":       "rInmoHlu'...",
 
   "upload.result.file_success":       "De'wI' ghItlhlIj peplu' 'ej ngeHlu'.",
   "upload.result.text_success":       "ghItlhlIj peplu' 'ej ngeHlu'.",
@@ -92,5 +95,26 @@
   "test_files.description":           "De'wI' ghItlh ngoH yIlaj, ghIq ngeHwI'Daq yIchagh.",
 
   "cta.title":                        "De'wI' ghItlh DangeHqang'a'?",
-  "cta.description":                  "SGraph ngeH nab wa'DIch yIjeS."
+  "cta.description":                  "SGraph ngeH nab wa'DIch yIjeS.",
+
+  "upload.token.unlimited":           "lo'laH potlh",
+  "upload.token.remaining":           "{remaining} lo'laH",
+  "upload.timing.title":              "ngeH rInpu'",
+  "download.timing.title":            "laj rInpu'",
+
+  "app.tagline":                      "De'wI' ghItlhlIj, ngaSruqlIj, peghlIj",
+
+  "transparency.title":               "ngeHvam pollu'pu'bogh",
+  "transparency.footer":              "Hoch 'oH. latlh pollu'be'.",
+  "transparency.ip_address":          "De'wI' HablI' lIj",
+  "transparency.upload_time":         "ngeH poH",
+  "transparency.download_time":       "laj poH",
+  "transparency.file_size":           "De'wI' ghItlh tIn",
+  "transparency.label.file_name":     "De'wI' ghItlh pong",
+  "transparency.label.file_content":  "De'wI' ghItlh De'",
+  "transparency.label.decryption_key":"ngaSruq peghHa'wI'",
+  "transparency.label.raw_ip":        "De'wI' HablI' ngIq",
+  "transparency.not_stored":          "pollu'be'",
+  "transparency.encrypted":           "peplu' (lajlaHbe')",
+  "transparency.key_not_stored":      "pollu'be' (SoH neH ghaj)"
 }

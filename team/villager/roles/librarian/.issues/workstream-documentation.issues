@@ -1,0 +1,19 @@
+# Villager Librarian — Documentation and Knowledge
+Workstream-1 | in-progress | Villager team documentation setup
+	Task-1 | done | Create Villager role ROLE.md files for all 15 roles
+	Task-2 | done | Set up .issues tracking for all Villager roles
+	Task-3 | in-progress | Create Villager master index (16-Feb version)
+	Task-4 | todo | Index all release documentation as it is produced
+	Task-5 | todo | Create operational runbook template
+	Task-6 | todo | Cross-reference Villager documents with Explorer sources
+Workstream-2 | in-progress | 16-Feb brief processing (daily memo workflow)
+	Task-7 | in-progress | Catalogue all 16-Feb briefs
+	Task-8 | in-progress | Produce debrief for 16-Feb daily brief
+	Task-9 | todo | Verify all cross-references and links
+Workstream-3 | todo | Briefing packs infrastructure (from 16-Feb brief, P1)
+	Task-10 | todo | Create briefing pack template structure
+	Task-11 | todo | Create reference summaries for key systems
+	Task-12 | todo | Build pack library catalogue
+Workstream-4 | todo | DPO-AppSec-GRC evidence pack (from 16-Feb brief, P1)
+	Task-13 | todo | Search all project documents for DPO/AppSec/GRC evidence
+	Task-14 | todo | Structure evidence pack with verified sources and quotes

@@ -1,0 +1,15 @@
+# Villager Conductor — Productisation Pipeline
+Workstream-1 | in-progress | First IFD production release
+	Task-1 | todo | Receive and verify Explorer handover brief
+	Task-2 | todo | Decompose handover into role-specific hardening tasks
+	Task-3 | todo | Create release plan with gating criteria
+	Task-4 | todo | Coordinate QA, AppSec, and DevOps sign-offs
+	Task-5 | todo | Conduct release ceremony and deploy approval
+	Task-6 | todo | Post-deployment verification and monitoring check
+Workstream-2 | in-progress | 16-Feb brief processing (daily memo workflow)
+	Task-7 | done | Dispatch Architect and Librarian to read brief
+	Task-8 | in-progress | Update impacted role .issues files with brief tasks
+	Task-9 | todo | Coordinate subdomain architecture work (DevOps P1)
+	Task-10 | todo | Coordinate SA pipeline work (Dev + Architect P1)
+	Task-11 | todo | Coordinate translation audit (Translator P1)
+	Task-12 | todo | Coordinate DPO/AppSec/GRC evidence collection

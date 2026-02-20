@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SG/Send Card - Design A: The Minimal</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+  h1 { font-size: 14px; color: #666; margin-bottom: 20px; font-weight: 400; }
+
+  .card { width: 85mm; height: 55mm; background: white; border: 0.5px solid #ccc; overflow: hidden; position: relative; margin: 5mm 0; }
+
+  /* --- FRONT --- */
+  .front { display: flex; flex-direction: column; justify-content: center; padding: 6mm 7mm; }
+  .front .brand { font-size: 22pt; font-weight: 700; letter-spacing: -0.5px; color: #111; margin-bottom: 3mm; }
+  .front .brand span { color: #0d9488; }
+  .front .tagline { font-size: 8pt; color: #333; line-height: 1.5; margin-bottom: 4mm; }
+  .front .tagline strong { font-weight: 600; }
+  .front .url { font-size: 10pt; font-weight: 600; color: #0d9488; letter-spacing: 0.3px; }
+
+  /* --- BACK --- */
+  .back { display: flex; flex-direction: column; padding: 5mm 6mm; }
+  .back .section-title { font-size: 6.5pt; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #999; margin-bottom: 2mm; }
+  .back .steps { font-size: 7pt; color: #333; line-height: 1.7; margin-bottom: 3mm; }
+  .back .steps li { margin-left: 3mm; }
+  .back .token-label { font-size: 6.5pt; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #999; margin-bottom: 1.5mm; }
+  .back .token-box { border-bottom: 1.5px solid #111; height: 7mm; margin-bottom: 3mm; font-size: 11pt; font-family: 'Courier New', monospace; display: flex; align-items: flex-end; padding-bottom: 0.5mm; }
+  .back .token-box input { border: none; outline: none; font-size: 11pt; font-family: 'Courier New', monospace; width: 100%; background: transparent; }
+  .back .bottom-row { display: flex; justify-content: space-between; align-items: flex-end; flex: 1; }
+  .back .brand-icon { font-size: 14pt; font-weight: 700; color: #ccc; letter-spacing: -0.5px; }
+  .back .brand-icon span { color: #0d9488; }
+  .back .footer-text { font-size: 6.5pt; color: #666; text-align: right; line-height: 1.5; }
+
+  /* --- A4 PRINT SHEET --- */
+  .print-sheet { display: none; }
+
+  @media print {
+    body { background: white; padding: 0; }
+    h1, .single-cards, .instructions { display: none; }
+    .print-sheet { display: block; page-break-after: always; }
+    .print-grid { display: grid; grid-template-columns: 85mm 85mm; grid-template-rows: repeat(5, 55mm); gap: 0; justify-content: center; padding-top: 5mm; }
+    .print-grid .card { margin: 0; border: 0.25px dashed #ccc; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Design A: The Minimal -- SG/Send Business Card (85 x 55 mm)</h1>
+
+<div class="instructions" style="max-width: 85mm; margin-bottom: 20px; font-size: 12px; color: #666; line-height: 1.5;">
+  <p><strong>To print:</strong> File > Print. The A4 sheet with 10 cards prints automatically. For single cards, use the preview below to check the design.</p>
+  <p>Type your access code into the token field before printing, or leave blank to handwrite.</p>
+</div>
+
+<div class="single-cards">
+  <!-- FRONT -->
+  <div class="card front">
+    <div class="brand">SG<span>/</span>Send</div>
+    <div class="tagline">
+      <strong>Zero-knowledge encrypted file sharing.</strong><br>
+      Your files are encrypted in your browser.<br>
+      The server can never read them.
+    </div>
+    <div class="url">send.sgraph.ai</div>
+  </div>
+
+  <!-- BACK -->
+  <div class="card back">
+    <div class="section-title">How to use</div>
+    <ol class="steps">
+      <li>Go to <strong>send.sgraph.ai</strong></li>
+      <li>Enter your access code (below)</li>
+      <li>Drop a file -- it encrypts in your browser</li>
+      <li>Share the link + key via separate channels</li>
+    </ol>
+    <div class="token-label">Your access code</div>
+    <div class="token-box"><input type="text" placeholder="" /></div>
+    <div class="bottom-row">
+      <div class="brand-icon">SG<span>/</span></div>
+      <div class="footer-text">No app. No account.<br>Just a browser.</div>
+    </div>
+  </div>
+</div>
+
+<!-- A4 PRINT SHEET (10 fronts) -->
+<div class="print-sheet">
+  <div class="print-grid">
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+    <div class="card front"><div class="brand">SG<span>/</span>Send</div><div class="tagline"><strong>Zero-knowledge encrypted file sharing.</strong><br>Your files are encrypted in your browser.<br>The server can never read them.</div><div class="url">send.sgraph.ai</div></div>
+  </div>
+</div>
+
+</body>
+</html>

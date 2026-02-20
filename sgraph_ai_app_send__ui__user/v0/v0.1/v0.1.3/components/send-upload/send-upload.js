@@ -394,9 +394,8 @@ class SendUpload extends HTMLElement {
             await ApiClient.uploadPayload(createResult.transfer_id, encrypted);
             const completeResult = await ApiClient.completeTransfer(createResult.transfer_id);
 
-            const tokenName   = completeResult.token_name || ApiClient.getAccessToken() || '';
-            const combinedUrl = this.buildCombinedUrl(createResult.transfer_id, keyString, tokenName);
-            const linkOnlyUrl = this.buildLinkOnlyUrl(createResult.transfer_id, tokenName);
+            const combinedUrl = this.buildCombinedUrl(createResult.transfer_id, keyString);
+            const linkOnlyUrl = this.buildLinkOnlyUrl(createResult.transfer_id);
 
             this.result = { transferId: createResult.transfer_id, combinedUrl, linkOnlyUrl, keyString, isText, transparency: completeResult.transparency || null };
             this.state = 'complete'; this.render(); this.setupDynamicListeners();
@@ -448,13 +447,11 @@ class SendUpload extends HTMLElement {
         });
     }
 
-    buildCombinedUrl(tid, key, token) {
-        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        return `${window.location.origin}/send/v0/v0.1/v0.1.3/download.html${tokenParam}#${tid}/${key}`;
+    buildCombinedUrl(tid, key) {
+        return `${window.location.origin}/send/v0/v0.1/v0.1.3/download.html#${tid}/${key}`;
     }
-    buildLinkOnlyUrl(tid, token) {
-        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        return `${window.location.origin}/send/v0/v0.1/v0.1.3/download.html${tokenParam}#${tid}`;
+    buildLinkOnlyUrl(tid) {
+        return `${window.location.origin}/send/v0/v0.1/v0.1.3/download.html#${tid}`;
     }
 
     async copyToClipboard(text, button) {

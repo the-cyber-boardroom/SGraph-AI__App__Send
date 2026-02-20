@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SG/Send — Download</title>
+    <meta name="description" content="Download and decrypt your file. Decryption happens in your browser — we never see your data.">
+    <meta name="theme-color" content="#1A1A2E">
+    <!-- Fonts: DM Sans (display + body) + JetBrains Mono (code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- CSS: base + design system override -->
+    <link rel="stylesheet" href="../v0.1.0/css/common.css">
+    <link rel="stylesheet" href="css/sg-design-system.css">
+</head>
+<body class="theme-aurora">
+    <header>
+        <h1><span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span></h1>
+        <p class="header-tagline" data-i18n="app.tagline">Your files, your keys, your privacy</p>
+        <nav class="header-nav">
+            <a href="https://docs.send.sgraph.ai/" target="_blank" rel="noopener" class="nav-link" title="Documentation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                Docs
+            </a>
+            <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener" class="nav-link" title="GitHub">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/></svg>
+                GitHub
+            </a>
+            <div class="locale-dropdown" id="locale-dropdown">
+                <button class="locale-dropdown__trigger" id="locale-trigger" title="Language">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    <span id="locale-current">EN</span>
+                </button>
+                <div class="locale-dropdown__menu" id="locale-menu"></div>
+            </div>
+        </nav>
+    </header>
+    <main>
+        <!-- Loading indicator: visible before JS loads, hidden by component -->
+        <div id="page-loading" class="card card-enter" style="text-align: center; padding: var(--space-8);">
+            <div class="loading-slash">/</div>
+            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-3);" data-i18n="download.loading">Loading transfer info...</div>
+        </div>
+
+        <send-download></send-download>
+
+        <!-- CTA section: hidden until JS determines what to show -->
+        <section id="cta-signup" class="card card-enter" style="margin-top: var(--space-6); text-align: center; display: none;">
+            <h3 style="font-size: var(--text-body); margin-bottom: var(--space-1); font-weight: var(--weight-semibold);" data-i18n="cta.title">Want to send files too?</h3>
+            <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-4);" data-i18n="cta.description">
+                Join the early access program for SG/Send.
+            </p>
+            <form class="launchlist-form" action="https://getlaunchlist.com/s/zSa8gI" method="POST">
+                <div style="display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: center;">
+                    <input name="name" type="text" class="input" placeholder="Name" style="flex: 1; min-width: 120px;">
+                    <input name="email" type="email" class="input" placeholder="Email" required style="flex: 1; min-width: 180px;">
+                    <button type="submit" class="btn btn-primary">Sign Up</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Send-a-file CTA: shown when user already has a token -->
+        <section id="cta-send" class="card card-enter" style="margin-top: var(--space-6); text-align: center; display: none;">
+            <a href="index.html" class="btn btn-primary" style="text-decoration: none;" data-i18n="download.result.send_another">Send a new File or Text</a>
+        </section>
+
+        <p class="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
+    </main>
+    <!-- v0.1.4 base scripts -->
+    <script src="../v0.1.4/js/i18n.js"></script>
+    <script src="../v0.1.0/js/crypto.js"></script>
+    <script src="../v0.1.0/js/api-client.js"></script>
+    <script src="../v0.1.4/components/send-download/send-download.js"></script>
+    <script src="../v0.1.0/components/send-transparency/send-transparency.js"></script>
+    <!-- v0.1.5 surgical overrides -->
+    <script src="../v0.1.5/js/i18n.js"></script>
+    <script src="../v0.1.5/components/send-download/send-download.js"></script>
+    <!-- v0.1.6 surgical overrides (design-aware) -->
+    <script src="js/i18n.js"></script>
+    <script src="components/send-download/send-download.js"></script>
+    <script>
+        // Hide loading indicator once the download component renders
+        const _loading = document.getElementById('page-loading');
+        if (_loading) _loading.style.display = 'none';
+
+        // Show appropriate CTA based on whether user has a token
+        const _hasToken = typeof ApiClient !== 'undefined' && ApiClient.hasAccessToken();
+        const _ctaSignup = document.getElementById('cta-signup');
+        const _ctaSend   = document.getElementById('cta-send');
+        if (_hasToken && _ctaSend)   { _ctaSend.style.display = ''; }
+        else if (_ctaSignup)         { _ctaSignup.style.display = ''; }
+
+        I18n.init().then(() => {
+            document.documentElement.lang = I18n.locale;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = I18n.t(el.getAttribute('data-i18n'));
+            });
+            renderLocaleSelector();
+        });
+
+        function renderLocaleSelector() {
+            const menu = document.getElementById('locale-menu');
+            const current = document.getElementById('locale-current');
+            if (!menu) return;
+            const active = I18n.availableLocales.find(l => l.code === I18n.locale);
+            if (current) current.textContent = (active && active.flag ? active.flag + ' ' : '') + I18n.locale.toUpperCase();
+            menu.innerHTML = I18n.availableLocales.map(l =>
+                `<button class="locale-dropdown__item ${l.code === I18n.locale ? 'locale-dropdown__item--active' : ''}"
+                         onclick="I18n.setLocale('${l.code}'); document.getElementById('locale-dropdown').classList.remove('open');">${l.flag || ''} ${l.name}</button>`
+            ).join('');
+        }
+
+        // Toggle dropdown
+        document.getElementById('locale-trigger').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('locale-dropdown').classList.toggle('open');
+        });
+        // Close on outside click
+        document.addEventListener('click', () => {
+            document.getElementById('locale-dropdown').classList.remove('open');
+        });
+
+        document.addEventListener('locale-changed', () => {
+            document.documentElement.lang = I18n.locale;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = I18n.t(el.getAttribute('data-i18n'));
+            });
+            renderLocaleSelector();
+        });
+
+        // Hide page-level CTA when download component shows its own link
+        document.addEventListener('download-complete', () => {
+            const ctaSend = document.getElementById('cta-send');
+            if (ctaSend) ctaSend.style.display = 'none';
+        });
+    </script>
+</body>
+</html>

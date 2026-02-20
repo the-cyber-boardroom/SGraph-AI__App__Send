@@ -1,0 +1,46 @@
+# CloudFront Log Pipeline — Task Tracking
+# Pack: packs/cloudfront-log-pipeline/
+# Version: v0.4.4
+# Date: 2026-02-16
+
+## Phase 1: Core Pipeline (Steps 1-3)
+
+- [ ] P1: Create Type_Safe schemas for SA log events, ingestion results, consolidation results, aggregate windows
+- [ ] P1: Create Service__SA__Log__Ingestion — wrap existing CloudFront__Logs__Collector, store parsed events in cache
+- [ ] P1: Create Service__SA__Consolidation — read raw events from cache, group and summarise, store consolidated output
+- [ ] P1: Create Service__SA__Temporal__Aggregation — roll up consolidated data into 30min/hourly/daily/monthly windows with finality
+- [ ] P1: Create SA__Pipeline__Setup factory — wire services together, env var gating
+- [ ] P1: Create Routes__SA — REST endpoints under /api/sa/ for pipeline operations
+- [ ] P1: Register Routes__SA in Fast_API__SGraph__App__Send__Admin.setup_routes()
+- [ ] P1: Add SA env vars to admin__config.py (SGRAPH_SEND__SA_LOGS_BUCKET, SA_ENABLED, etc.)
+
+## Phase 1: Testing
+
+- [ ] P1: Unit tests for log parsing (synthetic tab-delimited data, edge cases)
+- [ ] P1: Unit tests for IP address absence (assert no c-ip in CF_LOG_FIELDS, no IP patterns in parsed output)
+- [ ] P1: Integration tests for full pipeline (ingest → consolidate → aggregate with in-memory cache)
+- [ ] P1: Unit tests for finality cascade logic
+
+## Phase 1: Cache Browsing
+
+- [ ] P1: SA cache browse endpoint (GET /api/sa/cache/browse/{path})
+- [ ] P1: SA cache entry endpoint (GET /api/sa/cache/entry/{cache_id})
+
+## Phase 2: Traffic Data Endpoints
+
+- [ ] P2: GET /api/sa/traffic/summary
+- [ ] P2: GET /api/sa/traffic/timeseries
+- [ ] P2: GET /api/sa/traffic/top-paths
+- [ ] P2: GET /api/sa/traffic/edge-locations
+- [ ] P2: GET /api/sa/traffic/status-codes
+
+## Phase 3: Archive (Step 4)
+
+- [ ] P3: Service__SA__Archive — move processed logs to Glacier/IA
+- [ ] P3: POST /api/sa/cloudfront/archive endpoint
+- [ ] P3: Processed-file tracking (so we know what's been ingested)
+
+## Deferred
+
+- [ ] DEFERRED: S3 event triggers for automated ingestion (Step 5)
+- [ ] DEFERRED: Issues FS S3 adapter for SA metadata
