@@ -4,11 +4,15 @@
 
    Features:
      - Generate RSA-OAEP 4096-bit key pairs (non-extractable private keys)
+     - Generate ECDSA P-256 signing key pairs alongside encryption keys
      - Store keys in IndexedDB (sg-send-pki)
-     - Export/import public keys as PEM
+     - Export/import public key bundles (JSON: encrypt + sign)
      - SHA-256 fingerprints for key identification
-     - Hybrid encryption test (RSA-OAEP wraps AES-256-GCM)
+     - Hybrid encryption (RSA-OAEP wraps AES-256-GCM)
+     - Digital signatures (ECDSA P-256) for sender authentication
      - Contacts store for imported public keys
+     - Encrypt & Sign / Decrypt & Verify message workflow
+     - Payload v2: encrypted + signed, backwards-compatible with v1
      - Browser capability detection
 
    Usage:
@@ -181,6 +185,18 @@ class PKIManager extends HTMLElement {
             const fingerprint      = await this._computeFingerprint(keyPair.publicKey);
             const keySize          = algorithm === 'ECDH' ? 256 : 4096;
 
+            // Generate ECDSA P-256 signing key pair alongside the encryption key
+            let signingKey = null, signingPublicKey = null, signingPublicKeyPEM = null, signingFingerprint = null;
+            if (algorithm !== 'ECDH') {
+                const signingPair = await crypto.subtle.generateKey(
+                    { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']
+                );
+                signingKey          = signingPair.privateKey;
+                signingPublicKey    = signingPair.publicKey;
+                signingPublicKeyPEM = await this._exportPublicKeyPEM(signingPair.publicKey);
+                signingFingerprint  = await this._computeFingerprint(signingPair.publicKey);
+            }
+
             await this._dbAdd('keys', {
                 label,
                 created     : new Date().toISOString(),
@@ -190,10 +206,14 @@ class PKIManager extends HTMLElement {
                 privateKey  : keyPair.privateKey,
                 publicKeyFingerprint : fingerprint,
                 publicKeyPEM,
+                signingKey,
+                signingPublicKey,
+                signingPublicKeyPEM,
+                signingFingerprint,
             });
 
             await this._loadAll();
-            this._showToast(`Key pair '${label}' created. Your private key is secure.`, 'success');
+            this._showToast(`Key pair '${label}' created with signing key.`, 'success');
         } catch (err) {
             this._showToast(`Key generation failed: ${err.message}`, 'error');
         }
@@ -222,6 +242,12 @@ class PKIManager extends HTMLElement {
         } catch (_) {
             return await crypto.subtle.importKey('spki', der, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
         }
+    }
+
+    async _importSigningKeyPEM(pem) {
+        const b64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+        const der = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        return await crypto.subtle.importKey('spki', der, { name: 'ECDSA', namedCurve: 'P-256' }, true, ['verify']);
     }
 
     // =========================================================================
@@ -274,19 +300,25 @@ class PKIManager extends HTMLElement {
     // Actions
     // =========================================================================
 
+    _buildPublicKeyBundle(record) {
+        const bundle = { v: 1, encrypt: record.publicKeyPEM };
+        if (record.signingPublicKeyPEM) bundle.sign = record.signingPublicKeyPEM;
+        return JSON.stringify(bundle);
+    }
+
     async _handleCopyPublicKey(keyRecord) {
+        const text = this._buildPublicKeyBundle(keyRecord);
         try {
-            await navigator.clipboard.writeText(keyRecord.publicKeyPEM);
-            this._showToast('Public key copied to clipboard', 'success');
+            await navigator.clipboard.writeText(text);
+            this._showToast('Public key bundle copied to clipboard', 'success');
         } catch (_) {
-            // Fallback for non-secure contexts
             const ta = document.createElement('textarea');
-            ta.value = keyRecord.publicKeyPEM;
+            ta.value = text;
             document.body.appendChild(ta);
             ta.select();
             document.execCommand('copy');
             document.body.removeChild(ta);
-            this._showToast('Public key copied to clipboard', 'success');
+            this._showToast('Public key bundle copied to clipboard', 'success');
         }
     }
 
@@ -313,11 +345,30 @@ class PKIManager extends HTMLElement {
         }
     }
 
-    async _handleImportPublicKey(label, pemText) {
+    async _handleImportPublicKey(label, rawText) {
         try {
-            const publicKey   = await this._importPublicKeyPEM(pemText);
-            const fingerprint = await this._computeFingerprint(publicKey);
+            let encryptPEM, signPEM = null;
+
+            // Detect JSON bundle vs legacy PEM
+            const trimmed = rawText.trim();
+            if (trimmed.startsWith('{')) {
+                const bundle = JSON.parse(trimmed);
+                encryptPEM = bundle.encrypt;
+                signPEM    = bundle.sign || null;
+            } else {
+                encryptPEM = trimmed;
+            }
+
+            const publicKey    = await this._importPublicKeyPEM(encryptPEM);
+            const fingerprint  = await this._computeFingerprint(publicKey);
             const publicKeyPEM = await this._exportPublicKeyPEM(publicKey);
+
+            let signingPublicKey = null, signingPublicKeyPEM = null, signingFingerprint = null;
+            if (signPEM) {
+                signingPublicKey    = await this._importSigningKeyPEM(signPEM);
+                signingPublicKeyPEM = signPEM;
+                signingFingerprint  = await this._computeFingerprint(signingPublicKey);
+            }
 
             await this._dbAdd('contacts', {
                 label,
@@ -326,11 +377,15 @@ class PKIManager extends HTMLElement {
                 publicKey,
                 publicKeyFingerprint: fingerprint,
                 publicKeyPEM,
+                signingPublicKey,
+                signingPublicKeyPEM,
+                signingFingerprint,
                 source              : 'manual',
             });
 
             await this._loadAll();
-            this._showToast(`Public key for '${label}' imported.`, 'success');
+            const sigMsg = signingPublicKey ? ' (with signing key)' : ' (encryption only)';
+            this._showToast(`Public key for '${label}' imported${sigMsg}.`, 'success');
         } catch (err) {
             this._showToast(`Import failed: ${err.message}`, 'error');
         }
@@ -376,7 +431,7 @@ class PKIManager extends HTMLElement {
     // Messages — Encrypt / Decrypt
     // =========================================================================
 
-    async _handleMessageEncrypt(contactId, plaintext) {
+    async _handleMessageEncrypt(contactId, signingKeyId, plaintext) {
         const outputEl = this.shadowRoot.querySelector('#msg-encrypt-output');
         if (!outputEl) return;
 
@@ -386,18 +441,31 @@ class PKIManager extends HTMLElement {
         try {
             const { wrappedKey, iv, encrypted } = await this._hybridEncrypt(contact.publicKey, plaintext);
 
-            const payload = JSON.stringify({
-                v: 1,
+            const payload = {
+                v: 2,
                 w: this._arrayBufToB64(wrappedKey),
                 i: this._arrayBufToB64(iv.buffer),
                 c: this._arrayBufToB64(encrypted),
-            });
-            const encoded = btoa(payload);
+            };
+
+            // Sign the ciphertext with sender's ECDSA key if available
+            const senderKey = this._keys.find(k => k.id === signingKeyId);
+            if (senderKey && senderKey.signingKey) {
+                const dataToSign = this._b64ToArrayBuf(payload.c);
+                const signature = await crypto.subtle.sign(
+                    { name: 'ECDSA', hash: 'SHA-256' }, senderKey.signingKey, dataToSign
+                );
+                payload.s = this._arrayBufToB64(signature);
+                payload.f = senderKey.signingFingerprint;
+            }
+
+            const encoded = btoa(JSON.stringify(payload));
 
             outputEl.textContent = encoded;
             try {
                 await navigator.clipboard.writeText(encoded);
-                this._showToast('Encrypted payload copied to clipboard', 'success');
+                const signed = payload.s ? ' (signed)' : ' (unsigned)';
+                this._showToast(`Encrypted${signed} payload copied to clipboard`, 'success');
             } catch (_) {
                 this._showToast('Encrypted. Select and copy the payload manually.', 'success');
             }
@@ -416,14 +484,41 @@ class PKIManager extends HTMLElement {
 
         try {
             const payload = JSON.parse(atob(encodedPayload));
-            if (payload.v !== 1) throw new Error('Unsupported payload version');
+            if (payload.v !== 1 && payload.v !== 2) throw new Error('Unsupported payload version');
 
             const wrappedKey = this._b64ToArrayBuf(payload.w);
             const iv         = new Uint8Array(this._b64ToArrayBuf(payload.i));
             const encrypted  = this._b64ToArrayBuf(payload.c);
 
             const decrypted = await this._hybridDecrypt(keyRecord.privateKey, wrappedKey, iv, encrypted);
-            outputEl.innerHTML = `<span class="test-pass">${this._escapeHtml(decrypted)}</span>`;
+
+            // Verify signature if present (v2 payload)
+            let verifyHtml = '';
+            if (payload.s && payload.f) {
+                const senderContact = this._contacts.find(c => c.signingFingerprint === payload.f);
+                if (senderContact && senderContact.signingPublicKey) {
+                    try {
+                        const sigBuf    = this._b64ToArrayBuf(payload.s);
+                        const dataToVerify = this._b64ToArrayBuf(payload.c);
+                        const valid = await crypto.subtle.verify(
+                            { name: 'ECDSA', hash: 'SHA-256' }, senderContact.signingPublicKey, sigBuf, dataToVerify
+                        );
+                        if (valid) {
+                            verifyHtml = `<div class="verify verify--ok">Signed by <strong>${this._escapeHtml(senderContact.label)}</strong> — signature verified</div>`;
+                        } else {
+                            verifyHtml = `<div class="verify verify--fail">Signature INVALID — message may be tampered</div>`;
+                        }
+                    } catch (_) {
+                        verifyHtml = `<div class="verify verify--fail">Signature verification error</div>`;
+                    }
+                } else {
+                    verifyHtml = `<div class="verify verify--unknown">Signed (fingerprint: ${this._escapeHtml(payload.f)}) — sender not in contacts</div>`;
+                }
+            } else {
+                verifyHtml = `<div class="verify verify--unsigned">Unsigned message (v${payload.v}) — sender not authenticated</div>`;
+            }
+
+            outputEl.innerHTML = `<span class="test-pass">${this._escapeHtml(decrypted)}</span>${verifyHtml}`;
             this._showToast('Message decrypted successfully', 'success');
         } catch (err) {
             outputEl.innerHTML = `<span class="test-fail">Error: ${this._escapeHtml(err.message)}</span>`;
@@ -581,8 +676,8 @@ class PKIManager extends HTMLElement {
                         <input type="text" id="import-label" placeholder="e.g. Alice - Investor Group" autocomplete="off">
                     </div>
                     <div class="modal__field">
-                        <label for="import-pem">Paste PEM-encoded public key</label>
-                        <textarea id="import-pem" rows="8" placeholder="-----BEGIN PUBLIC KEY-----&#10;MIIBIjANBgkqhkiG9w0BAQEFAA...&#10;-----END PUBLIC KEY-----"></textarea>
+                        <label for="import-pem">Paste key bundle (JSON) or PEM</label>
+                        <textarea id="import-pem" rows="8" placeholder='{"v":1,"encrypt":"-----BEGIN PUBLIC KEY-----...","sign":"-----BEGIN PUBLIC KEY-----..."}'></textarea>
                     </div>
                     <div class="modal__actions">
                         <button class="btn btn--ghost btn--sm" id="modal-cancel">Cancel</button>
@@ -730,6 +825,9 @@ class PKIManager extends HTMLElement {
                         <div class="key-card__meta">Algorithm: ${k.algorithm} ${k.keySize}-bit</div>
                         <div class="key-card__meta">Fingerprint: <code>${this._escapeHtml(k.publicKeyFingerprint)}</code></div>
                         <div class="key-card__meta">Private key: <span class="badge badge--secure">non-extractable</span></div>
+                        <div class="key-card__meta">Signing: ${k.signingKey
+                            ? `<span class="badge badge--secure">ECDSA P-256</span>`
+                            : `<span class="badge badge--warn">none</span>`}</div>
                     </div>
                 </div>
                 <div class="key-card__actions">
@@ -767,7 +865,9 @@ class PKIManager extends HTMLElement {
                         <div class="key-card__label">${this._escapeHtml(c.label)}</div>
                         <div class="key-card__meta">Imported: ${this._formatDate(c.imported)}</div>
                         <div class="key-card__meta">Fingerprint: <code>${this._escapeHtml(c.publicKeyFingerprint)}</code></div>
-                        <div class="key-card__meta">Source: ${this._escapeHtml(c.source || 'manual')}</div>
+                        <div class="key-card__meta">Signing: ${c.signingPublicKey
+                            ? `<span class="badge badge--secure">verifiable</span>`
+                            : `<span class="badge badge--warn">no signing key</span>`}</div>
                     </div>
                 </div>
                 <div class="key-card__actions">
@@ -800,7 +900,7 @@ class PKIManager extends HTMLElement {
         ).join('');
 
         const keyOpts = rsaKeys.map(k =>
-            `<option value="${k.id}">${this._escapeHtml(k.label)}</option>`
+            `<option value="${k.id}">${this._escapeHtml(k.label)}${k.signingKey ? '' : ' (no signing)'}</option>`
         ).join('');
 
         return `
@@ -808,29 +908,35 @@ class PKIManager extends HTMLElement {
                 <div class="layout-grid__col">
                     <section class="section">
                         <div class="section__header">
-                            <h3 class="section__title">Encrypt</h3>
+                            <h3 class="section__title">Encrypt &amp; Sign</h3>
                         </div>
-                        ${rsaContacts.length > 0 ? `
+                        ${rsaContacts.length > 0 && rsaKeys.length > 0 ? `
                             <div class="msg-field">
-                                <label>To (contact's public key)</label>
+                                <label>To (recipient)</label>
                                 <select id="msg-encrypt-contact">${contactOpts}</select>
+                            </div>
+                            <div class="msg-field">
+                                <label>From (sign with your key)</label>
+                                <select id="msg-encrypt-signer">${keyOpts}</select>
                             </div>
                             <div class="msg-field">
                                 <label>Message</label>
                                 <textarea id="msg-encrypt-plaintext" rows="3" placeholder="Type your message here..."></textarea>
                             </div>
-                            <button class="btn btn--primary btn--sm" id="btn-msg-encrypt">Encrypt &amp; Copy</button>
+                            <button class="btn btn--primary btn--sm" id="btn-msg-encrypt">Encrypt, Sign &amp; Copy</button>
                             <div class="msg-field">
                                 <label>Encrypted payload</label>
                                 <div class="msg-output" id="msg-encrypt-output">—</div>
                             </div>
-                        ` : '<div class="section__empty">Import a contact\'s public key to encrypt messages</div>'}
+                        ` : rsaContacts.length === 0
+                            ? '<div class="section__empty">Import a contact\'s public key to encrypt messages</div>'
+                            : '<div class="section__empty">Generate a key pair to sign messages</div>'}
                     </section>
                 </div>
                 <div class="layout-grid__col">
                     <section class="section">
                         <div class="section__header">
-                            <h3 class="section__title">Decrypt</h3>
+                            <h3 class="section__title">Decrypt &amp; Verify</h3>
                         </div>
                         ${rsaKeys.length > 0 ? `
                             <div class="msg-field">
@@ -841,7 +947,7 @@ class PKIManager extends HTMLElement {
                                 <label>Paste encrypted payload</label>
                                 <textarea id="msg-decrypt-payload" rows="3" placeholder="Paste the encrypted payload here..."></textarea>
                             </div>
-                            <button class="btn btn--primary btn--sm" id="btn-msg-decrypt">Decrypt</button>
+                            <button class="btn btn--primary btn--sm" id="btn-msg-decrypt">Decrypt &amp; Verify</button>
                             <div class="msg-field">
                                 <label>Decrypted message</label>
                                 <div class="msg-output" id="msg-decrypt-output">—</div>
@@ -957,8 +1063,9 @@ class PKIManager extends HTMLElement {
                 const id = Number(btn.dataset.contactId);
                 const contact = this._contacts.find(c => c.id === id);
                 if (contact) {
-                    this._showToast('PEM copied to clipboard', 'success');
-                    navigator.clipboard.writeText(contact.publicKeyPEM).catch(() => {});
+                    const text = this._buildPublicKeyBundle(contact);
+                    this._showToast('Key bundle copied to clipboard', 'success');
+                    navigator.clipboard.writeText(text).catch(() => {});
                 }
             });
         });
@@ -989,12 +1096,14 @@ class PKIManager extends HTMLElement {
         const btnMsgEncrypt = root.querySelector('#btn-msg-encrypt');
         if (btnMsgEncrypt) {
             btnMsgEncrypt.addEventListener('click', () => {
-                const select    = root.querySelector('#msg-encrypt-contact');
-                const textarea  = root.querySelector('#msg-encrypt-plaintext');
-                const contactId = Number(select.value);
-                const plaintext = textarea.value.trim();
+                const contactSel = root.querySelector('#msg-encrypt-contact');
+                const signerSel  = root.querySelector('#msg-encrypt-signer');
+                const textarea   = root.querySelector('#msg-encrypt-plaintext');
+                const contactId  = Number(contactSel.value);
+                const signerId   = Number(signerSel.value);
+                const plaintext  = textarea.value.trim();
                 if (!plaintext) { this._showToast('Type a message first', 'error'); return; }
-                this._handleMessageEncrypt(contactId, plaintext);
+                this._handleMessageEncrypt(contactId, signerId, plaintext);
             });
         }
 
@@ -1205,6 +1314,11 @@ class PKIManager extends HTMLElement {
             .badge--error {
                 background: var(--admin-error-bg, rgba(248,113,113,0.1));
                 color: var(--admin-error, #f87171);
+            }
+
+            .badge--warn {
+                background: var(--admin-warning-bg, rgba(251,191,36,0.1));
+                color: var(--admin-warning, #fbbf24);
             }
 
             /* --- Empty State --- */
@@ -1548,6 +1662,39 @@ class PKIManager extends HTMLElement {
                 max-height: 6rem;
                 overflow-y: auto;
                 user-select: all;
+            }
+
+            /* --- Verification Status --- */
+            .verify {
+                margin-top: 0.375rem;
+                padding: 0.25rem 0.5rem;
+                border-radius: var(--admin-radius, 6px);
+                font-size: var(--admin-font-size-xs, 0.75rem);
+                line-height: 1.4;
+            }
+
+            .verify--ok {
+                background: var(--admin-success-bg, rgba(52,211,153,0.1));
+                color: var(--admin-success, #34d399);
+                border: 1px solid rgba(52,211,153,0.2);
+            }
+
+            .verify--fail {
+                background: var(--admin-error-bg, rgba(248,113,113,0.1));
+                color: var(--admin-error, #f87171);
+                border: 1px solid rgba(248,113,113,0.2);
+            }
+
+            .verify--unknown {
+                background: var(--admin-warning-bg, rgba(251,191,36,0.1));
+                color: var(--admin-warning, #fbbf24);
+                border: 1px solid rgba(251,191,36,0.15);
+            }
+
+            .verify--unsigned {
+                background: var(--admin-surface-hover, #2a2e3d);
+                color: var(--admin-text-muted, #5e6280);
+                border: 1px solid var(--admin-border-subtle, #252838);
             }
 
             /* --- Info Strip --- */
