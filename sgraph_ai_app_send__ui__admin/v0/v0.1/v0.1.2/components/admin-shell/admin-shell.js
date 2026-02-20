@@ -1,9 +1,10 @@
 /* =============================================================================
    SGraph Send Admin Console — Shell Web Component
-   v0.1.2 — IFD overlay: adds "PKI" nav item under new Security section
+   v0.1.2 — IFD overlay: adds "PKI" nav, disables auto-reload
 
    Changes from v0.1.1:
      - Added "Security" nav section with "PKI Keys" nav item (links to pki.html)
+     - Disabled health check auto-reload interval (manual refresh only)
      - Updated version badge to v0.1.2
    ============================================================================= */
 
@@ -20,6 +21,7 @@ class AdminShell extends HTMLElement {
     connectedCallback() {
         this.render();
         this._setupListeners();
+        // v0.1.2: single health check on load, no recurring interval
         this._checkHealth();
     }
 
@@ -59,16 +61,17 @@ class AdminShell extends HTMLElement {
         }
         this._updateHealthIndicator();
 
-        // Re-check every 60 seconds
-        this._healthInterval = setInterval(async () => {
-            try {
-                await adminAPI.getHealth();
-                this._healthStatus = 'healthy';
-            } catch (_) {
-                this._healthStatus = 'error';
-            }
-            this._updateHealthIndicator();
-        }, 60000);
+        // v0.1.2: auto-reload disabled — single check on page load only
+        // Re-enable by uncommenting the interval below:
+        // this._healthInterval = setInterval(async () => {
+        //     try {
+        //         await adminAPI.getHealth();
+        //         this._healthStatus = 'healthy';
+        //     } catch (_) {
+        //         this._healthStatus = 'error';
+        //     }
+        //     this._updateHealthIndicator();
+        // }, 60000);
     }
 
     _updateHealthIndicator() {
