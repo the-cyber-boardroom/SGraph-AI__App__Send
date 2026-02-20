@@ -33,7 +33,54 @@ class PKIManager extends HTMLElement {
 
     connectedCallback() {
         this.render();
+
+        // Web Crypto API requires a secure context (HTTPS or localhost).
+        // Accessing via 0.0.0.0 or a plain HTTP IP will make crypto.subtle undefined.
+        if (!this._hasWebCrypto()) {
+            this._loading = false;
+            this._renderInsecureContextError();
+            return;
+        }
+
         this._initDB();
+    }
+
+    _hasWebCrypto() {
+        return typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined';
+    }
+
+    _renderInsecureContextError() {
+        const el = this.shadowRoot.querySelector('#content');
+        if (!el) return;
+        const currentUrl  = location.href;
+        const localhostUrl = currentUrl.replace(location.hostname, 'localhost');
+        el.innerHTML = `
+            <div class="panel-header">
+                <h2 class="panel-header__title">PKI Key Management</h2>
+                <a href="index.html" class="btn btn--ghost btn--sm">Back to Admin</a>
+            </div>
+            <section class="section">
+                <div class="insecure-context">
+                    <div class="insecure-context__icon">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="40" height="40">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="insecure-context__title">Secure Context Required</div>
+                    <p class="insecure-context__text">
+                        The Web Crypto API (<code>crypto.subtle</code>) is not available because this page
+                        is being served over an insecure context.
+                    </p>
+                    <p class="insecure-context__text">
+                        Browsers restrict <code>crypto.subtle</code> to <strong>HTTPS</strong> or <strong>localhost</strong>.
+                        The current origin (<code>${this._escapeHtml(location.origin)}</code>) does not qualify.
+                    </p>
+                    <p class="insecure-context__fix">
+                        Try accessing this page via <a href="${this._escapeAttr(localhostUrl)}">${this._escapeHtml(localhostUrl)}</a> instead.
+                    </p>
+                </div>
+            </section>
+        `;
     }
 
     disconnectedCallback() {
@@ -1275,6 +1322,60 @@ class PKIManager extends HTMLElement {
                 font-size: var(--admin-font-size-sm, 0.875rem);
                 color: var(--admin-warning, #fbbf24);
                 line-height: 1.5;
+            }
+
+            /* --- Insecure Context Error --- */
+            .insecure-context {
+                text-align: center;
+                padding: 2rem 1rem;
+            }
+
+            .insecure-context__icon {
+                color: var(--admin-warning, #fbbf24);
+                margin-bottom: 0.75rem;
+            }
+
+            .insecure-context__title {
+                font-size: var(--admin-font-size-xl, 1.25rem);
+                font-weight: 600;
+                color: var(--admin-text, #e4e6ef);
+                margin-bottom: 1rem;
+            }
+
+            .insecure-context__text {
+                font-size: var(--admin-font-size-sm, 0.875rem);
+                color: var(--admin-text-secondary, #8b8fa7);
+                line-height: 1.6;
+                margin: 0 0 0.75rem;
+                max-width: 560px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .insecure-context__text code {
+                font-family: var(--admin-font-mono, monospace);
+                font-size: var(--admin-font-size-xs, 0.75rem);
+                background: var(--admin-bg, #0f1117);
+                padding: 0.125rem 0.375rem;
+                border-radius: 3px;
+            }
+
+            .insecure-context__fix {
+                font-size: var(--admin-font-size-sm, 0.875rem);
+                color: var(--admin-text, #e4e6ef);
+                background: var(--admin-primary-bg, rgba(79,143,247,0.1));
+                border: 1px solid rgba(79,143,247,0.2);
+                border-radius: var(--admin-radius, 6px);
+                padding: 0.75rem 1rem;
+                max-width: 560px;
+                margin: 1rem auto 0;
+                line-height: 1.5;
+            }
+
+            .insecure-context__fix a {
+                color: var(--admin-primary, #4f8ff7);
+                text-decoration: underline;
+                word-break: break-all;
             }
 
             /* --- Responsive --- */
