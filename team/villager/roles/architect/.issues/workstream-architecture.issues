@@ -11,3 +11,6 @@ Workstream-2 | todo | Deployment packaging architecture review (from 18-Feb brie
 Workstream-3 | todo | Delete button architecture (from 19-Feb brief, P3)
 	Task-8 | todo | Design delete mechanism (sender-delete, recipient-delete, or both)
 	Task-9 | todo | Assess interaction with expiring links and audit logging
+Workstream-4 | todo | PKI architecture for deployment (from 20-21 Feb briefs, P2)
+	Task-10 | todo | Review PKI deployment implications: key discovery API endpoints in server mode
+	Task-11 | todo | Assess delegated token authorization feature for architecture fit
