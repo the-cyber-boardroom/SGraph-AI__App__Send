@@ -1,0 +1,20 @@
+# Town Planner Accountant — Financial Models and Cost Visibility
+Workstream-1 | todo | Cost measurement methodology (Genesis)
+	Task-1 | todo | Research existing cost accounting models (ABC, TCO, EVM) for adaptation to agentic AI
+	Task-2 | todo | Define cost measurement methodology: token counts, session duration, output volume
+	Task-3 | todo | Propose initial cost model for agent work streams
+	Task-4 | todo | Define "externality cost" measurement (cost to consumers of output)
+Workstream-2 | todo | Production cost tracking
+	Task-5 | todo | Track current AWS production costs (Lambda, S3, CloudFront)
+	Task-6 | todo | Connect recent logging cost spike to the decision that caused it
+	Task-7 | todo | Define cost-per-user and cost-per-transfer metrics
+	Task-8 | todo | Project deployment costs at 100, 1,000, and 10,000 user scale
+Workstream-3 | todo | Financial models for investors (Alchemist collaboration)
+	Task-9 | todo | Produce unit economics model for investor briefing pack
+	Task-10 | todo | Produce revenue projection model (freemium, enterprise, API)
+	Task-11 | todo | Produce infrastructure ROI analysis (compound value of prior investments)
+	Task-12 | todo | Produce first financial model for due-diligence/business/
+Workstream-4 | todo | Budget framework and reporting
+	Task-13 | todo | Establish budget framework (how budgets are set, tracked, reported)
+	Task-14 | todo | Produce first weekly cost report
+	Task-15 | todo | Work with Conductor to implement budget-aware task allocation
