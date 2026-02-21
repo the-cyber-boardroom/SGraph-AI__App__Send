@@ -13,3 +13,8 @@ Workstream-2 | in-progress | 16-Feb brief processing (daily memo workflow)
 	Task-10 | todo | Coordinate SA pipeline work (Dev + Architect P1)
 	Task-11 | todo | Coordinate translation audit (Translator P1)
 	Task-12 | todo | Coordinate DPO/AppSec/GRC evidence collection
+Workstream-3 | todo | 17-19 Feb brief processing
+	Task-13 | todo | Onboard Accountant role (#19) — create ROLE.md and .issues for both teams
+	Task-14 | todo | Coordinate INC-002 execution status with Explorer team
+	Task-15 | todo | Coordinate operational runbook creation (GRC + DevOps)
+	Task-16 | todo | Coordinate deployment packaging work (DevOps + Architect)

@@ -17,3 +17,18 @@ Workstream-3 | todo | Briefing packs infrastructure (from 16-Feb brief, P1)
 Workstream-4 | todo | DPO-AppSec-GRC evidence pack (from 16-Feb brief, P1)
 	Task-13 | todo | Search all project documents for DPO/AppSec/GRC evidence
 	Task-14 | todo | Structure evidence pack with verified sources and quotes
+Workstream-5 | todo | Visitor programme infrastructure (from 19-Feb brief, P2)
+	Task-15 | todo | Create team/visitors/ folder structure
+	Task-16 | todo | Write team/visitors/.claude.md for visitor-context LLM sessions
+	Task-17 | todo | Write WELCOME.md welcome letter (with Advocate)
+	Task-18 | todo | Write GETTING-STARTED.md with platform-specific instructions
+	Task-19 | todo | Write TALK-TO-AGENTS.md with role loading instructions
+	Task-20 | todo | Write CHALLENGES.md exploration tasks and easter eggs
+	Task-21 | todo | Set up team/visitors/manuel/ for first visitor
+Workstream-6 | todo | CC BY licensing audit (from 18-Feb brief, P3)
+	Task-22 | todo | Audit all existing documents for CC BY footer
+	Task-23 | todo | Add standard CC BY footer to documents missing it
+Workstream-7 | done | 17-19 Feb brief catch-up
+	Task-24 | done | Produce master index for 17-19 Feb briefs
+	Task-25 | done | Produce debrief for 17-19 Feb briefs
+	Task-26 | done | Dispatch tasks to impacted Villager role .issues files

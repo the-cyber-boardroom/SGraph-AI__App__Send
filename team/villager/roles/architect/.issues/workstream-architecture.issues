@@ -3,3 +3,11 @@ Workstream-1 | todo | Architecture verification for productisation
 	Task-1 | todo | Document Explorer design decisions for Villager team reference
 	Task-2 | todo | Review hardening changes for boundary compliance
 	Task-3 | todo | Validate production deployment matches designed architecture
+Workstream-2 | todo | Deployment packaging architecture review (from 18-Feb brief, P1)
+	Task-4 | todo | Review Lambda-vs-server-mode implications for each deployment target
+	Task-5 | todo | Define architecture for Docker (FastAPI server mode vs Lambda emulation)
+	Task-6 | todo | Review CloudFormation template for architectural correctness
+	Task-7 | todo | Assess PyPI package boundaries (what ships, what doesn't)
+Workstream-3 | todo | Delete button architecture (from 19-Feb brief, P3)
+	Task-8 | todo | Design delete mechanism (sender-delete, recipient-delete, or both)
+	Task-9 | todo | Assess interaction with expiring links and audit logging

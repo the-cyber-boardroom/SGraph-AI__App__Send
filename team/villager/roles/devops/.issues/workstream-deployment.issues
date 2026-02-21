@@ -18,3 +18,14 @@ Workstream-2 | todo | Subdomain architecture (from 16-Feb brief, P1)
 Workstream-3 | todo | Log archive and cleanup (from 16-Feb brief, P2)
 	Task-15 | todo | Implement log archive workflow (move processed logs to Glacier/IA)
 	Task-16 | todo | Implement log cleanup from live logging bucket
+Workstream-4 | todo | Partner deployment packaging (from 18-Feb brief, P1)
+	Task-17 | todo | Create Dockerfile + docker-compose.yml for self-hosted deployment
+	Task-18 | todo | Create CloudFormation one-click deployment template
+	Task-19 | todo | Create PyPI package (pip install sgraph-send)
+	Task-20 | todo | Create Terraform module (P2)
+	Task-21 | todo | Create GCP Cloud Run deployment (P2)
+	Task-22 | todo | Write deployment documentation for each target
+	Task-23 | todo | Coordinate with Architect on Lambda-vs-server-mode per target
+Workstream-5 | todo | Operational runbooks — DevOps co-ownership (from 19-Feb brief, P1)
+	Task-24 | todo | Co-author P0 "pull the plug" runbook with GRC
+	Task-25 | todo | Define exact AWS teardown steps for P0 scenario

@@ -5,3 +5,15 @@ Workstream-1 | todo | Production risk assessment
 	Task-3 | todo | Verify governance controls in deployment pipeline
 	Task-4 | todo | Verify audit trail covers all production changes
 	Task-5 | todo | Provide GRC clearance for first production release
+Workstream-2 | todo | Operational runbooks (from 19-Feb brief, P1)
+	Task-6 | todo | Write P0 "pull the plug" runbook (with DevOps)
+	Task-7 | todo | Write P1 major incident runbook
+	Task-8 | todo | Write P2 external disclosure runbook
+	Task-9 | todo | Write cost spike runbook (with Accountant)
+	Task-10 | todo | Write P3–P10 runbook templates (P3)
+	Task-11 | todo | Write token compromise runbook (P3)
+	Task-12 | todo | Write service degradation runbook (P3)
+Workstream-3 | todo | Delete button policy (from 19-Feb brief, P3)
+	Task-13 | todo | Define delete policy: log deletion? notify sender? soft vs immediate?
+	Task-14 | todo | Assess interaction with expiring links feature
+	Task-15 | todo | Co-review with AppSec and DPO
