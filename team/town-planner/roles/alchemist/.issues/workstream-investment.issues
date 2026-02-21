@@ -1,10 +1,10 @@
 # Town Planner Alchemist — Investment and Business Development
-Workstream-1 | todo | Materials inventory and audit (first task from role definition)
-	Task-1 | todo | Audit all existing investor-facing materials (for-ambassador/ docs, investor proposal)
-	Task-2 | todo | Create materials inventory: what exists, what's current, what needs updating
-	Task-3 | todo | Produce updated investor briefing pack incorporating PKI milestone
-	Task-4 | todo | Incorporate security review completion into credibility materials
-	Task-5 | todo | Incorporate agentic team story into investor narrative
+Workstream-1 | in-progress | Materials inventory and audit (first task from role definition)
+	Task-1 | done | Audit all existing investor-facing materials (for-ambassador/ docs, investor proposal)
+	Task-2 | done | Create materials inventory: what exists, what's current, what needs updating
+	Task-3 | done | Produce updated investor briefing pack incorporating PKI milestone
+	Task-4 | done | Incorporate security review completion into credibility materials
+	Task-5 | done | Incorporate agentic team story into investor narrative
 Workstream-2 | todo | Narrative construction
 	Task-6 | todo | Write origin-story.md narrative
 	Task-7 | todo | Write market-thesis.md narrative
