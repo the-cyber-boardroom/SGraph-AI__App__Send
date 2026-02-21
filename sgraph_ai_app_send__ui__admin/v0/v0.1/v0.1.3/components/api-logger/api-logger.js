@@ -1,28 +1,37 @@
 /* =============================================================================
    SGraph Send Admin Console — API Logger (Debug)
-   v0.1.3 — Records all fetch() calls with method, URL, status, duration
+   v0.1.3 — Records all fetch() calls with method colours, status borders,
+             expandable request/response details
    ============================================================================= */
 
 (function() {
     'use strict';
+
+    const METHOD_COLORS = {
+        GET    : '#22c55e',
+        POST   : '#3b82f6',
+        PUT    : '#f59e0b',
+        PATCH  : '#8b5cf6',
+        DELETE : '#ef4444'
+    };
 
     class ApiLogger extends HTMLElement {
 
         constructor() {
             super();
             this._entries = [];
-            this._filter  = '';     // '' | '2xx' | '4xx' | '5xx' | 'err'
-            this._boundHandlers = {};
+            this._statusFilter = '';     // '' | '2xx' | '4xx' | '5xx' | 'err'
+            this._textFilter   = '';
         }
 
         connectedCallback() {
             this.render();
-            this.setupEventListeners();
+            this._setupEventListeners();
             this._interceptFetch();
         }
 
         disconnectedCallback() {
-            this.cleanup();
+            this._cleanup();
         }
 
         render() {
@@ -30,6 +39,7 @@
                 <style>${this.getStyles()}</style>
                 <div class="al-container">
                     <div class="al-header">
+                        <input class="al-search" type="text" placeholder="Filter URLs..." />
                         <div class="al-filters">
                             <button class="al-filter-btn al-filter-btn--active" data-filter="">All</button>
                             <button class="al-filter-btn" data-filter="2xx">2xx</button>
@@ -43,11 +53,16 @@
                 </div>
             `;
 
+            this.querySelector('.al-search').addEventListener('input', (e) => {
+                this._textFilter = e.target.value.toLowerCase();
+                this._rerender();
+            });
+
             this.querySelectorAll('.al-filter-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    this._filter = btn.dataset.filter;
+                    this._statusFilter = btn.dataset.filter;
                     this.querySelectorAll('.al-filter-btn').forEach(b =>
-                        b.classList.toggle('al-filter-btn--active', b.dataset.filter === this._filter));
+                        b.classList.toggle('al-filter-btn--active', b.dataset.filter === this._statusFilter));
                     this._rerender();
                 });
             });
@@ -58,30 +73,30 @@
             });
         }
 
-        setupEventListeners() {
-            this._boundHandlers.onApiCall = (data) => this._addEntry(data);
-            window.sgraphAdmin.events.on('api-call', this._boundHandlers.onApiCall);
+        _setupEventListeners() {
+            this._onApiCall = (data) => this._addEntry(data);
+            window.sgraphAdmin.events.on('api-call', this._onApiCall);
 
-            this._boundHandlers.onApiError = (data) => this._addEntry({
+            this._onApiError = (data) => this._addEntry({
                 method: data.method || 'GET',
                 url: data.url || data.operation || '?',
                 status: 0,
                 duration: 0,
                 error: data.error
             });
-            window.sgraphAdmin.events.on('api-error', this._boundHandlers.onApiError);
+            window.sgraphAdmin.events.on('api-error', this._onApiError);
         }
 
-        cleanup() {
-            if (this._boundHandlers.onApiCall) {
-                window.sgraphAdmin.events.off('api-call', this._boundHandlers.onApiCall);
+        _cleanup() {
+            if (this._onApiCall) {
+                window.sgraphAdmin.events.off('api-call', this._onApiCall);
             }
-            if (this._boundHandlers.onApiError) {
-                window.sgraphAdmin.events.off('api-error', this._boundHandlers.onApiError);
+            if (this._onApiError) {
+                window.sgraphAdmin.events.off('api-error', this._onApiError);
             }
-            // Restore original fetch
             if (this._originalFetch) {
                 window.fetch = this._originalFetch;
+                this._originalFetch = null;
             }
         }
 
@@ -93,16 +108,25 @@
                 const method = (options && options.method) || 'GET';
                 const start  = performance.now();
                 const urlStr = typeof url === 'string' ? url : url.url || String(url);
+                const reqBody = options && options.body ? options.body : null;
 
                 try {
                     const response = await self._originalFetch.apply(window, arguments);
                     const duration = Math.round(performance.now() - start);
 
+                    // Clone response to capture body without consuming it
+                    let responseBody = null;
+                    try {
+                        responseBody = await response.clone().json();
+                    } catch (_) { /* non-JSON response */ }
+
                     window.sgraphAdmin.events.emit('api-call', {
                         method,
                         url: urlStr,
                         status: response.status,
-                        duration
+                        duration,
+                        requestBody: reqBody,
+                        responseBody
                     });
 
                     return response;
@@ -122,27 +146,38 @@
 
         _addEntry(data) {
             const entry = {
-                method   : data.method || 'GET',
-                url      : data.url || '?',
-                status   : data.status || 0,
-                duration : data.duration || 0,
-                error    : data.error || null,
-                timestamp: new Date().toISOString()
+                method       : data.method || 'GET',
+                url          : data.url || '?',
+                status       : data.status || 0,
+                duration     : data.duration || 0,
+                error        : data.error || null,
+                requestBody  : data.requestBody || null,
+                responseBody : data.responseBody || null,
+                timestamp    : new Date().toISOString()
             };
             this._entries.push(entry);
             if (this._entries.length > 200) this._entries.shift();
 
-            // Check filter
             if (!this._matchesFilter(entry)) return;
-
             this._renderEntry(entry);
         }
 
         _matchesFilter(entry) {
-            if (!this._filter) return true;
-            if (this._filter === 'err') return entry.status === 0 || entry.error;
-            const range = parseInt(this._filter);
-            return entry.status >= range && entry.status < range + 100;
+            // Status filter
+            if (this._statusFilter) {
+                if (this._statusFilter === 'err') {
+                    if (entry.status !== 0 && !entry.error) return false;
+                } else {
+                    const range = parseInt(this._statusFilter);
+                    if (entry.status < range || entry.status >= range + 100) return false;
+                }
+            }
+            // Text filter
+            if (this._textFilter) {
+                const searchable = (entry.url + ' ' + entry.method).toLowerCase();
+                if (!searchable.includes(this._textFilter)) return false;
+            }
+            return true;
         }
 
         _renderEntry(entry) {
@@ -155,26 +190,74 @@
             const time = new Date(entry.timestamp);
             const timeStr = `${time.getHours().toString().padStart(2,'0')}:${time.getMinutes().toString().padStart(2,'0')}:${time.getSeconds().toString().padStart(2,'0')}`;
 
-            const statusClass = entry.status === 0 ? 'al-status--err' :
-                                entry.status < 300  ? 'al-status--ok'  :
-                                entry.status < 500  ? 'al-status--warn' :
-                                                      'al-status--err';
+            const statusBorder = entry.status === 0  ? 'var(--admin-warning)' :
+                                 entry.status < 300   ? 'var(--admin-success)' :
+                                 entry.status < 500   ? 'var(--admin-warning)' :
+                                                        'var(--admin-error)';
+
+            const methodColor = METHOD_COLORS[entry.method.toUpperCase()] || 'var(--admin-text)';
 
             const el = document.createElement('div');
             el.className = 'al-entry';
-            el.innerHTML = `
+            el.style.borderLeftColor = statusBorder;
+
+            const summary = document.createElement('div');
+            summary.className = 'al-entry-summary';
+            summary.innerHTML = `
                 <span class="al-entry-time">${timeStr}</span>
-                <span class="al-entry-method">${this._escapeHtml(entry.method)}</span>
-                <span class="al-entry-status ${statusClass}">${entry.status || 'ERR'}</span>
+                <span class="al-entry-method" style="color: ${methodColor}">${this._escapeHtml(entry.method)}</span>
+                <span class="al-entry-status al-status--${entry.status === 0 ? 'err' : entry.status < 300 ? 'ok' : entry.status < 500 ? 'warn' : 'err'}">${entry.status || 'ERR'}</span>
                 <span class="al-entry-duration">${entry.duration}ms</span>
-                <span class="al-entry-url" title="${this._escapeAttr(entry.url)}">${this._escapeHtml(entry.url)}</span>
+                <span class="al-entry-url" title="${this._escapeAttr(entry.url)}">${this._escapeHtml(this._truncateUrl(entry.url))}</span>
                 ${entry.error ? `<span class="al-entry-error">${this._escapeHtml(entry.error)}</span>` : ''}
             `;
+
+            el.appendChild(summary);
+
+            // Expandable detail
+            const hasDetail = entry.requestBody || entry.responseBody || entry.error;
+            if (hasDetail) {
+                summary.style.cursor = 'pointer';
+                summary.addEventListener('click', () => {
+                    let detail = el.querySelector('.al-entry-detail');
+                    if (detail) {
+                        detail.remove();
+                    } else {
+                        detail = document.createElement('div');
+                        detail.className = 'al-entry-detail';
+                        let html = '';
+                        if (entry.requestBody) {
+                            html += `<div class="al-detail-section"><span class="al-detail-label">Request:</span><pre class="al-detail-body">${this._escapeHtml(this._formatBody(entry.requestBody))}</pre></div>`;
+                        }
+                        if (entry.responseBody) {
+                            html += `<div class="al-detail-section"><span class="al-detail-label">Response:</span><pre class="al-detail-body">${this._escapeHtml(this._formatBody(entry.responseBody))}</pre></div>`;
+                        }
+                        if (entry.error) {
+                            html += `<div class="al-detail-section"><span class="al-detail-label">Error:</span><pre class="al-detail-body al-detail-body--error">${this._escapeHtml(entry.error)}</pre></div>`;
+                        }
+                        detail.innerHTML = html;
+                        el.appendChild(detail);
+                    }
+                });
+            }
+
             list.prepend(el);
 
             while (list.children.length > 100) {
                 list.lastChild.remove();
             }
+        }
+
+        _truncateUrl(url) {
+            return url.length > 60 ? url.slice(0, 57) + '...' : url;
+        }
+
+        _formatBody(body) {
+            if (typeof body === 'string') {
+                try { return JSON.stringify(JSON.parse(body), null, 2); }
+                catch (_) { return body; }
+            }
+            return JSON.stringify(body, null, 2);
         }
 
         _rerender() {
@@ -214,10 +297,28 @@
                 .al-header {
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
+                    gap: 0.375rem;
                     padding: 0.5rem 0.75rem;
                     border-bottom: 1px solid var(--admin-border);
                     flex-shrink: 0;
+                    flex-wrap: wrap;
+                }
+
+                .al-search {
+                    flex: 1;
+                    min-width: 80px;
+                    padding: 0.25rem 0.5rem;
+                    font-size: var(--admin-font-size-xs);
+                    font-family: var(--admin-font-mono);
+                    color: var(--admin-text);
+                    background: var(--admin-bg);
+                    border: 1px solid var(--admin-border);
+                    border-radius: var(--admin-radius);
+                }
+
+                .al-search:focus {
+                    outline: none;
+                    border-color: var(--admin-primary);
                 }
 
                 .al-filters {
@@ -275,18 +376,23 @@
                 }
 
                 .al-entry {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 0.375rem;
-                    padding: 0.25rem 0.5rem;
-                    margin-bottom: 0.125rem;
+                    margin-bottom: 0.25rem;
                     border-radius: var(--admin-radius);
                     font-size: var(--admin-font-size-xs);
                     font-family: var(--admin-font-mono);
+                    border-left: 3px solid transparent;
                 }
 
                 .al-entry:hover {
                     background: var(--admin-surface-hover);
+                }
+
+                .al-entry-summary {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.375rem;
+                    padding: 0.25rem 0.5rem;
+                    align-items: center;
                 }
 
                 .al-entry-time {
@@ -296,7 +402,6 @@
 
                 .al-entry-method {
                     font-weight: 600;
-                    color: var(--admin-text);
                     flex-shrink: 0;
                     min-width: 2.5rem;
                 }
@@ -305,6 +410,9 @@
                     font-weight: 600;
                     flex-shrink: 0;
                     min-width: 2rem;
+                    padding: 0 0.25rem;
+                    border-radius: 3px;
+                    background: var(--admin-border);
                 }
 
                 .al-status--ok   { color: var(--admin-success); }
@@ -318,14 +426,49 @@
 
                 .al-entry-url {
                     color: var(--admin-text-secondary);
-                    word-break: break-all;
-                    cursor: help;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    max-width: 200px;
                 }
 
                 .al-entry-error {
                     color: var(--admin-error);
                     width: 100%;
                     padding-left: 1rem;
+                }
+
+                .al-entry-detail {
+                    padding: 0.25rem 0.75rem 0.5rem;
+                    border-top: 1px solid var(--admin-border-subtle, var(--admin-border));
+                }
+
+                .al-detail-section {
+                    margin-bottom: 0.375rem;
+                }
+
+                .al-detail-label {
+                    font-size: 0.6875rem;
+                    font-weight: 600;
+                    color: var(--admin-text-muted);
+                    text-transform: uppercase;
+                }
+
+                .al-detail-body {
+                    margin: 0.25rem 0 0;
+                    padding: 0.5rem;
+                    font-size: 0.6875rem;
+                    color: var(--admin-text-secondary);
+                    background: var(--admin-bg);
+                    border-radius: var(--admin-radius);
+                    white-space: pre-wrap;
+                    word-break: break-all;
+                    max-height: 150px;
+                    overflow-y: auto;
+                }
+
+                .al-detail-body--error {
+                    color: var(--admin-error);
                 }
             `;
         }

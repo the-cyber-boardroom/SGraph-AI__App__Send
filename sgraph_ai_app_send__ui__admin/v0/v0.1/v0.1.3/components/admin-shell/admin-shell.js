@@ -27,6 +27,9 @@
             this._sidebarOpen  = false;
             this._debugOpen    = true;
             this._boundHandlers = {};
+            this._activeDebugTab = 'messages';
+            this._debugWidth   = 320;           // default debug sidebar width
+            this._loadPreferences();
         }
 
         connectedCallback() {
@@ -35,7 +38,13 @@
 
             this.render();
             this._setupListeners();
+            this._setupResize();
+            this._setupMessageBadge();
             this._checkHealth();
+
+            // Apply persisted debug sidebar width
+            this._applyDebugWidth();
+            this._updateDebugSidebar();
 
             // Register the router on the global namespace
             window.sgraphAdmin.router = this;
@@ -60,6 +69,8 @@
 
         disconnectedCallback() {
             if (this._healthInterval) clearInterval(this._healthInterval);
+            if (this._resizeCleanup) this._resizeCleanup();
+            if (this._badgeUnsub) this._badgeUnsub();
             window.sgraphAdmin.events.off('navigated', this._boundHandlers.onNavigated);
         }
 
@@ -99,6 +110,41 @@
             }
 
             window.sgraphAdmin.events.emit('navigated', { appId, navLabel: app.navLabel });
+        }
+
+        // --- Sidebar API --------------------------------------------------------
+
+        openSidebar(tabId) {
+            this._debugOpen = true;
+            this._updateDebugSidebar();
+            if (tabId) this._switchDebugTab(tabId);
+        }
+
+        closeSidebar() {
+            this._debugOpen = false;
+            this._updateDebugSidebar();
+        }
+
+        // --- Preferences --------------------------------------------------------
+
+        _loadPreferences() {
+            try {
+                const raw = localStorage.getItem('sgraph-admin-prefs');
+                if (raw) {
+                    const prefs = JSON.parse(raw);
+                    if (prefs.debugWidth) this._debugWidth = prefs.debugWidth;
+                    if (prefs.debugOpen !== undefined) this._debugOpen = prefs.debugOpen;
+                }
+            } catch (_) { /* ignore */ }
+        }
+
+        _savePreferences() {
+            try {
+                localStorage.setItem('sgraph-admin-prefs', JSON.stringify({
+                    debugWidth : this._debugWidth,
+                    debugOpen  : this._debugOpen
+                }));
+            } catch (_) { /* ignore */ }
         }
 
         // --- Auto-registration --------------------------------------------------
@@ -194,15 +240,106 @@
 
         _updateDebugSidebar() {
             const debugSidebar = this.querySelector('.as-debug-sidebar');
+            const resizeHandle = this.querySelector('.as-debug-resize');
             const shell = this.querySelector('.as-shell');
             if (debugSidebar) debugSidebar.classList.toggle('as-debug-sidebar--hidden', !this._debugOpen);
+            if (resizeHandle) resizeHandle.style.display = this._debugOpen ? '' : 'none';
             if (shell) shell.classList.toggle('as-shell--no-debug', !this._debugOpen);
 
             const toggleBtn = this.querySelector('.as-debug-toggle');
             if (toggleBtn) toggleBtn.textContent = this._debugOpen ? 'Debug' : 'Debug';
+            this._savePreferences();
+        }
+
+        _applyDebugWidth() {
+            const shell = this.querySelector('.as-shell');
+            if (shell) {
+                shell.style.setProperty('--debug-width', this._debugWidth + 'px');
+            }
+        }
+
+        _setupResize() {
+            const handle = this.querySelector('.as-debug-resize');
+            if (!handle) return;
+
+            let isResizing = false;
+            let startX, startWidth;
+
+            const onMouseDown = (e) => {
+                if (!this._debugOpen) return;
+                isResizing = true;
+                startX = e.clientX;
+                const sidebar = this.querySelector('.as-debug-sidebar');
+                startWidth = sidebar ? sidebar.offsetWidth : this._debugWidth;
+                handle.classList.add('as-debug-resize--active');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff = startX - e.clientX;  // dragging left = wider (right-side panel)
+                const newWidth = Math.min(Math.max(startWidth + diff, 280), 800);
+                this._debugWidth = newWidth;
+                this._applyDebugWidth();
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('as-debug-resize--active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                this._savePreferences();
+            };
+
+            handle.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+
+            this._resizeCleanup = () => {
+                handle.removeEventListener('mousedown', onMouseDown);
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+        }
+
+        _setupMessageBadge() {
+            const badge = this.querySelector('.as-msg-badge');
+            if (!badge) return;
+
+            const update = () => {
+                const svc = window.sgraphAdmin.messages;
+                if (!svc) return;
+                const msgs = svc.getMessages();
+                const errorCount = msgs.filter(m => m.type === 'error').length;
+                const total = msgs.length;
+                badge.textContent = total || '';
+                badge.style.display = total > 0 ? 'inline-flex' : 'none';
+                badge.classList.toggle('as-msg-badge--error', errorCount > 0);
+            };
+
+            // Click badge → open messages tab
+            badge.addEventListener('click', () => {
+                this.openSidebar('messages');
+            });
+
+            // Subscribe to message events
+            const onMsg = () => update();
+            window.sgraphAdmin.events.on('message-added', onMsg);
+            window.sgraphAdmin.events.on('messages-cleared', onMsg);
+
+            this._badgeUnsub = () => {
+                window.sgraphAdmin.events.off('message-added', onMsg);
+                window.sgraphAdmin.events.off('messages-cleared', onMsg);
+            };
+
+            update();
         }
 
         _switchDebugTab(tabId) {
+            this._activeDebugTab = tabId;
             this.querySelectorAll('.as-debug-tab').forEach(t => {
                 t.classList.toggle('as-debug-tab--active', t.dataset.tab === tabId);
             });
@@ -301,6 +438,8 @@
                         <div class="as-main-content"></div>
                     </main>
 
+                    <div class="as-debug-resize"></div>
+
                     <aside class="as-debug-sidebar">
                         <div class="as-debug-tabs">
                             <button class="as-debug-tab as-debug-tab--active" data-tab="messages">Msgs</button>
@@ -324,6 +463,8 @@
                         <span class="as-status-health">Ready</span>
                         <span class="as-status-active">Active: -</span>
                         <span class="as-status-count">Components: 0</span>
+                        <span class="as-status-spacer"></span>
+                        <button class="as-msg-badge" title="Messages">0</button>
                     </footer>
                 </div>
             `;
@@ -347,22 +488,24 @@
             return `
                 /* --- Shell Grid --- */
                 .as-shell {
+                    --debug-width: 320px;
                     display: grid;
                     grid-template-areas:
-                        "header  header  header"
-                        "sidebar main   debug"
-                        "status  status  status";
-                    grid-template-columns: var(--admin-sidebar-width, 240px) 1fr 320px;
+                        "header  header  header  header"
+                        "sidebar main   resize  debug"
+                        "status  status  status  status";
+                    grid-template-columns: var(--admin-sidebar-width, 240px) 1fr 4px var(--debug-width);
                     grid-template-rows: var(--admin-header-height, 56px) 1fr auto;
                     height: 100vh;
                     overflow: hidden;
                 }
 
                 .as-shell--no-debug {
-                    grid-template-columns: var(--admin-sidebar-width, 240px) 1fr 0;
+                    grid-template-columns: var(--admin-sidebar-width, 240px) 1fr 0 0;
                 }
 
-                .as-shell--no-debug .as-debug-sidebar {
+                .as-shell--no-debug .as-debug-sidebar,
+                .as-shell--no-debug .as-debug-resize {
                     display: none;
                 }
 
@@ -541,6 +684,21 @@
                     margin: 0 auto;
                 }
 
+                /* --- Debug Resize Handle --- */
+                .as-debug-resize {
+                    grid-area: resize;
+                    width: 4px;
+                    cursor: col-resize;
+                    background: transparent;
+                    transition: background 0.15s;
+                    z-index: 10;
+                }
+
+                .as-debug-resize:hover,
+                .as-debug-resize--active {
+                    background: var(--admin-primary);
+                }
+
                 /* --- Debug Sidebar --- */
                 .as-debug-sidebar {
                     grid-area: debug;
@@ -608,13 +766,40 @@
                     font-family: var(--admin-font-mono);
                 }
 
+                .as-status-spacer {
+                    flex: 1;
+                }
+
+                .as-msg-badge {
+                    display: none;
+                    align-items: center;
+                    justify-content: center;
+                    min-width: 1.25rem;
+                    height: 1.25rem;
+                    padding: 0 0.375rem;
+                    border-radius: 9999px;
+                    font-size: 0.6875rem;
+                    font-weight: 600;
+                    font-family: var(--admin-font-mono);
+                    background: var(--admin-border);
+                    color: var(--admin-text-secondary);
+                    border: none;
+                    cursor: pointer;
+                }
+
+                .as-msg-badge--error {
+                    background: var(--admin-error);
+                    color: #fff;
+                }
+
                 /* --- Responsive --- */
                 @media (max-width: 1024px) {
                     .as-shell {
-                        grid-template-columns: var(--admin-sidebar-width, 240px) 1fr 0;
+                        grid-template-columns: var(--admin-sidebar-width, 240px) 1fr 0 0;
                     }
 
-                    .as-debug-sidebar {
+                    .as-debug-sidebar,
+                    .as-debug-resize {
                         display: none;
                     }
                 }
@@ -664,7 +849,8 @@
                         pointer-events: auto;
                     }
 
-                    .as-debug-sidebar {
+                    .as-debug-sidebar,
+                    .as-debug-resize {
                         display: none;
                     }
                 }
