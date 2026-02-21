@@ -29,7 +29,8 @@ class SystemInfo extends HTMLElement {
 
     connectedCallback() {
         this.render();
-        this.loadAll();
+        // Don't load here — wait for shell to activate this view via onActivated()
+        // Prevents duplicate API calls (connectedCallback + onActivated both fire on startup)
     }
 
     disconnectedCallback() {
