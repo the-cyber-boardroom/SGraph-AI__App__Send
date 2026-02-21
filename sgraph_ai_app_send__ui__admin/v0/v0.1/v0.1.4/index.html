@@ -18,7 +18,7 @@
             Default view: system-info (avoids N+1 API calls from token-manager).
         -->
         <system-info          data-nav-section="System"      style="display:none"></system-info>
-        <cache-browser        data-nav-section="System"      style="display:none"></cache-browser>
+        <storage-browser      data-nav-section="System"      style="display:none"></storage-browser>
         <pki-keys             data-nav-section="PKI"         style="display:none"></pki-keys>
         <pki-encrypt          data-nav-section="PKI"         style="display:none"></pki-encrypt>
         <pki-contacts         data-nav-section="PKI"         style="display:none"></pki-contacts>
@@ -40,6 +40,7 @@
     <script src="../v0.1.0/js/admin-api.js"></script>
     <script src="../v0.1.1/js/admin-api-cache.js"></script>
     <script src="../v0.1.3/js/admin-api-keys.js"></script>
+    <script src="../v0.1.3/js/qr-code.js"></script>
 
     <!-- Layer 3: Debug panels (must define before shell uses them) -->
     <script src="../v0.1.3/components/messages-panel/messages-panel.js"></script>
@@ -63,7 +64,7 @@
     <script src="../v0.1.2/components/analytics-dashboard/analytics-dashboard.js"></script>
     <script src="../v0.1.0/components/system-info/system-info.js"></script>
     <script src="../v0.1.1/components/metrics-dashboard/metrics-dashboard.js"></script>
-    <script src="../v0.1.1/components/cache-browser/cache-browser.js"></script>
+    <script src="../v0.1.3/components/storage-browser/storage-browser.js"></script>
 
     <!-- Layer 5: Registration overlay (adds appId to legacy components) -->
     <script src="../v0.1.3/js/register-legacy-apps.js"></script>
