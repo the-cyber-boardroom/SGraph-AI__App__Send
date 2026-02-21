@@ -126,6 +126,16 @@ class Send__Cache__Client(Type_Safe):                                      # Cac
             return_full_path = False                           ,
             recursive        = False                           ) or []
 
+    def token__list_all_with_details(self):                               # List all tokens with full data (bulk)
+        token_names = self.token__list_all()
+        tokens      = []
+        for token_name in token_names:
+            if token_name:
+                detail = self.token__lookup(token_name)
+                if detail:
+                    tokens.append(detail)
+        return tokens
+
     def token__list_data(self, token_name):                              # List data files for a specific token
         cache_id = self.token__lookup_cache_id(token_name)
         if cache_id is None:
