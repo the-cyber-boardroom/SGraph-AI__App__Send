@@ -12,14 +12,15 @@
 
 ## Team Structure: Explorer and Villager
 
-As of v0.3.0, the project operates with **two teams** based on Wardley Maps methodology:
+As of v0.5.8, the project operates with **three teams** based on Wardley Maps methodology:
 
 | Team | Focus | Wardley Stage | Output |
 |------|-------|---------------|--------|
 | **Explorer** | Discover, experiment, build first versions | Genesis → Custom-Built | Minor versions (IFD) |
 | **Villager** | Stabilise, harden, deploy to production | Custom-Built → Product | Major versions (IFD releases) |
+| **Town Planner** | Transmute technical output into investment and business value | Product → Commodity | Investor materials, business strategy |
 
-**Session-specific instructions** live in `.claude/explorer/CLAUDE.md` and `.claude/villager/CLAUDE.md`. When starting a new Claude Code session, the human will indicate which team context applies. Read the team-specific CLAUDE.md for your session's rules.
+**Session-specific instructions** live in `.claude/explorer/CLAUDE.md`, `.claude/villager/CLAUDE.md`, and `.claude/town-planner/CLAUDE.md`. When starting a new Claude Code session, the human will indicate which team context applies. Read the team-specific CLAUDE.md for your session's rules.
 
 ### Key Separation Rules
 
@@ -27,12 +28,15 @@ As of v0.3.0, the project operates with **two teams** based on Wardley Maps meth
 2. **Villagers do NOT fix bugs that change behaviour.** Bugs go back to Explorer.
 3. **Explorers do NOT deploy to production.** Production is Villager territory.
 4. **Explorers do NOT optimise for performance.** That's the Villager's job.
-5. **Distinct environments.** Explorer and Villager operate in separate infrastructure.
+5. **Town Planners do NOT make technical decisions.** They translate technical output into business value.
+6. **Town Planners do NOT create user-facing marketing.** That's the Ambassador/Journalist. Town Planners speak to investors.
+7. **Distinct environments.** Explorer, Villager, and Town Planner operate in separate infrastructure.
 
 ### Role Definitions
 
 - **Explorer role definition:** `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md`
 - **Villager role definition:** `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md`
+- **Alchemist role definition:** `team/humans/dinis_cruz/briefs/02/21/v0.5.8__role-definition__alchemist.md`
 - **Wardley Maps context:** `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md`
 
 ---
@@ -94,9 +98,10 @@ library/                         # Specs, guides, roadmap, dependencies
   guides/                        # Development guides, IFD, agentic workflow
   roadmap/phases/                # Phase overview
   sgraph-send/dev_packs/         # Briefing packs for agent sessions (D065)
+  alchemist/                     # Alchemist materials library (narratives, materials, investors, due diligence)
 
 team/                            # Team structure
-  roles/                         # Role-based review documents
+  roles/                         # Explorer team role-based review documents
     architect/                   # API contracts, data models, topology
     appsec/                      # Application security
     cartographer/                # System maps, dependency graphs
@@ -107,6 +112,9 @@ team/                            # Team structure
     journalist/                  # Communications, content
     librarian/                   # Knowledge base, Issues FS maintenance
     qa/                          # Test strategy, security testing
+  villager/roles/                # Villager team roles (mirrored structure)
+  town-planner/roles/            # Town Planner team roles
+    alchemist/                   # Investment, business strategy, investor relations
   humans/dinis_cruz/briefs/      # Human briefs (input — date-bucketed)
   humans/dinis_cruz/debriefs/    # Team debriefs (output — date-bucketed, with relative links)
 
@@ -114,6 +122,7 @@ team/                            # Team structure
   CLAUDE.md                      # This file — shared guidance for all sessions
   explorer/CLAUDE.md             # Explorer team session instructions
   villager/CLAUDE.md             # Villager team session instructions
+  town-planner/CLAUDE.md         # Town Planner team session instructions
 
 .github/workflows/               # CI pipelines
 ```
@@ -175,9 +184,9 @@ team/                            # Team structure
 
 Each agent operates as a specific role. Roles produce review documents in their `team/roles/{role}/reviews/` folder. The Librarian maintains the master index.
 
-**17 roles across two teams** — Conductor, Architect, Dev, QA, DevOps, Librarian, Cartographer, AppSec, Historian, Journalist, Designer, Advocate, Sherpa, Ambassador, CISO, DPO, GRC. Plus two meta-roles: Explorer (leads Explorer team) and Villager (leads Villager team).
+**18 roles across three teams** — Conductor, Architect, Dev, QA, DevOps, Librarian, Cartographer, AppSec, Historian, Journalist, Designer, Advocate, Sherpa, Ambassador, CISO, DPO, GRC, Alchemist. Plus three meta-roles: Explorer (leads Explorer team), Villager (leads Villager team), and Town Planner (leads Town Planner team).
 
-**Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs and Villager briefs. **IMPORTANT: The `briefs/` folder is read-only for agents.** Only the human creates files there. Agent outputs go to `team/humans/dinis_cruz/claude-code-web/` or `team/roles/{role}/reviews/`.
+**Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs, Villager briefs, and Town Planner briefs. **IMPORTANT: The `briefs/` folder is read-only for agents.** Only the human creates files there. Agent outputs go to `team/humans/dinis_cruz/claude-code-web/` or `team/roles/{role}/reviews/`.
 
 Before starting work, check:
 1. Latest human brief in `team/humans/dinis_cruz/briefs/`
