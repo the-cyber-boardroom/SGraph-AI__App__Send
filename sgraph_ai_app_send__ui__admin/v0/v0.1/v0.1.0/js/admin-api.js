@@ -127,10 +127,19 @@ class AdminAPI {
 
     /**
      * List all tokens.
-     * @returns {Promise<{files: Array}>}
+     * @returns {Promise<{token_names: Array}>}
      */
     listTokens() {
         return this._get('/tokens/list');
+    }
+
+    /**
+     * List all tokens with full details (bulk endpoint).
+     * Single call replaces list + N lookups.
+     * @returns {Promise<{tokens: Array}>}
+     */
+    listTokenDetails() {
+        return this._get('/tokens/list-details');
     }
 
     // --- Analytics ----------------------------------------------------------
