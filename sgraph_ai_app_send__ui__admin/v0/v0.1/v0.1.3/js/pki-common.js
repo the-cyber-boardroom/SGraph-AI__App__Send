@@ -99,6 +99,12 @@
         return `-----BEGIN PUBLIC KEY-----\n${b64.match(/.{1,64}/g).join('\n')}\n-----END PUBLIC KEY-----`;
     }
 
+    async function exportSigningKeyPEM(signingPublicKey) {
+        const exported = await crypto.subtle.exportKey('spki', signingPublicKey);
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
+        return `-----BEGIN PUBLIC KEY-----\n${b64.match(/.{1,64}/g).join('\n')}\n-----END PUBLIC KEY-----`;
+    }
+
     async function importPublicKeyPEM(pem) {
         const b64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
         const der = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
@@ -340,6 +346,7 @@
         db                       : new PKIDatabase(),
         hasWebCrypto,
         exportPublicKeyPEM,
+        exportSigningKeyPEM,
         importPublicKeyPEM,
         importSigningKeyPEM,
         computeFingerprint,
