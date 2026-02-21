@@ -76,6 +76,8 @@ class SendAccessGate extends HTMLElement {
                            class="input"
                            placeholder="Paste your access token"
                            autocomplete="off"
+                           autocapitalize="off"
+                           autocorrect="off"
                            spellcheck="false">
                     <button class="btn btn-primary" id="access-token-submit">Go</button>
                 </div>
@@ -114,7 +116,7 @@ class SendAccessGate extends HTMLElement {
         const input  = this.querySelector('#access-token-input');
         const error  = this.querySelector('#access-token-error');
         const submit = this.querySelector('#access-token-submit');
-        const token  = (input.value || '').trim();
+        const token  = (input.value || '').trim().toLowerCase();
 
         if (!token) {
             error.classList.remove('hidden');
