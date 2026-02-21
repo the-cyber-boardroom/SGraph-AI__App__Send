@@ -57,7 +57,6 @@
 
         cleanup() {
             if (this._boundHandlers.onDbChange) pki().db.offChange(this._boundHandlers.onDbChange);
-            if (this._toastTimer) clearTimeout(this._toastTimer);
         }
 
         // --- Data ----------------------------------------------------------------
@@ -69,7 +68,7 @@
                 this._keys     = await pki().db.getAll('keys');
                 this._contacts = await pki().db.getAll('contacts');
             } catch (err) {
-                this._showToast(`Failed to load data: ${err.message}`, 'error');
+                window.sgraphAdmin.messages.error(`Failed to load data: ${err.message}`);
             }
             this._loading = false;
             this._renderContent();
@@ -80,6 +79,7 @@
         async _handleEncrypt(contactId, signingKeyId, plaintext) {
             const outputEl = this.querySelector('#pe-encrypt-output');
             if (!outputEl) return;
+            const msg = window.sgraphAdmin.messages;
 
             const contact = this._contacts.find(c => c.id === contactId);
             if (!contact) { outputEl.textContent = 'No contact selected'; return; }
@@ -113,15 +113,15 @@
                 try {
                     await navigator.clipboard.writeText(encoded);
                     const signed = payload.s ? ' (signed)' : '';
-                    this._showToast(`Encrypted${signed} payload copied to clipboard`, 'success');
+                    msg.success(`Encrypted${signed} payload copied to clipboard`);
                 } catch (_) {
-                    this._showToast('Encrypted. Select and copy the payload manually.', 'success');
+                    msg.success('Encrypted. Select and copy the payload manually.');
                 }
 
                 if (this.events) this.events.emit('message-encrypted', { recipientFingerprint: contact.publicKeyFingerprint, payloadSize: encoded.length });
             } catch (err) {
                 outputEl.textContent = `Error: ${err.message}`;
-                this._showToast(`Encrypt failed: ${err.message}`, 'error');
+                msg.error(`Encrypt failed: ${err.message}`);
             }
         }
 
@@ -130,49 +130,70 @@
         async _handleDecrypt(keyId, encodedPayload) {
             const outputEl = this.querySelector('#pe-decrypt-output');
             if (!outputEl) return;
+            const msg = window.sgraphAdmin.messages;
 
             const keyRecord = this._keys.find(k => k.id === keyId);
             if (!keyRecord) { outputEl.textContent = 'No key selected'; return; }
 
+            // Step 1: Decode and parse the payload
+            let payload;
             try {
-                const payload = JSON.parse(atob(encodedPayload));
-                if (payload.v !== 1 && payload.v !== 2) throw new Error('Unsupported payload version');
+                payload = JSON.parse(atob(encodedPayload));
+            } catch (_) {
+                const errMsg = 'Invalid payload — the pasted text is not a valid encrypted message';
+                outputEl.innerHTML = `<span class="pe-fail">${pki().escapeHtml(errMsg)}</span>`;
+                msg.error(errMsg);
+                return;
+            }
 
+            if (payload.v !== 1 && payload.v !== 2) {
+                const errMsg = `Unsupported payload version: v${payload.v}`;
+                outputEl.innerHTML = `<span class="pe-fail">${pki().escapeHtml(errMsg)}</span>`;
+                msg.error(errMsg);
+                return;
+            }
+
+            // Step 2: Decrypt
+            let decrypted;
+            try {
                 const wrappedKey = pki().b64ToArrayBuf(payload.w);
                 const iv         = new Uint8Array(pki().b64ToArrayBuf(payload.i));
                 const encrypted  = pki().b64ToArrayBuf(payload.c);
-                const decrypted  = await pki().hybridDecrypt(keyRecord.privateKey, wrappedKey, iv, encrypted);
+                decrypted        = await pki().hybridDecrypt(keyRecord.privateKey, wrappedKey, iv, encrypted);
+            } catch (_) {
+                const errMsg = 'Decryption failed — this message was not encrypted with this key pair';
+                outputEl.innerHTML = `<span class="pe-fail">${pki().escapeHtml(errMsg)}</span>`;
+                msg.error(errMsg);
+                return;
+            }
 
-                let verifyHtml = '';
-                if (payload.s && payload.f) {
-                    const sender = this._contacts.find(c => c.signingFingerprint === payload.f);
-                    if (sender && sender.signingPublicKey) {
-                        try {
-                            const sigBuf     = pki().b64ToArrayBuf(payload.s);
-                            const dataToVerify = pki().b64ToArrayBuf(payload.c);
-                            const valid = await crypto.subtle.verify(
-                                { name: 'ECDSA', hash: 'SHA-256' }, sender.signingPublicKey, sigBuf, dataToVerify
-                            );
-                            verifyHtml = valid
-                                ? `<div class="pe-verify pe-verify--ok">Signed by <strong>${pki().escapeHtml(sender.label)}</strong> — signature verified</div>`
-                                : `<div class="pe-verify pe-verify--fail">Signature INVALID — message may be tampered</div>`;
-                        } catch (_) {
-                            verifyHtml = `<div class="pe-verify pe-verify--fail">Signature verification error</div>`;
-                        }
-                    } else {
-                        verifyHtml = `<div class="pe-verify pe-verify--unknown">Signed (fingerprint: ${pki().escapeHtml(payload.f)}) — sender not in your contacts</div>`;
+            // Step 3: Verify signature
+            let verifyHtml = '';
+            if (payload.s && payload.f) {
+                const sender = this._contacts.find(c => c.signingFingerprint === payload.f);
+                if (sender && sender.signingPublicKey) {
+                    try {
+                        const sigBuf       = pki().b64ToArrayBuf(payload.s);
+                        const dataToVerify = pki().b64ToArrayBuf(payload.c);
+                        const valid = await crypto.subtle.verify(
+                            { name: 'ECDSA', hash: 'SHA-256' }, sender.signingPublicKey, sigBuf, dataToVerify
+                        );
+                        verifyHtml = valid
+                            ? `<div class="pe-verify pe-verify--ok">Signed by <strong>${pki().escapeHtml(sender.label)}</strong> — signature verified</div>`
+                            : `<div class="pe-verify pe-verify--fail">Signature INVALID — message may be tampered</div>`;
+                    } catch (_) {
+                        verifyHtml = `<div class="pe-verify pe-verify--fail">Signature verification error</div>`;
                     }
                 } else {
-                    verifyHtml = `<div class="pe-verify pe-verify--info">No signature — sender's key was created before signing was available. Confidentiality is intact.</div>`;
+                    verifyHtml = `<div class="pe-verify pe-verify--unknown">Signed (fingerprint: ${pki().escapeHtml(payload.f)}) — sender not in your contacts</div>`;
                 }
-
-                outputEl.innerHTML = `<span class="pe-pass">${pki().escapeHtml(decrypted)}</span>${verifyHtml}`;
-                this._showToast('Message decrypted successfully', 'success');
-                if (this.events) this.events.emit('message-decrypted', { senderFingerprint: payload.f || null, verified: verifyHtml.includes('verified') });
-            } catch (err) {
-                outputEl.innerHTML = `<span class="pe-fail">Error: ${pki().escapeHtml(err.message)}</span>`;
-                this._showToast(`Decrypt failed: ${err.message}`, 'error');
+            } else {
+                verifyHtml = `<div class="pe-verify pe-verify--info">No signature — sender's key was created before signing was available. Confidentiality is intact.</div>`;
             }
+
+            outputEl.innerHTML = `<span class="pe-pass">${pki().escapeHtml(decrypted)}</span>${verifyHtml}`;
+            msg.success('Message decrypted successfully');
+            if (this.events) this.events.emit('message-decrypted', { senderFingerprint: payload.f || null, verified: verifyHtml.includes('verified') });
         }
 
         // --- Test round-trip -----------------------------------------------------
@@ -200,16 +221,6 @@
             }
         }
 
-        // --- Toast ---------------------------------------------------------------
-
-        _showToast(message, type) {
-            const el = this.querySelector('.pk-toast-area');
-            if (!el) return;
-            el.innerHTML = `<div class="pk-toast pk-toast--${type}">${pki().escapeHtml(message)}</div>`;
-            if (this._toastTimer) clearTimeout(this._toastTimer);
-            this._toastTimer = setTimeout(() => { if (el) el.innerHTML = ''; }, 4000);
-        }
-
         // --- Render --------------------------------------------------------------
 
         render() {
@@ -233,7 +244,6 @@
                     .pe-test-subtitle { font-size: var(--admin-font-size-xs, 0.75rem); color: var(--admin-text-secondary, #8b8fa7); margin: 0 0 0.5rem; }
                     @media (max-width: 768px) { .pe-grid { grid-template-columns: 1fr; } }
                 </style>
-                <div class="pk-toast-area"></div>
                 <div class="pk-content"></div>
             `;
             this._renderContent();
@@ -319,7 +329,7 @@
                     const contactId = Number(this.querySelector('#pe-encrypt-contact').value);
                     const signerId  = Number(this.querySelector('#pe-encrypt-signer').value);
                     const plaintext = this.querySelector('#pe-encrypt-plaintext').value.trim();
-                    if (!plaintext) { this._showToast('Type a message first', 'error'); return; }
+                    if (!plaintext) { window.sgraphAdmin.messages.warning('Type a message first'); return; }
                     this._handleEncrypt(contactId, signerId, plaintext);
                 });
             }
@@ -329,7 +339,7 @@
                 btnDecrypt.addEventListener('click', () => {
                     const keyId   = Number(this.querySelector('#pe-decrypt-key').value);
                     const payload = this.querySelector('#pe-decrypt-payload').value.trim();
-                    if (!payload) { this._showToast('Paste an encrypted payload first', 'error'); return; }
+                    if (!payload) { window.sgraphAdmin.messages.warning('Paste an encrypted payload first'); return; }
                     this._handleDecrypt(keyId, payload);
                 });
             }

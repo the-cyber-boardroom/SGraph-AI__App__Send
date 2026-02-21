@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGraph Send — Admin Console</title>
     <link rel="stylesheet" href="../v0.1.0/css/admin.css">
+    <link rel="stylesheet" href="css/sg-brand.css">
 </head>
 <body>
     <admin-shell>
@@ -31,31 +32,31 @@
     </admin-shell>
 
     <!-- Layer 1: Services (must load first) -->
-    <script src="js/event-bus.js"></script>
-    <script src="js/config-manager.js"></script>
-    <script src="js/messages-service.js"></script>
+    <script src="../v0.1.3/js/event-bus.js"></script>
+    <script src="../v0.1.3/js/config-manager.js"></script>
+    <script src="../v0.1.3/js/messages-service.js"></script>
 
     <!-- Layer 2: API client (loads before components) -->
     <script src="../v0.1.0/js/admin-api.js"></script>
     <script src="../v0.1.1/js/admin-api-cache.js"></script>
-    <script src="js/admin-api-keys.js"></script>
+    <script src="../v0.1.3/js/admin-api-keys.js"></script>
 
     <!-- Layer 3: Debug panels (must define before shell uses them) -->
-    <script src="components/messages-panel/messages-panel.js"></script>
-    <script src="components/events-viewer/events-viewer.js"></script>
-    <script src="components/api-logger/api-logger.js"></script>
+    <script src="../v0.1.3/components/messages-panel/messages-panel.js"></script>
+    <script src="../v0.1.3/components/events-viewer/events-viewer.js"></script>
+    <script src="../v0.1.3/components/api-logger/api-logger.js"></script>
 
     <!-- Layer 4a: PKI shared utilities + components (v0.1.3) -->
-    <script src="js/pki-common.js"></script>
-    <script src="components/pki-keys/pki-keys.js"></script>
-    <script src="components/pki-encrypt/pki-encrypt.js"></script>
-    <script src="components/pki-contacts/pki-contacts.js"></script>
+    <script src="../v0.1.3/js/pki-common.js"></script>
+    <script src="../v0.1.3/components/pki-keys/pki-keys.js"></script>
+    <script src="../v0.1.3/components/pki-encrypt/pki-encrypt.js"></script>
+    <script src="../v0.1.3/components/pki-contacts/pki-contacts.js"></script>
 
     <!-- Layer 4b: Key discovery components (v0.1.3) -->
-    <script src="components/key-publish/key-publish.js"></script>
-    <script src="components/key-lookup/key-lookup.js"></script>
-    <script src="components/key-registry/key-registry.js"></script>
-    <script src="components/key-log/key-log.js"></script>
+    <script src="../v0.1.3/components/key-publish/key-publish.js"></script>
+    <script src="../v0.1.3/components/key-lookup/key-lookup.js"></script>
+    <script src="../v0.1.3/components/key-registry/key-registry.js"></script>
+    <script src="../v0.1.3/components/key-log/key-log.js"></script>
 
     <!-- Layer 4c: Legacy components (v0.1.0–v0.1.2) -->
     <script src="../v0.1.2/components/token-manager/token-manager.js"></script>
@@ -65,9 +66,12 @@
     <script src="../v0.1.1/components/cache-browser/cache-browser.js"></script>
 
     <!-- Layer 5: Registration overlay (adds appId to legacy components) -->
-    <script src="js/register-legacy-apps.js"></script>
+    <script src="../v0.1.3/js/register-legacy-apps.js"></script>
 
     <!-- Layer 6: Shell (reads children, builds layout, auto-registers apps) -->
+    <script src="../v0.1.3/components/admin-shell/admin-shell.js"></script>
+
+    <!-- Layer 7: Brand patch (v0.1.4 — updates header logo and version) -->
     <script src="components/admin-shell/admin-shell.js"></script>
 </body>
 </html>

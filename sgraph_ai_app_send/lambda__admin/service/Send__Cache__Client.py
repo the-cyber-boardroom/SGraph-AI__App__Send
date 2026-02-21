@@ -12,6 +12,7 @@ NS_ANALYTICS  = 'analytics'                                                # Raw
 NS_TOKENS     = 'tokens'                                                   # Token metadata + usage events
 NS_COSTS      = 'costs'                                                    # AWS cost data
 NS_TRANSFERS  = 'transfers'                                                # Per-transfer analytics summaries
+NS_KEYS       = 'keys'                                                     # Public key registry entries
 
 
 class Send__Cache__Client(Type_Safe):                                      # Cache service client wrapper for SGraph Send
@@ -143,3 +144,106 @@ class Send__Cache__Client(Type_Safe):                                      # Cac
         return self.cache_client.data().list().data__list(
             cache_id  = cache_id   ,
             namespace = NS_TOKENS  )
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Key Registry Operations
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def key__create(self, key_data):                                        # Create a new key entry via KEY_BASED strategy
+        code = key_data.get('code', '')
+        result = self.cache_client.store().store__json__cache_key(
+            namespace       = NS_KEYS         ,
+            strategy        = 'key_based'     ,
+            cache_key       = code            ,
+            file_id         = code            ,
+            body            = key_data        ,
+            json_field_path = 'code'          )
+        if result and hasattr(result, 'cache_id'):
+            return result
+        return None
+
+    def key__lookup(self, code):                                            # Find key by lookup code (hash lookup)
+        cache_hash = self.hash_generator.from_string(code)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_KEYS         )
+        if response and response.get('cache_id'):
+            cache_id = response.get('cache_id')
+            return self.cache_client.retrieve().retrieve__cache_id__json(
+                cache_id  = cache_id ,
+                namespace = NS_KEYS  )
+        return None
+
+    def key__lookup_cache_id(self, code):                                   # Get cache_id for a key by code
+        cache_hash = self.hash_generator.from_string(code)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_KEYS         )
+        if response:
+            return response.get('cache_id')
+        return None
+
+    def key__update(self, cache_id, key_data):                              # Update key data
+        return self.cache_client.update().update__json(
+            cache_id  = cache_id  ,
+            namespace = NS_KEYS   ,
+            body      = key_data  )
+
+    def key__list_all(self):                                                # List all key codes from storage
+        return self.cache_client.admin_storage().folders(
+            path             = f'{NS_KEYS}/data/key-based/' ,
+            return_full_path = False                         ,
+            recursive        = False                         ) or []
+
+    def key__index_fingerprint(self, fingerprint, code):                    # Create fingerprint→code index
+        index_data = dict(fingerprint=fingerprint, code=code)
+        fp_hex     = fingerprint.replace('sha256:', '')
+        return self.cache_client.store().store__json__cache_key(
+            namespace       = NS_KEYS                         ,
+            strategy        = 'key_based'                     ,
+            cache_key       = f'idx-fp-{fp_hex}'              ,
+            file_id         = f'idx-fp-{fp_hex}'              ,
+            body            = index_data                      ,
+            json_field_path = 'fingerprint'                   )
+
+    def key__lookup_by_fingerprint(self, fingerprint):                      # Check if fingerprint already exists
+        fp_hex     = fingerprint.replace('sha256:', '')
+        cache_hash = self.hash_generator.from_string(f'idx-fp-{fp_hex}')
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_KEYS         )
+        if response and response.get('cache_id'):
+            cache_id = response.get('cache_id')
+            return self.cache_client.retrieve().retrieve__cache_id__json(
+                cache_id  = cache_id ,
+                namespace = NS_KEYS  )
+        return None
+
+    def key__append_log(self, log_entry):                                   # Append entry to transparency log
+        seq     = log_entry.get('seq', 0)
+        log_key = f'log-{seq:08d}'
+        log_entry['log_key'] = log_key                                      # Add key field so hash matches
+        return self.cache_client.store().store__json__cache_key(
+            namespace       = NS_KEYS                                 ,
+            strategy        = 'key_based'                             ,
+            cache_key       = log_key                                 ,
+            file_id         = log_key                                 ,
+            body            = log_entry                               ,
+            json_field_path = 'log_key'                               )
+
+    def key__get_log_entries(self):                                          # Get all transparency log entries
+        all_codes = self.key__list_all()
+        log_codes = sorted([c for c in all_codes if c.startswith('log-')])
+        entries   = []
+        for log_key in log_codes:
+            cache_hash = self.hash_generator.from_string(log_key)
+            response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+                cache_hash = str(cache_hash) ,
+                namespace  = NS_KEYS         )
+            if response and response.get('cache_id'):
+                entry = self.cache_client.retrieve().retrieve__cache_id__json(
+                    cache_id  = response['cache_id'] ,
+                    namespace = NS_KEYS              )
+                if entry:
+                    entries.append(entry)
+        return entries

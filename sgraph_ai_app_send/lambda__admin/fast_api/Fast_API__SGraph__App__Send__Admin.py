@@ -11,7 +11,9 @@ from sgraph_ai_app_send.lambda__admin.admin__config                             
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client                   import Send__Cache__Client
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                    import create_send_cache_client
 from sgraph_ai_app_send.lambda__admin.service.Service__Tokens                       import Service__Tokens
+from sgraph_ai_app_send.lambda__admin.service.Service__Keys                         import Service__Keys
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import Routes__Tokens
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                  import Routes__Keys
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser        import Routes__Cache__Browser
 from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                 import Middleware__Analytics
 from sgraph_ai_app_send.lambda__admin.service.Service__Analytics__Pulse             import compute_pulse
@@ -29,6 +31,7 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
 
     send_cache_client : Send__Cache__Client      = None                             # Cache service client (IN_MEMORY mode)
     service_tokens    : Service__Tokens           = None                             # Token lifecycle service
+    service_keys      : Service__Keys             = None                             # Key registry service
     metrics_cache     : Service__Metrics__Cache   = None                             # Metrics cache service
 
     def setup(self):
@@ -43,6 +46,9 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
 
         if self.service_tokens is None:                                             # Auto-create token service
             self.service_tokens = Service__Tokens(send_cache_client=self.send_cache_client)
+
+        if self.service_keys is None:                                                # Auto-create key registry service
+            self.service_keys = Service__Keys(send_cache_client=self.send_cache_client)
 
         if self.metrics_cache is None:                                              # Auto-create metrics pipeline
             if METRICS__USE_STUB:                                                      # Local dev: stub data, no AWS calls
@@ -59,6 +65,8 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         self.add_routes(Routes__Info             )
         self.add_routes(Routes__Tokens           ,
                         service_tokens = self.service_tokens)
+        self.add_routes(Routes__Keys             ,
+                        service_keys   = self.service_keys  )
         self.add_routes(Routes__Set_Cookie       )
         self.add_routes(Routes__Cache__Browser  ,
                         send_cache_client = self.send_cache_client)

@@ -58,7 +58,6 @@
 
         cleanup() {
             if (this._boundHandlers.onDbChange) pki().db.offChange(this._boundHandlers.onDbChange);
-            if (this._toastTimer) clearTimeout(this._toastTimer);
         }
 
         // --- Data ----------------------------------------------------------------
@@ -69,7 +68,7 @@
             try {
                 this._contacts = await pki().db.getAll('contacts');
             } catch (err) {
-                this._showToast(`Failed to load contacts: ${err.message}`, 'error');
+                window.sgraphAdmin.messages.error(`Failed to load contacts: ${err.message}`);
             }
             this._loading = false;
             this._renderContent();
@@ -110,10 +109,10 @@
 
                 await this._loadContacts();
                 const sigMsg = signingPublicKey ? ' (with signing key)' : ' (encryption only)';
-                this._showToast(`Public key for '${label}' imported${sigMsg}.`, 'success');
+                window.sgraphAdmin.messages.success(`Public key for '${label}' imported${sigMsg}.`);
                 if (this.events) this.events.emit('contact-imported', { fingerprint, source: 'manual' });
             } catch (err) {
-                this._showToast(`Import failed: ${err.message}`, 'error');
+                window.sgraphAdmin.messages.error(`Import failed: ${err.message}`);
             }
         }
 
@@ -121,10 +120,10 @@
             try {
                 await pki().db.delete('contacts', contact.id);
                 await this._loadContacts();
-                this._showToast(`Contact '${contact.label}' removed.`, 'success');
+                window.sgraphAdmin.messages.success(`Contact '${contact.label}' removed.`);
                 if (this.events) this.events.emit('contact-deleted', { contactId: contact.id });
             } catch (err) {
-                this._showToast(`Delete failed: ${err.message}`, 'error');
+                window.sgraphAdmin.messages.error(`Delete failed: ${err.message}`);
             }
         }
 
@@ -132,9 +131,9 @@
             const text = pki().buildPublicKeyBundle(contact);
             try {
                 await navigator.clipboard.writeText(text);
-                this._showToast('Key bundle copied to clipboard', 'success');
+                window.sgraphAdmin.messages.success('Key bundle copied to clipboard');
             } catch (_) {
-                this._showToast('Could not copy to clipboard', 'error');
+                window.sgraphAdmin.messages.error('Could not copy to clipboard');
             }
         }
 
@@ -183,22 +182,11 @@
             labelInput.focus();
         }
 
-        // --- Toast ---------------------------------------------------------------
-
-        _showToast(message, type) {
-            const el = this.querySelector('.pk-toast-area');
-            if (!el) return;
-            el.innerHTML = `<div class="pk-toast pk-toast--${type}">${pki().escapeHtml(message)}</div>`;
-            if (this._toastTimer) clearTimeout(this._toastTimer);
-            this._toastTimer = setTimeout(() => { if (el) el.innerHTML = ''; }, 4000);
-        }
-
         // --- Render --------------------------------------------------------------
 
         render() {
             this.innerHTML = `
                 <style>${pki().PKI_SHARED_STYLES}</style>
-                <div class="pk-toast-area"></div>
                 <div class="pk-modal-overlay"></div>
                 <div class="pk-content"></div>
             `;

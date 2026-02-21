@@ -1,0 +1,130 @@
+/* =============================================================================
+   SGraph Send Admin Console — SG Brand Override
+   v0.1.4 — Applies SG/Send design guidelines to admin console
+
+   Overrides CSS custom properties from v0.1.0/css/admin.css to match
+   the SG brand palette (Aurora theme — dark navy + teal accents).
+   Adds DM Sans + JetBrains Mono typography.
+
+   Reference: v0.3.5__designer__sg-send-design-guidelines.md
+   ============================================================================= */
+
+/* --- Google Fonts ---------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* --- SG Brand Custom Properties (Aurora Theme) ----------------------------- */
+:root {
+    /* Backgrounds — Dark Navy */
+    --admin-bg:                 #1A1A2E;
+    --admin-surface:            #16213E;
+    --admin-surface-raised:     #1c2a4a;
+    --admin-surface-hover:      #253254;
+    --admin-border:             #2C3E6B;
+    --admin-border-subtle:      #222d4d;
+
+    /* Text */
+    --admin-text:               #F0F0F5;
+    --admin-text-secondary:     #8892A0;
+    --admin-text-muted:         #5a6478;
+
+    /* Primary — Teal */
+    --admin-primary:            #4ECDC4;
+    --admin-primary-hover:      #3dbdb4;
+    --admin-primary-bg:         rgba(78, 205, 196, 0.1);
+
+    /* Semantic */
+    --admin-success:            #4ECDC4;
+    --admin-success-bg:         rgba(78, 205, 196, 0.08);
+    --admin-error:              #E94560;
+    --admin-error-bg:           rgba(233, 69, 96, 0.08);
+    --admin-warning:            #fbbf24;
+    --admin-warning-bg:         rgba(251, 191, 36, 0.08);
+
+    /* Typography — DM Sans + JetBrains Mono */
+    --admin-font:               'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --admin-font-mono:          'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+
+    /* Shadows — deeper for navy backgrounds */
+    --admin-shadow:             0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --admin-shadow-lg:          0 4px 16px rgba(0, 0, 0, 0.5);
+
+    /* Motion — per brand guidelines */
+    --admin-transition:         150ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* --- Brand Logo in Header -------------------------------------------------- */
+.sg-brand-logo {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    user-select: none;
+}
+
+.sg-brand-logo__sg {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--admin-text);
+    letter-spacing: -0.01em;
+}
+
+.sg-brand-logo__slash {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--admin-primary);
+    display: inline-block;
+    transform: rotate(-15deg);
+    margin: 0 0.05em;
+}
+
+.sg-brand-logo__product {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--admin-text);
+    letter-spacing: -0.01em;
+}
+
+/* --- Header badge uses teal ------------------------------------------------ */
+.as-header-badge {
+    background: var(--admin-primary-bg) !important;
+    color: var(--admin-primary) !important;
+}
+
+/* --- Active nav item uses teal --------------------------------------------- */
+.as-nav-item--active {
+    color: var(--admin-primary) !important;
+    background: var(--admin-primary-bg) !important;
+    border-left-color: var(--admin-primary) !important;
+}
+
+/* --- Health dot uses teal for healthy -------------------------------------- */
+.as-health-dot--healthy {
+    background: var(--admin-primary) !important;
+    box-shadow: 0 0 6px var(--admin-primary) !important;
+}
+
+/* --- Debug tab active uses teal -------------------------------------------- */
+.as-debug-tab--active {
+    color: var(--admin-primary) !important;
+    border-bottom-color: var(--admin-primary) !important;
+}
+
+/* --- Brand badge variants -------------------------------------------------- */
+.pk-badge--secure {
+    background: rgba(78, 205, 196, 0.12) !important;
+    color: #4ECDC4 !important;
+    border-color: rgba(78, 205, 196, 0.25) !important;
+}
+
+/* --- Spinner uses teal ----------------------------------------------------- */
+.admin-spinner,
+.pk-spinner {
+    border-top-color: var(--admin-primary) !important;
+}
+
+/* --- Links use teal -------------------------------------------------------- */
+a {
+    color: var(--admin-primary);
+}
