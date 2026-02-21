@@ -61,7 +61,6 @@
             if (this._boundHandlers.onDbChange) {
                 pki().db.offChange(this._boundHandlers.onDbChange);
             }
-            Object.assign(pki().PKIToastMixin, { clearToast() {} }).clearToast?.call?.(this);
         }
 
         // --- Data ----------------------------------------------------------------
@@ -72,7 +71,7 @@
             try {
                 this._keys = await pki().db.getAll('keys');
             } catch (err) {
-                this._showToast(`Failed to load keys: ${err.message}`, 'error');
+                window.sgraphAdmin.messages.error(`Failed to load keys: ${err.message}`);
             }
             this._loading = false;
             this._renderContent();
@@ -115,10 +114,10 @@
                 });
 
                 await this._loadKeys();
-                this._showToast(`Key pair '${label}' created with signing key.`, 'success');
+                window.sgraphAdmin.messages.success(`Key pair '${label}' created with signing key.`);
                 if (this.events) this.events.emit('key-generated', { fingerprint, algorithm });
             } catch (err) {
-                this._showToast(`Key generation failed: ${err.message}`, 'error');
+                window.sgraphAdmin.messages.error(`Key generation failed: ${err.message}`);
             }
 
             this._generating = false;
@@ -131,12 +130,12 @@
             const text = pki().buildPublicKeyBundle(keyRecord);
             try {
                 await navigator.clipboard.writeText(text);
-                this._showToast('Public key bundle copied to clipboard', 'success');
+                window.sgraphAdmin.messages.success('Public key bundle copied to clipboard');
             } catch (_) {
                 const ta = document.createElement('textarea');
                 ta.value = text;
                 document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-                this._showToast('Public key bundle copied to clipboard', 'success');
+                window.sgraphAdmin.messages.success('Public key bundle copied to clipboard');
             }
         }
 
@@ -146,10 +145,10 @@
             try {
                 await pki().db.delete('keys', keyRecord.id);
                 await this._loadKeys();
-                this._showToast(`Key pair '${keyRecord.label}' deleted permanently.`, 'success');
+                window.sgraphAdmin.messages.success(`Key pair '${keyRecord.label}' deleted permanently.`);
                 if (this.events) this.events.emit('key-deleted', { fingerprint: keyRecord.publicKeyFingerprint });
             } catch (err) {
-                this._showToast(`Delete failed: ${err.message}`, 'error');
+                window.sgraphAdmin.messages.error(`Delete failed: ${err.message}`);
             }
         }
 
@@ -237,22 +236,11 @@
             });
         }
 
-        // --- Toast ---------------------------------------------------------------
-
-        _showToast(message, type) {
-            const el = this.querySelector('.pk-toast-area');
-            if (!el) return;
-            el.innerHTML = `<div class="pk-toast pk-toast--${type}">${pki().escapeHtml(message)}</div>`;
-            if (this._toastTimer) clearTimeout(this._toastTimer);
-            this._toastTimer = setTimeout(() => { if (el) el.innerHTML = ''; }, 4000);
-        }
-
         // --- Render --------------------------------------------------------------
 
         render() {
             this.innerHTML = `
                 <style>${pki().PKI_SHARED_STYLES}</style>
-                <div class="pk-toast-area"></div>
                 <div class="pk-modal-overlay"></div>
                 <div class="pk-content"></div>
             `;

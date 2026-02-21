@@ -21,6 +21,10 @@
         <pki-keys             data-nav-section="PKI"         style="display:none"></pki-keys>
         <pki-encrypt          data-nav-section="PKI"         style="display:none"></pki-encrypt>
         <pki-contacts         data-nav-section="PKI"         style="display:none"></pki-contacts>
+        <key-publish          data-nav-section="Registry"    style="display:none"></key-publish>
+        <key-lookup           data-nav-section="Registry"    style="display:none"></key-lookup>
+        <key-registry         data-nav-section="Registry"    style="display:none"></key-registry>
+        <key-log              data-nav-section="Registry"    style="display:none"></key-log>
         <token-manager        data-nav-section="Tokens"      style="display:none"></token-manager>
         <analytics-dashboard  data-nav-section="Monitoring"  style="display:none"></analytics-dashboard>
         <metrics-dashboard    data-nav-section="Monitoring"  style="display:none"></metrics-dashboard>
@@ -34,19 +38,26 @@
     <!-- Layer 2: API client (loads before components) -->
     <script src="../v0.1.0/js/admin-api.js"></script>
     <script src="../v0.1.1/js/admin-api-cache.js"></script>
+    <script src="js/admin-api-keys.js"></script>
 
     <!-- Layer 3: Debug panels (must define before shell uses them) -->
     <script src="components/messages-panel/messages-panel.js"></script>
     <script src="components/events-viewer/events-viewer.js"></script>
     <script src="components/api-logger/api-logger.js"></script>
 
-    <!-- Layer 4a: PKI shared utilities + new components (v0.1.3) -->
+    <!-- Layer 4a: PKI shared utilities + components (v0.1.3) -->
     <script src="js/pki-common.js"></script>
     <script src="components/pki-keys/pki-keys.js"></script>
     <script src="components/pki-encrypt/pki-encrypt.js"></script>
     <script src="components/pki-contacts/pki-contacts.js"></script>
 
-    <!-- Layer 4b: Legacy components (v0.1.0–v0.1.2) -->
+    <!-- Layer 4b: Key discovery components (v0.1.3) -->
+    <script src="components/key-publish/key-publish.js"></script>
+    <script src="components/key-lookup/key-lookup.js"></script>
+    <script src="components/key-registry/key-registry.js"></script>
+    <script src="components/key-log/key-log.js"></script>
+
+    <!-- Layer 4c: Legacy components (v0.1.0–v0.1.2) -->
     <script src="../v0.1.2/components/token-manager/token-manager.js"></script>
     <script src="../v0.1.2/components/analytics-dashboard/analytics-dashboard.js"></script>
     <script src="../v0.1.0/components/system-info/system-info.js"></script>
