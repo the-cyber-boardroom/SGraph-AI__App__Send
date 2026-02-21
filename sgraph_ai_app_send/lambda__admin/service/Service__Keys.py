@@ -45,12 +45,12 @@ class Service__Keys(Type_Safe):                                              # K
 
         fingerprint = _compute_fingerprint_from_pem(public_key_pem)
 
-        # Check for duplicate fingerprint (scan all entries)
+        # Check for duplicate fingerprint (scan active entries only)
         all_codes = self.send_cache_client.key__list_all()
         for existing_code in all_codes:
-            if existing_code and not existing_code.startswith('log-'):
+            if existing_code and not existing_code.startswith('log-') and not existing_code.startswith('idx-'):
                 existing_entry = self.send_cache_client.key__lookup(existing_code)
-                if existing_entry and existing_entry.get('fingerprint') == fingerprint:
+                if existing_entry and existing_entry.get('active', True) and existing_entry.get('fingerprint') == fingerprint:
                     return dict(error='duplicate', fingerprint=fingerprint)
 
         # Generate unique lookup code (retry on collision)

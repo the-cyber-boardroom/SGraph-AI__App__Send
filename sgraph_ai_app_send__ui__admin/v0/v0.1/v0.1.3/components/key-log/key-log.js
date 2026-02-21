@@ -118,7 +118,7 @@
                 ? '<div class="kl-chain kl-chain--ok">Hash chain verified — all entries are consistent</div>'
                 : '<div class="kl-chain kl-chain--fail">Hash chain BROKEN — log may have been tampered</div>';
 
-            const rows = this._entries.map(e => {
+            const rows = [...this._entries].reverse().map(e => {
                 const displayCode = e.code ? e.code.toUpperCase() : '-';
                 const actionClass = `kl-action--${e.action}`;
                 return `
