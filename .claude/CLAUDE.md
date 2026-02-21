@@ -200,7 +200,7 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 - **Path:** `team/humans/dinis_cruz/debriefs/MM/DD/{version}__debrief__{topic}.md`
 - **Purpose:** Single document Dinis can read to see what was delivered, what decisions were made, and what to review
-- **Links:** All links must be **relative** to the debrief file
+- **Links:** All links must be **relative** to the debrief file. **COUNT THE DIRECTORY DEPTH CAREFULLY.** Debriefs live at `debriefs/MM/DD/file.md` — that's 3 directories deep from `dinis_cruz/`. To link to briefs at `briefs/MM/DD/file.md`, you need `../../../briefs/MM/DD/file.md` (3 levels up to reach `dinis_cruz/`, then down into `briefs/`). Similarly, to link to role reviews at `team/roles/{role}/reviews/`, count from the debrief's directory to the repo root. **Always verify relative links resolve correctly before committing** — use `realpath` or manually trace each `../` level. Common mistake: using `../../` (2 levels) when `../../../` (3 levels) is needed.
 - **When:** Create a debrief whenever a session produces multiple deliverables
 - **Content:** Executive summary, recommended reading order, key decisions, what's next
 
