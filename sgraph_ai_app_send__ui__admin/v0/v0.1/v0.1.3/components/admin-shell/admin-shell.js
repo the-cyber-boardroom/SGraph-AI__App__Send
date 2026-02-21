@@ -30,6 +30,9 @@
         }
 
         connectedCallback() {
+            // Save child components BEFORE render() wipes innerHTML
+            this._savedChildren = Array.from(this.children);
+
             this.render();
             this._setupListeners();
             this._checkHealth();
@@ -37,15 +40,21 @@
             // Register the router on the global namespace
             window.sgraphAdmin.router = this;
 
-            // Emit ready event after a tick to let components register
+            // Move saved children into the main content area and register them
             requestAnimationFrame(() => {
-                this._autoRegisterComponents();
-                // Navigate to first app
-                if (this._apps.size > 0 && !this._activeAppId) {
-                    const firstAppId = this._apps.keys().next().value;
-                    this.navigateTo(firstAppId);
+                const mainArea = this.querySelector('.as-main-content');
+                if (mainArea) {
+                    for (const child of this._savedChildren) {
+                        mainArea.appendChild(child);
+                    }
                 }
-                window.sgraphAdmin.events.emit('event-bus-ready', {});
+                this._autoRegisterComponents();
+                // Navigate to preferred default (system-info, not tokens)
+                if (this._apps.size > 0 && !this._activeAppId) {
+                    const defaultApp = this._apps.has('system') ? 'system' : this._apps.keys().next().value;
+                    this.navigateTo(defaultApp);
+                }
+                window.sgraphAdmin.events.emit('shell-ready', { components: this._apps.size });
             });
         }
 
@@ -289,9 +298,7 @@
                     </nav>
 
                     <main class="as-main">
-                        <div class="as-main-content">
-                            ${this._getSlottedContent()}
-                        </div>
+                        <div class="as-main-content"></div>
                     </main>
 
                     <aside class="as-debug-sidebar">
@@ -320,12 +327,6 @@
                     </footer>
                 </div>
             `;
-        }
-
-        _getSlottedContent() {
-            // Preserve any child elements that were in the original HTML
-            // They'll be moved into the main content area
-            return '';
         }
 
         // --- Helpers ------------------------------------------------------------

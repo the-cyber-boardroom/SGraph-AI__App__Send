@@ -13,13 +13,14 @@
             during render. The Router auto-registers components that have a
             static appId property on their constructor.
 
-            All components initially hidden except the first one.
+            Order here determines nav order within each section.
+            Default view: system-info (avoids N+1 API calls from token-manager).
         -->
-        <token-manager        data-nav-section="Tokens"     style="display:none"></token-manager>
+        <system-info          data-nav-section="System"      style="display:none"></system-info>
+        <cache-browser        data-nav-section="System"      style="display:none"></cache-browser>
+        <token-manager        data-nav-section="Tokens"      style="display:none"></token-manager>
         <analytics-dashboard  data-nav-section="Monitoring"  style="display:none"></analytics-dashboard>
         <metrics-dashboard    data-nav-section="Monitoring"  style="display:none"></metrics-dashboard>
-        <cache-browser        data-nav-section="System"      style="display:none"></cache-browser>
-        <system-info          data-nav-section="System"      style="display:none"></system-info>
     </admin-shell>
 
     <!-- Layer 1: Services (must load first) -->
