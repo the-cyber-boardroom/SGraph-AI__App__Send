@@ -17,3 +17,6 @@ Workstream-3 | todo | Delete button policy (from 19-Feb brief, P3)
 	Task-13 | todo | Define delete policy: log deletion? notify sender? soft vs immediate?
 	Task-14 | todo | Assess interaction with expiring links feature
 	Task-15 | todo | Co-review with AppSec and DPO
+Workstream-4 | todo | PKI auth model transition risk (from 21-Feb AppSec, P1)
+	Task-16 | todo | Review auth model transition risk assessment (token→PKI)
+	Task-17 | todo | Define transition plan governance: what changes, what stays, rollback criteria

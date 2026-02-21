@@ -18,3 +18,7 @@ Workstream-3 | todo | 17-19 Feb brief processing
 	Task-14 | todo | Coordinate INC-002 execution status with Explorer team
 	Task-15 | todo | Coordinate operational runbook creation (GRC + DevOps)
 	Task-16 | todo | Coordinate deployment packaging work (DevOps + Architect)
+Workstream-4 | todo | PKI capability release planning (from 20-21 Feb briefs)
+	Task-17 | todo | Plan release incorporating admin UI v0.1.2 with PKI
+	Task-18 | todo | Track B0-B10 classification alongside P0-P10 for release prioritisation
+	Task-19 | todo | Coordinate AppSec review of 2 critical PKI findings before release

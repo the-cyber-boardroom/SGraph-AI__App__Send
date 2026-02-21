@@ -14,3 +14,7 @@ Workstream-2 | todo | Production environment integration tests (from 16-Feb brie
 	Task-11 | todo | Write automated test: API responds correctly
 	Task-12 | todo | Write automated test: SSL certificates are valid
 	Task-13 | todo | Write pre/post deployment transition tests
+Workstream-3 | todo | PKI and incident test coverage (from 19-21 Feb, P2)
+	Task-14 | todo | Add URL sanitisation tests to regression baseline (from INC-003)
+	Task-15 | todo | Add PKI end-to-end verification tests to regression suite (from QA v0.4.25)
+	Task-16 | todo | Update regression baseline count (was 111+, now 153+ after INC-003)

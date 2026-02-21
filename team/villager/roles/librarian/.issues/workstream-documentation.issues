@@ -32,3 +32,9 @@ Workstream-7 | done | 17-19 Feb brief catch-up
 	Task-24 | done | Produce master index for 17-19 Feb briefs
 	Task-25 | done | Produce debrief for 17-19 Feb briefs
 	Task-26 | done | Dispatch tasks to impacted Villager role .issues files
+Workstream-8 | done | 19-21 Feb brief catch-up
+	Task-27 | done | Produce master index for 19-21 Feb briefs
+	Task-28 | done | Produce debrief for 19-21 Feb briefs
+	Task-29 | done | Dispatch tasks to impacted Villager role .issues files
+Workstream-9 | todo | Incident directory documentation (from 19 Feb, P3)
+	Task-30 | todo | Update Villager docs for incident naming convention (INC-{N}__{date}__{description})

@@ -29,3 +29,7 @@ Workstream-4 | todo | Partner deployment packaging (from 18-Feb brief, P1)
 Workstream-5 | todo | Operational runbooks — DevOps co-ownership (from 19-Feb brief, P1)
 	Task-24 | todo | Co-author P0 "pull the plug" runbook with GRC
 	Task-25 | todo | Define exact AWS teardown steps for P0 scenario
+Workstream-6 | todo | PKI deployment readiness (from 20-21 Feb briefs, P1)
+	Task-26 | todo | Include admin UI v0.1.2 (pki.html, pki-manager, token-manager, analytics) in all deployment targets
+	Task-27 | todo | Plan deployment of key discovery API (4 new endpoints: POST/GET/DELETE /api/keys, GET /api/keys)
+	Task-28 | todo | Adopt IFD simultaneous patching pattern in deployment pipeline (from INC-003)
