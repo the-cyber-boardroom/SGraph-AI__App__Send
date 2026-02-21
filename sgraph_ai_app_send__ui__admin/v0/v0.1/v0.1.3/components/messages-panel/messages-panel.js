@@ -38,6 +38,18 @@
                 window.sgraphAdmin.messages.clear();
                 this.querySelector('.mp-list').innerHTML = '<div class="mp-empty">No messages</div>';
             });
+
+            // Populate from existing messages in the service (survives tab switches)
+            this._renderExistingMessages();
+        }
+
+        _renderExistingMessages() {
+            const svc = window.sgraphAdmin.messages;
+            if (!svc) return;
+            const msgs = svc.getMessages();
+            for (const msg of msgs) {
+                this._addMessage(msg, /* skipAutoDismiss */ true);
+            }
         }
 
         setupEventListeners() {
@@ -51,7 +63,7 @@
             }
         }
 
-        _addMessage(msg) {
+        _addMessage(msg, skipAutoDismiss) {
             const list = this.querySelector('.mp-list');
             if (!list) return;
 
@@ -70,11 +82,6 @@
                 <span class="mp-message-text">${this._escapeHtml(msg.text)}</span>
             `;
             list.prepend(el);
-
-            // Auto-dismiss
-            if (msg.autoDismiss > 0) {
-                setTimeout(() => el.remove(), msg.autoDismiss);
-            }
 
             // Limit displayed messages
             while (list.children.length > 50) {

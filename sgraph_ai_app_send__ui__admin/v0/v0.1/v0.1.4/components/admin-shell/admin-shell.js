@@ -47,4 +47,20 @@
         }
     };
 
+    // Apply brand patch to the existing shell instance (already rendered by Layer 6)
+    const existingShell = document.querySelector('admin-shell');
+    if (existingShell) {
+        // Apply logo directly without full re-render (which would wipe components)
+        const headerTitle = existingShell.querySelector('.as-header-title');
+        if (headerTitle) {
+            headerTitle.innerHTML = `
+                <span class="sg-brand-logo">
+                    <span class="sg-brand-logo__sg">SG</span><span class="sg-brand-logo__slash">/</span><span class="sg-brand-logo__product">Send</span>
+                </span>
+            `;
+        }
+        const versionEl = existingShell.querySelector('.as-header-version');
+        if (versionEl) versionEl.textContent = 'v0.1.4';
+    }
+
 })();

@@ -38,14 +38,11 @@
 
         _setupEvents() {
             this._boundHandlers.onPublished = () => this._loadKeys();
-            this._boundHandlers.onUnpublished = () => this._loadKeys();
             window.sgraphAdmin.events.on('key-published', this._boundHandlers.onPublished);
-            window.sgraphAdmin.events.on('key-unpublished', this._boundHandlers.onUnpublished);
         }
 
         cleanup() {
             if (this._boundHandlers.onPublished) window.sgraphAdmin.events.off('key-published', this._boundHandlers.onPublished);
-            if (this._boundHandlers.onUnpublished) window.sgraphAdmin.events.off('key-unpublished', this._boundHandlers.onUnpublished);
         }
 
         async _loadKeys() {
@@ -67,10 +64,11 @@
                 await adminAPI.unpublishKey(code);
                 const displayCode = code.toUpperCase();
                 msg().success(`Key ${displayCode} unpublished`);
+                // Reload first, then emit event (other components may also listen)
+                await this._loadKeys();
                 if (window.sgraphAdmin?.events) {
                     window.sgraphAdmin.events.emit('key-unpublished', { code });
                 }
-                await this._loadKeys();
             } catch (err) {
                 msg().error(`Unpublish failed: ${err.message}`);
             }
@@ -104,9 +102,9 @@
                     <div class="kr-card" data-code="${k.code}">
                         <div class="kr-card__code">${pki().escapeHtml(displayCode)}</div>
                         <div class="kr-card__meta">
-                            <div>Algorithm: ${pki().escapeHtml(k.algorithm)} ${k.key_size ? `(${k.key_size})` : ''}</div>
-                            <div>Fingerprint: <code>${pki().escapeHtml(k.fingerprint)}</code></div>
-                            <div>Published: ${pki().formatDate(k.created)}</div>
+                            <div>Algorithm: ${pki().escapeHtml(k.algorithm || 'unknown')} ${k.key_size ? `(${k.key_size})` : ''}</div>
+                            <div>Fingerprint: <code>${pki().escapeHtml(k.fingerprint || '—')}</code></div>
+                            <div>Published: ${k.created ? pki().formatDate(k.created) : '—'}</div>
                             ${k.signing_key_pem ? '<div><span class="pk-badge pk-badge--secure">signing</span></div>' : ''}
                         </div>
                         <div class="kr-card__actions">

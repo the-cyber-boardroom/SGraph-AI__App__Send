@@ -116,7 +116,7 @@ class Service__Keys(Type_Safe):                                              # K
         codes = self.send_cache_client.key__list_all()
         keys  = []
         for code in codes:
-            if code:
+            if code and not code.startswith('log-') and not code.startswith('idx-'):
                 entry = self.send_cache_client.key__lookup(code)
                 if entry and entry.get('active', True):
                     keys.append(entry)
