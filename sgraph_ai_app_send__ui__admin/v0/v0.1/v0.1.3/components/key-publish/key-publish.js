@@ -87,7 +87,11 @@
                             <div class="kp-success__label">Published! Share this lookup code:</div>
                             <div class="kp-success__code">${pki().escapeHtml(displayCode)}</div>
                             <div class="kp-success__meta">Fingerprint: <code>${pki().escapeHtml(result.fingerprint)}</code></div>
-                            <button class="pk-btn pk-btn--primary pk-btn--xs" id="kp-copy-code" data-code="${pki().escapeHtml(displayCode)}">Copy Code</button>
+                            <div class="kp-success__btns">
+                                <button class="pk-btn pk-btn--primary pk-btn--xs" id="kp-copy-code" data-code="${pki().escapeHtml(displayCode)}">Copy Code</button>
+                                <button class="pk-btn pk-btn--ghost pk-btn--xs" id="kp-show-qr">Show QR</button>
+                            </div>
+                            <div class="kp-qr" id="kp-qr-container" style="display:none"></div>
                         </div>
                     `;
                     const copyBtn = this.querySelector('#kp-copy-code');
@@ -98,6 +102,20 @@
                                 msg().success(`Code ${displayCode} copied to clipboard`);
                             } catch (_) {
                                 msg().error('Could not copy to clipboard');
+                            }
+                        });
+                    }
+                    const qrBtn = this.querySelector('#kp-show-qr');
+                    const qrBox = this.querySelector('#kp-qr-container');
+                    if (qrBtn && qrBox && window.sgraphAdmin?.qr) {
+                        qrBtn.addEventListener('click', () => {
+                            if (qrBox.style.display === 'none') {
+                                qrBox.innerHTML = window.sgraphAdmin.qr.toSvg(displayCode, { ecl: 'medium', border: 2 });
+                                qrBox.style.display = 'flex';
+                                qrBtn.textContent = 'Hide QR';
+                            } else {
+                                qrBox.style.display = 'none';
+                                qrBtn.textContent = 'Show QR';
                             }
                         });
                     }
@@ -124,6 +142,9 @@
                     .kp-success__code   { font-size: 1.75rem; font-weight: 700; font-family: var(--admin-font-mono, monospace); color: var(--admin-success, #34d399); letter-spacing: 0.12em; margin-bottom: 0.5rem; user-select: all; }
                     .kp-success__meta   { font-size: var(--admin-font-size-xs, 0.75rem); color: var(--admin-text-muted, #5e6280); margin-bottom: 0.75rem; }
                     .kp-error           { color: var(--admin-error, #f87171); }
+                    .kp-qr              { margin-top: 0.75rem; display: flex; justify-content: center; }
+                    .kp-qr svg          { width: 160px; height: 160px; border-radius: var(--admin-radius, 6px); }
+                    .kp-success__btns   { display: flex; gap: 0.375rem; justify-content: center; }
                     .kp-field           { margin-bottom: 0.5rem; }
                     .kp-field label     { display: block; font-size: var(--admin-font-size-xs, 0.75rem); font-weight: 500; color: var(--admin-text-secondary, #8b8fa7); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.03em; }
                     .kp-field select    { width: 100%; padding: 0.4rem 0.5rem; font-size: var(--admin-font-size-sm, 0.875rem); font-family: var(--admin-font, sans-serif); color: var(--admin-text, #e4e6ef); background: var(--admin-bg, #0f1117); border: 1px solid var(--admin-border, #2e3347); border-radius: var(--admin-radius, 6px); box-sizing: border-box; }

@@ -84,6 +84,8 @@
                     .kr-card__meta  { font-size: var(--admin-font-size-xs, 0.75rem); color: var(--admin-text-muted, #5e6280); line-height: 1.6; margin-bottom: 0.5rem; }
                     .kr-card__actions { display: flex; gap: 0.375rem; }
                     .kr-count       { font-size: var(--admin-font-size-xs, 0.75rem); color: var(--admin-text-muted, #5e6280); }
+                    .kr-qr          { margin-top: 0.5rem; display: flex; justify-content: center; }
+                    .kr-qr svg      { width: 120px; height: 120px; border-radius: var(--admin-radius, 6px); }
                 </style>
                 <div class="pk-content"></div>
             `;
@@ -108,8 +110,10 @@
                             ${k.signing_key_pem ? '<div><span class="pk-badge pk-badge--secure">signing</span></div>' : ''}
                         </div>
                         <div class="kr-card__actions">
+                            <button class="pk-btn pk-btn--ghost pk-btn--xs kr-btn-qr" data-code="${k.code}">QR</button>
                             <button class="pk-btn pk-btn--danger pk-btn--xs kr-btn-unpublish" data-code="${k.code}">Unpublish</button>
                         </div>
+                        <div class="kr-qr" id="kr-qr-${k.code}" style="display:none"></div>
                     </div>
                 `;
             }).join('');
@@ -135,6 +139,25 @@
                     this._handleUnpublish(btn.dataset.code);
                 });
             });
+
+            if (window.sgraphAdmin?.qr) {
+                this.querySelectorAll('.kr-btn-qr').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const code  = btn.dataset.code;
+                        const qrBox = this.querySelector(`#kr-qr-${code}`);
+                        if (!qrBox) return;
+                        if (qrBox.style.display === 'none') {
+                            qrBox.innerHTML = window.sgraphAdmin.qr.toSvg(code.toUpperCase(), { ecl: 'medium', border: 2 });
+                            qrBox.style.display = 'flex';
+                            btn.textContent = 'Hide QR';
+                        } else {
+                            qrBox.style.display = 'none';
+                            btn.textContent = 'QR';
+                        }
+                    });
+                });
+            }
         }
     }
 

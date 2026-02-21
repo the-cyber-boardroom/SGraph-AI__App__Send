@@ -33,14 +33,6 @@
         Ctor.navIcon  = '\u{1F4C8}';
     }
 
-    // Cache Browser (v0.1.1)
-    if (window.customElements.get('cache-browser')) {
-        const Ctor = customElements.get('cache-browser');
-        Ctor.appId    = 'cache';
-        Ctor.navLabel = 'Cache';
-        Ctor.navIcon  = '\u{1F5C4}';
-    }
-
     // System Info (v0.1.0)
     if (window.customElements.get('system-info')) {
         const Ctor = customElements.get('system-info');
