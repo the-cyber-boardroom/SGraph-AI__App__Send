@@ -79,9 +79,14 @@
         async _generateKeys() {
             this._state = 'loading';
             this._render();
-            this._keyPair  = await VaultCrypto.generateKeyPair();
-            this._vaultKey = await VaultCrypto.deriveVaultCacheKey(this._keyPair.publicKey);
-            this._state    = 'locked';
+            try {
+                this._keyPair  = await VaultCrypto.generateKeyPair();
+                this._vaultKey = await VaultCrypto.deriveVaultCacheKey(this._keyPair.publicKey);
+                this._state    = 'locked';
+            } catch (e) {
+                console.error('[user-vault] Key generation failed:', e);
+                this._state = 'no-key';
+            }
             this._render();
         }
 
@@ -118,8 +123,8 @@
         async _loadIndex() {
             try {
                 const resp = await VaultAPI.getIndex(this._vaultKey);
-                if (resp && resp.encrypted_index) {
-                    const packed    = VaultCrypto.b64ToArrayBuf(resp.encrypted_index);
+                if (resp && resp.data) {
+                    const packed    = VaultCrypto.b64ToArrayBuf(resp.data);
                     const plaintext = await VaultCrypto.decrypt(this._keyPair.privateKey, packed);
                     this._index     = JSON.parse(new TextDecoder().decode(plaintext));
                 }
@@ -161,8 +166,8 @@
 
         async _downloadFile(guid) {
             const resp = await VaultAPI.getFile(this._vaultKey, guid);
-            if (!resp || !resp.encrypted_data) return;
-            const packed    = VaultCrypto.b64ToArrayBuf(resp.encrypted_data);
+            if (!resp || !resp.data) return;
+            const packed    = VaultCrypto.b64ToArrayBuf(resp.data);
             const plaintext = await VaultCrypto.decrypt(this._keyPair.privateKey, packed);
             const meta      = this._index[guid] || {};
             const blob      = new Blob([plaintext], { type: meta.type || 'application/octet-stream' });
