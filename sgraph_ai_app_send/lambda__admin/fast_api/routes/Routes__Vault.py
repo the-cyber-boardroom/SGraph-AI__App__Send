@@ -72,7 +72,7 @@ class Routes__Vault(Fast_API__Routes):                                         #
         result = self.service_vault.get_folder(vault_cache_key, folder_guid)
         if result is None:
             raise HTTPException(status_code=404, detail='Folder not found')
-        return result
+        return dict(data=result)
 
     def folders__vault_cache_key(self, vault_cache_key: Safe_Str__Id) -> dict: # GET /vault/folders/{vault_cache_key}
         result = self.service_vault.list_folders(vault_cache_key)
@@ -98,7 +98,9 @@ class Routes__Vault(Fast_API__Routes):                                         #
         result = self.service_vault.get_file(vault_cache_key, file_guid)
         if result is None:
             raise HTTPException(status_code=404, detail='File not found')
-        return result
+        if isinstance(result, (bytes, bytearray)):
+            return dict(data=base64.b64encode(result).decode('ascii'))
+        return dict(data=result)
 
     def files__vault_cache_key(self, vault_cache_key: Safe_Str__Id) -> dict:   # GET /vault/files/{vault_cache_key}
         result = self.service_vault.list_files(vault_cache_key)
@@ -122,7 +124,9 @@ class Routes__Vault(Fast_API__Routes):                                         #
         result = self.service_vault.get_index(vault_cache_key)
         if result is None:
             raise HTTPException(status_code=404, detail='Index not found')
-        return result
+        if isinstance(result, (bytes, bytearray)):
+            return dict(data=base64.b64encode(result).decode('ascii'))
+        return dict(data=result)
 
     # ═══════════════════════════════════════════════════════════════════════
     # Bulk Operations
