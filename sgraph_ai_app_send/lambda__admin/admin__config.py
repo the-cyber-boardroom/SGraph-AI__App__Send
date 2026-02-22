@@ -14,7 +14,7 @@ APP__SEND__ADMIN__LAMBDA_DEPENDENCIES       = ['httpx==0.28.1'                  
 APP_SEND__UI__ADMIN__ROUTE__PATH__CONSOLE    = 'admin'
 APP_SEND__UI__ADMIN__START_PAGE              = 'index'
 APP_SEND__UI__ADMIN__MAJOR__VERSION          = "v0/v0.1"
-APP_SEND__UI__ADMIN__LATEST__VERSION         = "v0.1.4"
+APP_SEND__UI__ADMIN__LATEST__VERSION         = "v0.1.5"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Observability Pipeline — Environment Variables
