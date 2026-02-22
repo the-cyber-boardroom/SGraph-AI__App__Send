@@ -53,7 +53,7 @@ const VaultCrypto = {
             { name: 'RSA-OAEP', modulusLength: 4096,
               publicExponent: new Uint8Array([1, 0, 1]),
               hash: 'SHA-256' },
-            true, ['encrypt', 'decrypt']
+            false, ['encrypt', 'decrypt']
         );
         await this._dbPut({
             id:         this.KEY_ID,
