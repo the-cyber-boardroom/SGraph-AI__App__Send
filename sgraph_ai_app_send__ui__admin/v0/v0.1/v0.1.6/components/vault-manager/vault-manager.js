@@ -200,10 +200,22 @@
         .vm-breadcrumb .vm-bc-current:hover { background: none; }
 
         .vm-actions     { display: flex; gap: 0.375rem; align-items: center; }
-        .vm-body        { flex: 1; display: flex; overflow: hidden; min-height: 0; position: relative; }
-        .vm-body.vm-loading .vm-tree-sidebar, .vm-body.vm-loading .vm-content, .vm-body.vm-loading .vm-detail-panel { opacity: 0.4; pointer-events: none; filter: blur(1px); transition: all 200ms ease; }
+        .vm-body        { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
+        .vm-body.vm-loading .vm-row-1, .vm-body.vm-loading .vm-row-2, .vm-body.vm-loading .vm-row-3 { opacity: 0.4; pointer-events: none; filter: blur(1px); transition: all 200ms ease; }
         .vm-loading-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; }
         .vm-loading-overlay .pk-spinner { width: 24px; height: 24px; }
+
+        /* --- 3-Row Layout --- */
+        .vm-row-1       { display: flex; overflow: hidden; min-height: 80px; flex: 1; position: relative; }
+        .vm-row-2       { flex-shrink: 0; border-top: 1px solid var(--admin-border-subtle, #252838); }
+        .vm-row-3       { flex: 1; min-height: 60px; overflow: hidden; display: flex; flex-direction: column; border-top: 1px solid var(--admin-border-subtle, #252838); }
+        .vm-row-3 vault-preview, .vm-row-3 vault-editor { flex: 1; min-height: 0; }
+        .vm-preview-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--admin-text-muted, #5e6280); font-size: 0.75rem; font-style: italic; }
+
+        /* --- Horizontal resize handle (between rows) --- */
+        .vm-resize-row  { height: 4px; cursor: row-resize; background: transparent; transition: background 150ms ease; flex-shrink: 0; z-index: 5; }
+        .vm-resize-row:hover, .vm-resize-row.vm-resize-active { background: var(--admin-primary, #4f8ff7); }
+
         .vm-content     { flex: 1; overflow-y: auto; position: relative; min-width: 200px; }
 
         /* --- Key Selector --- */
@@ -238,25 +250,6 @@
         /* --- Resize Handles --- */
         .vm-resize-handle { width: 4px; cursor: col-resize; background: transparent; transition: background 150ms ease; flex-shrink: 0; z-index: 5; }
         .vm-resize-handle:hover, .vm-resize-handle.vm-resize-active { background: var(--admin-primary, #4f8ff7); }
-
-        /* --- Detail Panel --- */
-        .vm-detail-panel { width: 260px; min-width: 180px; overflow-y: auto; padding: 0.5rem; flex-shrink: 0; display: flex; flex-direction: column; }
-        .vm-detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.375rem; }
-        .vm-detail-title { font-size: 0.8125rem; font-weight: 600; color: var(--admin-text, #e4e6ef); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-        .vm-detail-close { cursor: pointer; color: var(--admin-text-muted, #5e6280); background: none; border: none; padding: 0.125rem; display: inline-flex; }
-        .vm-detail-close:hover { color: var(--admin-text, #e4e6ef); }
-        .vm-detail-close svg { width: 16px; height: 16px; }
-        .vm-detail-meta { display: grid; grid-template-columns: auto 1fr; gap: 0.125rem 0.5rem; font-size: 0.6875rem; margin-bottom: 0.5rem; }
-        .vm-detail-label { font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
-        .vm-detail-value { color: var(--admin-text, #e4e6ef); word-break: break-all; }
-        .vm-detail-value code { font-family: var(--admin-font-mono, monospace); font-size: 0.625rem; color: var(--admin-text-secondary, #8b8fa7); }
-        .vm-detail-actions { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
-        .vm-detail-actions .pk-btn { width: 100%; justify-content: flex-start; gap: 0.375rem; text-align: left; }
-        .vm-detail-preview { border-top: 1px solid var(--admin-border-subtle, #252838); padding-top: 0.5rem; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-        .vm-detail-preview-label { font-size: 0.625rem; font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.375rem; }
-        .vm-detail-preview img { max-width: 100%; border-radius: var(--admin-radius, 6px); border: 1px solid var(--admin-border-subtle, #252838); }
-        .vm-detail-preview pre { font-size: 0.6875rem; font-family: var(--admin-font-mono, monospace); color: var(--admin-text-secondary, #8b8fa7); background: var(--admin-bg, #0f1117); border: 1px solid var(--admin-border-subtle, #252838); border-radius: var(--admin-radius, 6px); padding: 0.5rem; flex: 1; overflow: auto; white-space: pre-wrap; word-break: break-all; min-height: 0; }
-        .vm-detail-preview-loading { font-size: 0.75rem; color: var(--admin-text-muted, #5e6280); font-style: italic; }
 
         /* --- Table --- */
         .vm-table        { width: 100%; border-collapse: collapse; }
