@@ -200,10 +200,22 @@
         .vm-breadcrumb .vm-bc-current:hover { background: none; }
 
         .vm-actions     { display: flex; gap: 0.375rem; align-items: center; }
-        .vm-body        { flex: 1; display: flex; overflow: hidden; min-height: 0; position: relative; }
-        .vm-body.vm-loading .vm-tree-sidebar, .vm-body.vm-loading .vm-content, .vm-body.vm-loading .vm-detail-panel { opacity: 0.4; pointer-events: none; filter: blur(1px); transition: all 200ms ease; }
+        .vm-body        { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
+        .vm-body.vm-loading .vm-row-1, .vm-body.vm-loading .vm-row-2, .vm-body.vm-loading .vm-row-3 { opacity: 0.4; pointer-events: none; filter: blur(1px); transition: all 200ms ease; }
         .vm-loading-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; }
         .vm-loading-overlay .pk-spinner { width: 24px; height: 24px; }
+
+        /* --- 3-Row Layout --- */
+        .vm-row-1       { display: flex; overflow: hidden; min-height: 80px; flex: 1; position: relative; }
+        .vm-row-2       { flex-shrink: 0; border-top: 1px solid var(--admin-border-subtle, #252838); }
+        .vm-row-3       { flex: 1; min-height: 60px; overflow: hidden; display: flex; flex-direction: column; border-top: 1px solid var(--admin-border-subtle, #252838); }
+        .vm-row-3 vault-preview, .vm-row-3 vault-editor { flex: 1; min-height: 0; }
+        .vm-preview-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--admin-text-muted, #5e6280); font-size: 0.75rem; font-style: italic; }
+
+        /* --- Horizontal resize handle (between rows) --- */
+        .vm-resize-row  { height: 4px; cursor: row-resize; background: transparent; transition: background 150ms ease; flex-shrink: 0; z-index: 5; }
+        .vm-resize-row:hover, .vm-resize-row.vm-resize-active { background: var(--admin-primary, #4f8ff7); }
+
         .vm-content     { flex: 1; overflow-y: auto; position: relative; min-width: 200px; }
 
         /* --- Key Selector --- */
@@ -238,25 +250,6 @@
         /* --- Resize Handles --- */
         .vm-resize-handle { width: 4px; cursor: col-resize; background: transparent; transition: background 150ms ease; flex-shrink: 0; z-index: 5; }
         .vm-resize-handle:hover, .vm-resize-handle.vm-resize-active { background: var(--admin-primary, #4f8ff7); }
-
-        /* --- Detail Panel --- */
-        .vm-detail-panel { width: 260px; min-width: 180px; overflow-y: auto; padding: 0.5rem; flex-shrink: 0; display: flex; flex-direction: column; }
-        .vm-detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.375rem; }
-        .vm-detail-title { font-size: 0.8125rem; font-weight: 600; color: var(--admin-text, #e4e6ef); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-        .vm-detail-close { cursor: pointer; color: var(--admin-text-muted, #5e6280); background: none; border: none; padding: 0.125rem; display: inline-flex; }
-        .vm-detail-close:hover { color: var(--admin-text, #e4e6ef); }
-        .vm-detail-close svg { width: 16px; height: 16px; }
-        .vm-detail-meta { display: grid; grid-template-columns: auto 1fr; gap: 0.125rem 0.5rem; font-size: 0.6875rem; margin-bottom: 0.5rem; }
-        .vm-detail-label { font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
-        .vm-detail-value { color: var(--admin-text, #e4e6ef); word-break: break-all; }
-        .vm-detail-value code { font-family: var(--admin-font-mono, monospace); font-size: 0.625rem; color: var(--admin-text-secondary, #8b8fa7); }
-        .vm-detail-actions { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
-        .vm-detail-actions .pk-btn { width: 100%; justify-content: flex-start; gap: 0.375rem; text-align: left; }
-        .vm-detail-preview { border-top: 1px solid var(--admin-border-subtle, #252838); padding-top: 0.5rem; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-        .vm-detail-preview-label { font-size: 0.625rem; font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.375rem; }
-        .vm-detail-preview img { max-width: 100%; border-radius: var(--admin-radius, 6px); border: 1px solid var(--admin-border-subtle, #252838); }
-        .vm-detail-preview pre { font-size: 0.6875rem; font-family: var(--admin-font-mono, monospace); color: var(--admin-text-secondary, #8b8fa7); background: var(--admin-bg, #0f1117); border: 1px solid var(--admin-border-subtle, #252838); border-radius: var(--admin-radius, 6px); padding: 0.5rem; flex: 1; overflow: auto; white-space: pre-wrap; word-break: break-all; min-height: 0; }
-        .vm-detail-preview-loading { font-size: 0.75rem; color: var(--admin-text-muted, #5e6280); font-style: italic; }
 
         /* --- Table --- */
         .vm-table        { width: 100%; border-collapse: collapse; }
@@ -340,9 +333,7 @@
     const SVG_DELETE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>';
     const SVG_RENAME = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>';
     const SVG_CHEVRON = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
-    const SVG_CLOSE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
     const SVG_RAW    = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
-    const SVG_EYE    = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>';
     const SVG_MOVE   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L11 6.414V13.586l1.293-1.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L9 13.586V6.414L7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3z"/></svg>';
     const SVG_SHARE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>';
     const SVG_COPY   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>';
@@ -369,14 +360,12 @@
             this._showNewFolder  = false;  // inline new-folder input visible
             this._renamingGuid   = null;   // guid of item being renamed
             this._lastFolder     = null;   // cached folder data for current view
-            this._selectedItem   = null;   // guid of item selected for detail panel
+            this._selectedItem   = null;   // guid of item selected for settings + preview
             this._showRawData    = false;  // raw data view toggle
             this._treeExpanded   = {};     // guid -> bool: which tree nodes are expanded
             this._dragCounter    = 0;      // for nested dragenter/dragleave counting
-            this._previewData    = null;   // { type: 'image'|'text', data: ... } for detail panel preview
-            this._previewLoading = false;
             this._treeWidth      = 200;   // tree sidebar width in px
-            this._detailWidth    = 260;   // detail panel width in px
+            this._row1Height     = null;  // row-1 height in px (null = flex:1)
             this._draggingGuid   = null;  // guid of item being dragged internally
             this._loadPrefs();
         }
@@ -387,7 +376,7 @@
                 if (raw) {
                     const p = JSON.parse(raw);
                     if (p.treeWidth)    this._treeWidth    = p.treeWidth;
-                    if (p.detailWidth)  this._detailWidth  = p.detailWidth;
+                    if (p.row1Height)   this._row1Height   = p.row1Height;
                 }
             } catch (_) { /* ignore */ }
         }
@@ -396,7 +385,7 @@
             try {
                 localStorage.setItem('sgraph-vault-prefs', JSON.stringify({
                     treeWidth        : this._treeWidth,
-                    detailWidth      : this._detailWidth
+                    row1Height       : this._row1Height
                 }));
             } catch (_) { /* ignore */ }
         }
@@ -448,6 +437,8 @@
                 keyOptions += `<option value="${i}"${selected}>${escapeHtml(label)} (${escapeHtml(shortFp)})</option>`;
             }
 
+            const row1Style = this._row1Height ? `flex: 0 0 ${this._row1Height}px` : 'flex: 1';
+
             container.innerHTML = `
                 <div class="vm-toolbar">
                     <div class="vm-key-selector">
@@ -462,12 +453,21 @@
                     </div>
                 </div>
                 <div class="vm-body" id="vm-body">
-                    <div class="vm-tree-sidebar" id="vm-tree-sidebar" style="width: ${this._treeWidth}px"></div>
-                    <div class="vm-resize-handle" id="vm-resize-left"></div>
-                    <div class="vm-content" id="vm-content">
-                        <div class="vm-drag-overlay" id="vm-drag-overlay">
-                            <span class="vm-drag-overlay-text">Drop files here to encrypt &amp; upload</span>
+                    <div class="vm-row-1" id="vm-row-1" style="${row1Style}">
+                        <div class="vm-tree-sidebar" id="vm-tree-sidebar" style="width: ${this._treeWidth}px"></div>
+                        <div class="vm-resize-handle" id="vm-resize-left"></div>
+                        <div class="vm-content" id="vm-content">
+                            <div class="vm-drag-overlay" id="vm-drag-overlay">
+                                <span class="vm-drag-overlay-text">Drop files here to encrypt &amp; upload</span>
+                            </div>
                         </div>
+                    </div>
+                    <div class="vm-row-2" id="vm-row-2">
+                        <vault-settings id="vm-settings"></vault-settings>
+                    </div>
+                    <div class="vm-resize-row" id="vm-resize-row"></div>
+                    <div class="vm-row-3" id="vm-row-3">
+                        <vault-preview id="vm-preview"></vault-preview>
                     </div>
                     <input type="file" class="vm-file-input-hidden" id="vm-file-input" multiple>
                 </div>
@@ -495,8 +495,18 @@
             contentArea.addEventListener('dragleave', (e) => this._onDragLeave(e));
             contentArea.addEventListener('drop',      (e) => this._onDrop(e));
 
-            // Resize handles
+            // Resize handles — column (tree sidebar) + row (browser vs preview)
             this._setupResize('vm-resize-left', 'vm-tree-sidebar', '_treeWidth', 120, Infinity, false);
+            this._setupRowResize('vm-resize-row', 'vm-row-1', '_row1Height', 80);
+
+            // Settings bar events (delegated from vault-settings component)
+            const settingsEl = container.querySelector('#vm-settings');
+            settingsEl.addEventListener('vault-settings-download', (e) => this._downloadFile(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-share',    (e) => this._showShareDialog(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-edit',     (e) => this._openEditor(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-open',     (e) => this._navigateToFolder(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-delete',   (e) => this._deleteItem(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-rename',   (e) => this._commitRename(e.detail.guid, e.detail.newName));
 
             this._renderTree();
             this._browseFolder(this._currentFolder);
@@ -588,28 +598,18 @@
         }
 
         _bindTreeEvents(sidebar) {
-            // Single-click: select folder (show detail panel)
-            // Double-click: navigate into folder
+            // Single-click: navigate into folder + show settings
             sidebar.querySelectorAll('.vm-tree-node').forEach(node => {
                 node.addEventListener('click', (e) => {
                     const guid = node.dataset.treeGuid;
-                    // If clicking the chevron, toggle expand/collapse
+                    // If clicking the chevron, toggle expand/collapse only
                     const chevron = e.target.closest('[data-tree-toggle]');
                     if (chevron) {
                         this._treeExpanded[guid] = !this._treeExpanded[guid];
                         this._renderTree();
                         return;
                     }
-                    // Single click selects the folder → shows detail panel with rename/delete
-                    this._selectItem(guid);
-                    // Highlight active tree node
-                    sidebar.querySelectorAll('.vm-tree-node').forEach(n => n.classList.remove('vm-tree-selected'));
-                    node.classList.add('vm-tree-selected');
-                });
-                node.addEventListener('dblclick', (e) => {
-                    const guid = node.dataset.treeGuid;
-                    const chevron = e.target.closest('[data-tree-toggle]');
-                    if (chevron) return;
+                    // Navigate into the folder and show its settings
                     this._navigateToFolder(guid);
                 });
 
@@ -637,234 +637,102 @@
         }
 
         // -----------------------------------------------------------------
-        // Detail panel (right side)
+        // Selection + settings/preview (replaces detail panel)
         // -----------------------------------------------------------------
 
-        _renderDetailPanel() {
-            // Remove existing detail panel if any
-            const existing = this.querySelector('#vm-detail-panel');
-            if (existing) existing.remove();
-
-            if (!this._selectedItem) return;
-
-            const meta = this._index[this._selectedItem] || {};
-            const body = this.querySelector('.vm-body');
-            if (!body) return;
-
-            const isFile = meta.type !== 'folder';
-            const uploadDate = meta.uploadedAt || '\u2014';
-            const mime = meta.mime || '\u2014';
-            const size = isFile ? formatSize(meta.size) : '\u2014';
-
-            let previewHtml = '';
-            if (isFile) {
-                if (this._previewLoading) {
-                    previewHtml = `<div class="vm-detail-preview">
-                        <div class="vm-detail-preview-label">Preview</div>
-                        <div class="vm-detail-preview-loading">Decrypting preview...</div>
-                    </div>`;
-                } else if (this._previewData) {
-                    if (this._previewData.type === 'image') {
-                        previewHtml = `<div class="vm-detail-preview">
-                            <div class="vm-detail-preview-label">Preview</div>
-                            <img src="${this._previewData.data}" alt="Preview">
-                        </div>`;
-                    } else if (this._previewData.type === 'text') {
-                        previewHtml = `<div class="vm-detail-preview">
-                            <div class="vm-detail-preview-label">Preview</div>
-                            <pre>${escapeHtml(this._previewData.data)}</pre>
-                        </div>`;
-                    }
-                } else {
-                    // Show a button to load preview for supported types
-                    const previewable = this._isPreviewable(mime);
-                    if (previewable) {
-                        previewHtml = `<div class="vm-detail-preview">
-                            <div class="vm-detail-preview-label">Preview</div>
-                            <button class="pk-btn pk-btn--sm pk-btn--primary" id="vm-detail-preview-btn" style="width: 100%;">\uD83D\uDD0D Load Preview</button>
-                        </div>`;
-                    }
-                }
-            }
-
-            // Delete confirmation in detail panel
-            const isDeleting = this._pendingDelete === this._selectedItem;
-            let deleteHtml = '';
-            if (isDeleting) {
-                deleteHtml = `<div class="vm-inline-confirm" style="margin-top: 0.375rem;">
-                    <span>Delete "${escapeHtml((meta.name || this._selectedItem).substring(0, 20))}"?</span>
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost vm-confirm-yes" id="vm-detail-confirm-delete">Yes</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-cancel-delete">No</button>
-                </div>`;
-            }
-
-            const editable = this._isEditable(mime);
-            let actionsHtml = '';
-            if (isFile) {
-                actionsHtml = `<div class="vm-detail-actions">
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-download">\u2B07\uFE0F Download</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-share">\uD83D\uDD17 Share via Send</button>
-                    ${editable ? `<button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-edit">\uD83D\uDCDD Edit</button>` : ''}
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">\u270F\uFE0F Rename</button>
-                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">\uD83D\uDDD1\uFE0F Delete</button>`}
-                </div>${deleteHtml}`;
-            } else {
-                actionsHtml = `<div class="vm-detail-actions">
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-open">\uD83D\uDCC2 Open Folder</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">\u270F\uFE0F Rename</button>
-                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">\uD83D\uDDD1\uFE0F Delete</button>`}
-                </div>${deleteHtml}`;
-            }
-
-            // Compact grid metadata
-            let metaRows = `
-                <span class="vm-detail-label">Name</span><span class="vm-detail-value">${escapeHtml(meta.name || this._selectedItem)}</span>
-                <span class="vm-detail-label">Type</span><span class="vm-detail-value">${isFile ? 'File' : 'Folder'}</span>`;
-            if (isFile) {
-                metaRows += `<span class="vm-detail-label">Size</span><span class="vm-detail-value">${escapeHtml(size)}</span>`;
-                metaRows += `<span class="vm-detail-label">MIME</span><span class="vm-detail-value"><code>${escapeHtml(mime)}</code></span>`;
-            }
-            metaRows += `<span class="vm-detail-label">GUID</span><span class="vm-detail-value"><code>${escapeHtml(this._selectedItem)}</code></span>`;
-            if (uploadDate !== '\u2014') {
-                metaRows += `<span class="vm-detail-label">Date</span><span class="vm-detail-value">${escapeHtml(uploadDate)}</span>`;
-            }
-
-            const panelHtml = `
-                <div class="vm-detail-panel" id="vm-detail-panel" style="width: ${this._detailWidth}px">
-                    <div class="vm-detail-header">
-                        <div class="vm-detail-title">${escapeHtml(meta.name || this._selectedItem)}</div>
-                        <button class="vm-detail-close" id="vm-detail-close">${SVG_CLOSE}</button>
-                    </div>
-                    <div class="vm-detail-meta">${metaRows}</div>
-                    ${actionsHtml}
-                    ${previewHtml}
-                </div>
-            `;
-
-            // Insert resize handle then panel
-            const existingResizeRight = this.querySelector('#vm-resize-right');
-            if (existingResizeRight) existingResizeRight.remove();
-            body.insertAdjacentHTML('beforeend', `<div class="vm-resize-handle" id="vm-resize-right"></div>` + panelHtml);
-
-            // Bind detail panel events
-            const panel = this.querySelector('#vm-detail-panel');
-            panel.querySelector('#vm-detail-close').addEventListener('click', () => this._closeDetailPanel());
-
-            const downloadBtn = panel.querySelector('#vm-detail-download');
-            if (downloadBtn) downloadBtn.addEventListener('click', () => this._downloadFile(this._selectedItem));
-
-            const openBtn = panel.querySelector('#vm-detail-open');
-            if (openBtn) openBtn.addEventListener('click', () => this._navigateToFolder(this._selectedItem));
-
-            const renameBtn = panel.querySelector('#vm-detail-rename');
-            if (renameBtn) {
-                renameBtn.addEventListener('click', () => {
-                    const selectedMeta = this._index[this._selectedItem];
-                    if (selectedMeta && selectedMeta.type === 'folder') {
-                        // For folders, do inline rename in the detail panel title
-                        this._startDetailPanelRename();
-                    } else {
-                        // For files, use the table row rename
-                        this._renamingGuid = this._selectedItem;
-                        if (this._lastFolder) {
-                            this._renderFolderContents(this._lastFolder);
-                            this._renderBreadcrumb();
-                        }
-                        const input = this.querySelector(`[data-rename-guid="${this._selectedItem}"]`);
-                        if (input) { input.focus(); input.select(); }
-                    }
-                });
-            }
-
-            const previewBtn = panel.querySelector('#vm-detail-preview-btn');
-            if (previewBtn) previewBtn.addEventListener('click', () => this._loadPreview(this._selectedItem));
-
-            // Share button
-            const shareBtn = panel.querySelector('#vm-detail-share');
-            if (shareBtn) shareBtn.addEventListener('click', () => this._showShareDialog(this._selectedItem));
-
-            // Edit button (text/markdown files)
-            const editBtn = panel.querySelector('#vm-detail-edit');
-            if (editBtn) editBtn.addEventListener('click', () => this._openEditor(this._selectedItem));
-
-            // Delete button in detail panel
-            const deleteBtn = panel.querySelector('#vm-detail-delete');
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', () => {
-                    this._pendingDelete = this._selectedItem;
-                    this._renderDetailPanel();
-                });
-            }
-            const confirmDelete = panel.querySelector('#vm-detail-confirm-delete');
-            if (confirmDelete) {
-                confirmDelete.addEventListener('click', () => {
-                    this._deleteItem(this._selectedItem);
-                });
-            }
-            const cancelDelete = panel.querySelector('#vm-detail-cancel-delete');
-            if (cancelDelete) {
-                cancelDelete.addEventListener('click', () => {
-                    this._pendingDelete = null;
-                    this._renderDetailPanel();
-                });
-            }
-
-            // Setup right resize handle for detail panel
-            this._setupResize('vm-resize-right', 'vm-detail-panel', '_detailWidth', 180, Infinity, true);
-        }
-
-        _closeDetailPanel() {
-            this._selectedItem   = null;
-            this._previewData    = null;
-            this._previewLoading = false;
-            this._pendingDelete  = null;
-            const panel = this.querySelector('#vm-detail-panel');
-            if (panel) panel.remove();
-            const resizeRight = this.querySelector('#vm-resize-right');
-            if (resizeRight) resizeRight.remove();
-            // Remove selection highlight from rows and tree
+        _clearSelection() {
+            this._selectedItem  = null;
+            this._pendingDelete = null;
+            const settingsEl = this.querySelector('#vm-settings');
+            if (settingsEl) settingsEl.clear();
+            const previewEl = this.querySelector('#vm-preview');
+            if (previewEl) previewEl.showEmpty();
             this.querySelectorAll('.vm-row-selected').forEach(r => r.classList.remove('vm-row-selected'));
             this.querySelectorAll('.vm-tree-selected').forEach(n => n.classList.remove('vm-tree-selected'));
         }
 
-        _startDetailPanelRename() {
-            const panel = this.querySelector('#vm-detail-panel');
-            if (!panel) return;
-            const titleEl = panel.querySelector('.vm-detail-title');
-            if (!titleEl) return;
-            const meta = this._index[this._selectedItem];
-            if (!meta) return;
-
-            const currentName = meta.name || this._selectedItem;
-            titleEl.innerHTML = `<input type="text" class="vm-rename-input" id="vm-detail-rename-input" value="${escapeHtml(currentName)}">`;
-            const input = panel.querySelector('#vm-detail-rename-input');
-            input.focus();
-            input.select();
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') this._commitRename(this._selectedItem, input.value);
-                if (e.key === 'Escape') this._renderDetailPanel();
-            });
-            input.addEventListener('blur', () => {
-                this._commitRename(this._selectedItem, input.value);
+        _updateSettings() {
+            const settingsEl = this.querySelector('#vm-settings');
+            if (!settingsEl) return;
+            if (!this._selectedItem) { settingsEl.clear(); return; }
+            const meta = this._index[this._selectedItem] || {};
+            settingsEl.show({
+                guid       : this._selectedItem,
+                name       : meta.name || this._selectedItem,
+                type       : meta.type || 'unknown',
+                size       : meta.size,
+                mime       : meta.mime,
+                uploadedAt : meta.uploadedAt
             });
         }
 
-        _selectItem(guid) {
-            // If same item, deselect
-            if (this._selectedItem === guid) {
-                this._closeDetailPanel();
+        _updatePreview() {
+            const previewEl = this.querySelector('#vm-preview');
+            if (!previewEl) return;
+            if (!this._selectedItem) { previewEl.showEmpty(); return; }
+            const meta = this._index[this._selectedItem] || {};
+            if (meta.type === 'folder') {
+                previewEl.showEmpty('Folder selected');
                 return;
             }
-            this._selectedItem   = guid;
-            this._previewData    = null;
-            this._previewLoading = false;
+            const mime = meta.mime || '';
+            if (!this._isPreviewable(mime)) {
+                previewEl.showEmpty('No preview available for this file type');
+                return;
+            }
+            // Auto-preview: start loading
+            previewEl.showLoading('Decrypting preview...');
+            this._autoPreview(this._selectedItem);
+        }
+
+        async _autoPreview(fileGuid) {
+            const meta = this._index[fileGuid] || {};
+            const mime = meta.mime || '';
+            const previewEl = this.querySelector('#vm-preview');
+
+            try {
+                const result = await adminAPI.vaultGetFile(this._vaultCacheKey, fileGuid);
+                if (!result || !result.data) {
+                    if (this._selectedItem === fileGuid && previewEl) previewEl.showEmpty('File data not found');
+                    return;
+                }
+                if (this._selectedItem !== fileGuid) return;
+
+                const packed    = b64ToArrayBuf(result.data);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                if (this._selectedItem !== fileGuid) return;
+                if (!previewEl) return;
+
+                if (mime.startsWith('image/')) {
+                    const blob = new Blob([decrypted], { type: mime });
+                    const url  = URL.createObjectURL(blob);
+                    previewEl.show({ type: 'image', data: url, filename: meta.name || fileGuid });
+                } else {
+                    const text = new TextDecoder().decode(decrypted);
+                    const truncated = text.length > 10000 ? text.substring(0, 10000) + '\n... (truncated)' : text;
+                    previewEl.show({ type: 'text', data: truncated, filename: meta.name || fileGuid });
+                }
+            } catch (err) {
+                if (this._selectedItem === fileGuid && previewEl) {
+                    previewEl.showError('Preview failed: ' + err.message);
+                }
+            }
+        }
+
+        _selectItem(guid) {
+            if (this._selectedItem === guid) {
+                this._clearSelection();
+                return;
+            }
+            this._selectedItem = guid;
 
             // Highlight the selected row
             this.querySelectorAll('.vm-row-selected').forEach(r => r.classList.remove('vm-row-selected'));
             const row = this.querySelector(`tr[data-guid="${guid}"]`);
             if (row) row.classList.add('vm-row-selected');
 
-            this._renderDetailPanel();
+            this._updateSettings();
+            this._updatePreview();
         }
 
         _isPreviewable(mime) {
@@ -875,46 +743,6 @@
         _isEditable(mime) {
             if (!mime || mime === '\u2014') return false;
             return mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml' || mime === 'application/javascript';
-        }
-
-        async _loadPreview(fileGuid) {
-            const meta = this._index[fileGuid] || {};
-            const mime = meta.mime || '';
-            if (!this._isPreviewable(mime)) return;
-
-            this._previewLoading = true;
-            this._renderDetailPanel();
-
-            try {
-                const result = await adminAPI.vaultGetFile(this._vaultCacheKey, fileGuid);
-                if (!result || !result.data) {
-                    this._previewLoading = false;
-                    this._renderDetailPanel();
-                    return;
-                }
-
-                const packed    = b64ToArrayBuf(result.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
-
-                if (mime.startsWith('image/')) {
-                    const blob = new Blob([decrypted], { type: mime });
-                    const url  = URL.createObjectURL(blob);
-                    this._previewData = { type: 'image', data: url };
-                } else {
-                    // Text or JSON
-                    const text = new TextDecoder().decode(decrypted);
-                    // Truncate for display
-                    const truncated = text.length > 2000 ? text.substring(0, 2000) + '\n... (truncated)' : text;
-                    this._previewData = { type: 'text', data: truncated };
-                }
-
-                this._previewLoading = false;
-                this._renderDetailPanel();
-            } catch (err) {
-                this._previewLoading = false;
-                this._previewData    = { type: 'text', data: 'Preview failed: ' + err.message };
-                this._renderDetailPanel();
-            }
         }
 
         async _openEditor(fileGuid) {
@@ -934,13 +762,13 @@
                 const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
                 const text      = new TextDecoder().decode(decrypted);
 
-                // Replace the main content area with the editor
-                const content = this.querySelector('#vm-content');
-                if (!content) return;
-                content.innerHTML = '';
+                // Open editor in row-3 (preview area)
+                const row3 = this.querySelector('#vm-row-3');
+                if (!row3) return;
+                row3.innerHTML = '';
 
                 const editor = document.createElement('vault-editor');
-                content.appendChild(editor);
+                row3.appendChild(editor);
                 editor.open({
                     text,
                     filename : meta.name || fileGuid,
@@ -950,7 +778,6 @@
                         const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
                         const b64       = arrayBufToB64Safe(encrypted);
                         await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
-                        // Update index metadata
                         meta.size = encoded.byteLength;
                         await this._saveIndex();
                         this._msg('success', `"${meta.name}" saved`);
@@ -958,8 +785,12 @@
                 });
 
                 editor.addEventListener('vault-editor-close', () => {
-                    // Restore normal view
-                    this._browseFolder(this._currentFolder);
+                    // Restore preview component
+                    row3.innerHTML = '';
+                    const preview = document.createElement('vault-preview');
+                    preview.id = 'vm-preview';
+                    row3.appendChild(preview);
+                    this._updatePreview();
                 });
 
             } catch (err) {
@@ -1214,8 +1045,6 @@
             if (keyIndex < 0 || keyIndex >= this._allKeys.length) return;
             this._selectedKey    = this._allKeys[keyIndex];
             this._selectedItem   = null;
-            this._previewData    = null;
-            this._previewLoading = false;
             this._treeExpanded   = {};
             this._folderPath     = [];
 
@@ -1378,8 +1207,8 @@
                 }
                 this._renderBreadcrumb();
                 this._renderTree();
-                // Re-render detail panel if an item is selected
-                if (this._selectedItem) this._renderDetailPanel();
+                // Re-render settings if an item is selected
+                if (this._selectedItem) this._updateSettings();
             } catch (err) {
                 this._renderFolderContents({ children: [] });
                 this._renderBreadcrumb();
@@ -1390,7 +1219,7 @@
         _navigateToRoot() {
             this._currentFolder = this._vaultManifest.root_folder;
             this._folderPath    = [{ guid: this._currentFolder, name: 'Root' }];
-            this._closeDetailPanel();
+            this._clearSelection();
             this._browseFolder(this._currentFolder);
         }
 
@@ -1403,9 +1232,10 @@
                 this._folderPath.push({ guid: folderGuid, name: meta.name || folderGuid });
             }
             this._currentFolder = folderGuid;
-            // Expand this folder in the tree
             this._treeExpanded[folderGuid] = true;
-            this._closeDetailPanel();
+            // Select the folder to show its settings
+            this._selectedItem  = folderGuid;
+            this._pendingDelete = null;
             this._browseFolder(folderGuid);
         }
 
@@ -1464,8 +1294,8 @@
             }
             if (this._lastFolder) { this._renderFolderContents(this._lastFolder); this._renderBreadcrumb(); }
             this._renderTree();
-            // Update detail panel if the renamed item is selected
-            if (this._selectedItem === guid) this._renderDetailPanel();
+            // Update settings bar if the renamed item is selected
+            if (this._selectedItem === guid) this._updateSettings();
         }
 
         // =====================================================================
@@ -1553,7 +1383,7 @@
 
                 this._pendingDelete = null;
                 // If the deleted item was selected, close the detail panel
-                if (this._selectedItem === guid) this._closeDetailPanel();
+                if (this._selectedItem === guid) this._clearSelection();
                 this._msg('success', `"${meta.name || guid}" deleted`);
                 this._browseFolder(this._currentFolder);
             } catch (err) {
@@ -1604,6 +1434,45 @@
             document.addEventListener('mouseup', onMouseUp);
         }
 
+        _setupRowResize(handleId, rowId, heightProp, minHeight) {
+            const handle = this.querySelector('#' + handleId);
+            const row    = this.querySelector('#' + rowId);
+            if (!handle || !row) return;
+
+            let isResizing = false, startY, startHeight;
+
+            const onMouseDown = (e) => {
+                isResizing  = true;
+                startY      = e.clientY;
+                startHeight = row.offsetHeight;
+                handle.classList.add('vm-resize-active');
+                document.body.style.cursor     = 'row-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff      = e.clientY - startY;
+                const newHeight = Math.max(startHeight + diff, minHeight);
+                this[heightProp] = newHeight;
+                row.style.flex   = `0 0 ${newHeight}px`;
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('vm-resize-active');
+                document.body.style.cursor     = '';
+                document.body.style.userSelect = '';
+                this._savePrefs();
+            };
+
+            handle.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
         // =====================================================================
         // Move item between folders (internal drag-and-drop)
         // =====================================================================
@@ -1636,7 +1505,7 @@
 
                 const targetName = (this._index[targetFolderGuid] && this._index[targetFolderGuid].name) || 'folder';
                 this._msg('success', `Moved "${meta.name || itemGuid}" to "${targetName}"`);
-                this._closeDetailPanel();
+                this._clearSelection();
                 this._browseFolder(this._currentFolder);
             } catch (err) {
                 this._msg('error', `Move failed: ${err.message}`);
