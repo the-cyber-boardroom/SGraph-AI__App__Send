@@ -362,14 +362,12 @@
             this._showNewFolder  = false;  // inline new-folder input visible
             this._renamingGuid   = null;   // guid of item being renamed
             this._lastFolder     = null;   // cached folder data for current view
-            this._selectedItem   = null;   // guid of item selected for detail panel
+            this._selectedItem   = null;   // guid of item selected for settings + preview
             this._showRawData    = false;  // raw data view toggle
             this._treeExpanded   = {};     // guid -> bool: which tree nodes are expanded
             this._dragCounter    = 0;      // for nested dragenter/dragleave counting
-            this._previewData    = null;   // { type: 'image'|'text', data: ... } for detail panel preview
-            this._previewLoading = false;
             this._treeWidth      = 200;   // tree sidebar width in px
-            this._detailWidth    = 260;   // detail panel width in px
+            this._row1Height     = null;  // row-1 height in px (null = flex:1)
             this._draggingGuid   = null;  // guid of item being dragged internally
             this._loadPrefs();
         }
@@ -380,7 +378,7 @@
                 if (raw) {
                     const p = JSON.parse(raw);
                     if (p.treeWidth)    this._treeWidth    = p.treeWidth;
-                    if (p.detailWidth)  this._detailWidth  = p.detailWidth;
+                    if (p.row1Height)   this._row1Height   = p.row1Height;
                 }
             } catch (_) { /* ignore */ }
         }
@@ -389,7 +387,7 @@
             try {
                 localStorage.setItem('sgraph-vault-prefs', JSON.stringify({
                     treeWidth        : this._treeWidth,
-                    detailWidth      : this._detailWidth
+                    row1Height       : this._row1Height
                 }));
             } catch (_) { /* ignore */ }
         }
@@ -441,6 +439,8 @@
                 keyOptions += `<option value="${i}"${selected}>${escapeHtml(label)} (${escapeHtml(shortFp)})</option>`;
             }
 
+            const row1Style = this._row1Height ? `flex: 0 0 ${this._row1Height}px` : 'flex: 1';
+
             container.innerHTML = `
                 <div class="vm-toolbar">
                     <div class="vm-key-selector">
@@ -455,12 +455,21 @@
                     </div>
                 </div>
                 <div class="vm-body" id="vm-body">
-                    <div class="vm-tree-sidebar" id="vm-tree-sidebar" style="width: ${this._treeWidth}px"></div>
-                    <div class="vm-resize-handle" id="vm-resize-left"></div>
-                    <div class="vm-content" id="vm-content">
-                        <div class="vm-drag-overlay" id="vm-drag-overlay">
-                            <span class="vm-drag-overlay-text">Drop files here to encrypt &amp; upload</span>
+                    <div class="vm-row-1" id="vm-row-1" style="${row1Style}">
+                        <div class="vm-tree-sidebar" id="vm-tree-sidebar" style="width: ${this._treeWidth}px"></div>
+                        <div class="vm-resize-handle" id="vm-resize-left"></div>
+                        <div class="vm-content" id="vm-content">
+                            <div class="vm-drag-overlay" id="vm-drag-overlay">
+                                <span class="vm-drag-overlay-text">Drop files here to encrypt &amp; upload</span>
+                            </div>
                         </div>
+                    </div>
+                    <div class="vm-row-2" id="vm-row-2">
+                        <vault-settings id="vm-settings"></vault-settings>
+                    </div>
+                    <div class="vm-resize-row" id="vm-resize-row"></div>
+                    <div class="vm-row-3" id="vm-row-3">
+                        <vault-preview id="vm-preview"></vault-preview>
                     </div>
                     <input type="file" class="vm-file-input-hidden" id="vm-file-input" multiple>
                 </div>
@@ -488,8 +497,18 @@
             contentArea.addEventListener('dragleave', (e) => this._onDragLeave(e));
             contentArea.addEventListener('drop',      (e) => this._onDrop(e));
 
-            // Resize handles
+            // Resize handles — column (tree sidebar) + row (browser vs preview)
             this._setupResize('vm-resize-left', 'vm-tree-sidebar', '_treeWidth', 120, Infinity, false);
+            this._setupRowResize('vm-resize-row', 'vm-row-1', '_row1Height', 80);
+
+            // Settings bar events (delegated from vault-settings component)
+            const settingsEl = container.querySelector('#vm-settings');
+            settingsEl.addEventListener('vault-settings-download', (e) => this._downloadFile(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-share',    (e) => this._showShareDialog(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-edit',     (e) => this._openEditor(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-open',     (e) => this._navigateToFolder(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-delete',   (e) => this._deleteItem(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-rename',   (e) => this._commitRename(e.detail.guid, e.detail.newName));
 
             this._renderTree();
             this._browseFolder(this._currentFolder);
