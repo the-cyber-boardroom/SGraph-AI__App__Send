@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SG/Send — My Vault</title>
+    <meta name="description" content="Your personal encrypted vault. Files are encrypted in your browser before upload — we never see your data.">
+    <meta name="theme-color" content="#1A1A2E">
+    <!-- Fonts: DM Sans (display + body) + JetBrains Mono (code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- CSS: base + design system override -->
+    <link rel="stylesheet" href="../v0.1.0/css/common.css">
+    <link rel="stylesheet" href="../v0.1.6/css/sg-design-system.css">
+</head>
+<body class="theme-aurora">
+    <header>
+        <h1><span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span></h1>
+        <p class="header-tagline">My Vault</p>
+        <nav class="header-nav">
+            <a href="../v0.1.6/index.html" class="nav-link" title="Send a file">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Send
+            </a>
+            <a href="https://docs.send.sgraph.ai/" target="_blank" rel="noopener" class="nav-link" title="Documentation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                Docs
+            </a>
+        </nav>
+    </header>
+    <main>
+        <user-vault></user-vault>
+
+        <p class="disclaimer">Your files are encrypted in the browser. The server never sees plaintext.</p>
+    </main>
+    <!-- Vault scripts -->
+    <script src="js/vault-crypto.js"></script>
+    <script src="js/vault-api.js"></script>
+    <script src="components/user-vault/user-vault.js"></script>
+</body>
+</html>
