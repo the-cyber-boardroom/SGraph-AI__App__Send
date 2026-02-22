@@ -53,7 +53,7 @@
             this._index         = {};        // guid -> { name, type, size, kind, _parent }
             this._breadcrumb    = [];        // [{ guid, name }]
             this._currentFolder = null;
-            this._state         = 'loading'; // loading | generating | no-key | locked | open
+            this._state         = 'loading'; // loading | generating | no-key | insecure | locked | open
             this._sortBy        = 'name';    // name | size
             this._sortAsc       = true;
             this._pendingDelete = null;      // guid of item awaiting delete confirmation
@@ -69,6 +69,11 @@
 
         async _init() {
             this._render();
+            if (!VaultCrypto.isSecureContext()) {
+                this._state = 'insecure';
+                this._render();
+                return;
+            }
             try {
                 const hasKey = await VaultCrypto.hasKeyPair();
                 if (!hasKey) {
@@ -327,7 +332,9 @@
         // =====================================================================
 
         _render() {
-            if (this._state === 'loading') {
+            if (this._state === 'insecure') {
+                this.innerHTML = this._tmplInsecure();
+            } else if (this._state === 'loading') {
                 this.innerHTML = this._tmplLoading('Loading vault...');
             } else if (this._state === 'generating') {
                 this.innerHTML = this._tmplLoading('Generating RSA-4096 key pair... this may take a few seconds');
@@ -348,6 +355,31 @@
             <div class="card card-enter" style="text-align: center; padding: var(--space-8);">
                 <div class="loading-slash">/</div>
                 <div style="font-size: var(--font-size-sm, 0.875rem); color: var(--color-text-secondary); margin-top: var(--space-3);">${escapeHtml(msg)}</div>
+            </div>`;
+        }
+
+        _tmplInsecure() {
+            const localhostUrl = location.href.replace(location.hostname, 'localhost');
+            return `
+            <div class="card card-enter" style="padding: var(--space-6); text-align: center;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-error, #E94560)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: var(--space-4);">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <h2 style="font-size: var(--text-h3, 1.25rem); margin: 0 0 var(--space-2) 0;">Secure Context Required</h2>
+                <p style="font-size: var(--font-size-sm, 0.875rem); color: var(--color-text-secondary); margin: 0 0 var(--space-4) 0; max-width: 480px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                    The vault uses the Web Crypto API for zero-knowledge encryption, which requires a
+                    <strong style="color: var(--color-text, #E0E0E0);">secure context</strong> (HTTPS or localhost).
+                </p>
+                <p style="font-size: var(--font-size-sm, 0.875rem); color: var(--color-text-secondary); margin: 0 0 var(--space-4) 0;">
+                    Current origin: <code style="background: var(--bg-secondary, #16213E); padding: 2px 6px; border-radius: 4px; font-size: var(--text-small, 0.8rem);">${escapeHtml(location.origin)}</code>
+                </p>
+                <p style="font-size: var(--font-size-sm, 0.875rem); color: var(--color-text-secondary); margin: 0 0 var(--space-5) 0;">
+                    Try accessing this page via:
+                </p>
+                <a href="${escapeHtml(localhostUrl)}" style="display: inline-block; padding: var(--space-2) var(--space-4); background: var(--color-primary, #4ECDC4); color: var(--bg-primary, #0A1628); border-radius: var(--radius-sm, 6px); text-decoration: none; font-size: var(--font-size-sm, 0.875rem); font-weight: 600;">
+                    Open on localhost
+                </a>
             </div>`;
         }
 

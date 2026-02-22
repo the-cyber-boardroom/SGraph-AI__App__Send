@@ -15,6 +15,21 @@ const VaultCrypto = {
     STORE_NAME: 'keypairs',
     KEY_ID:     'vault-primary',
 
+    // ─── Secure context check ───────────────────────────────────────────────
+
+    isSecureContext() {
+        return window.isSecureContext && !!crypto.subtle;
+    },
+
+    _requireSecureContext() {
+        if (!this.isSecureContext()) {
+            throw new Error(
+                'Web Crypto API requires a secure context (HTTPS or localhost). ' +
+                'Current origin: ' + location.origin
+            );
+        }
+    },
+
     // ─── IndexedDB helpers ─────────────────────────────────────────────────
 
     _openDB() {
@@ -49,6 +64,7 @@ const VaultCrypto = {
     // ─── Key pair lifecycle ────────────────────────────────────────────────
 
     async generateKeyPair() {
+        this._requireSecureContext();
         const keyPair = await crypto.subtle.generateKey(
             { name: 'RSA-OAEP', modulusLength: 4096,
               publicExponent: new Uint8Array([1, 0, 1]),
