@@ -116,12 +116,66 @@ const SSHCrypto = (function () {
 
     function extractEd25519Seed(pkcs8) {
         const der = new Uint8Array(pkcs8)
-        // PKCS8 DER for Ed25519 is always 48 bytes:
-        //   30 2e 02 01 00 30 05 06 03 2b 65 70 04 22 04 20 {32 bytes seed}
-        if (der.length !== 48 || der[0] !== 0x30 || der[14] !== 0x04 || der[16] !== 0x04) {
-            throw new Error('Unexpected PKCS8 format for Ed25519')
+        // PKCS8 DER for Ed25519 has two common forms:
+        //   Short (48 bytes, version=0): 30 2e 02 01 00 30 05 06 03 2b 65 70 04 22 04 20 {32 bytes}
+        //   Long  (~83 bytes, version=1, includes public key):
+        //     30 51 02 01 01 30 05 06 03 2b 65 70 04 22 04 20 {32 bytes} a1 23 03 21 00 {32 bytes pub}
+        //
+        // Walk the ASN.1 structure to find the seed in both cases.
+        let offset = 0
+
+        // Outer SEQUENCE
+        if (der[offset] !== 0x30) throw new Error('PKCS8: expected SEQUENCE')
+        offset = skipTag(der, offset)
+
+        // version INTEGER — skip it (could be 0 or 1)
+        if (der[offset] !== 0x02) throw new Error('PKCS8: expected INTEGER (version)')
+        offset = skipTLV(der, offset)
+
+        // algorithm SEQUENCE — skip it
+        if (der[offset] !== 0x30) throw new Error('PKCS8: expected SEQUENCE (algorithm)')
+        offset = skipTLV(der, offset)
+
+        // Outer OCTET STRING containing the key
+        if (der[offset] !== 0x04) throw new Error('PKCS8: expected OCTET STRING (key wrapper)')
+        offset = skipTag(der, offset)
+
+        // Inner OCTET STRING containing the 32-byte seed
+        if (der[offset] !== 0x04) throw new Error('PKCS8: expected OCTET STRING (seed)')
+        offset = skipTag(der, offset)
+
+        return der.slice(offset, offset + 32)
+    }
+
+    // ASN.1 DER helpers: skip past tag + length, return offset of content
+    function skipTag(data, offset) {
+        offset++                                        // skip tag byte
+        return skipLength(data, offset)
+    }
+
+    // Skip past tag + length + content, return offset after the entire TLV
+    function skipTLV(data, offset) {
+        offset++                                        // skip tag byte
+        const { contentStart, contentLen } = readLength(data, offset)
+        return contentStart + contentLen
+    }
+
+    function skipLength(data, offset) {
+        const { contentStart } = readLength(data, offset)
+        return contentStart
+    }
+
+    function readLength(data, offset) {
+        const first = data[offset]
+        if ((first & 0x80) === 0) {
+            return { contentStart: offset + 1, contentLen: first }
         }
-        return der.slice(16, 48)
+        const numBytes = first & 0x7f
+        let len = 0
+        for (let i = 0; i < numBytes; i++) {
+            len = (len << 8) | data[offset + 1 + i]
+        }
+        return { contentStart: offset + 1 + numBytes, contentLen: len }
     }
 
     function formatPublicKeyEd25519(rawPub, comment) {
