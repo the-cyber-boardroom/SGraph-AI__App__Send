@@ -137,8 +137,10 @@
             if (result) {
                 await this._openVault();
             } else {
+                console.error('[user-vault] Vault creation failed — API returned null');
                 this._state = 'locked';
                 this._render();
+                this._showStatus('error', 'Vault creation failed. Check console for details.');
             }
         }
 
@@ -147,8 +149,10 @@
             this._render();
             const manifest = await VaultAPI.lookup(this._vaultKey);
             if (!manifest) {
+                console.error('[user-vault] Vault lookup failed — API returned null');
                 this._state = 'locked';
                 this._render();
+                this._showStatus('error', 'Could not open vault. Check console for details.');
                 return;
             }
             this._rootFolder    = manifest.root_folder;
