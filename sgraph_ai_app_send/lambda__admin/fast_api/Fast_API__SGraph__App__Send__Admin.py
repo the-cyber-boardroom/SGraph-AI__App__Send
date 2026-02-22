@@ -74,9 +74,9 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
             self.add_routes(Routes__Metrics      ,
                             metrics_cache = self.metrics_cache)
 
-        if self.send_cache_client is not None:                                      # Record admin traffic for Analytics Pulse
-            self.app().add_middleware(Middleware__Analytics,
-                                     send_cache_client = self.send_cache_client)
+        # if self.send_cache_client is not None:                                      # Record admin traffic for Analytics Pulse
+        #     self.app().add_middleware(Middleware__Analytics,
+        #                              send_cache_client = self.send_cache_client)
 
     def setup_pulse_route(self):                                                  # Register /health/pulse directly (no tag prefix)
         send_cache_client = self.send_cache_client
