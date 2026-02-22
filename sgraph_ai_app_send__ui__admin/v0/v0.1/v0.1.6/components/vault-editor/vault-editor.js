@@ -69,6 +69,13 @@
             this._onSave     = null;
             this._showPreview = false;
             this._saving     = false;
+            this._resizeObserver = null;
+            this._onResize       = () => this._updateBodyHeight();
+        }
+
+        disconnectedCallback() {
+            if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
+            window.removeEventListener('resize', this._onResize);
         }
 
         open({ text, filename, mime, onSave }) {
@@ -121,6 +128,27 @@
             `;
 
             this._bindEvents();
+            this._setupResizeTracking();
+        }
+
+        _setupResizeTracking() {
+            window.removeEventListener('resize', this._onResize);
+            window.addEventListener('resize', this._onResize);
+            if (this._resizeObserver) this._resizeObserver.disconnect();
+            this._resizeObserver = new ResizeObserver(this._onResize);
+            this._resizeObserver.observe(this);
+            requestAnimationFrame(() => this._updateBodyHeight());
+        }
+
+        _updateBodyHeight() {
+            const body    = this.querySelector('.ve-body');
+            const footer  = this.querySelector('.ve-footer');
+            if (!body) return;
+            const bodyTop      = body.getBoundingClientRect().top;
+            const footerH      = footer ? footer.offsetHeight : 35;
+            const bottomMargin = 40;   // room for vm-status-bar + padding
+            const available    = window.innerHeight - bodyTop - footerH - bottomMargin;
+            body.style.height  = Math.max(80, available) + 'px';
         }
 
         _bindEvents() {
