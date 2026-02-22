@@ -1,6 +1,6 @@
 [tool.poetry]
 name        = "sgraph_ai_app_send"
-version     = "v0.5.18"
+version     = "v0.5.19"
 description = "SGraph-AI__App__Send"
 authors     = ["Dinis Cruz <dinis.cruz@owasp.org>"]
 license     = "Apache 2.0"
