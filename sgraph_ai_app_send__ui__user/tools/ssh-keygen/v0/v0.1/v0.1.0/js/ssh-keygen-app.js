@@ -240,6 +240,29 @@ class SSHKeygenApp extends HTMLElement {
 
                 <div class="howto-card">
                     <button class="howto-header" data-action="toggle-howto">
+                        <span class="howto-title">Set Up Your Private Key (Mac / Linux)</span>
+                        <span class="howto-chevron">&#9656;</span>
+                    </button>
+                    <div class="howto-body">
+                        <ol>
+                            <li>Create the SSH directory (if it doesn&rsquo;t exist):<br>
+                                <code>mkdir -p ~/.ssh</code></li>
+                            <li>Move the downloaded key into place:<br>
+                                <code>mv ~/Downloads/${this._keyPrefix} ~/.ssh/${this._keyPrefix}</code></li>
+                            <li>Set permissions (required &mdash; SSH refuses keys that are too open):<br>
+                                <code>chmod 600 ~/.ssh/${this._keyPrefix}</code></li>
+                            <li>Add the key to your SSH agent:<br>
+                                <code>eval "$(ssh-agent -s)" && ssh-add ~/.ssh/${this._keyPrefix}</code></li>
+                            <li>Test the connection (example for GitHub):<br>
+                                <code>ssh -T git@github.com</code></li>
+                            <li>If you see <strong>&ldquo;Hi username! You&rsquo;ve successfully authenticated&rdquo;</strong> followed by <strong>&ldquo;GitHub does not provide shell access&rdquo;</strong> &mdash; that means it <strong>worked</strong>. This is the expected success message.</li>
+                        </ol>
+                        <p class="howto-note"><strong>Windows:</strong> Use Git Bash or WSL and follow the same steps. In PowerShell, use <code>ssh-add ~\\.ssh\\${this._keyPrefix}</code> instead.</p>
+                    </div>
+                </div>
+
+                <div class="howto-card">
+                    <button class="howto-header" data-action="toggle-howto">
                         <span class="howto-title">GitHub</span>
                         <span class="howto-chevron">&#9656;</span>
                     </button>
@@ -275,10 +298,11 @@ class SSHKeygenApp extends HTMLElement {
                     </button>
                     <div class="howto-body">
                         <ol>
-                            <li>Save the private key to <code>~/.ssh/${this._keyPrefix}</code></li>
-                            <li>Set permissions: <code>chmod 600 ~/.ssh/${this._keyPrefix}</code></li>
-                            <li>Copy the public key to the server: <code>ssh-copy-id -i ~/.ssh/${this._keyPrefix}.pub user@host</code></li>
-                            <li>Test: <code>ssh -i ~/.ssh/${this._keyPrefix} user@host</code></li>
+                            <li>Set up your private key locally (see <strong>Set Up Your Private Key</strong> above)</li>
+                            <li>Copy the public key to the server:<br>
+                                <code>ssh-copy-id -i ~/.ssh/${this._keyPrefix}.pub user@host</code></li>
+                            <li>Test the connection:<br>
+                                <code>ssh -i ~/.ssh/${this._keyPrefix} user@host</code></li>
                         </ol>
                     </div>
                 </div>
