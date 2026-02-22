@@ -18,7 +18,8 @@ from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup      
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
 ROUTES_PATHS__APP_SEND__STATIC__USER  = ['/',
-                                         f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}']
+                                         f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}',
+                                         '/tools/ssh-keygen'                            ]
 
 class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
@@ -92,5 +93,10 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         def redirect_to_latest():
             return RedirectResponse(url=path_latest_version)
 
+        @route_path(path='/tools/ssh-keygen')
+        def redirect_to_ssh_keygen():
+            return RedirectResponse(url=f'/{path_name}/tools/ssh-keygen/v0/v0.1/v0.1.0/index.html')
+
         self.add_route_get(redirect_root)
         self.add_route_get(redirect_to_latest)
+        self.add_route_get(redirect_to_ssh_keygen)
