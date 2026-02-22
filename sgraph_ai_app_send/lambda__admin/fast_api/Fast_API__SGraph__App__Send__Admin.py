@@ -74,7 +74,7 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
             self.add_routes(Routes__Metrics      ,
                             metrics_cache = self.metrics_cache)
 
-        # if self.send_cache_client is not None:                                      # Record admin traffic for Analytics Pulse
+        # if self.send_cache_client is not None:                                      # Record admin traffic for Analytics Pulse  # disabled: creates 5 files per request, caused 65k+ file buildup — redesign needed
         #     self.app().add_middleware(Middleware__Analytics,
         #                              send_cache_client = self.send_cache_client)
 
