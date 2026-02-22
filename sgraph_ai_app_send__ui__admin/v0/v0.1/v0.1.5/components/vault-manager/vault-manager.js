@@ -107,6 +107,8 @@
 
         .vm-no-key       { text-align: center; padding: 3rem 1rem; }
         .vm-no-key__icon { margin-bottom: 0.75rem; color: var(--admin-text-muted, #5e6280); }
+        .vm-no-key__icon svg { width: 40px; height: 40px; }
+        .pk-empty__icon svg  { width: 40px; height: 40px; }
         .vm-no-key__title { font-size: 1.125rem; font-weight: 600; color: var(--admin-text, #e4e6ef); margin-bottom: 0.5rem; }
         .vm-no-key__text { font-size: 0.875rem; color: var(--admin-text-secondary, #8b8fa7); line-height: 1.6; max-width: 480px; margin: 0 auto 1rem; }
 
@@ -309,11 +311,12 @@
                     this._renderNoKey();
                     return;
                 }
-                // Use the first key pair
+                // Use the first key pair — compute fingerprint if not stored
+                const fingerprint = keys[0].fingerprint || await pki.computeFingerprint(keys[0].publicKey);
                 this._selectedKey = {
                     publicKey   : keys[0].publicKey,
                     privateKey  : keys[0].privateKey,
-                    fingerprint : keys[0].fingerprint || 'unknown',
+                    fingerprint : fingerprint,
                     record      : keys[0]
                 };
                 await this._initVault();
