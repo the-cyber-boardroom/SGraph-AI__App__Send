@@ -25,16 +25,16 @@
     const EDITOR_STYLES = `
         ${PKI_SHARED_STYLES}
 
-        :host, vault-editor { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+        :host, vault-editor { display: block; height: 100%; overflow: hidden; }
 
-        .ve-container { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--admin-surface, #1a1d27); border-radius: var(--admin-radius-lg, 10px); overflow: hidden; }
+        .ve-container { display: grid; grid-template-rows: auto 1fr auto; height: 100%; background: var(--admin-surface, #1a1d27); border-radius: var(--admin-radius-lg, 10px); overflow: hidden; }
 
         .ve-toolbar { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--admin-border-subtle, #252838); flex-shrink: 0; }
         .ve-filename { font-size: 0.8125rem; font-weight: 600; color: var(--admin-text, #e4e6ef); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ve-dirty-indicator { font-size: 0.625rem; color: var(--admin-warning, #fbbf24); margin-left: 0.25rem; }
         .ve-mime { font-size: 0.6875rem; color: var(--admin-text-muted, #5e6280); font-family: var(--admin-font-mono, monospace); }
 
-        .ve-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+        .ve-body { display: flex; min-height: 0; overflow: hidden; }
 
         .ve-editor-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
         .ve-textarea { flex: 1; width: 100%; resize: none; border: none; outline: none; padding: 0.75rem; font-family: var(--admin-font-mono, 'SF Mono', 'Fira Code', 'Cascadia Code', monospace); font-size: 0.8125rem; line-height: 1.5; background: var(--admin-bg, #0f1117); color: var(--admin-text, #e4e6ef); tab-size: 4; }
