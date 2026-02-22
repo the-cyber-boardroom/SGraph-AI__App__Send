@@ -20,9 +20,12 @@
    New in v0.1.6:
    - Tree view sidebar — collapsible folder hierarchy on the left
    - Key selector dropdown — pick which PKI key to use
-   - Drag-and-drop overlay — subtle full-content-area overlay instead of box
-   - Detail/preview panel — right-side panel for selected file metadata + preview
+   - Drag-and-drop overlay — upload + internal file move between folders
+   - Detail/preview panel — right-side panel for file metadata + preview + delete
    - Raw data view toggle — show GUIDs and cache keys instead of names
+   - Resizable panel dividers + collapsible left sidebar
+   - Loading state + blur when switching keys
+   - Files-only table view (folders live in tree sidebar)
    ============================================================================= */
 
 (function() {
@@ -80,6 +83,18 @@
         return [...crypto.getRandomValues(new Uint8Array(4))].map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    // Chunked base64 encoder — avoids stack overflow for large files
+    // (pki-common's arrayBufToB64 uses spread which blows the stack > ~100KB)
+    function arrayBufToB64Safe(buf) {
+        const bytes = new Uint8Array(buf);
+        const CHUNK = 8192;
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += CHUNK) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+        }
+        return btoa(binary);
+    }
+
     function formatSize(bytes) {
         if (bytes == null) return '\u2014';
         if (bytes < 1024) return bytes + ' B';
@@ -108,8 +123,11 @@
         .vm-breadcrumb .vm-bc-current:hover { background: none; }
 
         .vm-actions     { display: flex; gap: 0.375rem; align-items: center; }
-        .vm-body        { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-        .vm-content     { flex: 1; overflow-y: auto; position: relative; }
+        .vm-body        { flex: 1; display: flex; overflow: hidden; min-height: 0; position: relative; }
+        .vm-body.vm-loading .vm-tree-sidebar, .vm-body.vm-loading .vm-content, .vm-body.vm-loading .vm-detail-panel { opacity: 0.4; pointer-events: none; filter: blur(1px); transition: all 200ms ease; }
+        .vm-loading-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; }
+        .vm-loading-overlay .pk-spinner { width: 24px; height: 24px; }
+        .vm-content     { flex: 1; overflow-y: auto; position: relative; min-width: 200px; }
 
         /* --- Key Selector --- */
         .vm-key-selector { display: flex; align-items: center; gap: 0.375rem; margin-right: 0.5rem; }
@@ -122,10 +140,12 @@
         .vm-raw-toggle.vm-raw-active { color: var(--admin-warning, #fbbf24); background: var(--admin-warning-bg, rgba(251,191,36,0.1)); }
 
         /* --- Tree View Sidebar --- */
-        .vm-tree-sidebar { width: 200px; min-width: 160px; max-width: 280px; border-right: 1px solid var(--admin-border-subtle, #252838); overflow-y: auto; overflow-x: hidden; padding: 0.5rem 0; font-size: 0.75rem; flex-shrink: 0; }
+        .vm-tree-sidebar { width: 200px; min-width: 120px; display: flex; flex-direction: column; overflow: hidden; font-size: 0.75rem; flex-shrink: 0; transition: width 200ms ease; }
+        .vm-tree-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0.5rem 0; }
         .vm-tree-node { display: flex; align-items: center; gap: 0.25rem; padding: 0.2rem 0.375rem; cursor: pointer; color: var(--admin-text-secondary, #8b8fa7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 3px; margin: 0 0.25rem; user-select: none; }
         .vm-tree-node:hover { background: var(--admin-surface-hover, #2a2e3d); color: var(--admin-text, #e4e6ef); }
         .vm-tree-node.vm-tree-active { background: var(--admin-primary-bg, rgba(79,143,247,0.1)); color: var(--admin-primary, #4f8ff7); font-weight: 600; }
+        .vm-tree-node.vm-tree-drop-target { outline: 2px dashed var(--admin-primary, #4f8ff7); outline-offset: -2px; background: var(--admin-primary-bg, rgba(79,143,247,0.08)); }
         .vm-tree-chevron { width: 14px; height: 14px; flex-shrink: 0; transition: transform 150ms ease; display: inline-flex; align-items: center; justify-content: center; }
         .vm-tree-chevron.vm-tree-expanded { transform: rotate(90deg); }
         .vm-tree-chevron.vm-tree-empty { visibility: hidden; }
@@ -134,9 +154,25 @@
         .vm-tree-label { overflow: hidden; text-overflow: ellipsis; }
         .vm-tree-children { padding-left: 0.75rem; }
         .vm-tree-children.vm-tree-collapsed { display: none; }
+        .vm-tree-footer { border-top: 1px solid var(--admin-border-subtle, #252838); padding: 0.375rem; display: flex; gap: 0.25rem; }
+        .vm-tree-footer .pk-btn { width: 100%; justify-content: center; }
+        .vm-tree-collapse-btn { position: absolute; top: 0.25rem; right: 0.25rem; z-index: 2; cursor: pointer; background: none; border: none; color: var(--admin-text-muted, #5e6280); padding: 0.125rem; display: inline-flex; border-radius: 3px; }
+        .vm-tree-collapse-btn:hover { background: var(--admin-surface-hover, #2a2e3d); color: var(--admin-text, #e4e6ef); }
+        .vm-tree-collapse-btn svg { width: 14px; height: 14px; }
+        /* Collapsed sidebar */
+        .vm-tree-sidebar.vm-sidebar-collapsed { width: 36px !important; min-width: 36px; max-width: 36px; }
+        .vm-sidebar-collapsed .vm-tree-label, .vm-sidebar-collapsed .vm-tree-chevron { display: none; }
+        .vm-sidebar-collapsed .vm-tree-node { justify-content: center; padding: 0.3rem; margin: 0.125rem 0.125rem; }
+        .vm-sidebar-collapsed .vm-tree-footer { padding: 0.25rem; }
+        .vm-sidebar-collapsed .vm-tree-footer-text { display: none; }
+        .vm-sidebar-collapsed .vm-tree-children { padding-left: 0; }
+
+        /* --- Resize Handles --- */
+        .vm-resize-handle { width: 4px; cursor: col-resize; background: transparent; transition: background 150ms ease; flex-shrink: 0; z-index: 5; }
+        .vm-resize-handle:hover, .vm-resize-handle.vm-resize-active { background: var(--admin-primary, #4f8ff7); }
 
         /* --- Detail Panel --- */
-        .vm-detail-panel { width: 260px; min-width: 200px; max-width: 320px; border-left: 1px solid var(--admin-border-subtle, #252838); overflow-y: auto; padding: 0.75rem; flex-shrink: 0; }
+        .vm-detail-panel { width: 260px; min-width: 180px; overflow-y: auto; padding: 0.75rem; flex-shrink: 0; }
         .vm-detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
         .vm-detail-title { font-size: 0.8125rem; font-weight: 600; color: var(--admin-text, #e4e6ef); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
         .vm-detail-close { cursor: pointer; color: var(--admin-text-muted, #5e6280); background: none; border: none; padding: 0.125rem; display: inline-flex; }
@@ -161,8 +197,10 @@
         .vm-table th:last-child { cursor: default; }
         .vm-table td     { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--admin-border-subtle, #252838); font-size: 0.8125rem; color: var(--admin-text, #e4e6ef); }
         .vm-table tr:hover td { background: var(--admin-surface-hover, #2a2e3d); }
-        .vm-table tr.vm-row-folder { cursor: pointer; }
         .vm-table tr.vm-row-selected td { background: var(--admin-primary-bg, rgba(79,143,247,0.08)); }
+        .vm-table tr[draggable="true"] { cursor: grab; }
+        .vm-table tr[draggable="true"]:active { cursor: grabbing; }
+        .vm-table tr.vm-row-dragging { opacity: 0.4; }
 
         .vm-icon         { display: inline-flex; align-items: center; gap: 0.375rem; }
         .vm-icon svg     { width: 16px; height: 16px; flex-shrink: 0; }
@@ -216,6 +254,9 @@
     const SVG_CLOSE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
     const SVG_RAW    = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
     const SVG_EYE    = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>';
+    const SVG_COLLAPSE = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
+    const SVG_EXPAND  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
+    const SVG_MOVE   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L11 6.414V13.586l1.293-1.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L9 13.586V6.414L7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3z"/></svg>';
 
     class VaultManager extends HTMLElement {
 
@@ -245,6 +286,33 @@
             this._dragCounter    = 0;      // for nested dragenter/dragleave counting
             this._previewData    = null;   // { type: 'image'|'text', data: ... } for detail panel preview
             this._previewLoading = false;
+            this._sidebarCollapsed = false;// tree sidebar collapsed to icons
+            this._treeWidth      = 200;   // tree sidebar width in px
+            this._detailWidth    = 260;   // detail panel width in px
+            this._draggingGuid   = null;  // guid of item being dragged internally
+            this._loadPrefs();
+        }
+
+        _loadPrefs() {
+            try {
+                const raw = localStorage.getItem('sgraph-vault-prefs');
+                if (raw) {
+                    const p = JSON.parse(raw);
+                    if (p.treeWidth)    this._treeWidth    = p.treeWidth;
+                    if (p.detailWidth)  this._detailWidth  = p.detailWidth;
+                    if (p.sidebarCollapsed !== undefined) this._sidebarCollapsed = p.sidebarCollapsed;
+                }
+            } catch (_) { /* ignore */ }
+        }
+
+        _savePrefs() {
+            try {
+                localStorage.setItem('sgraph-vault-prefs', JSON.stringify({
+                    treeWidth        : this._treeWidth,
+                    detailWidth      : this._detailWidth,
+                    sidebarCollapsed : this._sidebarCollapsed
+                }));
+            } catch (_) { /* ignore */ }
         }
 
         connectedCallback()    { this.render(); }
@@ -303,13 +371,13 @@
                     <div class="vm-breadcrumb" id="vm-breadcrumb"></div>
                     <div class="vm-actions">
                         <button class="pk-btn pk-btn--xs pk-btn--ghost vm-raw-toggle ${this._showRawData ? 'vm-raw-active' : ''}" id="vm-btn-raw" title="Toggle raw data view">${SVG_RAW}</button>
-                        <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-new-folder" title="New folder">${SVG_PLUS} Folder</button>
                         <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-btn-upload" title="Upload file">${SVG_UPLOAD} Upload</button>
                         <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-refresh" title="Refresh">${SVG_REFRESH}</button>
                     </div>
                 </div>
-                <div class="vm-body">
-                    <div class="vm-tree-sidebar" id="vm-tree-sidebar"></div>
+                <div class="vm-body" id="vm-body">
+                    <div class="vm-tree-sidebar${this._sidebarCollapsed ? ' vm-sidebar-collapsed' : ''}" id="vm-tree-sidebar" style="width: ${this._sidebarCollapsed ? '36' : this._treeWidth}px"></div>
+                    <div class="vm-resize-handle" id="vm-resize-left"></div>
                     <div class="vm-content" id="vm-content">
                         <div class="vm-drag-overlay" id="vm-drag-overlay">
                             <span class="vm-drag-overlay-text">Drop files here to encrypt &amp; upload</span>
@@ -327,7 +395,6 @@
 
             // Event listeners — toolbar
             container.querySelector('#vm-btn-refresh').addEventListener('click', () => this._browseFolder(this._currentFolder));
-            container.querySelector('#vm-btn-new-folder').addEventListener('click', () => this._toggleNewFolderInput());
             container.querySelector('#vm-btn-upload').addEventListener('click', () => container.querySelector('#vm-file-input').click());
             container.querySelector('#vm-file-input').addEventListener('change', (e) => { this._handleFileUpload(e.target.files); e.target.value = ''; });
             container.querySelector('#vm-btn-raw').addEventListener('click', () => this._toggleRawData());
@@ -341,6 +408,9 @@
             contentArea.addEventListener('dragover',  (e) => this._onDragOver(e));
             contentArea.addEventListener('dragleave', (e) => this._onDragLeave(e));
             contentArea.addEventListener('drop',      (e) => this._onDrop(e));
+
+            // Resize handles
+            this._setupResize('vm-resize-left', 'vm-tree-sidebar', '_treeWidth', 120, 360, false);
 
             this._renderTree();
             this._browseFolder(this._currentFolder);
@@ -380,8 +450,19 @@
                 this._treeExpanded[rootGuid] = true;
             }
 
-            sidebar.innerHTML = this._buildTreeNode(rootGuid, 'Root', 0);
+            const collapseIcon = this._sidebarCollapsed ? SVG_EXPAND : SVG_COLLAPSE;
+            sidebar.innerHTML = `
+                <button class="vm-tree-collapse-btn" id="vm-tree-collapse" title="${this._sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}">${collapseIcon}</button>
+                <div class="vm-tree-scroll">${this._buildTreeNode(rootGuid, 'Root', 0)}</div>
+                <div class="vm-tree-footer">
+                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-new-folder" title="New folder">${SVG_PLUS}<span class="vm-tree-footer-text"> New Folder</span></button>
+                </div>`;
             this._bindTreeEvents(sidebar);
+
+            // Collapse toggle
+            sidebar.querySelector('#vm-tree-collapse').addEventListener('click', () => this._toggleSidebarCollapse());
+            // New Folder button
+            sidebar.querySelector('#vm-btn-new-folder').addEventListener('click', () => this._toggleNewFolderInput());
         }
 
         _buildTreeNode(guid, name, depth) {
@@ -439,6 +520,27 @@
                     // Otherwise navigate to the folder
                     this._navigateToFolder(guid);
                 });
+
+                // Drop target for internal file moves
+                node.addEventListener('dragover', (e) => {
+                    if (!this._draggingGuid) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    node.classList.add('vm-tree-drop-target');
+                });
+                node.addEventListener('dragleave', () => {
+                    node.classList.remove('vm-tree-drop-target');
+                });
+                node.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    node.classList.remove('vm-tree-drop-target');
+                    const targetFolder = node.dataset.treeGuid;
+                    if (this._draggingGuid && targetFolder && targetFolder !== this._currentFolder) {
+                        this._moveItem(this._draggingGuid, targetFolder);
+                    }
+                    this._draggingGuid = null;
+                });
             });
         }
 
@@ -493,17 +595,30 @@
                 }
             }
 
+            // Delete confirmation in detail panel
+            const isDeleting = this._pendingDelete === this._selectedItem;
+            let deleteHtml = '';
+            if (isDeleting) {
+                deleteHtml = `<div class="vm-inline-confirm" style="margin-top: 0.5rem;">
+                    <span>Delete "${escapeHtml((meta.name || this._selectedItem).substring(0, 20))}"?</span>
+                    <button class="pk-btn pk-btn--xs pk-btn--ghost vm-confirm-yes" id="vm-detail-confirm-delete">Yes</button>
+                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-cancel-delete">No</button>
+                </div>`;
+            }
+
             let actionsHtml = '';
             if (isFile) {
                 actionsHtml = `<div class="vm-detail-actions">
                     <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-download">${SVG_DOWNLOAD} Download</button>
                     <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">${SVG_RENAME} Rename</button>
-                </div>`;
+                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">${SVG_DELETE} Delete</button>`}
+                </div>${deleteHtml}`;
             } else {
                 actionsHtml = `<div class="vm-detail-actions">
                     <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-open">Open</button>
                     <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">${SVG_RENAME} Rename</button>
-                </div>`;
+                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">${SVG_DELETE} Delete</button>`}
+                </div>${deleteHtml}`;
             }
 
             const panelHtml = `
@@ -541,7 +656,10 @@
                 </div>
             `;
 
-            body.insertAdjacentHTML('beforeend', panelHtml);
+            // Insert resize handle then panel
+            const existingResizeRight = this.querySelector('#vm-resize-right');
+            if (existingResizeRight) existingResizeRight.remove();
+            body.insertAdjacentHTML('beforeend', `<div class="vm-resize-handle" id="vm-resize-right"></div>` + panelHtml);
 
             // Bind detail panel events
             const panel = this.querySelector('#vm-detail-panel');
@@ -568,14 +686,42 @@
 
             const previewBtn = panel.querySelector('#vm-detail-preview-btn');
             if (previewBtn) previewBtn.addEventListener('click', () => this._loadPreview(this._selectedItem));
+
+            // Delete button in detail panel
+            const deleteBtn = panel.querySelector('#vm-detail-delete');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', () => {
+                    this._pendingDelete = this._selectedItem;
+                    this._renderDetailPanel();
+                });
+            }
+            const confirmDelete = panel.querySelector('#vm-detail-confirm-delete');
+            if (confirmDelete) {
+                confirmDelete.addEventListener('click', () => {
+                    this._deleteItem(this._selectedItem);
+                });
+            }
+            const cancelDelete = panel.querySelector('#vm-detail-cancel-delete');
+            if (cancelDelete) {
+                cancelDelete.addEventListener('click', () => {
+                    this._pendingDelete = null;
+                    this._renderDetailPanel();
+                });
+            }
+
+            // Setup right resize handle for detail panel
+            this._setupResize('vm-resize-right', 'vm-detail-panel', '_detailWidth', 180, 500, true);
         }
 
         _closeDetailPanel() {
             this._selectedItem   = null;
             this._previewData    = null;
             this._previewLoading = false;
+            this._pendingDelete  = null;
             const panel = this.querySelector('#vm-detail-panel');
             if (panel) panel.remove();
+            const resizeRight = this.querySelector('#vm-resize-right');
+            if (resizeRight) resizeRight.remove();
             // Remove selection highlight from rows
             this.querySelectorAll('.vm-row-selected').forEach(r => r.classList.remove('vm-row-selected'));
         }
@@ -656,30 +802,32 @@
             // Preserve the drag overlay element
             const overlayHtml = '<div class="vm-drag-overlay" id="vm-drag-overlay"><span class="vm-drag-overlay-text">Drop files here to encrypt &amp; upload</span></div>';
 
-            if (children.length === 0 && !this._showNewFolder) {
+            // Filter: only files in the table (folders live in tree sidebar)
+            const fileGuids = children.filter(guid => {
+                const meta = this._index[guid] || {};
+                return meta.type !== 'folder';
+            });
+
+            if (fileGuids.length === 0 && !this._showNewFolder) {
                 content.innerHTML = `
                     ${overlayHtml}
                     <div class="pk-empty">
-                        <div class="pk-empty__icon">${SVG_FOLDER}</div>
-                        <div class="pk-empty__text">This folder is empty</div>
-                        <div class="pk-empty__hint">Upload files or create a subfolder to get started</div>
+                        <div class="pk-empty__icon">${SVG_FILE}</div>
+                        <div class="pk-empty__text">No files in this folder</div>
+                        <div class="pk-empty__hint">Upload files or drag them here to get started</div>
                     </div>`;
                 this._updateStats(children);
                 return;
             }
 
-            // Build sorted item list with metadata
-            const items = children.map(guid => {
+            // Build sorted item list with metadata (files only)
+            const items = fileGuids.map(guid => {
                 const meta = this._index[guid] || {};
                 return { guid, name: meta.name || guid, type: meta.type || 'unknown', size: meta.size || 0, mime: meta.mime };
             });
 
-            // Sort: folders first, then by selected column
+            // Sort by selected column
             items.sort((a, b) => {
-                const aIsFolder = a.type === 'folder';
-                const bIsFolder = b.type === 'folder';
-                if (aIsFolder && !bIsFolder) return -1;
-                if (!aIsFolder && bIsFolder) return  1;
                 const dir = this._sortAsc ? 1 : -1;
                 if (this._sortBy === 'size') return (a.size - b.size) * dir;
                 return a.name.localeCompare(b.name) * dir;
@@ -691,7 +839,7 @@
             // Inline new folder row
             if (this._showNewFolder) {
                 rows += `<tr class="vm-new-folder-row">
-                    <td colspan="4" style="padding: 0;">
+                    <td colspan="3" style="padding: 0;">
                         <div class="vm-new-folder-row">
                             <span class="vm-icon vm-icon-folder">${SVG_FOLDER}</span>
                             <input type="text" class="vm-rename-input" id="vm-new-folder-input" placeholder="Folder name" autofocus>
@@ -703,7 +851,6 @@
             }
 
             for (const item of items) {
-                const isDeleting  = this._pendingDelete === item.guid;
                 const isRenaming  = this._renamingGuid  === item.guid;
                 const isSelected  = this._selectedItem  === item.guid;
                 const selectedCls = isSelected ? ' vm-row-selected' : '';
@@ -716,49 +863,17 @@
                         : `<span class="vm-name vm-name-editable" data-name-guid="${escapeHtml(item.guid)}">${escapeHtml(item.name)}</span>`
                       );
 
-                if (item.type === 'folder') {
-                    rows += `<tr class="vm-row-folder${selectedCls}" data-guid="${escapeHtml(item.guid)}">
-                        <td>
-                            <span class="vm-icon vm-icon-folder">${SVG_FOLDER}</span>
-                            ${displayName}
-                        </td>
-                        <td class="vm-meta">Folder</td>
-                        <td class="vm-meta">\u2014</td>
-                        <td>
-                            ${isDeleting
-                                ? `<span class="vm-inline-confirm">
-                                       <span>Delete?</span>
-                                       <button class="pk-btn pk-btn--xs pk-btn--ghost vm-confirm-yes" data-confirm-guid="${escapeHtml(item.guid)}">Yes</button>
-                                       <button class="pk-btn pk-btn--xs pk-btn--ghost vm-confirm-no">No</button>
-                                   </span>`
-                                : `<button class="pk-btn pk-btn--xs pk-btn--ghost vm-btn-rename" data-guid="${escapeHtml(item.guid)}" title="Rename">${SVG_RENAME}</button>
-                                   <button class="pk-btn pk-btn--xs pk-btn--danger vm-btn-delete" data-guid="${escapeHtml(item.guid)}" title="Delete">${SVG_DELETE}</button>`
-                            }
-                        </td>
-                    </tr>`;
-                } else {
-                    const size = item.size ? formatSize(item.size) : '\u2014';
-                    rows += `<tr class="${selectedCls}" data-guid="${escapeHtml(item.guid)}">
-                        <td>
-                            <span class="vm-icon vm-icon-file">${SVG_FILE}</span>
-                            ${displayName}
-                        </td>
-                        <td class="vm-meta">File</td>
-                        <td class="vm-meta">${escapeHtml(size)}</td>
-                        <td>
-                            ${isDeleting
-                                ? `<span class="vm-inline-confirm">
-                                       <span>Delete?</span>
-                                       <button class="pk-btn pk-btn--xs pk-btn--ghost vm-confirm-yes" data-confirm-guid="${escapeHtml(item.guid)}">Yes</button>
-                                       <button class="pk-btn pk-btn--xs pk-btn--ghost vm-confirm-no">No</button>
-                                   </span>`
-                                : `<button class="pk-btn pk-btn--xs pk-btn--ghost vm-btn-download" data-guid="${escapeHtml(item.guid)}" title="Download">${SVG_DOWNLOAD}</button>
-                                   <button class="pk-btn pk-btn--xs pk-btn--ghost vm-btn-rename" data-guid="${escapeHtml(item.guid)}" title="Rename">${SVG_RENAME}</button>
-                                   <button class="pk-btn pk-btn--xs pk-btn--danger vm-btn-delete" data-guid="${escapeHtml(item.guid)}" title="Delete">${SVG_DELETE}</button>`
-                            }
-                        </td>
-                    </tr>`;
-                }
+                const size = item.size ? formatSize(item.size) : '\u2014';
+                rows += `<tr class="${selectedCls}" data-guid="${escapeHtml(item.guid)}" draggable="true">
+                    <td>
+                        <span class="vm-icon vm-icon-file">${SVG_FILE}</span>
+                        ${displayName}
+                    </td>
+                    <td class="vm-meta">${escapeHtml(size)}</td>
+                    <td>
+                        <button class="pk-btn pk-btn--xs pk-btn--ghost vm-btn-download" data-guid="${escapeHtml(item.guid)}" title="Download">${SVG_DOWNLOAD}</button>
+                    </td>
+                </tr>`;
             }
 
             content.innerHTML = `
@@ -766,7 +881,6 @@
                 <table class="vm-table">
                     <thead><tr>
                         <th id="vm-th-name" class="${this._sortBy === 'name' ? 'vm-sort-active' : ''}">Name${this._sortBy === 'name' ? arrow : ''}</th>
-                        <th>Type</th>
                         <th id="vm-th-size" class="${this._sortBy === 'size' ? 'vm-sort-active' : ''}">Size${this._sortBy === 'size' ? arrow : ''}</th>
                         <th></th>
                     </tr></thead>
@@ -790,59 +904,25 @@
                     if (e.target.closest('button') || e.target.closest('input')) return;
                     this._selectItem(tr.dataset.guid);
                 });
-            });
 
-            // Folder double-click to navigate
-            content.querySelectorAll('.vm-row-folder').forEach(tr => {
-                tr.addEventListener('dblclick', (e) => {
-                    if (e.target.closest('button') || e.target.closest('input')) return;
-                    this._navigateToFolder(tr.dataset.guid);
+                // Internal drag start — file move to folder
+                tr.addEventListener('dragstart', (e) => {
+                    this._draggingGuid = tr.dataset.guid;
+                    tr.classList.add('vm-row-dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', tr.dataset.guid);
+                });
+                tr.addEventListener('dragend', () => {
+                    tr.classList.remove('vm-row-dragging');
+                    this._draggingGuid = null;
+                    // Clear any tree drop targets
+                    this.querySelectorAll('.vm-tree-drop-target').forEach(n => n.classList.remove('vm-tree-drop-target'));
                 });
             });
 
             // Download
             content.querySelectorAll('.vm-btn-download').forEach(btn => {
                 btn.addEventListener('click', (e) => { e.stopPropagation(); this._downloadFile(btn.dataset.guid); });
-            });
-
-            // Delete: show inline confirmation
-            content.querySelectorAll('.vm-btn-delete').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this._pendingDelete = btn.dataset.guid;
-                    this._renderFolderContents(this._lastFolder);
-                    this._renderBreadcrumb();
-                });
-            });
-
-            // Confirm delete
-            content.querySelectorAll('.vm-confirm-yes').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this._deleteItem(btn.dataset.confirmGuid);
-                });
-            });
-
-            // Cancel delete
-            content.querySelectorAll('.vm-confirm-no').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this._pendingDelete = null;
-                    this._renderFolderContents(this._lastFolder);
-                    this._renderBreadcrumb();
-                });
-            });
-
-            // Rename button
-            content.querySelectorAll('.vm-btn-rename').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this._renamingGuid = btn.dataset.guid;
-                    this._renderFolderContents(this._lastFolder);
-                    this._renderBreadcrumb();
-                    const input = content.querySelector(`[data-rename-guid="${btn.dataset.guid}"]`);
-                    if (input) { input.focus(); input.select(); }
-                });
             });
 
             // Double-click name to rename
@@ -960,7 +1040,25 @@
             this._previewLoading = false;
             this._treeExpanded   = {};
             this._folderPath     = [];
-            await this._initVault();
+
+            // Show loading state
+            const body = this.querySelector('#vm-body');
+            if (body) {
+                body.classList.add('vm-loading');
+                body.insertAdjacentHTML('afterbegin', '<div class="vm-loading-overlay" id="vm-loading-overlay"><span class="pk-spinner"></span></div>');
+            }
+
+            try {
+                await this._initVault();
+            } finally {
+                // Remove loading state (initVault re-renders, so we need the new body)
+                const newBody = this.querySelector('#vm-body');
+                if (newBody) {
+                    newBody.classList.remove('vm-loading');
+                    const overlay = newBody.querySelector('#vm-loading-overlay');
+                    if (overlay) overlay.remove();
+                }
+            }
         }
 
         async _initVault() {
@@ -978,7 +1076,7 @@
                     this._currentFolder = result.root_folder;
                     const emptyIndex = JSON.stringify({ version: 1, entries: {} });
                     const encIndex   = await encryptBlob(this._selectedKey.publicKey, new TextEncoder().encode(emptyIndex));
-                    await adminAPI.vaultStoreIndex(this._vaultCacheKey, arrayBufToB64(encIndex));
+                    await adminAPI.vaultStoreIndex(this._vaultCacheKey, arrayBufToB64Safe(encIndex));
                 }
 
                 await this._loadIndex();
@@ -1006,7 +1104,7 @@
         async _saveIndex() {
             const indexJson = JSON.stringify({ version: 1, entries: this._index });
             const encrypted = await encryptBlob(this._selectedKey.publicKey, new TextEncoder().encode(indexJson));
-            await adminAPI.vaultStoreIndex(this._vaultCacheKey, arrayBufToB64(encrypted));
+            await adminAPI.vaultStoreIndex(this._vaultCacheKey, arrayBufToB64Safe(encrypted));
         }
 
         // =====================================================================
@@ -1210,7 +1308,7 @@
                 const fileGuid  = generateGuid();
                 const data      = await file.arrayBuffer();
                 const encrypted = await encryptBlob(this._selectedKey.publicKey, data);
-                const b64       = arrayBufToB64(encrypted);
+                const b64       = arrayBufToB64Safe(encrypted);
 
                 this._msg('info', `Uploading "${file.name}"...`);
                 await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
@@ -1282,6 +1380,104 @@
                 this._browseFolder(this._currentFolder);
             } catch (err) {
                 this._msg('error', `Delete failed: ${err.message}`);
+            }
+        }
+
+        // =====================================================================
+        // Resize handles
+        // =====================================================================
+
+        _setupResize(handleId, panelId, widthProp, minWidth, maxWidth, isRightSide) {
+            const handle = this.querySelector('#' + handleId);
+            const panel  = this.querySelector('#' + panelId);
+            if (!handle || !panel) return;
+
+            let isResizing = false, startX, startWidth;
+
+            const onMouseDown = (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startWidth = panel.offsetWidth;
+                handle.classList.add('vm-resize-active');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff = isRightSide ? (startX - e.clientX) : (e.clientX - startX);
+                const newWidth = Math.min(Math.max(startWidth + diff, minWidth), maxWidth);
+                this[widthProp] = newWidth;
+                panel.style.width = newWidth + 'px';
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('vm-resize-active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                this._savePrefs();
+            };
+
+            handle.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        _toggleSidebarCollapse() {
+            this._sidebarCollapsed = !this._sidebarCollapsed;
+            const sidebar = this.querySelector('#vm-tree-sidebar');
+            if (sidebar) {
+                if (this._sidebarCollapsed) {
+                    sidebar.classList.add('vm-sidebar-collapsed');
+                    sidebar.style.width = '36px';
+                } else {
+                    sidebar.classList.remove('vm-sidebar-collapsed');
+                    sidebar.style.width = this._treeWidth + 'px';
+                }
+            }
+            this._savePrefs();
+            this._renderTree();
+        }
+
+        // =====================================================================
+        // Move item between folders (internal drag-and-drop)
+        // =====================================================================
+
+        async _moveItem(itemGuid, targetFolderGuid) {
+            const meta = this._index[itemGuid];
+            if (!meta) return;
+            const sourceFolderGuid = meta.parentGuid || this._currentFolder;
+            if (sourceFolderGuid === targetFolderGuid) return;
+
+            try {
+                // Remove from source folder
+                const source = await adminAPI.vaultGetFolder(this._vaultCacheKey, sourceFolderGuid);
+                if (source && source.data) {
+                    source.data.children = (source.data.children || []).filter(g => g !== itemGuid);
+                    await adminAPI.vaultStoreFolder(this._vaultCacheKey, sourceFolderGuid, source.data);
+                }
+
+                // Add to target folder
+                const target = await adminAPI.vaultGetFolder(this._vaultCacheKey, targetFolderGuid);
+                if (target && target.data) {
+                    target.data.children = target.data.children || [];
+                    target.data.children.push(itemGuid);
+                    await adminAPI.vaultStoreFolder(this._vaultCacheKey, targetFolderGuid, target.data);
+                }
+
+                // Update index
+                meta.parentGuid = targetFolderGuid;
+                await this._saveIndex();
+
+                const targetName = (this._index[targetFolderGuid] && this._index[targetFolderGuid].name) || 'folder';
+                this._msg('success', `Moved "${meta.name || itemGuid}" to "${targetName}"`);
+                this._closeDetailPanel();
+                this._browseFolder(this._currentFolder);
+            } catch (err) {
+                this._msg('error', `Move failed: ${err.message}`);
             }
         }
 
