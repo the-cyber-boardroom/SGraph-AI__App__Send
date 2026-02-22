@@ -692,15 +692,14 @@
             if (!row3) return;
             const existing = row3.querySelector('vault-preview');
             if (existing) return; // already there
-            row3.innerHTML = '';
-            const preview = document.createElement('vault-preview');
-            preview.id = 'vm-preview';
-            row3.appendChild(preview);
+            // Use innerHTML so the HTML parser upgrades the custom element
+            row3.innerHTML = '<vault-preview id="vm-preview"></vault-preview>';
             // Restore row-1 height if it was collapsed for editor
             const row1 = this.querySelector('#vm-row-1');
             if (row1) {
                 const h = this._row1Height;
                 row1.style.flex = h ? `0 0 ${h}px` : '1';
+                row1.style.minHeight = '';
             }
         }
 
@@ -821,7 +820,7 @@
                 if (!row3) return;
                 row3.innerHTML = '';
                 const row1 = this.querySelector('#vm-row-1');
-                if (row1) row1.style.flex = '0 0 120px';
+                if (row1) { row1.style.flex = '0 0 80px'; row1.style.minHeight = '0'; }
 
                 const editor = document.createElement('vault-editor');
                 row3.appendChild(editor);
@@ -877,10 +876,15 @@
                 this._index[guid] = { name: filename, type: 'file', size: 0, mime, parentGuid: this._currentFolder, uploadedAt: new Date().toISOString() };
                 await this._saveIndex();
 
-                // Refresh view, select and open editor
+                // Refresh view and open editor directly (skip _selectItem to avoid
+                // preview lifecycle — the editor replaces the preview immediately)
                 await this._browseFolder(this._currentFolder);
-                this._selectItem(guid);
-                this._openEditor(guid);
+                this._selectedItem = guid;
+                this._updateSettings();
+                // Highlight the row in the file list
+                const row = this.querySelector(`[data-guid="${guid}"]`);
+                if (row) row.classList.add('vm-row-selected');
+                await this._openEditor(guid);
                 this._msg('success', `Created "${filename}" — editing now`);
             } catch (err) {
                 this._msg('error', `Failed to create file: ${err.message}`);

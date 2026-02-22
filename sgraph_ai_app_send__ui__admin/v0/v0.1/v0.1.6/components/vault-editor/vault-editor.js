@@ -25,7 +25,7 @@
     const EDITOR_STYLES = `
         ${PKI_SHARED_STYLES}
 
-        :host, vault-editor { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        :host, vault-editor { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
 
         .ve-container { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--admin-surface, #1a1d27); border-radius: var(--admin-radius-lg, 10px); overflow: hidden; }
 
