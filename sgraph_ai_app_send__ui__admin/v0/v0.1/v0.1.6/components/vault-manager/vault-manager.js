@@ -26,6 +26,7 @@
    - Resizable panel dividers + collapsible left sidebar
    - Loading state + blur when switching keys
    - Files-only table view (folders live in tree sidebar)
+   - Share via Send link — decrypt, re-encrypt, upload as transfer
    ============================================================================= */
 
 (function() {
@@ -101,6 +102,68 @@
         if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
         if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
         return (bytes / 1073741824).toFixed(1) + ' GB';
+    }
+
+    // =========================================================================
+    // Share helpers — re-encrypt vault file for Send transfer
+    // =========================================================================
+
+    function arrayBufToBase64Url(buf) {
+        return arrayBufToB64Safe(buf).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function packageSgmeta(fileBytes, filename) {
+        const MAGIC = new Uint8Array([0x53, 0x47, 0x4D, 0x45, 0x54, 0x41, 0x00]); // "SGMETA\0"
+        const meta  = new TextEncoder().encode(JSON.stringify({ filename }));
+        const lenBuf = new ArrayBuffer(4);
+        new DataView(lenBuf).setUint32(0, meta.length, false); // big-endian
+        const packed = new Uint8Array(7 + 4 + meta.length + fileBytes.byteLength);
+        packed.set(MAGIC, 0);
+        packed.set(new Uint8Array(lenBuf), 7);
+        packed.set(meta, 11);
+        packed.set(new Uint8Array(fileBytes), 11 + meta.length);
+        return packed;
+    }
+
+    async function sendEncrypt(plaintext) {
+        const key    = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+        const rawKey = await crypto.subtle.exportKey('raw', key);
+        const keyStr = arrayBufToBase64Url(rawKey);
+        const iv     = crypto.getRandomValues(new Uint8Array(12));
+        const ct     = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+        const blob   = new Uint8Array(12 + ct.byteLength);
+        blob.set(iv, 0);
+        blob.set(new Uint8Array(ct), 12);
+        return { keyStr, encrypted: blob };
+    }
+
+    async function transferCreate(tokenName, fileSize, contentType) {
+        const resp = await fetch('/transfers/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-sgraph-access-token': tokenName },
+            body: JSON.stringify({ file_size_bytes: fileSize, content_type_hint: contentType })
+        });
+        if (!resp.ok) throw new Error(`Create failed: ${resp.status} ${resp.statusText}`);
+        return resp.json();
+    }
+
+    async function transferUpload(tokenName, transferId, encryptedBlob) {
+        const resp = await fetch(`/transfers/upload/${transferId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream', 'x-sgraph-access-token': tokenName },
+            body: encryptedBlob
+        });
+        if (!resp.ok) throw new Error(`Upload failed: ${resp.status} ${resp.statusText}`);
+        return resp.json();
+    }
+
+    async function transferComplete(tokenName, transferId) {
+        const resp = await fetch(`/transfers/complete/${transferId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-sgraph-access-token': tokenName }
+        });
+        if (!resp.ok) throw new Error(`Complete failed: ${resp.status} ${resp.statusText}`);
+        return resp.json();
     }
 
     // =========================================================================
@@ -239,6 +302,23 @@
 
         /* Hidden file input */
         .vm-file-input-hidden { display: none; }
+
+        /* --- Share Dialog --- */
+        .vm-share-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
+        .vm-share-dialog { background: var(--admin-surface, #1a1d27); border: 1px solid var(--admin-border, #2e3347); border-radius: var(--admin-radius-lg, 10px); padding: 1.25rem; width: 480px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+        .vm-share-title { font-size: 1rem; font-weight: 600; color: var(--admin-text, #e4e6ef); margin-bottom: 0.25rem; }
+        .vm-share-subtitle { font-size: 0.75rem; color: var(--admin-text-muted, #5e6280); margin-bottom: 1rem; }
+        .vm-share-field { margin-bottom: 0.75rem; }
+        .vm-share-field label { display: block; font-size: 0.6875rem; font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
+        .vm-share-field select, .vm-share-field input { width: 100%; background: var(--admin-bg, #0f1117); border: 1px solid var(--admin-border, #2e3347); border-radius: var(--admin-radius, 6px); color: var(--admin-text, #e4e6ef); font-size: 0.8125rem; padding: 0.375rem 0.5rem; outline: none; font-family: var(--admin-font-mono, monospace); }
+        .vm-share-field select:focus, .vm-share-field input:focus { border-color: var(--admin-primary, #4f8ff7); box-shadow: 0 0 0 2px var(--admin-primary-bg, rgba(79,143,247,0.1)); }
+        .vm-share-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+        .vm-share-progress { font-size: 0.75rem; color: var(--admin-text-secondary, #8b8fa7); margin-top: 0.75rem; min-height: 1.25rem; }
+        .vm-share-progress.vm-share-error { color: var(--admin-error, #ef4444); }
+        .vm-share-result { margin-top: 0.75rem; }
+        .vm-share-url-box { display: flex; gap: 0.375rem; align-items: stretch; }
+        .vm-share-url-input { flex: 1; background: var(--admin-bg, #0f1117); border: 1px solid var(--admin-border, #2e3347); border-radius: var(--admin-radius, 6px); color: var(--admin-text, #e4e6ef); font-size: 0.6875rem; font-family: var(--admin-font-mono, monospace); padding: 0.375rem 0.5rem; }
+        .vm-share-copied { font-size: 0.6875rem; color: var(--admin-success, #34d399); margin-top: 0.25rem; min-height: 1rem; }
     `;
 
     const SVG_FOLDER = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>';
@@ -257,6 +337,8 @@
     const SVG_COLLAPSE = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
     const SVG_EXPAND  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
     const SVG_MOVE   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L11 6.414V13.586l1.293-1.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L9 13.586V6.414L7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3z"/></svg>';
+    const SVG_SHARE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>';
+    const SVG_COPY   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>';
 
     class VaultManager extends HTMLElement {
 
@@ -610,6 +692,7 @@
             if (isFile) {
                 actionsHtml = `<div class="vm-detail-actions">
                     <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-download">${SVG_DOWNLOAD} Download</button>
+                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-share">${SVG_SHARE} Share</button>
                     <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">${SVG_RENAME} Rename</button>
                     ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">${SVG_DELETE} Delete</button>`}
                 </div>${deleteHtml}`;
@@ -686,6 +769,10 @@
 
             const previewBtn = panel.querySelector('#vm-detail-preview-btn');
             if (previewBtn) previewBtn.addEventListener('click', () => this._loadPreview(this._selectedItem));
+
+            // Share button
+            const shareBtn = panel.querySelector('#vm-detail-share');
+            if (shareBtn) shareBtn.addEventListener('click', () => this._showShareDialog(this._selectedItem));
 
             // Delete button in detail panel
             const deleteBtn = panel.querySelector('#vm-detail-delete');
@@ -1478,6 +1565,178 @@
                 this._browseFolder(this._currentFolder);
             } catch (err) {
                 this._msg('error', `Move failed: ${err.message}`);
+            }
+        }
+
+        // =====================================================================
+        // Share via Send link
+        // =====================================================================
+
+        async _showShareDialog(fileGuid) {
+            const meta = this._index[fileGuid] || {};
+
+            // Fetch available tokens
+            let tokenOptions = '';
+            try {
+                const result = await adminAPI.listTokens();
+                const tokens = result.tokens || result.data || [];
+                if (Array.isArray(tokens) && tokens.length > 0) {
+                    for (const t of tokens) {
+                        const name = typeof t === 'string' ? t : (t.name || t.token_name || '');
+                        if (name) tokenOptions += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+                    }
+                }
+            } catch (_) { /* tokens list unavailable */ }
+
+            const hasTokens = tokenOptions.length > 0;
+            const tokenField = hasTokens
+                ? `<select id="vm-share-token">${tokenOptions}</select>`
+                : `<input type="text" id="vm-share-token" placeholder="Enter access token name" required>`;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'vm-share-overlay';
+            overlay.id = 'vm-share-overlay';
+            overlay.innerHTML = `
+                <div class="vm-share-dialog">
+                    <div class="vm-share-title">${SVG_SHARE} Share File via Send Link</div>
+                    <div class="vm-share-subtitle">Decrypt from vault, re-encrypt for Send, generate a shareable link</div>
+                    <div class="vm-share-field">
+                        <label>File</label>
+                        <input type="text" value="${escapeHtml(meta.name || fileGuid)}" disabled>
+                    </div>
+                    <div class="vm-share-field">
+                        <label>Access Token</label>
+                        ${tokenField}
+                    </div>
+                    <div class="vm-share-progress" id="vm-share-progress"></div>
+                    <div class="vm-share-result" id="vm-share-result" style="display:none"></div>
+                    <div class="vm-share-actions" id="vm-share-actions">
+                        <button class="pk-btn pk-btn--sm pk-btn--ghost" id="vm-share-cancel">Cancel</button>
+                        <button class="pk-btn pk-btn--sm pk-btn--primary" id="vm-share-confirm">${SVG_SHARE} Share</button>
+                    </div>
+                </div>`;
+
+            this.appendChild(overlay);
+
+            // Events
+            overlay.querySelector('#vm-share-cancel').addEventListener('click', () => overlay.remove());
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            overlay.querySelector('#vm-share-confirm').addEventListener('click', () => {
+                const token = overlay.querySelector('#vm-share-token').value.trim();
+                if (!token) {
+                    overlay.querySelector('#vm-share-progress').textContent = 'Please enter an access token';
+                    overlay.querySelector('#vm-share-progress').classList.add('vm-share-error');
+                    return;
+                }
+                this._shareFile(fileGuid, token, overlay);
+            });
+        }
+
+        async _shareFile(fileGuid, tokenName, overlay) {
+            const meta     = this._index[fileGuid] || {};
+            const progress = overlay.querySelector('#vm-share-progress');
+            const actions  = overlay.querySelector('#vm-share-actions');
+            const result   = overlay.querySelector('#vm-share-result');
+            const filename = meta.name || fileGuid;
+            const mime     = meta.mime || 'application/octet-stream';
+
+            const setProgress = (text) => {
+                progress.textContent = text;
+                progress.classList.remove('vm-share-error');
+            };
+            const setError = (text) => {
+                progress.textContent = text;
+                progress.classList.add('vm-share-error');
+                actions.querySelector('#vm-share-confirm').disabled = false;
+            };
+
+            // Disable share button during processing
+            actions.querySelector('#vm-share-confirm').disabled = true;
+
+            try {
+                // Step 1: Decrypt from vault
+                setProgress('Decrypting from vault...');
+                const vaultResult = await adminAPI.vaultGetFile(this._vaultCacheKey, fileGuid);
+                if (!vaultResult || !vaultResult.data) throw new Error('File data not found in vault');
+
+                const packed    = b64ToArrayBuf(vaultResult.data);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+
+                // Step 2: Package with SGMETA envelope (preserves filename for recipient)
+                setProgress('Packaging with filename metadata...');
+                const sgmeta = packageSgmeta(decrypted, filename);
+
+                // Step 3: Re-encrypt with new Send-style AES key
+                setProgress('Re-encrypting for Send...');
+                const { keyStr, encrypted } = await sendEncrypt(sgmeta.buffer);
+
+                // Step 4: Create transfer
+                setProgress('Creating transfer...');
+                const createResult = await transferCreate(tokenName, meta.size || decrypted.byteLength, mime);
+                const transferId = createResult.transfer_id;
+
+                // Step 5: Upload encrypted blob (raw binary)
+                setProgress('Uploading encrypted file...');
+                await transferUpload(tokenName, transferId, encrypted);
+
+                // Step 6: Complete transfer
+                setProgress('Completing transfer...');
+                await transferComplete(tokenName, transferId);
+
+                // Step 7: Build share URL
+                const origin  = window.location.origin;
+                const shareUrl = `${origin}/send/v0/v0.1/v0.1.6/download.html#${transferId}/${keyStr}`;
+
+                // Show result
+                setProgress('');
+                actions.style.display = 'none';
+                result.style.display = 'block';
+                result.innerHTML = `
+                    <div style="font-size: 0.75rem; color: var(--admin-success, #34d399); font-weight: 600; margin-bottom: 0.5rem;">File shared successfully</div>
+                    <div class="vm-share-field">
+                        <label>Share URL (key included)</label>
+                        <div class="vm-share-url-box">
+                            <input type="text" class="vm-share-url-input" id="vm-share-url" value="${escapeHtml(shareUrl)}" readonly>
+                            <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-share-copy">${SVG_COPY} Copy</button>
+                        </div>
+                        <div class="vm-share-copied" id="vm-share-copied"></div>
+                    </div>
+                    <div class="vm-share-field">
+                        <label>Link only (key separate)</label>
+                        <div class="vm-share-url-box">
+                            <input type="text" class="vm-share-url-input" id="vm-share-url-only" value="${escapeHtml(`${origin}/send/v0/v0.1/v0.1.6/download.html#${transferId}`)}" readonly>
+                            <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-share-copy-link">${SVG_COPY}</button>
+                        </div>
+                    </div>
+                    <div class="vm-share-field">
+                        <label>Decrypt key (share separately)</label>
+                        <div class="vm-share-url-box">
+                            <input type="text" class="vm-share-url-input" id="vm-share-key-only" value="${escapeHtml(keyStr)}" readonly>
+                            <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-share-copy-key">${SVG_COPY}</button>
+                        </div>
+                    </div>
+                    <div class="vm-share-actions">
+                        <button class="pk-btn pk-btn--sm pk-btn--ghost" id="vm-share-done">Done</button>
+                    </div>`;
+
+                // Copy handlers
+                const copyTo = (inputId) => {
+                    const input = result.querySelector('#' + inputId);
+                    if (input) {
+                        navigator.clipboard.writeText(input.value).then(() => {
+                            const copied = result.querySelector('#vm-share-copied');
+                            if (copied) { copied.textContent = 'Copied to clipboard'; setTimeout(() => { copied.textContent = ''; }, 2000); }
+                        });
+                    }
+                };
+                result.querySelector('#vm-share-copy').addEventListener('click', () => copyTo('vm-share-url'));
+                result.querySelector('#vm-share-copy-link').addEventListener('click', () => copyTo('vm-share-url-only'));
+                result.querySelector('#vm-share-copy-key').addEventListener('click', () => copyTo('vm-share-key-only'));
+                result.querySelector('#vm-share-done').addEventListener('click', () => overlay.remove());
+
+                this._msg('success', `"${filename}" shared via Send link`);
+            } catch (err) {
+                setError('Share failed: ' + err.message);
             }
         }
 
