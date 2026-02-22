@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSH Key Generator — SG/Send</title>
+    <meta name="description" content="Generate SSH key pairs securely in your browser. Ed25519 and RSA 4096. Nothing is sent to any server. Open source.">
+    <meta name="theme-color" content="#1A1A2E">
+    <link rel="canonical" href="https://send.sgraph.ai/tools/ssh-keygen">
+    <!-- CSP: no outbound network after page load -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'none'; form-action 'none'; frame-ancestors 'none'">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- CSS: base + design system + page-specific -->
+    <link rel="stylesheet" href="../../../../../v0/v0.1/v0.1.0/css/common.css">
+    <link rel="stylesheet" href="../../../../../v0/v0.1/v0.1.6/css/sg-design-system.css">
+    <link rel="stylesheet" href="css/ssh-keygen.css">
+    <!-- JSON-LD structured data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "SSH Key Generator",
+        "description": "Generate SSH key pairs (Ed25519, RSA 4096) securely in your browser. Nothing is sent to any server.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any (browser-based)",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": {
+            "@type": "Organization",
+            "name": "SGraph",
+            "url": "https://sgraph.ai"
+        }
+    }
+    </script>
+</head>
+<body class="theme-aurora">
+    <header>
+        <h1><span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span></h1>
+        <p class="header-tagline">Developer Tools</p>
+        <nav class="header-nav">
+            <a href="https://send.sgraph.ai/" class="nav-link" title="SG/Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1m-2 0h2"/></svg>
+                Send
+            </a>
+            <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener" class="nav-link" title="GitHub">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.337-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"/></svg>
+                GitHub
+            </a>
+        </nav>
+    </header>
+    <main>
+        <ssh-keygen-app></ssh-keygen-app>
+    </main>
+    <script src="js/ssh-crypto.js"></script>
+    <script src="js/ssh-keygen-app.js"></script>
+</body>
+</html>
