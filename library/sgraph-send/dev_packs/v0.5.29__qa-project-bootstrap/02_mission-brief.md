@@ -128,4 +128,14 @@ No manual documentation effort. No stale screenshots. No drift.
 
 ---
 
+## Related Research
+
+- **Browser automation tool evaluation** — Architect compared Playwright (Python-native, mature) vs Vercel agent-browser (built-in visual diff, annotated screenshots, video recording). Recommendation: Playwright for scripted tests, agent-browser as complementary tool for visual diff and AI-driven exploratory testing.
+  See: [`team/roles/architect/reviews/26-02-22/v0.5.29__research__browser-automation-tool-evaluation.md`](../../../../team/roles/architect/reviews/26-02-22/v0.5.29__research__browser-automation-tool-evaluation.md)
+
+- **Feasibility and technical decisions** — Dev review covering stack decisions, estimated timeline, and identified risks.
+  See: [`team/roles/dev/reviews/26-02-22/v0.5.29__review__qa-project-bootstrap-pack.md`](../../../../team/roles/dev/reviews/26-02-22/v0.5.29__review__qa-project-bootstrap-pack.md)
+
+---
+
 *QA Bootstrap Pack — Mission Brief — v0.5.29*

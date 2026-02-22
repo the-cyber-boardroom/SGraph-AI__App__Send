@@ -473,4 +473,13 @@ def test_docs_site_renders(page, screenshots):
 
 ---
 
+## Related Research
+
+Before making tool decisions, review the Architect's browser automation evaluation:
+
+- **Tool evaluation:** [`team/roles/architect/reviews/26-02-22/v0.5.29__research__browser-automation-tool-evaluation.md`](../../../../team/roles/architect/reviews/26-02-22/v0.5.29__research__browser-automation-tool-evaluation.md) — Playwright vs Vercel agent-browser. Recommendation: start with Playwright (Phase 1-3 above), add agent-browser in Phase 2+ for visual diffing, annotated screenshots, and video recording.
+- **Dev feasibility review:** [`team/roles/dev/reviews/26-02-22/v0.5.29__review__qa-project-bootstrap-pack.md`](../../../../team/roles/dev/reviews/26-02-22/v0.5.29__review__qa-project-bootstrap-pack.md) — Stack decisions, timeline, risks.
+
+---
+
 *QA Bootstrap Pack — Technical Bootstrap Guide — v0.5.29*
