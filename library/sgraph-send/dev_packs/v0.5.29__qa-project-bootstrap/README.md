@@ -15,6 +15,8 @@ Bootstrap pack for the SG/Send QA Automation project — a standalone project th
 | 5 | [`04_practices-reference.md`](04_practices-reference.md) | Pointers to SG/Send main repo for practices and conventions |
 | 6 | [`05_technical-bootstrap-guide.md`](05_technical-bootstrap-guide.md) | Step-by-step setup instructions |
 | 7 | [`06_what-to-clone.md`](06_what-to-clone.md) | What to reference from the main SG/Send repo |
+| 8 | [`08_first-session-prompt.md`](08_first-session-prompt.md) | Copy-paste prompt to bootstrap a new Claude Code session |
+| 9 | [`09_claude-md-review.md`](09_claude-md-review.md) | What to keep/adapt/skip from SG/Send's CLAUDE.md files |
 
 ## Role Definitions
 
