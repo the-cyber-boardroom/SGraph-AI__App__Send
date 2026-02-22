@@ -9,6 +9,7 @@ from sgraph_ai_app_send.lambda__admin.fast_api.Fast_API__SGraph__App__Send__Admi
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser import ROUTES_PATHS__CACHE
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens               import ROUTES_PATHS__TOKENS
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                import ROUTES_PATHS__KEYS
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault              import ROUTES_PATHS__VAULT
 from tests.unit.lambda__admin.Fast_API__Test_Objs__SGraph__App__Send__Admin         import TEST_API_KEY__NAME, Fast_API__Test_Objs__SGraph__App__Send__Admin, \
     setup__html_graph_service__fast_api_test_objs
 
@@ -59,6 +60,7 @@ class test_Fast_API__SGraph__App__Send__Admin(TestCase):
                                 ROUTES_PATHS__APP_SEND__STATIC__ADMIN +
                                 ROUTES_PATHS__TOKENS                  +
                                 ROUTES_PATHS__KEYS                    +
+                                ROUTES_PATHS__VAULT                   +
                                 ROUTES_PATHS__ANALYTICS               +
                                 ROUTES_PATHS__CACHE                   )
 
