@@ -21,9 +21,9 @@ This is a standalone project (separate repo) that tests the SG/Send encrypted fi
 
 The bootstrap pack lives in the SG/Send main repo. Clone it and read the documents in order:
 
-```bash
+
 git clone https://github.com/the-cyber-boardroom/SGraph-AI__App__Send.git /tmp/sgraph-send-ref
-```
+
 
 Read these files from the cloned repo, in this order:
 
@@ -52,7 +52,7 @@ Also read the CLAUDE.md files to understand the conventions this project inherit
 
 After reading all documents, your first task is:
 
-1. Create the `sgsend-qa` repo structure as described in `05_technical-bootstrap-guide.md`
+1. Create the `sg_send-qa` repo structure as described in `05_technical-bootstrap-guide.md`
 2. Create a `.claude/CLAUDE.md` for the new repo (adapt from the SG/Send conventions — see the bootstrap pack's `09_claude-md-review.md` for what to keep, adapt, and skip)
 3. Follow Phase 1 of the technical bootstrap guide
 4. Get the first browser test running (Phase 2)
@@ -61,13 +61,3 @@ You are operating as the **Explorer team** with 6 roles: QA Lead, Architect, Dev
 
 **Key decision already made:** Use **Playwright for Python** as the primary browser automation tool. The Architect evaluation is in the research document above.
 ```
-
----
-
-## Notes for the Human
-
-- This prompt assumes the new session has access to clone from GitHub (public repo)
-- If the new session is in a restricted environment, you may need to copy the bootstrap pack files manually
-- The prompt references `09_claude-md-review.md` which is the companion document to this one — it tells the new session what to keep/adapt/skip from the existing CLAUDE.md files
-- Adjust the repo name (`sgsend-qa`) if you prefer something different
-- The new session will need GitHub credentials if you want it to create the repo on GitHub (otherwise it creates locally)

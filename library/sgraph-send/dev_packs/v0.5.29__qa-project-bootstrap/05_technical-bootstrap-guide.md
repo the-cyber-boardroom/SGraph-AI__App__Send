@@ -23,7 +23,7 @@
 ### Step 1.1: Create Repo Structure
 
 ```
-sgsend-qa/
+SG-Send__QA/
 ├── .claude/
 │   └── CLAUDE.md                ← Agent guidance (adapt from bootstrap pack)
 ├── .github/
@@ -32,25 +32,19 @@ sgsend-qa/
 ├── config/
 │   ├── test-config.json         ← Target URL, test parameters
 │   └── .env.example             ← Environment variable template
+├── sg_send_qa/                  ← Python code
+│   └── utils/
+│        └── Version.py          ← Provides version and first test target
 ├── tests/
-│   ├── user/                    ← User Lambda tests
-│   │   └── __init__.py
-│   ├── admin/                   ← Admin Lambda tests
-│   │   └── __init__.py
-│   ├── tools/                   ← Utility page tests
-│   │   └── __init__.py
-│   └── conftest.py              ← Shared fixtures (browser, screenshots)
-├── screenshots/                  ← Generated during test runs
-│   └── .gitkeep
-├── docs/                         ← Generated markdown + screenshots
+│   ├── unit/                    ← tests for code in sg_send_qa
+│   │   └── utils/
+│   │        └── test_Version.py
+│   ├── integration/                
+│       ├── user/                ← User Lambda tests
+│       └── admin/               ← Admin Lambda tests
+├── docs/                        ← Generated markdown + screenshots
+│   ├── screenshots/             ← Generated during test runs
 │   └── index.md                 ← Documentation home page
-├── server/
-│   ├── main.py                  ← FastAPI test runner
-│   └── routes/
-│       ├── routes_tests.py      ← POST /api/tests/run, GET /api/tests/results
-│       └── routes_docs.py       ← GET /api/docs
-├── cli/
-│   └── run_tests.py             ← CLI interface
 ├── pyproject.toml               ← Dependencies
 ├── requirements.txt             ← Pinned for CI
 └── README.md
@@ -119,7 +113,7 @@ app = FastAPI(title="SG/Send QA Test Runner")
 
 @app.get("/info/health")
 def health():
-    return {"status": "ok", "service": "sgsend-qa"}
+    return {"status": "ok", "service": "sg_send__qa"}
 
 @app.post("/api/tests/run")
 def run_all_tests():
@@ -462,7 +456,7 @@ if __name__ == "__main__":
 # tests/meta/test_docs_site.py
 def test_docs_site_renders(page, screenshots):
     """Verify the QA docs site renders correctly."""
-    page.goto("https://your-gh-pages-url.github.io/sgsend-qa/")
+    page.goto("https://your-gh-pages-url.github.io/sg_send__qa/")
     page.wait_for_load_state("networkidle")
 
     screenshots.capture(page, "01_docs_index",

@@ -84,7 +84,8 @@ The admin interface with token management, PKI, vault, and more.
 
 ### Phase 1: Repo and Pipeline (DO THIS FIRST)
 
-- Create repo structure (`tests/`, `screenshots/`, `docs/`, `server/`, `cli/`)
+- Create repo structure (`sg_send_qa/`, `tests/`, `screenshots/`, `docs/`, `server/`, `cli/`)
+- Add base python code to `sg_send_qa` (the utils/Version.py file, as can be seen in the parent SG/Send project)
 - Create CLAUDE.md with role definitions and project context
 - Create FastAPI server skeleton (`POST /api/tests/run`, `GET /api/tests/results`)
 - Create CLI skeleton (`python cli/run_tests.py`)
@@ -98,6 +99,7 @@ The admin interface with token management, PKI, vault, and more.
 - Evaluate Vercel Agent Browser as alternative (human's preferred tool)
 - Create a minimal test: open a URL, take a screenshot, save it
 - **VERIFY:** screenshot captured and saved
+- Confirm it works in Claude Code, in GH actions and serverless
 
 ### Phase 3: The Smoke Test
 

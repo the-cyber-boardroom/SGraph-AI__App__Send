@@ -31,19 +31,19 @@
 
 ### ADAPT (change details, keep concept)
 
-| Section | What to Change |
-|---|---|
+| Section | What to Change                                                                                                                          |
+|---|-----------------------------------------------------------------------------------------------------------------------------------------|
 | **Project description** | Change to: "SG/Send QA — browser automation test suite and living documentation generator for [send.sgraph.ai](https://send.sgraph.ai)" |
-| **Version file** | Change path to wherever the QA project stores its version (e.g., `sgsend_qa/version`) |
-| **Stack table** | Replace with QA project stack — see "Recommended Stack Table" below |
-| **Architecture** | Replace with QA project architecture — FastAPI test runner, CLI, GitHub Actions, GitHub Pages |
-| **Repo structure** | Replace with QA project structure from `05_technical-bootstrap-guide.md` |
-| **Code patterns** | Keep Type_Safe, osbot-utils, no-mocks rules. Drop Memory-FS, Lambda, encryption rules (not applicable). Add Playwright patterns. |
-| **Testing rules** | Keep no-mocks principle. Adapt for browser tests (Playwright fixtures, screenshot capture) |
-| **Role system** | Reduce from 18 roles to 6: QA Lead, Architect, Developer, DevOps, Librarian, Sherpa |
-| **Current state** | Start fresh — describe the QA project's current state |
-| **Key documents** | Point to bootstrap pack files and any new documents created |
-| **Team structure** | Single team (Explorer) — no Villager or Town Planner initially |
+| **Version file** | Change path to wherever the QA project stores its version (e.g., `sg_send__qa/version`)                                                 |
+| **Stack table** | Replace with QA project stack — see "Recommended Stack Table" below                                                                     |
+| **Architecture** | Replace with QA project architecture — FastAPI test runner, CLI, GitHub Actions, GitHub Pages                                           |
+| **Repo structure** | Replace with QA project structure from `05_technical-bootstrap-guide.md`                                                                |
+| **Code patterns** | Keep Type_Safe, osbot-utils, no-mocks rules. Drop Memory-FS, Lambda, encryption rules (not applicable). Add Playwright patterns.        |
+| **Testing rules** | Keep no-mocks principle. Adapt for browser tests (Playwright fixtures, screenshot capture)                                              |
+| **Role system** | Reduce from 18 roles to 6: QA Lead, Architect, Developer, DevOps, Librarian, Sherpa                                                     |
+| **Current state** | Start fresh — describe the QA project's current state                                                                                   |
+| **Key documents** | Point to bootstrap pack files and any new documents created                                                                             |
+| **Team structure** | Single team (Explorer) — no Villager or Town Planner initially                                                                          |
 
 ### SKIP (not relevant to QA project)
 
