@@ -1,0 +1,40 @@
+{
+  "node_id": "e1000001",
+  "node_type": "bug",
+  "node_index": 1,
+  "label": "Bug-1",
+  "title": "Middleware__Analytics creates 5 cache files per HTTP request, causing storage degradation",
+  "description": "Root cause: Middleware__Analytics (BaseHTTPMiddleware) calls send_cache_client.analytics__record_event() on every HTTP request. Each call creates a full temporal cache entry — 5 files (.json, .json.config, .metadata, etc.) per event. In production this produced 65,400+ files in the analytics namespace, degrading all storage operations (file listing, lookups, writes). Admin UI page load went from ~224ms to multi-second responses.\n\nImmediate fix: Middleware commented out on both admin and user lambdas (v0.5.13). Analytics data preserved by moving 2,251 objects to a separate S3 bucket for later analysis.\n\nRedesign required: Analytics recording must use a lightweight strategy — append-to-single-file, batched writes, or aggregation — instead of one cache entry per event. The current pattern (5 files * N requests) is O(5N) file operations and causes unbounded storage growth.\n\nRisk: If middleware is re-enabled without redesign, the same performance degradation will recur within hours under normal traffic.",
+  "status": "confirmed",
+  "created_at": 1740182400000,
+  "updated_at": 1740182400000,
+  "created_by": "c0000001",
+  "tags": ["analytics", "performance", "middleware", "storage", "risk"],
+  "links": [
+    {
+      "link_type_id": "4e0c1076",
+      "verb": "relates-to",
+      "target_id": "c1000005",
+      "target_label": "Feature-5"
+    },
+    {
+      "link_type_id": "2c499e3c",
+      "verb": "blocks",
+      "target_id": "d1000042",
+      "target_label": "Task-2"
+    }
+  ],
+  "properties": {
+    "priority": "P1",
+    "severity": "high",
+    "affected_files": [
+      "sgraph_ai_app_send/lambda__admin/fast_api/Fast_API__SGraph__App__Send__Admin.py",
+      "sgraph_ai_app_send/lambda__user/fast_api/Fast_API__SGraph__App__Send__User.py",
+      "sgraph_ai_app_send/lambda__admin/service/Middleware__Analytics.py"
+    ],
+    "root_cause": "Cache entry pattern (5 files per event) applied to high-frequency analytics recording",
+    "mitigation": "Middleware disabled in v0.5.13, analytics data moved to separate S3 bucket",
+    "redesign_required": true,
+    "role_assignment": "Explorer Team"
+  }
+}
