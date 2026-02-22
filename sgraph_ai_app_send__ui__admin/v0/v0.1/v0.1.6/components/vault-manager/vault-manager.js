@@ -138,11 +138,42 @@
     }
 
     // User Lambda base URL — transfer endpoints (/transfers/*) live on the
-    // user lambda, not the admin lambda.  Set window.sgraphAdmin.userLambdaUrl
-    // to point to the user lambda when the admin console is served separately.
-    // Falls back to same-origin (works when both lambdas share a domain).
+    // user lambda, not the admin lambda.
+    //
+    // Detection order:
+    // 1. Explicit: window.sgraphAdmin.userLambdaUrl
+    // 2. Auto-detect: admin hostname pattern → user lambda URL
+    //    - admin.sgraph.ai → https://send.sgraph.ai
+    //    - localhost:10061  → localhost:10062
+    // 3. Fallback: same-origin (works when both lambdas share a domain)
+    let _cachedUserLambdaUrl = null;
+
     function getUserLambdaUrl() {
-        return (window.sgraphAdmin && window.sgraphAdmin.userLambdaUrl) || '';
+        if (_cachedUserLambdaUrl !== null) return _cachedUserLambdaUrl;
+
+        // 1. Explicit config
+        if (window.sgraphAdmin && window.sgraphAdmin.userLambdaUrl) {
+            _cachedUserLambdaUrl = window.sgraphAdmin.userLambdaUrl;
+            return _cachedUserLambdaUrl;
+        }
+
+        const loc = window.location;
+
+        // 2a. Production: admin.sgraph.ai → send.sgraph.ai
+        if (loc.hostname.startsWith('admin.') && loc.hostname.includes('sgraph')) {
+            _cachedUserLambdaUrl = `${loc.protocol}//send.${loc.hostname.replace(/^admin\./, '')}`;
+            return _cachedUserLambdaUrl;
+        }
+
+        // 2b. Dev port swap (admin 10061 → user 10062)
+        if (loc.port === '10061') {
+            _cachedUserLambdaUrl = `${loc.protocol}//${loc.hostname}:10062`;
+            return _cachedUserLambdaUrl;
+        }
+
+        // 3. Same-origin fallback
+        _cachedUserLambdaUrl = '';
+        return _cachedUserLambdaUrl;
     }
 
     async function transferCreate(tokenName, fileSize, contentType) {
@@ -332,7 +363,8 @@
     const SVG_DOWNLOAD = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
     const SVG_DELETE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>';
     const SVG_RENAME = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>';
-    const SVG_CHEVRON = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
+    const SVG_CHEVRON  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
+    const SVG_NEW_FILE = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V8z" clip-rule="evenodd"/></svg>';
     const SVG_RAW    = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
     const SVG_MOVE   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L11 6.414V13.586l1.293-1.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L9 13.586V6.414L7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3z"/></svg>';
     const SVG_SHARE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>';
@@ -449,6 +481,7 @@
                     <div class="vm-actions">
                         <button class="pk-btn pk-btn--xs pk-btn--ghost vm-raw-toggle ${this._showRawData ? 'vm-raw-active' : ''}" id="vm-btn-raw" title="Toggle raw data view">${SVG_RAW}</button>
                         <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-btn-upload" title="Upload file">${SVG_UPLOAD} Upload</button>
+                        <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-new-file" title="Create new text file">${SVG_NEW_FILE} New</button>
                         <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-refresh" title="Refresh">${SVG_REFRESH}</button>
                     </div>
                 </div>
@@ -484,6 +517,7 @@
             container.querySelector('#vm-btn-upload').addEventListener('click', () => container.querySelector('#vm-file-input').click());
             container.querySelector('#vm-file-input').addEventListener('change', (e) => { this._handleFileUpload(e.target.files); e.target.value = ''; });
             container.querySelector('#vm-btn-raw').addEventListener('click', () => this._toggleRawData());
+            container.querySelector('#vm-btn-new-file').addEventListener('click', () => this._createNewFile());
 
             // Key selector change
             container.querySelector('#vm-key-select').addEventListener('change', (e) => this._onKeyChange(parseInt(e.target.value, 10)));
@@ -645,10 +679,29 @@
             this._pendingDelete = null;
             const settingsEl = this.querySelector('#vm-settings');
             if (settingsEl) settingsEl.clear();
+            this._restorePreview();
             const previewEl = this.querySelector('#vm-preview');
             if (previewEl) previewEl.showEmpty();
             this.querySelectorAll('.vm-row-selected').forEach(r => r.classList.remove('vm-row-selected'));
             this.querySelectorAll('.vm-tree-selected').forEach(n => n.classList.remove('vm-tree-selected'));
+        }
+
+        // Ensures row-3 contains a vault-preview (replaces editor if open)
+        _restorePreview() {
+            const row3 = this.querySelector('#vm-row-3');
+            if (!row3) return;
+            const existing = row3.querySelector('vault-preview');
+            if (existing) return; // already there
+            row3.innerHTML = '';
+            const preview = document.createElement('vault-preview');
+            preview.id = 'vm-preview';
+            row3.appendChild(preview);
+            // Restore row-1 height if it was collapsed for editor
+            const row1 = this.querySelector('#vm-row-1');
+            if (row1) {
+                const h = this._row1Height;
+                row1.style.flex = h ? `0 0 ${h}px` : '1';
+            }
         }
 
         _updateSettings() {
@@ -667,6 +720,7 @@
         }
 
         _updatePreview() {
+            this._restorePreview();
             const previewEl = this.querySelector('#vm-preview');
             if (!previewEl) return;
             if (!this._selectedItem) { previewEl.showEmpty(); return; }
@@ -762,10 +816,12 @@
                 const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
                 const text      = new TextDecoder().decode(decrypted);
 
-                // Open editor in row-3 (preview area)
+                // Open editor in row-3 — collapse row-1 to give editor more space
                 const row3 = this.querySelector('#vm-row-3');
                 if (!row3) return;
                 row3.innerHTML = '';
+                const row1 = this.querySelector('#vm-row-1');
+                if (row1) row1.style.flex = '0 0 120px';
 
                 const editor = document.createElement('vault-editor');
                 row3.appendChild(editor);
@@ -785,16 +841,49 @@
                 });
 
                 editor.addEventListener('vault-editor-close', () => {
-                    // Restore preview component
-                    row3.innerHTML = '';
-                    const preview = document.createElement('vault-preview');
-                    preview.id = 'vm-preview';
-                    row3.appendChild(preview);
                     this._updatePreview();
                 });
 
             } catch (err) {
                 this._msg('error', `Failed to open editor: ${err.message}`);
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // Create new file
+        // -----------------------------------------------------------------
+
+        async _createNewFile() {
+            try {
+                const filename = 'untitled.md';
+                const mime     = 'text/markdown';
+                const guid     = generateGuid();
+
+                // Encrypt empty content and store
+                const encoded   = new TextEncoder().encode('');
+                const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
+                const b64       = arrayBufToB64Safe(encrypted);
+                await adminAPI.vaultStoreFile(this._vaultCacheKey, guid, b64);
+
+                // Add to current folder
+                const parent = await adminAPI.vaultGetFolder(this._vaultCacheKey, this._currentFolder);
+                if (parent && parent.data) {
+                    parent.data.children = parent.data.children || [];
+                    parent.data.children.push(guid);
+                    await adminAPI.vaultStoreFolder(this._vaultCacheKey, this._currentFolder, parent.data);
+                }
+
+                // Register in index
+                this._index[guid] = { name: filename, type: 'file', size: 0, mime, parentGuid: this._currentFolder, uploadedAt: new Date().toISOString() };
+                await this._saveIndex();
+
+                // Refresh view, select and open editor
+                await this._browseFolder(this._currentFolder);
+                this._selectItem(guid);
+                this._openEditor(guid);
+                this._msg('success', `Created "${filename}" — editing now`);
+            } catch (err) {
+                this._msg('error', `Failed to create file: ${err.message}`);
             }
         }
 
@@ -1627,9 +1716,9 @@
                 setProgress('Completing transfer...');
                 await transferComplete(tokenName, transferId);
 
-                // Step 7: Build share URL
-                const origin  = window.location.origin;
-                const shareUrl = `${origin}/send/v0/v0.1/v0.1.6/download.html#${transferId}/${keyStr}`;
+                // Step 7: Build share URL (use user lambda origin for download link)
+                const userBase = getUserLambdaUrl() || window.location.origin;
+                const shareUrl = `${userBase}/send/v0/v0.1/v0.1.6/download.html#${transferId}/${keyStr}`;
 
                 // Show result
                 setProgress('');
@@ -1648,7 +1737,7 @@
                     <div class="vm-share-field">
                         <label>Link only (key separate)</label>
                         <div class="vm-share-url-box">
-                            <input type="text" class="vm-share-url-input" id="vm-share-url-only" value="${escapeHtml(`${origin}/send/v0/v0.1/v0.1.6/download.html#${transferId}`)}" readonly>
+                            <input type="text" class="vm-share-url-input" id="vm-share-url-only" value="${escapeHtml(`${userBase}/send/v0/v0.1/v0.1.6/download.html#${transferId}`)}" readonly>
                             <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-share-copy-link">${SVG_COPY}</button>
                         </div>
                     </div>
