@@ -649,234 +649,102 @@
         }
 
         // -----------------------------------------------------------------
-        // Detail panel (right side)
+        // Selection + settings/preview (replaces detail panel)
         // -----------------------------------------------------------------
 
-        _renderDetailPanel() {
-            // Remove existing detail panel if any
-            const existing = this.querySelector('#vm-detail-panel');
-            if (existing) existing.remove();
-
-            if (!this._selectedItem) return;
-
-            const meta = this._index[this._selectedItem] || {};
-            const body = this.querySelector('.vm-body');
-            if (!body) return;
-
-            const isFile = meta.type !== 'folder';
-            const uploadDate = meta.uploadedAt || '\u2014';
-            const mime = meta.mime || '\u2014';
-            const size = isFile ? formatSize(meta.size) : '\u2014';
-
-            let previewHtml = '';
-            if (isFile) {
-                if (this._previewLoading) {
-                    previewHtml = `<div class="vm-detail-preview">
-                        <div class="vm-detail-preview-label">Preview</div>
-                        <div class="vm-detail-preview-loading">Decrypting preview...</div>
-                    </div>`;
-                } else if (this._previewData) {
-                    if (this._previewData.type === 'image') {
-                        previewHtml = `<div class="vm-detail-preview">
-                            <div class="vm-detail-preview-label">Preview</div>
-                            <img src="${this._previewData.data}" alt="Preview">
-                        </div>`;
-                    } else if (this._previewData.type === 'text') {
-                        previewHtml = `<div class="vm-detail-preview">
-                            <div class="vm-detail-preview-label">Preview</div>
-                            <pre>${escapeHtml(this._previewData.data)}</pre>
-                        </div>`;
-                    }
-                } else {
-                    // Show a button to load preview for supported types
-                    const previewable = this._isPreviewable(mime);
-                    if (previewable) {
-                        previewHtml = `<div class="vm-detail-preview">
-                            <div class="vm-detail-preview-label">Preview</div>
-                            <button class="pk-btn pk-btn--sm pk-btn--primary" id="vm-detail-preview-btn" style="width: 100%;">\uD83D\uDD0D Load Preview</button>
-                        </div>`;
-                    }
-                }
-            }
-
-            // Delete confirmation in detail panel
-            const isDeleting = this._pendingDelete === this._selectedItem;
-            let deleteHtml = '';
-            if (isDeleting) {
-                deleteHtml = `<div class="vm-inline-confirm" style="margin-top: 0.375rem;">
-                    <span>Delete "${escapeHtml((meta.name || this._selectedItem).substring(0, 20))}"?</span>
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost vm-confirm-yes" id="vm-detail-confirm-delete">Yes</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-cancel-delete">No</button>
-                </div>`;
-            }
-
-            const editable = this._isEditable(mime);
-            let actionsHtml = '';
-            if (isFile) {
-                actionsHtml = `<div class="vm-detail-actions">
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-download">\u2B07\uFE0F Download</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-share">\uD83D\uDD17 Share via Send</button>
-                    ${editable ? `<button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-edit">\uD83D\uDCDD Edit</button>` : ''}
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">\u270F\uFE0F Rename</button>
-                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">\uD83D\uDDD1\uFE0F Delete</button>`}
-                </div>${deleteHtml}`;
-            } else {
-                actionsHtml = `<div class="vm-detail-actions">
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-open">\uD83D\uDCC2 Open Folder</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">\u270F\uFE0F Rename</button>
-                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">\uD83D\uDDD1\uFE0F Delete</button>`}
-                </div>${deleteHtml}`;
-            }
-
-            // Compact grid metadata
-            let metaRows = `
-                <span class="vm-detail-label">Name</span><span class="vm-detail-value">${escapeHtml(meta.name || this._selectedItem)}</span>
-                <span class="vm-detail-label">Type</span><span class="vm-detail-value">${isFile ? 'File' : 'Folder'}</span>`;
-            if (isFile) {
-                metaRows += `<span class="vm-detail-label">Size</span><span class="vm-detail-value">${escapeHtml(size)}</span>`;
-                metaRows += `<span class="vm-detail-label">MIME</span><span class="vm-detail-value"><code>${escapeHtml(mime)}</code></span>`;
-            }
-            metaRows += `<span class="vm-detail-label">GUID</span><span class="vm-detail-value"><code>${escapeHtml(this._selectedItem)}</code></span>`;
-            if (uploadDate !== '\u2014') {
-                metaRows += `<span class="vm-detail-label">Date</span><span class="vm-detail-value">${escapeHtml(uploadDate)}</span>`;
-            }
-
-            const panelHtml = `
-                <div class="vm-detail-panel" id="vm-detail-panel" style="width: ${this._detailWidth}px">
-                    <div class="vm-detail-header">
-                        <div class="vm-detail-title">${escapeHtml(meta.name || this._selectedItem)}</div>
-                        <button class="vm-detail-close" id="vm-detail-close">${SVG_CLOSE}</button>
-                    </div>
-                    <div class="vm-detail-meta">${metaRows}</div>
-                    ${actionsHtml}
-                    ${previewHtml}
-                </div>
-            `;
-
-            // Insert resize handle then panel
-            const existingResizeRight = this.querySelector('#vm-resize-right');
-            if (existingResizeRight) existingResizeRight.remove();
-            body.insertAdjacentHTML('beforeend', `<div class="vm-resize-handle" id="vm-resize-right"></div>` + panelHtml);
-
-            // Bind detail panel events
-            const panel = this.querySelector('#vm-detail-panel');
-            panel.querySelector('#vm-detail-close').addEventListener('click', () => this._closeDetailPanel());
-
-            const downloadBtn = panel.querySelector('#vm-detail-download');
-            if (downloadBtn) downloadBtn.addEventListener('click', () => this._downloadFile(this._selectedItem));
-
-            const openBtn = panel.querySelector('#vm-detail-open');
-            if (openBtn) openBtn.addEventListener('click', () => this._navigateToFolder(this._selectedItem));
-
-            const renameBtn = panel.querySelector('#vm-detail-rename');
-            if (renameBtn) {
-                renameBtn.addEventListener('click', () => {
-                    const selectedMeta = this._index[this._selectedItem];
-                    if (selectedMeta && selectedMeta.type === 'folder') {
-                        // For folders, do inline rename in the detail panel title
-                        this._startDetailPanelRename();
-                    } else {
-                        // For files, use the table row rename
-                        this._renamingGuid = this._selectedItem;
-                        if (this._lastFolder) {
-                            this._renderFolderContents(this._lastFolder);
-                            this._renderBreadcrumb();
-                        }
-                        const input = this.querySelector(`[data-rename-guid="${this._selectedItem}"]`);
-                        if (input) { input.focus(); input.select(); }
-                    }
-                });
-            }
-
-            const previewBtn = panel.querySelector('#vm-detail-preview-btn');
-            if (previewBtn) previewBtn.addEventListener('click', () => this._loadPreview(this._selectedItem));
-
-            // Share button
-            const shareBtn = panel.querySelector('#vm-detail-share');
-            if (shareBtn) shareBtn.addEventListener('click', () => this._showShareDialog(this._selectedItem));
-
-            // Edit button (text/markdown files)
-            const editBtn = panel.querySelector('#vm-detail-edit');
-            if (editBtn) editBtn.addEventListener('click', () => this._openEditor(this._selectedItem));
-
-            // Delete button in detail panel
-            const deleteBtn = panel.querySelector('#vm-detail-delete');
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', () => {
-                    this._pendingDelete = this._selectedItem;
-                    this._renderDetailPanel();
-                });
-            }
-            const confirmDelete = panel.querySelector('#vm-detail-confirm-delete');
-            if (confirmDelete) {
-                confirmDelete.addEventListener('click', () => {
-                    this._deleteItem(this._selectedItem);
-                });
-            }
-            const cancelDelete = panel.querySelector('#vm-detail-cancel-delete');
-            if (cancelDelete) {
-                cancelDelete.addEventListener('click', () => {
-                    this._pendingDelete = null;
-                    this._renderDetailPanel();
-                });
-            }
-
-            // Setup right resize handle for detail panel
-            this._setupResize('vm-resize-right', 'vm-detail-panel', '_detailWidth', 180, Infinity, true);
-        }
-
-        _closeDetailPanel() {
-            this._selectedItem   = null;
-            this._previewData    = null;
-            this._previewLoading = false;
-            this._pendingDelete  = null;
-            const panel = this.querySelector('#vm-detail-panel');
-            if (panel) panel.remove();
-            const resizeRight = this.querySelector('#vm-resize-right');
-            if (resizeRight) resizeRight.remove();
-            // Remove selection highlight from rows and tree
+        _clearSelection() {
+            this._selectedItem  = null;
+            this._pendingDelete = null;
+            const settingsEl = this.querySelector('#vm-settings');
+            if (settingsEl) settingsEl.clear();
+            const previewEl = this.querySelector('#vm-preview');
+            if (previewEl) previewEl.showEmpty();
             this.querySelectorAll('.vm-row-selected').forEach(r => r.classList.remove('vm-row-selected'));
             this.querySelectorAll('.vm-tree-selected').forEach(n => n.classList.remove('vm-tree-selected'));
         }
 
-        _startDetailPanelRename() {
-            const panel = this.querySelector('#vm-detail-panel');
-            if (!panel) return;
-            const titleEl = panel.querySelector('.vm-detail-title');
-            if (!titleEl) return;
-            const meta = this._index[this._selectedItem];
-            if (!meta) return;
-
-            const currentName = meta.name || this._selectedItem;
-            titleEl.innerHTML = `<input type="text" class="vm-rename-input" id="vm-detail-rename-input" value="${escapeHtml(currentName)}">`;
-            const input = panel.querySelector('#vm-detail-rename-input');
-            input.focus();
-            input.select();
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') this._commitRename(this._selectedItem, input.value);
-                if (e.key === 'Escape') this._renderDetailPanel();
-            });
-            input.addEventListener('blur', () => {
-                this._commitRename(this._selectedItem, input.value);
+        _updateSettings() {
+            const settingsEl = this.querySelector('#vm-settings');
+            if (!settingsEl) return;
+            if (!this._selectedItem) { settingsEl.clear(); return; }
+            const meta = this._index[this._selectedItem] || {};
+            settingsEl.show({
+                guid       : this._selectedItem,
+                name       : meta.name || this._selectedItem,
+                type       : meta.type || 'unknown',
+                size       : meta.size,
+                mime       : meta.mime,
+                uploadedAt : meta.uploadedAt
             });
         }
 
-        _selectItem(guid) {
-            // If same item, deselect
-            if (this._selectedItem === guid) {
-                this._closeDetailPanel();
+        _updatePreview() {
+            const previewEl = this.querySelector('#vm-preview');
+            if (!previewEl) return;
+            if (!this._selectedItem) { previewEl.showEmpty(); return; }
+            const meta = this._index[this._selectedItem] || {};
+            if (meta.type === 'folder') {
+                previewEl.showEmpty('Folder selected');
                 return;
             }
-            this._selectedItem   = guid;
-            this._previewData    = null;
-            this._previewLoading = false;
+            const mime = meta.mime || '';
+            if (!this._isPreviewable(mime)) {
+                previewEl.showEmpty('No preview available for this file type');
+                return;
+            }
+            // Auto-preview: start loading
+            previewEl.showLoading('Decrypting preview...');
+            this._autoPreview(this._selectedItem);
+        }
+
+        async _autoPreview(fileGuid) {
+            const meta = this._index[fileGuid] || {};
+            const mime = meta.mime || '';
+            const previewEl = this.querySelector('#vm-preview');
+
+            try {
+                const result = await adminAPI.vaultGetFile(this._vaultCacheKey, fileGuid);
+                if (!result || !result.data) {
+                    if (this._selectedItem === fileGuid && previewEl) previewEl.showEmpty('File data not found');
+                    return;
+                }
+                if (this._selectedItem !== fileGuid) return;
+
+                const packed    = b64ToArrayBuf(result.data);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                if (this._selectedItem !== fileGuid) return;
+                if (!previewEl) return;
+
+                if (mime.startsWith('image/')) {
+                    const blob = new Blob([decrypted], { type: mime });
+                    const url  = URL.createObjectURL(blob);
+                    previewEl.show({ type: 'image', data: url, filename: meta.name || fileGuid });
+                } else {
+                    const text = new TextDecoder().decode(decrypted);
+                    const truncated = text.length > 10000 ? text.substring(0, 10000) + '\n... (truncated)' : text;
+                    previewEl.show({ type: 'text', data: truncated, filename: meta.name || fileGuid });
+                }
+            } catch (err) {
+                if (this._selectedItem === fileGuid && previewEl) {
+                    previewEl.showError('Preview failed: ' + err.message);
+                }
+            }
+        }
+
+        _selectItem(guid) {
+            if (this._selectedItem === guid) {
+                this._clearSelection();
+                return;
+            }
+            this._selectedItem = guid;
 
             // Highlight the selected row
             this.querySelectorAll('.vm-row-selected').forEach(r => r.classList.remove('vm-row-selected'));
             const row = this.querySelector(`tr[data-guid="${guid}"]`);
             if (row) row.classList.add('vm-row-selected');
 
-            this._renderDetailPanel();
+            this._updateSettings();
+            this._updatePreview();
         }
 
         _isPreviewable(mime) {
@@ -887,46 +755,6 @@
         _isEditable(mime) {
             if (!mime || mime === '\u2014') return false;
             return mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml' || mime === 'application/javascript';
-        }
-
-        async _loadPreview(fileGuid) {
-            const meta = this._index[fileGuid] || {};
-            const mime = meta.mime || '';
-            if (!this._isPreviewable(mime)) return;
-
-            this._previewLoading = true;
-            this._renderDetailPanel();
-
-            try {
-                const result = await adminAPI.vaultGetFile(this._vaultCacheKey, fileGuid);
-                if (!result || !result.data) {
-                    this._previewLoading = false;
-                    this._renderDetailPanel();
-                    return;
-                }
-
-                const packed    = b64ToArrayBuf(result.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
-
-                if (mime.startsWith('image/')) {
-                    const blob = new Blob([decrypted], { type: mime });
-                    const url  = URL.createObjectURL(blob);
-                    this._previewData = { type: 'image', data: url };
-                } else {
-                    // Text or JSON
-                    const text = new TextDecoder().decode(decrypted);
-                    // Truncate for display
-                    const truncated = text.length > 2000 ? text.substring(0, 2000) + '\n... (truncated)' : text;
-                    this._previewData = { type: 'text', data: truncated };
-                }
-
-                this._previewLoading = false;
-                this._renderDetailPanel();
-            } catch (err) {
-                this._previewLoading = false;
-                this._previewData    = { type: 'text', data: 'Preview failed: ' + err.message };
-                this._renderDetailPanel();
-            }
         }
 
         async _openEditor(fileGuid) {
@@ -946,13 +774,13 @@
                 const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
                 const text      = new TextDecoder().decode(decrypted);
 
-                // Replace the main content area with the editor
-                const content = this.querySelector('#vm-content');
-                if (!content) return;
-                content.innerHTML = '';
+                // Open editor in row-3 (preview area)
+                const row3 = this.querySelector('#vm-row-3');
+                if (!row3) return;
+                row3.innerHTML = '';
 
                 const editor = document.createElement('vault-editor');
-                content.appendChild(editor);
+                row3.appendChild(editor);
                 editor.open({
                     text,
                     filename : meta.name || fileGuid,
@@ -962,7 +790,6 @@
                         const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
                         const b64       = arrayBufToB64Safe(encrypted);
                         await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
-                        // Update index metadata
                         meta.size = encoded.byteLength;
                         await this._saveIndex();
                         this._msg('success', `"${meta.name}" saved`);
@@ -970,8 +797,12 @@
                 });
 
                 editor.addEventListener('vault-editor-close', () => {
-                    // Restore normal view
-                    this._browseFolder(this._currentFolder);
+                    // Restore preview component
+                    row3.innerHTML = '';
+                    const preview = document.createElement('vault-preview');
+                    preview.id = 'vm-preview';
+                    row3.appendChild(preview);
+                    this._updatePreview();
                 });
 
             } catch (err) {
