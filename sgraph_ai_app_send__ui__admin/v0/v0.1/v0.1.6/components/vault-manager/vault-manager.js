@@ -137,18 +137,31 @@
         return { keyStr, encrypted: blob };
     }
 
+    // User Lambda base URL — transfer endpoints (/transfers/*) live on the
+    // user lambda, not the admin lambda.  Set window.sgraphAdmin.userLambdaUrl
+    // to point to the user lambda when the admin console is served separately.
+    // Falls back to same-origin (works when both lambdas share a domain).
+    function getUserLambdaUrl() {
+        return (window.sgraphAdmin && window.sgraphAdmin.userLambdaUrl) || '';
+    }
+
     async function transferCreate(tokenName, fileSize, contentType) {
-        const resp = await fetch('/transfers/create', {
+        const base = getUserLambdaUrl();
+        const resp = await fetch(`${base}/transfers/create`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-sgraph-access-token': tokenName },
             body: JSON.stringify({ file_size_bytes: fileSize, content_type_hint: contentType })
         });
-        if (!resp.ok) throw new Error(`Create failed: ${resp.status} ${resp.statusText}`);
+        if (!resp.ok) {
+            const hint = !base ? ' (Hint: set window.sgraphAdmin.userLambdaUrl to the user lambda URL)' : '';
+            throw new Error(`Create failed: ${resp.status} ${resp.statusText}${hint}`);
+        }
         return resp.json();
     }
 
     async function transferUpload(tokenName, transferId, encryptedBlob) {
-        const resp = await fetch(`/transfers/upload/${transferId}`, {
+        const base = getUserLambdaUrl();
+        const resp = await fetch(`${base}/transfers/upload/${transferId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/octet-stream', 'x-sgraph-access-token': tokenName },
             body: encryptedBlob
@@ -158,7 +171,8 @@
     }
 
     async function transferComplete(tokenName, transferId) {
-        const resp = await fetch(`/transfers/complete/${transferId}`, {
+        const base = getUserLambdaUrl();
+        const resp = await fetch(`${base}/transfers/complete/${transferId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-sgraph-access-token': tokenName }
         });
@@ -298,7 +312,10 @@
         /* --- Share Dialog --- */
         .vm-share-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
         .vm-share-dialog { background: var(--admin-surface, #1a1d27); border: 1px solid var(--admin-border, #2e3347); border-radius: var(--admin-radius-lg, 10px); padding: 1.25rem; width: 480px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-        .vm-share-title { font-size: 1rem; font-weight: 600; color: var(--admin-text, #e4e6ef); margin-bottom: 0.25rem; }
+        .vm-share-title { font-size: 1rem; font-weight: 600; color: var(--admin-text, #e4e6ef); margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.375rem; }
+        .vm-share-title svg { width: 18px; height: 18px; flex-shrink: 0; }
+        .vm-share-actions svg { width: 14px; height: 14px; vertical-align: -2px; }
+        .vm-share-result svg { width: 12px; height: 12px; vertical-align: -1px; }
         .vm-share-subtitle { font-size: 0.75rem; color: var(--admin-text-muted, #5e6280); margin-bottom: 1rem; }
         .vm-share-field { margin-bottom: 0.75rem; }
         .vm-share-field label { display: block; font-size: 0.6875rem; font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
@@ -932,7 +949,7 @@
                         const encoded   = new TextEncoder().encode(newText);
                         const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
                         const b64       = arrayBufToB64Safe(encrypted);
-                        await adminAPI.vaultPutFile(this._vaultCacheKey, fileGuid, b64);
+                        await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
                         // Update index metadata
                         meta.size = encoded.byteLength;
                         await this._saveIndex();
