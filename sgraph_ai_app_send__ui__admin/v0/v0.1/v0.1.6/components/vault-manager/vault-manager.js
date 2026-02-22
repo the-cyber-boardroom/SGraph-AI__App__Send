@@ -333,9 +333,7 @@
     const SVG_DELETE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>';
     const SVG_RENAME = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>';
     const SVG_CHEVRON = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
-    const SVG_CLOSE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
     const SVG_RAW    = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
-    const SVG_EYE    = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>';
     const SVG_MOVE   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L11 6.414V13.586l1.293-1.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L9 13.586V6.414L7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3z"/></svg>';
     const SVG_SHARE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>';
     const SVG_COPY   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>';
@@ -600,28 +598,18 @@
         }
 
         _bindTreeEvents(sidebar) {
-            // Single-click: select folder (show detail panel)
-            // Double-click: navigate into folder
+            // Single-click: navigate into folder + show settings
             sidebar.querySelectorAll('.vm-tree-node').forEach(node => {
                 node.addEventListener('click', (e) => {
                     const guid = node.dataset.treeGuid;
-                    // If clicking the chevron, toggle expand/collapse
+                    // If clicking the chevron, toggle expand/collapse only
                     const chevron = e.target.closest('[data-tree-toggle]');
                     if (chevron) {
                         this._treeExpanded[guid] = !this._treeExpanded[guid];
                         this._renderTree();
                         return;
                     }
-                    // Single click selects the folder → shows detail panel with rename/delete
-                    this._selectItem(guid);
-                    // Highlight active tree node
-                    sidebar.querySelectorAll('.vm-tree-node').forEach(n => n.classList.remove('vm-tree-selected'));
-                    node.classList.add('vm-tree-selected');
-                });
-                node.addEventListener('dblclick', (e) => {
-                    const guid = node.dataset.treeGuid;
-                    const chevron = e.target.closest('[data-tree-toggle]');
-                    if (chevron) return;
+                    // Navigate into the folder and show its settings
                     this._navigateToFolder(guid);
                 });
 
@@ -1057,8 +1045,6 @@
             if (keyIndex < 0 || keyIndex >= this._allKeys.length) return;
             this._selectedKey    = this._allKeys[keyIndex];
             this._selectedItem   = null;
-            this._previewData    = null;
-            this._previewLoading = false;
             this._treeExpanded   = {};
             this._folderPath     = [];
 
@@ -1221,8 +1207,8 @@
                 }
                 this._renderBreadcrumb();
                 this._renderTree();
-                // Re-render detail panel if an item is selected
-                if (this._selectedItem) this._renderDetailPanel();
+                // Re-render settings if an item is selected
+                if (this._selectedItem) this._updateSettings();
             } catch (err) {
                 this._renderFolderContents({ children: [] });
                 this._renderBreadcrumb();
@@ -1233,7 +1219,7 @@
         _navigateToRoot() {
             this._currentFolder = this._vaultManifest.root_folder;
             this._folderPath    = [{ guid: this._currentFolder, name: 'Root' }];
-            this._closeDetailPanel();
+            this._clearSelection();
             this._browseFolder(this._currentFolder);
         }
 
@@ -1246,9 +1232,10 @@
                 this._folderPath.push({ guid: folderGuid, name: meta.name || folderGuid });
             }
             this._currentFolder = folderGuid;
-            // Expand this folder in the tree
             this._treeExpanded[folderGuid] = true;
-            this._closeDetailPanel();
+            // Select the folder to show its settings
+            this._selectedItem  = folderGuid;
+            this._pendingDelete = null;
             this._browseFolder(folderGuid);
         }
 
@@ -1307,8 +1294,8 @@
             }
             if (this._lastFolder) { this._renderFolderContents(this._lastFolder); this._renderBreadcrumb(); }
             this._renderTree();
-            // Update detail panel if the renamed item is selected
-            if (this._selectedItem === guid) this._renderDetailPanel();
+            // Update settings bar if the renamed item is selected
+            if (this._selectedItem === guid) this._updateSettings();
         }
 
         // =====================================================================
@@ -1396,7 +1383,7 @@
 
                 this._pendingDelete = null;
                 // If the deleted item was selected, close the detail panel
-                if (this._selectedItem === guid) this._closeDetailPanel();
+                if (this._selectedItem === guid) this._clearSelection();
                 this._msg('success', `"${meta.name || guid}" deleted`);
                 this._browseFolder(this._currentFolder);
             } catch (err) {
@@ -1447,6 +1434,45 @@
             document.addEventListener('mouseup', onMouseUp);
         }
 
+        _setupRowResize(handleId, rowId, heightProp, minHeight) {
+            const handle = this.querySelector('#' + handleId);
+            const row    = this.querySelector('#' + rowId);
+            if (!handle || !row) return;
+
+            let isResizing = false, startY, startHeight;
+
+            const onMouseDown = (e) => {
+                isResizing  = true;
+                startY      = e.clientY;
+                startHeight = row.offsetHeight;
+                handle.classList.add('vm-resize-active');
+                document.body.style.cursor     = 'row-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff      = e.clientY - startY;
+                const newHeight = Math.max(startHeight + diff, minHeight);
+                this[heightProp] = newHeight;
+                row.style.flex   = `0 0 ${newHeight}px`;
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('vm-resize-active');
+                document.body.style.cursor     = '';
+                document.body.style.userSelect = '';
+                this._savePrefs();
+            };
+
+            handle.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
         // =====================================================================
         // Move item between folders (internal drag-and-drop)
         // =====================================================================
@@ -1479,7 +1505,7 @@
 
                 const targetName = (this._index[targetFolderGuid] && this._index[targetFolderGuid].name) || 'folder';
                 this._msg('success', `Moved "${meta.name || itemGuid}" to "${targetName}"`);
-                this._closeDetailPanel();
+                this._clearSelection();
                 this._browseFolder(this._currentFolder);
             } catch (err) {
                 this._msg('error', `Move failed: ${err.message}`);
