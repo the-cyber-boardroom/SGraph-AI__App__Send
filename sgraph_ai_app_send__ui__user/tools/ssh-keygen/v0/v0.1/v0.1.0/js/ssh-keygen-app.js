@@ -319,7 +319,7 @@ class SSHKeygenApp extends HTMLElement {
         return `
             <div class="keygen-cta">
                 <p class="cta-text">Need to send files securely?<br>SG/Send encrypts everything in your browser.</p>
-                <a href="/send/" class="btn btn-secondary cta-btn">Try SG/Send &rarr;</a>
+                <a href="https://send.sgraph.ai/" class="btn btn-secondary cta-btn">Try SG/Send &rarr;</a>
             </div>
         `
     }
