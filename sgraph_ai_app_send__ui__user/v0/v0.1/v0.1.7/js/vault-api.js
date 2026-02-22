@@ -77,8 +77,9 @@ const VaultAPI = {
         });
     },
 
-    getFolder(vaultCacheKey, folderGuid) {
-        return this._get(`/vault/folder/${encodeURIComponent(vaultCacheKey)}/${encodeURIComponent(folderGuid)}`);
+    async getFolder(vaultCacheKey, folderGuid) {
+        const resp = await this._get(`/vault/folder/${encodeURIComponent(vaultCacheKey)}/${encodeURIComponent(folderGuid)}`);
+        return resp ? resp.data : null;
     },
 
     listFolders(vaultCacheKey) {
