@@ -29,25 +29,41 @@ const VaultAPI = {
 
     async _get(path) {
         const url = `${this.adminUrl}${path}`;
-        const response = await fetch(url, {
-            credentials: 'include',
-            headers: { 'Accept': 'application/json' }
-        });
-        if (!response.ok) return null;
-        return response.json();
+        try {
+            const response = await fetch(url, {
+                credentials: 'include',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) {
+                console.warn(`[vault-api] GET ${path} → ${response.status} ${response.statusText}`);
+                return null;
+            }
+            return response.json();
+        } catch (e) {
+            console.error(`[vault-api] GET ${path} failed:`, e.message);
+            return null;
+        }
     },
 
     async _post(path, body) {
         const url = `${this.adminUrl}${path}`;
-        const response = await fetch(url, {
-            method:      'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json',
-                       'Accept': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        if (!response.ok) return null;
-        return response.json();
+        try {
+            const response = await fetch(url, {
+                method:      'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json',
+                           'Accept': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                console.warn(`[vault-api] POST ${path} → ${response.status} ${response.statusText}`);
+                return null;
+            }
+            return response.json();
+        } catch (e) {
+            console.error(`[vault-api] POST ${path} failed:`, e.message);
+            return null;
+        }
     },
 
     // --- Vault Lifecycle ----------------------------------------------------

@@ -12,7 +12,10 @@ from sgraph_ai_app_send.lambda__user.storage.Send__Config                       
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client                   import Send__Cache__Client
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                    import create_send_cache_client
+from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client__Vault            import Send__Cache__Client__Vault
 from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                  import Middleware__Analytics
+from sgraph_ai_app_send.lambda__admin.service.Service__Vault                        import Service__Vault
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                 import Routes__Vault
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
@@ -26,6 +29,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
     transfer_service     : Transfer__Service      = None                            # Shared transfer service instance
     send_cache_client    : Send__Cache__Client    = None                            # Cache service client (IN_MEMORY mode)
     admin_service_client : Admin__Service__Client = None                            # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
+    service_vault        : Service__Vault         = None                            # Vault lifecycle service
 
     def setup(self):
         with self.config as _:
@@ -54,6 +58,15 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             except Exception:                                                       # Admin client setup failure must not block user Lambda
                 self.admin_service_client = None
 
+        if self.service_vault is None and self.send_cache_client is not None:      # Auto-create vault service
+            try:
+                vault_cache_client = Send__Cache__Client__Vault(
+                    cache_client   = self.send_cache_client.cache_client   ,
+                    hash_generator = self.send_cache_client.hash_generator )
+                self.service_vault = Service__Vault(vault_cache_client=vault_cache_client)
+            except Exception:                                                       # Vault setup failure must not block user Lambda
+                self.service_vault = None
+
         return super().setup()
 
 
@@ -63,6 +76,9 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         self.add_routes(Routes__Transfers        ,
                         transfer_service     = self.transfer_service     ,
                         admin_service_client = self.admin_service_client )
+        if self.service_vault is not None:                                          # Add vault routes if vault service available
+            self.add_routes(Routes__Vault          ,
+                            service_vault = self.service_vault )
         self.add_routes(Routes__Set_Cookie)
 
         # if self.send_cache_client is not None:                                      # Add analytics middleware if cache client available  # disabled: creates 5 files per request, caused 65k+ file buildup — redesign needed
