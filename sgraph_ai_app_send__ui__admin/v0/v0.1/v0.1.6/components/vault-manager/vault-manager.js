@@ -23,7 +23,7 @@
    - Drag-and-drop overlay — upload + internal file move between folders
    - Detail/preview panel — right-side panel for file metadata + preview + delete
    - Raw data view toggle — show GUIDs and cache keys instead of names
-   - Resizable panel dividers + collapsible left sidebar
+   - Resizable panel dividers (tree + detail)
    - Loading state + blur when switching keys
    - Files-only table view (folders live in tree sidebar)
    - Share via Send link — decrypt, re-encrypt, upload as transfer
@@ -208,6 +208,7 @@
         .vm-tree-node { display: flex; align-items: center; gap: 0.25rem; padding: 0.2rem 0.375rem; cursor: pointer; color: var(--admin-text-secondary, #8b8fa7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 3px; margin: 0 0.25rem; user-select: none; }
         .vm-tree-node:hover { background: var(--admin-surface-hover, #2a2e3d); color: var(--admin-text, #e4e6ef); }
         .vm-tree-node.vm-tree-active { background: var(--admin-primary-bg, rgba(79,143,247,0.1)); color: var(--admin-primary, #4f8ff7); font-weight: 600; }
+        .vm-tree-node.vm-tree-selected { background: var(--admin-primary-bg, rgba(79,143,247,0.15)); color: var(--admin-primary, #4f8ff7); }
         .vm-tree-node.vm-tree-drop-target { outline: 2px dashed var(--admin-primary, #4f8ff7); outline-offset: -2px; background: var(--admin-primary-bg, rgba(79,143,247,0.08)); }
         .vm-tree-chevron { width: 14px; height: 14px; flex-shrink: 0; transition: transform 150ms ease; display: inline-flex; align-items: center; justify-content: center; }
         .vm-tree-chevron.vm-tree-expanded { transform: rotate(90deg); }
@@ -217,40 +218,31 @@
         .vm-tree-label { overflow: hidden; text-overflow: ellipsis; }
         .vm-tree-children { padding-left: 0.75rem; }
         .vm-tree-children.vm-tree-collapsed { display: none; }
-        .vm-tree-footer { border-top: 1px solid var(--admin-border-subtle, #252838); padding: 0.375rem; display: flex; gap: 0.25rem; }
-        .vm-tree-footer .pk-btn { width: 100%; justify-content: center; }
-        .vm-tree-collapse-btn { position: absolute; top: 0.25rem; right: 0.25rem; z-index: 2; cursor: pointer; background: none; border: none; color: var(--admin-text-muted, #5e6280); padding: 0.125rem; display: inline-flex; border-radius: 3px; }
-        .vm-tree-collapse-btn:hover { background: var(--admin-surface-hover, #2a2e3d); color: var(--admin-text, #e4e6ef); }
-        .vm-tree-collapse-btn svg { width: 14px; height: 14px; }
-        /* Collapsed sidebar */
-        .vm-tree-sidebar.vm-sidebar-collapsed { width: 36px !important; min-width: 36px; max-width: 36px; }
-        .vm-sidebar-collapsed .vm-tree-label, .vm-sidebar-collapsed .vm-tree-chevron { display: none; }
-        .vm-sidebar-collapsed .vm-tree-node { justify-content: center; padding: 0.3rem; margin: 0.125rem 0.125rem; }
-        .vm-sidebar-collapsed .vm-tree-footer { padding: 0.25rem; }
-        .vm-sidebar-collapsed .vm-tree-footer-text { display: none; }
-        .vm-sidebar-collapsed .vm-tree-children { padding-left: 0; }
+        .vm-tree-footer { border-top: 1px solid var(--admin-border-subtle, #252838); padding: 0.375rem; display: flex; gap: 0.25rem; flex-shrink: 0; }
+        .vm-tree-footer .pk-btn { width: 100%; justify-content: center; white-space: nowrap; }
 
         /* --- Resize Handles --- */
         .vm-resize-handle { width: 4px; cursor: col-resize; background: transparent; transition: background 150ms ease; flex-shrink: 0; z-index: 5; }
         .vm-resize-handle:hover, .vm-resize-handle.vm-resize-active { background: var(--admin-primary, #4f8ff7); }
 
         /* --- Detail Panel --- */
-        .vm-detail-panel { width: 260px; min-width: 180px; overflow-y: auto; padding: 0.75rem; flex-shrink: 0; }
-        .vm-detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+        .vm-detail-panel { width: 260px; min-width: 180px; overflow-y: auto; padding: 0.5rem; flex-shrink: 0; display: flex; flex-direction: column; }
+        .vm-detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.375rem; }
         .vm-detail-title { font-size: 0.8125rem; font-weight: 600; color: var(--admin-text, #e4e6ef); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
         .vm-detail-close { cursor: pointer; color: var(--admin-text-muted, #5e6280); background: none; border: none; padding: 0.125rem; display: inline-flex; }
         .vm-detail-close:hover { color: var(--admin-text, #e4e6ef); }
         .vm-detail-close svg { width: 16px; height: 16px; }
-        .vm-detail-row { display: flex; flex-direction: column; margin-bottom: 0.625rem; }
-        .vm-detail-label { font-size: 0.625rem; font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.125rem; }
-        .vm-detail-value { font-size: 0.75rem; color: var(--admin-text, #e4e6ef); word-break: break-all; }
-        .vm-detail-value code { font-family: var(--admin-font-mono, monospace); font-size: 0.6875rem; color: var(--admin-text-secondary, #8b8fa7); }
-        .vm-detail-preview { margin-top: 0.75rem; border-top: 1px solid var(--admin-border-subtle, #252838); padding-top: 0.75rem; }
-        .vm-detail-preview-label { font-size: 0.625rem; font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-        .vm-detail-preview img { max-width: 100%; max-height: 200px; border-radius: var(--admin-radius, 6px); border: 1px solid var(--admin-border-subtle, #252838); }
-        .vm-detail-preview pre { font-size: 0.6875rem; font-family: var(--admin-font-mono, monospace); color: var(--admin-text-secondary, #8b8fa7); background: var(--admin-bg, #0f1117); border: 1px solid var(--admin-border-subtle, #252838); border-radius: var(--admin-radius, 6px); padding: 0.5rem; max-height: 200px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+        .vm-detail-meta { display: grid; grid-template-columns: auto 1fr; gap: 0.125rem 0.5rem; font-size: 0.6875rem; margin-bottom: 0.5rem; }
+        .vm-detail-label { font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+        .vm-detail-value { color: var(--admin-text, #e4e6ef); word-break: break-all; }
+        .vm-detail-value code { font-family: var(--admin-font-mono, monospace); font-size: 0.625rem; color: var(--admin-text-secondary, #8b8fa7); }
+        .vm-detail-actions { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
+        .vm-detail-actions .pk-btn { width: 100%; justify-content: flex-start; gap: 0.375rem; text-align: left; }
+        .vm-detail-preview { border-top: 1px solid var(--admin-border-subtle, #252838); padding-top: 0.5rem; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .vm-detail-preview-label { font-size: 0.625rem; font-weight: 600; color: var(--admin-text-muted, #5e6280); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.375rem; }
+        .vm-detail-preview img { max-width: 100%; border-radius: var(--admin-radius, 6px); border: 1px solid var(--admin-border-subtle, #252838); }
+        .vm-detail-preview pre { font-size: 0.6875rem; font-family: var(--admin-font-mono, monospace); color: var(--admin-text-secondary, #8b8fa7); background: var(--admin-bg, #0f1117); border: 1px solid var(--admin-border-subtle, #252838); border-radius: var(--admin-radius, 6px); padding: 0.5rem; flex: 1; overflow: auto; white-space: pre-wrap; word-break: break-all; min-height: 0; }
         .vm-detail-preview-loading { font-size: 0.75rem; color: var(--admin-text-muted, #5e6280); font-style: italic; }
-        .vm-detail-actions { margin-top: 0.75rem; display: flex; gap: 0.375rem; flex-wrap: wrap; }
 
         /* --- Table --- */
         .vm-table        { width: 100%; border-collapse: collapse; }
@@ -334,8 +326,6 @@
     const SVG_CLOSE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
     const SVG_RAW    = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
     const SVG_EYE    = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>';
-    const SVG_COLLAPSE = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
-    const SVG_EXPAND  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
     const SVG_MOVE   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L11 6.414V13.586l1.293-1.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 011.414-1.414L9 13.586V6.414L7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3z"/></svg>';
     const SVG_SHARE  = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>';
     const SVG_COPY   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>';
@@ -368,7 +358,6 @@
             this._dragCounter    = 0;      // for nested dragenter/dragleave counting
             this._previewData    = null;   // { type: 'image'|'text', data: ... } for detail panel preview
             this._previewLoading = false;
-            this._sidebarCollapsed = false;// tree sidebar collapsed to icons
             this._treeWidth      = 200;   // tree sidebar width in px
             this._detailWidth    = 260;   // detail panel width in px
             this._draggingGuid   = null;  // guid of item being dragged internally
@@ -382,7 +371,6 @@
                     const p = JSON.parse(raw);
                     if (p.treeWidth)    this._treeWidth    = p.treeWidth;
                     if (p.detailWidth)  this._detailWidth  = p.detailWidth;
-                    if (p.sidebarCollapsed !== undefined) this._sidebarCollapsed = p.sidebarCollapsed;
                 }
             } catch (_) { /* ignore */ }
         }
@@ -391,8 +379,7 @@
             try {
                 localStorage.setItem('sgraph-vault-prefs', JSON.stringify({
                     treeWidth        : this._treeWidth,
-                    detailWidth      : this._detailWidth,
-                    sidebarCollapsed : this._sidebarCollapsed
+                    detailWidth      : this._detailWidth
                 }));
             } catch (_) { /* ignore */ }
         }
@@ -458,7 +445,7 @@
                     </div>
                 </div>
                 <div class="vm-body" id="vm-body">
-                    <div class="vm-tree-sidebar${this._sidebarCollapsed ? ' vm-sidebar-collapsed' : ''}" id="vm-tree-sidebar" style="width: ${this._sidebarCollapsed ? '36' : this._treeWidth}px"></div>
+                    <div class="vm-tree-sidebar" id="vm-tree-sidebar" style="width: ${this._treeWidth}px"></div>
                     <div class="vm-resize-handle" id="vm-resize-left"></div>
                     <div class="vm-content" id="vm-content">
                         <div class="vm-drag-overlay" id="vm-drag-overlay">
@@ -492,7 +479,7 @@
             contentArea.addEventListener('drop',      (e) => this._onDrop(e));
 
             // Resize handles
-            this._setupResize('vm-resize-left', 'vm-tree-sidebar', '_treeWidth', 120, 360, false);
+            this._setupResize('vm-resize-left', 'vm-tree-sidebar', '_treeWidth', 120, Infinity, false);
 
             this._renderTree();
             this._browseFolder(this._currentFolder);
@@ -532,17 +519,13 @@
                 this._treeExpanded[rootGuid] = true;
             }
 
-            const collapseIcon = this._sidebarCollapsed ? SVG_EXPAND : SVG_COLLAPSE;
             sidebar.innerHTML = `
-                <button class="vm-tree-collapse-btn" id="vm-tree-collapse" title="${this._sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}">${collapseIcon}</button>
                 <div class="vm-tree-scroll">${this._buildTreeNode(rootGuid, 'Root', 0)}</div>
                 <div class="vm-tree-footer">
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-new-folder" title="New folder">${SVG_PLUS}<span class="vm-tree-footer-text"> New Folder</span></button>
+                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-new-folder" title="New folder">\uD83D\uDCC1 New Folder</button>
                 </div>`;
             this._bindTreeEvents(sidebar);
 
-            // Collapse toggle
-            sidebar.querySelector('#vm-tree-collapse').addEventListener('click', () => this._toggleSidebarCollapse());
             // New Folder button
             sidebar.querySelector('#vm-btn-new-folder').addEventListener('click', () => this._toggleNewFolderInput());
         }
@@ -588,7 +571,8 @@
         }
 
         _bindTreeEvents(sidebar) {
-            // Click on tree node to navigate
+            // Single-click: select folder (show detail panel)
+            // Double-click: navigate into folder
             sidebar.querySelectorAll('.vm-tree-node').forEach(node => {
                 node.addEventListener('click', (e) => {
                     const guid = node.dataset.treeGuid;
@@ -599,7 +583,16 @@
                         this._renderTree();
                         return;
                     }
-                    // Otherwise navigate to the folder
+                    // Single click selects the folder → shows detail panel with rename/delete
+                    this._selectItem(guid);
+                    // Highlight active tree node
+                    sidebar.querySelectorAll('.vm-tree-node').forEach(n => n.classList.remove('vm-tree-selected'));
+                    node.classList.add('vm-tree-selected');
+                });
+                node.addEventListener('dblclick', (e) => {
+                    const guid = node.dataset.treeGuid;
+                    const chevron = e.target.closest('[data-tree-toggle]');
+                    if (chevron) return;
                     this._navigateToFolder(guid);
                 });
 
@@ -671,7 +664,7 @@
                     if (previewable) {
                         previewHtml = `<div class="vm-detail-preview">
                             <div class="vm-detail-preview-label">Preview</div>
-                            <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-preview-btn">${SVG_EYE} Load Preview</button>
+                            <button class="pk-btn pk-btn--sm pk-btn--primary" id="vm-detail-preview-btn" style="width: 100%;">\uD83D\uDD0D Load Preview</button>
                         </div>`;
                     }
                 }
@@ -681,61 +674,53 @@
             const isDeleting = this._pendingDelete === this._selectedItem;
             let deleteHtml = '';
             if (isDeleting) {
-                deleteHtml = `<div class="vm-inline-confirm" style="margin-top: 0.5rem;">
+                deleteHtml = `<div class="vm-inline-confirm" style="margin-top: 0.375rem;">
                     <span>Delete "${escapeHtml((meta.name || this._selectedItem).substring(0, 20))}"?</span>
                     <button class="pk-btn pk-btn--xs pk-btn--ghost vm-confirm-yes" id="vm-detail-confirm-delete">Yes</button>
                     <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-cancel-delete">No</button>
                 </div>`;
             }
 
+            const editable = this._isEditable(mime);
             let actionsHtml = '';
             if (isFile) {
                 actionsHtml = `<div class="vm-detail-actions">
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-download">${SVG_DOWNLOAD} Download</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-share">${SVG_SHARE} Share</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">${SVG_RENAME} Rename</button>
-                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">${SVG_DELETE} Delete</button>`}
+                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-download">\u2B07\uFE0F Download</button>
+                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-share">\uD83D\uDD17 Share via Send</button>
+                    ${editable ? `<button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-edit">\uD83D\uDCDD Edit</button>` : ''}
+                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">\u270F\uFE0F Rename</button>
+                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">\uD83D\uDDD1\uFE0F Delete</button>`}
                 </div>${deleteHtml}`;
             } else {
                 actionsHtml = `<div class="vm-detail-actions">
-                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-open">Open</button>
-                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">${SVG_RENAME} Rename</button>
-                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">${SVG_DELETE} Delete</button>`}
+                    <button class="pk-btn pk-btn--xs pk-btn--primary" id="vm-detail-open">\uD83D\uDCC2 Open Folder</button>
+                    <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-detail-rename">\u270F\uFE0F Rename</button>
+                    ${isDeleting ? '' : `<button class="pk-btn pk-btn--xs pk-btn--danger" id="vm-detail-delete">\uD83D\uDDD1\uFE0F Delete</button>`}
                 </div>${deleteHtml}`;
             }
 
+            // Compact grid metadata
+            let metaRows = `
+                <span class="vm-detail-label">Name</span><span class="vm-detail-value">${escapeHtml(meta.name || this._selectedItem)}</span>
+                <span class="vm-detail-label">Type</span><span class="vm-detail-value">${isFile ? 'File' : 'Folder'}</span>`;
+            if (isFile) {
+                metaRows += `<span class="vm-detail-label">Size</span><span class="vm-detail-value">${escapeHtml(size)}</span>`;
+                metaRows += `<span class="vm-detail-label">MIME</span><span class="vm-detail-value"><code>${escapeHtml(mime)}</code></span>`;
+            }
+            metaRows += `<span class="vm-detail-label">GUID</span><span class="vm-detail-value"><code>${escapeHtml(this._selectedItem)}</code></span>`;
+            if (uploadDate !== '\u2014') {
+                metaRows += `<span class="vm-detail-label">Date</span><span class="vm-detail-value">${escapeHtml(uploadDate)}</span>`;
+            }
+
             const panelHtml = `
-                <div class="vm-detail-panel" id="vm-detail-panel">
+                <div class="vm-detail-panel" id="vm-detail-panel" style="width: ${this._detailWidth}px">
                     <div class="vm-detail-header">
                         <div class="vm-detail-title">${escapeHtml(meta.name || this._selectedItem)}</div>
                         <button class="vm-detail-close" id="vm-detail-close">${SVG_CLOSE}</button>
                     </div>
-                    <div class="vm-detail-row">
-                        <div class="vm-detail-label">Name</div>
-                        <div class="vm-detail-value">${escapeHtml(meta.name || this._selectedItem)}</div>
-                    </div>
-                    <div class="vm-detail-row">
-                        <div class="vm-detail-label">Type</div>
-                        <div class="vm-detail-value">${escapeHtml(meta.type === 'folder' ? 'Folder' : 'File')}</div>
-                    </div>
-                    ${isFile ? `<div class="vm-detail-row">
-                        <div class="vm-detail-label">Size</div>
-                        <div class="vm-detail-value">${escapeHtml(size)}</div>
-                    </div>` : ''}
-                    <div class="vm-detail-row">
-                        <div class="vm-detail-label">GUID</div>
-                        <div class="vm-detail-value"><code>${escapeHtml(this._selectedItem)}</code></div>
-                    </div>
-                    ${isFile ? `<div class="vm-detail-row">
-                        <div class="vm-detail-label">MIME Type</div>
-                        <div class="vm-detail-value"><code>${escapeHtml(mime)}</code></div>
-                    </div>` : ''}
-                    <div class="vm-detail-row">
-                        <div class="vm-detail-label">Uploaded</div>
-                        <div class="vm-detail-value">${escapeHtml(uploadDate)}</div>
-                    </div>
-                    ${previewHtml}
+                    <div class="vm-detail-meta">${metaRows}</div>
                     ${actionsHtml}
+                    ${previewHtml}
                 </div>
             `;
 
@@ -757,13 +742,20 @@
             const renameBtn = panel.querySelector('#vm-detail-rename');
             if (renameBtn) {
                 renameBtn.addEventListener('click', () => {
-                    this._renamingGuid = this._selectedItem;
-                    if (this._lastFolder) {
-                        this._renderFolderContents(this._lastFolder);
-                        this._renderBreadcrumb();
+                    const selectedMeta = this._index[this._selectedItem];
+                    if (selectedMeta && selectedMeta.type === 'folder') {
+                        // For folders, do inline rename in the detail panel title
+                        this._startDetailPanelRename();
+                    } else {
+                        // For files, use the table row rename
+                        this._renamingGuid = this._selectedItem;
+                        if (this._lastFolder) {
+                            this._renderFolderContents(this._lastFolder);
+                            this._renderBreadcrumb();
+                        }
+                        const input = this.querySelector(`[data-rename-guid="${this._selectedItem}"]`);
+                        if (input) { input.focus(); input.select(); }
                     }
-                    const input = this.querySelector(`[data-rename-guid="${this._selectedItem}"]`);
-                    if (input) { input.focus(); input.select(); }
                 });
             }
 
@@ -773,6 +765,10 @@
             // Share button
             const shareBtn = panel.querySelector('#vm-detail-share');
             if (shareBtn) shareBtn.addEventListener('click', () => this._showShareDialog(this._selectedItem));
+
+            // Edit button (text/markdown files)
+            const editBtn = panel.querySelector('#vm-detail-edit');
+            if (editBtn) editBtn.addEventListener('click', () => this._openEditor(this._selectedItem));
 
             // Delete button in detail panel
             const deleteBtn = panel.querySelector('#vm-detail-delete');
@@ -797,7 +793,7 @@
             }
 
             // Setup right resize handle for detail panel
-            this._setupResize('vm-resize-right', 'vm-detail-panel', '_detailWidth', 180, 500, true);
+            this._setupResize('vm-resize-right', 'vm-detail-panel', '_detailWidth', 180, Infinity, true);
         }
 
         _closeDetailPanel() {
@@ -809,8 +805,31 @@
             if (panel) panel.remove();
             const resizeRight = this.querySelector('#vm-resize-right');
             if (resizeRight) resizeRight.remove();
-            // Remove selection highlight from rows
+            // Remove selection highlight from rows and tree
             this.querySelectorAll('.vm-row-selected').forEach(r => r.classList.remove('vm-row-selected'));
+            this.querySelectorAll('.vm-tree-selected').forEach(n => n.classList.remove('vm-tree-selected'));
+        }
+
+        _startDetailPanelRename() {
+            const panel = this.querySelector('#vm-detail-panel');
+            if (!panel) return;
+            const titleEl = panel.querySelector('.vm-detail-title');
+            if (!titleEl) return;
+            const meta = this._index[this._selectedItem];
+            if (!meta) return;
+
+            const currentName = meta.name || this._selectedItem;
+            titleEl.innerHTML = `<input type="text" class="vm-rename-input" id="vm-detail-rename-input" value="${escapeHtml(currentName)}">`;
+            const input = panel.querySelector('#vm-detail-rename-input');
+            input.focus();
+            input.select();
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') this._commitRename(this._selectedItem, input.value);
+                if (e.key === 'Escape') this._renderDetailPanel();
+            });
+            input.addEventListener('blur', () => {
+                this._commitRename(this._selectedItem, input.value);
+            });
         }
 
         _selectItem(guid) {
@@ -834,6 +853,11 @@
         _isPreviewable(mime) {
             if (!mime || mime === '\u2014') return false;
             return mime.startsWith('image/') || mime.startsWith('text/') || mime === 'application/json';
+        }
+
+        _isEditable(mime) {
+            if (!mime || mime === '\u2014') return false;
+            return mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml' || mime === 'application/javascript';
         }
 
         async _loadPreview(fileGuid) {
@@ -873,6 +897,56 @@
                 this._previewLoading = false;
                 this._previewData    = { type: 'text', data: 'Preview failed: ' + err.message };
                 this._renderDetailPanel();
+            }
+        }
+
+        async _openEditor(fileGuid) {
+            const meta = this._index[fileGuid];
+            if (!meta) return;
+            const mime = meta.mime || 'text/plain';
+
+            try {
+                this._msg('info', `Decrypting "${meta.name}" for editing...`);
+                const result = await adminAPI.vaultGetFile(this._vaultCacheKey, fileGuid);
+                if (!result || !result.data) {
+                    this._msg('error', 'Could not load file for editing');
+                    return;
+                }
+
+                const packed    = b64ToArrayBuf(result.data);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const text      = new TextDecoder().decode(decrypted);
+
+                // Replace the main content area with the editor
+                const content = this.querySelector('#vm-content');
+                if (!content) return;
+                content.innerHTML = '';
+
+                const editor = document.createElement('vault-editor');
+                content.appendChild(editor);
+                editor.open({
+                    text,
+                    filename : meta.name || fileGuid,
+                    mime,
+                    onSave   : async (newText) => {
+                        const encoded   = new TextEncoder().encode(newText);
+                        const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
+                        const b64       = arrayBufToB64Safe(encrypted);
+                        await adminAPI.vaultPutFile(this._vaultCacheKey, fileGuid, b64);
+                        // Update index metadata
+                        meta.size = encoded.byteLength;
+                        await this._saveIndex();
+                        this._msg('success', `"${meta.name}" saved`);
+                    }
+                });
+
+                editor.addEventListener('vault-editor-close', () => {
+                    // Restore normal view
+                    this._browseFolder(this._currentFolder);
+                });
+
+            } catch (err) {
+                this._msg('error', `Failed to open editor: ${err.message}`);
             }
         }
 
@@ -1511,22 +1585,6 @@
             handle.addEventListener('mousedown', onMouseDown);
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
-        }
-
-        _toggleSidebarCollapse() {
-            this._sidebarCollapsed = !this._sidebarCollapsed;
-            const sidebar = this.querySelector('#vm-tree-sidebar');
-            if (sidebar) {
-                if (this._sidebarCollapsed) {
-                    sidebar.classList.add('vm-sidebar-collapsed');
-                    sidebar.style.width = '36px';
-                } else {
-                    sidebar.classList.remove('vm-sidebar-collapsed');
-                    sidebar.style.width = this._treeWidth + 'px';
-                }
-            }
-            this._savePrefs();
-            this._renderTree();
         }
 
         // =====================================================================
