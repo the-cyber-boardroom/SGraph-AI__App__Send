@@ -25,9 +25,9 @@
     const EDITOR_STYLES = `
         ${PKI_SHARED_STYLES}
 
-        :host, vault-editor { display: block; height: 100%; }
+        :host, vault-editor { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 
-        .ve-container { display: flex; flex-direction: column; height: 100%; background: var(--admin-surface, #1a1d27); border-radius: var(--admin-radius-lg, 10px); overflow: hidden; }
+        .ve-container { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--admin-surface, #1a1d27); border-radius: var(--admin-radius-lg, 10px); overflow: hidden; }
 
         .ve-toolbar { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--admin-border-subtle, #252838); flex-shrink: 0; }
         .ve-filename { font-size: 0.8125rem; font-weight: 600; color: var(--admin-text, #e4e6ef); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -77,7 +77,7 @@
             this._filename   = filename || 'untitled';
             this._mime       = mime || 'text/plain';
             this._onSave     = onSave;
-            this._showPreview = this._isMarkdown();
+            this._showPreview = false;
             this._render();
         }
 
