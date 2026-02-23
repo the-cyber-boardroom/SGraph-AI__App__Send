@@ -1630,7 +1630,11 @@
             const hasTokens = tokenOptions.length > 0;
             const tokenField = hasTokens
                 ? `<select id="vm-share-token">${tokenOptions}</select>`
-                : `<input type="text" id="vm-share-token" placeholder="Enter access token name" required autocomplete="off">`;
+                : `<div style="position: relative;">
+                       <input type="password" id="vm-share-token" placeholder="Enter access token" required autocomplete="off" style="width: 100%; padding-right: 2.5rem;">
+                       <button type="button" id="vm-toggle-token-vis" title="Show access token"
+                               style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; font-size: 1rem; color: var(--color-text-secondary, #6c757d); line-height: 1;">&#128065;</button>
+                   </div>`;
 
             const overlay = document.createElement('div');
             overlay.className = 'vm-share-overlay';
@@ -1660,6 +1664,16 @@
             // Events
             overlay.querySelector('#vm-share-cancel').addEventListener('click', () => overlay.remove());
             overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            const toggleBtn = overlay.querySelector('#vm-toggle-token-vis');
+            if (toggleBtn) {
+                const tokenInput = overlay.querySelector('#vm-share-token');
+                toggleBtn.addEventListener('click', () => {
+                    const isHidden = tokenInput.type === 'password';
+                    tokenInput.type      = isHidden ? 'text' : 'password';
+                    toggleBtn.title      = isHidden ? 'Hide access token' : 'Show access token';
+                    toggleBtn.innerHTML  = isHidden ? '&#128064;' : '&#128065;';
+                });
+            }
             overlay.querySelector('#vm-share-confirm').addEventListener('click', () => {
                 const token = overlay.querySelector('#vm-share-token').value.trim();
                 if (!token) {
