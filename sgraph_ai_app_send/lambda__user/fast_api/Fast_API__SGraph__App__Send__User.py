@@ -7,7 +7,9 @@ from osbot_fast_api_serverless.fast_api.Serverless__Fast_API                    
 from starlette.responses                                                            import RedirectResponse
 from starlette.staticfiles                                                          import StaticFiles
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import Routes__Transfers
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned             import Routes__Presigned
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                      import Transfer__Service
+from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls               import Service__Presigned_Urls
 from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client                   import Send__Cache__Client
@@ -29,6 +31,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
     send_config          : Send__Config          = None                              # Storage configuration (auto-detects mode)
     transfer_service     : Transfer__Service      = None                            # Shared transfer service instance
+    presigned_service    : Service__Presigned_Urls = None                           # Presigned URL service (S3 mode only)
     send_cache_client    : Send__Cache__Client    = None                            # Cache service client (IN_MEMORY mode)
     admin_service_client : Admin__Service__Client = None                            # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
     service_vault        : Service__Vault         = None                            # Vault lifecycle service
@@ -47,6 +50,16 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
         if self.transfer_service is None:                                           # Auto-create transfer service if not provided
             self.transfer_service = Transfer__Service(storage_fs=storage_fs)
+
+        if self.presigned_service is None:                                           # Auto-create presigned URL service
+            from sgraph_ai_app_send.lambda__user.storage.Storage_FS__S3 import Storage_FS__S3
+            presigned_kwargs = dict(transfer_service = self.transfer_service,
+                                    storage_mode     = self.send_config.storage_mode)
+            if isinstance(storage_fs, Storage_FS__S3):                               # Wire S3 client from storage backend
+                presigned_kwargs['s3']        = storage_fs.s3
+                presigned_kwargs['s3_bucket'] = storage_fs.s3_bucket
+                presigned_kwargs['s3_prefix'] = storage_fs.s3_prefix
+            self.presigned_service = Service__Presigned_Urls(**presigned_kwargs)
 
         if self.send_cache_client is None:                                          # Auto-create cache client in IN_MEMORY mode
             try:
@@ -87,6 +100,9 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         self.add_routes(Routes__Info             )
         self.add_routes(Routes__Transfers        ,
                         transfer_service     = self.transfer_service     ,
+                        admin_service_client = self.admin_service_client )
+        self.add_routes(Routes__Presigned        ,
+                        presigned_service    = self.presigned_service    ,
                         admin_service_client = self.admin_service_client )
         if self.service_vault is not None:                                          # Add vault routes if vault service available
             self.add_routes(Routes__Vault          ,
