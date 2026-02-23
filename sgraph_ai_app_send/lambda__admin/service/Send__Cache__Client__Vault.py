@@ -151,6 +151,48 @@ class Send__Cache__Client__Vault(Type_Safe):                                   #
             body         = encrypted_index_bytes )
 
     # ═══════════════════════════════════════════════════════════════════════
+    # ACL Operations — store, get, update, list, delete
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def acl__store(self, cache_id, user_id, acl_data):                       # Store an ACL entry (keyed by user_id)
+        return self.cache_client.data_store().data__store_json__with__id_and_key(
+            cache_id     = cache_id    ,
+            namespace    = NS_VAULT    ,
+            data_key     = 'acl'       ,
+            data_file_id = user_id     ,
+            body         = acl_data    )
+
+    def acl__get(self, cache_id, user_id):                                   # Retrieve ACL entry for a user
+        return self.cache_client.data().retrieve().data__json__with__id_and_key(
+            cache_id     = cache_id    ,
+            namespace    = NS_VAULT    ,
+            data_key     = 'acl'       ,
+            data_file_id = user_id     )
+
+    def acl__update(self, cache_id, user_id, acl_data):                      # Update ACL entry for a user
+        return self.cache_client.data().update().data__update_json__with__id_and_key(
+            cache_id     = cache_id    ,
+            namespace    = NS_VAULT    ,
+            data_key     = 'acl'       ,
+            data_file_id = user_id     ,
+            body         = acl_data    )
+
+    def acl__list(self, cache_id):                                           # List all ACL entries in a vault
+        return self.cache_client.data().list().data__list__with__key(
+            cache_id  = cache_id  ,
+            namespace = NS_VAULT  ,
+            data_key  = 'acl'     )
+
+    def acl__delete(self, cache_id, user_id):                                # Delete an ACL entry
+        from mgraph_ai_service_cache_client.schemas.cache.enums.Enum__Cache__Data_Type import Enum__Cache__Data_Type
+        return self.cache_client.data().delete().delete__data__file__with__id_and_key(
+            cache_id     = cache_id                ,
+            namespace    = NS_VAULT                ,
+            data_type    = Enum__Cache__Data_Type.JSON ,
+            data_key     = 'acl'                   ,
+            data_file_id = user_id                 )
+
+    # ═══════════════════════════════════════════════════════════════════════
     # Bulk Operations — list all, delete all
     # ═══════════════════════════════════════════════════════════════════════
 

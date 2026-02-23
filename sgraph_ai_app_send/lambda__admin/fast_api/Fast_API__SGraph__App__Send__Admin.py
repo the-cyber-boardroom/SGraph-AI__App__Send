@@ -13,10 +13,13 @@ from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                
 from sgraph_ai_app_send.lambda__admin.service.Service__Tokens                       import Service__Tokens
 from sgraph_ai_app_send.lambda__admin.service.Service__Keys                         import Service__Keys
 from sgraph_ai_app_send.lambda__admin.service.Service__Vault                        import Service__Vault
+from sgraph_ai_app_send.lambda__admin.service.Service__Vault__ACL                   import Service__Vault__ACL
+from sgraph_ai_app_send.lambda__admin.service.Service__Users                        import Service__Users
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client__Vault            import Send__Cache__Client__Vault
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import Routes__Tokens
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                  import Routes__Keys
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                 import Routes__Vault
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Users                 import Routes__Users
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser        import Routes__Cache__Browser
 from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                 import Middleware__Analytics
 from sgraph_ai_app_send.lambda__admin.service.Service__Analytics__Pulse             import compute_pulse
@@ -36,6 +39,8 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
     service_tokens     : Service__Tokens           = None                             # Token lifecycle service
     service_keys       : Service__Keys             = None                             # Key registry service
     service_vault      : Service__Vault            = None                             # Vault lifecycle service
+    service_vault_acl  : Service__Vault__ACL       = None                             # Vault ACL service (Phase 1)
+    service_users      : Service__Users            = None                             # User identity service (Phase 1)
     metrics_cache      : Service__Metrics__Cache   = None                             # Metrics cache service
 
     def setup(self):
@@ -60,6 +65,14 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
                 hash_generator = self.send_cache_client.hash_generator )
             self.service_vault = Service__Vault(vault_cache_client=vault_cache_client)
 
+        if self.service_vault_acl is None:                                            # Auto-create vault ACL service (Phase 1)
+            vault_cache_client = self.service_vault.vault_cache_client
+            self.service_vault_acl = Service__Vault__ACL(vault_cache_client=vault_cache_client)
+            self.service_vault.vault_acl = self.service_vault_acl                     # Wire ACL into vault service
+
+        if self.service_users is None:                                                # Auto-create user identity service (Phase 1)
+            self.service_users = Service__Users(send_cache_client=self.send_cache_client)
+
         if self.metrics_cache is None:                                              # Auto-create metrics pipeline
             if METRICS__USE_STUB:                                                      # Local dev: stub data, no AWS calls
                 self.metrics_cache = create_metrics_cache_with_stub(self.send_cache_client)
@@ -78,7 +91,10 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         self.add_routes(Routes__Keys             ,
                         service_keys   = self.service_keys  )
         self.add_routes(Routes__Vault            ,
-                        service_vault  = self.service_vault )
+                        service_vault     = self.service_vault     ,
+                        service_vault_acl = self.service_vault_acl )
+        self.add_routes(Routes__Users            ,
+                        service_users  = self.service_users  )
         self.add_routes(Routes__Set_Cookie       )
         self.add_routes(Routes__Cache__Browser  ,
                         send_cache_client = self.send_cache_client)

@@ -78,6 +78,10 @@ class AdminAPI {
         });
     }
 
+    _delete(path) {
+        return this._request(path, { method: 'DELETE' });
+    }
+
     // --- Token Management ---------------------------------------------------
 
     /**

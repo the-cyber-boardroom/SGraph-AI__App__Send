@@ -13,6 +13,7 @@ NS_TOKENS     = 'tokens'                                                   # Tok
 NS_COSTS      = 'costs'                                                    # AWS cost data
 NS_TRANSFERS  = 'transfers'                                                # Per-transfer analytics summaries
 NS_KEYS       = 'keys'                                                     # Public key registry entries
+NS_USERS      = 'users'                                                     # User identity records
 
 
 class Send__Cache__Client(Type_Safe):                                      # Cache service client wrapper for SGraph Send
@@ -247,3 +248,81 @@ class Send__Cache__Client(Type_Safe):                                      # Cac
                 if entry:
                     entries.append(entry)
         return entries
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # User Operations
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def user__create(self, user_data):                                        # Create a new user via KEY_BASED strategy
+        user_id = user_data.get('user_id', '')
+        result = self.cache_client.store().store__json__cache_key(
+            namespace       = NS_USERS        ,
+            strategy        = 'key_based'     ,
+            cache_key       = user_id         ,
+            file_id         = user_id         ,
+            body            = user_data       ,
+            json_field_path = 'user_id'       )
+        if result and hasattr(result, 'cache_id'):
+            return result
+        return None
+
+    def user__lookup(self, user_id):                                          # Find user by user_id (hash lookup)
+        cache_hash = self.hash_generator.from_string(user_id)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_USERS        )
+        if response and response.get('cache_id'):
+            cache_id = response.get('cache_id')
+            return self.cache_client.retrieve().retrieve__cache_id__json(
+                cache_id  = cache_id  ,
+                namespace = NS_USERS  )
+        return None
+
+    def user__lookup_cache_id(self, user_id):                                 # Get cache_id for a user by user_id
+        cache_hash = self.hash_generator.from_string(user_id)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_USERS        )
+        if response:
+            return response.get('cache_id')
+        return None
+
+    def user__update(self, cache_id, user_data):                              # Update user data
+        return self.cache_client.update().update__json(
+            cache_id  = cache_id   ,
+            namespace = NS_USERS   ,
+            body      = user_data  )
+
+    def user__list_all(self):                                                 # List all user IDs from storage
+        return self.cache_client.admin_storage().folders(
+            path             = f'{NS_USERS}/data/key-based/' ,
+            return_full_path = False                          ,
+            recursive        = False                          ) or []
+
+    def user__index_fingerprint(self, fingerprint, user_id):                  # Create fingerprint→user_id index
+        fp_hex     = fingerprint.replace('sha256:', '')
+        fp_key     = f'idx-fp-{fp_hex}'
+        index_data = dict(fp_key      = fp_key       ,                       # Must match cache_key for hash alignment
+                          fingerprint = fingerprint   ,
+                          user_id     = user_id       )
+        return self.cache_client.store().store__json__cache_key(
+            namespace       = NS_USERS        ,
+            strategy        = 'key_based'     ,
+            cache_key       = fp_key          ,
+            file_id         = fp_key          ,
+            body            = index_data      ,
+            json_field_path = 'fp_key'        )
+
+    def user__lookup_by_fingerprint(self, fingerprint):                       # Look up user by fingerprint index
+        fp_hex     = fingerprint.replace('sha256:', '')
+        fp_key     = f'idx-fp-{fp_hex}'
+        cache_hash = self.hash_generator.from_string(fp_key)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_USERS        )
+        if response and response.get('cache_id'):
+            cache_id = response.get('cache_id')
+            return self.cache_client.retrieve().retrieve__cache_id__json(
+                cache_id  = cache_id ,
+                namespace = NS_USERS )
+        return None

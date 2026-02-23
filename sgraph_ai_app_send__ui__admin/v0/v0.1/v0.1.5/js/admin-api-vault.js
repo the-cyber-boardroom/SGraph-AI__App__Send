@@ -92,4 +92,21 @@
         return this._get(`/vault/list-all/${encodeURIComponent(vaultCacheKey)}`);
     };
 
+    // --- ACL Operations ---
+
+    adminAPI.vaultShare = function(vaultCacheKey, userId, permission) {
+        return this._post(`/vault/share/${encodeURIComponent(vaultCacheKey)}`, {
+            user_id    : userId,
+            permission : permission || 'viewer'
+        });
+    };
+
+    adminAPI.vaultUnshare = function(vaultCacheKey, userId) {
+        return this._delete(`/vault/unshare/${encodeURIComponent(vaultCacheKey)}/${encodeURIComponent(userId)}`);
+    };
+
+    adminAPI.vaultPermissions = function(vaultCacheKey) {
+        return this._get(`/vault/permissions/${encodeURIComponent(vaultCacheKey)}`);
+    };
+
 })();
