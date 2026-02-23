@@ -94,7 +94,8 @@ class Transfer__Service(Type_Safe):                                             
                             timestamp      = meta['created_at']      ,
                             file_size_bytes= meta['file_size_bytes'] ,
                             stored_fields  = ['ip_hash', 'file_size_bytes', 'created_at', 'content_type_hint'],
-                            not_stored     = ['file_name', 'decryption_key', 'raw_ip'])
+                            encrypted      = ['file_name', 'file_content'],
+                            not_stored     = ['decryption_key', 'raw_ip'])
         return dict(transfer_id  = transfer_id ,                                 # todo: return Type_Safe class, not raw dict
                     download_url = download_url,
                     transparency = transparency)
