@@ -11,12 +11,13 @@
      settings.clear();
 
    Events emitted:
-     vault-settings-download  { guid }
-     vault-settings-share     { guid }
-     vault-settings-edit      { guid }
-     vault-settings-rename    { guid, newName }
-     vault-settings-delete    { guid }
-     vault-settings-open      { guid }
+     vault-settings-download       { guid }
+     vault-settings-share          { guid }     — share via Send link
+     vault-settings-share-contact  { guid }     — share with PKI contact
+     vault-settings-edit           { guid }
+     vault-settings-rename         { guid, newName }
+     vault-settings-delete         { guid }
+     vault-settings-open           { guid }
    ============================================================================= */
 
 (function() {
@@ -36,6 +37,7 @@
     const SVG_DELETE   = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>';
     const SVG_RENAME   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>';
     const SVG_SHARE    = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>';
+    const SVG_CONTACT  = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>';
     const SVG_FOLDER   = '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>';
 
     const SETTINGS_STYLES = `
@@ -129,6 +131,7 @@
             if (isFile) {
                 actionsHtml += `<button class="pk-btn pk-btn--xs pk-btn--primary" id="vs-download">${SVG_DOWNLOAD} Download</button>`;
                 actionsHtml += `<button class="pk-btn pk-btn--xs pk-btn--primary" id="vs-share">${SVG_SHARE} Share</button>`;
+                actionsHtml += `<button class="pk-btn pk-btn--xs pk-btn--ghost" id="vs-share-contact">${SVG_CONTACT} Contact</button>`;
                 if (this._isEditable(mime)) {
                     actionsHtml += `<button class="pk-btn pk-btn--xs pk-btn--ghost" id="vs-edit">${SVG_RENAME} Edit</button>`;
                 }
@@ -164,6 +167,9 @@
 
             const share = this.querySelector('#vs-share');
             if (share) share.addEventListener('click', () => this._emit('vault-settings-share', { guid }));
+
+            const shareContact = this.querySelector('#vs-share-contact');
+            if (shareContact) shareContact.addEventListener('click', () => this._emit('vault-settings-share-contact', { guid }));
 
             const edit = this.querySelector('#vs-edit');
             if (edit) edit.addEventListener('click', () => this._emit('vault-settings-edit', { guid }));

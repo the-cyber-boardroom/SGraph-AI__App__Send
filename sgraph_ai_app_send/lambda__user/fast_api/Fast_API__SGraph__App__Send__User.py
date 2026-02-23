@@ -17,6 +17,7 @@ from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client__Vault            import Send__Cache__Client__Vault
 from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                  import Middleware__Analytics
 from sgraph_ai_app_send.lambda__admin.service.Service__Vault                        import Service__Vault
+from sgraph_ai_app_send.lambda__admin.service.Service__Vault__ACL                  import Service__Vault__ACL
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                 import Routes__Vault
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
@@ -82,6 +83,17 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             except Exception:                                                       # Vault setup failure must not block user Lambda
                 self.service_vault = None
 
+        self.service_vault_acl = None                                              # ACL service (auto-created if vault available)
+        if self.service_vault is not None and self.send_cache_client is not None:
+            try:
+                vault_cache_client_acl = Send__Cache__Client__Vault(
+                    cache_client   = self.send_cache_client.cache_client   ,
+                    hash_generator = self.send_cache_client.hash_generator )
+                self.service_vault_acl = Service__Vault__ACL(
+                    vault_cache_client = vault_cache_client_acl )
+            except Exception:
+                self.service_vault_acl = None
+
         return super().setup()
 
 
@@ -106,7 +118,8 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                         admin_service_client = self.admin_service_client )
         if self.service_vault is not None:                                          # Add vault routes if vault service available
             self.add_routes(Routes__Vault          ,
-                            service_vault = self.service_vault )
+                            service_vault     = self.service_vault     ,
+                            service_vault_acl = self.service_vault_acl )
         self.add_routes(Routes__Set_Cookie)
 
         # if self.send_cache_client is not None:                                      # Add analytics middleware if cache client available  # disabled: creates 5 files per request, caused 65k+ file buildup — redesign needed

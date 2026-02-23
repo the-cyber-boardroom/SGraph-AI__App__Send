@@ -550,8 +550,9 @@
             // Settings bar events (delegated from vault-settings component)
             const settingsEl = container.querySelector('#vm-settings');
             settingsEl.addEventListener('vault-settings-download', (e) => this._downloadFile(e.detail.guid));
-            settingsEl.addEventListener('vault-settings-share',    (e) => this._showShareDialog(e.detail.guid));
-            settingsEl.addEventListener('vault-settings-edit',     (e) => this._openEditor(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-share',          (e) => this._showShareDialog(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-share-contact', (e) => this._showShareContactDialog(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-edit',          (e) => this._openEditor(e.detail.guid));
             settingsEl.addEventListener('vault-settings-open',     (e) => this._navigateToFolder(e.detail.guid));
             settingsEl.addEventListener('vault-settings-delete',   (e) => this._deleteItem(e.detail.guid));
             settingsEl.addEventListener('vault-settings-rename',   (e) => this._commitRename(e.detail.guid, e.detail.newName));
@@ -1802,6 +1803,37 @@
                 this._msg('success', `"${filename}" shared via Send link`);
             } catch (err) {
                 setError('Share failed: ' + err.message);
+            }
+        }
+
+        // Share with PKI contact (v2 multi-recipient encryption)
+        async _showShareContactDialog(fileGuid) {
+            const entry = this._index[fileGuid];
+            if (!entry) { this._msg('error', 'File not found in index'); return; }
+
+            try {
+                // Fetch encrypted blob
+                const result = await adminAPI.vaultGetFile(this._vaultCacheKey, fileGuid);
+                if (!result || !result.data) { this._msg('error', 'Failed to load file'); return; }
+
+                const packed = b64ToArrayBuf(result.data);
+
+                const dialog = document.createElement('vault-share-dialog');
+                await dialog.show({
+                    fileGuid,
+                    fileName       : entry.name || fileGuid,
+                    vaultCacheKey  : this._vaultCacheKey,
+                    ownerPrivateKey: this._selectedKey.privateKey,
+                    ownerPublicKey : this._selectedKey.publicKey,
+                    ownerFingerprint: this._selectedKey.fingerprint,
+                    encryptedBlob  : packed,
+                    onComplete     : ({ contactFp, permission }) => {
+                        this._msg('success', `"${entry.name || fileGuid}" shared with contact (${permission})`);
+                    }
+                });
+                document.body.appendChild(dialog);
+            } catch (err) {
+                this._msg('error', 'Failed to open share dialog: ' + err.message);
             }
         }
 
