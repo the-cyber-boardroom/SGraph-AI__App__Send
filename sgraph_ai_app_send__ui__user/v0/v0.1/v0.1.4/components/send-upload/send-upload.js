@@ -480,6 +480,8 @@ class SendUpload extends HTMLElement {
 
     // ─── Presigned Multipart Upload ──────────────────────────────────────
 
+    static PARALLEL_UPLOADS = 5;                                                   // Max concurrent S3 part uploads
+
     async _uploadViaPresigned(transferId, encrypted) {
         const partSize = (this._capabilities && this._capabilities.max_part_size) || (10 * 1024 * 1024);
         const numParts = Math.ceil(encrypted.byteLength / partSize);
@@ -490,23 +492,35 @@ class SendUpload extends HTMLElement {
         const partUrls   = initResult.part_urls;
 
         try {
-            // 2. Upload each part directly to S3
-            const completedParts = [];
-            for (let i = 0; i < partUrls.length; i++) {
+            // 2. Upload parts in parallel (concurrency pool)
+            const completedParts = new Array(partUrls.length);
+            let   partsCompleted = 0;
+
+            const uploadOnePart = async (i) => {
                 const start   = i * partSize;
                 const end     = Math.min(start + partSize, encrypted.byteLength);
                 const partBuf = encrypted.slice(start, end);
 
                 const etag = await ApiClient.uploadPart(partUrls[i].upload_url, partBuf);
-                completedParts.push({ part_number: partUrls[i].part_number, etag });
+                completedParts[i] = { part_number: partUrls[i].part_number, etag };
 
-                // Update progress (uploading stage spans 70-90%)
-                const partPct = Math.round(70 + (20 * (i + 1) / partUrls.length));
-                const bar = this.querySelector('.progress-bar__fill');
+                partsCompleted++;
+                const partPct = Math.round(70 + (20 * partsCompleted / partUrls.length));
+                const bar     = this.querySelector('.progress-bar__fill');
                 if (bar) bar.style.width = `${partPct}%`;
-                const label = this.querySelector('.progress-bar__fill')?.parentElement?.previousElementSibling;
-                if (label) label.textContent = this.t('upload.progress.uploading_part', { current: i + 1, total: partUrls.length });
+                const label = bar?.parentElement?.previousElementSibling;
+                if (label) label.textContent = this.t('upload.progress.uploading_part', { current: partsCompleted, total: partUrls.length });
+            };
+
+            // Concurrency pool — run up to PARALLEL_UPLOADS at a time
+            const active  = new Set();
+            const maxPool = SendUpload.PARALLEL_UPLOADS;
+            for (let i = 0; i < partUrls.length; i++) {
+                const p = uploadOnePart(i).then(() => active.delete(p));
+                active.add(p);
+                if (active.size >= maxPool) await Promise.race(active);
             }
+            await Promise.all(active);
 
             // 3. Complete multipart upload
             await ApiClient.completeMultipart(transferId, uploadId, completedParts);
