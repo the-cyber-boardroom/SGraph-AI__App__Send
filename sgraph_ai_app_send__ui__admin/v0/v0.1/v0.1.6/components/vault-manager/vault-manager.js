@@ -141,6 +141,7 @@
     // user lambda, not the admin lambda.
     //
     // Detection order:
+    // DC: note: for now defaulting to https://send.sgraph.ai
     // 1. Explicit: window.sgraphAdmin.userLambdaUrl
     // 2. Auto-detect: admin hostname pattern → user lambda URL
     //    - admin.sgraph.ai → https://send.sgraph.ai
@@ -149,31 +150,32 @@
     let _cachedUserLambdaUrl = null;
 
     function getUserLambdaUrl() {
-        if (_cachedUserLambdaUrl !== null) return _cachedUserLambdaUrl;
-
-        // 1. Explicit config
-        if (window.sgraphAdmin && window.sgraphAdmin.userLambdaUrl) {
-            _cachedUserLambdaUrl = window.sgraphAdmin.userLambdaUrl;
-            return _cachedUserLambdaUrl;
-        }
-
-        const loc = window.location;
-
-        // 2a. Production: admin.sgraph.ai → send.sgraph.ai
-        if (loc.hostname.startsWith('admin.') && loc.hostname.includes('sgraph')) {
-            _cachedUserLambdaUrl = `${loc.protocol}//send.${loc.hostname.replace(/^admin\./, '')}`;
-            return _cachedUserLambdaUrl;
-        }
-
-        // 2b. Dev port swap (admin 10061 → user 10062)
-        if (loc.port === '10061') {
-            _cachedUserLambdaUrl = `${loc.protocol}//${loc.hostname}:10062`;
-            return _cachedUserLambdaUrl;
-        }
-
-        // 3. Same-origin fallback
-        _cachedUserLambdaUrl = '';
-        return _cachedUserLambdaUrl;
+        return "https://send.sgraph.ai"
+        // if (_cachedUserLambdaUrl !== null) return _cachedUserLambdaUrl;
+        //
+        // // 1. Explicit config
+        // if (window.sgraphAdmin && window.sgraphAdmin.userLambdaUrl) {
+        //     _cachedUserLambdaUrl = window.sgraphAdmin.userLambdaUrl;
+        //     return _cachedUserLambdaUrl;
+        // }
+        //
+        // const loc = window.location;
+        //
+        // // 2a. Production: admin.sgraph.ai → send.sgraph.ai
+        // if (loc.hostname.startsWith('admin.') && loc.hostname.includes('sgraph')) {
+        //     _cachedUserLambdaUrl = `${loc.protocol}//${loc.hostname.replace(/^admin\./, '')}`;
+        //     return _cachedUserLambdaUrl;
+        // }
+        //
+        // // 2b. Dev port swap (admin 10061 → user 10062)
+        // if (loc.port === '10061') {
+        //     _cachedUserLambdaUrl = `${loc.protocol}//${loc.hostname}:10062`;
+        //     return _cachedUserLambdaUrl;
+        // }
+        //
+        // // 3. Same-origin fallback
+        // _cachedUserLambdaUrl = '';
+        // return _cachedUserLambdaUrl;
     }
 
     async function transferCreate(tokenName, fileSize, contentType) {
