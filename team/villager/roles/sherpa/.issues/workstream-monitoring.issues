@@ -3,3 +3,7 @@ Workstream-1 | todo | Production user experience monitoring
 	Task-1 | todo | Define production friction monitoring criteria
 	Task-2 | todo | Set up post-release user impact check procedure
 	Task-3 | todo | Create user issue triage workflow
+Workstream-2 | todo | UX validation from 18-Feb observations (P3)
+	Task-4 | todo | Validate post-encryption dead zone finding
+	Task-5 | todo | Validate download page confusion finding
+	Task-6 | todo | Assess QUICK SHARE vs SECURE SHARE trade-offs from user perspective

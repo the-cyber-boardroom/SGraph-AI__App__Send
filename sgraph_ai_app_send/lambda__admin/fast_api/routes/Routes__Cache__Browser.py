@@ -20,7 +20,7 @@ class Routes__Cache__Browser(Fast_API__Routes):                                #
     send_cache_client  : Send__Cache__Client                                   # Injected cache client
 
     def namespaces(self) -> dict:                                              # GET /cache/namespaces
-        return dict(namespaces=['analytics', 'tokens', 'costs', 'transfers'])
+        return dict(namespaces=['analytics', 'tokens', 'costs', 'transfers', 'keys'])
 
     @route_path("/folders/{path:path}")
     def folders__path(self, path: str = '') -> dict:                           # GET /cache/folders/{path}

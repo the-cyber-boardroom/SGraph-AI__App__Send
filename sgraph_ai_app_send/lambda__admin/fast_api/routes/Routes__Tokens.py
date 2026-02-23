@@ -16,7 +16,8 @@ ROUTES_PATHS__TOKENS = [f'/{TAG__ROUTES_TOKENS}/create'               ,
                         f'/{TAG__ROUTES_TOKENS}/lookup/{{token_name}}' ,
                         f'/{TAG__ROUTES_TOKENS}/use/{{token_name}}'    ,
                         f'/{TAG__ROUTES_TOKENS}/revoke/{{token_name}}' ,
-                        f'/{TAG__ROUTES_TOKENS}/list'                  ]
+                        f'/{TAG__ROUTES_TOKENS}/list'                  ,
+                        f'/{TAG__ROUTES_TOKENS}/list-details'          ]
 
 
 class Routes__Tokens(Fast_API__Routes):                                    # Token management endpoints
@@ -70,10 +71,15 @@ class Routes__Tokens(Fast_API__Routes):                                    # Tok
         token_names = self.service_tokens.list_tokens()
         return dict(token_names=token_names)
 
+    def list_details(self) -> dict:                                        # GET /tokens/list-details
+        tokens = self.service_tokens.list_tokens_with_details()            # Single call returns all token data
+        return dict(tokens=tokens)
+
     def setup_routes(self):                                                # Register all token endpoints
         self.add_route_post(self.create              )
         self.add_route_get (self.lookup__token_name  )
         self.add_route_post(self.use__token_name     )
         self.add_route_post(self.revoke__token_name  )
         self.add_route_get (self.list                )
+        self.add_route_get (self.list_details        )
         return self

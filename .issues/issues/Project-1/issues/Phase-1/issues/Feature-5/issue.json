@@ -40,6 +40,12 @@
       "verb": "has-task",
       "target_id": "d1000044",
       "target_label": "Task-4"
+    },
+    {
+      "link_type_id": "98d1c9d8",
+      "verb": "contains",
+      "target_id": "e1000001",
+      "target_label": "Bug-1"
     }
   ],
   "properties": {

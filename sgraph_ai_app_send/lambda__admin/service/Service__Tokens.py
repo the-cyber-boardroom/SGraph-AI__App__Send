@@ -84,3 +84,6 @@ class Service__Tokens(Type_Safe):                                          # Tok
 
     def list_tokens(self):                                                 # List all token files
         return self.send_cache_client.token__list_all()
+
+    def list_tokens_with_details(self):                                    # List all tokens with full data
+        return self.send_cache_client.token__list_all_with_details()

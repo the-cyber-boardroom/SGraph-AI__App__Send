@@ -64,3 +64,14 @@ class test_Routes__Tokens(TestCase):
         data = response.json()
         assert 'token_names' in data
         assert isinstance(data['token_names'], list)
+
+    def test__list_details(self):
+        self.client.post('/tokens/create', json=dict(token_name='route-detail-1', usage_limit=10))
+        response = self.client.get('/tokens/list-details')
+        assert response.status_code == 200
+        data = response.json()
+        assert 'tokens' in data
+        assert isinstance(data['tokens'], list)
+        assert len(data['tokens']) > 0
+        token_names = [t['token_name'] for t in data['tokens']]
+        assert 'route-detail-1' in token_names

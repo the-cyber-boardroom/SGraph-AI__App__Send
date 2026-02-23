@@ -1,0 +1,89 @@
+════════════════════════════════════════════════════════════════════════════════
+ADMIN PANEL: LEVEL 1 BASELINE
+════════════════════════════════════════════════════════════════════════════════
+
+┌────────────────────────────────────────────────────────────────────┐
+│ BENCHMARK METADATA                                                 │
+├────────────────────────────────────────────────────────────────────┤
+│ Property         │ Value                                           │
+├────────────────────────────────────────────────────────────────────┤
+│ Date             │ 2026-02-22 00:11:13                             │
+│ Version          │                                                 │
+│ Test Input       │ Live localhost server at http://localhost:10061 │
+│ Measurement Mode │ Enum__Measure_Mode.ONLY_3                       │
+│ Total Benchmarks │ 11                                              │
+└────────────────────────────────────────────────────────────────────┘
+
+DESCRIPTION
+────────────────────────────────────────────────────────────
+Global middleware overhead investigation. Every request — including /docs, /openapi.json, /404 — pays a ~700ms tax. Root cause is in the middleware chain, not in static file serving or S3 token validation.
+
+LEGEND
+────────────────────────────────────────────────────────────
+  A_xx  Static admin files      (target <50ms)
+  B_xx  FastAPI infrastructure  (target <20ms _ zero app logic)
+  C_xx  Application API         (target <100ms)
+
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ DETAILED CONVERSION BREAKDOWN                                                                                          │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Benchmark                          │ Time       │ Category                                                │ % of Total │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ A_01__static__index_html           │ 4.40s      │ Static admin files      (target <50ms)                  │  23.4%     │
+│ A_02__static__metrics_dashboard_js │ 2.78s      │ Static admin files      (target <50ms)                  │  14.8%     │
+│ A_03__static__admin_api_cache_js   │ 971.30ms   │ Static admin files      (target <50ms)                  │   5.2%     │
+│ A_04__static__pki_contacts_js      │ 887.80ms   │ Static admin files      (target <50ms)                  │   4.7%     │
+│ A_05__static__admin_root__redirect │ 821.30ms   │ Static admin files      (target <50ms)                  │   4.4%     │
+│ ────────────────────────────────   │ ────────── │ ──────────────────                                      │ ────────── │
+│ B_01__fastapi__docs                │ 774.10ms   │ FastAPI infrastructure  (target <20ms _ zero app logic) │   4.1%     │
+│ B_02__fastapi__openapi_json        │ 810.50ms   │ FastAPI infrastructure  (target <20ms _ zero app logic) │   4.3%     │
+│ B_03__fastapi__404                 │ 788.60ms   │ FastAPI infrastructure  (target <20ms _ zero app logic) │   4.2%     │
+│ ────────────────────────────────   │ ────────── │ ──────────────────                                      │ ────────── │
+│ C_01__api__info_status             │ 960.40ms   │ Application API         (target <100ms)                 │   5.1%     │
+│ C_02__api__tokens_list             │ 990.30ms   │ Application API         (target <100ms)                 │   5.3%     │
+│ C_03__api__tokens_list_details     │ 4.62s      │ Application API         (target <100ms)                 │  24.6%     │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Total: 11 benchmarks                                                                                                   │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+============================================================
+CATEGORY SUMMARY
+============================================================
+  Static admin files      (target <50ms):        9.85s  (A_xx benchmarks)
+  FastAPI infrastructure  (target <20ms _ zero app logic):        2.37s  (B_xx benchmarks)
+  Application API         (target <100ms):        6.57s  (C_xx benchmarks)
+  ─────────────────────────────────────────────
+  Overhead:                911.80ms  (full - create - convert)
+
+============================================================
+PERCENTAGE ANALYSIS (relative to Full Operations)
+============================================================
+  Converter Creation:  24.08% of full operation time
+  Convert Only:         66.7% of full operation time
+  Overhead:             9.25% of full operation time
+
+============================================================
+STAGE BREAKDOWN (Full Operations)
+============================================================
+  static__index_html        4.40s ( 44.6%) ██████████████████████
+  static__metrics_dashboard_js      2.78s ( 28.2%) ██████████████
+  static__admin_api_cache_js   971.30ms (  9.9%) ████
+  static__pki_contacts_js   887.80ms (  9.0%) ████
+  static__admin_root__redirect   821.30ms (  8.3%) ████
+
+============================================================
+BOTTLENECK ANALYSIS
+============================================================
+  Primary Bottleneck: C_03__api__tokens_list_details
+  Time:               4.62s
+  Percentage:          24.6% of total
+
+============================================================
+KEY INSIGHT
+============================================================
+  Category B is 24.1% of A → Significant
+
+════════════════════════════════════════════════════════════════════════════════
+Report generated: 2026-02-22 00:12:25
+Version: 
+════════════════════════════════════════════════════════════════════════════════

@@ -15,3 +15,8 @@ Workstream-2 | todo | Production change risk assessment (from 16-Feb brief)
 Workstream-3 | todo | DPO-AppSec-GRC evidence pack (from 16-Feb brief, P1)
 	Task-12 | todo | Contribute AppSec evidence: security influence on project decisions
 	Task-13 | todo | Verify IP address exclusion from CloudFront logs (empirically)
+Workstream-4 | todo | PKI security review for production (from 20-21 Feb briefs, P1)
+	Task-14 | todo | Review 2 critical PKI findings: auth on publish + proof-of-possession
+	Task-15 | todo | Review 5 high PKI findings for production impact
+	Task-16 | todo | Review auth model transition risk (token→PKI) for production
+	Task-17 | todo | Adopt data breach notification process from INC-004 for Villager team

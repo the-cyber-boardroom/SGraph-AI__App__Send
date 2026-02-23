@@ -39,7 +39,8 @@ class TokenManager extends HTMLElement {
 
     connectedCallback() {
         this.render();
-        this.loadTokens();
+        // Don't load data here — wait until shell activates this view
+        // This prevents 40+ API calls when token-manager is not the active panel
     }
 
     disconnectedCallback() {
@@ -60,22 +61,11 @@ class TokenManager extends HTMLElement {
         this._renderList();
 
         try {
-            const result     = await adminAPI.listTokens();
-            const tokenNames = result.token_names || [];
-            const tokens     = [];
-            for (const tokenName of tokenNames) {
-                if (tokenName) {
-                    try {
-                        const detail = await adminAPI.lookupToken(tokenName);
-                        tokens.push(detail);
-                    } catch (_) {
-                        // Skip tokens that fail lookup
-                    }
-                }
-            }
-            this._tokens = tokens;
-            this._loading = false;
-            this._error = null;
+            // Single bulk call replaces list + N individual lookups
+            const result   = await adminAPI.listTokenDetails();
+            this._tokens   = result.tokens || [];
+            this._loading  = false;
+            this._error    = null;
         } catch (err) {
             this._loading = false;
             this._error = err.message;
