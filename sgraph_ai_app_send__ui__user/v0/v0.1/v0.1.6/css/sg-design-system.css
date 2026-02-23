@@ -391,6 +391,20 @@ textarea.input {
     color: var(--color-text);
 }
 
+.transparency__section-label {
+    font-size: var(--font-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-3);
+    margin-bottom: var(--space-1);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.transparency__value--encrypted {
+    color: var(--accent);
+}
+
 .transparency__value--not-stored {
     color: var(--accent);
 }

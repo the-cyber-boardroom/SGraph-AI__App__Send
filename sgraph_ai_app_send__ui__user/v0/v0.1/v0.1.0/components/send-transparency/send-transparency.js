@@ -89,6 +89,7 @@ class SendTransparency extends HTMLElement {
             <div class="transparency">
                 <div class="transparency__title">${this.t('transparency.title')}</div>
                 ${this.renderStoredFields(data)}
+                ${this.renderEncryptedFields(data)}
                 ${this.renderNotStoredFields(data)}
                 <div class="transparency__footer">
                     ${this.t('transparency.footer')}
@@ -111,8 +112,15 @@ class SendTransparency extends HTMLElement {
         if (data.file_size_bytes) {
             fields.push({ label: this.t('transparency.file_size'), value: this.formatBytes(data.file_size_bytes) });
         }
+        if (data.encryption_method) {
+            fields.push({ label: this.t('transparency.encryption_method'), value: data.encryption_method });
+        }
 
-        return fields.map(f => `
+        if (fields.length === 0) return '';
+
+        return `
+            <div class="transparency__section-label">${this.t('transparency.section.stored')}</div>
+        ` + fields.map(f => `
             <div class="transparency__row">
                 <span class="transparency__label">${f.label}</span>
                 <span class="transparency__value">${f.value}</span>
@@ -120,8 +128,28 @@ class SendTransparency extends HTMLElement {
         `).join('');
     }
 
+    renderEncryptedFields(data) {
+        const encrypted = data.encrypted || [];
+        if (encrypted.length === 0) return '';
+
+        const labels = {
+            file_name:    this.t('transparency.label.file_name'),
+            file_content: this.t('transparency.label.file_content')
+        };
+
+        return `
+            <div class="transparency__section-label">${this.t('transparency.section.encrypted')}</div>
+            ${encrypted.map(field => `
+                <div class="transparency__row">
+                    <span class="transparency__label">${labels[field] || field}</span>
+                    <span class="transparency__value transparency__value--encrypted">${this.t('transparency.encrypted')}</span>
+                </div>
+            `).join('')}
+        `;
+    }
+
     renderNotStoredFields(data) {
-        const notStored = data.not_stored || ['file_name', 'file_content', 'decryption_key'];
+        const notStored = data.not_stored || ['decryption_key'];
         const labels    = {
             file_name:      this.t('transparency.label.file_name'),
             file_content:   this.t('transparency.label.file_content'),
@@ -135,12 +163,15 @@ class SendTransparency extends HTMLElement {
             raw_ip:         this.t('transparency.not_stored')
         };
 
-        return notStored.map(field => `
-            <div class="transparency__row">
-                <span class="transparency__label">${labels[field] || field}</span>
-                <span class="transparency__value transparency__value--not-stored">${descriptions[field] || this.t('transparency.not_stored')}</span>
-            </div>
-        `).join('');
+        return `
+            <div class="transparency__section-label">${this.t('transparency.section.not_stored')}</div>
+            ${notStored.map(field => `
+                <div class="transparency__row">
+                    <span class="transparency__label">${labels[field] || field}</span>
+                    <span class="transparency__value transparency__value--not-stored">${descriptions[field] || this.t('transparency.not_stored')}</span>
+                </div>
+            `).join('')}
+        `;
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────
