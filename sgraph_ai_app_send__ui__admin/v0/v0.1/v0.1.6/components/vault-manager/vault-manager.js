@@ -1630,7 +1630,7 @@
             const hasTokens = tokenOptions.length > 0;
             const tokenField = hasTokens
                 ? `<select id="vm-share-token">${tokenOptions}</select>`
-                : `<input type="text" id="vm-share-token" placeholder="Enter access token name" required>`;
+                : `<input type="text" id="vm-share-token" placeholder="Enter access token name" required autocomplete="off">`;
 
             const overlay = document.createElement('div');
             overlay.className = 'vm-share-overlay';
