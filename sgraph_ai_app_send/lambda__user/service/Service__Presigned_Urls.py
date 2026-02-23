@@ -190,7 +190,8 @@ class Service__Presigned_Urls(Type_Safe):                                       
     # Presigned download URL
     # =========================================================================
 
-    def create_download_url(self, transfer_id, expiry=PRESIGNED_DOWNLOAD_EXPIRY):
+    def create_download_url(self, transfer_id, expiry=PRESIGNED_DOWNLOAD_EXPIRY,
+                            downloader_ip='', user_agent=''):
         if not self.is_s3_mode():
             return dict(error='presigned_not_available', message='S3 storage mode required')
 
@@ -200,6 +201,16 @@ class Service__Presigned_Urls(Type_Safe):                                       
             meta = self.transfer_service.load_meta(transfer_id)
             if meta.get('status') != 'completed':
                 return dict(error='transfer_not_completed')
+
+            # Record download event (same as direct download path)
+            meta['download_count'] = meta.get('download_count', 0) + 1
+            meta['events'].append(dict(
+                action    = 'download_presigned',
+                timestamp = datetime.now(timezone.utc).isoformat(),
+                ip_hash   = self.transfer_service.hash_ip(downloader_ip),
+                user_agent = user_agent or ''
+            ))
+            self.transfer_service.save_meta(transfer_id, meta)
 
         s3_key = self.s3_key(transfer_id)
 

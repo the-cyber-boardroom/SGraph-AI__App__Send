@@ -142,7 +142,10 @@ class Routes__Presigned(Fast_API__Routes):                                      
     def download_url__transfer_id(self, transfer_id: Safe_Str__Id,                   # GET /presigned/download-url/{transfer_id}
                                         request: Request
                                  ) -> dict:
-        result = self.presigned_service.create_download_url(transfer_id=str(transfer_id))
+        result = self.presigned_service.create_download_url(
+            transfer_id   = str(transfer_id),
+            downloader_ip = request.client.host if request.client else '',
+            user_agent    = request.headers.get('user-agent', ''))
         if 'error' in result:
             if result['error'] == 'transfer_not_found':
                 raise HTTPException(status_code=404, detail='Transfer not found')

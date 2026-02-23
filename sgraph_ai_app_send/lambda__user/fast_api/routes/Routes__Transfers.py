@@ -117,9 +117,20 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Transfer not found')
         return result
 
+    LAMBDA_RESPONSE_LIMIT = 5 * 1024 * 1024                                     # 5MB safe limit (Lambda response limit is ~6MB)
+
     def download__transfer_id(self, transfer_id : Safe_Str__Id,                  # GET /transfers/download/{transfer_id} (todo: should be Transfer_Id)
                                     request     : Request
                              ) -> Response:
+        # Check file size before loading — prevent Lambda 6MB response blowup
+        info = self.transfer_service.get_transfer_info(transfer_id)
+        if info is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Transfer not found')
+        if info.get('file_size_bytes', 0) > self.LAMBDA_RESPONSE_LIMIT:
+            raise HTTPException(status_code = 413,
+                                detail      = 'File too large for direct download. Use /presigned/download-url/{transfer_id} instead.')
+
         payload = self.transfer_service.get_download_payload(transfer_id  = transfer_id                    ,
                                                              downloader_ip = request.client.host if request.client else '',
                                                              user_agent    = request.headers.get('user-agent', ''))
