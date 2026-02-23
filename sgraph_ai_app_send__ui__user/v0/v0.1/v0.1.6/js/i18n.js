@@ -18,17 +18,21 @@
 
         // ─── Transparency Panel ─────────────────────────────────────
         'transparency.title':               'What we stored about this transfer',
+        'transparency.section.stored':      'Stored by the server',
+        'transparency.section.encrypted':   'Stored encrypted (only you can read it)',
+        'transparency.section.not_stored':  'Never sent to the server',
         'transparency.footer':              "That's everything. Nothing else is captured.",
         'transparency.ip_address':          'Your IP address',
         'transparency.upload_time':         'Upload time',
         'transparency.download_time':       'Download time',
         'transparency.file_size':           'File size',
+        'transparency.encryption_method':   'Encryption',
         'transparency.label.file_name':     'File name',
         'transparency.label.file_content':  'File content',
         'transparency.label.decryption_key':'Decryption key',
         'transparency.label.raw_ip':        'Raw IP address',
         'transparency.not_stored':          'NOT stored',
-        'transparency.encrypted':           'Encrypted (we cannot read it)',
+        'transparency.encrypted':           'Encrypted (only you can read it)',
         'transparency.key_not_stored':      'NOT stored (only you have it)',
     };
 
