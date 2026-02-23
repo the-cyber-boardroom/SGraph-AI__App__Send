@@ -53,7 +53,13 @@
         return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
     }
 
-    async function encryptBlob(publicKey, data) {
+    async function encryptBlob(publicKey, fingerprint, data) {
+        // Use v2 multi-recipient format if vault-crypto-multi is loaded and fingerprint available
+        const multi = window.sgraphAdmin && window.sgraphAdmin.vaultCryptoMulti;
+        if (multi && fingerprint) {
+            return multi.encryptMulti([{ publicKey, fingerprint }], data);
+        }
+        // Fallback: v1 single-recipient format
         const aesKey     = await generateAesKey();
         const iv         = crypto.getRandomValues(new Uint8Array(12));
         const encrypted  = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, data);
@@ -69,7 +75,13 @@
         return packed;
     }
 
-    async function decryptBlob(privateKey, packed) {
+    async function decryptBlob(privateKey, packed, fingerprint) {
+        // Use v2 multi-recipient decryption if vault-crypto-multi is loaded
+        const multi = window.sgraphAdmin && window.sgraphAdmin.vaultCryptoMulti;
+        if (multi) {
+            return multi.decryptMulti(privateKey, packed, fingerprint);
+        }
+        // Fallback: v1 single-recipient format
         const bytes  = new Uint8Array(packed);
         const wkLen  = new Uint32Array(bytes.slice(0, 4).buffer)[0];
         const wrappedKey = bytes.slice(4, 4 + wkLen);
@@ -754,7 +766,7 @@
                 if (this._selectedItem !== fileGuid) return;
 
                 const packed    = b64ToArrayBuf(result.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
                 if (this._selectedItem !== fileGuid) return;
                 if (!previewEl) return;
 
@@ -814,7 +826,7 @@
                 }
 
                 const packed    = b64ToArrayBuf(result.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
                 const text      = new TextDecoder().decode(decrypted);
 
                 // Open editor in row-3 — collapse row-1 to give editor more space
@@ -832,7 +844,7 @@
                     mime,
                     onSave   : async (newText) => {
                         const encoded   = new TextEncoder().encode(newText);
-                        const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
+                        const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, encoded);
                         const b64       = arrayBufToB64Safe(encrypted);
                         await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
                         meta.size = encoded.byteLength;
@@ -862,7 +874,7 @@
 
                 // Encrypt empty content and store
                 const encoded   = new TextEncoder().encode('');
-                const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
+                const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, encoded);
                 const b64       = arrayBufToB64Safe(encrypted);
                 await adminAPI.vaultStoreFile(this._vaultCacheKey, guid, b64);
 
@@ -1177,7 +1189,7 @@
                     this._vaultManifest = await adminAPI.vaultLookup(this._vaultCacheKey);
                     this._currentFolder = result.root_folder;
                     const emptyIndex = JSON.stringify({ version: 1, entries: {} });
-                    const encIndex   = await encryptBlob(this._selectedKey.publicKey, new TextEncoder().encode(emptyIndex));
+                    const encIndex   = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, new TextEncoder().encode(emptyIndex));
                     await adminAPI.vaultStoreIndex(this._vaultCacheKey, arrayBufToB64Safe(encIndex));
                 }
 
@@ -1194,7 +1206,7 @@
                 const result = await adminAPI.vaultGetIndex(this._vaultCacheKey);
                 if (result && result.data) {
                     const packed    = b64ToArrayBuf(result.data);
-                    const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                    const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
                     const indexJson = JSON.parse(new TextDecoder().decode(decrypted));
                     this._index = indexJson.entries || {};
                 }
@@ -1205,7 +1217,7 @@
 
         async _saveIndex() {
             const indexJson = JSON.stringify({ version: 1, entries: this._index });
-            const encrypted = await encryptBlob(this._selectedKey.publicKey, new TextEncoder().encode(indexJson));
+            const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, new TextEncoder().encode(indexJson));
             await adminAPI.vaultStoreIndex(this._vaultCacheKey, arrayBufToB64Safe(encrypted));
         }
 
@@ -1410,7 +1422,7 @@
 
                 const fileGuid  = generateGuid();
                 const data      = await file.arrayBuffer();
-                const encrypted = await encryptBlob(this._selectedKey.publicKey, data);
+                const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, data);
                 const b64       = arrayBufToB64Safe(encrypted);
 
                 this._msg('info', `Uploading "${file.name}"...`);
@@ -1446,7 +1458,7 @@
                 }
 
                 const packed    = b64ToArrayBuf(result.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
 
                 const blob = new Blob([decrypted], { type: meta.mime || 'application/octet-stream' });
                 const url  = URL.createObjectURL(blob);
@@ -1713,7 +1725,7 @@
                 if (!vaultResult || !vaultResult.data) throw new Error('File data not found in vault');
 
                 const packed    = b64ToArrayBuf(vaultResult.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
 
                 // Step 2: Package with SGMETA envelope (preserves filename for recipient)
                 setProgress('Packaging with filename metadata...');
