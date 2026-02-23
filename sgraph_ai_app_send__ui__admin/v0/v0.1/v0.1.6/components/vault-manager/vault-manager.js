@@ -1417,6 +1417,10 @@
             }
         }
 
+        // Maximum encrypted bytes per chunk before base64 encoding.
+        // 3MB raw → ~4MB base64 → ~4.2MB JSON payload (safely under Lambda 6MB limit)
+        static VAULT_CHUNK_SIZE = 3 * 1024 * 1024;
+
         async _uploadFile(file) {
             try {
                 this._msg('info', `Encrypting "${file.name}"...`);
@@ -1424,10 +1428,16 @@
                 const fileGuid  = generateGuid();
                 const data      = await file.arrayBuffer();
                 const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, data);
-                const b64       = arrayBufToB64Safe(encrypted);
 
-                this._msg('info', `Uploading "${file.name}"...`);
-                await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
+                const useChunked = encrypted.byteLength > VaultManager.VAULT_CHUNK_SIZE;
+
+                if (useChunked) {
+                    await this._uploadFileChunked(file.name, fileGuid, encrypted);
+                } else {
+                    const b64 = arrayBufToB64Safe(encrypted);
+                    this._msg('info', `Uploading "${file.name}"...`);
+                    await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
+                }
 
                 const parent = await adminAPI.vaultGetFolder(this._vaultCacheKey, this._currentFolder);
                 if (parent && parent.data) {
@@ -1445,6 +1455,27 @@
             } catch (err) {
                 this._msg('error', `Upload failed: ${err.message}`);
             }
+        }
+
+        async _uploadFileChunked(fileName, fileGuid, encrypted) {
+            const chunkSize   = VaultManager.VAULT_CHUNK_SIZE;
+            const totalChunks = Math.ceil(encrypted.byteLength / chunkSize);
+
+            this._msg('info', `Uploading "${fileName}" in ${totalChunks} chunks...`);
+
+            for (let i = 0; i < totalChunks; i++) {
+                const start    = i * chunkSize;
+                const end      = Math.min(start + chunkSize, encrypted.byteLength);
+                const chunkBuf = encrypted.slice(start, end);
+                const chunkB64 = arrayBufToB64Safe(chunkBuf);
+
+                this._msg('info', `Uploading "${fileName}" chunk ${i + 1}/${totalChunks}...`);
+                await adminAPI.vaultStoreFileChunk(
+                    this._vaultCacheKey, fileGuid, i, totalChunks, chunkB64);
+            }
+
+            this._msg('info', `Assembling "${fileName}"...`);
+            await adminAPI.vaultAssembleFile(this._vaultCacheKey, fileGuid, totalChunks);
         }
 
         async _downloadFile(fileGuid) {

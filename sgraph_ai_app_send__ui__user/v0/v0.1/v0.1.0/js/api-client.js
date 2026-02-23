@@ -171,5 +171,105 @@ const ApiClient = {
             throw new Error(`Download failed: ${response.status}`);
         }
         return response.arrayBuffer();
+    },
+
+    // ─── Presigned URLs (large file transfer via S3) ───────────────────
+
+    /** @type {object|null} Cached capabilities response */
+    _capabilities: null,
+
+    /**
+     * Check what upload modes the backend supports.
+     * Cached after first call.
+     * @returns {Promise<{presigned_upload: boolean, multipart_upload: boolean, direct_upload: boolean, max_part_size: number, min_part_size: number, max_parts: number}>}
+     */
+    async getCapabilities() {
+        if (this._capabilities) return this._capabilities;
+        try {
+            const response = await fetch(`${this.baseUrl}/presigned/capabilities`);
+            if (!response.ok) return { presigned_upload: false, multipart_upload: false, direct_upload: true, max_part_size: 0, min_part_size: 0, max_parts: 0 };
+            this._capabilities = await response.json();
+            return this._capabilities;
+        } catch (e) {
+            return { presigned_upload: false, multipart_upload: false, direct_upload: true, max_part_size: 0, min_part_size: 0, max_parts: 0 };
+        }
+    },
+
+    /**
+     * Initiate a multipart upload via presigned URLs.
+     * @param {string} transferId
+     * @param {number} fileSizeBytes
+     * @param {number} [numParts]
+     * @returns {Promise<{transfer_id: string, upload_id: string, part_urls: Array<{part_number: number, upload_url: string}>, part_size: number}>}
+     */
+    async initiateMultipart(transferId, fileSizeBytes, numParts) {
+        const body = { transfer_id: transferId, file_size_bytes: fileSizeBytes };
+        if (numParts) body.num_parts = numParts;
+        const response = await fetch(`${this.baseUrl}/presigned/initiate`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+            body:    JSON.stringify(body)
+        });
+        if (response.status === 401) { this.clearAccessToken(); throw new Error('ACCESS_TOKEN_INVALID'); }
+        if (!response.ok) throw new Error(`Initiate multipart failed: ${response.status}`);
+        return response.json();
+    },
+
+    /**
+     * Upload a single part to S3 via presigned URL.
+     * @param {string} presignedUrl
+     * @param {ArrayBuffer|Blob} partData
+     * @returns {Promise<string>} ETag from S3
+     */
+    async uploadPart(presignedUrl, partData) {
+        const response = await fetch(presignedUrl, {
+            method:  'PUT',
+            body:    partData
+        });
+        if (!response.ok) throw new Error(`Part upload failed: ${response.status}`);
+        return response.headers.get('ETag') || '';
+    },
+
+    /**
+     * Complete a multipart upload after all parts are uploaded.
+     * @param {string} transferId
+     * @param {string} uploadId
+     * @param {Array<{part_number: number, etag: string}>} parts
+     * @returns {Promise<{transfer_id: string, status: string, etag: string}>}
+     */
+    async completeMultipart(transferId, uploadId, parts) {
+        const response = await fetch(`${this.baseUrl}/presigned/complete`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+            body:    JSON.stringify({ transfer_id: transferId, upload_id: uploadId, parts })
+        });
+        if (response.status === 401) { this.clearAccessToken(); throw new Error('ACCESS_TOKEN_INVALID'); }
+        if (!response.ok) throw new Error(`Complete multipart failed: ${response.status}`);
+        return response.json();
+    },
+
+    /**
+     * Abort a multipart upload (cleanup on failure).
+     * @param {string} transferId
+     * @param {string} uploadId
+     */
+    async abortMultipart(transferId, uploadId) {
+        try {
+            await fetch(`${this.baseUrl}/presigned/abort/${transferId}/${uploadId}`, {
+                method:  'POST',
+                headers: { ...this.authHeaders() }
+            });
+        } catch (e) { /* best-effort cleanup */ }
+    },
+
+    /**
+     * Get a presigned download URL for a transfer.
+     * @param {string} transferId
+     * @returns {Promise<{transfer_id: string, download_url: string, expires_in: number}>}
+     */
+    async getPresignedDownloadUrl(transferId) {
+        const response = await fetch(`${this.baseUrl}/presigned/download-url/${transferId}`);
+        if (!response.ok) throw new Error(`Get download URL failed: ${response.status}`);
+        return response.json();
     }
 };

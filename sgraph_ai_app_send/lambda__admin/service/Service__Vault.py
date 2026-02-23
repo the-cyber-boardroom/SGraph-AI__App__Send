@@ -123,6 +123,48 @@ class Service__Vault(Type_Safe):                                               #
         return self.vault_cache_client.file__delete(cache_id, file_guid)
 
     # ═══════════════════════════════════════════════════════════════════════
+    # Chunked File Upload — for files exceeding Lambda 6MB payload limit
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def store_file_chunk(self, vault_cache_key, file_guid, chunk_index, encrypted_chunk):
+        cache_id = self.vault_cache_client.vault__lookup_cache_id(vault_cache_key)
+        if cache_id is None:
+            return None
+        chunk_id = f'{file_guid}__chunk__{chunk_index}'
+        return self.vault_cache_client.file__store(cache_id, chunk_id, encrypted_chunk)
+
+    def assemble_file(self, vault_cache_key, file_guid, total_chunks):
+        cache_id = self.vault_cache_client.vault__lookup_cache_id(vault_cache_key)
+        if cache_id is None:
+            return None
+
+        # Read all chunks in order
+        parts = []
+        for i in range(total_chunks):
+            chunk_id   = f'{file_guid}__chunk__{i}'
+            chunk_data = self.vault_cache_client.file__get(cache_id, chunk_id)
+            if chunk_data is None:
+                return dict(error='missing_chunk', chunk_index=i)
+            if isinstance(chunk_data, (bytes, bytearray)):
+                parts.append(chunk_data)
+            else:
+                parts.append(bytes(chunk_data) if chunk_data else b'')
+
+        # Concatenate and store as the final file
+        assembled = b''.join(parts)
+        result = self.vault_cache_client.file__store(cache_id, file_guid, assembled)
+
+        # Clean up chunks (best-effort — delete may not be supported on all backends)
+        for i in range(total_chunks):
+            chunk_id = f'{file_guid}__chunk__{i}'
+            try:
+                self.vault_cache_client.file__delete(cache_id, chunk_id)
+            except Exception:
+                pass                                                             # Chunk cleanup is non-critical
+
+        return dict(status='assembled', file_guid=file_guid, size=len(assembled))
+
+    # ═══════════════════════════════════════════════════════════════════════
     # Index Operations
     # ═══════════════════════════════════════════════════════════════════════
 
