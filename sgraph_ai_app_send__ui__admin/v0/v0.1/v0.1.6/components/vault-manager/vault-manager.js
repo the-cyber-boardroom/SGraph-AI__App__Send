@@ -332,6 +332,16 @@
         .vm-status-bar   { display: flex; align-items: center; gap: 0.75rem; font-size: 0.6875rem; color: var(--admin-text-muted, #5e6280); padding: 0.375rem 0 0.125rem; border-top: 1px solid var(--admin-border-subtle, #252838); flex-wrap: wrap; }
         .vm-status-bar .vm-status-key { font-family: var(--admin-font-mono, monospace); }
 
+        /* --- Upload Progress Bar --- */
+        .vm-upload-progress { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.75rem; background: var(--admin-surface-hover, #2a2e3d); border-bottom: 1px solid var(--admin-border-subtle, #252838); font-size: 0.75rem; color: var(--admin-text-secondary, #8b8fa7); animation: vm-progress-fadein 200ms ease; }
+        @keyframes vm-progress-fadein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+        .vm-upload-progress__label { white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        .vm-upload-progress__track { flex: 1; height: 6px; background: var(--admin-border, #2e3347); border-radius: 3px; overflow: hidden; min-width: 80px; }
+        .vm-upload-progress__fill  { height: 100%; background: var(--admin-primary, #4f8ff7); border-radius: 3px; transition: width 150ms ease; }
+        .vm-upload-progress__pct   { font-family: var(--admin-font-mono, monospace); font-size: 0.6875rem; min-width: 3ch; text-align: right; }
+        .vm-upload-progress__cancel { background: none; border: 1px solid var(--admin-border, #2e3347); border-radius: var(--admin-radius, 6px); color: var(--admin-text-muted, #5e6280); font-size: 0.6875rem; padding: 0.125rem 0.5rem; cursor: pointer; white-space: nowrap; transition: all 150ms ease; }
+        .vm-upload-progress__cancel:hover { border-color: var(--admin-error, #f87171); color: var(--admin-error, #f87171); background: rgba(248,113,113,0.08); }
+
         .vm-no-key       { text-align: center; padding: 3rem 1rem; }
         .vm-no-key__icon { margin-bottom: 0.75rem; color: var(--admin-text-muted, #5e6280); }
         .vm-no-key__icon svg { width: 40px; height: 40px; }
@@ -499,6 +509,7 @@
                         <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-refresh" title="Refresh">${SVG_REFRESH}</button>
                     </div>
                 </div>
+                <div id="vm-upload-progress-slot"></div>
                 <div class="vm-body" id="vm-body">
                     <div class="vm-row-1" id="vm-row-1" style="${row1Style}">
                         <div class="vm-tree-sidebar" id="vm-tree-sidebar" style="width: ${this._treeWidth}px"></div>
@@ -1420,24 +1431,60 @@
         // Maximum encrypted bytes per chunk before base64 encoding.
         // 3MB raw → ~4MB base64 → ~4.2MB JSON payload (safely under Lambda 6MB limit)
         static VAULT_CHUNK_SIZE = 3 * 1024 * 1024;
+        static VAULT_UPLOAD_CONCURRENCY = 4;                                    // Parallel chunk uploads
+
+        _uploadAborted = false;
+
+        _showUploadProgress(fileName, pct) {
+            const slot = this.querySelector('#vm-upload-progress-slot');
+            if (!slot) return;
+            const pctInt = Math.round(pct);
+            slot.innerHTML = `
+                <div class="vm-upload-progress">
+                    <span class="vm-upload-progress__label" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>
+                    <div class="vm-upload-progress__track">
+                        <div class="vm-upload-progress__fill" style="width: ${pctInt}%"></div>
+                    </div>
+                    <span class="vm-upload-progress__pct">${pctInt}%</span>
+                    <button class="vm-upload-progress__cancel" id="vm-cancel-upload">Cancel</button>
+                </div>`;
+            const cancelBtn = slot.querySelector('#vm-cancel-upload');
+            if (cancelBtn) cancelBtn.addEventListener('click', () => { this._uploadAborted = true; });
+        }
+
+        _hideUploadProgress() {
+            const slot = this.querySelector('#vm-upload-progress-slot');
+            if (slot) slot.innerHTML = '';
+        }
 
         async _uploadFile(file) {
+            this._uploadAborted = false;
             try {
-                this._msg('info', `Encrypting "${file.name}"...`);
+                this._showUploadProgress(file.name, 0);
 
                 const fileGuid  = generateGuid();
                 const data      = await file.arrayBuffer();
+
+                if (this._uploadAborted) throw new Error('Upload cancelled');
+                this._showUploadProgress(file.name, 5);
+
                 const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, data);
+
+                if (this._uploadAborted) throw new Error('Upload cancelled');
+                this._showUploadProgress(file.name, 10);
 
                 const useChunked = encrypted.byteLength > VaultManager.VAULT_CHUNK_SIZE;
 
                 if (useChunked) {
                     await this._uploadFileChunked(file.name, fileGuid, encrypted);
                 } else {
+                    this._showUploadProgress(file.name, 50);
                     const b64 = arrayBufToB64Safe(encrypted);
-                    this._msg('info', `Uploading "${file.name}"...`);
                     await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
+                    this._showUploadProgress(file.name, 90);
                 }
+
+                if (this._uploadAborted) throw new Error('Upload cancelled');
 
                 const parent = await adminAPI.vaultGetFolder(this._vaultCacheKey, this._currentFolder);
                 if (parent && parent.data) {
@@ -1450,32 +1497,61 @@
                 this._index[fileGuid] = { name: file.name, type: 'file', size: file.size, parentGuid: this._currentFolder, mime: file.type, uploadedAt: now };
                 await this._saveIndex();
 
+                this._showUploadProgress(file.name, 100);
+                this._hideUploadProgress();
                 this._msg('success', `"${file.name}" uploaded and encrypted`);
                 this._browseFolder(this._currentFolder);
             } catch (err) {
-                this._msg('error', `Upload failed: ${err.message}`);
+                this._hideUploadProgress();
+                if (err.message === 'Upload cancelled') {
+                    this._msg('info', `Upload of "${file.name}" cancelled`);
+                } else {
+                    this._msg('error', `Upload failed: ${err.message}`);
+                }
             }
         }
 
         async _uploadFileChunked(fileName, fileGuid, encrypted) {
             const chunkSize   = VaultManager.VAULT_CHUNK_SIZE;
             const totalChunks = Math.ceil(encrypted.byteLength / chunkSize);
+            const concurrency = VaultManager.VAULT_UPLOAD_CONCURRENCY;
 
-            this._msg('info', `Uploading "${fileName}" in ${totalChunks} chunks...`);
-
+            // Prepare all chunks (base64 encode upfront so parallel uploads don't block on encoding)
+            const chunks = [];
             for (let i = 0; i < totalChunks; i++) {
                 const start    = i * chunkSize;
                 const end      = Math.min(start + chunkSize, encrypted.byteLength);
-                const chunkBuf = encrypted.slice(start, end);
-                const chunkB64 = arrayBufToB64Safe(chunkBuf);
-
-                this._msg('info', `Uploading "${fileName}" chunk ${i + 1}/${totalChunks}...`);
-                await adminAPI.vaultStoreFileChunk(
-                    this._vaultCacheKey, fileGuid, i, totalChunks, chunkB64);
+                chunks.push(arrayBufToB64Safe(encrypted.slice(start, end)));
             }
 
-            this._msg('info', `Assembling "${fileName}"...`);
+            // Upload in parallel batches
+            let completed = 0;
+            this._showUploadProgress(fileName, 10);
+
+            for (let batchStart = 0; batchStart < totalChunks; batchStart += concurrency) {
+                if (this._uploadAborted) throw new Error('Upload cancelled');
+
+                const batchEnd = Math.min(batchStart + concurrency, totalChunks);
+                const batch    = [];
+                for (let i = batchStart; i < batchEnd; i++) {
+                    batch.push(
+                        adminAPI.vaultStoreFileChunk(this._vaultCacheKey, fileGuid, i, totalChunks, chunks[i])
+                            .then(() => {
+                                completed++;
+                                // Progress: 10% (encrypt) → 85% (upload) → 95% (assemble)
+                                const pct = 10 + Math.round(75 * completed / totalChunks);
+                                this._showUploadProgress(fileName, pct);
+                            })
+                    );
+                }
+                await Promise.all(batch);
+            }
+
+            if (this._uploadAborted) throw new Error('Upload cancelled');
+
+            this._showUploadProgress(fileName, 90);
             await adminAPI.vaultAssembleFile(this._vaultCacheKey, fileGuid, totalChunks);
+            this._showUploadProgress(fileName, 95);
         }
 
         async _downloadFile(fileGuid) {
