@@ -18,6 +18,7 @@ from sgraph_ai_app_send.lambda__admin.service.Service__Vault                    
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                 import Routes__Vault
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
+from sgraph_ai_app_send.lambda__user.user__config                                   import HEADER__SGRAPH_SEND__ACCESS_TOKEN
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
 ROUTES_PATHS__APP_SEND__STATIC__USER  = ['/',
@@ -70,6 +71,16 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
         return super().setup()
 
+
+    def setup_middleware__cors(self):                                                # Override: add x-sgraph-access-token to allowed CORS headers
+        from starlette.middleware.cors import CORSMiddleware                          # so cross-origin requests from admin.send.sgraph.ai succeed
+        if self.config.enable_cors:
+            self.app().add_middleware(CORSMiddleware,
+                                      allow_origins     = ["*"]                                                                                                      ,
+                                      allow_credentials = True                                                                                                       ,
+                                      allow_methods     = ["GET", "POST", "HEAD", "OPTIONS"]                                                                         ,
+                                      allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization", HEADER__SGRAPH_SEND__ACCESS_TOKEN],
+                                      expose_headers    = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization"]                                  )
 
     def setup_routes(self):
         self.setup_static_routes()
