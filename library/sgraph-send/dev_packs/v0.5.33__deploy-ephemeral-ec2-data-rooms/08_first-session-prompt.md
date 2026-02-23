@@ -5,9 +5,9 @@
 
 ---
 
-## Copy-Paste Prompt for Claude Code
+## Prompt for Claude Code
 
-Copy the block below into a new Claude Code session (in the SG_Send__Deploy repo):
+Added to a new Claude Code session (in the SG_Send__Deploy repo):
 
 ---
 
@@ -81,17 +81,6 @@ Begin implementing EC2 management routes:
 - Use Serverless__Fast_API for the management Lambda.
 - Budget: max 5 EC2 instances, $10/day cap.
 ```
-
----
-
-## Notes for the Human
-
-- **Create the GitHub repo first**: `SGraph-AI/SG_Send__Deploy` (or `SG-Send__Deploy`)
-- **Set up AWS credentials** before starting the session
-- **The clone command** assumes the App__Send repo is accessible from the new session
-- **Adjust the clone URL** if the repo is private and needs authentication
-- **Phase 0** should be completable in the first session (2-3 hours)
-- **Phase 1** can start in the same session if time permits
 
 ---
 
