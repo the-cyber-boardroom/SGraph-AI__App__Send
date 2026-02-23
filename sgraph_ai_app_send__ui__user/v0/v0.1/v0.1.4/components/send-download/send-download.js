@@ -397,7 +397,9 @@ class SendDownload extends HTMLElement {
             this.transparencyData = {
                 download_timestamp: new Date().toISOString(),
                 file_size_bytes:    this.transferInfo.file_size_bytes,
-                not_stored:         ['file_name', 'file_content', 'decryption_key']
+                encryption_method:  'AES-256-GCM',
+                encrypted:          ['file_name', 'file_content'],
+                not_stored:         ['decryption_key', 'raw_ip']
             };
             this.state = 'complete'; this.render(); this.setupEventListeners();
 
