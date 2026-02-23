@@ -101,6 +101,51 @@ class test_Service__Vault(TestCase):
         result = self.service.get_index('bad-key')
         assert result is None
 
+    # ═══════════════════════════════════════════════════════════════════════
+    # Chunked File Upload
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def test__35__store_file_chunk(self):
+        chunk_0 = b'chunk-zero-data-aaa'
+        chunk_1 = b'chunk-one-data-bbb'
+        result_0 = self.service.store_file_chunk(self.vault_key, 'big-file', 0, chunk_0)
+        result_1 = self.service.store_file_chunk(self.vault_key, 'big-file', 1, chunk_1)
+        assert result_0 is not None
+        assert result_1 is not None
+
+    def test__36__assemble_file(self):
+        result = self.service.assemble_file(self.vault_key, 'big-file', 2)
+        assert result is not None
+        assert result['status']    == 'assembled'
+        assert result['file_guid'] == 'big-file'
+        assert result['size']      == len(b'chunk-zero-data-aaa') + len(b'chunk-one-data-bbb')
+
+        # Verify assembled file is readable
+        data = self.service.get_file(self.vault_key, 'big-file')
+        assert data is not None
+        if isinstance(data, (bytes, bytearray)):
+            assert data == b'chunk-zero-data-aaachunk-one-data-bbb'
+
+    def test__37__assemble_file__missing_chunk(self):
+        # Store only 1 of 2 expected chunks
+        self.service.store_file_chunk(self.vault_key, 'partial-file', 0, b'only-this')
+        result = self.service.assemble_file(self.vault_key, 'partial-file', 2)
+        assert result is not None
+        assert result.get('error') == 'missing_chunk'
+        assert result.get('chunk_index') == 1
+
+    def test__38__store_file_chunk__vault_not_found(self):
+        result = self.service.store_file_chunk('bad-key', 'f001', 0, b'data')
+        assert result is None
+
+    def test__39__assemble_file__vault_not_found(self):
+        result = self.service.assemble_file('bad-key', 'f001', 1)
+        assert result is None
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Bulk Operations
+    # ═══════════════════════════════════════════════════════════════════════
+
     def test__40__list_all(self):
         result = self.service.list_all(self.vault_key)
         assert result is not None

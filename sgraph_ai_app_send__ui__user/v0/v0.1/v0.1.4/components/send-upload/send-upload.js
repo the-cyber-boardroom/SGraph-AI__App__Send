@@ -36,6 +36,21 @@ class SendUpload extends HTMLElement {
         this.render();
         this.setupEventListeners();
         document.addEventListener('locale-changed', this._localeHandler);
+        this._checkCapabilities();
+    }
+
+    async _checkCapabilities() {
+        try {
+            const caps = await ApiClient.getCapabilities();
+            this._capabilities = caps;
+            if (caps.presigned_upload || caps.multipart_upload) {
+                SendUpload.MAX_FILE_SIZE = SendUpload.MAX_FILE_SIZE_PRESIGNED;
+            } else {
+                SendUpload.MAX_FILE_SIZE = SendUpload.MAX_FILE_SIZE_DIRECT;
+            }
+            // Re-render to update size limit display
+            if (this.state === 'idle') { this.render(); this.setupEventListeners(); }
+        } catch (e) { /* keep default 5MB limit */ }
     }
 
     disconnectedCallback() {
@@ -86,7 +101,7 @@ class SendUpload extends HTMLElement {
                 <div class="drop-zone__label">${this.escapeHtml(this.t('upload.drop_zone.label'))}</div>
                 <div class="drop-zone__hint">${this.escapeHtml(this.t('upload.drop_zone.hint'))}</div>
                 <div class="drop-zone__hint" style="margin-top: 0.5rem;">${this.escapeHtml(this.t('upload.drop_zone.encrypted_hint'))}</div>
-                <div class="drop-zone__hint" style="margin-top: 0.25rem; font-size: 0.75rem; opacity: 0.7;">${this.escapeHtml(this.t('upload.drop_zone.size_limit'))}</div>
+                <div class="drop-zone__hint" style="margin-top: 0.25rem; font-size: 0.75rem; opacity: 0.7;">${this.escapeHtml(this.t('upload.drop_zone.size_limit', { limit: this.formatBytes(SendUpload.MAX_FILE_SIZE) }))}</div>
                 <input type="file" id="file-input" style="display: none;">
             </div>
         `;
@@ -132,7 +147,9 @@ class SendUpload extends HTMLElement {
         `;
     }
 
-    static MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+    static MAX_FILE_SIZE_DIRECT   = 5 * 1024 * 1024;   // 5 MB — Lambda body limit
+    static MAX_FILE_SIZE_PRESIGNED = 1024 * 1024 * 1024; // 1 GB — presigned S3 upload
+    static MAX_FILE_SIZE = 5 * 1024 * 1024;              // Dynamic — updated by capabilities check
 
     static PROGRESS_STAGES = {
         'reading':    { label: 'upload.progress.reading',    pct: 10 },
@@ -394,7 +411,7 @@ class SendUpload extends HTMLElement {
             textValue = ti.value;
         } else if (!this.selectedFile) { return;
         } else if (this.selectedFile.size > SendUpload.MAX_FILE_SIZE) {
-            this.errorMessage = this.t('upload.error.file_too_large');
+            this.errorMessage = this.t('upload.error.file_too_large', { limit: this.formatBytes(SendUpload.MAX_FILE_SIZE) });
             this.state = 'error'; this.render(); this.setupEventListeners(); return;
         }
 
@@ -427,7 +444,15 @@ class SendUpload extends HTMLElement {
 
             this.state = 'uploading'; this.render();
 
-            await ApiClient.uploadPayload(createResult.transfer_id, encrypted);
+            const usePresigned = encrypted.byteLength > SendUpload.MAX_FILE_SIZE_DIRECT
+                              && this._capabilities
+                              && this._capabilities.multipart_upload;
+
+            if (usePresigned) {
+                await this._uploadViaPresigned(createResult.transfer_id, encrypted);
+            } else {
+                await ApiClient.uploadPayload(createResult.transfer_id, encrypted);
+            }
 
             this.state = 'completing'; this.render();
 
@@ -450,6 +475,45 @@ class SendUpload extends HTMLElement {
             if (err.message === 'ACCESS_TOKEN_INVALID') { document.dispatchEvent(new CustomEvent('access-token-invalid')); return; }
             this.errorMessage = err.message || this.t('upload.error.upload_failed');
             this.state = 'error'; this.render(); this.setupEventListeners();
+        }
+    }
+
+    // ─── Presigned Multipart Upload ──────────────────────────────────────
+
+    async _uploadViaPresigned(transferId, encrypted) {
+        const partSize = (this._capabilities && this._capabilities.max_part_size) || (10 * 1024 * 1024);
+        const numParts = Math.ceil(encrypted.byteLength / partSize);
+
+        // 1. Initiate multipart upload
+        const initResult = await ApiClient.initiateMultipart(transferId, encrypted.byteLength, numParts);
+        const uploadId   = initResult.upload_id;
+        const partUrls   = initResult.part_urls;
+
+        try {
+            // 2. Upload each part directly to S3
+            const completedParts = [];
+            for (let i = 0; i < partUrls.length; i++) {
+                const start   = i * partSize;
+                const end     = Math.min(start + partSize, encrypted.byteLength);
+                const partBuf = encrypted.slice(start, end);
+
+                const etag = await ApiClient.uploadPart(partUrls[i].upload_url, partBuf);
+                completedParts.push({ part_number: partUrls[i].part_number, etag });
+
+                // Update progress (uploading stage spans 70-90%)
+                const partPct = Math.round(70 + (20 * (i + 1) / partUrls.length));
+                const bar = this.querySelector('.progress-bar__fill');
+                if (bar) bar.style.width = `${partPct}%`;
+                const label = this.querySelector('.progress-bar__fill')?.parentElement?.previousElementSibling;
+                if (label) label.textContent = this.t('upload.progress.uploading_part', { current: i + 1, total: partUrls.length });
+            }
+
+            // 3. Complete multipart upload
+            await ApiClient.completeMultipart(transferId, uploadId, completedParts);
+        } catch (err) {
+            // Best-effort abort on failure
+            await ApiClient.abortMultipart(transferId, uploadId);
+            throw err;
         }
     }
 

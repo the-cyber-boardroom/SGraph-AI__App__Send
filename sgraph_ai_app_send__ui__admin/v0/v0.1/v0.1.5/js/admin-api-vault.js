@@ -73,6 +73,40 @@
         return this._get(`/vault/files/${encodeURIComponent(vaultCacheKey)}`);
     };
 
+    // --- Chunked File Upload (for files > ~4MB) ---
+
+    /**
+     * Upload a single chunk of an encrypted file.
+     * @param {string} vaultCacheKey
+     * @param {string} fileGuid
+     * @param {number} chunkIndex   — 0-based
+     * @param {number} totalChunks
+     * @param {string} chunkDataB64 — base64-encoded encrypted chunk
+     */
+    adminAPI.vaultStoreFileChunk = function(vaultCacheKey, fileGuid, chunkIndex, totalChunks, chunkDataB64) {
+        return this._post('/vault/file-chunk', {
+            vault_cache_key : vaultCacheKey,
+            file_guid       : fileGuid,
+            chunk_index     : chunkIndex,
+            total_chunks    : totalChunks,
+            chunk_data      : chunkDataB64
+        });
+    };
+
+    /**
+     * Assemble previously uploaded chunks into a single file.
+     * @param {string} vaultCacheKey
+     * @param {string} fileGuid
+     * @param {number} totalChunks
+     */
+    adminAPI.vaultAssembleFile = function(vaultCacheKey, fileGuid, totalChunks) {
+        return this._post('/vault/file-assemble', {
+            vault_cache_key : vaultCacheKey,
+            file_guid       : fileGuid,
+            total_chunks    : totalChunks
+        });
+    };
+
     // --- Index Operations ---
 
     adminAPI.vaultStoreIndex = function(vaultCacheKey, encryptedIndexB64) {
