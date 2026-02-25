@@ -5,6 +5,7 @@
 
 import base64
 import hashlib
+import json
 from fastapi                                                                     import HTTPException, Request, Response
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
@@ -65,6 +66,18 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Access token required')
         return provided_token
 
+    def unwrap_mcp_payload(self, body: bytes) -> bytes:                           # Decode JSON-wrapped base64 from MCP clients
+        """MCP tools communicate via JSON, so binary data arrives as {"data": "<base64>"}.
+        Browser uploads send raw bytes. Detect and unwrap the MCP format."""
+        if body and body[:1] == b'{':
+            try:
+                parsed = json.loads(body)
+                if isinstance(parsed, dict) and 'data' in parsed:
+                    return base64.b64decode(parsed['data'])
+            except (json.JSONDecodeError, Exception):
+                pass
+        return body
+
     # todo: return type should be Schema__Transfer__Initiated (not raw dict)
     # todo: sender_ip should be extracted from Request object, not hardcoded empty string
     def create(self, request: Schema__Transfer__Create,                           # POST /transfers/create
@@ -84,6 +97,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                  ) -> dict:
         self.check_access_token(request, access_token)
         body    = await request.body()
+        body    = self.unwrap_mcp_payload(body)                                # Decode JSON-wrapped base64 from MCP clients
         success = self.transfer_service.upload_payload(transfer_id  = transfer_id,
                                                        payload_bytes = body      )
         if success is False:
