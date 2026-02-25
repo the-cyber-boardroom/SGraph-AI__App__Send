@@ -27,6 +27,7 @@ from sgraph_ai_app_send.lambda__admin.admin__config                             
 from sgraph_ai_app_send.lambda__admin.server_analytics.Routes__Metrics              import Routes__Metrics
 from sgraph_ai_app_send.lambda__admin.server_analytics.Service__Metrics__Cache      import Service__Metrics__Cache
 from sgraph_ai_app_send.lambda__admin.server_analytics.Metrics__Pipeline__Setup     import create_metrics_cache, create_metrics_cache_with_stub
+from sgraph_ai_app_send.utils.MCP__Setup                                            import MCP__Setup
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
 ROUTES_PATHS__ANALYTICS = ['/health/pulse']
@@ -105,6 +106,13 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         # if self.send_cache_client is not None:                                      # Record admin traffic for Analytics Pulse  # disabled: creates 5 files per request, caused 65k+ file buildup — redesign needed
         #     self.app().add_middleware(Middleware__Analytics,
         #                              send_cache_client = self.send_cache_client)
+
+        self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
+
+    def setup_mcp(self):                                                              # Mount MCP server on /mcp endpoint
+        mcp_setup = MCP__Setup(name         = 'sgraph-send-admin'                   ,
+                               include_tags = ['tokens', 'keys', 'vault', 'users']  )
+        self.mcp = mcp_setup.mount_mcp(self.app())
 
     def setup_pulse_route(self):                                                  # Register /health/pulse directly (no tag prefix)
         send_cache_client = self.send_cache_client

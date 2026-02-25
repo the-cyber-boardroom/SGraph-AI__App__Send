@@ -5,6 +5,8 @@
 
 from osbot_utils.type_safe.Type_Safe import Type_Safe
 
+ROUTES_PATHS__MCP = ['/mcp']
+
 class MCP__Setup(Type_Safe):
     name         : str  = ""
     include_tags : list = None

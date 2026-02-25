@@ -11,6 +11,7 @@ from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens            
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                import ROUTES_PATHS__KEYS
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault              import ROUTES_PATHS__VAULT
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Users             import ROUTES_PATHS__USERS
+from sgraph_ai_app_send.utils.MCP__Setup                                            import ROUTES_PATHS__MCP
 from tests.unit.lambda__admin.Fast_API__Test_Objs__SGraph__App__Send__Admin         import TEST_API_KEY__NAME, Fast_API__Test_Objs__SGraph__App__Send__Admin, \
     setup__html_graph_service__fast_api_test_objs
 
@@ -64,7 +65,8 @@ class test_Fast_API__SGraph__App__Send__Admin(TestCase):
                                 ROUTES_PATHS__VAULT                   +
                                 ROUTES_PATHS__USERS                   +
                                 ROUTES_PATHS__ANALYTICS               +
-                                ROUTES_PATHS__CACHE                   )
+                                ROUTES_PATHS__CACHE                   +
+                                ROUTES_PATHS__MCP                     )
 
         for fast_api_path in self.fast_api.routes_paths():
             fast_api_paths.append(str(fast_api_path))               # cast to str to make it easier compare
