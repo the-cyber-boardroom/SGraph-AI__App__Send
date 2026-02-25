@@ -110,8 +110,9 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
 
     def setup_mcp(self):                                                              # Mount MCP server on /mcp endpoint
-        mcp_setup = MCP__Setup(name         = 'sgraph-send-admin'                   ,
-                               include_tags = ['tokens', 'keys', 'vault', 'users']  )
+        mcp_setup = MCP__Setup(name         = 'sgraph-send-admin'                         ,
+                               include_tags = ['tokens', 'keys', 'vault', 'users']        ,
+                               stateless    = True                                        )  # Lambda-compatible: no session state, authless discovery
         self.mcp = mcp_setup.mount_mcp(self.app())
 
     def setup_pulse_route(self):                                                  # Register /health/pulse directly (no tag prefix)
