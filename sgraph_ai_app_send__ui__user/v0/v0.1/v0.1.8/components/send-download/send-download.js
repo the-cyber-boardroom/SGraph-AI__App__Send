@@ -6,9 +6,12 @@
      - startDownload: intercepts saveFile to prevent auto-download for
        previewable content (images, markdown, PDF, code)
      - renderComplete: two-column layout — details (1/3) + preview (2/3)
+     - renderTransferInfo: hidden in preview mode (details panel shows same info)
      - Resizable divider between panels (drag to resize, persisted)
      - Prominent "Save Locally" button (no auto-download for previews)
-     - <main> expands to full width when preview is active
+     - send-download element breaks out of main for full-width preview
+     - Non-preview siblings (CTA, disclaimer) stay constrained at 720px
+     - Transparency panel: compact, sentence-case sections with left accent bar
      - Mobile responsive: stacks vertically on narrow screens
      - Markdown rendered via MarkdownParser in sandboxed iframe
      - Image files displayed inline as object URLs
@@ -21,12 +24,51 @@
 (function() {
     'use strict';
 
-    // ─── Inject responsive styles (once) ─────────────────────────────
+    // ─── Inject responsive + transparency styles (once) ─────────────
 
     if (!document.getElementById('v018-preview-styles')) {
         const style = document.createElement('style');
         style.id = 'v018-preview-styles';
         style.textContent = `
+            /* Keep non-preview siblings centred when main expands */
+            main.preview-expanded > *:not(send-download) {
+                max-width: 672px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            /* Compact transparency panel inside the details sidebar */
+            #details-panel .transparency {
+                padding: var(--space-3, 12px) var(--space-4, 16px);
+            }
+            #details-panel .transparency__title {
+                font-size: var(--text-small, 0.8rem);
+                margin-bottom: var(--space-2, 0.5rem);
+            }
+            #details-panel .transparency__section-label {
+                text-transform: none;
+                font-size: var(--text-small, 0.8rem);
+                letter-spacing: normal;
+                color: var(--accent, #4ECDC4);
+                border-left: 2px solid var(--accent, #4ECDC4);
+                padding-left: var(--space-2, 0.5rem);
+                margin-top: var(--space-3, 0.75rem);
+                margin-bottom: var(--space-1, 0.25rem);
+            }
+            #details-panel .transparency__row {
+                padding: 2px 0;
+                font-size: var(--text-small, 0.8rem);
+            }
+            #details-panel .transparency__value {
+                font-size: var(--text-small, 0.8rem);
+            }
+            #details-panel .transparency__footer {
+                font-size: var(--text-small, 0.8rem);
+                margin-top: var(--space-2, 0.5rem);
+                padding-top: var(--space-2, 0.5rem);
+            }
+
+            /* Mobile: stack vertically */
             @media (max-width: 768px) {
                 #preview-split {
                     grid-template-columns: 1fr !important;
@@ -40,6 +82,18 @@
         `;
         document.head.appendChild(style);
     }
+
+    // ─── Override renderTransferInfo — hide in preview mode ────────
+    //     The details panel already shows filename, type, size, date.
+
+    const _origRenderTransferInfo = SendDownload.prototype.renderTransferInfo;
+
+    SendDownload.prototype.renderTransferInfo = function() {
+        if (this.state === 'complete' && this._renderType && this._renderType !== 'text') {
+            return '';
+        }
+        return _origRenderTransferInfo.call(this);
+    };
 
     // ─── Override startDownload — intercept saveFile for previewable types
 
@@ -93,22 +147,24 @@
         }
     };
 
-    // ─── Override render — expand <main> for preview mode ────────────
+    // ─── Override render — expand main + constrain siblings ────────
 
     const _origRender = SendDownload.prototype.render;
 
     SendDownload.prototype.render = function() {
         _origRender.call(this);
 
-        // Expand <main> when showing a two-column preview
+        const isPreview = this.state === 'complete' && this._renderType && this._renderType !== 'text';
         const main = this.closest('main');
         if (main) {
-            if (this.state === 'complete' && this._renderType && this._renderType !== 'text') {
+            if (isPreview) {
                 main.style.maxWidth = 'calc(100vw - 2rem)';
                 main.style.width    = '100%';
+                main.classList.add('preview-expanded');
             } else {
                 main.style.maxWidth = '';
                 main.style.width    = '';
+                main.classList.remove('preview-expanded');
             }
         }
     };
@@ -619,11 +675,12 @@
             this._resizeCleanup();
             this._resizeCleanup = null;
         }
-        // Restore main width
+        // Restore main width + class
         const main = this.closest('main');
         if (main) {
             main.style.maxWidth = '';
             main.style.width    = '';
+            main.classList.remove('preview-expanded');
         }
         _origCleanup.call(this);
     };
