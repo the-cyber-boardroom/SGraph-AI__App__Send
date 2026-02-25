@@ -105,7 +105,15 @@
                 return;
             }
 
-            // Check for room key
+            // Check for room key (RoomCrypto must be loaded)
+            if (typeof RoomCrypto === 'undefined') {
+                console.error('[room-view] RoomCrypto not loaded — check script order');
+                this._state = 'ready';                 // proceed without encryption
+                this.render();
+                await this._loadFiles();
+                return;
+            }
+
             const keyHex = sessionStorage.getItem('sg_room_key');
             if (keyHex) {
                 try {
@@ -423,24 +431,28 @@
 
         _renderReady() {
             const s        = this._session;
-            const canWrite = s.permission === 'editor' || s.permission === 'owner';
+            const perm     = (s.permission || '').toLowerCase();
+            const canWrite = perm === 'editor' || perm === 'owner';
+            const hasKey   = !!this._roomKey;
             const fileRows = this._files.map(f => this._renderFileRow(f)).join('');
 
             return `
                 <div class="room-header">
                     <div class="room-title-row">
                         <h2 class="room-name">${escapeHtml(s.room_name || 'Data Room')}</h2>
-                        <span class="perm-badge perm-badge--${s.permission || 'viewer'}">${escapeHtml(s.permission || 'viewer')}</span>
+                        <span class="perm-badge perm-badge--${perm || 'viewer'}">${escapeHtml(s.permission || 'viewer')}</span>
                     </div>
                     <div class="room-meta">
                         <span class="meta-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             ${escapeHtml(s.user_id)}
                         </span>
-                        <span class="meta-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-                            Key: ${escapeHtml(this._roomKeyHex.substring(0, 8))}...
-                        </span>
+                        ${hasKey ? `
+                            <span class="meta-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                                Key: ${escapeHtml(this._roomKeyHex.substring(0, 8))}...
+                            </span>
+                        ` : ''}
                         <span class="meta-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                             Expires ${s.expires ? new Date(s.expires).toLocaleString() : 'in 24h'}
@@ -450,13 +462,31 @@
 
                 ${this._error ? `<div class="error-bar">${escapeHtml(this._error)}</div>` : ''}
 
+                ${!hasKey ? `
+                    <div class="key-banner">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                        </svg>
+                        <div class="key-banner-text">
+                            <strong>No encryption key set</strong>
+                            <span>Set a room key to encrypt/decrypt files and see file names.</span>
+                        </div>
+                        <form class="key-banner-form" id="form-key-inline">
+                            <input id="input-room-key-inline" type="text" class="input-key-inline"
+                                   placeholder="Paste 64-char hex key or leave empty to generate"
+                                   autocomplete="off" spellcheck="false">
+                            <button type="submit" class="btn btn--primary btn--sm">Set Key</button>
+                        </form>
+                    </div>
+                ` : ''}
+
                 <div class="vault-section">
                     <div class="section-header">
                         <h3 class="section-title">Files</h3>
                         <span class="file-count">${this._files.length} file${this._files.length !== 1 ? 's' : ''}</span>
                     </div>
 
-                    ${canWrite ? `
+                    ${canWrite && hasKey ? `
                         <div class="upload-zone" id="upload-zone">
                             <input type="file" id="file-input" multiple hidden>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32" stroke-linecap="round" stroke-linejoin="round">
@@ -467,6 +497,8 @@
                             <p>${this._uploading ? 'Uploading...' : 'Drop files here or click to upload'}</p>
                             <p class="upload-hint">Files are encrypted with the room key before upload</p>
                         </div>
+                    ` : canWrite && !hasKey ? `
+                        <div class="upload-disabled-hint">Set a room key above to enable file upload</div>
                     ` : ''}
 
                     ${this._files.length === 0 ? `
@@ -553,7 +585,7 @@
                 btn.addEventListener('click', () => this._handleDownload(btn.dataset.guid));
             });
 
-            // Key form
+            // Key form (need-key screen)
             const formKey = this.shadowRoot.querySelector('#form-key');
             if (formKey) {
                 formKey.addEventListener('submit', (e) => this._handleSetKey(e));
@@ -563,6 +595,36 @@
                         const wrap = this.shadowRoot.querySelector('#key-input-wrap');
                         if (wrap) wrap.style.display = radio.value === 'generate' ? 'none' : 'block';
                     });
+                });
+            }
+
+            // Inline key form (ready state, no key banner)
+            const formKeyInline = this.shadowRoot.querySelector('#form-key-inline');
+            if (formKeyInline) {
+                formKeyInline.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const input  = this.shadowRoot.querySelector('#input-room-key-inline');
+                    let keyHex   = (input ? input.value.trim() : '').toLowerCase().replace(/[^0-9a-f]/g, '');
+
+                    if (!keyHex && typeof RoomCrypto !== 'undefined') {
+                        // Empty input → generate new key
+                        keyHex = RoomCrypto.generateRoomKey();
+                    }
+
+                    if (keyHex.length !== 64) {
+                        this._showStatus('error', 'Key must be 64 hex characters (or leave empty to generate)');
+                        return;
+                    }
+
+                    try {
+                        this._roomKey    = await RoomCrypto.importKey(keyHex);
+                        this._roomKeyHex = keyHex;
+                        sessionStorage.setItem('sg_room_key', keyHex);
+                        this._showStatus('success', 'Room key set. Reloading files...');
+                        await this._loadFiles();
+                    } catch (err) {
+                        this._showStatus('error', 'Invalid key: ' + err.message);
+                    }
                 });
             }
 
@@ -792,6 +854,74 @@
                     gap: var(--space-1, 4px);
                     font-size: var(--text-small, 0.8rem);
                     color: var(--color-text-secondary, #8892A0);
+                }
+
+                /* --- Key Banner (inline, ready state) --- */
+
+                .key-banner {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: var(--space-3, 12px);
+                    padding: var(--space-4, 16px);
+                    margin-bottom: var(--space-4, 16px);
+                    background: rgba(224, 124, 79, 0.08);
+                    border: 1px solid rgba(224, 124, 79, 0.2);
+                    border-radius: var(--radius, 8px);
+                    color: var(--color-warning, #E07C4F);
+                }
+
+                .key-banner svg { flex-shrink: 0; }
+
+                .key-banner-text {
+                    flex: 1;
+                    min-width: 180px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+
+                .key-banner-text strong {
+                    font-size: var(--text-small, 0.8rem);
+                    color: var(--color-text, #E0E0E0);
+                }
+
+                .key-banner-text span {
+                    font-size: var(--text-micro, 0.625rem);
+                    color: var(--color-text-secondary, #8892A0);
+                }
+
+                .key-banner-form {
+                    display: flex;
+                    gap: var(--space-2, 8px);
+                    width: 100%;
+                }
+
+                .input-key-inline {
+                    flex: 1;
+                    padding: var(--space-2, 8px) var(--space-3, 12px);
+                    font-family: var(--font-mono, monospace);
+                    font-size: var(--text-micro, 0.625rem);
+                    color: var(--color-text, #E0E0E0);
+                    background: var(--bg-secondary, #16213E);
+                    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+                    border-radius: var(--radius-sm, 6px);
+                    box-sizing: border-box;
+                }
+
+                .input-key-inline:focus {
+                    outline: none;
+                    border-color: var(--accent, #4ECDC4);
+                }
+
+                .upload-disabled-hint {
+                    text-align: center;
+                    padding: var(--space-4, 16px);
+                    margin-bottom: var(--space-4, 16px);
+                    font-size: var(--text-small, 0.8rem);
+                    color: var(--color-text-secondary, #8892A0);
+                    border: 1px dashed var(--color-border, rgba(78, 205, 196, 0.15));
+                    border-radius: var(--radius-md, 12px);
                 }
 
                 /* --- Upload Zone --- */
