@@ -174,10 +174,15 @@
             if (!vaultKey) { this._files = []; this.render(); return; }
 
             try {
-                // Load file list
-                const result = await VaultAPI.listAll(vaultKey);
-                if (result && result.files && typeof result.files === 'object') {
-                    // files is { guid: data, ... } — convert to array
+                // Load file list (files-only endpoint, not list-all which includes acl/index/folders)
+                const result = await VaultAPI.listFiles(vaultKey);
+                if (result && Array.isArray(result.files)) {
+                    // files is [ { data_file_id, data_key, ... }, ... ]
+                    this._files = result.files
+                        .filter(f => f.data_file_id)
+                        .map(f => ({ guid: f.data_file_id }));
+                } else if (result && result.files && typeof result.files === 'object') {
+                    // Fallback: dict format { guid: data, ... }
                     this._files = Object.keys(result.files).map(guid => ({ guid }));
                 } else {
                     this._files = [];
