@@ -7,6 +7,7 @@ from sgraph_ai_app_send.lambda__user.fast_api.Fast_API__SGraph__App__Send__User 
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import ROUTES_PATHS__TRANSFERS
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned             import ROUTES_PATHS__PRESIGNED
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                import ROUTES_PATHS__VAULT
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Join                 import ROUTES_PATHS__JOIN
 from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User           import Fast_API__Test_Objs__SGraph__App__Send__User, \
     setup__fast_api__user__test_objs
 
@@ -42,6 +43,7 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
                                 ROUTES_PATHS__TRANSFERS               +
                                 ROUTES_PATHS__PRESIGNED               +
                                 ROUTES_PATHS__VAULT                   +
+                                ROUTES_PATHS__JOIN                    +
                                 ROUTES_PATHS__APP_SEND__STATIC__USER  +
                                 ROUTES_PATHS__SET_COOKIE              )
 

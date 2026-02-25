@@ -19,6 +19,11 @@ from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics             
 from sgraph_ai_app_send.lambda__admin.service.Service__Vault                        import Service__Vault
 from sgraph_ai_app_send.lambda__admin.service.Service__Vault__ACL                  import Service__Vault__ACL
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                 import Routes__Vault
+from sgraph_ai_app_send.lambda__admin.service.Service__Data_Room                   import Service__Data_Room
+from sgraph_ai_app_send.lambda__admin.service.Service__Invites                     import Service__Invites
+from sgraph_ai_app_send.lambda__admin.service.Service__Room__Session               import Service__Room__Session
+from sgraph_ai_app_send.lambda__admin.service.Service__Audit                       import Service__Audit
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Join                  import Routes__Join
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
 from sgraph_ai_app_send.lambda__user.user__config                                   import HEADER__SGRAPH_SEND__ACCESS_TOKEN
@@ -94,6 +99,23 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             except Exception:
                 self.service_vault_acl = None
 
+        # Data room services (invites, sessions, audit — for join flow)
+        self.service_data_room  = None
+        self.service_invites    = None
+        self.service_session    = None
+        self.service_audit      = None
+        if self.send_cache_client is not None:
+            try:
+                self.service_data_room = Service__Data_Room(send_cache_client=self.send_cache_client)
+                self.service_invites   = Service__Invites(send_cache_client=self.send_cache_client,
+                                                          service_data_room=self.service_data_room)
+                self.service_session   = Service__Room__Session(send_cache_client=self.send_cache_client)
+                self.service_audit     = Service__Audit(send_cache_client=self.send_cache_client)
+            except Exception:
+                self.service_invites = None
+                self.service_session = None
+                self.service_audit   = None
+
         return super().setup()
 
 
@@ -120,6 +142,11 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             self.add_routes(Routes__Vault          ,
                             service_vault     = self.service_vault     ,
                             service_vault_acl = self.service_vault_acl )
+        if self.service_invites is not None:                                     # Add join routes if invite service available
+            self.add_routes(Routes__Join           ,
+                            service_invites = self.service_invites ,
+                            service_session = self.service_session ,
+                            service_audit   = self.service_audit   )
         self.add_routes(Routes__Set_Cookie)
 
         # if self.send_cache_client is not None:                                      # Add analytics middleware if cache client available  # disabled: creates 5 files per request, caused 65k+ file buildup — redesign needed
