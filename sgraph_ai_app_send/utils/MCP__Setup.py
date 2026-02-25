@@ -54,10 +54,11 @@ class MCP__Http__Stateless(FastApiHttpSessionManager):
 
 
 class MCP__Setup(Type_Safe):
-    name         : str  = ""
-    include_tags : list = None
-    exclude_tags : list = None
-    stateless    : bool = False                                                        # Lambda-compatible stateless mode
+    name            : str  = ""
+    include_tags    : list = None
+    exclude_tags    : list = None
+    forward_headers : list = None                                                      # Header names to forward from MCP request to tool calls
+    stateless       : bool = False                                                     # Lambda-compatible stateless mode
 
     def mount_mcp(self, fast_api_app):
         from fastapi_mcp import FastApiMCP
@@ -69,6 +70,8 @@ class MCP__Setup(Type_Safe):
             kwargs['include_tags'] = self.include_tags
         if self.exclude_tags is not None:
             kwargs['exclude_tags'] = self.exclude_tags
+        if self.forward_headers is not None:
+            kwargs['headers'] = self.forward_headers
         mcp = FastApiMCP(**kwargs)
         if self.stateless:
             self._mount_stateless(fast_api_app, mcp)
