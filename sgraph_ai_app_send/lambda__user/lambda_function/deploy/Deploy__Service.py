@@ -1,3 +1,5 @@
+from mgraph_ai_service_cache_client.schemas.consts.const__Fast_API import ENV_VAR__CACHE__SERVICE__BUCKET_NAME
+
 import sgraph_ai_app_send__ui__user
 from osbot_fast_api_serverless.deploy.Deploy__Serverless__Fast_API          import Deploy__Serverless__Fast_API
 from osbot_utils.utils.Env                                                  import get_env
@@ -16,6 +18,9 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL      , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL      ))
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME  ))
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE, get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE ))
+            _.set_env_variable(ENV_VAR__CACHE__SERVICE__BUCKET_NAME       , get_env(ENV_VAR__CACHE__SERVICE__BUCKET_NAME        ))
+
+
             return _
 
     def handler(self):
