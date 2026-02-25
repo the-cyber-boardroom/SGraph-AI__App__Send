@@ -14,6 +14,10 @@ NS_COSTS      = 'costs'                                                    # AWS
 NS_TRANSFERS  = 'transfers'                                                # Per-transfer analytics summaries
 NS_KEYS       = 'keys'                                                     # Public key registry entries
 NS_USERS      = 'users'                                                     # User identity records
+NS_ROOMS      = 'rooms'                                                     # Data room metadata
+NS_INVITES    = 'invites'                                                   # Data room invite codes
+NS_AUDIT      = 'audit'                                                     # Immutable audit trail
+NS_SESSIONS   = 'sessions'                                                  # Room-scoped session tokens
 
 
 class Send__Cache__Client(Type_Safe):                                      # Cache service client wrapper for SGraph Send
@@ -326,3 +330,182 @@ class Send__Cache__Client(Type_Safe):                                      # Cac
                 cache_id  = cache_id ,
                 namespace = NS_USERS )
         return None
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Room Operations (Data Room entity)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def room__create(self, room_data):                                        # Create a new room via KEY_BASED strategy
+        room_id = room_data.get('room_id', '')
+        result = self.cache_client.store().store__json__cache_key(
+            namespace       = NS_ROOMS         ,
+            strategy        = 'key_based'      ,
+            cache_key       = room_id          ,
+            file_id         = room_id          ,
+            body            = room_data        ,
+            json_field_path = 'room_id'        )
+        if result and hasattr(result, 'cache_id'):
+            return result
+        return None
+
+    def room__lookup(self, room_id):                                          # Find room by room_id (hash lookup)
+        cache_hash = self.hash_generator.from_string(room_id)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_ROOMS        )
+        if response and response.get('cache_id'):
+            cache_id = response.get('cache_id')
+            return self.cache_client.retrieve().retrieve__cache_id__json(
+                cache_id  = cache_id  ,
+                namespace = NS_ROOMS  )
+        return None
+
+    def room__lookup_cache_id(self, room_id):                                 # Get cache_id for a room by room_id
+        cache_hash = self.hash_generator.from_string(room_id)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_ROOMS        )
+        if response:
+            return response.get('cache_id')
+        return None
+
+    def room__update(self, cache_id, room_data):                              # Update room data
+        return self.cache_client.update().update__json(
+            cache_id  = cache_id   ,
+            namespace = NS_ROOMS   ,
+            body      = room_data  )
+
+    def room__list_all(self):                                                 # List all room IDs from storage
+        return self.cache_client.admin_storage().folders(
+            path             = f'{NS_ROOMS}/data/key-based/' ,
+            return_full_path = False                          ,
+            recursive        = False                          ) or []
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Invite Operations (Data Room invite codes)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def invite__create(self, invite_data):                                    # Create a new invite via KEY_BASED strategy
+        invite_code = invite_data.get('invite_code', '')
+        result = self.cache_client.store().store__json__cache_key(
+            namespace       = NS_INVITES       ,
+            strategy        = 'key_based'      ,
+            cache_key       = invite_code      ,
+            file_id         = invite_code      ,
+            body            = invite_data      ,
+            json_field_path = 'invite_code'    )
+        if result and hasattr(result, 'cache_id'):
+            return result
+        return None
+
+    def invite__lookup(self, invite_code):                                    # Find invite by code (hash lookup)
+        cache_hash = self.hash_generator.from_string(invite_code)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_INVITES      )
+        if response and response.get('cache_id'):
+            cache_id = response.get('cache_id')
+            return self.cache_client.retrieve().retrieve__cache_id__json(
+                cache_id  = cache_id    ,
+                namespace = NS_INVITES  )
+        return None
+
+    def invite__lookup_cache_id(self, invite_code):                           # Get cache_id for an invite by code
+        cache_hash = self.hash_generator.from_string(invite_code)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_INVITES      )
+        if response:
+            return response.get('cache_id')
+        return None
+
+    def invite__update(self, cache_id, invite_data):                          # Update invite data
+        return self.cache_client.update().update__json(
+            cache_id  = cache_id    ,
+            namespace = NS_INVITES  ,
+            body      = invite_data )
+
+    def invite__list_all(self):                                               # List all invite codes from storage
+        return self.cache_client.admin_storage().folders(
+            path             = f'{NS_INVITES}/data/key-based/' ,
+            return_full_path = False                            ,
+            recursive        = False                            ) or []
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Audit Operations (Immutable append-only event log)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def audit__append(self, audit_data):                                      # Append audit event via KEY_BASED strategy
+        event_id = audit_data.get('event_id', '')
+        result = self.cache_client.store().store__json__cache_key(
+            namespace       = NS_AUDIT        ,
+            strategy        = 'key_based'     ,
+            cache_key       = event_id        ,
+            file_id         = event_id        ,
+            body            = audit_data      ,
+            json_field_path = 'event_id'      )
+        if result and hasattr(result, 'cache_id'):
+            return result
+        return None
+
+    def audit__lookup(self, event_id):                                        # Retrieve audit event by event_id
+        cache_hash = self.hash_generator.from_string(event_id)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_AUDIT        )
+        if response and response.get('cache_id'):
+            cache_id = response.get('cache_id')
+            return self.cache_client.retrieve().retrieve__cache_id__json(
+                cache_id  = cache_id  ,
+                namespace = NS_AUDIT  )
+        return None
+
+    def audit__list_all(self):                                                # List all audit event IDs from storage
+        return self.cache_client.admin_storage().folders(
+            path             = f'{NS_AUDIT}/data/key-based/' ,
+            return_full_path = False                          ,
+            recursive        = False                          ) or []
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Session Operations (Room-scoped session tokens)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def session__create(self, session_data):                                  # Create a new session via KEY_BASED strategy
+        session_token = session_data.get('session_token', '')
+        result = self.cache_client.store().store__json__cache_key(
+            namespace       = NS_SESSIONS        ,
+            strategy        = 'key_based'        ,
+            cache_key       = session_token      ,
+            file_id         = session_token      ,
+            body            = session_data       ,
+            json_field_path = 'session_token'    )
+        if result and hasattr(result, 'cache_id'):
+            return result
+        return None
+
+    def session__lookup(self, session_token):                                 # Find session by token (hash lookup)
+        cache_hash = self.hash_generator.from_string(session_token)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_SESSIONS     )
+        if response and response.get('cache_id'):
+            cache_id = response.get('cache_id')
+            return self.cache_client.retrieve().retrieve__cache_id__json(
+                cache_id  = cache_id    ,
+                namespace = NS_SESSIONS )
+        return None
+
+    def session__lookup_cache_id(self, session_token):                        # Get cache_id for a session by token
+        cache_hash = self.hash_generator.from_string(session_token)
+        response   = self.cache_client.retrieve().retrieve__hash__cache_hash__cache_id(
+            cache_hash = str(cache_hash) ,
+            namespace  = NS_SESSIONS     )
+        if response:
+            return response.get('cache_id')
+        return None
+
+    def session__update(self, cache_id, session_data):                        # Update session data
+        return self.cache_client.update().update__json(
+            cache_id  = cache_id     ,
+            namespace = NS_SESSIONS  ,
+            body      = session_data )

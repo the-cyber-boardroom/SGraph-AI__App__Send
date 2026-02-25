@@ -6,14 +6,15 @@ from osbot_fast_api.api.Fast_API                                                
 from osbot_fast_api.api.schemas.consts.consts__Fast_API                             import EXPECTED_ROUTES__SET_COOKIE
 from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE, ROUTES_PATHS__INFO
 from sgraph_ai_app_send.lambda__admin.fast_api.Fast_API__SGraph__App__Send__Admin   import Fast_API__SGraph__App__Send__Admin, ROUTES_PATHS__APP_SEND__STATIC__ADMIN, ROUTES_PATHS__ANALYTICS
-from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser import ROUTES_PATHS__CACHE
-from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens               import ROUTES_PATHS__TOKENS
-from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                import ROUTES_PATHS__KEYS
-from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault              import ROUTES_PATHS__VAULT
-from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Users             import ROUTES_PATHS__USERS
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser        import ROUTES_PATHS__CACHE
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import ROUTES_PATHS__TOKENS
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                  import ROUTES_PATHS__KEYS
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                 import ROUTES_PATHS__VAULT
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Users                 import ROUTES_PATHS__USERS
 from sgraph_ai_app_send.utils.MCP__Setup                                            import ROUTES_PATHS__MCP
-from tests.unit.lambda__admin.Fast_API__Test_Objs__SGraph__App__Send__Admin         import TEST_API_KEY__NAME, Fast_API__Test_Objs__SGraph__App__Send__Admin, \
-    setup__html_graph_service__fast_api_test_objs
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Data_Room             import ROUTES_PATHS__ROOMS
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Invites               import ROUTES_PATHS__INVITES
+from tests.unit.lambda__admin.Fast_API__Test_Objs__SGraph__App__Send__Admin         import TEST_API_KEY__NAME, Fast_API__Test_Objs__SGraph__App__Send__Admin, setup__html_graph_service__fast_api_test_objs
 
 
 class test_Fast_API__SGraph__App__Send__Admin(TestCase):
@@ -64,6 +65,8 @@ class test_Fast_API__SGraph__App__Send__Admin(TestCase):
                                 ROUTES_PATHS__KEYS                    +
                                 ROUTES_PATHS__VAULT                   +
                                 ROUTES_PATHS__USERS                   +
+                                ROUTES_PATHS__ROOMS                   +
+                                ROUTES_PATHS__INVITES                 +
                                 ROUTES_PATHS__ANALYTICS               +
                                 ROUTES_PATHS__CACHE                   +
                                 ROUTES_PATHS__MCP                     )
