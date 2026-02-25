@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SG/Send — Join Data Room</title>
+    <meta name="description" content="Join an encrypted data room with your invite code. Files are encrypted end-to-end — the server never sees your data.">
+    <meta name="theme-color" content="#1A1A2E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../v0.1.0/css/common.css">
+    <link rel="stylesheet" href="../v0.1.6/css/sg-design-system.css">
+</head>
+<body class="theme-aurora">
+    <header>
+        <h1><span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span></h1>
+        <p class="header-tagline">Join Data Room</p>
+        <nav class="header-nav">
+            <a href="../v0.1.6/index.html" class="nav-link" title="Send a file">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Send
+            </a>
+            <a href="../v0.1.7/vault.html" class="nav-link" title="My Vault">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Vault
+            </a>
+        </nav>
+    </header>
+    <main>
+        <room-join></room-join>
+        <p class="disclaimer">Data rooms use end-to-end encryption. The server never sees plaintext.</p>
+    </main>
+    <!-- Join scripts -->
+    <script src="js/join-api.js"></script>
+    <script src="components/room-join/room-join.js"></script>
+</body>
+</html>
