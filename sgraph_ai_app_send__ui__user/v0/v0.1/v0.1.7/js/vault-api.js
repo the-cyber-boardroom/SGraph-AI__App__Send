@@ -137,5 +137,15 @@ const VaultAPI = {
 
     listAll(vaultCacheKey) {
         return this._get(`/vault/list-all/${encodeURIComponent(vaultCacheKey)}`);
+    },
+
+    // --- Room Invite (admin endpoint) ----------------------------------------
+
+    createInvite(roomId, permission, createdBy, maxUses) {
+        return this._post(`/rooms/invite/${encodeURIComponent(roomId)}`, {
+            permission : permission || 'viewer',
+            created_by : createdBy  || '',
+            max_uses   : maxUses    ?? 1
+        });
     }
 };
