@@ -48,6 +48,8 @@ class DataRoomManager extends HTMLElement {
         this._auditLoading   = false;
         this._lastInvite     = null;       // last created invite result
         this._inviteCreating = false;
+        this._enterRoomLink  = '';        // generated enter-room join link
+        this._enterCreating  = false;
     }
 
     connectedCallback() {
@@ -249,19 +251,65 @@ class DataRoomManager extends HTMLElement {
         this._renderDetail();
     }
 
+    // --- Enter Room (self-invite with room key) ----------------------------
+
+    async _handleEnterRoom() {
+        if (!this._selectedRoom || !this._roomDetail || this._enterCreating) return;
+
+        this._enterCreating = true;
+        this._enterRoomLink = '';
+        this._renderDetail();
+
+        try {
+            const owner  = this._roomDetail.owner_user_id || 'admin';
+            const result = await adminAPI.roomCreateInvite(this._selectedRoom, 'editor', owner, 1);
+
+            if (result && result.invite_code) {
+                // Generate a room key (32 random bytes → 64 hex chars)
+                const bytes  = crypto.getRandomValues(new Uint8Array(32));
+                const keyHex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+
+                // Build join URL: user lambda join page with code + key in hash
+                const userBase = this._getUserLambdaUrl();
+                this._enterRoomLink = `${userBase}/v0/v0.1/v0.1.8/pages/join.html#${result.invite_code}::${keyHex}`;
+            }
+        } catch (err) {
+            this._error = `Enter room: ${err.message}`;
+        }
+
+        this._enterCreating = false;
+        this._renderDetail();
+    }
+
+    _getUserLambdaUrl() {
+        // Explicit config
+        if (window.sgraphAdmin && window.sgraphAdmin.userLambdaUrl) {
+            return window.sgraphAdmin.userLambdaUrl;
+        }
+        const loc = window.location;
+        // Production: admin.sgraph.ai → send.sgraph.ai
+        if (loc.hostname.startsWith('admin.') && loc.hostname.includes('sgraph')) {
+            return `${loc.protocol}//${loc.hostname.replace(/^admin\./, 'send.')}`;
+        }
+        // Dev: same origin
+        return loc.origin;
+    }
+
     // --- Row Selection ------------------------------------------------------
 
     _handleRowClick(roomId) {
         if (this._selectedRoom === roomId) {
-            this._selectedRoom = null;
-            this._roomDetail   = null;
-            this._members      = [];
-            this._auditEvents  = [];
-            this._lastInvite   = null;
+            this._selectedRoom  = null;
+            this._roomDetail    = null;
+            this._members       = [];
+            this._auditEvents   = [];
+            this._lastInvite    = null;
+            this._enterRoomLink = '';
         } else {
-            this._selectedRoom = roomId;
-            this._activeTab    = 'members';
-            this._lastInvite   = null;
+            this._selectedRoom  = roomId;
+            this._activeTab     = 'members';
+            this._lastInvite    = null;
+            this._enterRoomLink = '';
             this._loadRoomDetail(roomId);
         }
         this._renderList();
@@ -540,6 +588,24 @@ class DataRoomManager extends HTMLElement {
                         </div>
                     </div>
                 </div>
+                <div class="enter-room-section">
+                    <button class="btn btn--primary btn--sm" id="btn-enter-room"
+                            ${this._enterCreating ? 'disabled' : ''}>
+                        ${this._enterCreating ? '<span class="spinner"></span>' : ''} Enter Room
+                    </button>
+                    ${this._enterRoomLink ? `
+                        <div class="enter-room-result">
+                            <span class="detail-label">Join link (includes room key — single use):</span>
+                            <div class="enter-room-link-row">
+                                <input type="text" class="enter-room-link" id="enter-room-link"
+                                       value="${this._attr(this._enterRoomLink)}" readonly>
+                                <button class="btn btn--primary btn--xs" id="btn-copy-enter-link">Copy</button>
+                                <a class="btn btn--primary btn--xs" href="${this._attr(this._enterRoomLink)}"
+                                   target="_blank" rel="noopener" id="btn-open-enter-link">Open</a>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
                 <div class="tabs">
                     ${tabs.map(t => `
                         <button class="tab-btn ${this._activeTab === t ? 'tab-btn--active' : ''}"
@@ -703,6 +769,29 @@ class DataRoomManager extends HTMLElement {
         const inviteForm = el.querySelector('#create-invite-form');
         if (inviteForm) {
             inviteForm.addEventListener('submit', (e) => this._handleCreateInvite(e));
+        }
+
+        // Wire enter-room button
+        const btnEnterRoom = el.querySelector('#btn-enter-room');
+        if (btnEnterRoom) {
+            btnEnterRoom.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleEnterRoom();
+            });
+        }
+        const btnCopyEnterLink = el.querySelector('#btn-copy-enter-link');
+        if (btnCopyEnterLink) {
+            btnCopyEnterLink.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    await navigator.clipboard.writeText(this._enterRoomLink);
+                    btnCopyEnterLink.textContent = 'Copied!';
+                    setTimeout(() => { btnCopyEnterLink.textContent = 'Copy'; }, 2000);
+                } catch (err) {
+                    const input = el.querySelector('#enter-room-link');
+                    if (input) { input.select(); }
+                }
+            });
         }
     }
 
@@ -1219,6 +1308,44 @@ class DataRoomManager extends HTMLElement {
             }
 
             .inline-select:focus {
+                outline: none;
+                border-color: var(--admin-primary);
+            }
+
+            /* --- Enter Room --- */
+            .enter-room-section {
+                margin-bottom: 0.75rem;
+                display: flex;
+                flex-wrap: wrap;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+
+            .enter-room-result {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 0.375rem;
+            }
+
+            .enter-room-link-row {
+                display: flex;
+                gap: 0.375rem;
+            }
+
+            .enter-room-link {
+                flex: 1;
+                padding: 0.375rem 0.5rem;
+                font-family: var(--admin-font-mono);
+                font-size: var(--admin-font-size-xs);
+                color: var(--admin-primary);
+                background: var(--admin-bg);
+                border: 1px solid var(--admin-border);
+                border-radius: var(--admin-radius);
+                box-sizing: border-box;
+            }
+
+            .enter-room-link:focus {
                 outline: none;
                 border-color: var(--admin-primary);
             }

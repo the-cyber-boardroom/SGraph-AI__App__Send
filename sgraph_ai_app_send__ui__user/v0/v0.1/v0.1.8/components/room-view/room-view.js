@@ -62,6 +62,8 @@
             this._statusTimer = null;
             this._downloading = null;       // guid being downloaded
             this._uploading   = false;
+            this._inviteLink  = '';        // last generated invite link
+            this._inviteCreating = false;
         }
 
         connectedCallback() {
@@ -309,14 +311,12 @@
                         URL.revokeObjectURL(url);
                         this._showStatus('success', '"' + (meta.name || fileGuid) + '" decrypted and downloaded');
                     } catch (decErr) {
-                        // Decryption failed — offer raw download
-                        this._showStatus('error', 'Decryption failed (wrong key?). Downloading encrypted blob.');
-                        this._downloadRawBlob(packed, fileGuid);
+                        // Decryption failed — do NOT save encrypted blob
+                        this._showStatus('error', 'Decryption failed — wrong room key. File was not saved.');
                     }
                 } else {
-                    // No key — download encrypted blob
-                    this._downloadRawBlob(packed, fileGuid);
-                    this._showStatus('info', 'Downloaded encrypted blob (no room key set)');
+                    // No key — cannot decrypt, do NOT save encrypted blob
+                    this._showStatus('error', 'No room key set — cannot decrypt file. File was not saved.');
                 }
             } catch (e) {
                 this._showStatus('error', 'Download failed: ' + e.message);
@@ -336,6 +336,44 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+        }
+
+        // --- Invite Creation -----------------------------------------------------
+
+        async _handleCreateInvite(e) {
+            if (e) e.preventDefault();
+            if (!this._session || !this._roomKeyHex) return;
+
+            const form  = this.shadowRoot.querySelector('#invite-form');
+            const perm  = form ? form.querySelector('#invite-perm').value : 'viewer';
+
+            this._inviteCreating = true;
+            this._inviteLink     = '';
+            this.render();
+
+            try {
+                const result = await VaultAPI.createInvite(
+                    this._session.room_id,
+                    perm,
+                    this._session.user_id,
+                    1
+                );
+
+                if (result && result.invite_code) {
+                    // Build join URL: join.html#CODE:ROOMKEY
+                    // Omit user_id so the recipient enters their own identity
+                    const base = window.location.href.replace(/room\.html.*$/, 'join.html');
+                    this._inviteLink = `${base}#${result.invite_code}::${this._roomKeyHex}`;
+                    this._showStatus('success', 'Invite link created with room key');
+                } else {
+                    this._showStatus('error', 'Failed to create invite');
+                }
+            } catch (err) {
+                this._showStatus('error', 'Create invite failed: ' + err.message);
+            }
+
+            this._inviteCreating = false;
+            this.render();
         }
 
         // --- Render ==============================================================
@@ -522,6 +560,39 @@
                     `}
                 </div>
 
+                ${hasKey ? `
+                <div class="invite-section">
+                    <div class="section-header">
+                        <h3 class="section-title">Share Access</h3>
+                    </div>
+                    <form class="invite-form" id="invite-form">
+                        <select id="invite-perm" class="invite-select">
+                            <option value="viewer">Viewer</option>
+                            <option value="editor">Editor</option>
+                        </select>
+                        <button type="submit" class="btn btn--primary btn--sm"
+                                ${this._inviteCreating ? 'disabled' : ''}>
+                            ${this._inviteCreating ? '<span class="spinner"></span>' : ''}
+                            Create Invite Link
+                        </button>
+                    </form>
+                    ${this._inviteLink ? `
+                        <div class="invite-result">
+                            <span class="invite-label">Invite link (includes room key):</span>
+                            <div class="invite-link-row">
+                                <input type="text" class="invite-link-input" id="invite-link-input"
+                                       value="${escapeAttr(this._inviteLink)}" readonly>
+                                <button class="btn btn--ghost btn--sm" id="btn-copy-invite" title="Copy invite link">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    Copy
+                                </button>
+                            </div>
+                            <span class="invite-hint">Recipient will join with full decryption access. Link is single-use.</span>
+                        </div>
+                    ` : ''}
+                </div>
+                ` : ''}
+
                 <div class="room-footer">
                     <button class="btn btn--ghost btn--sm" id="btn-leave">Leave Room</button>
                     <div class="footer-actions">
@@ -652,6 +723,26 @@
                 });
                 fileInput.addEventListener('change', () => {
                     if (fileInput.files.length) this._handleUpload(fileInput.files);
+                });
+            }
+
+            // Invite form
+            const inviteForm = this.shadowRoot.querySelector('#invite-form');
+            if (inviteForm) {
+                inviteForm.addEventListener('submit', (e) => this._handleCreateInvite(e));
+            }
+            const btnCopyInvite = this.shadowRoot.querySelector('#btn-copy-invite');
+            if (btnCopyInvite) {
+                btnCopyInvite.addEventListener('click', async () => {
+                    try {
+                        await navigator.clipboard.writeText(this._inviteLink);
+                        this._showStatus('success', 'Invite link copied to clipboard');
+                    } catch (e) {
+                        // Fallback: select the input text
+                        const input = this.shadowRoot.querySelector('#invite-link-input');
+                        if (input) { input.select(); }
+                        this._showStatus('info', 'Press Ctrl+C to copy');
+                    }
                 });
             }
 
@@ -1046,6 +1137,72 @@
                 .file-meta {
                     font-size: var(--text-micro, 0.625rem);
                     color: var(--color-text-secondary, #8892A0);
+                }
+
+                /* --- Invite Section --- */
+
+                .invite-section {
+                    margin-bottom: var(--space-6, 24px);
+                    padding: var(--space-4, 16px);
+                    background: var(--bg-surface, #1E2A4A);
+                    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+                    border-radius: var(--radius, 8px);
+                }
+
+                .invite-form {
+                    display: flex;
+                    gap: var(--space-2, 8px);
+                    align-items: center;
+                }
+
+                .invite-select {
+                    padding: var(--space-2, 8px) var(--space-3, 12px);
+                    font-size: var(--text-small, 0.8rem);
+                    color: var(--color-text, #E0E0E0);
+                    background: var(--bg-secondary, #16213E);
+                    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+                    border-radius: var(--radius-sm, 6px);
+                    cursor: pointer;
+                }
+
+                .invite-result {
+                    margin-top: var(--space-3, 12px);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-2, 8px);
+                }
+
+                .invite-label {
+                    font-size: var(--text-small, 0.8rem);
+                    color: var(--color-text-secondary, #8892A0);
+                }
+
+                .invite-link-row {
+                    display: flex;
+                    gap: var(--space-2, 8px);
+                }
+
+                .invite-link-input {
+                    flex: 1;
+                    padding: var(--space-2, 8px) var(--space-3, 12px);
+                    font-family: var(--font-mono, monospace);
+                    font-size: var(--text-micro, 0.625rem);
+                    color: var(--accent, #4ECDC4);
+                    background: var(--bg-secondary, #16213E);
+                    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+                    border-radius: var(--radius-sm, 6px);
+                    box-sizing: border-box;
+                }
+
+                .invite-link-input:focus {
+                    outline: none;
+                    border-color: var(--accent, #4ECDC4);
+                }
+
+                .invite-hint {
+                    font-size: var(--text-micro, 0.625rem);
+                    color: var(--color-text-secondary, #8892A0);
+                    opacity: 0.7;
                 }
 
                 /* --- Room Footer --- */
