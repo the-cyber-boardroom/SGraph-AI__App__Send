@@ -124,6 +124,11 @@ class RoomJoin extends HTMLElement {
                 expires         : result.expires
             }));
 
+            // Store room key immediately so room-view has it on load
+            if (this._roomKey) {
+                sessionStorage.setItem('sg_room_key', this._roomKey);
+            }
+
         } catch (err) {
             this._error = err.message;
             this._step  = 'preview';

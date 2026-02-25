@@ -271,7 +271,7 @@ class DataRoomManager extends HTMLElement {
 
                 // Build join URL: user lambda join page with code + key in hash
                 const userBase = this._getUserLambdaUrl();
-                this._enterRoomLink = `${userBase}/v0/v0.1/v0.1.8/pages/join.html#${result.invite_code}::${keyHex}`;
+                this._enterRoomLink = `${userBase}/send/v0/v0.1/v0.1.8/join.html#${result.invite_code}::${keyHex}`;
             }
         } catch (err) {
             this._error = `Enter room: ${err.message}`;
