@@ -1,42 +1,91 @@
 /* =============================================================================
    SG/Send — Download Component Override
-   v0.1.8 — IFD surgical override (inline content rendering)
+   v0.1.8 — IFD surgical override (two-column preview layout)
 
    Changes from v0.1.6:
-     - renderComplete: route decrypted content through FileTypeDetect
-     - Markdown files rendered via MarkdownParser inside sandboxed iframe
+     - startDownload: intercepts saveFile to prevent auto-download for
+       previewable content (images, markdown, PDF, code)
+     - renderComplete: two-column layout — details (1/3) + preview (2/3)
+     - Resizable divider between panels (drag to resize, persisted)
+     - Prominent "Save Locally" button (no auto-download for previews)
+     - <main> expands to full width when preview is active
+     - Mobile responsive: stacks vertically on narrow screens
+     - Markdown rendered via MarkdownParser in sandboxed iframe
      - Image files displayed inline as object URLs
      - PDF files displayed in browser's native PDF viewer
      - Code files rendered with syntax highlighting (token-based)
-     - "View raw" toggle for all rendered content
+     - "View raw" toggle for markdown and code
      - "Send another" link points to v0.1.8
    ============================================================================= */
 
 (function() {
     'use strict';
 
-    // ─── Override startDownload to capture render type ─────────────────
+    // ─── Inject responsive styles (once) ─────────────────────────────
+
+    if (!document.getElementById('v018-preview-styles')) {
+        const style = document.createElement('style');
+        style.id = 'v018-preview-styles';
+        style.textContent = `
+            @media (max-width: 768px) {
+                #preview-split {
+                    grid-template-columns: 1fr !important;
+                    grid-template-rows: minmax(250px, 50vh) auto !important;
+                    max-height: none !important;
+                }
+                #split-resize { display: none !important; }
+                #preview-panel { order: -1; }
+                #details-panel { padding-right: 0 !important; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // ─── Override startDownload — intercept saveFile for previewable types
 
     const _origStartDownload = SendDownload.prototype.startDownload;
 
     SendDownload.prototype.startDownload = async function(keyOverride) {
         // Clear previous render state
         this._renderType = null;
-        this._renderedHtml = null;
-        this._objectUrl = null;
-        this._showRaw = false;
+        this._objectUrl  = null;
+        this._showRaw    = false;
+
+        // Temporarily intercept saveFile so we can suppress auto-download
+        // for previewable types. The base startDownload calls saveFile()
+        // at line 386 for non-text content — we need to catch that.
+        const origSaveFile = this.saveFile.bind(this);
+        let pendingSave = null;
+
+        this.saveFile = function(data, filename) {
+            // Detect render type before deciding whether to auto-download
+            const renderType = (typeof FileTypeDetect !== 'undefined')
+                ? FileTypeDetect.detect(filename, null)
+                : null;
+
+            if (renderType && renderType !== 'text') {
+                // Previewable — suppress auto-download, store for later
+                pendingSave = { data, filename };
+            } else {
+                // Not previewable — download immediately as normal
+                origSaveFile(data, filename);
+            }
+        };
 
         await _origStartDownload.call(this, keyOverride);
 
+        // Restore original saveFile
+        this.saveFile = origSaveFile;
+
         // After base flow completes, detect render type
         if (this.state === 'complete' && this.decryptedBytes) {
-            const filename = this.fileName || null;
+            const filename    = this.fileName || null;
             const contentType = (this.transferInfo && this.transferInfo.content_type_hint) || null;
-            this._renderType = (typeof FileTypeDetect !== 'undefined')
+            this._renderType  = (typeof FileTypeDetect !== 'undefined')
                 ? FileTypeDetect.detect(filename, contentType)
                 : null;
 
-            // For renderable types, re-render with inline view
+            // For renderable types, re-render with two-column preview
             if (this._renderType && this._renderType !== 'text') {
                 this.render();
                 this.setupEventListeners();
@@ -44,7 +93,27 @@
         }
     };
 
-    // ─── Override renderComplete for inline rendering ─────────────────
+    // ─── Override render — expand <main> for preview mode ────────────
+
+    const _origRender = SendDownload.prototype.render;
+
+    SendDownload.prototype.render = function() {
+        _origRender.call(this);
+
+        // Expand <main> when showing a two-column preview
+        const main = this.closest('main');
+        if (main) {
+            if (this.state === 'complete' && this._renderType && this._renderType !== 'text') {
+                main.style.maxWidth = 'calc(100vw - 2rem)';
+                main.style.width    = '100%';
+            } else {
+                main.style.maxWidth = '';
+                main.style.width    = '';
+            }
+        }
+    };
+
+    // ─── Override renderComplete — two-column preview layout ─────────
 
     SendDownload.prototype.renderComplete = function() {
         if (this.state !== 'complete') return '';
@@ -59,12 +128,12 @@
 
         const timingHtml = typeof this._renderTimings === 'function' ? this._renderTimings() : '';
 
-        // Route to inline renderer if applicable
+        // Route to two-column preview layout for previewable types
         if (this._renderType && this._renderType !== 'text') {
-            return this._renderInlineContent() + timingHtml + sendAnotherHtml;
+            return this._renderTwoColumnLayout(timingHtml, sendAnotherHtml);
         }
 
-        // Fallback: existing text display or file download confirmation
+        // Fallback: text display
         if (this.decryptedText !== null) {
             return `
                 <div class="status status--success" style="font-size: var(--font-size-sm); padding: 0.5rem 0.75rem;">
@@ -92,6 +161,7 @@
             `;
         }
 
+        // Fallback: non-previewable file (already auto-downloaded)
         return `
             <div class="status status--success">${this.escapeHtml(this.t('download.result.file_success'))}</div>
             <send-transparency id="transparency-panel"></send-transparency>
@@ -100,92 +170,135 @@
         `;
     };
 
-    // ─── Inline Content Renderer ──────────────────────────────────────
+    // ─── Two-Column Layout ───────────────────────────────────────────
 
-    SendDownload.prototype._renderInlineContent = function() {
-        const type = this._renderType;
+    SendDownload.prototype._renderTwoColumnLayout = function(timingHtml, sendAnotherHtml) {
         const filename = this.fileName || 'download';
+        const type     = this._renderType;
 
-        // Toolbar: filename + action buttons
-        const toolbar = this._renderContentToolbar(filename, type);
+        // Type badge label
+        const badgeLabel = (type === 'code' && typeof FileTypeDetect !== 'undefined')
+            ? FileTypeDetect.getLanguage(filename)
+            : type;
 
-        let contentHtml = '';
+        // Transfer metadata
+        const sizeStr    = this.transferInfo ? this.formatBytes(this.transferInfo.file_size_bytes) : '';
+        const uploadDate = this.transferInfo ? this.formatTimestamp(this.transferInfo.created_at) : '';
+        const downloads  = this.transferInfo ? (this.transferInfo.download_count || 0) : 0;
 
-        switch (type) {
-            case 'markdown':
-                contentHtml = this._renderMarkdownContent();
-                break;
-            case 'image':
-                contentHtml = this._renderImageContent();
-                break;
-            case 'pdf':
-                contentHtml = this._renderPdfContent();
-                break;
-            case 'code':
-                contentHtml = this._renderCodeContent();
-                break;
-            default:
-                contentHtml = this._renderRawContent();
-        }
-
-        return `
-            <div class="status status--success" style="font-size: var(--font-size-sm); padding: 0.5rem 0.75rem;">
-                ${this.escapeHtml(this.t('download.result.file_success'))}
-            </div>
-            ${toolbar}
-            <div id="content-display" style="margin-top: var(--space-3, 0.75rem);">
-                ${contentHtml}
-            </div>
-            <send-transparency id="transparency-panel"></send-transparency>
-        `;
-    };
-
-    // ─── Content Toolbar ──────────────────────────────────────────────
-
-    SendDownload.prototype._renderContentToolbar = function(filename, type) {
-        const langBadge = (type === 'code' && typeof FileTypeDetect !== 'undefined')
-            ? `<span style="font-size: var(--text-small, 0.8rem); color: var(--accent); font-family: var(--font-mono); background: var(--accent-subtle, rgba(78,205,196,0.12)); padding: 2px 8px; border-radius: var(--radius-sm, 6px);">${this.escapeHtml(FileTypeDetect.getLanguage(filename))}</span>`
-            : '';
-
-        const typeBadge = (type === 'markdown')
-            ? '<span style="font-size: var(--text-small, 0.8rem); color: var(--accent); font-family: var(--font-mono); background: var(--accent-subtle, rgba(78,205,196,0.12)); padding: 2px 8px; border-radius: var(--radius-sm, 6px);">markdown</span>'
-            : '';
-
+        // Raw toggle (for markdown and code)
         const rawToggle = (type === 'markdown' || type === 'code')
-            ? `<button class="btn btn-sm btn-secondary" id="toggle-raw-btn" style="font-size: var(--text-small, 0.8rem);">
+            ? `<button class="btn btn-sm btn-secondary" id="toggle-raw-btn" style="width: 100%; font-size: var(--font-size-sm);">
                    ${this._showRaw ? 'View Rendered' : 'View Raw'}
                </button>`
             : '';
 
+        // Preview content
+        let contentHtml = '';
+        switch (type) {
+            case 'markdown': contentHtml = this._renderMarkdownContent(); break;
+            case 'image':    contentHtml = this._renderImageContent();    break;
+            case 'pdf':      contentHtml = this._renderPdfContent();      break;
+            case 'code':     contentHtml = this._renderCodeContent();     break;
+            default:         contentHtml = this._renderRawContent();
+        }
+
+        // Load persisted split width
+        const savedWidth = this._loadSplitWidth();
+
         return `
-            <div style="margin-top: var(--space-4, 1rem); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2, 0.5rem);">
-                <div style="display: flex; align-items: center; gap: var(--space-2, 0.5rem);">
-                    <h3 style="margin: 0; font-size: var(--text-h3, 1.1rem); font-weight: var(--weight-bold, 700); color: var(--color-text);">
-                        ${this.escapeHtml(filename)}
-                    </h3>
-                    ${langBadge}${typeBadge}
-                </div>
-                <div style="display: flex; gap: var(--space-2, 0.5rem); align-items: center;">
+            <div class="status status--success" style="font-size: var(--font-size-sm); padding: 0.5rem 0.75rem; margin-bottom: var(--space-4, 1rem);">
+                ${this.escapeHtml(this.t('download.result.file_success'))}
+            </div>
+
+            <div id="preview-split" style="
+                display: grid;
+                grid-template-columns: ${savedWidth}px 4px 1fr;
+                gap: 0;
+                min-height: 400px;
+                max-height: 80vh;
+            ">
+                <!-- Left: Details Panel -->
+                <div id="details-panel" style="
+                    overflow-y: auto;
+                    padding-right: var(--space-4, 1rem);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-4, 1rem);
+                ">
+                    <!-- File info -->
+                    <div>
+                        <h3 style="margin: 0 0 var(--space-2, 0.5rem) 0; font-size: var(--text-h3, 1.1rem); font-weight: var(--weight-bold, 700); color: var(--color-text); word-break: break-all;">
+                            ${this.escapeHtml(filename)}
+                        </h3>
+                        <div style="display: flex; flex-wrap: wrap; gap: var(--space-2, 0.5rem); margin-bottom: var(--space-3, 0.75rem);">
+                            <span style="font-size: var(--text-small, 0.8rem); color: var(--accent); font-family: var(--font-mono); background: var(--accent-subtle, rgba(78,205,196,0.12)); padding: 2px 8px; border-radius: var(--radius-sm, 6px);">${this.escapeHtml(badgeLabel)}</span>
+                            <span style="font-size: var(--text-small, 0.8rem); color: var(--color-text-secondary); font-family: var(--font-mono);">${this.escapeHtml(sizeStr)}</span>
+                        </div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); display: flex; flex-direction: column; gap: var(--space-1, 0.25rem);">
+                            <div>Uploaded: ${this.escapeHtml(uploadDate)}</div>
+                            ${downloads > 0 ? `<div>Downloads: ${downloads}</div>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- SAVE LOCALLY — large, prominent, primary -->
+                    <button class="btn btn-primary" id="save-file-btn" style="
+                        width: 100%;
+                        padding: var(--space-4, 1rem) var(--space-6, 1.5rem);
+                        font-size: var(--text-body, 1rem);
+                        font-weight: var(--weight-bold, 700);
+                        border-radius: var(--radius-md, 12px);
+                        letter-spacing: 0.02em;
+                    ">
+                        Save Locally
+                    </button>
+
+                    <!-- Secondary actions -->
+                    <div style="display: flex; gap: var(--space-2, 0.5rem);">
+                        <button class="btn btn-sm btn-secondary" id="copy-content-btn" style="flex: 1;">Copy</button>
+                    </div>
+
                     ${rawToggle}
-                    <button class="btn btn-sm btn-secondary" id="copy-content-btn">Copy</button>
-                    <button class="btn btn-primary btn-sm" id="save-file-btn">Download</button>
+
+                    <!-- Transparency panel -->
+                    <send-transparency id="transparency-panel"></send-transparency>
+
+                    ${timingHtml}
+                    ${sendAnotherHtml}
+                </div>
+
+                <!-- Resize Handle -->
+                <div id="split-resize" style="
+                    cursor: col-resize;
+                    background: transparent;
+                    transition: background 0.15s;
+                    z-index: 10;
+                    border-radius: 2px;
+                "></div>
+
+                <!-- Right: Preview Panel -->
+                <div id="preview-panel" style="
+                    overflow: auto;
+                    border: 2px solid var(--accent, #4ECDC4);
+                    border-radius: var(--radius-md, 12px);
+                    background: var(--bg-secondary, #16213E);
+                ">
+                    ${contentHtml}
                 </div>
             </div>
         `;
     };
 
-    // ─── Markdown Rendering (sandboxed iframe) ────────────────────────
+    // ─── Markdown Rendering (sandboxed iframe) ──────────────────────
 
     SendDownload.prototype._renderMarkdownContent = function() {
         if (this._showRaw) return this._renderRawContent();
 
-        // Parse markdown to safe HTML
-        const rawText = new TextDecoder().decode(this.decryptedBytes);
+        const rawText  = new TextDecoder().decode(this.decryptedBytes);
         const safeHtml = (typeof MarkdownParser !== 'undefined')
             ? MarkdownParser.parse(rawText)
             : this.escapeHtml(rawText);
 
-        // Wrap in styled document for sandboxed iframe
         const iframeDoc = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -227,28 +340,25 @@
     img { max-width: 100%; }
 </style></head><body>${safeHtml}</body></html>`;
 
-        // Encode as data URI for srcdoc-like behaviour
         const encoded = btoa(unescape(encodeURIComponent(iframeDoc)));
 
         return `
             <iframe id="md-iframe"
                     sandbox="allow-same-origin"
-                    style="width: 100%; border: 2px solid var(--accent, #4ECDC4); border-radius: var(--radius-md, 12px);
-                           background: #1E2A4A; min-height: 200px; max-height: 600px;"
+                    style="width: 100%; height: 100%; border: none; background: #1E2A4A; display: block;"
                     src="data:text/html;base64,${encoded}"
                     title="Rendered markdown content"></iframe>
         `;
     };
 
-    // ─── Image Rendering ──────────────────────────────────────────────
+    // ─── Image Rendering ────────────────────────────────────────────
 
     SendDownload.prototype._renderImageContent = function() {
         const filename = this.fileName || 'image';
         const isSvg = (typeof FileTypeDetect !== 'undefined') && FileTypeDetect.isSvg(filename);
 
         if (isSvg) {
-            // SVG can contain scripts — render inside sandboxed iframe
-            const svgText = new TextDecoder().decode(this.decryptedBytes);
+            const svgText  = new TextDecoder().decode(this.decryptedBytes);
             const iframeDoc = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#1E2A4A;}</style>
 </head><body>${this.escapeHtml(svgText)}</body></html>`;
@@ -256,7 +366,7 @@
             return `
                 <iframe id="svg-iframe"
                         sandbox=""
-                        style="width: 100%; min-height: 300px; max-height: 600px; border: 2px solid var(--accent, #4ECDC4); border-radius: var(--radius-md, 12px); background: #1E2A4A;"
+                        style="width: 100%; height: 100%; border: none; background: #1E2A4A; display: block;"
                         src="data:text/html;base64,${encoded}"
                         title="SVG image"></iframe>
             `;
@@ -268,19 +378,18 @@
             : 'application/octet-stream';
         const blob = new Blob([this.decryptedBytes], { type: mime });
 
-        // Revoke previous object URL if any
         if (this._objectUrl) URL.revokeObjectURL(this._objectUrl);
         this._objectUrl = URL.createObjectURL(blob);
 
         return `
-            <div style="text-align: center; padding: var(--space-4, 1rem); background: var(--bg-secondary, #16213E); border: 2px solid var(--accent, #4ECDC4); border-radius: var(--radius-md, 12px);">
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: var(--space-4, 1rem);">
                 <img id="preview-image" src="${this._objectUrl}" alt="${this.escapeHtml(filename)}"
-                     style="max-width: 100%; max-height: 500px; border-radius: var(--radius-sm, 6px); object-fit: contain;">
+                     style="max-width: 100%; max-height: 100%; border-radius: var(--radius-sm, 6px); object-fit: contain;">
             </div>
         `;
     };
 
-    // ─── PDF Rendering ────────────────────────────────────────────────
+    // ─── PDF Rendering ──────────────────────────────────────────────
 
     SendDownload.prototype._renderPdfContent = function() {
         const blob = new Blob([this.decryptedBytes], { type: 'application/pdf' });
@@ -290,44 +399,38 @@
         return `
             <iframe id="pdf-viewer"
                     src="${this._objectUrl}"
-                    style="width: 100%; height: 600px; border: 2px solid var(--accent, #4ECDC4); border-radius: var(--radius-md, 12px); background: #fff;"
+                    style="width: 100%; height: 100%; border: none; background: #fff; display: block;"
                     title="PDF document"></iframe>
         `;
     };
 
-    // ─── Code Rendering (token-based syntax highlighting) ─────────────
+    // ─── Code Rendering (token-based syntax highlighting) ───────────
 
     SendDownload.prototype._renderCodeContent = function() {
         if (this._showRaw) return this._renderRawContent();
 
         const rawText = new TextDecoder().decode(this.decryptedBytes);
-        const lang = (typeof FileTypeDetect !== 'undefined')
+        const lang    = (typeof FileTypeDetect !== 'undefined')
             ? FileTypeDetect.getLanguage(this.fileName)
             : 'text';
 
         const highlighted = this._highlightCode(rawText, lang);
-        const lineCount = rawText.split('\n').length;
-
-        // Line numbers + highlighted code
-        const lineNums = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
+        const lineCount   = rawText.split('\n').length;
+        const lineNums    = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
 
         return `
-            <div style="position: relative; border: 2px solid var(--accent, #4ECDC4); border-radius: var(--radius-md, 12px); overflow: hidden; background: #16213E;">
-                <div style="display: flex; max-height: 500px; overflow-y: auto; font-family: var(--font-mono, monospace); font-size: 0.85rem; line-height: 1.6;">
-                    <pre style="margin: 0; padding: 1em 0.75em; text-align: right; color: var(--color-text-secondary, #8892A0); user-select: none; border-right: 1px solid var(--color-border, rgba(78,205,196,0.15)); background: rgba(0,0,0,0.1); min-width: 3em;">${lineNums}</pre>
-                    <pre style="margin: 0; padding: 1em; flex: 1; overflow-x: auto; color: var(--color-text, #E0E0E0);">${highlighted}</pre>
-                </div>
+            <div style="height: 100%; overflow: auto; font-family: var(--font-mono, monospace); font-size: 0.85rem; line-height: 1.6; display: flex;">
+                <pre style="margin: 0; padding: 1em 0.75em; text-align: right; color: var(--color-text-secondary, #8892A0); user-select: none; border-right: 1px solid var(--color-border, rgba(78,205,196,0.15)); background: rgba(0,0,0,0.1); min-width: 3em; position: sticky; left: 0;">${lineNums}</pre>
+                <pre style="margin: 0; padding: 1em; flex: 1; overflow-x: auto; color: var(--color-text, #E0E0E0);">${highlighted}</pre>
             </div>
         `;
     };
 
-    // ─── Token-based Syntax Highlighter ───────────────────────────────
-    // Lightweight — no external dependencies. Covers common patterns.
+    // ─── Token-based Syntax Highlighter ─────────────────────────────
 
     SendDownload.prototype._highlightCode = function(code, lang) {
         const esc = (s) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-        // Language-specific keyword sets
         const keywords = {
             javascript: /\b(const|let|var|function|return|if|else|for|while|class|extends|import|export|from|default|async|await|new|this|try|catch|finally|throw|typeof|instanceof|in|of|switch|case|break|continue|do|yield|null|undefined|true|false)\b/g,
             typescript: /\b(const|let|var|function|return|if|else|for|while|class|extends|import|export|from|default|async|await|new|this|try|catch|finally|throw|typeof|instanceof|in|of|switch|case|break|continue|do|yield|null|undefined|true|false|type|interface|enum|implements|declare|readonly|as|keyof|never|unknown|any|void)\b/g,
@@ -343,10 +446,7 @@
             php: /\b(function|class|extends|implements|public|private|protected|static|abstract|final|return|if|else|elseif|for|foreach|while|do|switch|case|break|continue|default|try|catch|finally|throw|new|echo|print|var|const|use|namespace|require|include|null|true|false|array|string|int|float|bool)\b/g,
         };
 
-        // Tokenize: strings, comments, numbers, keywords
         const escaped = esc(code);
-
-        // Apply highlighting with regex replacements
         let result = escaped;
 
         // Strings (double and single quoted)
@@ -377,21 +477,102 @@
         return result;
     };
 
-    // ─── Raw Content Renderer ─────────────────────────────────────────
+    // ─── Raw Content Renderer ───────────────────────────────────────
 
     SendDownload.prototype._renderRawContent = function() {
         const rawText = new TextDecoder().decode(this.decryptedBytes);
         return `
-            <pre style="background: #16213E; border: 2px solid var(--accent, #4ECDC4); border-radius: var(--radius-md, 12px); padding: var(--space-6, 1.25rem); white-space: pre-wrap; word-wrap: break-word; font-family: var(--font-mono, monospace); font-size: 0.85rem; line-height: 1.6; max-height: 500px; overflow-y: auto; margin: 0; color: var(--color-text, #E0E0E0);">${this.escapeHtml(rawText)}</pre>
+            <pre style="height: 100%; overflow: auto; margin: 0; padding: var(--space-6, 1.25rem); white-space: pre-wrap; word-wrap: break-word; font-family: var(--font-mono, monospace); font-size: 0.85rem; line-height: 1.6; color: var(--color-text, #E0E0E0);">${this.escapeHtml(rawText)}</pre>
         `;
     };
 
-    // ─── Override setupEventListeners for new buttons ──────────────────
+    // ─── Split Width Persistence ────────────────────────────────────
+
+    SendDownload.prototype._loadSplitWidth = function() {
+        try {
+            const raw = localStorage.getItem('sgraph-send-split-width');
+            if (raw) {
+                const w = parseInt(raw, 10);
+                if (w >= 200 && w <= 600) return w;
+            }
+        } catch (_) {}
+        return 300; // default ~1/3 on typical screens
+    };
+
+    SendDownload.prototype._saveSplitWidth = function(width) {
+        try {
+            localStorage.setItem('sgraph-send-split-width', String(width));
+        } catch (_) {}
+    };
+
+    // ─── Resize Handler (follows admin-shell pattern) ───────────────
+
+    SendDownload.prototype._setupResize = function() {
+        const handle = this.querySelector('#split-resize');
+        const split  = this.querySelector('#preview-split');
+        if (!handle || !split) return;
+
+        let isResizing = false;
+        let startX, startWidth;
+
+        const onMouseDown = (e) => {
+            isResizing = true;
+            startX     = e.clientX;
+            const details = this.querySelector('#details-panel');
+            startWidth = details ? details.offsetWidth : 300;
+            handle.style.background = 'var(--accent, #4ECDC4)';
+            document.body.style.cursor     = 'col-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        };
+
+        const onMouseMove = (e) => {
+            if (!isResizing) return;
+            const diff     = e.clientX - startX;
+            const newWidth = Math.min(Math.max(startWidth + diff, 200), 600);
+            split.style.gridTemplateColumns = `${newWidth}px 4px 1fr`;
+            this._currentSplitWidth = newWidth;
+        };
+
+        const onMouseUp = () => {
+            if (!isResizing) return;
+            isResizing = false;
+            handle.style.background        = '';
+            document.body.style.cursor     = '';
+            document.body.style.userSelect = '';
+            if (this._currentSplitWidth) {
+                this._saveSplitWidth(this._currentSplitWidth);
+            }
+        };
+
+        // Hover effect
+        handle.addEventListener('mouseenter', () => {
+            if (!isResizing) handle.style.background = 'var(--accent, #4ECDC4)';
+        });
+        handle.addEventListener('mouseleave', () => {
+            if (!isResizing) handle.style.background = '';
+        });
+
+        handle.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+        this._resizeCleanup = () => {
+            handle.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+    };
+
+    // ─── Override setupEventListeners for preview buttons ───────────
 
     const _origSetupEvents = SendDownload.prototype.setupEventListeners;
 
     SendDownload.prototype.setupEventListeners = function() {
         _origSetupEvents.call(this);
+
+        // Setup resizable divider
+        this._setupResize();
 
         // Toggle raw/rendered view
         const toggleBtn = this.querySelector('#toggle-raw-btn');
@@ -403,7 +584,7 @@
             });
         }
 
-        // Copy content (for rendered types)
+        // Copy content
         const copyBtn = this.querySelector('#copy-content-btn');
         if (copyBtn) {
             copyBtn.addEventListener('click', () => {
@@ -414,7 +595,7 @@
             });
         }
 
-        // Save file (for rendered types)
+        // Save file (explicit user action — no auto-download)
         const saveBtn = this.querySelector('#save-file-btn');
         if (saveBtn) {
             saveBtn.addEventListener('click', () => {
@@ -423,21 +604,9 @@
                 }
             });
         }
-
-        // Auto-resize markdown iframe
-        const mdIframe = this.querySelector('#md-iframe');
-        if (mdIframe) {
-            mdIframe.addEventListener('load', () => {
-                try {
-                    const body = mdIframe.contentDocument.body;
-                    const height = Math.min(Math.max(body.scrollHeight + 32, 200), 600);
-                    mdIframe.style.height = height + 'px';
-                } catch (e) { /* cross-origin fallback — use default height */ }
-            });
-        }
     };
 
-    // ─── Cleanup object URLs on disconnect ────────────────────────────
+    // ─── Cleanup object URLs + resize listeners ─────────────────────
 
     const _origCleanup = SendDownload.prototype.cleanup;
 
@@ -446,8 +615,18 @@
             URL.revokeObjectURL(this._objectUrl);
             this._objectUrl = null;
         }
+        if (this._resizeCleanup) {
+            this._resizeCleanup();
+            this._resizeCleanup = null;
+        }
+        // Restore main width
+        const main = this.closest('main');
+        if (main) {
+            main.style.maxWidth = '';
+            main.style.width    = '';
+        }
         _origCleanup.call(this);
     };
 
-    console.log('[v0.1.8] SendDownload patched: inline content rendering (markdown, images, PDF, code)');
+    console.log('[v0.1.8] SendDownload patched: two-column preview layout, no auto-download for previewable files');
 })();
