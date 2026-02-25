@@ -3,6 +3,7 @@
 # REST endpoints for encrypted file transfer workflow
 # ===============================================================================
 
+import base64
 import hashlib
 from fastapi                                                                     import HTTPException, Request, Response
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
@@ -14,13 +15,14 @@ from sgraph_ai_app_send.lambda__user.user__config                               
 
 TAG__ROUTES_TRANSFERS = 'transfers'
 
-ROUTES_PATHS__TRANSFERS = [f'/{TAG__ROUTES_TRANSFERS}/create'                          ,
-                           f'/{TAG__ROUTES_TRANSFERS}/upload/{{transfer_id}}'          ,
-                           f'/{TAG__ROUTES_TRANSFERS}/complete/{{transfer_id}}'        ,
-                           f'/{TAG__ROUTES_TRANSFERS}/info/{{transfer_id}}'            ,
-                           f'/{TAG__ROUTES_TRANSFERS}/download/{{transfer_id}}'        ,
-                           f'/{TAG__ROUTES_TRANSFERS}/check-token/{{token_name}}'      ,
-                           f'/{TAG__ROUTES_TRANSFERS}/validate-token/{{token_name}}'   ]
+ROUTES_PATHS__TRANSFERS = [f'/{TAG__ROUTES_TRANSFERS}/create'                                ,
+                           f'/{TAG__ROUTES_TRANSFERS}/upload/{{transfer_id}}'                ,
+                           f'/{TAG__ROUTES_TRANSFERS}/complete/{{transfer_id}}'              ,
+                           f'/{TAG__ROUTES_TRANSFERS}/info/{{transfer_id}}'                  ,
+                           f'/{TAG__ROUTES_TRANSFERS}/download/{{transfer_id}}'              ,
+                           f'/{TAG__ROUTES_TRANSFERS}/download-base64/{{transfer_id}}'      ,
+                           f'/{TAG__ROUTES_TRANSFERS}/check-token/{{token_name}}'            ,
+                           f'/{TAG__ROUTES_TRANSFERS}/validate-token/{{token_name}}'         ]
 
 
 class Routes__Transfers(Fast_API__Routes):                                       # Transfer workflow endpoints
@@ -140,6 +142,29 @@ class Routes__Transfers(Fast_API__Routes):                                      
         return Response(content    = payload                    ,
                         media_type = 'application/octet-stream')
 
+    LAMBDA_BASE64_LIMIT = 3750000                                                # ~3.75MB (base64 adds ~33%, must stay under Lambda 5MB response limit)
+
+    def download_base64__transfer_id(self, transfer_id : Safe_Str__Id,          # GET /transfers/download-base64/{transfer_id} — JSON-safe base64 download
+                                           request     : Request
+                                    ) -> dict:
+        info = self.transfer_service.get_transfer_info(transfer_id)
+        if info is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Transfer not found')
+        if info.get('file_size_bytes', 0) > self.LAMBDA_BASE64_LIMIT:
+            raise HTTPException(status_code = 413,
+                                detail      = 'File too large for base64 download. Use /presigned/download-url/{transfer_id} instead.')
+
+        payload = self.transfer_service.get_download_payload(transfer_id  = transfer_id                    ,
+                                                              downloader_ip = request.client.host if request.client else '',
+                                                              user_agent    = request.headers.get('user-agent', ''))
+        if payload is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Transfer not found or not available for download')
+        return dict(transfer_id     = str(transfer_id)                       ,
+                    data            = base64.b64encode(payload).decode('ascii'),
+                    file_size_bytes = info.get('file_size_bytes', 0)         )
+
     def check_token__token_name(self, token_name: str) -> dict:                  # GET /transfers/check_token/{token_name} — lookup only (no usage consumed)
         if self.admin_service_client is None:
             return dict(valid = True, status = 'active')                         # No admin service → always valid (dev mode)
@@ -172,11 +197,12 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Token validation service unavailable')
 
     def setup_routes(self):                                                      # Register all endpoints
-        self.add_route_post(self.create                    )
-        self.add_route_post(self.upload__transfer_id       )
-        self.add_route_post(self.complete__transfer_id     )
-        self.add_route_get (self.info__transfer_id         )
-        self.add_route_get (self.download__transfer_id     )
-        self.add_route_get (self.check_token__token_name   )
-        self.add_route_post(self.validate_token__token_name)
+        self.add_route_post(self.create                         )
+        self.add_route_post(self.upload__transfer_id            )
+        self.add_route_post(self.complete__transfer_id          )
+        self.add_route_get (self.info__transfer_id              )
+        self.add_route_get (self.download__transfer_id          )
+        self.add_route_get (self.download_base64__transfer_id   )
+        self.add_route_get (self.check_token__token_name        )
+        self.add_route_post(self.validate_token__token_name     )
         return self

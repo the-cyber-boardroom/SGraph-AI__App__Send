@@ -90,6 +90,28 @@ class test_Routes__Transfers(TestCase):
         response = self.client.get('/transfers/download/nonexistent')
         assert response.status_code           == 404
 
+    def test__download_base64(self):
+        import base64
+        payload = b'\x89PNG\x00\x01\x02\x03'
+        create  = self.client.post('/transfers/create',
+                                   json=dict(file_size_bytes = len(payload))).json()
+        tid = create['transfer_id']
+        self.client.post(f'/transfers/upload/{tid}',
+                         content = payload,
+                         headers = {'content-type': 'application/octet-stream'})
+        self.client.post(f'/transfers/complete/{tid}')
+
+        response = self.client.get(f'/transfers/download-base64/{tid}')
+        assert response.status_code           == 200
+        data = response.json()
+        assert data['transfer_id']             == tid
+        assert data['file_size_bytes']         == len(payload)
+        assert base64.b64decode(data['data'])  == payload
+
+    def test__download_base64__not_found(self):
+        response = self.client.get('/transfers/download-base64/nonexistent')
+        assert response.status_code           == 404
+
     def test__full_flow(self):
         payload = b'encrypted_file_content_here'
 
