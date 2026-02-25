@@ -31,8 +31,9 @@
         <room-view></room-view>
         <p class="disclaimer">This room uses end-to-end encryption. The server never sees plaintext.</p>
     </main>
-    <!-- Room view scripts: vault API (for file operations) + join API (for session validation) + room component -->
+    <!-- Room view scripts: vault API (for file ops) + room crypto + join API (session) + room component -->
     <script src="../v0.1.7/js/vault-api.js"></script>
+    <script src="js/room-crypto.js"></script>
     <script src="js/join-api.js"></script>
     <script src="components/room-view/room-view.js"></script>
 </body>
