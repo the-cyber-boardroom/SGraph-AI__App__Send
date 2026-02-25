@@ -44,6 +44,32 @@ class test_MCP__Setup(TestCase):
         route_paths = [r.path for r in app.routes if hasattr(r, 'path')]
         assert '/mcp' in route_paths
 
+    def test__short_operation_ids(self):
+        app = FastAPI()
+
+        @app.post('/vault/folder', tags=['vault'])
+        def folder():
+            return {'created': True}
+
+        @app.get('/vault/folder/{vault_cache_key}/{folder_guid}', tags=['vault'])
+        def folder_get(vault_cache_key: str, folder_guid: str):
+            return {'folder': folder_guid}
+
+        @app.get('/vault/folders/{vault_cache_key}', tags=['vault'])
+        def folders(vault_cache_key: str):
+            return {'folders': []}
+
+        mcp_setup = MCP__Setup(name='test', include_tags=['vault'])
+        mcp_setup._set_short_operation_ids(app)
+
+        from fastapi.routing import APIRoute
+        op_ids = {r.operation_id for r in app.routes if isinstance(r, APIRoute) and r.operation_id}
+        assert 'vault_folder_post' in op_ids                                           # Deduped with method suffix
+        assert 'vault_folder_get'  in op_ids                                           # Deduped with method suffix
+        assert 'vault_folders'     in op_ids                                           # Unique — no suffix needed
+        for op_id in op_ids:
+            assert len(op_id) <= 64, f'Tool name too long ({len(op_id)} chars): {op_id}'
+
     def test__mount_mcp__tag_filtering(self):
         app = FastAPI()
 

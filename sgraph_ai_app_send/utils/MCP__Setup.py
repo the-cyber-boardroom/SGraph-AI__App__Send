@@ -61,6 +61,7 @@ class MCP__Setup(Type_Safe):
 
     def mount_mcp(self, fast_api_app):
         from fastapi_mcp import FastApiMCP
+        self._set_short_operation_ids(fast_api_app)                                        # Shorten names before MCP reads OpenAPI
         kwargs = dict(fastapi               = fast_api_app        ,
                       name                   = self.name           ,
                       describe_all_responses = True                )
@@ -72,8 +73,53 @@ class MCP__Setup(Type_Safe):
         if self.stateless:
             self._mount_stateless(fast_api_app, mcp)
         else:
-            mcp.mount_http()                                                           # HTTP transport (JSON-RPC over POST)
+            mcp.mount_http()                                                               # HTTP transport (JSON-RPC over POST)
         return mcp
+
+    def _set_short_operation_ids(self, fast_api_app):
+        """Shorten operation_ids to fit Claude.ai's 64-char tool name limit.
+
+        fastapi-mcp uses OpenAPI operationId as the MCP tool name. FastAPI's
+        auto-generated IDs include the full path and method, exceeding 64 chars.
+        This sets short IDs derived from: {tag}_{action} (e.g. vault_create)."""
+        from fastapi.routing import APIRoute
+
+        tags = set(self.include_tags or [])
+        if not tags:
+            return
+
+        candidates = []
+        for route in fast_api_app.routes:
+            if not isinstance(route, APIRoute):
+                continue
+            route_tags = set(route.tags or [])
+            if not route_tags.intersection(tags):
+                continue
+
+            tag    = route.tags[0]
+            method = sorted(route.methods)[0].lower()
+
+            # Extract action from path: strip tag prefix, remove {params}
+            path_parts = [p for p in route.path.split('/')
+                          if p and not p.startswith('{')]
+            if path_parts and path_parts[0] == tag:
+                path_parts = path_parts[1:]
+            action = '_'.join(path_parts) or 'root'
+
+            name = f"{tag}_{action}"
+            candidates.append((route, name, method))
+
+        # Find duplicate names (e.g. vault_folder for both POST and GET)
+        name_counts = {}
+        for _, name, _ in candidates:
+            name_counts[name] = name_counts.get(name, 0) + 1
+
+        # Set operation_id, appending HTTP method for duplicates
+        for route, name, method in candidates:
+            if name_counts[name] > 1:
+                route.operation_id = f"{name}_{method}"
+            else:
+                route.operation_id = name
 
     def _mount_stateless(self, fast_api_app, mcp):
         """Mount MCP with stateless HTTP transport and authless discovery routes.
