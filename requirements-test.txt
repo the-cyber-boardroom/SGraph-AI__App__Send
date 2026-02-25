@@ -1,5 +1,6 @@
 osbot-utils
 osbot_fast_api_serverless
+fastapi-mcp
 
 # for issue tracking
 issues-fs
