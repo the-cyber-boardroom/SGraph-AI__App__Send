@@ -4,7 +4,7 @@
 # ===============================================================================
 
 from unittest                                                                    import TestCase
-from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User        import setup__fast_api__user__test_objs
+from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User        import setup__fast_api__user__test_objs, TEST_ACCESS_TOKEN
 
 # todo: this should be test_Routes__Transfers__client
 class test_Routes__Transfers(TestCase):
@@ -111,6 +111,16 @@ class test_Routes__Transfers(TestCase):
     def test__download_base64__not_found(self):
         response = self.client.get('/transfers/download-base64/nonexistent')
         assert response.status_code           == 404
+
+    def test__create_with_access_token_query_param(self):
+        from starlette.testclient import TestClient
+        unauthenticated_client = TestClient(self.client.app)                    # No default auth header
+        response = unauthenticated_client.post(f'/transfers/create?access_token={TEST_ACCESS_TOKEN}',
+                                               json=dict(file_size_bytes   = 1024,
+                                                         content_type_hint = 'text/plain'))
+        assert response.status_code           == 200
+        data = response.json()
+        assert 'transfer_id'                   in data
 
     def test__full_flow(self):
         payload = b'encrypted_file_content_here'

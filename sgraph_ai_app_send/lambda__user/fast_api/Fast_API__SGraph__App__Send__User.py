@@ -157,9 +157,11 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
 
     def setup_mcp(self):                                                              # Mount MCP server on /mcp endpoint
-        mcp_setup = MCP__Setup(name         = 'sgraph-send-user'                          ,
-                               include_tags = ['transfers', 'presigned', 'vault']         ,
-                               stateless    = True                                        )  # Lambda-compatible: no session state, authless discovery
+        from sgraph_ai_app_send.lambda__user.user__config import HEADER__SGRAPH_SEND__ACCESS_TOKEN
+        mcp_setup = MCP__Setup(name            = 'sgraph-send-user'                              ,
+                               include_tags    = ['transfers', 'presigned', 'vault']             ,
+                               forward_headers = ['authorization', HEADER__SGRAPH_SEND__ACCESS_TOKEN],
+                               stateless       = True                                            )  # Lambda-compatible: no session state, authless discovery
         self.mcp = mcp_setup.mount_mcp(self.app())
 
 

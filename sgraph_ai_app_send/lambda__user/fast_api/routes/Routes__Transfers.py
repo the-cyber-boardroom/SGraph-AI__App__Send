@@ -30,8 +30,11 @@ class Routes__Transfers(Fast_API__Routes):                                      
     transfer_service     : Transfer__Service                                     # Auto-initialized by Type_Safe
     admin_service_client : object = None                                         # Optional Admin__Service__Client (typed as object to avoid circular import)
 
-    def check_access_token(self, request: Request):                              # Validate access token — admin service or env-var fallback
-        provided_token = request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '')
+    def check_access_token(self, request: Request, access_token: str = ''):      # Validate access token — header, query param, or env-var fallback
+        provided_token = (access_token                                                 # MCP tool parameter (Claude.ai web)
+                          or request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '') # HTTP header (browser UI, Claude Code CLI)
+                          or request.query_params.get('access_token', '')               # Query param fallback
+                          )
 
         if self.admin_service_client is not None:                                # Admin service available — validate via token_lookup
             if not provided_token:
@@ -65,19 +68,21 @@ class Routes__Transfers(Fast_API__Routes):                                      
     # todo: return type should be Schema__Transfer__Initiated (not raw dict)
     # todo: sender_ip should be extracted from Request object, not hardcoded empty string
     def create(self, request: Schema__Transfer__Create,                           # POST /transfers/create
-                     raw_request: Request
+                     raw_request: Request,
+                     access_token: str = ''                                      # MCP tool parameter — pass token directly when headers unavailable
               ) -> dict:                                                         # todo: -> Schema__Transfer__Initiated
-        self.check_access_token(raw_request)
+        self.check_access_token(raw_request, access_token)
         result = self.transfer_service.create_transfer(file_size_bytes   = request.file_size_bytes  ,
                                                        content_type_hint = request.content_type_hint,
                                                        sender_ip        = ''                        )
         return dict(transfer_id = result['transfer_id'],                         # todo: return Type_Safe class from service
                     upload_url  = result['upload_url'] )
 
-    async def upload__transfer_id(self, transfer_id : Safe_Str__Id ,             # POST /transfers/upload/{transfer_id} (todo: transfer_id should be Transfer_Id)
-                                        request     : Request
+    async def upload__transfer_id(self, transfer_id   : Safe_Str__Id ,           # POST /transfers/upload/{transfer_id} (todo: transfer_id should be Transfer_Id)
+                                        request       : Request      ,
+                                        access_token  : str = ''               # MCP tool parameter
                                  ) -> dict:
-        self.check_access_token(request)
+        self.check_access_token(request, access_token)
         body    = await request.body()
         success = self.transfer_service.upload_payload(transfer_id  = transfer_id,
                                                        payload_bytes = body      )
@@ -88,10 +93,11 @@ class Routes__Transfers(Fast_API__Routes):                                      
                     transfer_id = transfer_id  ,                                # ideally the service should give us the objects to return
                     size        = len(body)    )
 
-    def complete__transfer_id(self, transfer_id: Safe_Str__Id,                    # POST /transfers/complete/{transfer_id} (todo: should be Transfer_Id)
-                                    request: Request
+    def complete__transfer_id(self, transfer_id  : Safe_Str__Id,                  # POST /transfers/complete/{transfer_id} (todo: should be Transfer_Id)
+                                    request      : Request     ,
+                                    access_token : str = ''                      # MCP tool parameter
                              ) -> dict:                                          # todo: -> Schema__Transfer__Complete_Response
-        token_name = self.check_access_token(request)
+        token_name = self.check_access_token(request, access_token)
         result     = self.transfer_service.complete_transfer(transfer_id)
         if result is None:
             raise HTTPException(status_code = 404,
