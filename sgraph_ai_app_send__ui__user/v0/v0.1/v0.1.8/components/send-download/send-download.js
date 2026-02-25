@@ -37,6 +37,11 @@
                 margin-right: auto;
             }
 
+            /* Details panel — enable container queries for narrow-width adaptation */
+            #details-panel {
+                container-type: inline-size;
+            }
+
             /* Compact transparency panel inside the details sidebar */
             #details-panel .transparency {
                 padding: var(--space-3, 12px) var(--space-4, 16px);
@@ -58,6 +63,8 @@
             #details-panel .transparency__row {
                 padding: 2px 0;
                 font-size: var(--text-small, 0.8rem);
+                flex-direction: column;
+                gap: 1px;
             }
             #details-panel .transparency__value {
                 font-size: var(--text-small, 0.8rem);
@@ -68,12 +75,48 @@
                 padding-top: var(--space-2, 0.5rem);
             }
 
+            /* Details panel — compact when sidebar is narrow */
+            @container (max-width: 280px) {
+                #details-panel > div:first-child h3 {
+                    font-size: 0.95rem !important;
+                }
+                #details-panel .btn {
+                    font-size: 0.8rem !important;
+                    padding: 0.5rem 0.75rem !important;
+                }
+                #details-panel .btn#save-file-btn {
+                    padding: 0.65rem 0.75rem !important;
+                    font-size: 0.85rem !important;
+                    border-radius: 8px !important;
+                }
+                #details-panel .transparency {
+                    padding: 8px 10px;
+                }
+                #details-panel .transparency__title {
+                    font-size: 0.75rem;
+                }
+                #details-panel .transparency__section-label {
+                    font-size: 0.7rem;
+                    margin-top: 8px;
+                }
+                #details-panel .transparency__row {
+                    font-size: 0.7rem;
+                }
+                #details-panel .transparency__value {
+                    font-size: 0.7rem;
+                }
+                #details-panel .transparency__footer {
+                    font-size: 0.7rem;
+                }
+            }
+
             /* Mobile: stack vertically */
             @media (max-width: 768px) {
                 #preview-split {
                     grid-template-columns: 1fr !important;
                     grid-template-rows: minmax(250px, 50vh) auto !important;
                     max-height: none !important;
+                    height: auto !important;
                 }
                 #split-resize { display: none !important; }
                 #preview-panel { order: -1; }
@@ -147,7 +190,7 @@
         }
     };
 
-    // ─── Override render — expand main + constrain siblings ────────
+    // ─── Override render — expand main + fill viewport height ──────
 
     const _origRender = SendDownload.prototype.render;
 
@@ -166,6 +209,16 @@
                 main.style.width    = '';
                 main.classList.remove('preview-expanded');
             }
+        }
+
+        // Fill available viewport height
+        const split = this.querySelector('#preview-split');
+        if (split && isPreview) {
+            requestAnimationFrame(() => {
+                const rect      = split.getBoundingClientRect();
+                const available = window.innerHeight - rect.top - 16;
+                split.style.height = Math.max(available, 300) + 'px';
+            });
         }
     };
 
@@ -271,8 +324,7 @@
                 display: grid;
                 grid-template-columns: ${savedWidth}px 4px 1fr;
                 gap: 0;
-                min-height: 400px;
-                max-height: 80vh;
+                min-height: 300px;
             ">
                 <!-- Left: Details Panel -->
                 <div id="details-panel" style="
@@ -280,7 +332,7 @@
                     padding-right: var(--space-4, 1rem);
                     display: flex;
                     flex-direction: column;
-                    gap: var(--space-4, 1rem);
+                    gap: var(--space-3, 0.75rem);
                 ">
                     <!-- File info -->
                     <div>
