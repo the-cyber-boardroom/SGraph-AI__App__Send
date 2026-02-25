@@ -15,6 +15,7 @@ issues-fs-cli                  = "*"
 osbot-fast-api-serverless      = "*"
 mgraph-ai-service-cache        = "*"
 mgraph-ai-service-cache-client = "*"
+fastapi-mcp                    = "*"
 
 [build-system]
 requires = ["poetry-core>=1.9.1"]
