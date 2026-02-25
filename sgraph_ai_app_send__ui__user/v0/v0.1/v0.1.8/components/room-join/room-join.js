@@ -11,8 +11,9 @@
      <room-join></room-join>
 
    URL hash support:
-     join.html#A1B2C3D4E5F6          — auto-fills invite code
-     join.html#A1B2C3D4E5F6:alice     — auto-fills code + user ID
+     join.html#CODE                    — auto-fills invite code
+     join.html#CODE:user               — auto-fills code + user ID
+     join.html#CODE:user:ROOMKEY       — auto-fills code + user ID + room key
    ============================================================================= */
 
 class RoomJoin extends HTMLElement {
@@ -24,6 +25,7 @@ class RoomJoin extends HTMLElement {
         this._step       = 'code';      // code | preview | joining | done | error
         this._inviteCode = '';
         this._userId     = '';
+        this._roomKey    = '';           // 64-char hex room encryption key (from URL hash)
         this._roomInfo   = null;         // from validate response
         this._joinResult = null;         // from accept response
         this._error      = null;
@@ -51,6 +53,9 @@ class RoomJoin extends HTMLElement {
         this._inviteCode = (parts[0] || '').trim().toUpperCase();
         if (parts[1]) {
             this._userId = parts[1].trim();
+        }
+        if (parts[2]) {
+            this._roomKey = parts[2].trim().toLowerCase();
         }
     }
 
@@ -132,6 +137,10 @@ class RoomJoin extends HTMLElement {
 
     _handleEnterRoom() {
         if (!this._joinResult) return;
+        // Store room key if available (from URL hash or future UI)
+        if (this._roomKey) {
+            sessionStorage.setItem('sg_room_key', this._roomKey);
+        }
         const roomId = this._joinResult.room_id;
         window.location.href = `room.html#${roomId}`;
     }
