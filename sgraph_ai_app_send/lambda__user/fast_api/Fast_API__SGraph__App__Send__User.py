@@ -22,6 +22,7 @@ from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault             
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
 from sgraph_ai_app_send.lambda__user.user__config                                   import HEADER__SGRAPH_SEND__ACCESS_TOKEN
+from sgraph_ai_app_send.utils.MCP__Setup                                            import MCP__Setup
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
 ROUTES_PATHS__APP_SEND__STATIC__USER  = ['/',
@@ -125,6 +126,13 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         # if self.send_cache_client is not None:                                      # Add analytics middleware if cache client available  # disabled: creates 5 files per request, caused 65k+ file buildup — redesign needed
         #     self.app().add_middleware(Middleware__Analytics,
         #                              send_cache_client = self.send_cache_client)
+
+        self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
+
+    def setup_mcp(self):                                                              # Mount MCP server on /mcp endpoint
+        mcp_setup = MCP__Setup(name         = 'sgraph-send-user'                          ,
+                               include_tags = ['transfers', 'presigned', 'vault']         )
+        self.mcp = mcp_setup.mount_mcp(self.app())
 
 
     # todo: refactor to separate class (focused on setting up this static route)
