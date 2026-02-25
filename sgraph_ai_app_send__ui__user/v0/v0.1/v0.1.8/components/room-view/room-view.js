@@ -309,14 +309,12 @@
                         URL.revokeObjectURL(url);
                         this._showStatus('success', '"' + (meta.name || fileGuid) + '" decrypted and downloaded');
                     } catch (decErr) {
-                        // Decryption failed — offer raw download
-                        this._showStatus('error', 'Decryption failed (wrong key?). Downloading encrypted blob.');
-                        this._downloadRawBlob(packed, fileGuid);
+                        // Decryption failed — do NOT save encrypted blob
+                        this._showStatus('error', 'Decryption failed — wrong room key. File was not saved.');
                     }
                 } else {
-                    // No key — download encrypted blob
-                    this._downloadRawBlob(packed, fileGuid);
-                    this._showStatus('info', 'Downloaded encrypted blob (no room key set)');
+                    // No key — cannot decrypt, do NOT save encrypted blob
+                    this._showStatus('error', 'No room key set — cannot decrypt file. File was not saved.');
                 }
             } catch (e) {
                 this._showStatus('error', 'Download failed: ' + e.message);
