@@ -11,6 +11,8 @@ from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens            
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                import ROUTES_PATHS__KEYS
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault              import ROUTES_PATHS__VAULT
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Users             import ROUTES_PATHS__USERS
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Data_Room        import ROUTES_PATHS__ROOMS
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Invites          import ROUTES_PATHS__INVITES
 from tests.unit.lambda__admin.Fast_API__Test_Objs__SGraph__App__Send__Admin         import TEST_API_KEY__NAME, Fast_API__Test_Objs__SGraph__App__Send__Admin, \
     setup__html_graph_service__fast_api_test_objs
 
@@ -63,6 +65,8 @@ class test_Fast_API__SGraph__App__Send__Admin(TestCase):
                                 ROUTES_PATHS__KEYS                    +
                                 ROUTES_PATHS__VAULT                   +
                                 ROUTES_PATHS__USERS                   +
+                                ROUTES_PATHS__ROOMS                   +
+                                ROUTES_PATHS__INVITES                 +
                                 ROUTES_PATHS__ANALYTICS               +
                                 ROUTES_PATHS__CACHE                   )
 
