@@ -156,6 +156,70 @@ class test_Routes__Transfers(TestCase):
         info     = self.client.get(f'/transfers/info/{tid}').json()
         assert info['download_count']            == 1
 
+    # --- MCP upload: JSON-wrapped base64 must be unwrapped ---
+
+    def test__upload_payload__mcp_base64_unwrap(self):
+        """MCP clients send encrypted bytes as JSON {"data": "<base64>"}.
+        The upload handler must unwrap this so the download returns raw bytes."""
+        import base64
+        raw_payload = b'\xde\xad\xbe\xef\x01\x02\x03\x04'
+        mcp_body    = b'{"data": "' + base64.b64encode(raw_payload) + b'"}'
+
+        create = self.client.post('/transfers/create',
+                                  json=dict(file_size_bytes = len(raw_payload))).json()
+        tid = create['transfer_id']
+        self.client.post(f'/transfers/upload/{tid}',
+                         content = mcp_body,
+                         headers = {'content-type': 'application/json'})
+        self.client.post(f'/transfers/complete/{tid}')
+
+        # Download must return raw bytes, not the JSON wrapper
+        response = self.client.get(f'/transfers/download/{tid}')
+        assert response.status_code  == 200
+        assert response.content      == raw_payload
+
+    def test__upload_payload__raw_bytes_unchanged(self):
+        """Browser uploads send raw bytes — these must NOT be altered by unwrap logic."""
+        raw_payload = b'\x7b\x00\x01\x02'                                     # starts with '{' but is NOT valid JSON
+
+        create = self.client.post('/transfers/create',
+                                  json=dict(file_size_bytes = len(raw_payload))).json()
+        tid = create['transfer_id']
+        self.client.post(f'/transfers/upload/{tid}',
+                         content = raw_payload,
+                         headers = {'content-type': 'application/octet-stream'})
+        self.client.post(f'/transfers/complete/{tid}')
+
+        response = self.client.get(f'/transfers/download/{tid}')
+        assert response.status_code  == 200
+        assert response.content      == raw_payload
+
+    def test__upload_payload__mcp_full_round_trip(self):
+        """Full MCP round-trip: upload via JSON base64, download raw, download-base64."""
+        import base64
+        raw_payload = b'hello from claude.ai web!'
+        mcp_body    = b'{"data": "' + base64.b64encode(raw_payload) + b'"}'
+
+        create = self.client.post('/transfers/create',
+                                  json=dict(file_size_bytes   = len(raw_payload),
+                                            content_type_hint = 'text/plain')).json()
+        tid = create['transfer_id']
+        upload = self.client.post(f'/transfers/upload/{tid}',
+                                  content = mcp_body,
+                                  headers = {'content-type': 'application/json'})
+        assert upload.json()['size'] == len(raw_payload)                       # size reflects unwrapped payload
+
+        self.client.post(f'/transfers/complete/{tid}')
+
+        # Direct download returns raw bytes
+        download = self.client.get(f'/transfers/download/{tid}')
+        assert download.content == raw_payload
+
+        # Base64 download returns base64 of raw bytes (not base64 of JSON)
+        b64_download = self.client.get(f'/transfers/download-base64/{tid}')
+        b64_data     = b64_download.json()
+        assert base64.b64decode(b64_data['data']) == raw_payload
+
     # --- Security: complete response must not leak sensitive data ---
 
     def test__complete__does_not_leak_token(self):
