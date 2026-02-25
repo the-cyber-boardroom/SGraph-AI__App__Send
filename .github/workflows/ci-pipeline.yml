@@ -172,6 +172,7 @@ jobs:
           SGRAPH_SEND__ADMIN__BASE_URL                 : ${{ secrets.SGRAPH_SEND__ADMIN__BASE_URL                 }}
           SGRAPH_SEND__ADMIN__API_KEY__NAME            : ${{ secrets.SGRAPH_SEND__ADMIN__API_KEY__NAME            }}
           SGRAPH_SEND__ADMIN__API_KEY__VALUE           : ${{ secrets.SGRAPH_SEND__ADMIN__API_KEY__VALUE           }}
+          CACHE__SERVICE__BUCKET_NAME                  : ${{ secrets.CACHE__SERVICE__BUCKET_NAME                  }}
         with:
           target     : ${{ inputs.target_deploy }}
           lambda_type: 'User'
