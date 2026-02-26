@@ -1,0 +1,346 @@
+{
+  "name": "SG/Send - Sherpa workmail",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "workmail",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "81b3e067-d66d-4687-98c0-f05c31504622",
+      "name": "MCP / Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        144
+      ],
+      "webhookId": "b3e1a368-bacd-49d8-a57a-5da37975ec7d",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "zHdMoXwT0QkwSpmY",
+          "name": "Header Auth account"
+        }
+      },
+      "notes": "Entry point — called by the MCP Server Trigger node or directly via webhook. Expects JSON body with 'operation' field."
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "output": "={{ ['send_email','list_inbox','get_message','reply'].indexOf($json.body.operation) }}"
+      },
+      "id": "a8c83dc6-885e-4a38-af06-106f55e0255e",
+      "name": "Route by Operation",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -240,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://ews.mail.{{ $vars.WORKMAIL_REGION }}.awsapps.com/EWS/Exchange.asmx",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=utf-8"
+            },
+            {
+              "name": "SOAPAction",
+              "value": "\"\""
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/xml",
+        "body": "=<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope\n  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n  xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\"\n  xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\"\n  xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <t:RequestServerVersion Version=\"Exchange2007_SP1\" />\n  </soap:Header>\n  <soap:Body>\n    <m:CreateItem MessageDisposition=\"SendAndSaveCopy\">\n      <m:SavedItemFolderId>\n        <t:DistinguishedFolderId Id=\"sentitems\" />\n      </m:SavedItemFolderId>\n      <m:Items>\n        <t:Message>\n          <t:Subject>{{ $json.body.subject }}</t:Subject>\n          <t:Body BodyType=\"HTML\">{{ $json.body.body }}</t:Body>\n          <t:ToRecipients>\n            <t:Mailbox>\n              <t:EmailAddress>{{ $json.body.to }}</t:EmailAddress>\n            </t:Mailbox>\n          </t:ToRecipients>\n          {{ $json.cc ? '<t:CcRecipients><t:Mailbox><t:EmailAddress>' + $json.body.cc + '</t:EmailAddress></t:Mailbox></t:CcRecipients>' : '' }}\n        </t:Message>\n      </m:Items>\n    </m:CreateItem>\n  </soap:Body>\n</soap:Envelope>",
+        "options": {}
+      },
+      "id": "6532e670-ea55-4862-b998-c8b77dca338b",
+      "name": "EWS: Send Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "LBtvVchT7997D64d",
+          "name": "WorkMail - Sherpa Explorer"
+        }
+      },
+      "notes": "Sends email via EWS CreateItem. Input: { to, subject, body (HTML), cc (optional) }"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ews.mail.eu-west-1.awsapps.com/EWS/Exchange.asmx",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=utf-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/xml",
+        "body": "=<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope\n  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n  xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\"\n  xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\"\n  xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <t:RequestServerVersion Version=\"Exchange2007_SP1\" />\n  </soap:Header>\n  <soap:Body>\n     <m:FindItem Traversal=\"Shallow\">\n      <m:ItemShape>\n        <t:BaseShape>AllProperties</t:BaseShape>\n        <t:AdditionalProperties>\n          <t:FieldURI FieldURI=\"message:From\" />\n          <t:FieldURI FieldURI=\"message:Sender\" />\n        </t:AdditionalProperties>\n      </m:ItemShape>\n    <m:IndexedPageItemView MaxEntriesReturned=\"{{ $json.body.limit ?? 20 }}\" Offset=\"0\" BasePoint=\"Beginning\" />\n    <m:Restriction>\n      <t:IsGreaterThan>\n        <t:FieldURI FieldURI=\"item:DateTimeReceived\" />\n        <t:FieldURIOrConstant>\n          <t:Constant Value=\"{{ $json.body.since ?? new Date(Date.now() - 24*60*60*1000).toISOString() }}\" />\n        </t:FieldURIOrConstant>\n      </t:IsGreaterThan>\n    </m:Restriction>\n    <m:SortOrder>\n      <t:FieldOrder Order=\"Descending\">\n        <t:FieldURI FieldURI=\"item:DateTimeReceived\" />\n      </t:FieldOrder>\n    </m:SortOrder>\n    <m:ParentFolderIds>\n      <t:DistinguishedFolderId Id=\"inbox\" />\n    </m:ParentFolderIds>\n  </m:FindItem>\n  </soap:Body>\n</soap:Envelope>",
+        "options": {}
+      },
+      "id": "3bcf4710-d81c-41e8-bbce-097b52c6ae48",
+      "name": "EWS: List Inbox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        144
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "LBtvVchT7997D64d",
+          "name": "WorkMail - Sherpa Explorer"
+        }
+      },
+      "notes": "Lists inbox messages. Input: { limit (default 20), offset (default 0), since (ISO timestamp, default 24h ago) }"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://ews.mail.{{ $vars.WORKMAIL_REGION }}.awsapps.com/EWS/Exchange.asmx",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=utf-8"
+            },
+            {
+              "name": "SOAPAction",
+              "value": "\"\""
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/xml",
+        "body": "=<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope\n  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n  xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\"\n  xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\"\n  xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <t:RequestServerVersion Version=\"Exchange2007_SP1\" />\n  </soap:Header>\n  <soap:Body>\n    <m:GetItem>\n      <m:ItemShape>\n        <t:BaseShape>AllProperties</t:BaseShape>\n        <t:IncludeMimeContent>false</t:IncludeMimeContent>\n        <t:AdditionalProperties>\n          <t:FieldURI FieldURI=\"item:Body\" />\n          <t:FieldURI FieldURI=\"message:From\" />\n          <t:FieldURI FieldURI=\"message:ToRecipients\" />\n          <t:FieldURI FieldURI=\"item:Subject\" />\n          <t:FieldURI FieldURI=\"item:DateTimeReceived\" />\n        </t:AdditionalProperties>\n      </m:ItemShape>\n      <m:ItemIds>\n        <t:ItemId Id=\"{{ $json.body.item_id }}\" />\n      </m:ItemIds>\n    </m:GetItem>\n  </soap:Body>\n</soap:Envelope>",
+        "options": {}
+      },
+      "id": "90de7a22-2365-4849-81d3-452a976ae2b6",
+      "name": "EWS: Get Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        288
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "LBtvVchT7997D64d",
+          "name": "WorkMail - Sherpa Explorer"
+        }
+      },
+      "notes": "Fetches full message by ItemId. Input: { item_id }"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://ews.mail.{{ $vars.WORKMAIL_REGION }}.awsapps.com/EWS/Exchange.asmx",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/xml; charset=utf-8"
+            },
+            {
+              "name": "SOAPAction",
+              "value": "\"\""
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/xml",
+        "body": "=<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope\n  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n  xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\"\n  xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\"\n  xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header>\n    <t:RequestServerVersion Version=\"Exchange2007_SP1\" />\n  </soap:Header>\n  <soap:Body>\n    <m:CreateItem MessageDisposition=\"SendAndSaveCopy\">\n      <m:Items>\n        <t:ReplyToItem>\n          <t:ReferenceItemId Id=\"{{ $json.body.item_id }}\" />\n          <t:NewBodyContent BodyType=\"HTML\">{{ $json.body.body }}</t:NewBodyContent>\n        </t:ReplyToItem>\n      </m:Items>\n    </m:CreateItem>\n  </soap:Body>\n</soap:Envelope>",
+        "options": {}
+      },
+      "id": "54d4a4cc-c3fb-48be-89c5-fd3cdb1ff8c4",
+      "name": "EWS: Reply to Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        432
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "LBtvVchT7997D64d",
+          "name": "WorkMail - Sherpa Explorer"
+        }
+      },
+      "notes": "Replies to an existing message. Input: { item_id, body (HTML) }"
+    },
+    {
+      "parameters": {
+        "jsCode": "// EWS returns XML. n8n's HTTP Request node returns it as a string.\n// This code node parses the SOAP response into a clean JSON structure.\n// It handles both FindItem and GetItem and CreateItem responses.\n\nconst xmlData = $input.item.json.data ?? $input.item.json;\n\n// Simple XML attribute/value extractor (no external deps needed)\nfunction extractBetweenTags(xml, tag) {\n  const closeTag = `</${tag}>`;\n  let searchFrom = 0;\n  while (true) {\n    const start = xml.indexOf(`<${tag}`, searchFrom);\n    if (start === -1) return null;\n    const charAfter = xml[start + tag.length + 1];\n    if (charAfter === '>' || charAfter === ' ') {\n      const contentStart = xml.indexOf('>', start) + 1;\n      const end = xml.indexOf(closeTag, contentStart);\n      if (end === -1) return null;\n      return xml.substring(contentStart, end).trim();\n    }\n    searchFrom = start + 1;\n  }\n}\n\nfunction extractAll(xml, tag) {\n  const results = [];\n  let searchFrom = 0;\n  while (true) {\n    const start = xml.indexOf(`<${tag}`, searchFrom);\n    if (start === -1) break;\n    const charAfter = xml[start + tag.length + 1];\n    if (charAfter !== '>' && charAfter !== ' ') {\n      searchFrom = start + 1;\n      continue;\n    }\n    const contentStart = xml.indexOf('>', start) + 1;\n    const end = xml.indexOf(`</${tag}>`, contentStart);\n    if (end === -1) break;\n    results.push(xml.substring(contentStart, end).trim());\n    searchFrom = end + `</${tag}>`.length;\n  }\n  return results;\n}\n\n\nfunction extractAttr(xml, tag, attr) {\n  const tagStart = xml.indexOf(`<${tag}`);\n  if (tagStart === -1) return null;\n  const tagEnd = xml.indexOf('>', tagStart);\n  const tagContent = xml.substring(tagStart, tagEnd);\n  const attrMatch = tagContent.match(new RegExp(`${attr}=\"([^\"]+)\"`, 'i'));\n  return attrMatch ? attrMatch[1] : null;\n}\n\n// Check for errors first\nconst responseCode = extractBetweenTags(xmlData, 'm:ResponseCode') ||\n                     extractBetweenTags(xmlData, 'ResponseCode');\n\nif (responseCode && responseCode !== 'NoError') {\n  const messageText = extractBetweenTags(xmlData, 'm:MessageText') ||\n                      extractBetweenTags(xmlData, 'MessageText') || 'Unknown EWS error';\n  return [{ json: { success: false, error: responseCode, message: messageText, raw: xmlData } }];\n}\n\n// Parse CreateItem response (send/reply)\nif (xmlData.includes('CreateItemResponse') || xmlData.includes('ReplyToItemResponse')) {\n  return [{ json: { success: true, operation: 'created' } }];\n}\n\n// Parse FindItem response (list inbox)\nif (xmlData.includes('FindItemResponse')) {\n  const messages = [];\n  const messageBlocks = extractAll(xmlData, 't:Message');\n  for (const block of messageBlocks) {\n    messages.push({      \n      item_id: extractAttr(block, 't:ItemId', 'Id') || extractAttr(block, 'ItemId', 'Id'),\n      change_key: extractAttr(block, 't:ItemId', 'ChangeKey'),\n      subject: extractBetweenTags(block, 't:Subject') || extractBetweenTags(block, 'Subject'),\n      from: (() => { \n        const f = extractBetweenTags(block, 't:From'); \n        if (!f) return null;\n        const m = extractBetweenTags(f, 't:Mailbox');\n        return m ? extractBetweenTags(m, 't:EmailAddress') : extractBetweenTags(f, 't:EmailAddress');\n      })(),\n      from_name: (() => { \n        const f = extractBetweenTags(block, 't:From'); \n        if (!f) return null;\n        const m = extractBetweenTags(f, 't:Mailbox');\n        return m ? extractBetweenTags(m, 't:Name') : extractBetweenTags(f, 't:Name');\n      })(),\n      received: extractBetweenTags(block, 't:DateTimeReceived') || extractBetweenTags(block, 'DateTimeReceived'),\n      is_read: extractBetweenTags(block, 't:IsRead') || extractBetweenTags(block, 'IsRead'),\n    });\n  }\n  return [{ json: { success: true, count: messages.length, messages } }];\n}\n\n// Parse GetItem response (full message)\nif (xmlData.includes('GetItemResponse')) {\n  const messageBlock = extractBetweenTags(xmlData, 't:Message') ||\n                       extractBetweenTags(xmlData, 'Message');\n  if (!messageBlock) return [{ json: { success: false, error: 'Could not parse message', raw: xmlData } }];\n  \n  return [{ json: {\n    success: true,\n    item_id: extractAttr(xmlData, 't:ItemId', 'Id'),\n    subject: extractBetweenTags(xmlData, 't:Subject'),\n    from_email: extractBetweenTags(xmlData, 't:EmailAddress'),\n    from_name: extractBetweenTags(xmlData, 't:Name'),\n    received: extractBetweenTags(xmlData, 't:DateTimeReceived'),\n    body: extractBetweenTags(xmlData, 't:Body'),\n    is_read: extractBetweenTags(xmlData, 't:IsRead'),\n  } }];\n}\n\n// Fallback: return raw\nreturn [{ json: { success: true, raw: xmlData } }];\n"
+      },
+      "id": "0e001242-30c3-47fa-b0c8-00db453ce2d9",
+      "name": "Parse EWS XML Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "38465a5e-c22b-4f14-918e-37ac2900ac10",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        224
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "MCP / Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Route by Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Operation": {
+      "main": [
+        [
+          {
+            "node": "EWS: Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "EWS: List Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "EWS: Get Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "EWS: Reply to Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EWS: Send Email": {
+      "main": [
+        [
+          {
+            "node": "Parse EWS XML Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EWS: List Inbox": {
+      "main": [
+        [
+          {
+            "node": "Parse EWS XML Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EWS: Get Message": {
+      "main": [
+        [
+          {
+            "node": "Parse EWS XML Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EWS: Reply to Message": {
+      "main": [
+        [
+          {
+            "node": "Parse EWS XML Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse EWS XML Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "4a91cd3f-f0a8-45cb-9103-a387d32889b1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3c68998758aa44d1cf29bd3e408a8eff006e3092f0ed9747a84ab43a22abfca1"
+  },
+  "id": "LNTb1Smmt91x8iGn",
+  "tags": []
+}
