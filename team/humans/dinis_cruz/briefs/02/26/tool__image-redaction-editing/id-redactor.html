@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ID Redactor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --border: #2e2e2e;
+    --accent: #e8ff47;
+    --accent-dim: rgba(232,255,71,0.12);
+    --text: #e8e8e8;
+    --muted: #666;
+    --danger: #ff4757;
+    --success: #2ed573;
+  }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px;
+  }
+
+  header {
+    width: 100%;
+    max-width: 960px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+  }
+
+  header p {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid rgba(232,255,71,0.3);
+    padding: 2px 8px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+
+  .workspace {
+    width: 100%;
+    max-width: 960px;
+  }
+
+  /* Upload zone */
+  #upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 4px;
+    padding: 60px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  #upload-zone:hover, #upload-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  #upload-zone input {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  #upload-zone .icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+  #upload-zone h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  #upload-zone p {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Canvas area */
+  #editor {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    margin-right: 4px;
+  }
+
+  .tool-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+  }
+  .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .tool-btn.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .tool-btn.danger { border-color: var(--danger); color: var(--danger); }
+  .tool-btn.danger:hover { background: var(--danger); color: #fff; }
+  .tool-btn.success { border-color: var(--success); color: var(--success); }
+  .tool-btn.success:hover { background: var(--success); color: #000; }
+
+  .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+  .color-swatch {
+    width: 24px; height: 24px;
+    border-radius: 3px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .color-swatch.active { border-color: var(--accent); }
+
+  .canvas-wrapper {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    min-height: 200px;
+  }
+
+  #main-canvas {
+    display: block;
+    max-width: 100%;
+    cursor: crosshair;
+  }
+
+  /* Selection overlay during drag */
+  #selection-box {
+    position: absolute;
+    border: 2px dashed var(--accent);
+    background: rgba(232,255,71,0.1);
+    pointer-events: none;
+    display: none;
+  }
+
+  .info-bar {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    gap: 20px;
+    padding: 0 2px;
+    align-items: center;
+  }
+  .info-bar span { color: var(--text); }
+
+  .undo-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>// ID_REDACTOR</h1>
+  <p>Upload · Redact · Download</p>
+  <div class="tag">Local Only</div>
+</header>
+
+<div class="workspace">
+
+  <div id="upload-zone">
+    <input type="file" id="file-input" accept="image/*">
+    <div class="icon">⬆</div>
+    <h2>Drop your ID image here</h2>
+    <p>or click to browse — PNG, JPG, WEBP accepted<br>
+    <small style="color:#444;margin-top:6px;display:block">Never leaves your browser</small></p>
+  </div>
+
+  <div id="editor">
+    <div class="toolbar">
+      <span class="toolbar-label">MODE</span>
+      <button class="tool-btn active" id="btn-redact" onclick="setMode('redact')">■ REDACT</button>
+      <button class="tool-btn" id="btn-erase" onclick="setMode('erase')">◻ ERASE</button>
+
+      <div class="sep"></div>
+      <span class="toolbar-label">COLOR</span>
+      <div class="color-swatch active" style="background:#000" onclick="setColor('#000000')" title="Black" id="sw-0"></div>
+      <div class="color-swatch" style="background:#1a1a4e" onclick="setColor('#1a1a4e')" title="Dark Blue" id="sw-1"></div>
+      <div class="color-swatch" style="background:#fff;border:2px solid #333" onclick="setColor('#ffffff')" title="White" id="sw-2"></div>
+
+      <div class="sep"></div>
+      <button class="tool-btn" onclick="undoLast()">↩ UNDO</button>
+      <button class="tool-btn danger" onclick="clearAll()">✕ CLEAR</button>
+      <div class="sep"></div>
+      <button class="tool-btn success" onclick="downloadImage()">↓ DOWNLOAD</button>
+      <button class="tool-btn" onclick="resetTool()" style="margin-left:auto">⟳ NEW IMAGE</button>
+    </div>
+
+    <div class="canvas-wrapper" id="canvas-wrapper">
+      <canvas id="main-canvas"></canvas>
+      <div id="selection-box"></div>
+    </div>
+
+    <div class="info-bar">
+      <div>REDACTIONS: <span id="count">0</span></div>
+      <div>SIZE: <span id="img-size">—</span></div>
+      <div class="undo-hint">Drag to draw redaction box · Ctrl+Z to undo</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+const selBox = document.getElementById('selection-box');
+const wrapper = document.getElementById('canvas-wrapper');
+
+let img = null;
+let redactions = []; // {x, y, w, h, color}
+let mode = 'redact';
+let color = '#000000';
+let dragging = false;
+let startX, startY, currentX, currentY;
+
+// --- Upload ---
+const fileInput = document.getElementById('file-input');
+const uploadZone = document.getElementById('upload-zone');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadFile(file);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    img = new Image();
+    img.onload = () => {
+      // Scale to fit max 880px wide
+      const maxW = Math.min(880, img.naturalWidth);
+      const scale = maxW / img.naturalWidth;
+      canvas.width = img.naturalWidth * scale;
+      canvas.height = img.naturalHeight * scale;
+      redactions = [];
+      renderCanvas();
+      document.getElementById('upload-zone').style.display = 'none';
+      document.getElementById('editor').style.display = 'flex';
+      document.getElementById('img-size').textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+      updateCount();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// --- Rendering ---
+function renderCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  for (const r of redactions) {
+    ctx.fillStyle = r.color;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  }
+}
+
+// --- Mouse events ---
+canvas.addEventListener('mousedown', e => {
+  const {x, y} = canvasPos(e);
+  startX = x; startY = y;
+  dragging = true;
+  selBox.style.display = 'block';
+  updateSelBox(x, y, 0, 0);
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const {x, y} = canvasPos(e);
+  currentX = x; currentY = y;
+  const rx = Math.min(startX, x), ry = Math.min(startY, y);
+  const rw = Math.abs(x - startX), rh = Math.abs(y - startY);
+  updateSelBox(rx, ry, rw, rh);
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!dragging) return;
+  dragging = false;
+  selBox.style.display = 'none';
+  const {x, y} = canvasPos(e);
+  const rx = Math.min(startX, x), ry = Math.min(startY, y);
+  const rw = Math.abs(x - startX), rh = Math.abs(y - startY);
+  if (rw < 3 || rh < 3) return;
+
+  if (mode === 'erase') {
+    // Remove any redactions overlapping this area
+    redactions = redactions.filter(r => !overlaps(r, {x:rx, y:ry, w:rw, h:rh}));
+  } else {
+    redactions.push({x: rx, y: ry, w: rw, h: rh, color});
+  }
+  renderCanvas();
+  updateCount();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (dragging) { dragging = false; selBox.style.display = 'none'; }
+});
+
+// Touch support
+canvas.addEventListener('touchstart', e => { e.preventDefault(); canvas.dispatchEvent(touchToMouse(e, 'mousedown')); }, {passive:false});
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); canvas.dispatchEvent(touchToMouse(e, 'mousemove')); }, {passive:false});
+canvas.addEventListener('touchend',   e => { e.preventDefault(); canvas.dispatchEvent(touchToMouse(e, 'mouseup')); },  {passive:false});
+
+function touchToMouse(e, type) {
+  const t = e.touches[0] || e.changedTouches[0];
+  return new MouseEvent(type, { clientX: t.clientX, clientY: t.clientY });
+}
+
+function canvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+
+function updateSelBox(x, y, w, h) {
+  const rect = canvas.getBoundingClientRect();
+  const wrapRect = wrapper.getBoundingClientRect();
+  const scaleX = rect.width / canvas.width;
+  const scaleY = rect.height / canvas.height;
+  selBox.style.left   = (rect.left - wrapRect.left + x * scaleX) + 'px';
+  selBox.style.top    = (rect.top  - wrapRect.top  + y * scaleY) + 'px';
+  selBox.style.width  = (w * scaleX) + 'px';
+  selBox.style.height = (h * scaleY) + 'px';
+}
+
+function overlaps(a, b) {
+  return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+}
+
+// --- Controls ---
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-redact').classList.toggle('active', m === 'redact');
+  document.getElementById('btn-erase').classList.toggle('active', m === 'erase');
+  canvas.style.cursor = m === 'erase' ? 'cell' : 'crosshair';
+}
+
+function setColor(c) {
+  color = c;
+  ['sw-0','sw-1','sw-2'].forEach((id,i) => {
+    document.getElementById(id).classList.remove('active');
+  });
+  // find which swatch
+  const swatches = ['#000000','#1a1a4e','#ffffff'];
+  const idx = swatches.indexOf(c);
+  if (idx >= 0) document.getElementById('sw-'+idx).classList.add('active');
+}
+
+function undoLast() {
+  if (redactions.length > 0) { redactions.pop(); renderCanvas(); updateCount(); }
+}
+
+function clearAll() {
+  if (!redactions.length) return;
+  if (confirm('Clear all redactions?')) { redactions = []; renderCanvas(); updateCount(); }
+}
+
+function updateCount() {
+  document.getElementById('count').textContent = redactions.length;
+}
+
+function downloadImage() {
+  if (!img) return;
+  // Render to a full-resolution canvas
+  const out = document.createElement('canvas');
+  out.width = img.naturalWidth;
+  out.height = img.naturalHeight;
+  const octx = out.getContext('2d');
+  octx.drawImage(img, 0, 0);
+  const scaleX = img.naturalWidth / canvas.width;
+  const scaleY = img.naturalHeight / canvas.height;
+  for (const r of redactions) {
+    octx.fillStyle = r.color;
+    octx.fillRect(r.x * scaleX, r.y * scaleY, r.w * scaleX, r.h * scaleY);
+  }
+  const link = document.createElement('a');
+  link.download = 'id-redacted.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+}
+
+function resetTool() {
+  redactions = [];
+  img = null;
+  document.getElementById('editor').style.display = 'none';
+  document.getElementById('upload-zone').style.display = 'block';
+  fileInput.value = '';
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLast(); }
+  if (e.key === 'r') setMode('redact');
+  if (e.key === 'e') setMode('erase');
+});
+</script>
+</body>
+</html>
