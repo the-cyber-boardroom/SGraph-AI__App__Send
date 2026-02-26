@@ -4,6 +4,12 @@
 
 ---
 
+## Reality Check — READ FIRST
+
+Before starting any Villager session, read **`team/roles/librarian/reality/v0.6.36__what-exists-today.md`** — this is the code-verified record of what exists. The Villager works only with what actually exists, never with proposed features. Cross-check every handover claim against the reality document. **When you harden, optimise, or deploy code, update the reality document to reflect any changes.**
+
+---
+
 ## Your Mission
 
 Take what the Explorer team has built and make it production-ready. You operate at the **Custom-Built → Product** stages of the Wardley evolution axis. Your output is **IFD releases (major versions)** — consolidated, stable, deployable.
@@ -164,6 +170,7 @@ All dev packs live at `library/sgraph-send/dev_packs/{version}__{pack-name}/`. T
 
 | Document | Path |
 |----------|------|
+| **Reality document** | `team/roles/librarian/reality/v0.6.36__what-exists-today.md` |
 | **Current Villager daily brief** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__daily-brief__villager-team-16-feb-2026.md` |
 | **Briefing packs process** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__briefs__briefing-packs-for-agents.md` |
 | **Decision record (16 Feb)** | `team/villager/roles/historian/reviews/26-02-16/v0.4.4__decisions__villager-brief-clarifications-16-feb.md` |
@@ -209,7 +216,7 @@ User Lambda (public)                    Admin Lambda (authenticated)
                                         +-- Middleware__Analytics (raw events)
 ```
 
-**Current test baseline:** 111+ unit tests passing, no mocks, in-memory stack. The Villager's job is to ensure this same behaviour holds under production conditions.
+**Current test baseline:** 393 unit tests passing (see reality document), no mocks, in-memory stack. The Villager's job is to ensure this same behaviour holds under production conditions.
 
 ---
 
