@@ -1,24 +1,32 @@
 /* =============================================================================
    SGraph Send Admin Console — Token Manager Web Component
-   v0.1.2 — IFD overlay: auto-refresh disabled
+   v0.1.3 — IFD overlay: token management improvements
 
-   Changes from v0.1.0:
-     - Disabled auto-refresh interval (manual refresh via button only)
+   Changes from v0.1.2:
+     - Fixed: spinner no longer persists after successful token create
+     - Added: sortable table columns (click header to sort)
+     - Added: search/filter tokens by name
+     - Added: edit usage limit (inline in detail view)
+     - Added: reactivate revoked/exhausted tokens
+     - Added: token count badge in header
+     - Added: copy token name to clipboard
 
    Token lifecycle management:
-     - Token list table (name, status, usage, created_by)
+     - Token list table (name, status, usage, created_by) — sortable
      - Create token form (name, usage_limit, created_by)
-     - Token detail view (click to expand)
-     - Revoke button with confirmation
+     - Token detail view (click to expand, edit limit)
+     - Revoke / Reactivate buttons
 
    Usage:
      <token-manager></token-manager>
 
    API calls:
-     GET  /tokens/list              — list all tokens
-     POST /tokens/create            — create a new token
-     GET  /tokens/lookup/{name}     — token detail
-     POST /tokens/revoke/{name}     — revoke a token
+     GET  /tokens/list-details              — list all tokens with details
+     POST /tokens/create                    — create a new token
+     GET  /tokens/lookup/{name}             — token detail
+     POST /tokens/revoke/{name}             — revoke a token
+     POST /tokens/update-limit/{name}       — update usage limit
+     POST /tokens/reactivate/{name}         — reactivate a token
    ============================================================================= */
 
 class TokenManager extends HTMLElement {
@@ -35,6 +43,10 @@ class TokenManager extends HTMLElement {
         this._creating       = false;
         this._revoking       = null;       // token_name being revoked
         this._refreshTimer   = null;
+        this._sortColumn     = 'name';     // 'name', 'status', 'usage', 'created_by'
+        this._sortAsc        = true;
+        this._filterText     = '';
+        this._editingLimit   = false;      // true when usage limit input is shown in detail
     }
 
     connectedCallback() {
@@ -82,6 +94,7 @@ class TokenManager extends HTMLElement {
         } catch (err) {
             this._tokenDetail = { error: err.message };
         }
+        this._editingLimit = false;
         this._renderDetail();
     }
 
@@ -105,6 +118,7 @@ class TokenManager extends HTMLElement {
             await adminAPI.createToken(tokenName, usageLimit, createdBy, {});
             this._showCreateForm = false;
             this._creating = false;
+            this._renderCreateForm();
             await this.loadTokens();
         } catch (err) {
             this._creating = false;
@@ -143,6 +157,105 @@ class TokenManager extends HTMLElement {
         }, 3000);
     }
 
+    // --- Reactivate Token ---------------------------------------------------
+
+    async _handleReactivate(tokenName) {
+        try {
+            await adminAPI.reactivateToken(tokenName);
+            await this.loadTokens();
+        } catch (err) {
+            this._error = `Reactivate failed: ${err.message}`;
+            this._renderList();
+        }
+    }
+
+    // --- Update Usage Limit -------------------------------------------------
+
+    async _handleUpdateLimit(tokenName, newLimit) {
+        try {
+            await adminAPI.updateTokenLimit(tokenName, newLimit);
+            this._editingLimit = false;
+            await this._loadTokenDetail(tokenName);
+            await this.loadTokens();
+        } catch (err) {
+            this._error = `Update limit failed: ${err.message}`;
+            this._renderError();
+        }
+    }
+
+    // --- Sorting ------------------------------------------------------------
+
+    _handleSort(column) {
+        if (this._sortColumn === column) {
+            this._sortAsc = !this._sortAsc;
+        } else {
+            this._sortColumn = column;
+            this._sortAsc    = true;
+        }
+        this._renderList();
+    }
+
+    _getSortedTokens() {
+        const tokens = [...this._tokens];
+        const col    = this._sortColumn;
+        const dir    = this._sortAsc ? 1 : -1;
+
+        tokens.sort((a, b) => {
+            let va, vb;
+            switch (col) {
+                case 'name':
+                    va = (a.token_name || '').toLowerCase();
+                    vb = (b.token_name || '').toLowerCase();
+                    return va < vb ? -dir : va > vb ? dir : 0;
+                case 'status':
+                    va = (a.status || '').toLowerCase();
+                    vb = (b.status || '').toLowerCase();
+                    return va < vb ? -dir : va > vb ? dir : 0;
+                case 'usage':
+                    va = a.usage_count ?? 0;
+                    vb = b.usage_count ?? 0;
+                    return (va - vb) * dir;
+                case 'created_by':
+                    va = (a.created_by || '').toLowerCase();
+                    vb = (b.created_by || '').toLowerCase();
+                    return va < vb ? -dir : va > vb ? dir : 0;
+                default:
+                    return 0;
+            }
+        });
+        return tokens;
+    }
+
+    // --- Filtering ----------------------------------------------------------
+
+    _getFilteredTokens(tokens) {
+        if (!this._filterText) return tokens;
+        const q = this._filterText.toLowerCase();
+        return tokens.filter(t =>
+            (t.token_name  || '').toLowerCase().includes(q) ||
+            (t.status      || '').toLowerCase().includes(q) ||
+            (t.created_by  || '').toLowerCase().includes(q)
+        );
+    }
+
+    // --- Copy to Clipboard --------------------------------------------------
+
+    async _handleCopy(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (_) {
+            // Fallback for non-secure contexts
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+    }
+
     // --- Auto-Refresh -------------------------------------------------------
 
     _startAutoRefresh() {
@@ -177,7 +290,10 @@ class TokenManager extends HTMLElement {
             <style>${TokenManager.styles}</style>
             <div class="token-manager">
                 <div class="panel-header">
-                    <h2 class="panel-header__title">Token Management</h2>
+                    <div class="panel-header__left">
+                        <h2 class="panel-header__title">Token Management</h2>
+                        <span class="token-count" id="token-count"></span>
+                    </div>
                     <div class="panel-header__actions">
                         <button class="btn btn--ghost btn--sm" id="btn-refresh" title="Refresh">
                             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
@@ -191,6 +307,7 @@ class TokenManager extends HTMLElement {
                 </div>
                 <div id="error-container"></div>
                 <div id="create-form-container"></div>
+                <div id="filter-container"></div>
                 <div id="list-container"></div>
                 <div id="detail-container"></div>
             </div>
@@ -202,6 +319,19 @@ class TokenManager extends HTMLElement {
             this._showCreateForm = !this._showCreateForm;
             this._renderCreateForm();
         });
+    }
+
+    // --- Render: Token Count ------------------------------------------------
+
+    _renderTokenCount() {
+        const el = this.shadowRoot.querySelector('#token-count');
+        if (!el) return;
+        if (this._tokens.length > 0) {
+            const active = this._tokens.filter(t => t.status === 'active').length;
+            el.textContent = `${this._tokens.length} total, ${active} active`;
+        } else {
+            el.textContent = '';
+        }
     }
 
     // --- Render: Error ------------------------------------------------------
@@ -273,11 +403,51 @@ class TokenManager extends HTMLElement {
         });
     }
 
+    // --- Render: Filter Bar -------------------------------------------------
+
+    _renderFilterBar() {
+        const el = this.shadowRoot.querySelector('#filter-container');
+        if (!el) return;
+        if (this._tokens.length === 0) {
+            el.innerHTML = '';
+            return;
+        }
+        el.innerHTML = `
+            <div class="filter-bar">
+                <svg class="filter-bar__icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+                </svg>
+                <input class="filter-bar__input" id="filter-input" type="text"
+                       placeholder="Filter tokens..." value="${this._escapeAttr(this._filterText)}">
+                ${this._filterText ? '<button class="btn btn--ghost btn--xs" id="btn-clear-filter">Clear</button>' : ''}
+            </div>
+        `;
+        const input = el.querySelector('#filter-input');
+        input.addEventListener('input', (e) => {
+            this._filterText = e.target.value;
+            this._renderList(true);  // true = skip re-rendering filter bar
+        });
+        const clearBtn = el.querySelector('#btn-clear-filter');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this._filterText = '';
+                this._renderFilterBar();
+                this._renderList(true);
+            });
+        }
+    }
+
     // --- Render: Token List -------------------------------------------------
 
-    _renderList() {
+    _renderList(skipFilter) {
         const el = this.shadowRoot.querySelector('#list-container');
         if (!el) return;
+
+        // Update count badge
+        this._renderTokenCount();
+
+        // Render filter bar (unless called from filter input itself)
+        if (!skipFilter) this._renderFilterBar();
 
         if (this._loading && this._tokens.length === 0) {
             el.innerHTML = `
@@ -299,16 +469,31 @@ class TokenManager extends HTMLElement {
             return;
         }
 
-        const rows = this._tokens.map(t => this._renderRow(t)).join('');
+        const sorted   = this._getSortedTokens();
+        const filtered = this._getFilteredTokens(sorted);
+        const rows     = filtered.map(t => this._renderRow(t)).join('');
+
+        const sortIcon = (col) => {
+            if (this._sortColumn !== col) return '<span class="sort-icon sort-icon--inactive">&#8597;</span>';
+            return this._sortAsc
+                ? '<span class="sort-icon">&#8593;</span>'
+                : '<span class="sort-icon">&#8595;</span>';
+        };
 
         el.innerHTML = `
+            ${filtered.length === 0 && this._filterText ? `
+                <div class="empty">
+                    <div class="empty__text">No tokens match "${this._escapeHtml(this._filterText)}"</div>
+                </div>
+            ` : ''}
+            ${filtered.length > 0 ? `
             <table class="token-table">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Usage</th>
-                        <th>Created By</th>
+                        <th class="sortable" data-col="name">Name ${sortIcon('name')}</th>
+                        <th class="sortable" data-col="status">Status ${sortIcon('status')}</th>
+                        <th class="sortable" data-col="usage">Usage ${sortIcon('usage')}</th>
+                        <th class="sortable" data-col="created_by">Created By ${sortIcon('created_by')}</th>
                         <th class="col-actions">Actions</th>
                     </tr>
                 </thead>
@@ -316,16 +501,22 @@ class TokenManager extends HTMLElement {
                     ${rows}
                 </tbody>
             </table>
+            ` : ''}
             ${this._loading ? '<div class="loading loading--inline"><span class="spinner"></span></div>' : ''}
         `;
 
         this._renderError();
 
+        // Wire sort headers
+        el.querySelectorAll('.sortable').forEach(th => {
+            th.addEventListener('click', () => this._handleSort(th.dataset.col));
+        });
+
         // Wire row clicks
         el.querySelectorAll('.token-row').forEach(row => {
             row.addEventListener('click', (e) => {
-                // Ignore clicks on buttons
-                if (e.target.closest('button')) return;
+                // Ignore clicks on buttons and inputs
+                if (e.target.closest('button') || e.target.closest('input')) return;
                 this._handleRowClick(row.dataset.token);
             });
         });
@@ -335,6 +526,24 @@ class TokenManager extends HTMLElement {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this._handleRevoke(btn.dataset.token);
+            });
+        });
+
+        // Wire reactivate buttons
+        el.querySelectorAll('.btn-reactivate').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleReactivate(btn.dataset.token);
+            });
+        });
+
+        // Wire copy buttons
+        el.querySelectorAll('.btn-copy').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleCopy(btn.dataset.value);
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
             });
         });
     }
@@ -348,6 +557,7 @@ class TokenManager extends HTMLElement {
         const isSelected = this._selectedToken === name;
         const isRevoking = this._revoking === name;
         const isActive   = status === 'active';
+        const isInactive = status === 'revoked' || status === 'exhausted';
 
         const usageText = usageLimit > 0
             ? `${usageCount} / ${usageLimit}`
@@ -361,6 +571,7 @@ class TokenManager extends HTMLElement {
             <tr class="token-row ${isSelected ? 'token-row--selected' : ''}" data-token="${this._escapeAttr(name)}">
                 <td class="col-name">
                     <span class="token-name">${this._escapeHtml(name)}</span>
+                    <button class="btn btn--ghost btn--xs btn-copy" data-value="${this._escapeAttr(name)}" title="Copy name">Copy</button>
                 </td>
                 <td>
                     <span class="status-badge status-badge--${status}">${status}</span>
@@ -378,6 +589,11 @@ class TokenManager extends HTMLElement {
                     ${isActive ? `
                         <button class="btn btn--danger btn--xs btn-revoke" data-token="${this._escapeAttr(name)}">
                             ${isRevoking ? 'Confirm Revoke?' : 'Revoke'}
+                        </button>
+                    ` : ''}
+                    ${isInactive ? `
+                        <button class="btn btn--success btn--xs btn-reactivate" data-token="${this._escapeAttr(name)}">
+                            Reactivate
                         </button>
                     ` : ''}
                 </td>
@@ -407,6 +623,20 @@ class TokenManager extends HTMLElement {
             ? Object.entries(d.metadata)
             : [];
 
+        const limitDisplay = this._editingLimit
+            ? `<div class="detail-edit-row">
+                   <input type="number" id="input-edit-limit" class="detail-edit-input"
+                          value="${(d.usage_limit ?? 0)}" min="0">
+                   <button class="btn btn--primary btn--xs" id="btn-save-limit">Save</button>
+                   <button class="btn btn--ghost btn--xs" id="btn-cancel-limit">Cancel</button>
+               </div>`
+            : `<span class="detail-value--editable" id="btn-edit-limit" title="Click to edit">
+                   ${(d.usage_limit ?? 0) > 0 ? d.usage_limit : 'Unlimited'}
+                   <svg class="edit-icon" viewBox="0 0 20 20" fill="currentColor" width="12" height="12">
+                       <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                   </svg>
+               </span>`;
+
         return `
             <div class="detail-grid">
                 <div class="detail-item">
@@ -425,7 +655,7 @@ class TokenManager extends HTMLElement {
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">Usage Limit</span>
-                    <span class="detail-value">${(d.usage_limit ?? 0) > 0 ? d.usage_limit : 'Unlimited'}</span>
+                    ${limitDisplay}
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">Created By</span>
@@ -445,6 +675,43 @@ class TokenManager extends HTMLElement {
         const el = this.shadowRoot.querySelector('#inline-detail');
         if (el) {
             el.innerHTML = this._renderInlineDetail();
+            this._wireDetailEvents();
+        }
+    }
+
+    _wireDetailEvents() {
+        const el = this.shadowRoot.querySelector('#inline-detail');
+        if (!el) return;
+
+        // Wire "edit limit" click
+        const editBtn = el.querySelector('#btn-edit-limit');
+        if (editBtn) {
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._editingLimit = true;
+                this._renderDetail();
+            });
+        }
+
+        // Wire save/cancel for limit editing
+        const saveBtn = el.querySelector('#btn-save-limit');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const input    = el.querySelector('#input-edit-limit');
+                const newLimit = parseInt(input.value, 10);
+                if (!isNaN(newLimit) && newLimit >= 0) {
+                    this._handleUpdateLimit(this._selectedToken, newLimit);
+                }
+            });
+        }
+        const cancelBtn = el.querySelector('#btn-cancel-limit');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._editingLimit = false;
+                this._renderDetail();
+            });
         }
     }
 
@@ -476,11 +743,30 @@ class TokenManager extends HTMLElement {
                 margin-bottom: 1.25rem;
             }
 
+            .panel-header__left {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
             .panel-header__title {
                 font-size: var(--admin-font-size-xl);
                 font-weight: 600;
                 color: var(--admin-text);
                 margin: 0;
+            }
+
+            .token-count {
+                font-size: var(--admin-font-size-xs);
+                color: var(--admin-text-muted);
+                background: var(--admin-surface-raised);
+                padding: 0.2rem 0.5rem;
+                border-radius: 9999px;
+                font-family: var(--admin-font-mono);
+            }
+
+            .token-count:empty {
+                display: none;
             }
 
             .panel-header__actions {
@@ -548,6 +834,17 @@ class TokenManager extends HTMLElement {
                 color: #fff;
             }
 
+            .btn--success {
+                background: var(--admin-success-bg);
+                color: var(--admin-success);
+                border: 1px solid rgba(74, 222, 128, 0.2);
+            }
+
+            .btn--success:hover:not(:disabled) {
+                background: var(--admin-success);
+                color: #fff;
+            }
+
             /* --- Loading & Empty --- */
             .loading {
                 display: flex;
@@ -609,6 +906,38 @@ class TokenManager extends HTMLElement {
                 border-radius: var(--admin-radius);
                 color: var(--admin-error);
                 font-size: var(--admin-font-size-sm);
+            }
+
+            /* --- Filter Bar --- */
+            .filter-bar {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+                padding: 0.375rem 0.625rem;
+                background: var(--admin-surface);
+                border: 1px solid var(--admin-border);
+                border-radius: var(--admin-radius);
+            }
+
+            .filter-bar__icon {
+                color: var(--admin-text-muted);
+                flex-shrink: 0;
+            }
+
+            .filter-bar__input {
+                flex: 1;
+                border: none;
+                background: transparent;
+                font-size: var(--admin-font-size-sm);
+                font-family: var(--admin-font);
+                color: var(--admin-text);
+                outline: none;
+                padding: 0.25rem 0;
+            }
+
+            .filter-bar__input::placeholder {
+                color: var(--admin-text-muted);
             }
 
             /* --- Create Form --- */
@@ -694,6 +1023,26 @@ class TokenManager extends HTMLElement {
                 border-bottom: 1px solid var(--admin-border);
             }
 
+            .token-table thead th.sortable {
+                cursor: pointer;
+                user-select: none;
+            }
+
+            .token-table thead th.sortable:hover {
+                color: var(--admin-text);
+            }
+
+            .sort-icon {
+                font-size: 0.75rem;
+                margin-left: 0.25rem;
+                color: var(--admin-primary);
+            }
+
+            .sort-icon--inactive {
+                color: var(--admin-text-muted);
+                opacity: 0.4;
+            }
+
             .token-table tbody td {
                 padding: 0.625rem 1rem;
                 font-size: var(--admin-font-size-sm);
@@ -714,6 +1063,22 @@ class TokenManager extends HTMLElement {
                 background: var(--admin-primary-bg);
             }
 
+            .col-name {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .col-name .btn-copy {
+                opacity: 0;
+                transition: opacity var(--admin-transition);
+                font-size: 0.625rem;
+            }
+
+            .token-row:hover .btn-copy {
+                opacity: 1;
+            }
+
             .token-name {
                 font-family: var(--admin-font-mono);
                 font-weight: 500;
@@ -722,7 +1087,7 @@ class TokenManager extends HTMLElement {
 
             .col-actions {
                 text-align: right;
-                width: 120px;
+                width: 140px;
             }
 
             .col-usage {
@@ -846,6 +1211,51 @@ class TokenManager extends HTMLElement {
                 font-size: var(--admin-font-size-xs);
                 overflow-x: auto;
                 white-space: pre;
+            }
+
+            .detail-value--editable {
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.375rem;
+                font-size: var(--admin-font-size-sm);
+                color: var(--admin-text);
+                padding: 0.125rem 0.25rem;
+                border-radius: var(--admin-radius);
+                transition: background var(--admin-transition);
+            }
+
+            .detail-value--editable:hover {
+                background: var(--admin-surface-hover);
+            }
+
+            .edit-icon {
+                color: var(--admin-text-muted);
+                opacity: 0;
+                transition: opacity var(--admin-transition);
+            }
+
+            .detail-value--editable:hover .edit-icon {
+                opacity: 1;
+            }
+
+            .detail-edit-row {
+                display: flex;
+                align-items: center;
+                gap: 0.375rem;
+            }
+
+            .detail-edit-input {
+                width: 80px;
+                padding: 0.25rem 0.5rem;
+                font-size: var(--admin-font-size-sm);
+                font-family: var(--admin-font-mono);
+                color: var(--admin-text);
+                background: var(--admin-bg);
+                border: 1px solid var(--admin-primary);
+                border-radius: var(--admin-radius);
+                outline: none;
+                box-shadow: 0 0 0 2px var(--admin-primary-bg);
             }
 
             /* --- Responsive --- */

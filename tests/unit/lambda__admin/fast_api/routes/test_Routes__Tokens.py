@@ -58,6 +58,31 @@ class test_Routes__Tokens(TestCase):
         data = response.json()
         assert data.get('status') == 'revoked'
 
+    def test__update_limit(self):
+        self.client.post('/tokens/create', json=dict(token_name='route-update-lim', usage_limit=10))
+        response = self.client.post('/tokens/update-limit/route-update-lim',
+                                     json=dict(usage_limit=200))
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get('usage_limit') == 200
+
+    def test__update_limit__not_found(self):
+        response = self.client.post('/tokens/update-limit/nonexistent-update',
+                                     json=dict(usage_limit=100))
+        assert response.status_code == 404
+
+    def test__reactivate_token(self):
+        self.client.post('/tokens/create', json=dict(token_name='route-reactivate', usage_limit=10))
+        self.client.post('/tokens/revoke/route-reactivate')
+        response = self.client.post('/tokens/reactivate/route-reactivate')
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get('status') == 'active'
+
+    def test__reactivate_token__not_found(self):
+        response = self.client.post('/tokens/reactivate/nonexistent-react')
+        assert response.status_code == 404
+
     def test__list_tokens(self):
         response = self.client.get('/tokens/list')
         assert response.status_code == 200
