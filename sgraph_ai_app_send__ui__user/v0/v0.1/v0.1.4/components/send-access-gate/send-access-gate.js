@@ -71,14 +71,20 @@ class SendAccessGate extends HTMLElement {
                     </p>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <input type="text"
-                           id="access-token-input"
-                           class="input"
-                           placeholder="Paste your access token"
-                           autocomplete="off"
-                           autocapitalize="off"
-                           autocorrect="off"
-                           spellcheck="false">
+                    <div style="position: relative; flex: 1;">
+                        <input type="password"
+                               id="access-token-input"
+                               class="input"
+                               style="width: 100%; padding-right: 2.5rem;"
+                               placeholder="Paste your access token"
+                               autocomplete="off"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               spellcheck="false">
+                        <button type="button" id="toggle-token-vis"
+                                title="Show access token"
+                                style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; font-size: 1rem; color: var(--color-text-secondary, #6c757d); line-height: 1;">&#128065;</button>
+                    </div>
                     <button class="btn btn-primary" id="access-token-submit">Go</button>
                 </div>
                 <div id="access-token-error" class="status status--error hidden" style="margin-top: 0.75rem;">
@@ -107,6 +113,14 @@ class SendAccessGate extends HTMLElement {
         submit.addEventListener('click', () => this.submitToken());
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') this.submitToken();
+        });
+
+        const toggleBtn = this.querySelector('#toggle-token-vis');
+        toggleBtn.addEventListener('click', () => {
+            const isHidden = input.type === 'password';
+            input.type        = isHidden ? 'text' : 'password';
+            toggleBtn.title   = isHidden ? 'Hide access token' : 'Show access token';
+            toggleBtn.innerHTML = isHidden ? '&#128064;' : '&#128065;';
         });
 
         input.focus();

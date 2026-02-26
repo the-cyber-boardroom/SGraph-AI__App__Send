@@ -71,5 +71,23 @@
   "test_files.description":           "Download a test file, then drag it into the upload zone above.",
 
   "cta.title":                        "Want to send files too?",
-  "cta.description":                  "Join the early access program for SGraph Send."
+  "cta.description":                  "Join the early access program for SGraph Send.",
+
+  "transparency.title":               "What we stored about this transfer",
+  "transparency.footer":              "That's it. Nothing else is captured.",
+  "transparency.section.stored":      "Stored by the server",
+  "transparency.section.encrypted":   "Stored but encrypted (we cannot read it)",
+  "transparency.section.not_stored":  "Never stored",
+  "transparency.ip_address":          "Your IP address",
+  "transparency.upload_time":         "Upload time",
+  "transparency.download_time":       "Download time",
+  "transparency.file_size":           "File size",
+  "transparency.encryption_method":   "Encryption",
+  "transparency.label.file_name":     "File name",
+  "transparency.label.file_content":  "File content",
+  "transparency.label.decryption_key":"Decryption key",
+  "transparency.label.raw_ip":        "Original IP address",
+  "transparency.not_stored":          "NOT stored",
+  "transparency.encrypted":           "Encrypted (we cannot read it)",
+  "transparency.key_not_stored":      "NOT stored (only you have it)"
 }

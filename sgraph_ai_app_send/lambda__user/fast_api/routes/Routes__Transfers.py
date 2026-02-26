@@ -3,7 +3,9 @@
 # REST endpoints for encrypted file transfer workflow
 # ===============================================================================
 
+import base64
 import hashlib
+import json
 from fastapi                                                                     import HTTPException, Request, Response
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
@@ -14,13 +16,14 @@ from sgraph_ai_app_send.lambda__user.user__config                               
 
 TAG__ROUTES_TRANSFERS = 'transfers'
 
-ROUTES_PATHS__TRANSFERS = [f'/{TAG__ROUTES_TRANSFERS}/create'                          ,
-                           f'/{TAG__ROUTES_TRANSFERS}/upload/{{transfer_id}}'          ,
-                           f'/{TAG__ROUTES_TRANSFERS}/complete/{{transfer_id}}'        ,
-                           f'/{TAG__ROUTES_TRANSFERS}/info/{{transfer_id}}'            ,
-                           f'/{TAG__ROUTES_TRANSFERS}/download/{{transfer_id}}'        ,
-                           f'/{TAG__ROUTES_TRANSFERS}/check-token/{{token_name}}'      ,
-                           f'/{TAG__ROUTES_TRANSFERS}/validate-token/{{token_name}}'   ]
+ROUTES_PATHS__TRANSFERS = [f'/{TAG__ROUTES_TRANSFERS}/create'                                ,
+                           f'/{TAG__ROUTES_TRANSFERS}/upload/{{transfer_id}}'                ,
+                           f'/{TAG__ROUTES_TRANSFERS}/complete/{{transfer_id}}'              ,
+                           f'/{TAG__ROUTES_TRANSFERS}/info/{{transfer_id}}'                  ,
+                           f'/{TAG__ROUTES_TRANSFERS}/download/{{transfer_id}}'              ,
+                           f'/{TAG__ROUTES_TRANSFERS}/download-base64/{{transfer_id}}'      ,
+                           f'/{TAG__ROUTES_TRANSFERS}/check-token/{{token_name}}'            ,
+                           f'/{TAG__ROUTES_TRANSFERS}/validate-token/{{token_name}}'         ]
 
 
 class Routes__Transfers(Fast_API__Routes):                                       # Transfer workflow endpoints
@@ -28,8 +31,11 @@ class Routes__Transfers(Fast_API__Routes):                                      
     transfer_service     : Transfer__Service                                     # Auto-initialized by Type_Safe
     admin_service_client : object = None                                         # Optional Admin__Service__Client (typed as object to avoid circular import)
 
-    def check_access_token(self, request: Request):                              # Validate access token — admin service or env-var fallback
-        provided_token = request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '')
+    def check_access_token(self, request: Request, access_token: str = ''):      # Validate access token — header, query param, or env-var fallback
+        provided_token = (access_token                                                 # MCP tool parameter (Claude.ai web)
+                          or request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '') # HTTP header (browser UI, Claude Code CLI)
+                          or request.query_params.get('access_token', '')               # Query param fallback
+                          )
 
         if self.admin_service_client is not None:                                # Admin service available — validate via token_lookup
             if not provided_token:
@@ -60,23 +66,42 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Access token required')
         return provided_token
 
+    def unwrap_mcp_payload(self, body: bytes) -> bytes:                           # Decode JSON-wrapped base64 from MCP clients
+        """MCP tools communicate via JSON, so binary data arrives as {"data": "<base64>"}.
+        Browser uploads send raw bytes. Detect and unwrap the MCP format."""
+        if body and body[:1] == b'{':
+            try:
+                parsed = json.loads(body)
+                if isinstance(parsed, dict) and 'data' in parsed:
+                    return base64.b64decode(parsed['data'])
+            except (json.JSONDecodeError, Exception):
+                pass
+        return body
+
     # todo: return type should be Schema__Transfer__Initiated (not raw dict)
     # todo: sender_ip should be extracted from Request object, not hardcoded empty string
     def create(self, request: Schema__Transfer__Create,                           # POST /transfers/create
-                     raw_request: Request
+                     raw_request: Request,
+                     access_token: str = ''                                      # MCP tool parameter — pass token directly when headers unavailable
               ) -> dict:                                                         # todo: -> Schema__Transfer__Initiated
-        self.check_access_token(raw_request)
+        self.check_access_token(raw_request, access_token)
         result = self.transfer_service.create_transfer(file_size_bytes   = request.file_size_bytes  ,
                                                        content_type_hint = request.content_type_hint,
                                                        sender_ip        = ''                        )
         return dict(transfer_id = result['transfer_id'],                         # todo: return Type_Safe class from service
                     upload_url  = result['upload_url'] )
 
-    async def upload__transfer_id(self, transfer_id : Safe_Str__Id ,             # POST /transfers/upload/{transfer_id} (todo: transfer_id should be Transfer_Id)
-                                        request     : Request
+    async def upload__transfer_id(self, transfer_id   : Safe_Str__Id ,           # POST /transfers/upload/{transfer_id} (todo: transfer_id should be Transfer_Id)
+                                        request       : Request      ,
+                                        access_token  : str = ''    ,          # MCP tool parameter
+                                        data          : str = ''               # MCP tool parameter — base64-encoded encrypted payload (includes SGMETA envelope)
                                  ) -> dict:
-        self.check_access_token(request)
-        body    = await request.body()
+        self.check_access_token(request, access_token)
+        if data:                                                               # MCP client sent payload as base64 tool parameter
+            body = base64.b64decode(data)
+        else:                                                                  # Browser/CLI client sent raw bytes in request body
+            body = await request.body()
+            body = self.unwrap_mcp_payload(body)                               # Decode JSON-wrapped base64 from older MCP clients
         success = self.transfer_service.upload_payload(transfer_id  = transfer_id,
                                                        payload_bytes = body      )
         if success is False:
@@ -86,10 +111,11 @@ class Routes__Transfers(Fast_API__Routes):                                      
                     transfer_id = transfer_id  ,                                # ideally the service should give us the objects to return
                     size        = len(body)    )
 
-    def complete__transfer_id(self, transfer_id: Safe_Str__Id,                    # POST /transfers/complete/{transfer_id} (todo: should be Transfer_Id)
-                                    request: Request
+    def complete__transfer_id(self, transfer_id  : Safe_Str__Id,                  # POST /transfers/complete/{transfer_id} (todo: should be Transfer_Id)
+                                    request      : Request     ,
+                                    access_token : str = ''                      # MCP tool parameter
                              ) -> dict:                                          # todo: -> Schema__Transfer__Complete_Response
-        token_name = self.check_access_token(request)
+        token_name = self.check_access_token(request, access_token)
         result     = self.transfer_service.complete_transfer(transfer_id)
         if result is None:
             raise HTTPException(status_code = 404,
@@ -117,9 +143,20 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Transfer not found')
         return result
 
+    LAMBDA_RESPONSE_LIMIT = 5 * 1024 * 1024                                     # 5MB safe limit (Lambda response limit is ~6MB)
+
     def download__transfer_id(self, transfer_id : Safe_Str__Id,                  # GET /transfers/download/{transfer_id} (todo: should be Transfer_Id)
                                     request     : Request
                              ) -> Response:
+        # Check file size before loading — prevent Lambda 6MB response blowup
+        info = self.transfer_service.get_transfer_info(transfer_id)
+        if info is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Transfer not found')
+        if info.get('file_size_bytes', 0) > self.LAMBDA_RESPONSE_LIMIT:
+            raise HTTPException(status_code = 413,
+                                detail      = 'File too large for direct download. Use /presigned/download-url/{transfer_id} instead.')
+
         payload = self.transfer_service.get_download_payload(transfer_id  = transfer_id                    ,
                                                              downloader_ip = request.client.host if request.client else '',
                                                              user_agent    = request.headers.get('user-agent', ''))
@@ -128,6 +165,29 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Transfer not found or not available for download')
         return Response(content    = payload                    ,
                         media_type = 'application/octet-stream')
+
+    LAMBDA_BASE64_LIMIT = 3750000                                                # ~3.75MB (base64 adds ~33%, must stay under Lambda 5MB response limit)
+
+    def download_base64__transfer_id(self, transfer_id : Safe_Str__Id,          # GET /transfers/download-base64/{transfer_id} — JSON-safe base64 download
+                                           request     : Request
+                                    ) -> dict:
+        info = self.transfer_service.get_transfer_info(transfer_id)
+        if info is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Transfer not found')
+        if info.get('file_size_bytes', 0) > self.LAMBDA_BASE64_LIMIT:
+            raise HTTPException(status_code = 413,
+                                detail      = 'File too large for base64 download. Use /presigned/download-url/{transfer_id} instead.')
+
+        payload = self.transfer_service.get_download_payload(transfer_id  = transfer_id                    ,
+                                                              downloader_ip = request.client.host if request.client else '',
+                                                              user_agent    = request.headers.get('user-agent', ''))
+        if payload is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Transfer not found or not available for download')
+        return dict(transfer_id     = str(transfer_id)                       ,
+                    data            = base64.b64encode(payload).decode('ascii'),
+                    file_size_bytes = info.get('file_size_bytes', 0)         )
 
     def check_token__token_name(self, token_name: str) -> dict:                  # GET /transfers/check_token/{token_name} — lookup only (no usage consumed)
         if self.admin_service_client is None:
@@ -161,11 +221,12 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                 detail      = 'Token validation service unavailable')
 
     def setup_routes(self):                                                      # Register all endpoints
-        self.add_route_post(self.create                    )
-        self.add_route_post(self.upload__transfer_id       )
-        self.add_route_post(self.complete__transfer_id     )
-        self.add_route_get (self.info__transfer_id         )
-        self.add_route_get (self.download__transfer_id     )
-        self.add_route_get (self.check_token__token_name   )
-        self.add_route_post(self.validate_token__token_name)
+        self.add_route_post(self.create                         )
+        self.add_route_post(self.upload__transfer_id            )
+        self.add_route_post(self.complete__transfer_id          )
+        self.add_route_get (self.info__transfer_id              )
+        self.add_route_get (self.download__transfer_id          )
+        self.add_route_get (self.download_base64__transfer_id   )
+        self.add_route_get (self.check_token__token_name        )
+        self.add_route_post(self.validate_token__token_name     )
         return self

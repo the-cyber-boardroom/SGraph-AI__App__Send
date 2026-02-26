@@ -53,7 +53,13 @@
         return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
     }
 
-    async function encryptBlob(publicKey, data) {
+    async function encryptBlob(publicKey, fingerprint, data) {
+        // Use v2 multi-recipient format if vault-crypto-multi is loaded and fingerprint available
+        const multi = window.sgraphAdmin && window.sgraphAdmin.vaultCryptoMulti;
+        if (multi && fingerprint) {
+            return multi.encryptMulti([{ publicKey, fingerprint }], data);
+        }
+        // Fallback: v1 single-recipient format
         const aesKey     = await generateAesKey();
         const iv         = crypto.getRandomValues(new Uint8Array(12));
         const encrypted  = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, data);
@@ -69,7 +75,13 @@
         return packed;
     }
 
-    async function decryptBlob(privateKey, packed) {
+    async function decryptBlob(privateKey, packed, fingerprint) {
+        // Use v2 multi-recipient decryption if vault-crypto-multi is loaded
+        const multi = window.sgraphAdmin && window.sgraphAdmin.vaultCryptoMulti;
+        if (multi) {
+            return multi.decryptMulti(privateKey, packed, fingerprint);
+        }
+        // Fallback: v1 single-recipient format
         const bytes  = new Uint8Array(packed);
         const wkLen  = new Uint32Array(bytes.slice(0, 4).buffer)[0];
         const wrappedKey = bytes.slice(4, 4 + wkLen);
@@ -141,6 +153,7 @@
     // user lambda, not the admin lambda.
     //
     // Detection order:
+    // DC: note: for now defaulting to https://send.sgraph.ai
     // 1. Explicit: window.sgraphAdmin.userLambdaUrl
     // 2. Auto-detect: admin hostname pattern → user lambda URL
     //    - admin.sgraph.ai → https://send.sgraph.ai
@@ -149,31 +162,32 @@
     let _cachedUserLambdaUrl = null;
 
     function getUserLambdaUrl() {
-        if (_cachedUserLambdaUrl !== null) return _cachedUserLambdaUrl;
-
-        // 1. Explicit config
-        if (window.sgraphAdmin && window.sgraphAdmin.userLambdaUrl) {
-            _cachedUserLambdaUrl = window.sgraphAdmin.userLambdaUrl;
-            return _cachedUserLambdaUrl;
-        }
-
-        const loc = window.location;
-
-        // 2a. Production: admin.sgraph.ai → send.sgraph.ai
-        if (loc.hostname.startsWith('admin.') && loc.hostname.includes('sgraph')) {
-            _cachedUserLambdaUrl = `${loc.protocol}//send.${loc.hostname.replace(/^admin\./, '')}`;
-            return _cachedUserLambdaUrl;
-        }
-
-        // 2b. Dev port swap (admin 10061 → user 10062)
-        if (loc.port === '10061') {
-            _cachedUserLambdaUrl = `${loc.protocol}//${loc.hostname}:10062`;
-            return _cachedUserLambdaUrl;
-        }
-
-        // 3. Same-origin fallback
-        _cachedUserLambdaUrl = '';
-        return _cachedUserLambdaUrl;
+        return "https://send.sgraph.ai"
+        // if (_cachedUserLambdaUrl !== null) return _cachedUserLambdaUrl;
+        //
+        // // 1. Explicit config
+        // if (window.sgraphAdmin && window.sgraphAdmin.userLambdaUrl) {
+        //     _cachedUserLambdaUrl = window.sgraphAdmin.userLambdaUrl;
+        //     return _cachedUserLambdaUrl;
+        // }
+        //
+        // const loc = window.location;
+        //
+        // // 2a. Production: admin.sgraph.ai → send.sgraph.ai
+        // if (loc.hostname.startsWith('admin.') && loc.hostname.includes('sgraph')) {
+        //     _cachedUserLambdaUrl = `${loc.protocol}//${loc.hostname.replace(/^admin\./, '')}`;
+        //     return _cachedUserLambdaUrl;
+        // }
+        //
+        // // 2b. Dev port swap (admin 10061 → user 10062)
+        // if (loc.port === '10061') {
+        //     _cachedUserLambdaUrl = `${loc.protocol}//${loc.hostname}:10062`;
+        //     return _cachedUserLambdaUrl;
+        // }
+        //
+        // // 3. Same-origin fallback
+        // _cachedUserLambdaUrl = '';
+        // return _cachedUserLambdaUrl;
     }
 
     async function transferCreate(tokenName, fileSize, contentType) {
@@ -317,6 +331,16 @@
 
         .vm-status-bar   { display: flex; align-items: center; gap: 0.75rem; font-size: 0.6875rem; color: var(--admin-text-muted, #5e6280); padding: 0.375rem 0 0.125rem; border-top: 1px solid var(--admin-border-subtle, #252838); flex-wrap: wrap; }
         .vm-status-bar .vm-status-key { font-family: var(--admin-font-mono, monospace); }
+
+        /* --- Upload Progress Bar --- */
+        .vm-upload-progress { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.75rem; background: var(--admin-surface-hover, #2a2e3d); border-bottom: 1px solid var(--admin-border-subtle, #252838); font-size: 0.75rem; color: var(--admin-text-secondary, #8b8fa7); animation: vm-progress-fadein 200ms ease; }
+        @keyframes vm-progress-fadein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+        .vm-upload-progress__label { white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        .vm-upload-progress__track { flex: 1; height: 6px; background: var(--admin-border, #2e3347); border-radius: 3px; overflow: hidden; min-width: 80px; }
+        .vm-upload-progress__fill  { height: 100%; background: var(--admin-primary, #4f8ff7); border-radius: 3px; transition: width 150ms ease; }
+        .vm-upload-progress__pct   { font-family: var(--admin-font-mono, monospace); font-size: 0.6875rem; min-width: 3ch; text-align: right; }
+        .vm-upload-progress__cancel { background: none; border: 1px solid var(--admin-border, #2e3347); border-radius: var(--admin-radius, 6px); color: var(--admin-text-muted, #5e6280); font-size: 0.6875rem; padding: 0.125rem 0.5rem; cursor: pointer; white-space: nowrap; transition: all 150ms ease; }
+        .vm-upload-progress__cancel:hover { border-color: var(--admin-error, #f87171); color: var(--admin-error, #f87171); background: rgba(248,113,113,0.08); }
 
         .vm-no-key       { text-align: center; padding: 3rem 1rem; }
         .vm-no-key__icon { margin-bottom: 0.75rem; color: var(--admin-text-muted, #5e6280); }
@@ -485,6 +509,7 @@
                         <button class="pk-btn pk-btn--xs pk-btn--ghost" id="vm-btn-refresh" title="Refresh">${SVG_REFRESH}</button>
                     </div>
                 </div>
+                <div id="vm-upload-progress-slot"></div>
                 <div class="vm-body" id="vm-body">
                     <div class="vm-row-1" id="vm-row-1" style="${row1Style}">
                         <div class="vm-tree-sidebar" id="vm-tree-sidebar" style="width: ${this._treeWidth}px"></div>
@@ -536,8 +561,9 @@
             // Settings bar events (delegated from vault-settings component)
             const settingsEl = container.querySelector('#vm-settings');
             settingsEl.addEventListener('vault-settings-download', (e) => this._downloadFile(e.detail.guid));
-            settingsEl.addEventListener('vault-settings-share',    (e) => this._showShareDialog(e.detail.guid));
-            settingsEl.addEventListener('vault-settings-edit',     (e) => this._openEditor(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-share',          (e) => this._showShareDialog(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-share-contact', (e) => this._showShareContactDialog(e.detail.guid));
+            settingsEl.addEventListener('vault-settings-edit',          (e) => this._openEditor(e.detail.guid));
             settingsEl.addEventListener('vault-settings-open',     (e) => this._navigateToFolder(e.detail.guid));
             settingsEl.addEventListener('vault-settings-delete',   (e) => this._deleteItem(e.detail.guid));
             settingsEl.addEventListener('vault-settings-rename',   (e) => this._commitRename(e.detail.guid, e.detail.newName));
@@ -752,7 +778,7 @@
                 if (this._selectedItem !== fileGuid) return;
 
                 const packed    = b64ToArrayBuf(result.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
                 if (this._selectedItem !== fileGuid) return;
                 if (!previewEl) return;
 
@@ -812,7 +838,7 @@
                 }
 
                 const packed    = b64ToArrayBuf(result.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
                 const text      = new TextDecoder().decode(decrypted);
 
                 // Open editor in row-3 — collapse row-1 to give editor more space
@@ -830,7 +856,7 @@
                     mime,
                     onSave   : async (newText) => {
                         const encoded   = new TextEncoder().encode(newText);
-                        const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
+                        const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, encoded);
                         const b64       = arrayBufToB64Safe(encrypted);
                         await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
                         meta.size = encoded.byteLength;
@@ -860,7 +886,7 @@
 
                 // Encrypt empty content and store
                 const encoded   = new TextEncoder().encode('');
-                const encrypted = await encryptBlob(this._selectedKey.publicKey, encoded);
+                const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, encoded);
                 const b64       = arrayBufToB64Safe(encrypted);
                 await adminAPI.vaultStoreFile(this._vaultCacheKey, guid, b64);
 
@@ -1175,7 +1201,7 @@
                     this._vaultManifest = await adminAPI.vaultLookup(this._vaultCacheKey);
                     this._currentFolder = result.root_folder;
                     const emptyIndex = JSON.stringify({ version: 1, entries: {} });
-                    const encIndex   = await encryptBlob(this._selectedKey.publicKey, new TextEncoder().encode(emptyIndex));
+                    const encIndex   = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, new TextEncoder().encode(emptyIndex));
                     await adminAPI.vaultStoreIndex(this._vaultCacheKey, arrayBufToB64Safe(encIndex));
                 }
 
@@ -1192,7 +1218,7 @@
                 const result = await adminAPI.vaultGetIndex(this._vaultCacheKey);
                 if (result && result.data) {
                     const packed    = b64ToArrayBuf(result.data);
-                    const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                    const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
                     const indexJson = JSON.parse(new TextDecoder().decode(decrypted));
                     this._index = indexJson.entries || {};
                 }
@@ -1203,7 +1229,7 @@
 
         async _saveIndex() {
             const indexJson = JSON.stringify({ version: 1, entries: this._index });
-            const encrypted = await encryptBlob(this._selectedKey.publicKey, new TextEncoder().encode(indexJson));
+            const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, new TextEncoder().encode(indexJson));
             await adminAPI.vaultStoreIndex(this._vaultCacheKey, arrayBufToB64Safe(encrypted));
         }
 
@@ -1402,17 +1428,63 @@
             }
         }
 
+        // Maximum encrypted bytes per chunk before base64 encoding.
+        // 3MB raw → ~4MB base64 → ~4.2MB JSON payload (safely under Lambda 6MB limit)
+        static VAULT_CHUNK_SIZE = 3 * 1024 * 1024;
+        static VAULT_UPLOAD_CONCURRENCY = 4;                                    // Parallel chunk uploads
+
+        _uploadAborted = false;
+
+        _showUploadProgress(fileName, pct) {
+            const slot = this.querySelector('#vm-upload-progress-slot');
+            if (!slot) return;
+            const pctInt = Math.round(pct);
+            slot.innerHTML = `
+                <div class="vm-upload-progress">
+                    <span class="vm-upload-progress__label" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>
+                    <div class="vm-upload-progress__track">
+                        <div class="vm-upload-progress__fill" style="width: ${pctInt}%"></div>
+                    </div>
+                    <span class="vm-upload-progress__pct">${pctInt}%</span>
+                    <button class="vm-upload-progress__cancel" id="vm-cancel-upload">Cancel</button>
+                </div>`;
+            const cancelBtn = slot.querySelector('#vm-cancel-upload');
+            if (cancelBtn) cancelBtn.addEventListener('click', () => { this._uploadAborted = true; });
+        }
+
+        _hideUploadProgress() {
+            const slot = this.querySelector('#vm-upload-progress-slot');
+            if (slot) slot.innerHTML = '';
+        }
+
         async _uploadFile(file) {
+            this._uploadAborted = false;
             try {
-                this._msg('info', `Encrypting "${file.name}"...`);
+                this._showUploadProgress(file.name, 0);
 
                 const fileGuid  = generateGuid();
                 const data      = await file.arrayBuffer();
-                const encrypted = await encryptBlob(this._selectedKey.publicKey, data);
-                const b64       = arrayBufToB64Safe(encrypted);
 
-                this._msg('info', `Uploading "${file.name}"...`);
-                await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
+                if (this._uploadAborted) throw new Error('Upload cancelled');
+                this._showUploadProgress(file.name, 5);
+
+                const encrypted = await encryptBlob(this._selectedKey.publicKey, this._selectedKey.fingerprint, data);
+
+                if (this._uploadAborted) throw new Error('Upload cancelled');
+                this._showUploadProgress(file.name, 10);
+
+                const useChunked = encrypted.byteLength > VaultManager.VAULT_CHUNK_SIZE;
+
+                if (useChunked) {
+                    await this._uploadFileChunked(file.name, fileGuid, encrypted);
+                } else {
+                    this._showUploadProgress(file.name, 50);
+                    const b64 = arrayBufToB64Safe(encrypted);
+                    await adminAPI.vaultStoreFile(this._vaultCacheKey, fileGuid, b64);
+                    this._showUploadProgress(file.name, 90);
+                }
+
+                if (this._uploadAborted) throw new Error('Upload cancelled');
 
                 const parent = await adminAPI.vaultGetFolder(this._vaultCacheKey, this._currentFolder);
                 if (parent && parent.data) {
@@ -1425,11 +1497,61 @@
                 this._index[fileGuid] = { name: file.name, type: 'file', size: file.size, parentGuid: this._currentFolder, mime: file.type, uploadedAt: now };
                 await this._saveIndex();
 
+                this._showUploadProgress(file.name, 100);
+                this._hideUploadProgress();
                 this._msg('success', `"${file.name}" uploaded and encrypted`);
                 this._browseFolder(this._currentFolder);
             } catch (err) {
-                this._msg('error', `Upload failed: ${err.message}`);
+                this._hideUploadProgress();
+                if (err.message === 'Upload cancelled') {
+                    this._msg('info', `Upload of "${file.name}" cancelled`);
+                } else {
+                    this._msg('error', `Upload failed: ${err.message}`);
+                }
             }
+        }
+
+        async _uploadFileChunked(fileName, fileGuid, encrypted) {
+            const chunkSize   = VaultManager.VAULT_CHUNK_SIZE;
+            const totalChunks = Math.ceil(encrypted.byteLength / chunkSize);
+            const concurrency = VaultManager.VAULT_UPLOAD_CONCURRENCY;
+
+            // Prepare all chunks (base64 encode upfront so parallel uploads don't block on encoding)
+            const chunks = [];
+            for (let i = 0; i < totalChunks; i++) {
+                const start    = i * chunkSize;
+                const end      = Math.min(start + chunkSize, encrypted.byteLength);
+                chunks.push(arrayBufToB64Safe(encrypted.slice(start, end)));
+            }
+
+            // Upload in parallel batches
+            let completed = 0;
+            this._showUploadProgress(fileName, 10);
+
+            for (let batchStart = 0; batchStart < totalChunks; batchStart += concurrency) {
+                if (this._uploadAborted) throw new Error('Upload cancelled');
+
+                const batchEnd = Math.min(batchStart + concurrency, totalChunks);
+                const batch    = [];
+                for (let i = batchStart; i < batchEnd; i++) {
+                    batch.push(
+                        adminAPI.vaultStoreFileChunk(this._vaultCacheKey, fileGuid, i, totalChunks, chunks[i])
+                            .then(() => {
+                                completed++;
+                                // Progress: 10% (encrypt) → 85% (upload) → 95% (assemble)
+                                const pct = 10 + Math.round(75 * completed / totalChunks);
+                                this._showUploadProgress(fileName, pct);
+                            })
+                    );
+                }
+                await Promise.all(batch);
+            }
+
+            if (this._uploadAborted) throw new Error('Upload cancelled');
+
+            this._showUploadProgress(fileName, 90);
+            await adminAPI.vaultAssembleFile(this._vaultCacheKey, fileGuid, totalChunks);
+            this._showUploadProgress(fileName, 95);
         }
 
         async _downloadFile(fileGuid) {
@@ -1444,7 +1566,7 @@
                 }
 
                 const packed    = b64ToArrayBuf(result.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
 
                 const blob = new Blob([decrypted], { type: meta.mime || 'application/octet-stream' });
                 const url  = URL.createObjectURL(blob);
@@ -1628,7 +1750,11 @@
             const hasTokens = tokenOptions.length > 0;
             const tokenField = hasTokens
                 ? `<select id="vm-share-token">${tokenOptions}</select>`
-                : `<input type="text" id="vm-share-token" placeholder="Enter access token name" required>`;
+                : `<div style="position: relative;">
+                       <input type="password" id="vm-share-token" placeholder="Enter access token" required autocomplete="off" style="width: 100%; padding-right: 2.5rem;">
+                       <button type="button" id="vm-toggle-token-vis" title="Show access token"
+                               style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; font-size: 1rem; color: var(--color-text-secondary, #6c757d); line-height: 1;">&#128065;</button>
+                   </div>`;
 
             const overlay = document.createElement('div');
             overlay.className = 'vm-share-overlay';
@@ -1658,6 +1784,16 @@
             // Events
             overlay.querySelector('#vm-share-cancel').addEventListener('click', () => overlay.remove());
             overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            const toggleBtn = overlay.querySelector('#vm-toggle-token-vis');
+            if (toggleBtn) {
+                const tokenInput = overlay.querySelector('#vm-share-token');
+                toggleBtn.addEventListener('click', () => {
+                    const isHidden = tokenInput.type === 'password';
+                    tokenInput.type      = isHidden ? 'text' : 'password';
+                    toggleBtn.title      = isHidden ? 'Hide access token' : 'Show access token';
+                    toggleBtn.innerHTML  = isHidden ? '&#128064;' : '&#128065;';
+                });
+            }
             overlay.querySelector('#vm-share-confirm').addEventListener('click', () => {
                 const token = overlay.querySelector('#vm-share-token').value.trim();
                 if (!token) {
@@ -1697,7 +1833,7 @@
                 if (!vaultResult || !vaultResult.data) throw new Error('File data not found in vault');
 
                 const packed    = b64ToArrayBuf(vaultResult.data);
-                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed);
+                const decrypted = await decryptBlob(this._selectedKey.privateKey, packed, this._selectedKey.fingerprint);
 
                 // Step 2: Package with SGMETA envelope (preserves filename for recipient)
                 setProgress('Packaging with filename metadata...');
@@ -1774,6 +1910,37 @@
                 this._msg('success', `"${filename}" shared via Send link`);
             } catch (err) {
                 setError('Share failed: ' + err.message);
+            }
+        }
+
+        // Share with PKI contact (v2 multi-recipient encryption)
+        async _showShareContactDialog(fileGuid) {
+            const entry = this._index[fileGuid];
+            if (!entry) { this._msg('error', 'File not found in index'); return; }
+
+            try {
+                // Fetch encrypted blob
+                const result = await adminAPI.vaultGetFile(this._vaultCacheKey, fileGuid);
+                if (!result || !result.data) { this._msg('error', 'Failed to load file'); return; }
+
+                const packed = b64ToArrayBuf(result.data);
+
+                const dialog = document.createElement('vault-share-dialog');
+                await dialog.show({
+                    fileGuid,
+                    fileName       : entry.name || fileGuid,
+                    vaultCacheKey  : this._vaultCacheKey,
+                    ownerPrivateKey: this._selectedKey.privateKey,
+                    ownerPublicKey : this._selectedKey.publicKey,
+                    ownerFingerprint: this._selectedKey.fingerprint,
+                    encryptedBlob  : packed,
+                    onComplete     : ({ contactFp, permission }) => {
+                        this._msg('success', `"${entry.name || fileGuid}" shared with contact (${permission})`);
+                    }
+                });
+                document.body.appendChild(dialog);
+            } catch (err) {
+                this._msg('error', 'Failed to open share dialog: ' + err.message);
             }
         }
 

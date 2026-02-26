@@ -12,12 +12,14 @@ from   sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client__Vault      
 
 class Service__Vault(Type_Safe):                                               # Vault lifecycle management
     vault_cache_client : Send__Cache__Client__Vault                            # Dedicated vault cache client
+    vault_acl          : 'Service__Vault__ACL' = None                          # Optional ACL service (Phase 1)
 
     # ═══════════════════════════════════════════════════════════════════════
     # Vault Lifecycle
     # ═══════════════════════════════════════════════════════════════════════
 
-    def create(self, vault_cache_key, key_fingerprint=''):                     # Create a new vault with root folder
+    def create(self, vault_cache_key, key_fingerprint='',                     # Create a new vault with root folder
+               owner_user_id=''):                                            # Optional owner for ACL (Phase 1)
         existing = self.vault_cache_client.vault__lookup_cache_id(vault_cache_key)
         if existing:
             return None                                                        # Vault already exists
@@ -27,6 +29,7 @@ class Service__Vault(Type_Safe):                                               #
         manifest = dict(type            = 'vault_root'                             ,
                         created         = datetime.now(timezone.utc).isoformat()   ,
                         key_fingerprint = key_fingerprint                           ,
+                        owner_user_id   = owner_user_id                            ,
                         root_folder     = root_folder_guid                         )
 
         result = self.vault_cache_client.vault__create(vault_cache_key, manifest)
@@ -41,9 +44,14 @@ class Service__Vault(Type_Safe):                                               #
                            children = []                )
         self.vault_cache_client.folder__store(cache_id, root_folder_guid, root_folder)
 
-        return dict(cache_id    = cache_id         ,
-                    root_folder = root_folder_guid ,
-                    created     = manifest['created'])
+        # Auto-grant owner permission if ACL service is configured and user_id provided
+        if self.vault_acl and owner_user_id:
+            self.vault_acl.grant_access(cache_id, owner_user_id, 'owner', owner_user_id)
+
+        return dict(cache_id       = cache_id         ,
+                    root_folder    = root_folder_guid ,
+                    owner_user_id  = owner_user_id    ,
+                    created        = manifest['created'])
 
     def lookup(self, vault_cache_key):                                         # Lookup vault manifest
         return self.vault_cache_client.vault__lookup(vault_cache_key)
@@ -113,6 +121,48 @@ class Service__Vault(Type_Safe):                                               #
         if cache_id is None:
             return None
         return self.vault_cache_client.file__delete(cache_id, file_guid)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Chunked File Upload — for files exceeding Lambda 6MB payload limit
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def store_file_chunk(self, vault_cache_key, file_guid, chunk_index, encrypted_chunk):
+        cache_id = self.vault_cache_client.vault__lookup_cache_id(vault_cache_key)
+        if cache_id is None:
+            return None
+        chunk_id = f'{file_guid}__chunk__{chunk_index}'
+        return self.vault_cache_client.file__store(cache_id, chunk_id, encrypted_chunk)
+
+    def assemble_file(self, vault_cache_key, file_guid, total_chunks):
+        cache_id = self.vault_cache_client.vault__lookup_cache_id(vault_cache_key)
+        if cache_id is None:
+            return None
+
+        # Read all chunks in order
+        parts = []
+        for i in range(total_chunks):
+            chunk_id   = f'{file_guid}__chunk__{i}'
+            chunk_data = self.vault_cache_client.file__get(cache_id, chunk_id)
+            if chunk_data is None:
+                return dict(error='missing_chunk', chunk_index=i)
+            if isinstance(chunk_data, (bytes, bytearray)):
+                parts.append(chunk_data)
+            else:
+                parts.append(bytes(chunk_data) if chunk_data else b'')
+
+        # Concatenate and store as the final file
+        assembled = b''.join(parts)
+        result = self.vault_cache_client.file__store(cache_id, file_guid, assembled)
+
+        # Clean up chunks (best-effort — delete may not be supported on all backends)
+        for i in range(total_chunks):
+            chunk_id = f'{file_guid}__chunk__{i}'
+            try:
+                self.vault_cache_client.file__delete(cache_id, chunk_id)
+            except Exception:
+                pass                                                             # Chunk cleanup is non-critical
+
+        return dict(status='assembled', file_guid=file_guid, size=len(assembled))
 
     # ═══════════════════════════════════════════════════════════════════════
     # Index Operations

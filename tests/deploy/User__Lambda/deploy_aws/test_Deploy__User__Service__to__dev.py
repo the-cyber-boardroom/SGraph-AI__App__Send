@@ -14,6 +14,19 @@ class test_Deploy__User__Service__to__dev(test_Deploy__User__Service__base, Test
     #     load_dotenv(dotenv_path=dot_env_file, override=True)
     #     super().setUpClass()
 
+    # def test_2__upload_dependencies(self):
+    #     super().test_2__upload_dependencies()
+    # todo:
+    # add these changes to osbot-aws
+    # if self.target_aws_lambda:
+    # args.extend([
+    #     '--platform',       'manylinux2014_x86_64',
+    #     '--only-binary=:all:',
+    #     '--python-version', '3.13',
+    #     '--implementation', 'cp',
+    #     '--abi',            'cp313',        # must match python-version
+    # ])
+
     # def test_4_create__lambda_function(self):
     #     super().test_4_create__lambda_function()
 

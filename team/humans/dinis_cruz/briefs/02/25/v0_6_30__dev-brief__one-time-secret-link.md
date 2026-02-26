@@ -1,0 +1,365 @@
+# Dev Brief: Ephemeral Data Sharing — Short-Lived Secrets with Configurable Lifespans
+
+**version** v0.6.30  
+**date** 25 Feb 2026  
+**from** Human (project lead)  
+**to** Developer (lead), Architect, AppSec, GRC, DPO, Sherpa  
+**type** Dev brief — new feature, immediate implementation  
+
+---
+
+## The Concept
+
+Sharing data with a built-in expiry — a configurable level of ephemerality. "One-time secret" is just the most aggressive edge case on a spectrum:
+
+| Ephemerality Level | Behaviour | Use Case |
+|---|---|---|
+| **One view** | Self-destructs after first view | Passwords, API keys, one-time tokens |
+| **N views** | Self-destructs after N views (e.g., 3) | Shared credential for a small team |
+| **Time-bounded** | Expires after duration (1h, 24h, 7d) regardless of views | Temporary access links, time-limited offers |
+| **Time + views** | Expires after duration OR N views, whichever comes first | Most flexible — default mode |
+| **Session-bounded** | Expires when browser session ends | Ultra-temporary sharing during a call or meeting |
+
+The one-time-use link is the entry point. The platform supports the full spectrum.
+
+Several websites already offer one-time secrets (OneTimeSecret, PrivNote, etc.). We need our own because: (a) we need it for sharing data room access keys (companion brief), (b) it's a natural extension of SG/Send, (c) it demonstrates the platform's value for a simple, common use case, and (d) it drives DRU.
+
+---
+
+## ⚠️ Critical Security Principle: Zero Customer Data on Server-Side Leak
+
+**One of our core server-side security properties: a full server-side data leak and unauthorised access to ALL logs should expose zero customer data.**
+
+This means:
+- The server stores encrypted blobs and opaque identifiers (hashes, GUIDs)
+- No plaintext content, no meaningful metadata, no customer-readable data
+- If an attacker dumps the entire database and all logs, they get: encrypted blobs, random IDs, timestamps, and IP addresses — nothing that identifies what was shared or by whom
+
+This principle is under threat from human-friendly features. See the metadata leak warning below.
+
+---
+
+## ⚠️ Metadata Leak Risk: Human-Friendly Short Codes
+
+**AppSec, GRC, DPO, and Sherpa must review this section.**
+
+Human-friendly short codes (letting users name their links) create a metadata leak risk on the server side. The names users choose WILL contain confidential information.
+
+**Real-world example**: an executive once shared a file called `list-of-redundancies.xls`. The file itself was password-protected, but the filename leaked a highly confidential restructuring action. The same will happen with link names.
+
+If we let users create `send.sgraph.ai/s/q4-layoff-plan` or `send.sgraph.ai/s/merger-terms` — that identifier is stored on the server. A server-side data leak now exposes customer intent, even though the content remains encrypted.
+
+### The Design Principle
+
+> **We should not provide easy ways for users to operate unsafely and then blame them for creating security incidents. We must create paths where users always operate in a secure/safe way by default.**
+
+### The Decision
+
+**In symmetric mode**: link identifiers MUST be server-generated random IDs (like the current transfer IDs). Users do NOT get to name their links. The URL is `send.sgraph.ai/s/xK9mP2qR` — opaque and meaningless to anyone reading server logs. This is not a UX limitation — it's a security feature.
+
+**In PKI mode**: the main link uses a strong opaque ID. BUT we store TWO encrypted files:
+
+```
+Server stores:
+  1. content.enc    ← the actual secret, encrypted with recipient's public key
+  2. metadata.enc   ← friendly name, sender info, description — also encrypted
+
+The URL: send.sgraph.ai/d/b12/xK9mP2qR
+  (opaque ID — not human-readable — safe to appear in server logs)
+
+When the recipient decrypts (in their browser, with their private key):
+  They see: "Quarterly Report from Alice" (from decrypted metadata)
+  They see: the actual content (from decrypted content)
+
+In the recipient's data vault:
+  📄 "Quarterly Report from Alice"  ← friendly name from decrypted metadata
+  From: Alice (verified by signature)
+  Received: 2026-02-25
+  Expires: 2026-03-04
+```
+
+This gives users the friendly experience (meaningful names, sender info, organisation in their vault) while keeping the server completely blind to the metadata. The friendly name exists ONLY in the encrypted metadata file — the server never sees it.
+
+### Additional Consideration: Link Sharing via HTML and Direct URLs
+
+A good number of links will be shared via HTML links in emails or pasted as direct URLs — contexts where the URL fragment (`#...`) is often stripped or not transmitted. This further reduces the utility of putting meaningful data in the URL itself, and reinforces the decision to keep URLs opaque with encrypted metadata alongside.
+
+---
+
+## Two Modes: Symmetric and PKI
+
+The one-time secret link operates differently depending on whether the recipient has a PKI key pair:
+
+### Symmetric Mode (MVP — This Brief)
+
+The decryption key is IN the URL. Anyone with the link can decrypt. Security relies on the link being seen only once (or within the configured ephemerality level).
+
+```
+https://send.sgraph.ai/s/xK9mP2qR#decryptionKeyHere
+
+  - xK9mP2qR is a server-generated OPAQUE identifier (no user-chosen names)
+  - The fragment IS the decryption key
+  - Anyone who has the full URL can decrypt
+  - One-time viewing (or N-views / time-bound) is the protection mechanism
+  - Server never sees the fragment (zero-knowledge preserved)
+  - Server sees only the opaque ID — meaningless without the fragment
+```
+
+This is the least secure mode but the most usable. Suitable for: sharing passwords, one-time tokens, data room access keys, quick secrets.
+
+**No human-friendly codes in symmetric mode.** The identifier is always server-generated and opaque. See the metadata leak risk section above for why.
+
+### PKI Mode (Future)
+
+The recipient has a public key. The secret is encrypted with their public key. The URL contains a reference to the public key + an opaque document ID. Only the holder of the private key can decrypt, regardless of who sees the URL.
+
+```
+https://send.sgraph.ai/d/b12/xK9mP2qR
+
+  /d/           ← "deliver" or "decrypt"
+  b12           ← first characters of recipient's public key fingerprint
+  xK9mP2qR     ← OPAQUE document identifier (not human-readable)
+
+  The document is encrypted with the public key that starts with "b12"
+  Only the private key holder can decrypt
+  The URL is safe to share publicly — it's just an opaque reference
+  The link can be LONG-LIVED (not one-time) because the encryption protects it
+```
+
+In PKI mode, the security doesn't come from the link being secret — it comes from the encryption. The link could be posted on a website, shared on social media, printed on a business card. Only the intended recipient can decrypt it.
+
+**Friendly names live in encrypted metadata, not in the URL.** The server stores two encrypted files per secret: the content and the metadata (name, sender, description). When the recipient decrypts, they see the friendly name in their data vault. The URL stays opaque. See the metadata leak risk section above for the full architecture.
+
+---
+
+## Always Include the Sender's Public Key
+
+Every message and secret should include the sender's public key by default. This creates a viral adoption loop:
+
+```
+Bob receives a secret from Alice:
+  
+  🔓 Secret from Alice
+  
+  "Here's the API key for staging: sk-abc123..."
+  
+  ────────────────────────────────────────
+  📧 Sent by: Alice
+  🔑 Alice's public key: [Import Contact]
+  ────────────────────────────────────────
+
+Bob clicks [Import Contact] → Alice's public key is saved in his browser.
+Bob can now send encrypted messages back to Alice.
+The PKI relationship is bootstrapped through a one-time secret.
+```
+
+Making this optional but default. If the sender doesn't want to reveal their identity, they can disable it.
+
+---
+
+## The Workflow
+
+### Sender
+
+```
+1. Go to send.sgraph.ai/secret (or a "Share Secret" button in the admin UI)
+2. Type or paste the secret: "data-room-key-abc123"
+3. Optionally set:
+   - Expiry: 1 hour / 24 hours / 7 days (default: 24 hours)
+   - Passphrase: additional passphrase the recipient must enter
+4. Click [Create Link]
+5. Get back: https://send.sgraph.ai/s/xK9mP2qR
+6. Copy link → send via email, WhatsApp, Slack, whatever
+```
+
+### Recipient
+
+```
+1. Click the link: https://send.sgraph.ai/s/xK9mP2qR
+2. If passphrase was set: enter passphrase
+3. See the secret: "data-room-key-abc123"
+4. Link is now destroyed. Clicking it again shows: "This secret has already been viewed."
+```
+
+### What Happens Under the Hood
+
+```
+1. Sender creates secret:
+   - Secret encrypted in the browser (client-side)
+   - Encrypted blob stored on server
+   - Server stores: encrypted_blob + metadata (expiry, view count = 0)
+   - Server does NOT have the decryption key
+   
+2. The link contains the decryption key in the URL fragment:
+   https://send.sgraph.ai/s/xK9mP2qR#decryptionKeyHere
+   
+   The fragment (#...) is never sent to the server.
+   The server only sees: /s/xK9mP2qR
+   
+3. Recipient opens link:
+   - Browser fetches encrypted blob from server
+   - Browser decrypts using the key from the URL fragment
+   - Server marks the secret as viewed (view count = 1)
+   - Server deletes the encrypted blob
+   
+4. Second access attempt:
+   - Server responds: "Secret already viewed" or "Secret not found"
+   - No blob to fetch. No key would help anyway.
+```
+
+**Zero-knowledge**: the server never sees the secret in cleartext. The decryption key is in the URL fragment, which browsers don't send to servers. Same security model as the rest of SG/Send.
+
+---
+
+## Integration with Data Room Admin
+
+The primary immediate use case: sharing data room access keys.
+
+```
+Admin creates a user key for Bob → key is "alpha-7829"
+
+Option A: Admin clicks [Share via Secret Link]
+  → Auto-creates a one-time secret containing "alpha-7829"
+  → Returns: https://send.sgraph.ai/s/xK9mP2qR#...
+  → Admin sends link to Bob
+
+Option B: Admin clicks [Copy Key]
+  → Key copied to clipboard
+  → Admin shares it however they want (less secure but their choice)
+```
+
+Option A should be the default/promoted path. Option B exists for flexibility (zero lock-in principle).
+
+---
+
+## Product Positioning
+
+This feature is independently valuable beyond data room key sharing:
+
+| Use Case | Example |
+|---|---|
+| **Share a password** | "Here's the WiFi password for the office" |
+| **Share an API key** | "Here's the staging API key, don't put it in Slack" |
+| **Share credentials** | "Here's the login for the shared account" |
+| **Share sensitive text** | "Here's the confirmation code / 2FA backup" |
+| **Data room access keys** | "Here's your key to the Project Alpha data room" |
+
+This is a "front door" feature — simple enough that anyone can use it without understanding PKI or encryption. It introduces users to SG/Send through a common, relatable use case. It drives DRU directly.
+
+---
+
+## URL Structure
+
+```
+https://send.sgraph.ai/s/{secret_id}#{decryption_key}
+
+  /s/           ← short for "secret" (or could be /secret/)
+  {secret_id}   ← server-side identifier for the encrypted blob
+  #             ← fragment separator (never sent to server)
+  {key}         ← AES decryption key, base64url encoded
+```
+
+The entire URL is what the sender shares. It's a single link. The recipient doesn't need to know about encryption, keys, or fragments. They just click a link and see the secret.
+
+---
+
+## Server-Side Abuse Detection
+
+Even though the server sees only opaque IDs and encrypted blobs, strong logging of actions (creation, access, expiry, deletion) enables abuse detection:
+
+| Server-Side Signal | What It Detects |
+|---|---|
+| High creation rate from one IP | Spam / abuse |
+| Secret accessed from unexpected geography | Possible interception |
+| Bulk creation of secrets with same expiry pattern | Automated exfiltration |
+| Secrets created but never accessed | Possible testing / reconnaissance |
+| Unusual access timing patterns | Coordinated activity |
+
+These logs contain NO customer data — only opaque IDs, timestamps, IPs, and action types.
+
+---
+
+## Client-Side Encrypted Logging
+
+The zero-knowledge model has a side effect: the server is intentionally blind, which limits what monitoring and incident response teams can see. This doesn't mean they should fly blind.
+
+### The Model
+
+The client (which performs every meaningful action) can create its own signed logs and submit them — encrypted with the public keys of the admin/security team. The client knows what it did. It can log what it did. The log is encrypted so only the security team can read it.
+
+```
+Client performs action: "Created secret xK9mP2qR at 10:42:03, expiry 24h"
+
+Client creates a log entry:
+  {
+    "action": "secret_created",
+    "secret_id": "xK9mP2qR",
+    "timestamp": "2026-02-25T10:42:03Z",
+    "expiry": "24h",
+    "client_key_fingerprint": "b12..."
+  }
+
+Client signs the entry with the user's private key.
+Client encrypts the signed entry with the security team's public key.
+Client submits the encrypted log to the server.
+
+Server stores: an encrypted blob it cannot read.
+Security team decrypts: a complete, signed action log.
+```
+
+### Why This Works
+
+The key insight: these client-side logs and the server-side opaque logs (hashes, GUIDs, timestamps) have a high degree of interconnectivity and inter-relationship. For legitimate users, the two streams are consistent. For an attacker attempting to suppress or manipulate logs, creating fabricated entries that are consistent with the traffic patterns of other users (which the attacker doesn't have access to) is extremely difficult at graph-level and graph-aggregation analysis.
+
+This is analogous to how CSP (Content Security Policy) violation reports worked in practice: even when only a fraction of users had browsers that supported CSP, a single triggered alert was enough for the security team to know something was wrong. One real signal from one real user — even in a sea of noise — has value.
+
+**Do we trust client-side logs 100%?** No. An attacker who controls the client can suppress or manipulate them. But:
+
+| Attacker Action | Detectability |
+|---|---|
+| Suppress all logs | Absence of logs from an active account is itself a signal |
+| Submit false logs | False entries fail consistency checks against server-side signals |
+| Replay old logs | Timestamps and sequence numbers don't match server-side patterns |
+| Modify log content | Signature verification fails (log is signed with user's key) |
+
+The signed client logs and the opaque server logs together provide a much stronger signal than either alone. A sophisticated attacker would need to coordinate fabrications across both streams in a way that looks consistent with aggregate platform traffic — which they cannot see.
+
+### Comparison to Existing Patterns
+
+| Pattern | Mechanism | Parallel |
+|---|---|---|
+| **CSP violation reports** | Browser sends violation reports to a reporting endpoint. Even partial coverage creates useful signal. | Client-side encrypted logs: even if some clients suppress, the ones that don't send real signals. |
+| **Google Analytics** | Client-controlled — an attacker can manipulate or suppress GA entirely. | Our model: client-controlled but SIGNED. Manipulation is detectable. Suppression is a signal. |
+| **Server access logs** | Server-controlled — complete but blind to client intent. | Our model: complements server logs with signed client intent. |
+
+### Implementation Note
+
+The security team's public key(s) must be embedded in the client at deploy time and verifiable (e.g., published in the SG/Send GitHub repo and in the transparency panel). This prevents an attacker from substituting their own public key and making the logs unreadable by the real security team.
+
+---
+
+## Acceptance Criteria
+
+| # | Criterion |
+|---|---|
+| 1 | Create ephemeral data with configurable lifespan: one-view, N-views, time-bounded, time+views |
+| 2 | Get back a shareable link with opaque server-generated ID (no user-chosen names in URLs) |
+| 3 | Recipient clicks link → sees the secret (decrypted in browser) |
+| 4 | Access limits enforced: view count, time expiry, or both |
+| 5 | Expired/exhausted secrets → appropriate message ("viewed" / "expired") |
+| 6 | Server never sees the secret in cleartext (key in URL fragment) |
+| 7 | Server stores zero meaningful metadata (opaque IDs only — zero customer data on full leak) |
+| 8 | PKI mode: metadata (friendly name, sender) stored as separate encrypted file alongside content |
+| 9 | PKI mode: friendly names visible only in recipient's data vault after decryption |
+| 10 | Passphrase-protected secrets require passphrase entry before decryption |
+| 11 | Sender's public key included by default (opt-out available) |
+| 12 | Integrated into data room admin: [Share via Secret Link] button on user key creation |
+| 13 | Works on mobile (the link must work from WhatsApp/email on a phone) |
+| 14 | Server-side abuse detection logging (opaque signals only, no customer data) |
+| 15 | AppSec + GRC + DPO review completed on metadata leak risks |
+| 16 | Client-side encrypted logging: signed action logs submitted encrypted with security team's public key |
+| 17 | Security team public key embedded in client at deploy time, published in GitHub repo and transparency panel |
+
+---
+
+This document is released under the Creative Commons Attribution 4.0 International licence (CC BY 4.0). You are free to share and adapt this material for any purpose, including commercially, as long as you give appropriate credit.

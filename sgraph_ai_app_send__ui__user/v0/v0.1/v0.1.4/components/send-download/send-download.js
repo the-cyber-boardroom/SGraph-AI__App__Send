@@ -369,7 +369,7 @@ class SendDownload extends HTMLElement {
             this.state = 'decrypting'; this._setBeforeUnload(true); this.render();
 
             const key       = await SendCrypto.importKey(keyString);
-            const encrypted = await ApiClient.downloadPayload(this.transferId);
+            const encrypted = await this._downloadEncryptedPayload();
             const decrypted = await SendCrypto.decryptFile(key, encrypted);
 
             // Check for SGMETA envelope (contains filename and other metadata)
@@ -397,7 +397,9 @@ class SendDownload extends HTMLElement {
             this.transparencyData = {
                 download_timestamp: new Date().toISOString(),
                 file_size_bytes:    this.transferInfo.file_size_bytes,
-                not_stored:         ['file_name', 'file_content', 'decryption_key']
+                encryption_method:  'AES-256-GCM',
+                encrypted:          ['file_name', 'file_content'],
+                not_stored:         ['decryption_key', 'raw_ip']
             };
             this.state = 'complete'; this.render(); this.setupEventListeners();
 
@@ -412,6 +414,22 @@ class SendDownload extends HTMLElement {
             const nki = this.querySelector('#key-input');
             if (nki) nki.value = keyOverride || keyString;
         }
+    }
+
+    // ─── Payload Download (presigned → direct fallback) ─────────────────
+
+    async _downloadEncryptedPayload() {
+        // Try presigned S3 download first (bypasses Lambda 6MB limit)
+        try {
+            const result = await ApiClient.getPresignedDownloadUrl(this.transferId);
+            if (result && result.download_url) {
+                const response = await fetch(result.download_url);
+                if (response.ok) return response.arrayBuffer();
+            }
+        } catch (e) { /* presigned not available — fall back to direct */ }
+
+        // Fall back to direct Lambda download (works for small files)
+        return ApiClient.downloadPayload(this.transferId);
     }
 
     // ─── LocalStorage History ────────────────────────────────────────────

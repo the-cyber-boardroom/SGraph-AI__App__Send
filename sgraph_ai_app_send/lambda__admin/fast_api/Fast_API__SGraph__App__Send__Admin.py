@@ -13,10 +13,19 @@ from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                
 from sgraph_ai_app_send.lambda__admin.service.Service__Tokens                       import Service__Tokens
 from sgraph_ai_app_send.lambda__admin.service.Service__Keys                         import Service__Keys
 from sgraph_ai_app_send.lambda__admin.service.Service__Vault                        import Service__Vault
+from sgraph_ai_app_send.lambda__admin.service.Service__Vault__ACL                   import Service__Vault__ACL
+from sgraph_ai_app_send.lambda__admin.service.Service__Users                        import Service__Users
+from sgraph_ai_app_send.lambda__admin.service.Service__Data_Room                    import Service__Data_Room
+from sgraph_ai_app_send.lambda__admin.service.Service__Invites                      import Service__Invites
+from sgraph_ai_app_send.lambda__admin.service.Service__Room__Session                import Service__Room__Session
+from sgraph_ai_app_send.lambda__admin.service.Service__Audit                        import Service__Audit
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client__Vault            import Send__Cache__Client__Vault
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import Routes__Tokens
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                  import Routes__Keys
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                 import Routes__Vault
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Users                 import Routes__Users
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Data_Room             import Routes__Data_Room
+from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Invites               import Routes__Invites
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser        import Routes__Cache__Browser
 from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                 import Middleware__Analytics
 from sgraph_ai_app_send.lambda__admin.service.Service__Analytics__Pulse             import compute_pulse
@@ -24,6 +33,7 @@ from sgraph_ai_app_send.lambda__admin.admin__config                             
 from sgraph_ai_app_send.lambda__admin.server_analytics.Routes__Metrics              import Routes__Metrics
 from sgraph_ai_app_send.lambda__admin.server_analytics.Service__Metrics__Cache      import Service__Metrics__Cache
 from sgraph_ai_app_send.lambda__admin.server_analytics.Metrics__Pipeline__Setup     import create_metrics_cache, create_metrics_cache_with_stub
+from sgraph_ai_app_send.utils.MCP__Setup                                            import MCP__Setup
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
 ROUTES_PATHS__ANALYTICS = ['/health/pulse']
@@ -32,11 +42,17 @@ ROUTES_PATHS__APP_SEND__STATIC__ADMIN  = [f'/{APP_SEND__UI__ADMIN__ROUTE__PATH__
 
 class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
 
-    send_cache_client  : Send__Cache__Client      = None                             # Cache service client (IN_MEMORY mode)
-    service_tokens     : Service__Tokens           = None                             # Token lifecycle service
-    service_keys       : Service__Keys             = None                             # Key registry service
-    service_vault      : Service__Vault            = None                             # Vault lifecycle service
-    metrics_cache      : Service__Metrics__Cache   = None                             # Metrics cache service
+    send_cache_client    : Send__Cache__Client      = None                             # Cache service client (IN_MEMORY mode)
+    service_tokens       : Service__Tokens           = None                             # Token lifecycle service
+    service_keys         : Service__Keys             = None                             # Key registry service
+    service_vault        : Service__Vault            = None                             # Vault lifecycle service
+    service_vault_acl    : Service__Vault__ACL       = None                             # Vault ACL service (Phase 1)
+    service_users        : Service__Users            = None                             # User identity service (Phase 1)
+    service_data_room    : Service__Data_Room        = None                             # Data room service (Phase 3)
+    service_invites      : Service__Invites          = None                             # Invite service (Phase 3)
+    service_room_session : Service__Room__Session    = None                             # Room session service (Phase 3)
+    service_audit        : Service__Audit            = None                             # Audit trail service (Phase 3)
+    metrics_cache        : Service__Metrics__Cache   = None                             # Metrics cache service
 
     def setup(self):
         with self.config as _:
@@ -60,6 +76,32 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
                 hash_generator = self.send_cache_client.hash_generator )
             self.service_vault = Service__Vault(vault_cache_client=vault_cache_client)
 
+        if self.service_vault_acl is None:                                            # Auto-create vault ACL service (Phase 1)
+            vault_cache_client = self.service_vault.vault_cache_client
+            self.service_vault_acl = Service__Vault__ACL(vault_cache_client=vault_cache_client)
+            self.service_vault.vault_acl = self.service_vault_acl                     # Wire ACL into vault service
+
+        if self.service_users is None:                                                # Auto-create user identity service (Phase 1)
+            self.service_users = Service__Users(send_cache_client=self.send_cache_client)
+
+        if self.service_audit is None:                                                  # Auto-create audit service (Phase 3)
+            self.service_audit = Service__Audit(send_cache_client=self.send_cache_client)
+
+        if self.service_data_room is None:                                              # Auto-create data room service (Phase 3)
+            self.service_data_room = Service__Data_Room(
+                send_cache_client = self.send_cache_client ,
+                service_vault     = self.service_vault     ,
+                service_vault_acl = self.service_vault_acl )
+
+        if self.service_invites is None:                                                # Auto-create invite service (Phase 3)
+            self.service_invites = Service__Invites(
+                send_cache_client = self.send_cache_client  ,
+                service_data_room = self.service_data_room  )
+
+        if self.service_room_session is None:                                           # Auto-create room session service (Phase 3)
+            self.service_room_session = Service__Room__Session(
+                send_cache_client = self.send_cache_client)
+
         if self.metrics_cache is None:                                              # Auto-create metrics pipeline
             if METRICS__USE_STUB:                                                      # Local dev: stub data, no AWS calls
                 self.metrics_cache = create_metrics_cache_with_stub(self.send_cache_client)
@@ -78,7 +120,17 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         self.add_routes(Routes__Keys             ,
                         service_keys   = self.service_keys  )
         self.add_routes(Routes__Vault            ,
-                        service_vault  = self.service_vault )
+                        service_vault     = self.service_vault     ,
+                        service_vault_acl = self.service_vault_acl )
+        self.add_routes(Routes__Users            ,
+                        service_users  = self.service_users  )
+        self.add_routes(Routes__Data_Room         ,
+                        service_data_room = self.service_data_room ,
+                        service_invites   = self.service_invites   ,
+                        service_audit     = self.service_audit     )
+        self.add_routes(Routes__Invites          ,
+                        service_invites   = self.service_invites   ,
+                        service_audit     = self.service_audit     )
         self.add_routes(Routes__Set_Cookie       )
         self.add_routes(Routes__Cache__Browser  ,
                         send_cache_client = self.send_cache_client)
@@ -89,6 +141,14 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
         # if self.send_cache_client is not None:                                      # Record admin traffic for Analytics Pulse  # disabled: creates 5 files per request, caused 65k+ file buildup — redesign needed
         #     self.app().add_middleware(Middleware__Analytics,
         #                              send_cache_client = self.send_cache_client)
+
+        self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
+
+    def setup_mcp(self):                                                              # Mount MCP server on /mcp endpoint
+        mcp_setup = MCP__Setup(name         = 'sgraph-send-admin'                         ,
+                               include_tags = ['tokens', 'keys', 'vault', 'users']        ,
+                               stateless    = True                                        )  # Lambda-compatible: no session state, authless discovery
+        self.mcp = mcp_setup.mount_mcp(self.app())
 
     def setup_pulse_route(self):                                                  # Register /health/pulse directly (no tag prefix)
         send_cache_client = self.send_cache_client

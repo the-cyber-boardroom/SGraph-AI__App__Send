@@ -35,7 +35,7 @@ const I18n = {
             'upload.drop_zone.label':           'Drop your file here',
             'upload.drop_zone.hint':            'or click to browse',
             'upload.drop_zone.encrypted_hint':  'Encrypted in your browser before upload',
-            'upload.drop_zone.size_limit':      'Maximum file size: 5 MB',
+            'upload.drop_zone.size_limit':      'Maximum file size: {limit}',
 
             // ─── Upload: Text Input ─────────────────────────────────────
             'upload.text.placeholder':          'Type or paste your text here',
@@ -50,6 +50,7 @@ const I18n = {
             'upload.progress.encrypting':       'Encrypting...',
             'upload.progress.creating':         'Preparing transfer...',
             'upload.progress.uploading':        'Uploading...',
+            'upload.progress.uploading_part':   'Uploading part {current} of {total}...',
             'upload.progress.completing':       'Finalising...',
 
             // ─── Upload: Result ─────────────────────────────────────────
@@ -74,7 +75,7 @@ const I18n = {
             // ─── Upload: Errors ─────────────────────────────────────────
             'upload.error.empty_text':          'Please enter some text to encrypt.',
             'upload.error.upload_failed':       'Upload failed. Please try again.',
-            'upload.error.file_too_large':      'File is too large. Maximum size is 5 MB.',
+            'upload.error.file_too_large':      'File is too large. Maximum size is {limit}.',
 
             // ─── Download: Loading ──────────────────────────────────────
             'download.loading':                 'Loading transfer info...',
