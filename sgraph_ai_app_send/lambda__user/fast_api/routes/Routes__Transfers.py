@@ -93,11 +93,15 @@ class Routes__Transfers(Fast_API__Routes):                                      
 
     async def upload__transfer_id(self, transfer_id   : Safe_Str__Id ,           # POST /transfers/upload/{transfer_id} (todo: transfer_id should be Transfer_Id)
                                         request       : Request      ,
-                                        access_token  : str = ''               # MCP tool parameter
+                                        access_token  : str = ''    ,          # MCP tool parameter
+                                        data          : str = ''               # MCP tool parameter — base64-encoded encrypted payload (includes SGMETA envelope)
                                  ) -> dict:
         self.check_access_token(request, access_token)
-        body    = await request.body()
-        body    = self.unwrap_mcp_payload(body)                                # Decode JSON-wrapped base64 from MCP clients
+        if data:                                                               # MCP client sent payload as base64 tool parameter
+            body = base64.b64decode(data)
+        else:                                                                  # Browser/CLI client sent raw bytes in request body
+            body = await request.body()
+            body = self.unwrap_mcp_payload(body)                               # Decode JSON-wrapped base64 from older MCP clients
         success = self.transfer_service.upload_payload(transfer_id  = transfer_id,
                                                        payload_bytes = body      )
         if success is False:
