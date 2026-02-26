@@ -79,6 +79,38 @@ class Service__Tokens(Type_Safe):                                          # Tok
                     usage_count = token_data['usage_count']         ,
                     remaining   = max(0, usage_limit - token_data['usage_count']) if usage_limit > 0 else -1)
 
+    def update_limit(self, token_name, new_limit):                          # Update usage limit for a token
+        token_data = self.send_cache_client.token__lookup(token_name)
+        if token_data is None:
+            return None
+
+        token_data['usage_limit'] = new_limit
+        usage_count = token_data.get('usage_count', 0)
+        if token_data.get('status') == 'exhausted' and (new_limit == 0 or usage_count < new_limit):
+            token_data['status'] = 'active'                              # Auto-reactivate if new limit allows
+
+        cache_id = self.send_cache_client.token__lookup_cache_id(token_name)
+        if cache_id is None:
+            return None
+        self.send_cache_client.token__update(cache_id, token_data)
+        return token_data
+
+    def reactivate(self, token_name):                                      # Reactivate a revoked or exhausted token
+        token_data = self.send_cache_client.token__lookup(token_name)
+        if token_data is None:
+            return None
+
+        status = token_data.get('status', '')
+        if status == 'active':
+            return token_data                                              # Already active
+
+        token_data['status'] = 'active'
+        cache_id = self.send_cache_client.token__lookup_cache_id(token_name)
+        if cache_id is None:
+            return None
+        self.send_cache_client.token__update(cache_id, token_data)
+        return token_data
+
     def revoke(self, token_name):                                          # Revoke a token
         return self.send_cache_client.token__revoke(token_name)
 

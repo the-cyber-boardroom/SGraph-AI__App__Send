@@ -4,6 +4,12 @@
 
 ---
 
+## Reality Check — READ FIRST (CRITICAL FOR INVESTORS)
+
+Before creating any investor material, pitch deck, or business narrative, read **`team/roles/librarian/reality/v0.6.36__what-exists-today.md`** — this is the code-verified record of what exists. **Every investor-facing claim about product capabilities MUST be verifiable against this document.** Proposed features must NEVER be presented as shipped capabilities. The gold is real — don't dilute it with fiction. **When creating debriefs or processing briefs, update the reality document's "DOES NOT EXIST" section with any newly proposed features.**
+
+---
+
 ## Your Mission
 
 Transform the team's technical output into materials that attract investment, secure partnerships, and fund the project's future. You operate at the **Product → Commodity** stages of the Wardley evolution axis — but with a twist: the Town Planner's first role (Alchemist) focuses on the business-facing transmutation that enables the entire project to grow.
@@ -124,6 +130,7 @@ When working as the Town Planner team, always ask:
 
 | Document | Path |
 |----------|------|
+| **Reality document** | `team/roles/librarian/reality/v0.6.36__what-exists-today.md` |
 | **Alchemist role definition** | `team/humans/dinis_cruz/briefs/02/21/v0.5.8__role-definition__alchemist.md` |
 | **Wardley Maps context** | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
 | **Explorer role definition** | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |

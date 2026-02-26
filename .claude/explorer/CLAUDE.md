@@ -4,6 +4,12 @@
 
 ---
 
+## Reality Check — READ FIRST
+
+Before starting any Explorer session, read **`team/roles/librarian/reality/v0.6.36__what-exists-today.md`** — this is the code-verified record of what exists. When processing briefs or writing assessments, always distinguish between what EXISTS (listed in reality doc) and what is PROPOSED (not yet built). **When you ship new code, update the reality document in the same commit.**
+
+---
+
 ## Your Mission
 
 Discover, experiment, build first versions. You operate at the **Genesis → Custom-Built** stages of the Wardley evolution axis. Your output is **minor versions** (IFD methodology).
@@ -102,6 +108,7 @@ When a component is mature enough for the Villager team:
 
 | Document | Path |
 |----------|------|
+| **Reality document** | `team/roles/librarian/reality/v0.6.36__what-exists-today.md` |
 | Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
 | Wardley Maps context | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
 | Daily brief (v0.3.2) | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__daily-brief__sgraph-send-14-feb-2026.md` |

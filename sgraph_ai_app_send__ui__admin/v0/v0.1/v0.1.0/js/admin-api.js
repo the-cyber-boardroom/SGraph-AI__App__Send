@@ -130,6 +130,27 @@ class AdminAPI {
     }
 
     /**
+     * Update a token's usage limit.
+     * @param {string} tokenName
+     * @param {number} usageLimit — new max uses (0 = unlimited)
+     * @returns {Promise<object>} — updated token data
+     */
+    updateTokenLimit(tokenName, usageLimit) {
+        return this._post(`/tokens/update-limit/${encodeURIComponent(tokenName)}`, {
+            usage_limit: usageLimit
+        });
+    }
+
+    /**
+     * Reactivate a revoked or exhausted token.
+     * @param {string} tokenName
+     * @returns {Promise<object>} — updated token data
+     */
+    reactivateToken(tokenName) {
+        return this._post(`/tokens/reactivate/${encodeURIComponent(tokenName)}`);
+    }
+
+    /**
      * List all tokens.
      * @returns {Promise<{token_names: Array}>}
      */
