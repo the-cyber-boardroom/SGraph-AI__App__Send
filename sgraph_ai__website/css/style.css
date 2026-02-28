@@ -938,12 +938,21 @@ body.i18n-loading {
   visibility: hidden;
 }
 
+/* Locale Picker — positioning inside header flex container */
+#locale-picker {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 /* Locale Dropdown */
 .locale-dropdown {
   position: relative;
+  display: inline-block;
 }
 
 .locale-dropdown__trigger {
+  -webkit-appearance: none;
+  appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -955,6 +964,7 @@ body.i18n-loading {
   border: 1px solid transparent;
   cursor: pointer;
   font-family: var(--font-body);
+  line-height: var(--lh-body);
   transition: color var(--transition-fast), background var(--transition-fast);
   white-space: nowrap;
 }
@@ -975,30 +985,35 @@ body.i18n-loading {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  min-width: 140px;
-  background: var(--bg-surface);
+  min-width: 180px;
+  background: var(--color-deep-blue);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-btn);
   box-shadow: var(--shadow-card);
   z-index: 100;
   padding: var(--sp-1) 0;
+  flex-direction: column;
 }
 
 .locale-dropdown.open .locale-dropdown__menu {
-  display: block;
+  display: flex;
 }
 
 .locale-dropdown__item {
+  -webkit-appearance: none;
+  appearance: none;
   display: block;
   width: 100%;
-  padding: 0.375rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
   font-family: var(--font-body);
+  line-height: var(--lh-body);
   color: var(--text-secondary);
-  background: transparent;
+  background: none;
   border: none;
   text-align: left;
   cursor: pointer;
+  white-space: nowrap;
   transition: color var(--transition-fast), background var(--transition-fast);
 }
 
