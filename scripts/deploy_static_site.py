@@ -36,17 +36,20 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 CONTENT_TYPE_MAP = {
-    ".html": "text/html",
-    ".css":  "text/css",
-    ".js":   "application/javascript",
-    ".json": "application/json",
-    ".png":  "image/png",
-    ".jpg":  "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif":  "image/gif",
-    ".svg":  "image/svg+xml",
-    ".ico":  "image/x-icon",
-    ".webp": "image/webp",
+    ".html":  "text/html",
+    ".css":   "text/css",
+    ".js":    "application/javascript",
+    ".json":  "application/json",
+    ".png":   "image/png",
+    ".jpg":   "image/jpeg",
+    ".jpeg":  "image/jpeg",
+    ".gif":   "image/gif",
+    ".svg":   "image/svg+xml",
+    ".ico":   "image/x-icon",
+    ".webp":  "image/webp",
+    ".woff2": "font/woff2",
+    ".woff":  "font/woff",
+    ".ttf":   "font/ttf",
 }
 
 CACHE_CONTROL = {
@@ -58,6 +61,7 @@ CACHE_CONTROL = {
 HTML_EXTENSIONS  = {".html"}
 CSS_JS_EXTENSIONS = {".css", ".js", ".json"}
 IMAGE_EXTENSIONS  = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp"}
+FONT_EXTENSIONS   = {".woff2", ".woff", ".ttf"}
 
 # CloudFront cache TTL configuration (seconds)
 CLOUDFRONT_DEFAULT_TTL = 300    # 5 minutes
@@ -93,6 +97,24 @@ def resolve_bucket_name(account_id, region):
     Convention: {account-id}--static-sgraph-ai--{region}
     """
     return f"{account_id}--static-sgraph-ai--{region}"
+
+
+def version_to_ifd_path(version):
+    """Convert a version string to IFD nested path.
+
+    IFD versioning nests releases as: v{major}/v{major}.{minor}/v{major}.{minor}.{patch}
+    Examples:
+        v0.7.7   -> v0/v0.7/v0.7.7
+        v1.2.3   -> v1/v1.2/v1.2.3
+        v0.10.1  -> v0/v0.10/v0.10.1
+    """
+    clean = version.lstrip("v")
+    parts = clean.split(".")
+    if len(parts) != 3:
+        print(f"WARNING: version '{version}' doesn't match X.Y.Z — using flat path")
+        return version
+    major, minor, _patch = parts
+    return f"v{major}/v{major}.{minor}/v{major}.{minor}.{_patch}"
 
 
 def cache_control_for(extension):
@@ -190,8 +212,8 @@ def s3_sync_by_type(source_dir, s3_prefix, file_type, extensions, cache_control,
 
     if file_type == "html":
         # For HTML: sync everything, exclude non-HTML, exclude dotfiles and README
-        cmd += ["--exclude", "README.md", "--exclude", ".*"]
-        for ext in CSS_JS_EXTENSIONS | IMAGE_EXTENSIONS:
+        cmd += ["--exclude", "README.md", "--exclude", ".*", "--exclude", "cloudfront/*"]
+        for ext in CSS_JS_EXTENSIONS | IMAGE_EXTENSIONS | FONT_EXTENSIONS:
             cmd += ["--exclude", f"*{ext}"]
         if delete:
             cmd += ["--delete"]
@@ -212,15 +234,18 @@ def s3_sync_by_type(source_dir, s3_prefix, file_type, extensions, cache_control,
 def deploy_to_s3(source_dir, bucket, site, version):
     """Deploy the static site to S3 using the versioned deployment model.
 
-    Step 1: Sync to websites/{site}/releases/{version}/
+    Step 1: Sync to websites/{site}/releases/{ifd_path}/  (IFD versioning)
     Step 2: Copy the release to websites/{site}/latest/
+
+    IFD versioning: v0.7.7 -> releases/v0/v0.7/v0.7.7/
     """
-    release_prefix = f"s3://{bucket}/websites/{site}/releases/{version}/"
+    ifd_path = version_to_ifd_path(version)
+    release_prefix = f"s3://{bucket}/websites/{site}/releases/{ifd_path}/"
     latest_prefix  = f"s3://{bucket}/websites/{site}/latest/"
 
-    # ----- Deploy to releases/{version}/ -----
+    # ----- Deploy to releases/{ifd_path}/ -----
     print(f"\n{'='*60}")
-    print(f"Deploying to releases/{version}/")
+    print(f"Deploying to releases/{ifd_path}/")
     print(f"{'='*60}")
 
     s3_sync_by_type(source_dir, release_prefix, "html",
@@ -241,6 +266,9 @@ def deploy_to_s3(source_dir, bucket, site, version):
 
     s3_sync_by_type(source_dir, release_prefix, "image",
                     IMAGE_EXTENSIONS, CACHE_CONTROL["image"])
+
+    s3_sync_by_type(source_dir, release_prefix, "font",
+                    FONT_EXTENSIONS, CACHE_CONTROL["image"])  # fonts get long cache like images
 
     # ----- Copy release to latest/ -----
     print(f"\n{'='*60}")
@@ -404,7 +432,8 @@ def main():
             sys.exit(1)
 
     if args.dry_run:
-        print(f"\n[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/releases/{args.version}/")
+        ifd_path = version_to_ifd_path(args.version)
+        print(f"\n[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/releases/{ifd_path}/")
         print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/latest/")
         if args.cloudfront_distribution_id:
             print(f"[dry-run] Would invalidate CloudFront {args.cloudfront_distribution_id}")
@@ -421,9 +450,10 @@ def main():
     if args.smoke_test_url:
         smoke_test(args.smoke_test_url)
 
+    ifd_path = version_to_ifd_path(args.version)
     print(f"\n{'='*60}")
     print(f"Deployment complete: {args.site} {args.version}")
-    print(f"  Release : s3://{bucket}/websites/{args.site}/releases/{args.version}/")
+    print(f"  Release : s3://{bucket}/websites/{args.site}/releases/{ifd_path}/")
     print(f"  Latest  : s3://{bucket}/websites/{args.site}/latest/")
     print(f"{'='*60}")
 
