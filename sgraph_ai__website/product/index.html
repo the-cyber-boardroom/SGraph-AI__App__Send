@@ -6,11 +6,12 @@
     <title>SG/Send — Zero-Knowledge Encrypted File Sharing — SGraph AI</title>
     <meta name="description" content="Send files with zero-knowledge encryption. Your browser encrypts everything before upload. We literally cannot read your files.">
     <meta name="theme-color" content="#1A1A2E">
+    <meta name="i18n-title-key" content="product.title">
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="stylesheet" href="../fonts/fonts.css">
     <link rel="stylesheet" href="../css/style.css">
 </head>
-<body class="theme-aurora">
+<body class="theme-aurora i18n-loading">
     <header class="site-header">
         <div class="container">
             <a href="../" class="site-logo" aria-label="SGraph AI Home">
@@ -18,11 +19,12 @@
             </a>
             <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
             <nav class="site-nav" aria-label="Main navigation">
-                <a href="./" class="active">Product</a>
-                <a href="../agents/">Team</a>
-                <a href="../architecture/">Architecture</a>
-                <a href="../pricing/">Pricing</a>
+                <a href="./" class="active" data-i18n="nav.product">Product</a>
+                <a href="../agents/" data-i18n="nav.team">Team</a>
+                <a href="../architecture/" data-i18n="nav.architecture">Architecture</a>
+                <a href="../pricing/" data-i18n="nav.pricing">Pricing</a>
             </nav>
+            <div id="locale-picker"></div>
         </div>
     </header>
 
@@ -31,35 +33,35 @@
         <!-- Section 1: Hero -->
         <section class="section section--hero">
             <div class="container">
-                <h1 class="section__title">Your files, your keys, your privacy</h1>
-                <p class="section__subtitle">SG/Send encrypts files in your browser before upload. The server stores only encrypted data. Your decryption key never leaves your device.</p>
-                <a href="https://send.sgraph.ai" class="btn btn-primary btn-lg">Start Sending &rarr;</a>
+                <h1 class="section__title" data-i18n="product.hero.title">Your files, your keys, your privacy</h1>
+                <p class="section__subtitle" data-i18n="product.hero.subtitle">SG/Send encrypts files in your browser before upload. The server stores only encrypted data. Your decryption key never leaves your device.</p>
+                <a href="https://send.sgraph.ai" class="btn btn-primary btn-lg" data-i18n="product.hero.cta">Start Sending &rarr;</a>
             </div>
         </section>
 
         <!-- Section 2: How It Works -->
         <section class="section section--alt">
             <div class="container">
-                <h2 class="section__title">How it works</h2>
-                <p class="section__subtitle">Three steps. Zero knowledge. Complete privacy.</p>
+                <h2 class="section__title" data-i18n="product.how.title">How it works</h2>
+                <p class="section__subtitle" data-i18n="product.how.subtitle">Three steps. Zero knowledge. Complete privacy.</p>
                 <div class="features-grid features-grid--3">
 
                     <div class="card">
                         <div class="card__step">1</div>
-                        <h3 class="card__title">Encrypt</h3>
-                        <p class="card__text">Your browser generates a unique encryption key and encrypts your file using AES-256-GCM via the Web Crypto API. This happens entirely on your device.</p>
+                        <h3 class="card__title" data-i18n="product.step.encrypt.title">Encrypt</h3>
+                        <p class="card__text" data-i18n="product.step.encrypt.desc">Your browser generates a unique encryption key and encrypts your file using AES-256-GCM via the Web Crypto API. This happens entirely on your device.</p>
                     </div>
 
                     <div class="card">
                         <div class="card__step">2</div>
-                        <h3 class="card__title">Upload</h3>
-                        <p class="card__text">Only the encrypted ciphertext is uploaded. The server never sees your file's contents, name, or decryption key.</p>
+                        <h3 class="card__title" data-i18n="product.step.upload.title">Upload</h3>
+                        <p class="card__text" data-i18n="product.step.upload.desc">Only the encrypted ciphertext is uploaded. The server never sees your file's contents, name, or decryption key.</p>
                     </div>
 
                     <div class="card">
                         <div class="card__step">3</div>
-                        <h3 class="card__title">Share</h3>
-                        <p class="card__text">Share the download link. The decryption key is embedded in the URL fragment (#) &mdash; it never reaches our servers.</p>
+                        <h3 class="card__title" data-i18n="product.step.share.title">Share</h3>
+                        <p class="card__text" data-i18n="product.step.share.desc">Share the download link. The decryption key is embedded in the URL fragment (#) &mdash; it never reaches our servers.</p>
                     </div>
 
                 </div>
@@ -69,47 +71,47 @@
         <!-- Section 3: What Makes SG/Send Different -->
         <section class="section">
             <div class="container">
-                <h2 class="section__title">What makes SG/Send different</h2>
-                <p class="section__subtitle">A side-by-side comparison with traditional file sharing services.</p>
+                <h2 class="section__title" data-i18n="product.compare.title">What makes SG/Send different</h2>
+                <p class="section__subtitle" data-i18n="product.compare.subtitle">A side-by-side comparison with traditional file sharing services.</p>
                 <div class="table-wrapper">
                     <table class="comparison-table">
                         <thead>
                             <tr>
-                                <th>Feature</th>
-                                <th>Traditional Sharing</th>
-                                <th class="comparison-table__highlight">SG/Send</th>
+                                <th data-i18n="product.compare.col_feature">Feature</th>
+                                <th data-i18n="product.compare.col_traditional">Traditional Sharing</th>
+                                <th class="comparison-table__highlight" data-i18n="product.compare.col_sgsend">SG/Send</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td>Encryption</td>
-                                <td>Server-side (they hold the key)</td>
-                                <td class="comparison-table__highlight">Browser-side (you hold the key)</td>
+                                <td data-i18n="product.compare.encryption">Encryption</td>
+                                <td data-i18n="product.compare.encryption_trad">Server-side (they hold the key)</td>
+                                <td class="comparison-table__highlight" data-i18n="product.compare.encryption_sg">Browser-side (you hold the key)</td>
                             </tr>
                             <tr>
-                                <td>Who can read your files</td>
-                                <td>The service provider</td>
-                                <td class="comparison-table__highlight">Only the recipient</td>
+                                <td data-i18n="product.compare.who_reads">Who can read your files</td>
+                                <td data-i18n="product.compare.who_reads_trad">The service provider</td>
+                                <td class="comparison-table__highlight" data-i18n="product.compare.who_reads_sg">Only the recipient</td>
                             </tr>
                             <tr>
-                                <td>File names visible to server</td>
-                                <td>Yes</td>
-                                <td class="comparison-table__highlight">No</td>
+                                <td data-i18n="product.compare.filenames">File names visible to server</td>
+                                <td data-i18n="product.compare.filenames_trad">Yes</td>
+                                <td class="comparison-table__highlight" data-i18n="product.compare.filenames_sg">No</td>
                             </tr>
                             <tr>
-                                <td>IP addresses stored</td>
-                                <td>Yes, in plain text</td>
-                                <td class="comparison-table__highlight">Hashed with daily salt</td>
+                                <td data-i18n="product.compare.ip">IP addresses stored</td>
+                                <td data-i18n="product.compare.ip_trad">Yes, in plain text</td>
+                                <td class="comparison-table__highlight" data-i18n="product.compare.ip_sg">Hashed with daily salt</td>
                             </tr>
                             <tr>
-                                <td>Server-side decryption</td>
-                                <td>Possible</td>
-                                <td class="comparison-table__highlight">Impossible by design</td>
+                                <td data-i18n="product.compare.server_decrypt">Server-side decryption</td>
+                                <td data-i18n="product.compare.server_decrypt_trad">Possible</td>
+                                <td class="comparison-table__highlight" data-i18n="product.compare.server_decrypt_sg">Impossible by design</td>
                             </tr>
                             <tr>
-                                <td>Pricing</td>
-                                <td>Monthly subscription</td>
-                                <td class="comparison-table__highlight">Zero when idle</td>
+                                <td data-i18n="product.compare.pricing">Pricing</td>
+                                <td data-i18n="product.compare.pricing_trad">Monthly subscription</td>
+                                <td class="comparison-table__highlight" data-i18n="product.compare.pricing_sg">Zero when idle</td>
                             </tr>
                         </tbody>
                     </table>
@@ -120,28 +122,28 @@
         <!-- Section 4: Use Cases -->
         <section class="section section--alt">
             <div class="container">
-                <h2 class="section__title">Built for real-world use</h2>
-                <p class="section__subtitle">From one-off transfers to enterprise data rooms.</p>
+                <h2 class="section__title" data-i18n="product.usecases.title">Built for real-world use</h2>
+                <p class="section__subtitle" data-i18n="product.usecases.subtitle">From one-off transfers to enterprise data rooms.</p>
                 <div class="features-grid features-grid--2">
 
                     <div class="card">
-                        <h3 class="card__title">Secure Document Transfer</h3>
-                        <p class="card__text">Send contracts, financials, and legal documents. Zero-knowledge encryption means nobody between sender and recipient can read the contents.</p>
+                        <h3 class="card__title" data-i18n="product.usecase.documents.title">Secure Document Transfer</h3>
+                        <p class="card__text" data-i18n="product.usecase.documents.desc">Send contracts, financials, and legal documents. Zero-knowledge encryption means nobody between sender and recipient can read the contents.</p>
                     </div>
 
                     <div class="card">
-                        <h3 class="card__title">Data Rooms</h3>
-                        <p class="card__text">Create encrypted data rooms for due diligence, M&amp;A, or board materials. Enterprise security without enterprise pricing.</p>
+                        <h3 class="card__title" data-i18n="product.usecase.datarooms.title">Data Rooms</h3>
+                        <p class="card__text" data-i18n="product.usecase.datarooms.desc">Create encrypted data rooms for due diligence, M&amp;A, or board materials. Enterprise security without enterprise pricing.</p>
                     </div>
 
                     <div class="card">
-                        <h3 class="card__title">Password Sharing</h3>
-                        <p class="card__text">Share credentials, API keys, and secrets through an encrypted channel instead of plain-text email or chat.</p>
+                        <h3 class="card__title" data-i18n="product.usecase.passwords.title">Password Sharing</h3>
+                        <p class="card__text" data-i18n="product.usecase.passwords.desc">Share credentials, API keys, and secrets through an encrypted channel instead of plain-text email or chat.</p>
                     </div>
 
                     <div class="card">
-                        <h3 class="card__title">AI Agent Coordination</h3>
-                        <p class="card__text">AI agents use SG/Send to exchange encrypted files and keys, with full audit trails and PKI-verified identity.</p>
+                        <h3 class="card__title" data-i18n="product.usecase.agents.title">AI Agent Coordination</h3>
+                        <p class="card__text" data-i18n="product.usecase.agents.desc">AI agents use SG/Send to exchange encrypted files and keys, with full audit trails and PKI-verified identity.</p>
                     </div>
 
                 </div>
@@ -151,53 +153,53 @@
         <!-- Section 5: Enterprise Features -->
         <section class="section">
             <div class="container">
-                <h2 class="section__title">Enterprise-grade features</h2>
-                <p class="section__subtitle">Everything you need for secure file operations at scale.</p>
+                <h2 class="section__title" data-i18n="product.enterprise.title">Enterprise-grade features</h2>
+                <p class="section__subtitle" data-i18n="product.enterprise.subtitle">Everything you need for secure file operations at scale.</p>
                 <div class="features-grid features-grid--3">
 
                     <div class="card card--feature">
-                        <h3 class="card__title">AES-256-GCM Encryption</h3>
-                        <p class="card__text">Military-grade authenticated encryption. Every file gets a unique key generated in your browser.</p>
+                        <h3 class="card__title" data-i18n="product.feature.aes.title">AES-256-GCM Encryption</h3>
+                        <p class="card__text" data-i18n="product.feature.aes.desc">Military-grade authenticated encryption. Every file gets a unique key generated in your browser.</p>
                     </div>
 
                     <div class="card card--feature">
-                        <h3 class="card__title">Zero-Knowledge Architecture</h3>
-                        <p class="card__text">The server stores only ciphertext. No file names, no plaintext, no decryption keys ever touch the backend.</p>
+                        <h3 class="card__title" data-i18n="product.feature.zk.title">Zero-Knowledge Architecture</h3>
+                        <p class="card__text" data-i18n="product.feature.zk.desc">The server stores only ciphertext. No file names, no plaintext, no decryption keys ever touch the backend.</p>
                     </div>
 
                     <div class="card card--feature">
-                        <h3 class="card__title">Self-Host Option</h3>
-                        <p class="card__text">Run SG/Send on your own AWS account. Your infrastructure, your data, your control.</p>
+                        <h3 class="card__title" data-i18n="product.feature.selfhost.title">Self-Host Option</h3>
+                        <p class="card__text" data-i18n="product.feature.selfhost.desc">Run SG/Send on your own AWS account. Your infrastructure, your data, your control.</p>
                     </div>
 
                     <div class="card card--feature">
-                        <h3 class="card__title">Immutable Audit Trail</h3>
-                        <p class="card__text">Git-based audit logging. Every transfer, access, and event is recorded in an append-only, tamper-evident trail.</p>
+                        <h3 class="card__title" data-i18n="product.feature.audit.title">Immutable Audit Trail</h3>
+                        <p class="card__text" data-i18n="product.feature.audit.desc">Git-based audit logging. Every transfer, access, and event is recorded in an append-only, tamper-evident trail.</p>
                     </div>
 
                     <div class="card card--feature">
-                        <h3 class="card__title">Token-Based Access Control</h3>
-                        <p class="card__text">Fine-grained permissions with scoped access tokens. Control who can upload, download, and manage transfers.</p>
+                        <h3 class="card__title" data-i18n="product.feature.tokens.title">Token-Based Access Control</h3>
+                        <p class="card__text" data-i18n="product.feature.tokens.desc">Fine-grained permissions with scoped access tokens. Control who can upload, download, and manage transfers.</p>
                     </div>
 
                     <div class="card card--feature">
-                        <h3 class="card__title">Personal Encrypted Vaults</h3>
-                        <p class="card__text">Persistent encrypted storage for each user. Files stay encrypted at rest with keys only you control.</p>
+                        <h3 class="card__title" data-i18n="product.feature.vaults.title">Personal Encrypted Vaults</h3>
+                        <p class="card__text" data-i18n="product.feature.vaults.desc">Persistent encrypted storage for each user. Files stay encrypted at rest with keys only you control.</p>
                     </div>
 
                     <div class="card card--feature">
-                        <h3 class="card__title">Data Rooms with RBAC</h3>
-                        <p class="card__text">Role-based access control for collaborative spaces. Set viewer, editor, and admin permissions per room.</p>
+                        <h3 class="card__title" data-i18n="product.feature.rbac.title">Data Rooms with RBAC</h3>
+                        <p class="card__text" data-i18n="product.feature.rbac.desc">Role-based access control for collaborative spaces. Set viewer, editor, and admin permissions per room.</p>
                     </div>
 
                     <div class="card card--feature">
-                        <h3 class="card__title">API + MCP Integration</h3>
-                        <p class="card__text">Full REST API plus Model Context Protocol support. Integrate SG/Send into any workflow or AI agent pipeline.</p>
+                        <h3 class="card__title" data-i18n="product.feature.api.title">API + MCP Integration</h3>
+                        <p class="card__text" data-i18n="product.feature.api.desc">Full REST API plus Model Context Protocol support. Integrate SG/Send into any workflow or AI agent pipeline.</p>
                     </div>
 
                     <div class="card card--feature">
-                        <h3 class="card__title">7 Deployment Targets</h3>
-                        <p class="card__text">Lambda, Docker, Fargate, GCP Cloud Run, EC2, AMI, or CLI. One codebase, deploy anywhere.</p>
+                        <h3 class="card__title" data-i18n="product.feature.deploy.title">7 Deployment Targets</h3>
+                        <p class="card__text" data-i18n="product.feature.deploy.desc">Lambda, Docker, Fargate, GCP Cloud Run, EC2, AMI, or CLI. One codebase, deploy anywhere.</p>
                     </div>
 
                 </div>
@@ -207,11 +209,11 @@
         <!-- Section 6: Pricing Philosophy -->
         <section class="section section--alt">
             <div class="container">
-                <h2 class="section__title">Pay for what you use. Nothing when you don't.</h2>
-                <p class="section__subtitle">Traditional secure file sharing charges &pound;7,500&ndash;25,000 per project. Modern alternatives cost &pound;140&ndash;460/month whether you use them or not.</p>
+                <h2 class="section__title" data-i18n="product.pricing.title">Pay for what you use. Nothing when you don't.</h2>
+                <p class="section__subtitle" data-i18n="product.pricing.subtitle">Traditional secure file sharing charges &pound;7,500&ndash;25,000 per project. Modern alternatives cost &pound;140&ndash;460/month whether you use them or not.</p>
                 <div class="card card--highlight">
-                    <p class="card__text card__text--large">SG/Send runs on serverless infrastructure. When nobody is using it, it costs nothing. You pay only for what you use.</p>
-                    <a href="https://send.sgraph.ai" class="btn btn-primary btn-lg">Try SG/Send &rarr;</a>
+                    <p class="card__text card__text--large" data-i18n="product.pricing.desc">SG/Send runs on serverless infrastructure. When nobody is using it, it costs nothing. You pay only for what you use.</p>
+                    <a href="https://send.sgraph.ai" class="btn btn-primary btn-lg" data-i18n="product.pricing.cta">Try SG/Send &rarr;</a>
                 </div>
             </div>
         </section>
@@ -219,9 +221,9 @@
         <!-- Section 7: Open Source -->
         <section class="section">
             <div class="container">
-                <h2 class="section__title">Open source. Verify everything.</h2>
-                <p class="section__subtitle">SG/Send is open source. Verify our encryption. Audit our code. Run it on your own infrastructure.</p>
-                <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-secondary btn-lg">View on GitHub &rarr;</a>
+                <h2 class="section__title" data-i18n="product.opensource.title">Open source. Verify everything.</h2>
+                <p class="section__subtitle" data-i18n="product.opensource.subtitle">SG/Send is open source. Verify our encryption. Audit our code. Run it on your own infrastructure.</p>
+                <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-secondary btn-lg" data-i18n="product.opensource.cta">View on GitHub &rarr;</a>
             </div>
         </section>
 
@@ -234,33 +236,41 @@
                     <a href="../" class="site-logo">
                         <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
                     </a>
-                    <p>AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+                    <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
                 </div>
                 <div class="footer-col">
-                    <h4>Product</h4>
+                    <h4 data-i18n="footer.product">Product</h4>
                     <ul>
                         <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
-                        <li><a href="../architecture/">Architecture</a></li>
-                        <li><a href="../agents/">Team</a></li>
+                        <li><a href="../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+                        <li><a href="../agents/" data-i18n="footer.team">Team</a></li>
                     </ul>
                 </div>
                 <div class="footer-col">
-                    <h4>Open Source</h4>
+                    <h4 data-i18n="footer.open_source">Open Source</h4>
                     <ul>
                         <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
                     </ul>
                 </div>
                 <div class="footer-col">
-                    <h4>Connect</h4>
+                    <h4 data-i18n="footer.connect">Connect</h4>
                     <ul>
                         <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
                     </ul>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2026 SGraph AI. All rights reserved.</p>
+                <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
             </div>
         </div>
     </footer>
+
+    <script src="../js/i18n.js"></script>
+    <script>
+        SgI18n.init().then(() => {
+            document.body.classList.remove('i18n-loading');
+            SgI18n.renderLocaleSelector();
+        });
+    </script>
 </body>
 </html>
