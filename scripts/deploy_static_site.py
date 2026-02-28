@@ -1,0 +1,432 @@
+#!/usr/bin/env python3
+"""Deploy a static website to S3 with versioned releases and CloudFront invalidation.
+
+Follows the v0.7.6 architecture brief: CI pipeline logic lives in Python,
+GitHub Actions is just the trigger and executor.
+
+Deployment model:
+  1. Validate required files exist
+  2. Sync to S3: websites/{site}/releases/{version}/
+  3. Copy release to: websites/{site}/latest/
+  4. Invalidate CloudFront cache
+
+S3 bucket naming convention: {account-id}--static-sgraph-ai--{region}
+
+Cache-Control strategy:
+  - HTML files:  short cache  (300s / 5 minutes)
+  - CSS/JS/JSON: medium cache (86400s / 1 day)
+  - Images:      long cache   (604800s / 1 week)
+
+CloudFront TTL configuration (applied via cache policy):
+  - Default TTL: 300 seconds  (5 minutes)
+  - Max TTL:     3600 seconds (1 hour)
+  - Min TTL:     0 seconds
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+CONTENT_TYPE_MAP = {
+    ".html": "text/html",
+    ".css":  "text/css",
+    ".js":   "application/javascript",
+    ".json": "application/json",
+    ".png":  "image/png",
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif":  "image/gif",
+    ".svg":  "image/svg+xml",
+    ".ico":  "image/x-icon",
+    ".webp": "image/webp",
+}
+
+CACHE_CONTROL = {
+    "html":   "public, max-age=300",       # 5 minutes
+    "css_js": "public, max-age=86400",     # 1 day
+    "image":  "public, max-age=604800",    # 1 week
+}
+
+HTML_EXTENSIONS  = {".html"}
+CSS_JS_EXTENSIONS = {".css", ".js", ".json"}
+IMAGE_EXTENSIONS  = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp"}
+
+# CloudFront cache TTL configuration (seconds)
+CLOUDFRONT_DEFAULT_TTL = 300    # 5 minutes
+CLOUDFRONT_MAX_TTL     = 3600   # 1 hour
+CLOUDFRONT_MIN_TTL     = 0      # 0 seconds
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def run_cmd(cmd, description="", check=True):
+    """Run a shell command via subprocess. Print output in real time."""
+    if description:
+        print(f"\n--- {description} ---")
+    print(f"  $ {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.stdout:
+        for line in result.stdout.strip().split("\n"):
+            print(f"  {line}")
+    if result.stderr:
+        for line in result.stderr.strip().split("\n"):
+            print(f"  [stderr] {line}")
+    if check and result.returncode != 0:
+        print(f"\nERROR: command exited with code {result.returncode}")
+        sys.exit(result.returncode)
+    return result
+
+
+def resolve_bucket_name(account_id, region):
+    """Build the S3 bucket name from account ID and region.
+
+    Convention: {account-id}--static-sgraph-ai--{region}
+    """
+    return f"{account_id}--static-sgraph-ai--{region}"
+
+
+def cache_control_for(extension):
+    """Return the Cache-Control header value for a given file extension."""
+    if extension in HTML_EXTENSIONS:
+        return CACHE_CONTROL["html"]
+    if extension in CSS_JS_EXTENSIONS:
+        return CACHE_CONTROL["css_js"]
+    if extension in IMAGE_EXTENSIONS:
+        return CACHE_CONTROL["image"]
+    return CACHE_CONTROL["html"]          # default to short cache
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+def validate_website_files(site_dir):
+    """Check that expected HTML files exist. Warn but do not fail if missing."""
+    required_files = [
+        "index.html",
+        "product/index.html",
+        "agents/index.html",
+        "architecture/index.html",
+        "contact/index.html",
+    ]
+    print("\n--- Validating required HTML files ---")
+    missing = 0
+    for rel in required_files:
+        full_path = site_dir / rel
+        if full_path.exists():
+            print(f"  OK: {rel}")
+        else:
+            print(f"  MISSING: {rel}")
+            missing += 1
+    if missing:
+        print(f"\n  WARNING: {missing} required file(s) missing")
+        print("  Continuing — some pages may still be in development")
+    return missing
+
+
+def validate_keys_json(site_dir):
+    """Validate agents/keys.json is valid JSON if it exists."""
+    keys_file = site_dir / "agents" / "keys.json"
+    print("\n--- Validating keys.json ---")
+    if not keys_file.exists():
+        print("  SKIP: keys.json does not exist yet")
+        return True
+    try:
+        with open(keys_file) as f:
+            json.load(f)
+        print("  OK: keys.json is valid JSON")
+        return True
+    except json.JSONDecodeError as exc:
+        print(f"  ERROR: keys.json is NOT valid JSON — {exc}")
+        return False
+
+
+def check_broken_links(site_dir):
+    """Scan HTML files for broken internal links. Warn but do not fail."""
+    print("\n--- Checking internal links in HTML files ---")
+    import re
+    broken = 0
+    for html_file in site_dir.rglob("*.html"):
+        with open(html_file) as f:
+            content = f.read()
+        hrefs = re.findall(r'href="(/[^"#?]*)"', content)
+        for href in hrefs:
+            relative_path = href.lstrip("/")
+            target = site_dir / relative_path
+            if target.is_file() or (target / "index.html").is_file():
+                continue
+            print(f"  BROKEN: {html_file.relative_to(site_dir)} -> {href}")
+            broken += 1
+    if broken:
+        print(f"\n  WARNING: {broken} potentially broken internal link(s) found")
+    else:
+        print("  No broken internal links detected")
+    return broken
+
+
+# ---------------------------------------------------------------------------
+# S3 sync helpers
+# ---------------------------------------------------------------------------
+
+def s3_sync_by_type(source_dir, s3_prefix, file_type, extensions, cache_control,
+                    content_type=None, delete=False):
+    """Sync a specific file type from source_dir to an S3 prefix.
+
+    Uses `aws s3 sync` via subprocess for performance (per v0.7.6 brief:
+    "If a step requires invoking a CLI tool like `aws s3 sync` because it's
+    faster than a Python equivalent, invoke it via subprocess from Python").
+    """
+    cmd = ["aws", "s3", "sync", str(source_dir) + "/", s3_prefix]
+
+    if file_type == "html":
+        # For HTML: sync everything, exclude non-HTML, exclude dotfiles and README
+        cmd += ["--exclude", "README.md", "--exclude", ".*"]
+        for ext in CSS_JS_EXTENSIONS | IMAGE_EXTENSIONS:
+            cmd += ["--exclude", f"*{ext}"]
+        if delete:
+            cmd += ["--delete"]
+    else:
+        # For other types: exclude everything, then include only matching extensions
+        cmd += ["--exclude", "*"]
+        for ext in extensions:
+            cmd += ["--include", f"*{ext}"]
+
+    if content_type:
+        cmd += ["--content-type", content_type]
+    cmd += ["--cache-control", cache_control]
+
+    description = f"Syncing {file_type} files"
+    run_cmd(cmd, description=description)
+
+
+def deploy_to_s3(source_dir, bucket, site, version):
+    """Deploy the static site to S3 using the versioned deployment model.
+
+    Step 1: Sync to websites/{site}/releases/{version}/
+    Step 2: Copy the release to websites/{site}/latest/
+    """
+    release_prefix = f"s3://{bucket}/websites/{site}/releases/{version}/"
+    latest_prefix  = f"s3://{bucket}/websites/{site}/latest/"
+
+    # ----- Deploy to releases/{version}/ -----
+    print(f"\n{'='*60}")
+    print(f"Deploying to releases/{version}/")
+    print(f"{'='*60}")
+
+    s3_sync_by_type(source_dir, release_prefix, "html",
+                    HTML_EXTENSIONS, CACHE_CONTROL["html"],
+                    content_type="text/html", delete=True)
+
+    s3_sync_by_type(source_dir, release_prefix, "css",
+                    {".css"}, CACHE_CONTROL["css_js"],
+                    content_type="text/css")
+
+    s3_sync_by_type(source_dir, release_prefix, "js",
+                    {".js"}, CACHE_CONTROL["css_js"],
+                    content_type="application/javascript")
+
+    s3_sync_by_type(source_dir, release_prefix, "json",
+                    {".json"}, CACHE_CONTROL["css_js"],
+                    content_type="application/json")
+
+    s3_sync_by_type(source_dir, release_prefix, "image",
+                    IMAGE_EXTENSIONS, CACHE_CONTROL["image"])
+
+    # ----- Copy release to latest/ -----
+    print(f"\n{'='*60}")
+    print(f"Copying release to latest/")
+    print(f"{'='*60}")
+
+    run_cmd(
+        ["aws", "s3", "sync", release_prefix, latest_prefix, "--delete"],
+        description="Syncing release to latest/"
+    )
+
+
+# ---------------------------------------------------------------------------
+# CloudFront
+# ---------------------------------------------------------------------------
+
+def invalidate_cloudfront(distribution_id):
+    """Invalidate the CloudFront cache for all paths."""
+    if not distribution_id:
+        print("\n  SKIP: No CloudFront distribution ID provided")
+        return
+    print(f"\n--- Invalidating CloudFront cache ---")
+    run_cmd(
+        ["aws", "cloudfront", "create-invalidation",
+         "--distribution-id", distribution_id,
+         "--paths", "/*"],
+        description=f"CloudFront invalidation ({distribution_id})"
+    )
+
+
+def print_cloudfront_ttl_config():
+    """Print the CloudFront cache TTL configuration for reference."""
+    print(f"\n--- CloudFront Cache TTL Configuration ---")
+    print(f"  Default TTL : {CLOUDFRONT_DEFAULT_TTL}s ({CLOUDFRONT_DEFAULT_TTL // 60} minutes)")
+    print(f"  Max TTL     : {CLOUDFRONT_MAX_TTL}s ({CLOUDFRONT_MAX_TTL // 60} minutes)")
+    print(f"  Min TTL     : {CLOUDFRONT_MIN_TTL}s")
+    print(f"  Note: TTL values are configured via CloudFront cache policy.")
+    print(f"  The Cache-Control headers set during S3 upload guide caching")
+    print(f"  behaviour within these TTL bounds.")
+
+
+# ---------------------------------------------------------------------------
+# Smoke test
+# ---------------------------------------------------------------------------
+
+def smoke_test(url):
+    """Verify the deployed site returns HTTP 200."""
+    if not url:
+        print("\n  SKIP: No URL provided for smoke test")
+        return True
+    print(f"\n--- Smoke test: {url} ---")
+    result = run_cmd(
+        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", url],
+        description=f"Testing {url}",
+        check=False
+    )
+    status = result.stdout.strip()
+    if status == "200":
+        print(f"  OK: {url} returned HTTP 200")
+        return True
+    else:
+        print(f"  WARNING: {url} returned HTTP {status} (expected 200)")
+        print(f"  CloudFront invalidation may still be in progress")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Deploy a static website to S3 with versioned releases."
+    )
+    parser.add_argument(
+        "--site",
+        required=True,
+        help="Site identifier (e.g. 'sgraph-ai'). Used in S3 paths: websites/{site}/",
+    )
+    parser.add_argument(
+        "--version",
+        required=True,
+        help="Version tag for this release (e.g. 'v0.7.6'). Creates releases/{version}/",
+    )
+    parser.add_argument(
+        "--source-dir",
+        required=True,
+        help="Local directory containing the static site files to deploy.",
+    )
+    parser.add_argument(
+        "--bucket",
+        default=None,
+        help="S3 bucket name. If not provided, derived from --account-id and --region.",
+    )
+    parser.add_argument(
+        "--account-id",
+        default=os.environ.get("AWS_ACCOUNT_ID", ""),
+        help="AWS account ID (for bucket name convention). Default: $AWS_ACCOUNT_ID",
+    )
+    parser.add_argument(
+        "--region",
+        default=os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "eu-west-2")),
+        help="AWS region. Default: $AWS_REGION or eu-west-2",
+    )
+    parser.add_argument(
+        "--cloudfront-distribution-id",
+        default=os.environ.get("CLOUDFRONT_DIST", ""),
+        help="CloudFront distribution ID for cache invalidation. Default: $CLOUDFRONT_DIST",
+    )
+    parser.add_argument(
+        "--smoke-test-url",
+        default="",
+        help="URL to test after deployment (e.g. 'https://sgraph.ai'). Optional.",
+    )
+    parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help="Skip file validation checks before deployment.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print what would be done without executing S3 commands.",
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    source_dir = Path(args.source_dir).resolve()
+    if not source_dir.is_dir():
+        print(f"ERROR: source directory does not exist: {source_dir}")
+        sys.exit(1)
+
+    # Resolve bucket name
+    bucket = args.bucket
+    if not bucket:
+        if not args.account_id:
+            print("ERROR: either --bucket or --account-id must be provided")
+            sys.exit(1)
+        bucket = resolve_bucket_name(args.account_id, args.region)
+    print(f"Site       : {args.site}")
+    print(f"Version    : {args.version}")
+    print(f"Source     : {source_dir}")
+    print(f"Bucket     : {bucket}")
+    print(f"Region     : {args.region}")
+
+    # CloudFront TTL reference
+    print_cloudfront_ttl_config()
+
+    if args.dry_run:
+        print("\n*** DRY RUN — no changes will be made ***")
+
+    # --- Validation ---
+    if not args.skip_validation:
+        validate_website_files(source_dir)
+        check_broken_links(source_dir)
+        if not validate_keys_json(source_dir):
+            print("\nERROR: keys.json validation failed — aborting deployment")
+            sys.exit(1)
+
+    if args.dry_run:
+        print(f"\n[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/releases/{args.version}/")
+        print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/latest/")
+        if args.cloudfront_distribution_id:
+            print(f"[dry-run] Would invalidate CloudFront {args.cloudfront_distribution_id}")
+        print("\nDry run complete.")
+        sys.exit(0)
+
+    # --- Deploy ---
+    deploy_to_s3(source_dir, bucket, args.site, args.version)
+
+    # --- CloudFront ---
+    invalidate_cloudfront(args.cloudfront_distribution_id)
+
+    # --- Smoke test ---
+    if args.smoke_test_url:
+        smoke_test(args.smoke_test_url)
+
+    print(f"\n{'='*60}")
+    print(f"Deployment complete: {args.site} {args.version}")
+    print(f"  Release : s3://{bucket}/websites/{args.site}/releases/{args.version}/")
+    print(f"  Latest  : s3://{bucket}/websites/{args.site}/latest/")
+    print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    main()
