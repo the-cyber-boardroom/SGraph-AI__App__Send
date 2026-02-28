@@ -45,8 +45,7 @@
       box-shadow: 0 0 0 1px var(--accent), var(--shadow-card);
     }
 
-    .pricing-card--featured::before {
-      content: 'Most Popular';
+    .pricing-card__badge {
       position: absolute;
       top: 0;
       left: 50%;
@@ -211,7 +210,7 @@
     }
   </style>
 </head>
-<body class="theme-aurora">
+<body class="theme-aurora i18n-loading">
 
   <!-- ============================================================
        HEADER
@@ -223,11 +222,12 @@
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
       <nav class="site-nav" aria-label="Main navigation">
-        <a href="../product/">Product</a>
-        <a href="../agents/">Team</a>
-        <a href="../architecture/">Architecture</a>
-        <a href="./" class="active">Pricing</a>
+        <a href="../product/" data-i18n="nav.product">Product</a>
+        <a href="../agents/" data-i18n="nav.team">Team</a>
+        <a href="../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="./" class="active" data-i18n="nav.pricing">Pricing</a>
       </nav>
+      <div id="locale-picker"></div>
     </div>
   </header>
 
@@ -238,8 +238,8 @@
          ============================================================ -->
     <section class="hero hero--small">
       <div class="container">
-        <h1 class="display">Simple, transparent pricing</h1>
-        <p class="lead">
+        <h1 class="display" data-i18n="pricing.hero.title">Simple, transparent pricing</h1>
+        <p class="lead" data-i18n="pricing.hero.lead">
           Zero-knowledge encrypted file sharing from one penny per file.
           No subscriptions. No hidden fees. Pay for what you use.
         </p>
@@ -255,60 +255,61 @@
 
           <!-- FREE TIER -->
           <div class="pricing-card">
-            <div class="pricing-card__tier">Early Access</div>
-            <div class="pricing-card__name">Free</div>
-            <div class="pricing-card__price">&pound;0</div>
-            <div class="pricing-card__price-note">No payment required</div>
-            <p class="pricing-card__desc">
+            <div class="pricing-card__tier" data-i18n="pricing.tier.free.label">Early Access</div>
+            <div class="pricing-card__name" data-i18n="pricing.tier.free.name">Free</div>
+            <div class="pricing-card__price" data-i18n="pricing.tier.free.price">&pound;0</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.tier.free.price_note">No payment required</div>
+            <p class="pricing-card__desc" data-i18n="pricing.tier.free.desc">
               Join the Early Access Programme and evaluate SG/Send with free credits.
             </p>
             <ul class="pricing-card__features">
-              <li>Limited evaluation credits</li>
-              <li>Full zero-knowledge encryption</li>
-              <li>Ideal for trying the service</li>
-              <li>No credit card required</li>
+              <li data-i18n="pricing.tier.free.f1">Limited evaluation credits</li>
+              <li data-i18n="pricing.tier.free.f2">Full zero-knowledge encryption</li>
+              <li data-i18n="pricing.tier.free.f3">Ideal for trying the service</li>
+              <li data-i18n="pricing.tier.free.f4">No credit card required</li>
             </ul>
-            <a href="mailto:sherpa@sgraph.ai?subject=Early%20Access%20Request&body=Hi%2C%20I%27d%20like%20to%20join%20the%20SG%2FSend%20Early%20Access%20Programme." class="btn btn-secondary btn--lg pricing-card__cta">Join Early Access</a>
-            <p class="pricing-card__footer">Sherpa typically responds within 48 hours</p>
+            <a href="../early-access/" class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.tier.free.cta">Join Early Access</a>
+            <p class="pricing-card__footer" data-i18n="pricing.tier.free.footer">No credit card required</p>
           </div>
 
           <!-- STARTER TIER (FEATURED) -->
           <div class="pricing-card pricing-card--featured">
-            <div class="pricing-card__tier">Starter</div>
-            <div class="pricing-card__name">Credits</div>
-            <div class="pricing-card__price">&pound;5</div>
-            <div class="pricing-card__price-note">One-time payment &middot; 500 files</div>
-            <p class="pricing-card__desc">
+            <span class="pricing-card__badge" data-i18n="pricing.tier.starter.badge">Most Popular</span>
+            <div class="pricing-card__tier" data-i18n="pricing.tier.starter.label">Starter</div>
+            <div class="pricing-card__name" data-i18n="pricing.tier.starter.name">Credits</div>
+            <div class="pricing-card__price" data-i18n="pricing.tier.starter.price">&pound;5</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.tier.starter.price_note">One-time payment &middot; 500 files</div>
+            <p class="pricing-card__desc" data-i18n="pricing.tier.starter.desc">
               500 encrypted file transfers at just &pound;0.01 per file. Valid for 3 months.
             </p>
             <ul class="pricing-card__features">
-              <li>&pound;0.01 per encrypted transfer</li>
-              <li>500 file transfers included</li>
-              <li>3-month credit validity</li>
-              <li>Same zero-knowledge encryption</li>
-              <li>Email support via Sherpa</li>
+              <li data-i18n="pricing.tier.starter.f1">&pound;0.01 per encrypted transfer</li>
+              <li data-i18n="pricing.tier.starter.f2">500 file transfers included</li>
+              <li data-i18n="pricing.tier.starter.f3">3-month credit validity</li>
+              <li data-i18n="pricing.tier.starter.f4">Same zero-knowledge encryption</li>
+              <li data-i18n="pricing.tier.starter.f5">Email support via Sherpa</li>
             </ul>
-            <a href="mailto:sherpa@sgraph.ai?subject=Buy%20SG%2FSend%20Credits&body=Hi%2C%20I%27d%20like%20to%20purchase%20the%20SG%2FSend%20Starter%20Pack%20(%C2%A35%20for%20500%20file%20transfers).%0A%0APlease%20send%20me%20the%20Stripe%20payment%20link." class="btn btn-primary btn--lg pricing-card__cta">Buy Credits &rarr;</a>
-            <p class="pricing-card__footer">Secure payment via Stripe</p>
+            <a href="mailto:sherpa@sgraph.ai?subject=Buy%20SG%2FSend%20Credits&body=Hi%2C%20I%27d%20like%20to%20purchase%20the%20SG%2FSend%20Starter%20Pack%20(%C2%A35%20for%20500%20file%20transfers).%0A%0APlease%20send%20me%20the%20Stripe%20payment%20link." class="btn btn-primary btn--lg pricing-card__cta" data-i18n="pricing.tier.starter.cta">Buy Credits &rarr;</a>
+            <p class="pricing-card__footer" data-i18n="pricing.tier.starter.footer">Secure payment via Stripe</p>
           </div>
 
           <!-- SELF-HOSTED TIER -->
           <div class="pricing-card">
-            <div class="pricing-card__tier">Enterprise</div>
-            <div class="pricing-card__name">Self-Hosted</div>
-            <div class="pricing-card__price">Custom</div>
-            <div class="pricing-card__price-note">Deploy in your environment</div>
-            <p class="pricing-card__desc">
+            <div class="pricing-card__tier" data-i18n="pricing.tier.selfhosted.label">Enterprise</div>
+            <div class="pricing-card__name" data-i18n="pricing.tier.selfhosted.name">Self-Hosted</div>
+            <div class="pricing-card__price" data-i18n="pricing.tier.selfhosted.price">Custom</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.tier.selfhosted.price_note">Deploy in your environment</div>
+            <p class="pricing-card__desc" data-i18n="pricing.tier.selfhosted.desc">
               Run SG/Send in your own AWS account with your own encryption keys.
             </p>
             <ul class="pricing-card__features">
-              <li>Your AWS account, your keys</li>
-              <li>Full infrastructure control</li>
-              <li>Custom deployment support</li>
-              <li>Dedicated onboarding</li>
+              <li data-i18n="pricing.tier.selfhosted.f1">Your AWS account, your keys</li>
+              <li data-i18n="pricing.tier.selfhosted.f2">Full infrastructure control</li>
+              <li data-i18n="pricing.tier.selfhosted.f3">Custom deployment support</li>
+              <li data-i18n="pricing.tier.selfhosted.f4">Dedicated onboarding</li>
             </ul>
-            <a href="mailto:sherpa@sgraph.ai?subject=Self-Hosted%20SG%2FSend%20Enquiry&body=Hi%2C%20I%27m%20interested%20in%20deploying%20SG%2FSend%20in%20our%20own%20environment.%20Please%20get%20in%20touch." class="btn btn-secondary btn--lg pricing-card__cta">Contact Us &rarr;</a>
-            <p class="pricing-card__footer">Coming soon</p>
+            <a href="mailto:sherpa@sgraph.ai?subject=Self-Hosted%20SG%2FSend%20Enquiry&body=Hi%2C%20I%27m%20interested%20in%20deploying%20SG%2FSend%20in%20our%20own%20environment.%20Please%20get%20in%20touch." class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.tier.selfhosted.cta">Contact Us &rarr;</a>
+            <p class="pricing-card__footer" data-i18n="pricing.tier.selfhosted.footer">Coming soon</p>
           </div>
 
         </div>
@@ -323,7 +324,7 @@
         <div class="encryption-callout">
           <div class="encryption-callout__icon">&#128274;</div>
           <div class="encryption-callout__text">
-            <p>
+            <p data-i18n="pricing.encryption.text">
               <strong>Every tier uses the same zero-knowledge encryption.</strong>
               Files are encrypted in your browser using AES-256-GCM before upload.
               The server stores only encrypted ciphertext. We literally cannot read your files.
@@ -339,40 +340,40 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2>How it works</h2>
-          <p>Get started in minutes. No software to install.</p>
+          <h2 data-i18n="pricing.how.title">How it works</h2>
+          <p data-i18n="pricing.how.subtitle">Get started in minutes. No software to install.</p>
         </div>
 
         <div class="how-it-works" style="max-width: 640px; margin-inline: auto;">
           <div class="how-it-works__step">
             <div class="how-it-works__number"></div>
             <div class="how-it-works__content">
-              <h3>Get your access token</h3>
-              <p>Join Early Access for free or buy a Starter Pack. You'll receive a unique access token via email.</p>
+              <h3 data-i18n="pricing.how.step1.title">Get your access token</h3>
+              <p data-i18n="pricing.how.step1.desc">Join Early Access for free or buy a Starter Pack. You'll receive a unique access token via email.</p>
             </div>
           </div>
 
           <div class="how-it-works__step">
             <div class="how-it-works__number"></div>
             <div class="how-it-works__content">
-              <h3>Upload and encrypt</h3>
-              <p>Visit <a href="https://send.sgraph.ai">send.sgraph.ai</a>, enter your token, and upload a file. Encryption happens in your browser — the file is encrypted before it leaves your device.</p>
+              <h3 data-i18n="pricing.how.step2.title">Upload and encrypt</h3>
+              <p data-i18n="pricing.how.step2.desc">Visit <a href="https://send.sgraph.ai">send.sgraph.ai</a>, enter your token, and upload a file. Encryption happens in your browser — the file is encrypted before it leaves your device.</p>
             </div>
           </div>
 
           <div class="how-it-works__step">
             <div class="how-it-works__number"></div>
             <div class="how-it-works__content">
-              <h3>Share the link</h3>
-              <p>You get a download link and a decryption key. Share them with your recipient — they decrypt in their browser too.</p>
+              <h3 data-i18n="pricing.how.step3.title">Share the link</h3>
+              <p data-i18n="pricing.how.step3.desc">You get a download link and a decryption key. Share them with your recipient — they decrypt in their browser too.</p>
             </div>
           </div>
 
           <div class="how-it-works__step">
             <div class="how-it-works__number"></div>
             <div class="how-it-works__content">
-              <h3>Zero knowledge, always</h3>
-              <p>The server never sees your plaintext data, file names, or encryption keys. By design, nobody but you and your recipient can access the content.</p>
+              <h3 data-i18n="pricing.how.step4.title">Zero knowledge, always</h3>
+              <p data-i18n="pricing.how.step4.desc">The server never sees your plaintext data, file names, or encryption keys. By design, nobody but you and your recipient can access the content.</p>
             </div>
           </div>
         </div>
@@ -385,35 +386,35 @@
     <section class="section">
       <div class="container">
         <div class="section-header">
-          <h2>Frequently asked questions</h2>
+          <h2 data-i18n="pricing.faq.title">Frequently asked questions</h2>
         </div>
 
         <div style="max-width: 640px; margin-inline: auto;">
           <div class="how-it-works__step" style="border-bottom: 1px solid var(--border-color); padding-block: var(--sp-6);">
             <div class="how-it-works__content">
-              <h3>What counts as one file transfer?</h3>
-              <p>Each file you upload and encrypt counts as one transfer. Downloading and decrypting by your recipient does not use additional credits.</p>
+              <h3 data-i18n="pricing.faq.q1">What counts as one file transfer?</h3>
+              <p data-i18n="pricing.faq.a1">Each file you upload and encrypt counts as one transfer. Downloading and decrypting by your recipient does not use additional credits.</p>
             </div>
           </div>
 
           <div class="how-it-works__step" style="border-bottom: 1px solid var(--border-color); padding-block: var(--sp-6);">
             <div class="how-it-works__content">
-              <h3>What happens when my credits expire?</h3>
-              <p>Credits are valid for 3 months from purchase. Files you've already uploaded remain accessible — only new uploads require credits.</p>
+              <h3 data-i18n="pricing.faq.q2">What happens when my credits expire?</h3>
+              <p data-i18n="pricing.faq.a2">Credits are valid for 3 months from purchase. Files you've already uploaded remain accessible — only new uploads require credits.</p>
             </div>
           </div>
 
           <div class="how-it-works__step" style="border-bottom: 1px solid var(--border-color); padding-block: var(--sp-6);">
             <div class="how-it-works__content">
-              <h3>Can I buy more credits later?</h3>
-              <p>Yes. When you run low or your credits expire, you can purchase another Starter Pack at any time.</p>
+              <h3 data-i18n="pricing.faq.q3">Can I buy more credits later?</h3>
+              <p data-i18n="pricing.faq.a3">Yes. When you run low or your credits expire, you can purchase another Starter Pack at any time.</p>
             </div>
           </div>
 
           <div class="how-it-works__step" style="border-bottom: none; padding-block: var(--sp-6);">
             <div class="how-it-works__content">
-              <h3>Who operates SG/Send?</h3>
-              <p>SG/Send is operated by <strong>The Cyber Boardroom Ltd</strong>, a company registered in England and Wales. Payments are processed securely via Stripe.</p>
+              <h3 data-i18n="pricing.faq.q4">Who operates SG/Send?</h3>
+              <p data-i18n="pricing.faq.a4">SG/Send is operated by <strong>The Cyber Boardroom Ltd</strong>, a company registered in England and Wales. Payments are processed securely via Stripe.</p>
             </div>
           </div>
         </div>
@@ -432,40 +433,47 @@
           <a href="../" class="site-logo">
             <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
           </a>
-          <p>AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
         </div>
 
         <div class="footer-col">
-          <h4>Product</h4>
+          <h4 data-i18n="footer.product">Product</h4>
           <ul>
             <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
-            <li><a href="./">Pricing</a></li>
-            <li><a href="../architecture/">Architecture</a></li>
+            <li><a href="./" data-i18n="footer.pricing">Pricing</a></li>
+            <li><a href="../architecture/" data-i18n="footer.architecture">Architecture</a></li>
           </ul>
         </div>
 
         <div class="footer-col">
-          <h4>Open Source</h4>
+          <h4 data-i18n="footer.open_source">Open Source</h4>
           <ul>
             <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
           </ul>
         </div>
 
         <div class="footer-col">
-          <h4>Connect</h4>
+          <h4 data-i18n="footer.connect">Connect</h4>
           <ul>
-            <li><a href="../contact/">Contact</a></li>
+            <li><a href="../contact/" data-i18n="footer.contact">Contact</a></li>
             <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
           </ul>
         </div>
       </div>
 
       <div class="footer-bottom">
-        <p>&copy; 2026 SGraph AI. Operated by The Cyber Boardroom Ltd.</p>
-        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm">Got a question? Email the Sherpa</a>
+        <p data-i18n="footer.copyright">&copy; 2026 SGraph AI. Operated by The Cyber Boardroom Ltd.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
       </div>
     </div>
   </footer>
 
+  <script src="../js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
 </body>
 </html>

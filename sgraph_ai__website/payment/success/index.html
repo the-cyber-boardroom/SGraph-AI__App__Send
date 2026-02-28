@@ -82,7 +82,7 @@
     }
   </style>
 </head>
-<body class="theme-aurora">
+<body class="theme-aurora i18n-loading">
 
   <!-- ============================================================
        HEADER
@@ -94,11 +94,12 @@
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
       <nav class="site-nav" aria-label="Main navigation">
-        <a href="../../product/">Product</a>
-        <a href="../../agents/">Team</a>
-        <a href="../../architecture/">Architecture</a>
-        <a href="../../pricing/">Pricing</a>
+        <a href="../../product/" data-i18n="nav.product">Product</a>
+        <a href="../../agents/" data-i18n="nav.team">Team</a>
+        <a href="../../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="../../pricing/" data-i18n="nav.pricing">Pricing</a>
       </nav>
+      <div id="locale-picker"></div>
     </div>
   </header>
 
@@ -111,24 +112,24 @@
       <div class="container">
         <div class="success-card">
           <div class="success-card__icon">&#10003;</div>
-          <h1 class="success-card__title">Payment successful</h1>
-          <p class="success-card__message">
+          <h1 class="success-card__title" data-i18n="payment.success.heading">Payment successful</h1>
+          <p class="success-card__message" data-i18n="payment.success.message">
             Thank you for purchasing SG/Send credits.
             A receipt has been sent to your email by Stripe.
           </p>
 
           <div class="next-steps">
-            <h2 class="next-steps__title">What happens next</h2>
+            <h2 class="next-steps__title" data-i18n="payment.success.next_title">What happens next</h2>
             <ol>
-              <li>We'll create your access token (typically within a few hours)</li>
-              <li>You'll receive an email from Sherpa with your token and instructions</li>
-              <li>Visit <a href="https://send.sgraph.ai">send.sgraph.ai</a> and start sending encrypted files</li>
+              <li data-i18n="payment.success.step1">We'll create your access token (typically within a few hours)</li>
+              <li data-i18n="payment.success.step2">You'll receive an email from Sherpa with your token and instructions</li>
+              <li data-i18n="payment.success.step3">Visit <a href="https://send.sgraph.ai">send.sgraph.ai</a> and start sending encrypted files</li>
             </ol>
           </div>
 
           <div class="success-actions">
-            <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg">Go to SG/Send &rarr;</a>
-            <a href="../../pricing/" class="btn btn-secondary btn--lg">Back to Pricing</a>
+            <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg" data-i18n="payment.success.cta_send">Go to SG/Send &rarr;</a>
+            <a href="../../pricing/" class="btn btn-secondary btn--lg" data-i18n="payment.success.cta_pricing">Back to Pricing</a>
           </div>
         </div>
       </div>
@@ -146,40 +147,47 @@
           <a href="../../" class="site-logo">
             <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
           </a>
-          <p>AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
         </div>
 
         <div class="footer-col">
-          <h4>Product</h4>
+          <h4 data-i18n="footer.product">Product</h4>
           <ul>
             <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
-            <li><a href="../../pricing/">Pricing</a></li>
-            <li><a href="../../architecture/">Architecture</a></li>
+            <li><a href="../../pricing/" data-i18n="footer.pricing">Pricing</a></li>
+            <li><a href="../../architecture/" data-i18n="footer.architecture">Architecture</a></li>
           </ul>
         </div>
 
         <div class="footer-col">
-          <h4>Open Source</h4>
+          <h4 data-i18n="footer.open_source">Open Source</h4>
           <ul>
             <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
           </ul>
         </div>
 
         <div class="footer-col">
-          <h4>Connect</h4>
+          <h4 data-i18n="footer.connect">Connect</h4>
           <ul>
-            <li><a href="../../contact/">Contact</a></li>
+            <li><a href="../../contact/" data-i18n="footer.contact">Contact</a></li>
             <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
           </ul>
         </div>
       </div>
 
       <div class="footer-bottom">
-        <p>&copy; 2026 SGraph AI. Operated by The Cyber Boardroom Ltd.</p>
-        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm">Got a question? Email the Sherpa</a>
+        <p data-i18n="footer.copyright">&copy; 2026 SGraph AI. Operated by The Cyber Boardroom Ltd.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
       </div>
     </div>
   </footer>
 
+  <script src="../../js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
 </body>
 </html>

@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SGraph AI — AI Agents That Build, Use, and Secure the Same Platform</title>
   <meta name="description" content="SG/Send is a zero-knowledge encrypted file sharing platform, built entirely by AI agents working in parallel. The same agents that built it use it every day.">
+  <meta name="i18n-title-key" content="home.title">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./fonts/fonts.css">
   <link rel="stylesheet" href="./css/style.css">
 </head>
-<body class="theme-aurora">
+<body class="theme-aurora i18n-loading">
 
   <!-- ============================================================
        HEADER
@@ -21,11 +22,12 @@
       </a>
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
       <nav class="site-nav" aria-label="Main navigation">
-        <a href="./product/">Product</a>
-        <a href="./agents/">Team</a>
-        <a href="./architecture/">Architecture</a>
-        <a href="./pricing/">Pricing</a>
+        <a href="./product/" data-i18n="nav.product">Product</a>
+        <a href="./agents/" data-i18n="nav.team">Team</a>
+        <a href="./architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="./pricing/" data-i18n="nav.pricing">Pricing</a>
       </nav>
+      <div id="locale-picker"></div>
     </div>
   </header>
 
@@ -36,16 +38,16 @@
          ============================================================ -->
     <section class="hero">
       <div class="container">
-        <h1 class="display">AI agents that build, use, and secure the same platform.</h1>
-        <p class="lead">
+        <h1 class="display" data-i18n="home.hero.title">AI agents that build, use, and secure the same platform.</h1>
+        <p class="lead" data-i18n="home.hero.lead">
           <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
           is a zero-knowledge encrypted file sharing platform,
           built entirely by AI agents working in parallel.
           The same agents that built it use it every day.
         </p>
         <div class="hero-ctas">
-          <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg">Try SG/Send &rarr;</a>
-          <a href="./agents/" class="btn btn-secondary btn--lg">Meet the Team &rarr;</a>
+          <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg" data-i18n="home.hero.cta_try">Try SG/Send &rarr;</a>
+          <a href="./agents/" class="btn btn-secondary btn--lg" data-i18n="home.hero.cta_team">Meet the Team &rarr;</a>
         </div>
       </div>
     </section>
@@ -56,38 +58,38 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2><span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span> &mdash; Zero-Knowledge File Sharing</h2>
-          <p>
+          <h2 data-i18n="home.platform.title"><span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span> &mdash; Zero-Knowledge File Sharing</h2>
+          <p data-i18n="home.platform.desc">
             Files are encrypted in your browser using AES-256-GCM before upload.
             The server stores only encrypted ciphertext. Your decryption key never leaves your device.
           </p>
         </div>
 
-        <div class="callout text-center">
+        <div class="callout text-center" data-i18n="home.platform.callout">
           We literally cannot read your files.
         </div>
 
         <div class="grid grid--3 mt-8">
           <div class="card">
             <div class="card__icon">&#128274;</div>
-            <h3 class="card__title">Browser Encryption</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.feature.encryption.title">Browser Encryption</h3>
+            <p class="card__desc" data-i18n="home.feature.encryption.desc">
               AES-256-GCM encryption runs entirely in your browser via the Web Crypto API.
               Files are encrypted before they ever leave your device.
             </p>
           </div>
           <div class="card">
             <div class="card__icon">&#128683;</div>
-            <h3 class="card__title">Zero Knowledge</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.feature.zero_knowledge.title">Zero Knowledge</h3>
+            <p class="card__desc" data-i18n="home.feature.zero_knowledge.desc">
               The server never sees your plaintext data, your file names, or your encryption keys.
               By design, we cannot access your content.
             </p>
           </div>
           <div class="card">
             <div class="card__icon">&#9889;</div>
-            <h3 class="card__title">Serverless Pricing</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.feature.serverless.title">Serverless Pricing</h3>
+            <p class="card__desc" data-i18n="home.feature.serverless.desc">
               Runs on AWS Lambda — you only pay for what you use.
               No idle servers, no minimum commitments, scales to zero.
             </p>
@@ -95,7 +97,7 @@
         </div>
 
         <div class="text-center mt-8">
-          <a href="https://send.sgraph.ai" class="btn btn-primary">Try SG/Send &rarr;</a>
+          <a href="https://send.sgraph.ai" class="btn btn-primary" data-i18n="home.platform.cta">Try SG/Send &rarr;</a>
         </div>
       </div>
     </section>
@@ -106,68 +108,68 @@
     <section class="section">
       <div class="container">
         <div class="section-header">
-          <h2>Meet the Team</h2>
-          <p>18 AI agents. One human. Everything in public.</p>
+          <h2 data-i18n="home.team.title">Meet the Team</h2>
+          <p data-i18n="home.team.subtitle">18 AI agents. One human. Everything in public.</p>
         </div>
 
         <div class="grid grid--3">
           <article class="card agent-card">
-            <h3 class="card__title">Sherpa</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.agent.sherpa.title">Sherpa</h3>
+            <p class="card__desc" data-i18n="home.agent.sherpa.desc">
               Guides users through SG/Send and answers questions.
               The first point of contact for anyone who needs help.
             </p>
-            <a href="./agents/sherpa/" class="card__link">View Profile &rarr;</a>
+            <a href="./agents/sherpa/" class="card__link" data-i18n="home.agent.sherpa.link">View Profile &rarr;</a>
           </article>
 
           <article class="card agent-card">
-            <h3 class="card__title">Ambassador</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.agent.ambassador.title">Ambassador</h3>
+            <p class="card__desc" data-i18n="home.agent.ambassador.desc">
               Represents SGraph AI to the outside world.
               Translates technical capability into clear communication.
             </p>
-            <a href="./agents/ambassador/" class="card__link">View Profile &rarr;</a>
+            <a href="./agents/ambassador/" class="card__link" data-i18n="home.agent.ambassador.link">View Profile &rarr;</a>
           </article>
 
           <article class="card agent-card">
-            <h3 class="card__title">Architect</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.agent.architect.title">Architect</h3>
+            <p class="card__desc" data-i18n="home.agent.architect.desc">
               Designs the system topology, API contracts, and data models.
               Ensures every component fits together coherently.
             </p>
-            <a href="./agents/architect/" class="card__link">View Profile &rarr;</a>
+            <a href="./agents/architect/" class="card__link" data-i18n="home.agent.architect.link">View Profile &rarr;</a>
           </article>
 
           <article class="card agent-card">
-            <h3 class="card__title">Librarian</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.agent.librarian.title">Librarian</h3>
+            <p class="card__desc" data-i18n="home.agent.librarian.desc">
               Maintains the knowledge base, master index, and reality document.
               The single source of truth for what actually exists.
             </p>
-            <a href="./agents/librarian/" class="card__link">View Profile &rarr;</a>
+            <a href="./agents/librarian/" class="card__link" data-i18n="home.agent.librarian.link">View Profile &rarr;</a>
           </article>
 
           <article class="card agent-card">
-            <h3 class="card__title">Dev</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.agent.dev.title">Dev</h3>
+            <p class="card__desc" data-i18n="home.agent.dev.desc">
               Writes the application code, implements features, and fixes bugs.
               Works in Python with FastAPI, Type_Safe, and Memory-FS.
             </p>
-            <a href="./agents/dev/" class="card__link">View Profile &rarr;</a>
+            <a href="./agents/dev/" class="card__link" data-i18n="home.agent.dev.link">View Profile &rarr;</a>
           </article>
 
           <article class="card agent-card">
-            <h3 class="card__title">AppSec</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="home.agent.appsec.title">AppSec</h3>
+            <p class="card__desc" data-i18n="home.agent.appsec.desc">
               Reviews every change for security vulnerabilities.
               Verifies the zero-knowledge model holds under all conditions.
             </p>
-            <a href="./agents/appsec/" class="card__link">View Profile &rarr;</a>
+            <a href="./agents/appsec/" class="card__link" data-i18n="home.agent.appsec.link">View Profile &rarr;</a>
           </article>
         </div>
 
         <div class="text-center mt-8">
-          <a href="./agents/" class="btn btn-secondary">View All Team Members &rarr;</a>
+          <a href="./agents/" class="btn btn-secondary" data-i18n="home.team.cta">View All Team Members &rarr;</a>
         </div>
       </div>
     </section>
@@ -178,8 +180,8 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2>Built in Public</h2>
-          <p>
+          <h2 data-i18n="home.built.title">Built in Public</h2>
+          <p data-i18n="home.built.desc">
             SG/Send is developed using an agentic model: 18 specialised AI agents
             collaborate under human oversight, with every decision, review,
             and line of code tracked in the open.
@@ -189,25 +191,25 @@
         <div class="stats-row">
           <div class="stat">
             <div class="stat__value">18</div>
-            <div class="stat__label">AI Agents</div>
+            <div class="stat__label" data-i18n="home.stat.agents">AI Agents</div>
           </div>
           <div class="stat">
             <div class="stat__value">73</div>
-            <div class="stat__label">HTTP Endpoints</div>
+            <div class="stat__label" data-i18n="home.stat.endpoints">HTTP Endpoints</div>
           </div>
           <div class="stat">
             <div class="stat__value">393</div>
-            <div class="stat__label">Passing Tests</div>
+            <div class="stat__label" data-i18n="home.stat.tests">Passing Tests</div>
           </div>
           <div class="stat">
             <div class="stat__value">6</div>
-            <div class="stat__label">User-Facing Pages</div>
+            <div class="stat__label" data-i18n="home.stat.pages">User-Facing Pages</div>
           </div>
         </div>
 
         <div class="text-center mt-8" style="display: flex; justify-content: center; gap: var(--sp-4); flex-wrap: wrap;">
-          <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub &rarr;</a>
-          <a href="./architecture/" class="btn btn-ghost">Explore Architecture &rarr;</a>
+          <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-secondary" target="_blank" rel="noopener" data-i18n="home.built.cta_github">View on GitHub &rarr;</a>
+          <a href="./architecture/" class="btn btn-ghost" data-i18n="home.built.cta_arch">Explore Architecture &rarr;</a>
         </div>
       </div>
     </section>
@@ -224,28 +226,28 @@
           <a href="./" class="site-logo">
             <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
           </a>
-          <p>AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
         </div>
 
         <div class="footer-col">
-          <h4>Product</h4>
+          <h4 data-i18n="footer.product">Product</h4>
           <ul>
             <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
-            <li><a href="./pricing/">Pricing</a></li>
-            <li><a href="./architecture/">Architecture</a></li>
-            <li><a href="./agents/">Team</a></li>
+            <li><a href="./pricing/" data-i18n="footer.pricing">Pricing</a></li>
+            <li><a href="./architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="./agents/" data-i18n="footer.team">Team</a></li>
           </ul>
         </div>
 
         <div class="footer-col">
-          <h4>Open Source</h4>
+          <h4 data-i18n="footer.open_source">Open Source</h4>
           <ul>
             <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
           </ul>
         </div>
 
         <div class="footer-col">
-          <h4>Connect</h4>
+          <h4 data-i18n="footer.connect">Connect</h4>
           <ul>
             <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
           </ul>
@@ -253,11 +255,18 @@
       </div>
 
       <div class="footer-bottom">
-        <p>&copy; 2026 SGraph AI. All rights reserved.</p>
-        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm">Got a question? Email the Sherpa</a>
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
       </div>
     </div>
   </footer>
 
+  <script src="./js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
 </body>
 </html>

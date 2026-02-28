@@ -930,7 +930,90 @@ code, .mono {
 }
 
 /* ------------------------------------------------------------
-   17. Utility Classes
+   17. i18n — Locale Dropdown & FOUC Prevention
+   ------------------------------------------------------------ */
+
+/* FOUC prevention: hide content until translations are applied */
+body.i18n-loading {
+  visibility: hidden;
+}
+
+/* Locale Dropdown */
+.locale-dropdown {
+  position: relative;
+}
+
+.locale-dropdown__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-btn);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: color var(--transition-fast), background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.locale-dropdown__trigger:hover {
+  color: var(--text-heading);
+  background: rgba(78, 205, 196, 0.12);
+}
+
+.locale-dropdown__trigger svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.locale-dropdown__menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-btn);
+  box-shadow: var(--shadow-card);
+  z-index: 100;
+  padding: var(--sp-1) 0;
+}
+
+.locale-dropdown.open .locale-dropdown__menu {
+  display: block;
+}
+
+.locale-dropdown__item {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.locale-dropdown__item:hover {
+  color: var(--text-heading);
+  background: rgba(78, 205, 196, 0.12);
+}
+
+.locale-dropdown__item--active {
+  color: var(--accent);
+  font-weight: var(--fw-medium);
+}
+
+/* ------------------------------------------------------------
+   18. Utility Classes
    ------------------------------------------------------------ */
 .sr-only {
   position: absolute;
@@ -1046,7 +1129,7 @@ code, .mono {
 }
 
 /* ------------------------------------------------------------
-   18. Responsive Fine-Tuning
+   19. Responsive Fine-Tuning
    ------------------------------------------------------------ */
 @media (max-width: 768px) {
   :root {
