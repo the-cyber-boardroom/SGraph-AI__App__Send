@@ -1,0 +1,199 @@
+name: Deploy Website - sgraph.ai
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'sgraph_ai__website/**'
+      - '.github/workflows/deploy-website.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: "website-deploy"
+  cancel-in-progress: false
+
+env:
+  S3_BUCKET         : ${{ secrets.WEBSITE_S3_BUCKET }}
+  CLOUDFRONT_DIST   : ${{ secrets.WEBSITE_CF_DIST }}
+  AWS_REGION        : eu-west-2
+  WEBSITE_DIR       : sgraph_ai__website
+
+jobs:
+  validate:
+    name: Validate Website Files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required HTML files exist
+        run: |
+          echo "Checking required HTML files..."
+          required_files=(
+            "index.html"
+            "product/index.html"
+            "agents/index.html"
+            "architecture/index.html"
+            "contact/index.html"
+          )
+          missing=0
+          for file in "${required_files[@]}"; do
+            if [ -f "${{ env.WEBSITE_DIR }}/${file}" ]; then
+              echo "  OK: ${file}"
+            else
+              echo "  MISSING: ${file}"
+              missing=$((missing + 1))
+            fi
+          done
+          if [ $missing -gt 0 ]; then
+            echo ""
+            echo "WARNING: ${missing} required file(s) missing"
+            echo "Continuing — some pages may still be in development"
+          fi
+
+      - name: Check for broken internal links
+        run: |
+          echo "Checking internal links in HTML files..."
+          broken=0
+          while IFS= read -r html_file; do
+            # Extract href values that start with / (internal absolute links)
+            hrefs=$(grep -oP 'href="(/[^"#?]*)"' "$html_file" | grep -oP '"/[^"]*"' | tr -d '"' || true)
+            for href in $hrefs; do
+              # Resolve the href to a file path within the website directory
+              # Strip leading slash and check if file or directory/index.html exists
+              relative_path="${href#/}"
+              target="${{ env.WEBSITE_DIR }}/${relative_path}"
+              if [ -f "${target}" ] || [ -f "${target}/index.html" ] || [ -f "${target}index.html" ]; then
+                continue
+              else
+                echo "  BROKEN: ${html_file} -> ${href}"
+                broken=$((broken + 1))
+              fi
+            done
+          done < <(find "${{ env.WEBSITE_DIR }}" -name "*.html" -type f)
+          if [ $broken -gt 0 ]; then
+            echo ""
+            echo "WARNING: ${broken} potentially broken internal link(s) found"
+            echo "Review before deploying to production"
+          else
+            echo "No broken internal links detected"
+          fi
+
+      - name: Validate keys.json is valid JSON
+        run: |
+          keys_file="${{ env.WEBSITE_DIR }}/agents/keys.json"
+          if [ -f "${keys_file}" ]; then
+            echo "Validating ${keys_file}..."
+            python3 -m json.tool "${keys_file}" > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+              echo "  OK: keys.json is valid JSON"
+            else
+              echo "  ERROR: keys.json is NOT valid JSON"
+              exit 1
+            fi
+          else
+            echo "  SKIP: keys.json does not exist yet"
+          fi
+
+  deploy:
+    name: Deploy to S3 + CloudFront
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: validate
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region            : ${{ env.AWS_REGION }}
+
+      - name: Sync HTML files to S3 (short cache)
+        run: |
+          aws s3 sync ${{ env.WEBSITE_DIR }}/ s3://${{ env.S3_BUCKET }}/ \
+            --delete \
+            --exclude "README.md" \
+            --exclude ".*" \
+            --exclude "*.css" \
+            --exclude "*.js" \
+            --exclude "*.json" \
+            --exclude "*.png" \
+            --exclude "*.jpg" \
+            --exclude "*.jpeg" \
+            --exclude "*.gif" \
+            --exclude "*.svg" \
+            --exclude "*.ico" \
+            --exclude "*.webp" \
+            --content-type "text/html" \
+            --cache-control "public, max-age=300"
+
+      - name: Sync CSS files to S3 (medium cache)
+        run: |
+          aws s3 sync ${{ env.WEBSITE_DIR }}/ s3://${{ env.S3_BUCKET }}/ \
+            --exclude "*" \
+            --include "*.css" \
+            --content-type "text/css" \
+            --cache-control "public, max-age=86400"
+
+      - name: Sync JS files to S3 (medium cache)
+        run: |
+          aws s3 sync ${{ env.WEBSITE_DIR }}/ s3://${{ env.S3_BUCKET }}/ \
+            --exclude "*" \
+            --include "*.js" \
+            --content-type "application/javascript" \
+            --cache-control "public, max-age=86400"
+
+      - name: Sync JSON files to S3 (medium cache)
+        run: |
+          aws s3 sync ${{ env.WEBSITE_DIR }}/ s3://${{ env.S3_BUCKET }}/ \
+            --exclude "*" \
+            --include "*.json" \
+            --content-type "application/json" \
+            --cache-control "public, max-age=86400"
+
+      - name: Sync image files to S3 (long cache)
+        run: |
+          aws s3 sync ${{ env.WEBSITE_DIR }}/ s3://${{ env.S3_BUCKET }}/ \
+            --exclude "*" \
+            --include "*.png" \
+            --include "*.jpg" \
+            --include "*.jpeg" \
+            --include "*.gif" \
+            --include "*.svg" \
+            --include "*.ico" \
+            --include "*.webp" \
+            --cache-control "public, max-age=604800"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ env.CLOUDFRONT_DIST }} \
+            --paths "/*"
+
+      - name: Smoke test — verify site is reachable
+        run: |
+          echo "Waiting for CloudFront invalidation to propagate..."
+          sleep 10
+          echo "Testing https://sgraph.ai..."
+          status_code=$(curl -s -o /dev/null -w "%{http_code}" https://sgraph.ai)
+          if [ "$status_code" -eq 200 ]; then
+            echo "  OK: sgraph.ai returned HTTP ${status_code}"
+          else
+            echo "  WARNING: sgraph.ai returned HTTP ${status_code} (expected 200)"
+            echo "  CloudFront invalidation may still be in progress"
+          fi

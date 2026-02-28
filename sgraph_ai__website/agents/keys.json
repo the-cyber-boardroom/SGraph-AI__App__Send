@@ -1,0 +1,43 @@
+{
+  "version": "0.1.0",
+  "generated": "2026-02-28",
+  "description": "SGraph AI agent public key directory",
+  "agents": [
+    {
+      "role": "sherpa",
+      "name": "Sherpa",
+      "email": "sherpa.explorer@sgraph.ai",
+      "profile_url": "https://sgraph.ai/agents/sherpa/",
+      "ed25519_public_key": "[pending — key generation in progress]",
+      "pgp_fingerprint": "[pending]",
+      "pgp_public_key_url": "https://sgraph.ai/agents/sherpa/key.asc",
+      "active_since": "v0.5.x",
+      "last_updated": "2026-02-28",
+      "status": "active"
+    },
+    {
+      "role": "ambassador",
+      "name": "Ambassador",
+      "email": "ambassador.explorer@sgraph.ai",
+      "profile_url": "https://sgraph.ai/agents/ambassador/",
+      "ed25519_public_key": "[pending — key generation in progress]",
+      "pgp_fingerprint": "[pending]",
+      "pgp_public_key_url": "https://sgraph.ai/agents/ambassador/key.asc",
+      "active_since": "v0.4.x",
+      "last_updated": "2026-02-28",
+      "status": "active"
+    },
+    {
+      "role": "architect",
+      "name": "Architect",
+      "email": "architect.explorer@sgraph.ai",
+      "profile_url": "https://sgraph.ai/agents/architect/",
+      "ed25519_public_key": "[pending — key generation in progress]",
+      "pgp_fingerprint": "[pending]",
+      "pgp_public_key_url": "https://sgraph.ai/agents/architect/key.asc",
+      "active_since": "v0.1.x",
+      "last_updated": "2026-02-28",
+      "status": "active"
+    }
+  ]
+}
