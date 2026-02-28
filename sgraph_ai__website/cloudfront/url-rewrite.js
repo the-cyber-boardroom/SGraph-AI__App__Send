@@ -4,10 +4,14 @@
 // Association: Viewer Request event on CloudFront distribution E2YZA5CZTJE62H
 //
 // What it does:
-//   /                          → /index.html                    (no change needed)
-//   /websites/sgraph-ai/latest/product/  → /websites/sgraph-ai/latest/product/index.html
-//   /websites/sgraph-ai/latest/agents/   → /websites/sgraph-ai/latest/agents/index.html
+//   /                          → /index.html                    (append index.html)
+//   /websites/sgraph-ai/latest/product/  → .../product/index.html (append index.html)
+//   /websites/sgraph-ai/latest/product   → 302 → .../product/    (redirect to add slash)
 //   /favicon.ico               → /favicon.ico                   (no change)
+//
+// The redirect for bare paths (no trailing slash, no extension) is essential:
+// without it the browser treats "product" as a file, and relative paths like
+// ../fonts/fonts.css resolve one directory too high.
 //
 // Deploy via AWS Console or CLI:
 //   aws cloudfront create-function \
@@ -29,9 +33,15 @@ function handler(event) {
     if (uri.endsWith('/')) {
         request.uri += 'index.html';
     }
-    // If URI has no file extension, assume directory and append /index.html
+    // If URI has no file extension, redirect to add trailing slash.
+    // This ensures the browser URL updates so relative paths resolve correctly.
+    // Without this, /product loads index.html but ../fonts/ resolves one level too high.
     else if (!uri.includes('.')) {
-        request.uri += '/index.html';
+        return {
+            statusCode: 302,
+            statusDescription: 'Found',
+            headers: { location: { value: uri + '/' } }
+        };
     }
 
     return request;
