@@ -1,16 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    SGraph AI Website — i18n Module
-   Adapted from send.sgraph.ai v0.1.4 i18n system.
+   URL-based locale routing with pre-rendered HTML.
 
-   Same-URL approach: JS switches text in place.
-   English embedded inline. Other locales loaded async via fetch.
+   Locales are served at path prefixes:
+     /            → English (default)
+     /pt-pt/      → Portuguese (Portugal)
+     /pt-br/      → Portuguese (Brazil)
+     /tlh/        → Klingon
+
+   The locale switcher navigates to the equivalent page in the target locale.
+   Translation JSON files are loaded for runtime needs (dynamic content).
 
    Usage:
      SgI18n.t('nav.product')
-     SgI18n.setLocale('pt-PT')
-
-   Events:
-     'locale-changed' on document — all [data-i18n] elements re-render
+     SgI18n.navigateToLocale('pt-pt')
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const SgI18n = {
@@ -19,36 +22,53 @@ const SgI18n = {
 
     strings: { en: {} },
 
+    // Locale code → URL slug mapping
+    localeToSlug: {
+        'en':    '',
+        'pt-pt': 'pt-pt',
+        'pt-br': 'pt-br',
+        'tlh':   'tlh'
+    },
+
     availableLocales: [
-        { code: 'en',    name: 'English',             flag: '\uD83C\uDDEC\uD83C\uDDE7' },
-        { code: 'pt',    name: 'Português (Brasil)',   flag: '\uD83C\uDDE7\uD83C\uDDF7' },
-        { code: 'pt-PT', name: 'Português (Portugal)', flag: '\uD83C\uDDF5\uD83C\uDDF9' },
-        { code: 'tlh',   name: 'tlhIngan Hol',        flag: '\uD83D\uDD96' }
+        { code: 'en',    name: 'English',              flag: '\uD83C\uDDEC\uD83C\uDDE7' },
+        { code: 'pt-br', name: 'Português (Brasil)',    flag: '\uD83C\uDDE7\uD83C\uDDF7' },
+        { code: 'pt-pt', name: 'Português (Portugal)',  flag: '\uD83C\uDDF5\uD83C\uDDF9' },
+        { code: 'tlh',   name: 'tlhIngan Hol',         flag: '\uD83D\uDD96' }
     ],
 
     // ─── Initialisation ────────────────────────────────────────────────────
 
     async init() {
-        // Load English master strings
+        // Detect locale from URL path
+        this.locale = this._detectLocale();
+
+        // Load English master strings (needed for fallback)
         try {
             const base = this._basePath();
             const resp = await fetch(base + 'i18n/en.json');
             if (resp.ok) this.strings.en = await resp.json();
         } catch (e) { /* English fallback to key */ }
 
-        // Restore saved locale
-        const saved = localStorage.getItem('sgraph-locale');
-        if (saved && saved !== 'en' && this.isSupported(saved)) {
-            this.locale = saved;
-            await this.loadLocale(saved);
+        // Load current locale strings if not English
+        if (this.locale !== 'en') {
+            await this.loadLocale(this.locale);
         }
 
-        // Apply translations
+        // Apply any runtime translations (for dynamic elements)
         this._applyAll();
     },
 
     isSupported(code) {
         return this.availableLocales.some(l => l.code === code);
+    },
+
+    // ─── Locale Detection from URL ───────────────────────────────────────
+
+    _detectLocale() {
+        const path = window.location.pathname;
+        const match = path.match(/^\/(pt-pt|pt-br|tlh)\//);
+        return match ? match[1] : 'en';
     },
 
     // ─── Locale Loading ────────────────────────────────────────────────────
@@ -80,30 +100,38 @@ const SgI18n = {
         return str;
     },
 
-    // ─── Locale Switching ──────────────────────────────────────────────────
+    // ─── Locale Navigation ──────────────────────────────────────────────
 
-    async setLocale(code) {
+    navigateToLocale(code) {
         if (!this.isSupported(code)) return;
-        if (!this.strings[code] && code !== 'en') {
-            await this.loadLocale(code);
+        const currentLocale = this._detectLocale();
+        let currentPath = window.location.pathname;
+
+        // Strip current locale prefix to get the base page path
+        if (currentLocale !== 'en') {
+            currentPath = currentPath.replace(new RegExp('^/' + currentLocale + '/'), '/');
         }
-        this.locale = code;
-        localStorage.setItem('sgraph-locale', code);
-        this._applyAll();
-        document.dispatchEvent(new CustomEvent('locale-changed', {
-            detail: { locale: code }
-        }));
+
+        // Build target URL
+        const slug = this.localeToSlug[code];
+        if (slug) {
+            window.location.href = '/' + slug + currentPath;
+        } else {
+            // English — no prefix
+            window.location.href = currentPath;
+        }
     },
 
     // ─── Internal: Apply translations to all [data-i18n] elements ──────────
 
     _applyAll() {
-        document.documentElement.lang = this.locale;
+        document.documentElement.lang = this.locale === 'pt-br' ? 'pt-BR'
+                                      : this.locale === 'pt-pt' ? 'pt-PT'
+                                      : this.locale;
 
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             const val = this.t(key);
-            // Support innerHTML for keys containing HTML (e.g. <strong>)
             if (val.includes('<')) {
                 el.innerHTML = val;
             } else {
@@ -111,22 +139,18 @@ const SgI18n = {
             }
         });
 
-        // Handle placeholder attributes
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             el.placeholder = this.t(el.getAttribute('data-i18n-placeholder'));
         });
 
-        // Handle title attributes
         document.querySelectorAll('[data-i18n-title]').forEach(el => {
             el.title = this.t(el.getAttribute('data-i18n-title'));
         });
 
-        // Handle aria-label attributes
         document.querySelectorAll('[data-i18n-aria]').forEach(el => {
             el.setAttribute('aria-label', this.t(el.getAttribute('data-i18n-aria')));
         });
 
-        // Update page title if key exists
         const titleKey = document.querySelector('meta[name="i18n-title-key"]');
         if (titleKey) {
             document.title = this.t(titleKey.content);
@@ -166,10 +190,10 @@ const SgI18n = {
             btn.type = 'button';
             btn.textContent = loc.flag + '  ' + loc.name;
             btn.addEventListener('click', () => {
-                this.setLocale(loc.code).then(() => {
-                    this.renderLocaleSelector(containerId);
-                });
                 dropdown.classList.remove('open');
+                if (loc.code !== this.locale) {
+                    this.navigateToLocale(loc.code);
+                }
             });
             menu.appendChild(btn);
         });
@@ -190,7 +214,6 @@ const SgI18n = {
     // ─── Internal: Resolve base path to website root ───────────────────────
 
     _basePath() {
-        // Count depth from root based on page URL
         const path = window.location.pathname;
         const segments = path.split('/').filter(s => s.length > 0);
         // Remove filename if present
