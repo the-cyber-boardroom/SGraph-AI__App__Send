@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture — SGraph AI</title>
+  <meta name="description" content="How SG/Send is built: the technology stack, security model, deployment targets, and agentic development methodology.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="theme-aurora">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="https://send.sgraph.ai">Product</a>
+        <a href="/agents/">Agents</a>
+        <a href="/architecture/" class="active">Architecture</a>
+        <a href="/contact/">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <h1 class="display">How <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span> is Built</h1>
+        <p class="lead">
+          A zero-knowledge encrypted file sharing platform built on serverless infrastructure,
+          developed by 18 AI agents working in parallel under human oversight.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         TECHNOLOGY STACK
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2>Technology Stack</h2>
+          <p>Every layer is chosen for simplicity, security, and zero-dependency deployment.</p>
+        </div>
+
+        <table class="stack-table">
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Technology</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Runtime</td>
+              <td>Python 3.12 / arm64</td>
+              <td>Application server language</td>
+            </tr>
+            <tr>
+              <td>Web Framework</td>
+              <td>FastAPI via osbot-fast-api</td>
+              <td>HTTP routing and request handling</td>
+            </tr>
+            <tr>
+              <td>Compute</td>
+              <td>AWS Lambda + Mangum</td>
+              <td>Serverless execution, pay-per-use</td>
+            </tr>
+            <tr>
+              <td>Storage</td>
+              <td>Memory-FS (Storage_FS)</td>
+              <td>Pluggable backend: memory, disk, or S3</td>
+            </tr>
+            <tr>
+              <td>Encryption</td>
+              <td>Web Crypto API (AES-256-GCM)</td>
+              <td>Client-side encryption in the browser</td>
+            </tr>
+            <tr>
+              <td>Type System</td>
+              <td>Type_Safe (osbot-utils)</td>
+              <td>Schema definitions without Pydantic</td>
+            </tr>
+            <tr>
+              <td>Frontend</td>
+              <td>Vanilla JS + Web Components</td>
+              <td>Zero framework dependencies (IFD)</td>
+            </tr>
+            <tr>
+              <td>Testing</td>
+              <td>pytest, in-memory stack</td>
+              <td>No mocks, no patches, real implementations</td>
+            </tr>
+            <tr>
+              <td>CI/CD</td>
+              <td>GitHub Actions</td>
+              <td>Test, tag, deploy pipeline</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ARCHITECTURE DIAGRAM
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2>System Architecture</h2>
+          <p>Two Lambda functions, one storage layer, one CDN. Simple by design.</p>
+        </div>
+
+        <div class="arch-diagram" role="img" aria-label="Architecture diagram showing the system topology of SG/Send">
+                         +------------------+
+                         |    CloudFront     |
+                         |    CDN / WAF      |
+                         +--------+---------+
+                                  |
+                    +-------------+-------------+
+                    |                           |
+          +---------+---------+       +---------+---------+
+          |   User Lambda     |       |   Admin Lambda    |
+          |   (Public)        |       |   (Authenticated) |
+          |                   |       |                   |
+          |  /transfers/*     |       |  /tokens/*        |
+          |  /health          |       |  /stats/*         |
+          |  /presigned/*     |       |  /admin/*         |
+          |  /vault/*         |       |  /mcp/*           |
+          |  /mcp/*           |       |                   |
+          |  Static UI        |       |  Admin UI         |
+          +---------+---------+       +---------+---------+
+                    |                           |
+                    +-------------+-------------+
+                                  |
+                       +----------+----------+
+                       |     Memory-FS       |
+                       |   (Storage_FS)      |
+                       |                     |
+                       |  Backend: S3 / Disk |
+                       |  / In-Memory        |
+                       +---------------------+
+
+    +-----------------------------------------------------------+
+    |                    Browser (Client)                        |
+    |                                                           |
+    |   1. User selects file                                    |
+    |   2. AES-256-GCM key generated (Web Crypto API)           |
+    |   3. File encrypted in browser                            |
+    |   4. Only ciphertext uploaded to server                   |
+    |   5. Key stays with sender, shared out-of-band            |
+    |   6. Recipient decrypts in their browser                  |
+    +-----------------------------------------------------------+</div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECURITY MODEL
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2>Security Model</h2>
+          <p>Zero knowledge is not a feature &mdash; it is the architecture.</p>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="card">
+            <h3 class="card__title">Client-Side Encryption</h3>
+            <p class="card__desc">
+              All encryption and decryption happens in the browser using the Web Crypto API.
+              AES-256-GCM with randomly generated keys. The server never has access to plaintext.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">No Plaintext on Server</h3>
+            <p class="card__desc">
+              The backend stores only encrypted ciphertext. Even with full database access,
+              file contents cannot be read without the decryption key.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">No File Names Stored</h3>
+            <p class="card__desc">
+              Original file names are never sent to the server. The server assigns random
+              transfer IDs. File metadata stays with the sender.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Hashed IP Addresses</h3>
+            <p class="card__desc">
+              IP addresses are SHA-256 hashed with a daily rotating salt before storage.
+              Stored as <code>ip_hash</code> for rate limiting, never as raw IPs.
+            </p>
+          </div>
+        </div>
+
+        <div class="callout mt-8">
+          All backend data is non-sensitive and non-confidential by design.
+          A complete server compromise reveals nothing about the content of transferred files.
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         DEPLOYMENT
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2>Deployment Targets</h2>
+          <p>One codebase, seven deployment targets grouped into four patterns.</p>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="card">
+            <h3 class="card__title">Lambda</h3>
+            <p class="card__desc">
+              Primary deployment. Two Lambda functions (User + Admin) behind Lambda Function URLs.
+              Direct HTTPS endpoints, no API Gateway needed.
+            </p>
+            <span class="tag">Production</span>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Container</h3>
+            <p class="card__desc">
+              Docker, AWS Fargate, and GCP Cloud Run. The same application packaged as a container
+              for environments that prefer containers over serverless.
+            </p>
+            <span class="tag">Docker / Fargate / GCP</span>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Server</h3>
+            <p class="card__desc">
+              EC2 instances and AMI builds. For teams that need full control of the runtime
+              environment or have compliance requirements for dedicated infrastructure.
+            </p>
+            <span class="tag">EC2 / AMI</span>
+          </div>
+          <div class="card">
+            <h3 class="card__title">CLI</h3>
+            <p class="card__desc">
+              Command-line interface for scripted transfers, CI/CD pipelines, and power users
+              who prefer terminal-based workflows.
+            </p>
+            <span class="tag">Terminal</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         DEVELOPMENT MODEL
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2>Agentic Development</h2>
+          <p>18 AI agents collaborate under human oversight using a role-based workflow.</p>
+        </div>
+
+        <div class="grid grid--3">
+          <div class="card">
+            <h3 class="card__title">Role-Based Teams</h3>
+            <p class="card__desc">
+              Three teams &mdash; Explorer (build new), Villager (stabilise), and Town Planner (strategy).
+              Each agent has a defined role: Architect, Dev, QA, AppSec, Librarian, and more.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">IFD Methodology</h3>
+            <p class="card__desc">
+              Incremental Feature Development. Small, complete, testable increments.
+              No framework dependencies. Web Components with surgical versioning.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Everything in Public</h3>
+            <p class="card__desc">
+              All code, reviews, decisions, and briefs live in the open repo.
+              Every agent produces versioned documents tracked by the Librarian.
+            </p>
+          </div>
+        </div>
+
+        <div class="stats-row mt-8">
+          <div class="stat">
+            <div class="stat__value">18</div>
+            <div class="stat__label">AI Agents</div>
+          </div>
+          <div class="stat">
+            <div class="stat__value">73</div>
+            <div class="stat__label">HTTP Endpoints</div>
+          </div>
+          <div class="stat">
+            <div class="stat__value">393</div>
+            <div class="stat__label">Passing Tests</div>
+          </div>
+          <div class="stat">
+            <div class="stat__value">7</div>
+            <div class="stat__label">Deploy Targets</div>
+          </div>
+        </div>
+
+        <div class="text-center mt-8">
+          <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-secondary" target="_blank" rel="noopener">View Source on GitHub &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="/" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p>AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="/architecture/">Architecture</a></li>
+            <li><a href="/agents/">Agents</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <ul>
+            <li><a href="/contact/">Contact</a></li>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>&copy; 2026 SGraph AI. All rights reserved.</p>
+        <button class="btn btn-sherpa btn--sm" onclick="openContactModal()">Got a question? Email the Sherpa</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       CONTACT MODAL
+       ============================================================ -->
+  <div id="contact-modal" class="modal-overlay" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 class="modal__title" id="modal-title">Contact the Sherpa</h2>
+        <button class="modal__close" onclick="closeContactModal()" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal__body">
+        <p class="text-secondary mb-6">Your message goes to <strong>sherpa@sgraph.ai</strong> &mdash; our Sherpa guides users and answers questions.</p>
+        <form id="contact-form-modal" novalidate>
+          <input type="hidden" name="page" value="/architecture/">
+          <div class="form-group">
+            <label class="form-label" for="modal-message">Message <span class="text-accent">*</span></label>
+            <textarea class="form-textarea" id="modal-message" name="message" placeholder="What can we help you with?" required minlength="10" maxlength="5000" rows="5"></textarea>
+            <p class="form-hint">10 &ndash; 5,000 characters</p>
+            <p class="form-error hidden" id="modal-message-error"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="modal-email">Email <span class="text-secondary">(optional)</span></label>
+            <input class="form-input" type="email" id="modal-email" name="email" placeholder="you@example.com">
+            <p class="form-error hidden" id="modal-email-error"></p>
+          </div>
+          <div id="modal-alert" class="hidden"></div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-ghost" onclick="closeContactModal()">Cancel</button>
+        <button class="btn btn-primary" type="submit" form="contact-form-modal">Send Message</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/contact-form.js"></script>
+</body>
+</html>
