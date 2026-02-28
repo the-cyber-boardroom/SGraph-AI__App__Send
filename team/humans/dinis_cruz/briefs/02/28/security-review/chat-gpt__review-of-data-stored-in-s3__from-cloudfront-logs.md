@@ -1,0 +1,229 @@
+# Security Review: CloudFront Log Exposure – send.sgraph.ai
+
+Date: 2026-02-28  
+Reviewer: External AI-assisted review (conversation-based assessment)
+
+---
+
+## 1. Scope
+
+This document evaluates whether the publicly shared CloudFront log data
+constitutes a security or privacy incident for the `send.sgraph.ai` service.
+
+The review is based on:
+
+- A sample of actual CloudFront logs.
+- Clarifications provided by a core contributor to the project.
+- The architectural model of the SG/Send platform.
+- The assumption that encryption is cryptographically sound.
+
+---
+
+## 2. Architectural Context (Critical to Assessment)
+
+The following design characteristics of `send.sgraph.ai` directly influenced the risk assessment:
+
+1. **Client-Side Encryption Model**
+   - Files are encrypted in the browser.
+   - Decryption keys never reach the server.
+   - The key is passed via URL fragment (`#key`), which is never transmitted in HTTP requests.
+   - The server stores only encrypted blobs.
+
+2. **Server-Compromise Threat Model**
+   - The system is explicitly designed under the assumption that:
+     - The server may be fully compromised.
+     - All stored files (ciphertext) may be exposed.
+     - All logs may be exposed.
+   - The design goal is zero user impact even under total backend compromise.
+
+3. **CloudFront Logging Configuration**
+   - Client IP (`c-ip`) is deliberately excluded.
+   - No request bodies are logged.
+   - No query strings are logged.
+   - No cookies are logged.
+   - No authorization headers are logged.
+
+4. **Transfer Identifiers**
+   - IDs such as `7a79bfaeaba9` refer to encrypted objects.
+   - They do not contain decryption keys.
+   - They are assumed to be randomly generated and non-guessable.
+
+5. **Tokens (e.g., `eap-feb-w4`)**
+   - Public-ish promotional tokens.
+   - Usage capped.
+   - Actively monitored.
+   - Revocable at any time.
+
+These properties materially reduce the risk associated with log exposure.
+
+---
+
+## 3. Data Present in the Log Sample
+
+The exposed data includes:
+
+- Timestamps (high precision)
+- HTTP methods (GET, POST)
+- Status codes (200, 307)
+- Hostnames:
+  - `send.sgraph.ai`
+  - `admin.send.sgraph.ai`
+- Endpoint paths (e.g., `/transfers/complete/{id}`)
+- User agents
+- TLS version and cipher
+- Response sizes
+- Edge locations (LHR5, ORD56)
+- Country codes (IE, US, GB)
+
+This data represents operational metadata.
+
+---
+
+## 4. Data Explicitly NOT Present
+
+The logs do **not** contain:
+
+- Client IP addresses
+- Email addresses
+- Account identifiers
+- Authorization headers
+- Session cookies
+- Bearer tokens
+- AWS credentials
+- Presigned S3 URLs
+- Encryption keys
+- Query strings
+- Request bodies
+
+The absence of this data significantly lowers security and privacy risk.
+
+---
+
+## 5. Risk Analysis
+
+### 5.1 Transfer IDs
+
+Example:
+```
+
+/transfers/complete/7a79bfaeaba9
+
+```
+
+These identifiers point to encrypted blobs stored on the server.
+Without the browser-held decryption key (in the URL fragment),
+they do not enable data access.
+
+Assuming sufficient entropy and rate limiting, exposure of these IDs alone
+does not compromise user data.
+
+**Risk Level: Low**
+
+---
+
+### 5.2 Tokens
+
+Example:
+```
+
+/tokens/lookup/eap-feb-w4
+
+```
+
+These tokens are:
+- Intentionally shared.
+- Usage capped.
+- Monitored in real time.
+- Revocable.
+
+Worst-case scenario: allocation exhaustion.
+
+No privilege escalation or data access beyond intended scope is implied.
+
+**Risk Level: Low**
+
+---
+
+### 5.3 User Agents & Country Codes
+
+User agents and country codes are visible, but:
+
+- No IP addresses are present.
+- No accounts are linked.
+- No emails are exposed.
+
+This constitutes anonymous telemetry.
+
+**Risk Level: Low**
+
+---
+
+### 5.4 Response Sizes
+
+Encrypted payload size may be inferred from response size.
+Ciphertext length does not weaken properly implemented encryption.
+
+**Risk Level: Low**
+
+---
+
+## 6. Breach Classification Assessment
+
+Based on the reviewed data:
+
+- No credentials were exposed.
+- No personal data was exposed.
+- No encryption keys were exposed.
+- No presigned URLs were exposed.
+- No sensitive headers or bodies were exposed.
+
+This does **not** meet the threshold of a security incident
+or reportable data breach.
+
+---
+
+## 7. Influence of Conversation on Assessment
+
+The risk evaluation evolved as additional architectural details were provided.
+
+Initial questions focused on:
+- Whether transfer IDs could be sensitive.
+- Whether tokens could be abused.
+- Whether logs might contain personal data (e.g., IP addresses).
+
+Subsequent clarifications significantly reduced perceived risk:
+
+1. Confirmation that client IPs were intentionally excluded.
+2. Confirmation that decryption keys exist only in URL fragments.
+3. Confirmation that tokens are intentionally shareable and revocable.
+4. Clarification that the platform is designed assuming total server compromise.
+
+These architectural properties are decisive.
+
+In a traditional server-side encryption model, log exposure could materially increase risk.
+In this specific design, where:
+- The server stores only ciphertext,
+- Keys never reach the backend,
+- Logs exclude personal and secret data,
+
+the exposure of operational logs does not materially affect user security.
+
+The design philosophy of SG/Send directly informs the conclusion.
+
+---
+
+## 8. Final Verdict
+
+Publishing the provided log data publicly:
+
+- Does not compromise user security.
+- Does not expose sensitive information.
+- Does not weaken the cryptographic model.
+- Does not introduce new meaningful attack surface.
+- Does not require incident escalation or user notification.
+
+### Classification:
+
+**Low-risk operational metadata exposure.**
+
+This does not qualify as a security incident.
