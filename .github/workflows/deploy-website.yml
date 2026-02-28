@@ -11,6 +11,7 @@ on:
       - 'sgraph_ai__website/**'
       - 'scripts/deploy_static_site.py'
       - 'scripts/store_ci_artifacts.py'
+      - 'scripts/generate_i18n_pages.py'
       - '.github/workflows/deploy-website.yml'
   workflow_dispatch:
     inputs:
@@ -57,6 +58,9 @@ jobs:
       - name: Read version
         id: version
         run: echo "version=$(cat sgraph_ai_app_send/version)" >> $GITHUB_OUTPUT
+
+      - name: Generate i18n locale pages
+        run: python scripts/generate_i18n_pages.py
 
       - name: Deploy static site
         run: |
