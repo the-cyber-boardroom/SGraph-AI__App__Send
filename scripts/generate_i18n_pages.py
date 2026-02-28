@@ -29,8 +29,13 @@ SITE_URL    = 'https://sgraph.ai'
 
 # Locale code → URL slug → JSON file mapping
 LOCALES = [
-    { 'code': 'pt-pt', 'slug': 'pt-pt', 'json': 'pt-PT.json', 'lang': 'pt-PT', 'hreflang': 'pt-PT' },
+    { 'code': 'pt-pt', 'slug': 'pt-pt', 'json': 'pt-pt.json', 'lang': 'pt-PT', 'hreflang': 'pt-PT' },
     { 'code': 'pt-br', 'slug': 'pt-br', 'json': 'pt-br.json', 'lang': 'pt-BR', 'hreflang': 'pt-BR' },
+    { 'code': 'es-es', 'slug': 'es-es', 'json': 'es-es.json', 'lang': 'es-ES', 'hreflang': 'es-ES' },
+    { 'code': 'es-ar', 'slug': 'es-ar', 'json': 'es-ar.json', 'lang': 'es-AR', 'hreflang': 'es-AR' },
+    { 'code': 'es-mx', 'slug': 'es-mx', 'json': 'es-mx.json', 'lang': 'es-MX', 'hreflang': 'es-MX' },
+    { 'code': 'fr-fr', 'slug': 'fr-fr', 'json': 'fr-fr.json', 'lang': 'fr-FR', 'hreflang': 'fr-FR' },
+    { 'code': 'fr-ca', 'slug': 'fr-ca', 'json': 'fr-ca.json', 'lang': 'fr-CA', 'hreflang': 'fr-CA' },
     { 'code': 'tlh',   'slug': 'tlh',   'json': 'tlh.json',   'lang': 'tlh',   'hreflang': 'tlh'   },
 ]
 
@@ -99,6 +104,13 @@ def translate_html(html_content, translations, en_translations, locale_info, rel
         r'<html\s+lang="[^"]*"',
         f'<html lang="{locale_info["lang"]}"',
         result
+    )
+
+    # 1b. Mark page as pre-rendered so i18n.js skips JSON loading
+    result = result.replace(
+        '</head>',
+        '  <meta name="i18n-prerendered" content="true" />\n</head>',
+        1
     )
 
     # 2. Translate data-i18n element content

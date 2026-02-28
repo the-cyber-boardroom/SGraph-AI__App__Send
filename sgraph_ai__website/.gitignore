@@ -1,0 +1,10 @@
+# Generated locale pages (built by scripts/generate_i18n_pages.py)
+# These are build artifacts — generated in CI before deployment.
+/pt-pt/
+/pt-br/
+/es-es/
+/es-ar/
+/es-mx/
+/fr-fr/
+/fr-ca/
+/tlh/

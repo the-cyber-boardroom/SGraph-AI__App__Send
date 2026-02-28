@@ -6,13 +6,22 @@
      /            → English (default)
      /pt-pt/      → Portuguese (Portugal)
      /pt-br/      → Portuguese (Brazil)
+     /es-es/      → Español (España)
+     /es-ar/      → Español (Argentina)
+     /es-mx/      → Español (México)
+     /fr-fr/      → Français (France)
+     /fr-ca/      → Français (Canada)
      /tlh/        → Klingon
 
-   The locale switcher navigates to the equivalent page in the target locale.
-   Translation JSON files are loaded for runtime needs (dynamic content).
+   All pages (English and locale) are pre-rendered with translations baked
+   into the HTML at build time. This module only handles:
+     - Locale detection from URL
+     - Locale selector dropdown rendering
+     - Navigation between locale versions of a page
+
+   No JSON files are fetched at runtime.
 
    Usage:
-     SgI18n.t('nav.product')
      SgI18n.navigateToLocale('pt-pt')
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -20,13 +29,16 @@ const SgI18n = {
 
     locale: 'en',
 
-    strings: { en: {} },
-
     // Locale code → URL slug mapping
     localeToSlug: {
         'en':    '',
         'pt-pt': 'pt-pt',
         'pt-br': 'pt-br',
+        'es-es': 'es-es',
+        'es-ar': 'es-ar',
+        'es-mx': 'es-mx',
+        'fr-fr': 'fr-fr',
+        'fr-ca': 'fr-ca',
         'tlh':   'tlh'
     },
 
@@ -34,29 +46,21 @@ const SgI18n = {
         { code: 'en',    name: 'English',              flag: '\uD83C\uDDEC\uD83C\uDDE7' },
         { code: 'pt-br', name: 'Português (Brasil)',    flag: '\uD83C\uDDE7\uD83C\uDDF7' },
         { code: 'pt-pt', name: 'Português (Portugal)',  flag: '\uD83C\uDDF5\uD83C\uDDF9' },
+        { code: 'es-es', name: 'Español (España)',      flag: '\uD83C\uDDEA\uD83C\uDDF8' },
+        { code: 'es-ar', name: 'Español (Argentina)',   flag: '\uD83C\uDDE6\uD83C\uDDF7' },
+        { code: 'es-mx', name: 'Español (México)',      flag: '\uD83C\uDDF2\uD83C\uDDFD' },
+        { code: 'fr-fr', name: 'Français (France)',     flag: '\uD83C\uDDEB\uD83C\uDDF7' },
+        { code: 'fr-ca', name: 'Français (Canada)',     flag: '\uD83C\uDDE8\uD83C\uDDE6' },
         { code: 'tlh',   name: 'tlhIngan Hol',         flag: '\uD83D\uDD96' }
     ],
 
     // ─── Initialisation ────────────────────────────────────────────────────
 
     async init() {
-        // Detect locale from URL path
+        // Detect locale from URL path — that's all we need.
+        // Translations are pre-rendered into the HTML at build time,
+        // so no JSON files are fetched.
         this.locale = this._detectLocale();
-
-        // Load English master strings (needed for fallback)
-        try {
-            const base = this._basePath();
-            const resp = await fetch(base + 'i18n/en.json');
-            if (resp.ok) this.strings.en = await resp.json();
-        } catch (e) { /* English fallback to key */ }
-
-        // Load current locale strings if not English
-        if (this.locale !== 'en') {
-            await this.loadLocale(this.locale);
-        }
-
-        // Apply any runtime translations (for dynamic elements)
-        this._applyAll();
     },
 
     isSupported(code) {
@@ -67,37 +71,10 @@ const SgI18n = {
 
     _detectLocale() {
         const path = window.location.pathname;
-        const match = path.match(/^\/(pt-pt|pt-br|tlh)\//);
+        const slugs = Object.values(this.localeToSlug).filter(s => s);
+        const pattern = new RegExp('^\\/(' + slugs.join('|') + ')\\/');
+        const match = path.match(pattern);
         return match ? match[1] : 'en';
-    },
-
-    // ─── Locale Loading ────────────────────────────────────────────────────
-
-    async loadLocale(code) {
-        if (this.strings[code]) return true;
-        try {
-            const base = this._basePath();
-            const resp = await fetch(base + 'i18n/' + code + '.json');
-            if (resp.ok) {
-                this.strings[code] = await resp.json();
-                return true;
-            }
-        } catch (e) { /* fallback to English */ }
-        return false;
-    },
-
-    // ─── Translation ───────────────────────────────────────────────────────
-
-    t(key, params) {
-        let str = (this.strings[this.locale] && this.strings[this.locale][key])
-               || this.strings.en[key]
-               || key;
-        if (params) {
-            Object.entries(params).forEach(([k, v]) => {
-                str = str.split('{' + k + '}').join(String(v));
-            });
-        }
-        return str;
     },
 
     // ─── Locale Navigation ──────────────────────────────────────────────
@@ -119,41 +96,6 @@ const SgI18n = {
         } else {
             // English — no prefix
             window.location.href = currentPath;
-        }
-    },
-
-    // ─── Internal: Apply translations to all [data-i18n] elements ──────────
-
-    _applyAll() {
-        document.documentElement.lang = this.locale === 'pt-br' ? 'pt-BR'
-                                      : this.locale === 'pt-pt' ? 'pt-PT'
-                                      : this.locale;
-
-        document.querySelectorAll('[data-i18n]').forEach(el => {
-            const key = el.getAttribute('data-i18n');
-            const val = this.t(key);
-            if (val.includes('<')) {
-                el.innerHTML = val;
-            } else {
-                el.textContent = val;
-            }
-        });
-
-        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-            el.placeholder = this.t(el.getAttribute('data-i18n-placeholder'));
-        });
-
-        document.querySelectorAll('[data-i18n-title]').forEach(el => {
-            el.title = this.t(el.getAttribute('data-i18n-title'));
-        });
-
-        document.querySelectorAll('[data-i18n-aria]').forEach(el => {
-            el.setAttribute('aria-label', this.t(el.getAttribute('data-i18n-aria')));
-        });
-
-        const titleKey = document.querySelector('meta[name="i18n-title-key"]');
-        if (titleKey) {
-            document.title = this.t(titleKey.content);
         }
     },
 
@@ -209,18 +151,5 @@ const SgI18n = {
         document.addEventListener('click', () => dropdown.classList.remove('open'));
 
         container.appendChild(dropdown);
-    },
-
-    // ─── Internal: Resolve base path to website root ───────────────────────
-
-    _basePath() {
-        const path = window.location.pathname;
-        const segments = path.split('/').filter(s => s.length > 0);
-        // Remove filename if present
-        if (segments.length > 0 && segments[segments.length - 1].includes('.')) {
-            segments.pop();
-        }
-        if (segments.length === 0) return './';
-        return '../'.repeat(segments.length);
     }
 };
