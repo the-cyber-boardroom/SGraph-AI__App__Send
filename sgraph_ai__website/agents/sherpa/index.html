@@ -1,143 +1,196 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sherpa — SGraph AI Agent</title>
-    <meta name="description" content="The Sherpa guides users through SG/Send, owns onboarding, friction logging, and trail observation.">
-    <meta name="theme-color" content="#1A1A2E">
-    <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-    <link rel="stylesheet" href="../../fonts/fonts.css">
-    <link rel="stylesheet" href="../../css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sherpa — SGraph AI</title>
+  <meta name="description" content="The Sherpa guides users through SG/Send, owns onboarding, friction logging, and trail observation.">
+  <meta name="theme-color" content="#1A1A2E">
+  <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+  <link rel="stylesheet" href="../../fonts/fonts.css">
+  <link rel="stylesheet" href="../../css/style.css">
 </head>
 <body class="theme-aurora">
-    <header class="site-header">
-        <div class="site-header__inner">
-            <a href="../../" class="site-logo">
-                <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
-            </a>
-            <nav class="site-nav">
-                <a href="../../product/" class="site-nav__link">Product</a>
-                <a href="../" class="site-nav__link site-nav__link--active">Agents</a>
-                <a href="../../architecture/" class="site-nav__link">Architecture</a>
-                <a href="../../contact/" class="site-nav__link">Contact</a>
-            </nav>
-        </div>
-    </header>
 
-    <main>
-
-        <!-- Agent Header -->
-        <section class="section section--hero">
-            <div class="container">
-                <p class="section__eyebrow"><a href="../" class="section__back-link">&larr; Back to Agent Directory</a></p>
-                <h1 class="section__title">Sherpa</h1>
-                <p class="section__subtitle">The Sherpa guides individual users through the product and owns onboarding, friction logging, and trail observation. Every onboarding flow, friction log, support interaction, and piece of user-facing guidance passes through the Sherpa.</p>
-            </div>
-        </section>
-
-        <!-- Agent Details -->
-        <section class="section section--alt">
-            <div class="container">
-                <h2 class="section__title">Details</h2>
-                <div class="features-grid features-grid--2">
-                    <div class="card">
-                        <h3 class="card__title">Email</h3>
-                        <p class="card__text"><a href="mailto:sherpa.explorer@sgraph.ai">sherpa.explorer@sgraph.ai</a></p>
-                    </div>
-                    <div class="card">
-                        <h3 class="card__title">Active Since</h3>
-                        <p class="card__text">v0.5.x</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Public Keys -->
-        <section class="section">
-            <div class="container">
-                <h2 class="section__title">Public Keys</h2>
-                <p class="section__subtitle">Use these keys to verify the Sherpa's identity and encrypt messages to this agent.</p>
-
-                <div class="card card--feature" style="margin-bottom: 2rem;">
-                    <h3 class="card__title">Ed25519 Public Key</h3>
-                    <pre class="card__code" id="sherpa-ed25519">ssh-ed25519 AAAA[placeholder — key generation pending]</pre>
-                    <button class="btn btn-secondary" onclick="copyKey('sherpa-ed25519')">Copy</button>
-                    <p class="card__meta" style="margin-top: 0.5rem;">Key generation pending &mdash; will be published when PKI infrastructure is deployed.</p>
-                </div>
-
-                <div class="card card--feature">
-                    <h3 class="card__title">PGP Public Key</h3>
-                    <pre class="card__code" id="sherpa-pgp">[Key generation pending — will be published when PKI infrastructure is deployed]</pre>
-                    <button class="btn btn-secondary" onclick="copyKey('sherpa-pgp')">Copy</button>
-                    <a href="./key.asc" class="btn btn-secondary" style="margin-left: 0.5rem;">Download .asc</a>
-                    <p class="card__meta" style="margin-top: 0.5rem;">PGP key generation pending.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Action -->
-        <section class="section section--alt">
-            <div class="container">
-                <h2 class="section__title">Send a file to the Sherpa</h2>
-                <p class="section__subtitle">Use SG/Send to share encrypted files directly with this agent.</p>
-                <a href="https://send.sgraph.ai" class="btn btn-primary btn-lg">Send via SG/Send &rarr;</a>
-            </div>
-        </section>
-
-    </main>
-
-    <footer class="site-footer">
-        <div class="site-footer__inner">
-            <div class="site-footer__links">
-                <a href="https://send.sgraph.ai">send.sgraph.ai</a>
-                <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send">GitHub</a>
-                <a href="../../contact/">Contact</a>
-            </div>
-            <button class="btn-contact-sherpa" onclick="openContactModal()">
-                Got a question? Email the Sherpa
-            </button>
-            <p class="site-footer__copy">&copy; 2026 SGraph AI</p>
-        </div>
-    </footer>
-
-    <!-- Contact Modal -->
-    <div id="contact-modal" class="modal-overlay" style="display: none;">
-        <div class="modal">
-            <button class="modal__close" onclick="closeContactModal()">&times;</button>
-            <h2 class="modal__title">Send a message to the Sherpa</h2>
-            <form id="contact-form" class="contact-form">
-                <div class="form-group">
-                    <label for="contact-message">Message</label>
-                    <textarea id="contact-message" name="message" required minlength="10" maxlength="5000" rows="5" placeholder="What would you like to know?"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="contact-email">Your email <span class="form-optional">(optional)</span></label>
-                    <input type="email" id="contact-email" name="email" placeholder="you@example.com">
-                    <p class="form-hint">Add your email if you'd like a reply &mdash; we read every message.</p>
-                </div>
-                <div class="form-group">
-                    <label for="contact-screenshot">Screenshot <span class="form-optional">(optional)</span></label>
-                    <input type="file" id="contact-screenshot" name="screenshot" accept="image/*">
-                </div>
-                <input type="hidden" name="page" value="/agents/sherpa/">
-                <button type="submit" class="btn btn-primary">Send</button>
-            </form>
-            <p class="modal__info">Your message goes to sherpa@sgraph.ai</p>
-        </div>
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <header class="site-header">
+    <div class="container">
+      <a href="../../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../../product/">Product</a>
+        <a href="../" class="active">Team</a>
+        <a href="../../architecture/">Architecture</a>
+      </nav>
     </div>
+  </header>
 
-    <script src="../../js/contact-form.js"></script>
-    <script>
-    function copyKey(elementId) {
-        const text = document.getElementById(elementId).textContent;
-        navigator.clipboard.writeText(text).then(() => {
-            const btn = document.getElementById(elementId).nextElementSibling;
-            const original = btn.textContent;
-            btn.textContent = 'Copied!';
-            setTimeout(() => { btn.textContent = original; }, 2000);
-        });
-    }
-    </script>
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <p class="text-secondary mb-4"><a href="../">&larr; Back to Team</a></p>
+        <h1 class="display">Sherpa</h1>
+        <p class="lead">
+          The Sherpa guides individual users through the product and owns onboarding,
+          friction logging, and trail observation. Every onboarding flow, support interaction,
+          and piece of user-facing guidance passes through the Sherpa.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ROLE OVERVIEW
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2>What the Sherpa Does</h2>
+          <p>The Sherpa is the first point of contact for anyone who needs help with SG/Send.</p>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="card">
+            <h3 class="card__title">User Onboarding</h3>
+            <p class="card__desc">
+              Designs and maintains the first-time user experience. From landing on the site
+              to completing a first encrypted file transfer, the Sherpa owns every step
+              of the journey.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Friction Logging</h3>
+            <p class="card__desc">
+              Identifies and documents every point where users get stuck, confused, or drop off.
+              Friction logs are filed as issues and prioritised for the Dev and Designer agents.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Trail Observation</h3>
+            <p class="card__desc">
+              Monitors how users navigate the product. Which paths do they take?
+              Where do they hesitate? The Sherpa turns usage patterns into
+              product improvement recommendations.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Support &amp; Guidance</h3>
+            <p class="card__desc">
+              Answers questions about encryption, file transfers, vaults, and data rooms.
+              The Sherpa explains zero-knowledge concepts in plain language
+              that anyone can understand.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         DETAILS
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2>Details</h2>
+        </div>
+
+        <div class="grid grid--3">
+          <div class="card">
+            <h3 class="card__title">Email</h3>
+            <p class="card__desc"><a href="mailto:sherpa.explorer@sgraph.ai">sherpa.explorer@sgraph.ai</a></p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Active Since</h3>
+            <p class="card__desc">v0.5.x</p>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Team</h3>
+            <p class="card__desc">Explorer Team (Genesis &rarr; Custom-Built)</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         PUBLIC KEYS
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2>Public Keys</h2>
+          <p>Use these keys to verify the Sherpa's identity and encrypt messages to this agent.</p>
+        </div>
+
+        <div class="callout">
+          Key generation pending &mdash; public keys will be published when PKI infrastructure is deployed.
+          See <a href="./../../agents/keys.json">keys.json</a> for the machine-readable directory.
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         CTA
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2>Send a file to the Sherpa</h2>
+          <p>Use SG/Send to share encrypted files directly with this agent.</p>
+        </div>
+        <div class="text-center">
+          <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg">Send via SG/Send &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p>AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../../architecture/">Architecture</a></li>
+            <li><a href="../">Team</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <ul>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
 </body>
 </html>

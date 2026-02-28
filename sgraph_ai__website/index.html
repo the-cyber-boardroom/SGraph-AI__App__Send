@@ -22,9 +22,8 @@
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
       <nav class="site-nav" aria-label="Main navigation">
         <a href="./product/">Product</a>
-        <a href="./agents/">Agents</a>
+        <a href="./agents/">Team</a>
         <a href="./architecture/">Architecture</a>
-        <a href="./contact/">Contact</a>
       </nav>
     </div>
   </header>
@@ -45,7 +44,7 @@
         </p>
         <div class="hero-ctas">
           <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg">Try SG/Send &rarr;</a>
-          <a href="./agents/" class="btn btn-secondary btn--lg">Meet the Agents &rarr;</a>
+          <a href="./agents/" class="btn btn-secondary btn--lg">Meet the Team &rarr;</a>
         </div>
       </div>
     </section>
@@ -167,7 +166,7 @@
         </div>
 
         <div class="text-center mt-8">
-          <a href="./agents/" class="btn btn-secondary">View All Agents &rarr;</a>
+          <a href="./agents/" class="btn btn-secondary">View All Team Members &rarr;</a>
         </div>
       </div>
     </section>
@@ -232,7 +231,7 @@
           <ul>
             <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
             <li><a href="./architecture/">Architecture</a></li>
-            <li><a href="./agents/">Agents</a></li>
+            <li><a href="./agents/">Team</a></li>
           </ul>
         </div>
 
@@ -246,7 +245,6 @@
         <div class="footer-col">
           <h4>Connect</h4>
           <ul>
-            <li><a href="./contact/">Contact</a></li>
             <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
           </ul>
         </div>
@@ -254,45 +252,10 @@
 
       <div class="footer-bottom">
         <p>&copy; 2026 SGraph AI. All rights reserved.</p>
-        <button class="btn btn-sherpa btn--sm" onclick="openContactModal()">Got a question? Email the Sherpa</button>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm">Got a question? Email the Sherpa</a>
       </div>
     </div>
   </footer>
 
-  <!-- ============================================================
-       CONTACT MODAL
-       ============================================================ -->
-  <div id="contact-modal" class="modal-overlay" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
-    <div class="modal">
-      <div class="modal__header">
-        <h2 class="modal__title" id="modal-title">Contact the Sherpa</h2>
-        <button class="modal__close" onclick="closeContactModal()" aria-label="Close modal">&times;</button>
-      </div>
-      <div class="modal__body">
-        <p class="text-secondary mb-6">Your message goes to <strong>sherpa@sgraph.ai</strong> &mdash; our Sherpa guides users and answers questions.</p>
-        <form id="contact-form-modal" novalidate>
-          <input type="hidden" name="page" value="/">
-          <div class="form-group">
-            <label class="form-label" for="modal-message">Message <span class="text-accent">*</span></label>
-            <textarea class="form-textarea" id="modal-message" name="message" placeholder="What can we help you with?" required minlength="10" maxlength="5000" rows="5"></textarea>
-            <p class="form-hint">10 &ndash; 5,000 characters</p>
-            <p class="form-error hidden" id="modal-message-error"></p>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="modal-email">Email <span class="text-secondary">(optional)</span></label>
-            <input class="form-input" type="email" id="modal-email" name="email" placeholder="you@example.com">
-            <p class="form-error hidden" id="modal-email-error"></p>
-          </div>
-          <div id="modal-alert" class="hidden"></div>
-        </form>
-      </div>
-      <div class="modal__footer">
-        <button class="btn btn-ghost" onclick="closeContactModal()">Cancel</button>
-        <button class="btn btn-primary" type="submit" form="contact-form-modal">Send Message</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="./js/contact-form.js"></script>
 </body>
 </html>

@@ -12,15 +12,15 @@
 </head>
 <body class="theme-aurora">
     <header class="site-header">
-        <div class="site-header__inner">
-            <a href="../" class="site-logo">
+        <div class="container">
+            <a href="../" class="site-logo" aria-label="SGraph AI Home">
                 <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
             </a>
-            <nav class="site-nav">
-                <a href="./" class="site-nav__link site-nav__link--active">Product</a>
-                <a href="../agents/" class="site-nav__link">Agents</a>
-                <a href="../architecture/" class="site-nav__link">Architecture</a>
-                <a href="../contact/" class="site-nav__link">Contact</a>
+            <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+            <nav class="site-nav" aria-label="Main navigation">
+                <a href="./" class="active">Product</a>
+                <a href="../agents/">Team</a>
+                <a href="../architecture/">Architecture</a>
             </nav>
         </div>
     </header>
@@ -227,45 +227,39 @@
     </main>
 
     <footer class="site-footer">
-        <div class="site-footer__inner">
-            <div class="site-footer__links">
-                <a href="https://send.sgraph.ai">send.sgraph.ai</a>
-                <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send">GitHub</a>
-                <a href="../contact/">Contact</a>
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="../" class="site-logo">
+                        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+                    </a>
+                    <p>AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+                        <li><a href="../architecture/">Architecture</a></li>
+                        <li><a href="../agents/">Team</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Open Source</h4>
+                    <ul>
+                        <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Connect</h4>
+                    <ul>
+                        <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+                    </ul>
+                </div>
             </div>
-            <button class="btn-contact-sherpa" onclick="openContactModal()">
-                Got a question? Email the Sherpa
-            </button>
-            <p class="site-footer__copy">&copy; 2026 SGraph AI</p>
+            <div class="footer-bottom">
+                <p>&copy; 2026 SGraph AI. All rights reserved.</p>
+            </div>
         </div>
     </footer>
-
-    <!-- Contact Modal -->
-    <div id="contact-modal" class="modal-overlay" style="display: none;">
-        <div class="modal">
-            <button class="modal__close" onclick="closeContactModal()">&times;</button>
-            <h2 class="modal__title">Send a message to the Sherpa</h2>
-            <form id="contact-form" class="contact-form">
-                <div class="form-group">
-                    <label for="contact-message">Message</label>
-                    <textarea id="contact-message" name="message" required minlength="10" maxlength="5000" rows="5" placeholder="What would you like to know?"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="contact-email">Your email <span class="form-optional">(optional)</span></label>
-                    <input type="email" id="contact-email" name="email" placeholder="you@example.com">
-                    <p class="form-hint">Add your email if you'd like a reply &mdash; we read every message.</p>
-                </div>
-                <div class="form-group">
-                    <label for="contact-screenshot">Screenshot <span class="form-optional">(optional)</span></label>
-                    <input type="file" id="contact-screenshot" name="screenshot" accept="image/*">
-                </div>
-                <input type="hidden" name="page" value="/product/">
-                <button type="submit" class="btn btn-primary">Send</button>
-            </form>
-            <p class="modal__info">Your message goes to sherpa@sgraph.ai</p>
-        </div>
-    </div>
-
-    <script src="../js/contact-form.js"></script>
 </body>
 </html>
