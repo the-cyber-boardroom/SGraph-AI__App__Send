@@ -6,7 +6,7 @@ name: Deploy Website - sgraph.ai
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - 'sgraph_ai__website/**'
       - 'scripts/deploy_static_site.py'
