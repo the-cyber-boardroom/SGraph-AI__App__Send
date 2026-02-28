@@ -70,7 +70,7 @@ jobs:
             --source-dir ${{ env.WEBSITE_DIR }} \
             --bucket ${{ secrets.WEBSITE_S3_BUCKET }} \
             --region ${{ env.AWS_REGION }} \
-            --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} \
+            --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }} \
             --smoke-test-url "https://sgraph.ai"
 
       - name: Store CI artifacts

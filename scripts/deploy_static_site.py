@@ -375,8 +375,9 @@ def parse_args():
     )
     parser.add_argument(
         "--cloudfront-distribution-id",
-        default=os.environ.get("CLOUDFRONT_DIST", ""),
-        help="CloudFront distribution ID for cache invalidation. Default: $CLOUDFRONT_DIST",
+        nargs="+",
+        default=[],
+        help="CloudFront distribution ID(s) for cache invalidation. Multiple IDs can be provided.",
     )
     parser.add_argument(
         "--smoke-test-url",
@@ -435,8 +436,8 @@ def main():
         ifd_path = version_to_ifd_path(args.version)
         print(f"\n[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/releases/{ifd_path}/")
         print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/latest/")
-        if args.cloudfront_distribution_id:
-            print(f"[dry-run] Would invalidate CloudFront {args.cloudfront_distribution_id}")
+        for dist_id in args.cloudfront_distribution_id:
+            print(f"[dry-run] Would invalidate CloudFront {dist_id}")
         print("\nDry run complete.")
         sys.exit(0)
 
@@ -444,7 +445,8 @@ def main():
     deploy_to_s3(source_dir, bucket, args.site, args.version)
 
     # --- CloudFront ---
-    invalidate_cloudfront(args.cloudfront_distribution_id)
+    for dist_id in args.cloudfront_distribution_id:
+        invalidate_cloudfront(dist_id)
 
     # --- Smoke test ---
     if args.smoke_test_url:
