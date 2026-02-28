@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful — SG/Send</title>
+  <meta name="description" content="Your SG/Send credit purchase was successful. You'll receive your access token via email shortly.">
+  <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+  <link rel="stylesheet" href="../../fonts/fonts.css">
+  <link rel="stylesheet" href="../../css/style.css">
+  <style>
+    .success-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-card);
+      padding: var(--sp-8);
+      max-width: 560px;
+      margin-inline: auto;
+      text-align: center;
+    }
+
+    .success-card__icon {
+      font-size: 3rem;
+      margin-bottom: var(--sp-4);
+    }
+
+    .success-card__title {
+      font-size: var(--fs-h1);
+      color: var(--text-heading);
+      margin-bottom: var(--sp-4);
+    }
+
+    .success-card__message {
+      color: var(--text-secondary);
+      font-size: 1.05rem;
+      margin-bottom: var(--sp-6);
+      line-height: 1.7;
+    }
+
+    .next-steps {
+      text-align: left;
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-btn);
+      padding: var(--sp-6);
+      margin-bottom: var(--sp-6);
+    }
+
+    .next-steps__title {
+      font-size: var(--fs-h3);
+      color: var(--text-heading);
+      margin-bottom: var(--sp-4);
+    }
+
+    .next-steps ol {
+      counter-reset: next-step;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-3);
+    }
+
+    .next-steps li {
+      counter-increment: next-step;
+      display: flex;
+      gap: var(--sp-3);
+      align-items: baseline;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+    }
+
+    .next-steps li::before {
+      content: counter(next-step) '.';
+      color: var(--accent);
+      font-weight: var(--fw-bold);
+      flex-shrink: 0;
+    }
+
+    .success-actions {
+      display: flex;
+      gap: var(--sp-4);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body class="theme-aurora">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <header class="site-header">
+    <div class="container">
+      <a href="../../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../../product/">Product</a>
+        <a href="../../agents/">Team</a>
+        <a href="../../architecture/">Architecture</a>
+        <a href="../../pricing/">Pricing</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         SUCCESS MESSAGE
+         ============================================================ -->
+    <section class="section" style="padding-block: var(--sp-24) var(--sp-16);">
+      <div class="container">
+        <div class="success-card">
+          <div class="success-card__icon">&#10003;</div>
+          <h1 class="success-card__title">Payment successful</h1>
+          <p class="success-card__message">
+            Thank you for purchasing SG/Send credits.
+            A receipt has been sent to your email by Stripe.
+          </p>
+
+          <div class="next-steps">
+            <h2 class="next-steps__title">What happens next</h2>
+            <ol>
+              <li>We'll create your access token (typically within a few hours)</li>
+              <li>You'll receive an email from Sherpa with your token and instructions</li>
+              <li>Visit <a href="https://send.sgraph.ai">send.sgraph.ai</a> and start sending encrypted files</li>
+            </ol>
+          </div>
+
+          <div class="success-actions">
+            <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg">Go to SG/Send &rarr;</a>
+            <a href="../../pricing/" class="btn btn-secondary btn--lg">Back to Pricing</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p>AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../../pricing/">Pricing</a></li>
+            <li><a href="../../architecture/">Architecture</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Connect</h4>
+          <ul>
+            <li><a href="../../contact/">Contact</a></li>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>&copy; 2026 SGraph AI. Operated by The Cyber Boardroom Ltd.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
