@@ -1,0 +1,82 @@
+name: Deploy Website - sgraph.ai
+
+# v0.7.6 architecture: GitHub Actions is the trigger and executor.
+# All deployment logic lives in Python scripts under scripts/.
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'sgraph_ai__website/**'
+      - 'scripts/deploy_static_site.py'
+      - 'scripts/store_ci_artifacts.py'
+      - 'scripts/generate_i18n_pages.py'
+      - '.github/workflows/deploy-website.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: "website-deploy"
+  cancel-in-progress: false
+
+env:
+  AWS_REGION  : eu-west-2
+  WEBSITE_DIR : sgraph_ai__website
+  SITE_NAME   : sgraph-ai
+
+jobs:
+  deploy:
+    name: Deploy to S3 + CloudFront
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region            : ${{ env.AWS_REGION }}
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat sgraph_ai_app_send/version)" >> $GITHUB_OUTPUT
+
+      - name: Generate i18n locale pages
+        run: python scripts/generate_i18n_pages.py
+
+      - name: Deploy static site
+        run: |
+          python scripts/deploy_static_site.py \
+            --site ${{ env.SITE_NAME }} \
+            --version ${{ steps.version.outputs.version }} \
+            --source-dir ${{ env.WEBSITE_DIR }} \
+            --bucket ${{ secrets.WEBSITE_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }} \
+            --smoke-test-url "https://sgraph.ai"
+
+      - name: Store CI artifacts
+        run: |
+          python scripts/store_ci_artifacts.py \
+            --version ${{ steps.version.outputs.version }} \
+            --bucket ${{ secrets.WEBSITE_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --site ${{ env.SITE_NAME }}

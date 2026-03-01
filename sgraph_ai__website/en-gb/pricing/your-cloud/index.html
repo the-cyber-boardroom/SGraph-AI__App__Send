@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Cloud Account — SG/Send</title>
+  <meta name="i18n-title-key" content="pricing.yourcloudpage.page.title">
+  <meta name="description" content="Deploy SG/Send in your own AWS, GCP, or Azure account. Free from us — you pay your cloud provider directly.">
+  <meta name="theme-color" content="#1A1A2E">
+  <link rel="icon" type="image/svg+xml" href="../../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../../_common/css/style.css">
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <header class="site-header">
+    <div class="container">
+      <a href="../../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../../product/" data-i18n="nav.product">Product</a>
+        <a href="../../agents/" data-i18n="nav.team">Team</a>
+        <a href="../../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="../" class="active" data-i18n="nav.pricing">Pricing</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <p><a href="../" class="text-secondary" data-i18n="pricing.yourcloudpage.hero.back">&larr; Back to Pricing</a></p>
+        <h1 class="display" data-i18n="pricing.yourcloudpage.hero.title">Deploy in Your Cloud Account</h1>
+        <p class="lead" data-i18n="pricing.yourcloudpage.hero.lead">
+          Run SG/Send in your own AWS, GCP, or Azure account. Free from us &mdash; you pay your cloud provider directly.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         HOW IT WORKS
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.yourcloudpage.howitworks.title">How It Works</h2>
+        </div>
+
+        <div class="grid grid--3">
+
+          <div class="card">
+            <h3 class="card__title" data-i18n="pricing.yourcloudpage.howitworks.infra.title">Your Infrastructure</h3>
+            <p class="card__desc" data-i18n="pricing.yourcloudpage.howitworks.infra.desc">
+              Deploy in your AWS account with your own S3 buckets, Lambda functions, and CloudFront distribution.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3 class="card__title" data-i18n="pricing.yourcloudpage.howitworks.billing.title">Your Billing</h3>
+            <p class="card__desc" data-i18n="pricing.yourcloudpage.howitworks.billing.desc">
+              Pay your cloud provider directly. No additional fees from SG/Send.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3 class="card__title" data-i18n="pricing.yourcloudpage.howitworks.isolation.title">Full Isolation</h3>
+            <p class="card__desc" data-i18n="pricing.yourcloudpage.howitworks.isolation.desc">
+              Nothing touches SG/Send infrastructure. Complete data sovereignty.
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         DEPLOYMENT OPTIONS
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.yourcloudpage.options.title">Deployment Options</h2>
+          <p data-i18n="pricing.yourcloudpage.options.subtitle">Choose the installation method that suits your workflow.</p>
+        </div>
+
+        <div class="grid grid--2">
+
+          <div class="card">
+            <h3 class="card__title" data-i18n="pricing.yourcloudpage.options.pypi.title">PyPI Packages</h3>
+            <p class="card__desc" data-i18n="pricing.yourcloudpage.options.pypi.desc">
+              Install SG/Send as a Python package from PyPI. Ideal for integrating into existing Python environments and CI/CD pipelines.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3 class="card__title" data-i18n="pricing.yourcloudpage.options.source.title">Source Code from GitHub</h3>
+            <p class="card__desc" data-i18n="pricing.yourcloudpage.options.source.desc">
+              Clone the repository and build from source. Full control over customisation and deployment configuration.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3 class="card__title" data-i18n="pricing.yourcloudpage.options.aws.title">AWS Deployment Guide</h3>
+            <p class="card__desc" data-i18n="pricing.yourcloudpage.options.aws.desc">
+              Deploy to Lambda with S3 storage and CloudFront CDN. Production-ready infrastructure in your AWS account.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3 class="card__title" data-i18n="pricing.yourcloudpage.options.docker.title">Docker Deployment</h3>
+            <p class="card__desc" data-i18n="pricing.yourcloudpage.options.docker.desc">
+              Run SG/Send as a Docker container. Works with Fargate, GCP Cloud Run, Kubernetes, or any container runtime.
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         CTA
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container text-center">
+        <h2 data-i18n="pricing.yourcloudpage.cta.title">Need deployment support?</h2>
+        <div style="margin-top: var(--sp-6);">
+          <a href="mailto:sherpa@sgraph.ai" class="btn btn-primary btn--lg" data-i18n="pricing.yourcloudpage.cta.sherpa">Email the Sherpa &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="../../agents/" data-i18n="footer.team">Team</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>

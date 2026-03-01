@@ -207,3 +207,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 tests/unit/lambda__admin/server_analytics/aws/cloud_front/_cf_cache
+
+# Generated i18n locale pages (built in CI, pushed to S3)
+sgraph_ai__website/pt-pt/
+sgraph_ai__website/pt-br/
+sgraph_ai__website/tlh/

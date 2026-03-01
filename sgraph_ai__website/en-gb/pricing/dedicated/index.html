@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SG/Send Cloud — Dedicated</title>
+  <meta name="i18n-title-key" content="pricing.dedicatedpage.page.title">
+  <meta name="description" content="SG/Send Cloud dedicated single-tenant deployment — isolated infrastructure managed by us. Your own S3, Lambda, and CloudFront.">
+  <meta name="theme-color" content="#1A1A2E">
+  <link rel="icon" type="image/svg+xml" href="../../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../../_common/css/style.css">
+  <style>
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-2);
+      color: var(--accent);
+      font-size: var(--fs-small);
+      font-weight: var(--fw-medium);
+      text-decoration: none;
+      margin-bottom: var(--sp-6);
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--sp-6);
+    }
+
+    @media (max-width: 768px) {
+      .why-grid {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        margin-inline: auto;
+      }
+    }
+
+    .why-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-card);
+      padding: var(--sp-8) var(--sp-6);
+      transition: border-color var(--transition-normal), transform var(--transition-normal);
+    }
+
+    .why-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .why-card h3 {
+      color: var(--accent);
+      margin-bottom: var(--sp-3);
+    }
+
+    .why-card p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      text-align: left;
+      padding: var(--sp-4) var(--sp-6);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .comparison-table th {
+      color: var(--text-heading);
+      font-weight: var(--fw-bold);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background-color: rgba(78, 205, 196, 0.06);
+    }
+
+    .comparison-table td {
+      color: var(--text-primary);
+      font-size: 0.95rem;
+    }
+
+    .comparison-table td:first-child {
+      font-weight: var(--fw-medium);
+      color: var(--text-heading);
+    }
+
+    .comparison-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .comparison-table .highlight {
+      color: var(--accent);
+      font-weight: var(--fw-bold);
+    }
+
+    @media (max-width: 640px) {
+      .comparison-table th,
+      .comparison-table td {
+        padding: var(--sp-3) var(--sp-4);
+        font-size: 0.85rem;
+      }
+    }
+  </style>
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <header class="site-header">
+    <div class="container">
+      <a href="../../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../../product/" data-i18n="nav.product">Product</a>
+        <a href="../../agents/" data-i18n="nav.team">Team</a>
+        <a href="../../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="../" class="active" data-i18n="nav.pricing">Pricing</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <a href="../" class="back-link" data-i18n="pricing.dedicatedpage.hero.back">&larr; Back to Pricing</a>
+        <h1 class="display" data-i18n="pricing.dedicatedpage.hero.title">SG/Send Cloud &mdash; Dedicated</h1>
+        <p class="lead" data-i18n="pricing.dedicatedpage.hero.lead">
+          Isolated infrastructure managed by us. Your own S3, Lambda, and CloudFront in SG/Send&rsquo;s AWS account.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         WHY DEDICATED?
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.dedicatedpage.why.title">Why Dedicated?</h2>
+        </div>
+
+        <div class="why-grid">
+          <div class="why-card">
+            <h3 data-i18n="pricing.dedicatedpage.why.compliance_title">Compliance</h3>
+            <p data-i18n="pricing.dedicatedpage.why.compliance_desc">Some regulated industries require dedicated infrastructure. Single-tenant means your encrypted data is in infrastructure no other customer shares.</p>
+          </div>
+
+          <div class="why-card">
+            <h3 data-i18n="pricing.dedicatedpage.why.domain_title">Custom Domain</h3>
+            <p data-i18n="pricing.dedicatedpage.why.domain_desc">Your own domain (send.customer.com), custom branding and logo. Your users see your brand, not ours.</p>
+          </div>
+
+          <div class="why-card">
+            <h3 data-i18n="pricing.dedicatedpage.why.sla_title">Custom SLA</h3>
+            <p data-i18n="pricing.dedicatedpage.why.sla_desc">Dedicated support, custom service level agreements, priority response. We tailor the support model to your requirements.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         WHAT'S DIFFERENT — COMPARISON TABLE
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.dedicatedpage.compare.title">What&rsquo;s Different</h2>
+          <p data-i18n="pricing.dedicatedpage.compare.subtitle">Both use the same zero-knowledge encryption. The difference is in infrastructure isolation, customisation, and support.</p>
+        </div>
+
+        <div style="max-width: 800px; margin-inline: auto; overflow-x: auto;">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th data-i18n="pricing.dedicatedpage.compare.col_feature">Feature</th>
+                <th data-i18n="pricing.dedicatedpage.compare.col_shared">Shared</th>
+                <th data-i18n="pricing.dedicatedpage.compare.col_dedicated">Dedicated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-i18n="pricing.dedicatedpage.compare.row_infra">Infrastructure</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_infra_shared">Multi-tenant (shared)</td>
+                <td class="highlight" data-i18n="pricing.dedicatedpage.compare.row_infra_dedicated">Single-tenant (isolated)</td>
+              </tr>
+              <tr>
+                <td data-i18n="pricing.dedicatedpage.compare.row_storage">Storage</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_storage_shared">Shared S3 buckets</td>
+                <td class="highlight" data-i18n="pricing.dedicatedpage.compare.row_storage_dedicated">Dedicated S3, Lambda, CloudFront</td>
+              </tr>
+              <tr>
+                <td data-i18n="pricing.dedicatedpage.compare.row_domain">Domain</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_domain_shared">send.sgraph.ai</td>
+                <td class="highlight" data-i18n="pricing.dedicatedpage.compare.row_domain_dedicated">Your custom domain</td>
+              </tr>
+              <tr>
+                <td data-i18n="pricing.dedicatedpage.compare.row_branding">Branding</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_branding_shared">SG/Send branding</td>
+                <td class="highlight" data-i18n="pricing.dedicatedpage.compare.row_branding_dedicated">Your brand, your logo</td>
+              </tr>
+              <tr>
+                <td data-i18n="pricing.dedicatedpage.compare.row_support">Support</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_support_shared">Email (Sherpa)</td>
+                <td class="highlight" data-i18n="pricing.dedicatedpage.compare.row_support_dedicated">Dedicated support, priority response</td>
+              </tr>
+              <tr>
+                <td data-i18n="pricing.dedicatedpage.compare.row_sla">SLA</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_sla_shared">Best effort</td>
+                <td class="highlight" data-i18n="pricing.dedicatedpage.compare.row_sla_dedicated">Custom SLA</td>
+              </tr>
+              <tr>
+                <td data-i18n="pricing.dedicatedpage.compare.row_pricing">Pricing</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_pricing_shared">&pound;5 / 500 transfers</td>
+                <td class="highlight" data-i18n="pricing.dedicatedpage.compare.row_pricing_dedicated">Custom pricing</td>
+              </tr>
+              <tr>
+                <td data-i18n="pricing.dedicatedpage.compare.row_encryption">Encryption</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_encryption_shared">Zero-knowledge AES-256-GCM</td>
+                <td data-i18n="pricing.dedicatedpage.compare.row_encryption_dedicated">Zero-knowledge AES-256-GCM</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         CTA
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container text-center">
+        <h2 data-i18n="pricing.dedicatedpage.cta.title">Need dedicated infrastructure?</h2>
+        <p class="lead" style="margin-bottom: var(--sp-8);" data-i18n="pricing.dedicatedpage.cta.desc">Contact us to discuss your requirements, compliance needs, and custom pricing.</p>
+        <a href="mailto:sherpa@sgraph.ai?subject=SG%2FSend%20Dedicated%20%E2%80%94%20Pricing%20Enquiry" class="btn btn-primary btn--lg" data-i18n="pricing.dedicatedpage.cta.button">Contact Us for Pricing &rarr;</a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="../../agents/" data-i18n="footer.team">Team</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>

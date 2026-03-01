@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join the Early Access Programme — SG/Send</title>
+  <meta name="description" content="Get free access to SG/Send, the zero-knowledge encrypted file sharing platform. No payment required. Sign up and start sending encrypted files today.">
+  <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+  <style>
+    /* EAP page styles */
+    .eap-form-card {
+      background-color: var(--bg-surface);
+      border: 2px solid var(--accent);
+      border-radius: var(--radius-card);
+      padding: var(--sp-8);
+      max-width: 480px;
+      margin-inline: auto;
+      box-shadow: 0 0 0 1px var(--accent), var(--shadow-card);
+    }
+
+    .eap-form-card__title {
+      font-size: var(--fs-h2);
+      color: var(--text-heading);
+      margin-bottom: var(--sp-2);
+      text-align: center;
+    }
+
+    .eap-form-card__subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      text-align: center;
+      margin-bottom: var(--sp-6);
+    }
+
+    .eap-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-4);
+    }
+
+    .eap-form .form-input {
+      padding: var(--sp-4);
+      font-size: 1rem;
+    }
+
+    .eap-form .btn {
+      padding: var(--sp-4);
+      font-size: 1.05rem;
+    }
+
+    .eap-form__hint {
+      font-size: var(--fs-small);
+      color: var(--text-secondary);
+      text-align: center;
+      margin-top: var(--sp-2);
+    }
+
+    .eap-benefits {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--sp-6);
+    }
+
+    @media (max-width: 768px) {
+      .eap-benefits {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .eap-benefit {
+      display: flex;
+      gap: var(--sp-4);
+      align-items: flex-start;
+    }
+
+    .eap-benefit__icon {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(78, 205, 196, 0.12);
+      border-radius: 50%;
+      font-size: 1.2rem;
+    }
+
+    .eap-benefit__text h3 {
+      font-size: 1rem;
+      margin-bottom: var(--sp-1);
+    }
+
+    .eap-benefit__text p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .eap-steps {
+      counter-reset: eap-step;
+      max-width: 560px;
+      margin-inline: auto;
+    }
+
+    .eap-step {
+      display: flex;
+      gap: var(--sp-4);
+      align-items: flex-start;
+      padding-block: var(--sp-4);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .eap-step:last-child {
+      border-bottom: none;
+    }
+
+    .eap-step__number {
+      counter-increment: eap-step;
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(78, 205, 196, 0.12);
+      color: var(--accent);
+      font-family: var(--font-display);
+      font-weight: var(--fw-bold);
+      font-size: 0.9rem;
+      border-radius: 50%;
+    }
+
+    .eap-step__number::before {
+      content: counter(eap-step);
+    }
+
+    .eap-step__content h3 {
+      font-size: 1rem;
+      margin-bottom: var(--sp-1);
+    }
+
+    .eap-step__content p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <header class="site-header">
+    <div class="container">
+      <a href="../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../product/" data-i18n="nav.product">Product</a>
+        <a href="../agents/" data-i18n="nav.team">Team</a>
+        <a href="../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="../pricing/" data-i18n="nav.pricing">Pricing</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <h1 class="display" data-i18n="eap.hero.title">Join the Early Access Programme</h1>
+        <p class="lead" data-i18n="eap.hero.subtitle">
+          Get free access to SG/Send — zero-knowledge encrypted file sharing.
+          No payment required. No credit card needed.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SIGNUP FORM
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="eap-form-card">
+          <h2 class="eap-form-card__title" data-i18n="eap.form.title">Sign up for free</h2>
+          <p class="eap-form-card__subtitle" data-i18n="eap.form.subtitle">We'll send you an access token within 48 hours.</p>
+
+          <form class="eap-form launchlist-form" action="https://getlaunchlist.com/s/zSa8gI" method="POST">
+            <input
+              class="form-input"
+              type="text"
+              name="name"
+              placeholder="Name"
+              data-i18n-placeholder="eap.form.name_placeholder"
+              autocomplete="name"
+            >
+            <input
+              class="form-input"
+              type="email"
+              name="email"
+              placeholder="Email"
+              data-i18n-placeholder="eap.form.email_placeholder"
+              required
+              autocomplete="email"
+            >
+            <button type="submit" class="btn btn-primary" data-i18n="eap.form.submit">Join Early Access Programme</button>
+          </form>
+          <p class="eap-form__hint" data-i18n="eap.form.hint">Free evaluation credits. Upgrade anytime.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         WHAT YOU GET
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="eap.benefits.title">What you get</h2>
+          <p data-i18n="eap.benefits.subtitle">Full access to the same zero-knowledge encryption used by paying customers.</p>
+        </div>
+
+        <div class="eap-benefits">
+          <div class="eap-benefit">
+            <div class="eap-benefit__icon">&#128274;</div>
+            <div class="eap-benefit__text">
+              <h3 data-i18n="eap.benefit.encryption.title">Zero-knowledge encryption</h3>
+              <p data-i18n="eap.benefit.encryption.desc">AES-256-GCM encryption in your browser. The server never sees your plaintext data.</p>
+            </div>
+          </div>
+
+          <div class="eap-benefit">
+            <div class="eap-benefit__icon">&#127380;</div>
+            <div class="eap-benefit__text">
+              <h3 data-i18n="eap.benefit.credits.title">Free evaluation credits</h3>
+              <p data-i18n="eap.benefit.credits.desc">Enough credits to fully evaluate the platform. No payment or credit card required.</p>
+            </div>
+          </div>
+
+          <div class="eap-benefit">
+            <div class="eap-benefit__icon">&#9889;</div>
+            <div class="eap-benefit__text">
+              <h3 data-i18n="eap.benefit.instant.title">Quick setup</h3>
+              <p data-i18n="eap.benefit.instant.desc">Receive your access token within 48 hours. No software to install — it works in your browser.</p>
+            </div>
+          </div>
+
+          <div class="eap-benefit">
+            <div class="eap-benefit__icon">&#128640;</div>
+            <div class="eap-benefit__text">
+              <h3 data-i18n="eap.benefit.upgrade.title">Upgrade anytime</h3>
+              <p data-i18n="eap.benefit.upgrade.desc">When you're ready, upgrade to the Starter Pack for just &pound;5 (500 file transfers).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         HOW IT WORKS
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="eap.steps.title">How it works</h2>
+        </div>
+
+        <div class="eap-steps">
+          <div class="eap-step">
+            <div class="eap-step__number"></div>
+            <div class="eap-step__content">
+              <h3 data-i18n="eap.step1.title">Sign up above</h3>
+              <p data-i18n="eap.step1.desc">Enter your name and email. That's all we need.</p>
+            </div>
+          </div>
+
+          <div class="eap-step">
+            <div class="eap-step__number"></div>
+            <div class="eap-step__content">
+              <h3 data-i18n="eap.step2.title">Get your token</h3>
+              <p data-i18n="eap.step2.desc">Our Sherpa will send you an access token within 48 hours.</p>
+            </div>
+          </div>
+
+          <div class="eap-step">
+            <div class="eap-step__number"></div>
+            <div class="eap-step__content">
+              <h3 data-i18n="eap.step3.title">Start sending</h3>
+              <p data-i18n="eap.step3.desc">Visit <a href="https://send.sgraph.ai">send.sgraph.ai</a>, enter your token, and upload encrypted files.</p>
+            </div>
+          </div>
+
+          <div class="eap-step">
+            <div class="eap-step__number"></div>
+            <div class="eap-step__content">
+              <h3 data-i18n="eap.step4.title">Share securely</h3>
+              <p data-i18n="eap.step4.desc">Share the download link and decryption key with your recipient. They decrypt in their browser — zero knowledge, always.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         BOTTOM CTA
+         ============================================================ -->
+    <section class="section">
+      <div class="container" style="text-align: center;">
+        <h2 data-i18n="eap.cta.title">Ready to try zero-knowledge encryption?</h2>
+        <p class="text-secondary mb-6" data-i18n="eap.cta.subtitle">
+          Already have credits? Go straight to SG/Send.
+        </p>
+        <div style="display: flex; gap: var(--sp-4); justify-content: center; flex-wrap: wrap;">
+          <a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" class="btn btn-primary btn--lg" data-i18n="eap.cta.signup">Sign Up Free</a>
+          <a href="https://send.sgraph.ai" class="btn btn-secondary btn--lg" data-i18n="eap.cta.send">Go to SG/Send &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../pricing/" data-i18n="footer.pricing">Pricing</a></li>
+            <li><a href="../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="../contact/" data-i18n="footer.contact">Contact</a></li>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright">&copy; 2026 SGraph AI. Operated by The Cyber Boardroom Ltd.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>

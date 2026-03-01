@@ -10,6 +10,33 @@
 
 ---
 
+## Reality Document — MANDATORY CHECK
+
+**Before describing, assessing, or assuming what SGraph Send can do, READ:**
+
+`team/roles/librarian/reality/v0.6.36__what-exists-today.md`
+
+This is the **code-verified** record of every endpoint, UI page, test, and feature that actually exists. It was built by auditing source code, not briefs or reviews.
+
+### Rules (Non-Negotiable)
+
+1. **If the reality document doesn't list it, it does not exist.** Do not describe proposed features as if they are shipped.
+2. **Proposed features must be labelled.** If you describe something not in the reality document, you MUST write: "PROPOSED — does not exist yet."
+3. **Briefs are aspirations, not facts.** A brief describing user trails, tools, or features does NOT mean those features exist. Always cross-check against the reality document.
+4. **Update the reality document when you change code.** If you add, remove, or change an endpoint, UI page, or test, update the reality document in the same commit.
+5. **Update the reality document when processing briefs.** If a brief mentions new features or goals, check whether they exist and add any missing items to the "DOES NOT EXIST" section.
+6. **Update the reality document when creating debriefs.** Every debrief should reference the reality document and confirm which deliverables are code-verified vs. proposed.
+
+### When to Read It
+
+- **Starting a session** — read it alongside briefs and debriefs
+- **Processing a human brief** — cross-check brief claims against reality
+- **Creating a debrief** — confirm what's real vs. proposed
+- **Writing any review or assessment** — ground your analysis in what exists
+- **Describing features to investors or external audiences** — only claim what's verified
+
+---
+
 ## Team Structure: Explorer and Villager
 
 As of v0.5.8, the project operates with **three teams** based on Wardley Maps methodology:
@@ -189,10 +216,11 @@ Each agent operates as a specific role. Roles produce review documents in their 
 **Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs, Villager briefs, and Town Planner briefs. **IMPORTANT: The `briefs/` folder is read-only for agents.** Only the human creates files there. Agent outputs go to `team/humans/dinis_cruz/claude-code-web/` or `team/roles/{role}/reviews/`.
 
 Before starting work, check:
-1. Latest human brief in `team/humans/dinis_cruz/briefs/`
-2. Latest debrief in `team/humans/dinis_cruz/debriefs/`
-3. Latest Librarian master index in `team/roles/librarian/reviews/`
-4. Your role's previous reviews in `team/roles/{your-role}/reviews/`
+1. **Reality document** at `team/roles/librarian/reality/v0.6.36__what-exists-today.md` — what actually exists in code
+2. Latest human brief in `team/humans/dinis_cruz/briefs/`
+3. Latest debrief in `team/humans/dinis_cruz/debriefs/`
+4. Latest Librarian master index in `team/roles/librarian/reviews/`
+5. Your role's previous reviews in `team/roles/{your-role}/reviews/`
 
 ### Debriefs
 
@@ -200,19 +228,34 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 - **Path:** `team/humans/dinis_cruz/debriefs/MM/DD/{version}__debrief__{topic}.md`
 - **Purpose:** Single document Dinis can read to see what was delivered, what decisions were made, and what to review
-- **Links:** All links must be **relative** to the debrief file. **COUNT THE DIRECTORY DEPTH CAREFULLY.** Debriefs live at `debriefs/MM/DD/file.md` — that's 3 directories deep from `dinis_cruz/`. To link to briefs at `briefs/MM/DD/file.md`, you need `../../../briefs/MM/DD/file.md` (3 levels up to reach `dinis_cruz/`, then down into `briefs/`). Similarly, to link to role reviews at `team/roles/{role}/reviews/`, count from the debrief's directory to the repo root. **Always verify relative links resolve correctly before committing** — use `realpath` or manually trace each `../` level. Common mistake: using `../../` (2 levels) when `../../../` (3 levels) is needed.
+- **Links:** All links must be **relative** to the debrief file and **must work in GitHub's web UI**. **COUNT THE DIRECTORY DEPTH CAREFULLY.** Debriefs live at `team/humans/dinis_cruz/debriefs/MM/DD/file.md` — that's **5 directories deep** from the repo root. Use this reference table:
+
+  | Link target | Levels up | Prefix | Example |
+  |---|---|---|---|
+  | Another debrief (`debriefs/MM/DD/`) | 2 | `../../` | `../../02/14/v0.3.0__debrief__topic.md` |
+  | Briefs (`briefs/MM/DD/`) | 3 + down | `../../../briefs/` | `../../../briefs/02/14/v0.3.2__brief.md` |
+  | Claude-code-web (`claude-code-web/MM/DD/`) | 3 + down | `../../../claude-code-web/` | `../../../claude-code-web/02/14/file.md` |
+  | Role reviews (`team/roles/{role}/reviews/`) | **5** + down | `../../../../../roles/` | `../../../../../roles/architect/reviews/26-03-01/file.md` |
+  | Library (`library/`) | **6** + down | `../../../../../../library/` | `../../../../../../library/docs/specs/README.md` |
+
+  **The most common mistake** is linking to `team/roles/` with only 3 levels (`../../../roles/...`). This resolves to `team/humans/dinis_cruz/roles/...` which does not exist. You need **5 levels** (`../../../../../roles/...`) to reach `team/` and then down into `roles/`.
+
+  **Always verify** relative links resolve correctly before committing — run: `cd team/humans/dinis_cruz/debriefs/MM/DD && ls -la ../../../../../roles/{role}/reviews/YY-MM-DD/filename.md`
 - **When:** Create a debrief whenever a session produces multiple deliverables
 - **Content:** Executive summary, recommended reading order, key decisions, what's next
 
 ---
 
-## Current State (v0.3.0)
+## Current State (v0.6.36)
 
-**Milestone:** End-to-end MVP complete. Full transfer cycle works. Admin UI console shipped. 14 roles active. 111+ tests passing.
+**See `team/roles/librarian/reality/v0.6.36__what-exists-today.md` for the full code-verified picture.**
 
-**Two parallel tracks now active:**
-1. **Explorer track:** Design agency brief, landing page, large file transfer research, Issues FS adoption, new features
+**Summary:** 73 HTTP endpoints (18 User + 55 Admin), 6 User UI pages, 17 Admin components, 393 passing tests, MCP on both Lambdas, full encryption pipeline, data rooms, personal vaults, PKI, audit trails, token management, analytics.
+
+**Three parallel tracks:**
+1. **Explorer track:** New features (rooms, vaults, PKI, MCP), experiments, first versions
 2. **Villager track:** IFD production release, deployment hardening, performance, monitoring, stability
+3. **Town Planner track:** Investor materials, business strategy, Alchemist narratives
 
 ---
 
@@ -220,6 +263,7 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 | Document | Location |
 |---|---|
+| **Reality document** | `team/roles/librarian/reality/v0.6.36__what-exists-today.md` |
 | Project brief | `library/docs/_to_process/01-project-brief.md` |
 | Specs index | `library/docs/specs/README.md` |
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |

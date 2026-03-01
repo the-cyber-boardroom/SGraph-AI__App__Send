@@ -86,6 +86,47 @@ class test_Service__Tokens(TestCase):
         assert result.get('success') is False
         assert result.get('reason')  == 'revoked'
 
+    def test__update_limit(self):
+        self.service.create('svc-update-lim', usage_limit=10, created_by='test')
+        result = self.service.update_limit('svc-update-lim', 100)
+        assert result is not None
+        assert result.get('usage_limit') == 100
+        assert result.get('status')      == 'active'
+
+    def test__update_limit__reactivates_exhausted(self):
+        self.service.create('svc-update-exhaust', usage_limit=1, created_by='test')
+        self.service.use('svc-update-exhaust')
+        token = self.service.lookup('svc-update-exhaust')
+        assert token.get('status') == 'exhausted'
+
+        result = self.service.update_limit('svc-update-exhaust', 50)
+        assert result.get('status')      == 'active'
+        assert result.get('usage_limit') == 50
+
+    def test__update_limit__not_found(self):
+        result = self.service.update_limit('nonexistent-update', 100)
+        assert result is None
+
+    def test__reactivate(self):
+        self.service.create('svc-react', usage_limit=10, created_by='test')
+        self.service.revoke('svc-react')
+        token = self.service.lookup('svc-react')
+        assert token.get('status') == 'revoked'
+
+        result = self.service.reactivate('svc-react')
+        assert result is not None
+        assert result.get('status') == 'active'
+
+    def test__reactivate__already_active(self):
+        self.service.create('svc-react-active', usage_limit=10, created_by='test')
+        result = self.service.reactivate('svc-react-active')
+        assert result is not None
+        assert result.get('status') == 'active'
+
+    def test__reactivate__not_found(self):
+        result = self.service.reactivate('nonexistent-react')
+        assert result is None
+
     def test__list_tokens(self):
         files = self.service.list_tokens()
         assert files is not None

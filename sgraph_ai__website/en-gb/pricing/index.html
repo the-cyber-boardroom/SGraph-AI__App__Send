@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing — SG/Send</title>
+  <meta name="i18n-title-key" content="pricing.page.title">
+  <meta name="description" content="SG/Send pricing — free open-source deployment or hosted cloud service. Zero-knowledge encrypted file sharing for everyone.">
+  <meta name="theme-color" content="#1A1A2E">
+  <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+  <style>
+    /* Pricing-specific styles */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--sp-6);
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .pricing-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .pricing-grid {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        margin-inline: auto;
+      }
+    }
+
+    .pricing-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-card);
+      padding: var(--sp-8) var(--sp-6);
+      text-align: center;
+      transition: border-color var(--transition-normal), transform var(--transition-normal);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pricing-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .pricing-card--featured {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), var(--shadow-card);
+    }
+
+    .pricing-card__badge {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: var(--accent);
+      color: var(--color-navy);
+      font-size: var(--fs-small);
+      font-weight: var(--fw-bold);
+      padding: var(--sp-1) var(--sp-4);
+      border-radius: 100px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .pricing-card__tier {
+      font-size: var(--fs-small);
+      font-weight: var(--fw-medium);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: var(--sp-3);
+    }
+
+    .pricing-card__name {
+      font-size: var(--fs-h3);
+      font-weight: var(--fw-bold);
+      color: var(--text-heading);
+      margin-bottom: var(--sp-2);
+    }
+
+    .pricing-card__price {
+      font-size: var(--fs-h2);
+      font-weight: var(--fw-bold);
+      color: var(--text-heading);
+      line-height: 1.2;
+      margin-bottom: var(--sp-1);
+    }
+
+    .pricing-card__price-note {
+      font-size: var(--fs-small);
+      color: var(--text-secondary);
+      margin-bottom: var(--sp-4);
+    }
+
+    .pricing-card__desc {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: var(--sp-6);
+      flex-grow: 1;
+    }
+
+    .pricing-card__features {
+      text-align: left;
+      margin-bottom: var(--sp-6);
+    }
+
+    .pricing-card__features li {
+      display: flex;
+      align-items: baseline;
+      gap: var(--sp-3);
+      padding-block: var(--sp-2);
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      border-bottom: 1px solid rgba(44, 62, 107, 0.3);
+    }
+
+    .pricing-card__features li:last-child {
+      border-bottom: none;
+    }
+
+    .pricing-card__features li::before {
+      content: '\2713';
+      color: var(--accent);
+      font-weight: var(--fw-bold);
+      flex-shrink: 0;
+    }
+
+    .pricing-card__cta {
+      width: 100%;
+      margin-top: auto;
+    }
+
+    .pricing-card__footer {
+      font-size: var(--fs-small);
+      color: var(--text-secondary);
+      margin-top: var(--sp-3);
+    }
+
+    .encryption-callout {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-6);
+      background-color: var(--bg-surface);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-card);
+      padding: var(--sp-6);
+    }
+
+    .encryption-callout__icon {
+      font-size: 2.5rem;
+      flex-shrink: 0;
+    }
+
+    .encryption-callout__text p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .encryption-callout__text strong {
+      color: var(--text-heading);
+    }
+
+    @media (max-width: 480px) {
+      .encryption-callout {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+
+    .how-it-works {
+      counter-reset: step;
+    }
+
+    .how-it-works__step {
+      display: flex;
+      gap: var(--sp-6);
+      align-items: flex-start;
+      padding-block: var(--sp-6);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .how-it-works__step:last-child {
+      border-bottom: none;
+    }
+
+    .how-it-works__number {
+      counter-increment: step;
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(78, 205, 196, 0.12);
+      color: var(--accent);
+      font-family: var(--font-display);
+      font-weight: var(--fw-bold);
+      font-size: 1.1rem;
+      border-radius: 50%;
+    }
+
+    .how-it-works__number::before {
+      content: counter(step);
+    }
+
+    .how-it-works__content h3 {
+      margin-bottom: var(--sp-2);
+    }
+
+    .how-it-works__content p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <header class="site-header">
+    <div class="container">
+      <a href="../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../product/" data-i18n="nav.product">Product</a>
+        <a href="../agents/" data-i18n="nav.team">Team</a>
+        <a href="../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="./" class="active" data-i18n="nav.pricing">Pricing</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <h1 class="display" data-i18n="pricing.hero.title">Pricing &amp; Deployment Options</h1>
+        <p class="lead" data-i18n="pricing.hero.lead">
+          Free open-source deployment or hosted cloud service.
+          Every mode uses the same zero-knowledge encryption.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION 1: FREE OFFERINGS
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.free.title">Free</h2>
+          <p data-i18n="pricing.free.subtitle">Genuinely free &mdash; no catch, no expiring free tier. Our mission is to make encrypted file transfer ubiquitous.</p>
+        </div>
+
+        <div class="pricing-grid">
+
+          <!-- A: Early Access Programme -->
+          <div class="pricing-card">
+            <div class="pricing-card__tier" data-i18n="pricing.eap.tier">Early Access</div>
+            <div class="pricing-card__name" data-i18n="pricing.eap.name">Try It Free</div>
+            <div class="pricing-card__price" data-i18n="pricing.eap.price">&pound;0</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.eap.price_note">No payment required</div>
+            <p class="pricing-card__desc" data-i18n="pricing.eap.desc">
+              Join the Early Access Programme and evaluate SG/Send with free credits. Same zero-knowledge encryption as paid tiers.
+            </p>
+            <ul class="pricing-card__features">
+              <li data-i18n="pricing.eap.f1">Limited evaluation credits</li>
+              <li data-i18n="pricing.eap.f2">Full zero-knowledge encryption</li>
+              <li data-i18n="pricing.eap.f3">No credit card needed</li>
+              <li data-i18n="pricing.eap.f4">Sherpa responds within 48h</li>
+            </ul>
+            <a href="../early-access/" class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.eap.cta">Join Early Access &rarr;</a>
+          </div>
+
+          <!-- B: Open Source -->
+          <div class="pricing-card">
+            <div class="pricing-card__tier" data-i18n="pricing.oss.tier">Open Source</div>
+            <div class="pricing-card__name" data-i18n="pricing.oss.name">Self-Hosted</div>
+            <div class="pricing-card__price" data-i18n="pricing.oss.price">Free</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.oss.price_note">Free forever</div>
+            <p class="pricing-card__desc" data-i18n="pricing.oss.desc">
+              Clone the repo from GitHub and deploy in your own environment. Your keys, your data, your infrastructure.
+            </p>
+            <ul class="pricing-card__features">
+              <li data-i18n="pricing.oss.f1">Full source code on GitHub</li>
+              <li data-i18n="pricing.oss.f2">Commercial use permitted</li>
+              <li data-i18n="pricing.oss.f3">No dependency on SG/Send</li>
+              <li data-i18n="pricing.oss.f4">Community support</li>
+            </ul>
+            <a href="./self-hosted/" class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.oss.cta">View on GitHub &rarr;</a>
+          </div>
+
+          <!-- C: Your Cloud Account -->
+          <div class="pricing-card">
+            <div class="pricing-card__tier" data-i18n="pricing.yourcloud.tier">Your Cloud</div>
+            <div class="pricing-card__name" data-i18n="pricing.yourcloud.name">Own Account</div>
+            <div class="pricing-card__price" data-i18n="pricing.yourcloud.price">Free</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.yourcloud.price_note">You pay your cloud provider</div>
+            <p class="pricing-card__desc" data-i18n="pricing.yourcloud.desc">
+              Deploy in your own AWS, GCP, or Azure account. You pay your cloud provider directly for infrastructure costs. Free from us.
+            </p>
+            <ul class="pricing-card__features">
+              <li data-i18n="pricing.yourcloud.f1">Your AWS/GCP/Azure account</li>
+              <li data-i18n="pricing.yourcloud.f2">Full isolation from SG/Send</li>
+              <li data-i18n="pricing.yourcloud.f3">PyPI packages or source</li>
+              <li data-i18n="pricing.yourcloud.f4">Deployment guide provided</li>
+            </ul>
+            <a href="./your-cloud/" class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.yourcloud.cta">Deployment Guide &rarr;</a>
+          </div>
+
+          <!-- D: Partner / White Label -->
+          <div class="pricing-card">
+            <div class="pricing-card__tier" data-i18n="pricing.partner.tier">Partner</div>
+            <div class="pricing-card__name" data-i18n="pricing.partner.name">White Label</div>
+            <div class="pricing-card__price" data-i18n="pricing.partner.price">Free</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.partner.price_note">No licensing fee</div>
+            <p class="pricing-card__desc" data-i18n="pricing.partner.desc">
+              Offer SG/Send functionality to your customers under your own brand. Customise branding, logos, and domain.
+            </p>
+            <ul class="pricing-card__features">
+              <li data-i18n="pricing.partner.f1">Your brand, your domain</li>
+              <li data-i18n="pricing.partner.f2">Integrate into your product</li>
+              <li data-i18n="pricing.partner.f3">No licensing fee from us</li>
+              <li data-i18n="pricing.partner.f4">Deployment support available</li>
+            </ul>
+            <a href="./partners/" class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.partner.cta">Partner Programme &rarr;</a>
+          </div>
+
+        </div>
+
+        <p class="text-center" style="margin-top: var(--sp-8);">
+          <a href="./free/" class="text-secondary" data-i18n="pricing.free.why_link">Why is it free? We&rsquo;re open source &rarr;</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ENCRYPTION CALLOUT
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="encryption-callout">
+          <div class="encryption-callout__icon">&#128274;</div>
+          <div class="encryption-callout__text">
+            <p data-i18n="pricing.encryption.text">
+              <strong>Every mode uses the same zero-knowledge encryption.</strong>
+              Whether you use our hosted service or deploy in your own environment,
+              files are encrypted in the browser before they leave your device.
+              We never see your data. Your cloud provider never sees your data.
+              Nobody sees your data except you and your recipient.
+              The only difference between modes is who manages the infrastructure.
+              The encryption is identical.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION 2: SG/SEND CLOUD
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.cloud.section_title">SG/Send Cloud</h2>
+          <p data-i18n="pricing.cloud.section_subtitle">We run it, you use it. Hosted service with full management, monitoring, and support.</p>
+        </div>
+
+        <div class="pricing-grid">
+
+          <!-- Tier 1: Multi-Tenant (Shared) -->
+          <div class="pricing-card pricing-card--featured">
+            <span class="pricing-card__badge" data-i18n="pricing.shared.badge">Available Now</span>
+            <div class="pricing-card__tier" data-i18n="pricing.shared.tier">Shared</div>
+            <div class="pricing-card__name" data-i18n="pricing.shared.name">Multi-Tenant</div>
+            <div class="pricing-card__price" data-i18n="pricing.shared.price">&pound;5</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.shared.price_note">500 file transfers &middot; &pound;0.01/file</div>
+            <p class="pricing-card__desc" data-i18n="pricing.shared.desc">
+              The send.sgraph.ai hosted service. Shared infrastructure, but every file is encrypted with its own key.
+            </p>
+            <ul class="pricing-card__features">
+              <li data-i18n="pricing.shared.f1">&pound;0.01 per encrypted transfer</li>
+              <li data-i18n="pricing.shared.f2">3-month credit validity</li>
+              <li data-i18n="pricing.shared.f3">Stripe payment (card, Apple Pay)</li>
+              <li data-i18n="pricing.shared.f4">Email support via Sherpa</li>
+              <li data-i18n="pricing.shared.f5">Best-effort SLA</li>
+            </ul>
+            <a href="./cloud/" class="btn btn-primary btn--lg pricing-card__cta" data-i18n="pricing.shared.cta">Buy Credits &rarr;</a>
+            <p class="pricing-card__footer" data-i18n="pricing.shared.footer">Secure payment via Stripe</p>
+          </div>
+
+          <!-- Tier 2: Single-Tenant (Dedicated) -->
+          <div class="pricing-card">
+            <div class="pricing-card__tier" data-i18n="pricing.dedicated.tier">Dedicated</div>
+            <div class="pricing-card__name" data-i18n="pricing.dedicated.name">Single-Tenant</div>
+            <div class="pricing-card__price" data-i18n="pricing.dedicated.price">Custom</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.dedicated.price_note">Contact us for pricing</div>
+            <p class="pricing-card__desc" data-i18n="pricing.dedicated.desc">
+              Isolated infrastructure in SG/Send&rsquo;s AWS account. Your own S3, Lambda, and CloudFront &mdash; managed by us.
+            </p>
+            <ul class="pricing-card__features">
+              <li data-i18n="pricing.dedicated.f1">Dedicated S3, Lambda, CloudFront</li>
+              <li data-i18n="pricing.dedicated.f2">Custom domain and branding</li>
+              <li data-i18n="pricing.dedicated.f3">Dedicated email support</li>
+              <li data-i18n="pricing.dedicated.f4">Custom SLA</li>
+              <li data-i18n="pricing.dedicated.f5">Compliance-ready isolation</li>
+            </ul>
+            <a href="./dedicated/" class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.dedicated.cta">Contact Us &rarr;</a>
+          </div>
+
+          <!-- Tier 3: AWS Marketplace -->
+          <div class="pricing-card">
+            <div class="pricing-card__tier" data-i18n="pricing.marketplace.tier">Marketplace</div>
+            <div class="pricing-card__name" data-i18n="pricing.marketplace.name">AWS Marketplace</div>
+            <div class="pricing-card__price" data-i18n="pricing.marketplace.price">Pay-per-use</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.marketplace.price_note">Coming soon</div>
+            <p class="pricing-card__desc" data-i18n="pricing.marketplace.desc">
+              Deploy via AWS Marketplace. Pay through AWS billing, counts against committed spend. One-click deployment.
+            </p>
+            <ul class="pricing-card__features">
+              <li data-i18n="pricing.marketplace.f1">Your AWS account</li>
+              <li data-i18n="pricing.marketplace.f2">AWS consolidated billing</li>
+              <li data-i18n="pricing.marketplace.f3">No vendor onboarding needed</li>
+              <li data-i18n="pricing.marketplace.f4">One-click deployment</li>
+            </ul>
+            <a href="./aws-marketplace/" class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.marketplace.cta">Register Interest &rarr;</a>
+          </div>
+
+          <!-- Tier 4: BYOC (Managed) -->
+          <div class="pricing-card">
+            <div class="pricing-card__tier" data-i18n="pricing.managed.tier">Managed</div>
+            <div class="pricing-card__name" data-i18n="pricing.managed.name">Your Cloud, We Manage</div>
+            <div class="pricing-card__price" data-i18n="pricing.managed.price">Custom</div>
+            <div class="pricing-card__price-note" data-i18n="pricing.managed.price_note">Professional services</div>
+            <p class="pricing-card__desc" data-i18n="pricing.managed.desc">
+              SG/Send deployed in your cloud account, managed or assisted by us. Full data residency control.
+            </p>
+            <ul class="pricing-card__features">
+              <li data-i18n="pricing.managed.f1">100% your cloud account</li>
+              <li data-i18n="pricing.managed.f2">We manage deployment</li>
+              <li data-i18n="pricing.managed.f3">Full data residency control</li>
+              <li data-i18n="pricing.managed.f4">Dedicated support</li>
+            </ul>
+            <a href="./managed/" class="btn btn-secondary btn--lg pricing-card__cta" data-i18n="pricing.managed.cta">Contact Us &rarr;</a>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         HOW IT WORKS
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.how.title">How it works</h2>
+          <p data-i18n="pricing.how.subtitle">Get started in minutes. No software to install.</p>
+        </div>
+
+        <div class="how-it-works" style="max-width: 640px; margin-inline: auto;">
+          <div class="how-it-works__step">
+            <div class="how-it-works__number"></div>
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.how.step1.title">Get your access token</h3>
+              <p data-i18n="pricing.how.step1.desc">Join Early Access for free or buy a Starter Pack. You'll receive a unique access token via email.</p>
+            </div>
+          </div>
+
+          <div class="how-it-works__step">
+            <div class="how-it-works__number"></div>
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.how.step2.title">Upload and encrypt</h3>
+              <p data-i18n="pricing.how.step2.desc">Visit <a href="https://send.sgraph.ai">send.sgraph.ai</a>, enter your token, and upload a file. Encryption happens in your browser &mdash; the file is encrypted before it leaves your device.</p>
+            </div>
+          </div>
+
+          <div class="how-it-works__step">
+            <div class="how-it-works__number"></div>
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.how.step3.title">Share the link</h3>
+              <p data-i18n="pricing.how.step3.desc">You get a download link and a decryption key. Share them with your recipient &mdash; they decrypt in their browser too.</p>
+            </div>
+          </div>
+
+          <div class="how-it-works__step">
+            <div class="how-it-works__number"></div>
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.how.step4.title">Zero knowledge, always</h3>
+              <p data-i18n="pricing.how.step4.desc">The server never sees your plaintext data, file names, or encryption keys. By design, nobody but you and your recipient can access the content.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         FAQ
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.faq.title">Frequently asked questions</h2>
+        </div>
+
+        <div style="max-width: 640px; margin-inline: auto;">
+          <div class="how-it-works__step" style="border-bottom: 1px solid var(--border-color); padding-block: var(--sp-6);">
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.faq.q1">What counts as one file transfer?</h3>
+              <p data-i18n="pricing.faq.a1">Each file you upload and encrypt counts as one transfer. Downloading and decrypting by your recipient does not use additional credits.</p>
+            </div>
+          </div>
+
+          <div class="how-it-works__step" style="border-bottom: 1px solid var(--border-color); padding-block: var(--sp-6);">
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.faq.q2">Is the free tier really free?</h3>
+              <p data-i18n="pricing.faq.a2">Yes. The open-source and self-hosted options are genuinely free &mdash; no catch, no expiring trial. We make money from the hosted cloud service, not from licensing the software.</p>
+            </div>
+          </div>
+
+          <div class="how-it-works__step" style="border-bottom: 1px solid var(--border-color); padding-block: var(--sp-6);">
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.faq.q3">What&rsquo;s the difference between shared and dedicated?</h3>
+              <p data-i18n="pricing.faq.a3">Both use the same zero-knowledge encryption. Shared (multi-tenant) runs on our standard infrastructure. Dedicated (single-tenant) gives you isolated S3, Lambda, and CloudFront &mdash; required by some regulated industries for compliance.</p>
+            </div>
+          </div>
+
+          <div class="how-it-works__step" style="border-bottom: 1px solid var(--border-color); padding-block: var(--sp-6);">
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.faq.q4">Can I switch between deployment modes?</h3>
+              <p data-i18n="pricing.faq.a4">Yes. You can start with Early Access, move to the cloud service, and later deploy self-hosted. The encryption is identical across all modes &mdash; only the infrastructure changes.</p>
+            </div>
+          </div>
+
+          <div class="how-it-works__step" style="border-bottom: none; padding-block: var(--sp-6);">
+            <div class="how-it-works__content">
+              <h3 data-i18n="pricing.faq.q5">Who operates SG/Send?</h3>
+              <p data-i18n="pricing.faq.a5">SG/Send is operated by <strong>The Cyber Boardroom Ltd</strong>, a company registered in England and Wales. Cloud payments are processed securely via Stripe.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="../agents/" data-i18n="footer.team">Team</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>
