@@ -13,8 +13,9 @@ APP__SEND__USER__LAMBDA_DEPENDENCIES       = ['fastapi-mcp==0.4.0'              
 
 APP_SEND__UI__USER__ROUTE__PATH__CONSOLE    = 'send'
 APP_SEND__UI__USER__START_PAGE              = 'index'
-APP_SEND__UI__USER__MAJOR__VERSION          = "v0/v0.1"
-APP_SEND__UI__USER__LATEST__VERSION         = "v0.1.8"
+APP_SEND__UI__USER__MAJOR__VERSION          = "v0/v0.2"
+APP_SEND__UI__USER__LATEST__VERSION         = "v0.2.0"
+APP_SEND__UI__USER__LOCALE                  = "en-gb"
 
 ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN          = 'SGRAPH_SEND__ACCESS_TOKEN'
 HEADER__SGRAPH_SEND__ACCESS_TOKEN           = 'x-sgraph-access-token'

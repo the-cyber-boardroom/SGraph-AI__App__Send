@@ -1,16 +1,26 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — API Client
-   v0.2.0 — Consolidated from v0.1.0 with /api/ prefix for CloudFront routing
+   v0.2.0 — Consolidated from v0.1.0
 
-   All transfer operations (create, upload, complete, download) go through
-   this module. The base URL is /api — CloudFront routes /api/* to Lambda.
+   Matches the actual Lambda backend route structure:
+     /transfers/create                    POST  — create transfer
+     /transfers/upload/{id}               POST  — upload encrypted payload
+     /transfers/complete/{id}             POST  — complete transfer
+     /transfers/info/{id}                 GET   — transfer info
+     /transfers/download/{id}             GET   — download encrypted payload
+     /transfers/check_token/{name}        GET   — check token (no usage consumed)
+     /transfers/validate_token/{name}     POST  — validate token (consumes a use)
+     /presigned/capabilities              GET   — check upload capabilities
+     /presigned/initiate                  POST  — start multipart upload
+     /presigned/complete                  POST  — complete multipart upload
+     /presigned/abort/{id}/{upload_id}    POST  — cancel multipart upload
+     /presigned/download-url/{id}         GET   — presigned download URL
 
-   Token management uses localStorage for access tokens.
+   Auth: Access token sent via x-sgraph-access-token header.
+   Token management uses localStorage.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 const ApiClient = {
-
-    baseUrl: '/api',
 
     // ─── Token Management ────────────────────────────────────────────────
 
@@ -32,13 +42,13 @@ const ApiClient = {
 
     _authHeaders() {
         const token = this.getAccessToken();
-        return token ? { 'Authorization': `Bearer ${token}` } : {};
+        return token ? { 'x-sgraph-access-token': token } : {};
     },
 
     // ─── Transfer Lifecycle ──────────────────────────────────────────────
 
     async createTransfer(fileSize, contentType) {
-        const res = await fetch(`${this.baseUrl}/transfers`, {
+        const res = await fetch('/transfers/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -57,8 +67,8 @@ const ApiClient = {
     },
 
     async uploadPayload(transferId, encrypted) {
-        const res = await fetch(`${this.baseUrl}/transfers/${transferId}/payload`, {
-            method: 'PUT',
+        const res = await fetch(`/transfers/upload/${transferId}`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/octet-stream',
                 ...this._authHeaders()
@@ -73,7 +83,7 @@ const ApiClient = {
     },
 
     async completeTransfer(transferId) {
-        const res = await fetch(`${this.baseUrl}/transfers/${transferId}/complete`, {
+        const res = await fetch(`/transfers/complete/${transferId}`, {
             method: 'POST',
             headers: this._authHeaders()
         });
@@ -87,13 +97,13 @@ const ApiClient = {
     // ─── Token Validation ────────────────────────────────────────────────
 
     async checkToken(token) {
-        const res = await fetch(`${this.baseUrl}/tokens/${encodeURIComponent(token)}/check`);
+        const res = await fetch(`/transfers/check_token/${encodeURIComponent(token)}`);
         if (!res.ok) throw new Error(`Token check failed: ${res.status}`);
         return res.json();
     },
 
     async validateToken(tokenName) {
-        const res = await fetch(`${this.baseUrl}/tokens/${encodeURIComponent(tokenName)}/validate`, {
+        const res = await fetch(`/transfers/validate_token/${encodeURIComponent(tokenName)}`, {
             method: 'POST'
         });
         if (!res.ok) throw new Error(`Token validate failed: ${res.status}`);
@@ -103,7 +113,7 @@ const ApiClient = {
     // ─── Transfer Info & Download ────────────────────────────────────────
 
     async getTransferInfo(transferId) {
-        const res = await fetch(`${this.baseUrl}/transfers/${transferId}`, {
+        const res = await fetch(`/transfers/info/${transferId}`, {
             headers: this._authHeaders()
         });
         if (!res.ok) throw new Error(`Transfer info failed: ${res.status}`);
@@ -111,7 +121,7 @@ const ApiClient = {
     },
 
     async downloadPayload(transferId) {
-        const res = await fetch(`${this.baseUrl}/transfers/${transferId}/payload`, {
+        const res = await fetch(`/transfers/download/${transferId}`, {
             headers: this._authHeaders()
         });
         if (!res.ok) {
@@ -124,7 +134,7 @@ const ApiClient = {
     // ─── Presigned URLs (S3) ─────────────────────────────────────────────
 
     async getPresignedDownloadUrl(transferId) {
-        const res = await fetch(`${this.baseUrl}/transfers/${transferId}/download-url`, {
+        const res = await fetch(`/presigned/download-url/${transferId}`, {
             headers: this._authHeaders()
         });
         if (!res.ok) throw new Error(`Presigned download URL failed: ${res.status}`);
@@ -132,7 +142,7 @@ const ApiClient = {
     },
 
     async getCapabilities() {
-        const res = await fetch(`${this.baseUrl}/capabilities`, {
+        const res = await fetch('/presigned/capabilities', {
             headers: this._authHeaders()
         });
         if (!res.ok) throw new Error(`Capabilities failed: ${res.status}`);
@@ -142,13 +152,17 @@ const ApiClient = {
     // ─── Multipart Upload ────────────────────────────────────────────────
 
     async initiateMultipart(transferId, totalSize, numParts) {
-        const res = await fetch(`${this.baseUrl}/transfers/${transferId}/multipart/initiate`, {
+        const res = await fetch('/presigned/initiate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...this._authHeaders()
             },
-            body: JSON.stringify({ total_size: totalSize, num_parts: numParts })
+            body: JSON.stringify({
+                transfer_id: transferId,
+                file_size_bytes: totalSize,
+                num_parts: numParts
+            })
         });
         if (!res.ok) throw new Error(`Multipart initiate failed: ${res.status}`);
         return res.json();
@@ -164,13 +178,17 @@ const ApiClient = {
     },
 
     async completeMultipart(transferId, uploadId, parts) {
-        const res = await fetch(`${this.baseUrl}/transfers/${transferId}/multipart/complete`, {
+        const res = await fetch('/presigned/complete', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...this._authHeaders()
             },
-            body: JSON.stringify({ upload_id: uploadId, parts })
+            body: JSON.stringify({
+                transfer_id: transferId,
+                upload_id: uploadId,
+                parts
+            })
         });
         if (!res.ok) throw new Error(`Multipart complete failed: ${res.status}`);
         return res.json();
@@ -178,13 +196,9 @@ const ApiClient = {
 
     async abortMultipart(transferId, uploadId) {
         try {
-            await fetch(`${this.baseUrl}/transfers/${transferId}/multipart/abort`, {
+            await fetch(`/presigned/abort/${transferId}/${uploadId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...this._authHeaders()
-                },
-                body: JSON.stringify({ upload_id: uploadId })
+                headers: this._authHeaders()
             });
         } catch (e) { /* best effort */ }
     }

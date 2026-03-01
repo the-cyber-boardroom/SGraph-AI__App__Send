@@ -11,7 +11,7 @@ from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned          
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                      import Transfer__Service
 from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls               import Service__Presigned_Urls
 from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
-from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE
+from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE, APP_SEND__UI__USER__LOCALE
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client                   import Send__Cache__Client
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                    import create_send_cache_client
 from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client__Vault            import Send__Cache__Client__Vault
@@ -176,7 +176,8 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         major_version       = APP_SEND__UI__USER__MAJOR__VERSION
         latest_version      = APP_SEND__UI__USER__LATEST__VERSION
         start_page          = APP_SEND__UI__USER__START_PAGE
-        path_latest_version = f"/{path_name}/{major_version}/{latest_version}/{start_page}.html"
+        locale              = APP_SEND__UI__USER__LOCALE
+        path_latest_version = f"/{path_name}/{major_version}/{latest_version}/{locale}/{start_page}.html"
         self.app().mount(path_static, StaticFiles(directory=path_static_folder), name=path_name)
 
         @route_path(path='/')

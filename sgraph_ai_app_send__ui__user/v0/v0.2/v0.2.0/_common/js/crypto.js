@@ -22,6 +22,16 @@ const SendCrypto = {
         return !!(window.crypto && window.crypto.subtle);
     },
 
+    requireSecureContext() {
+        if (!this.isAvailable()) {
+            throw new Error(
+                'Web Crypto API is not available. ' +
+                'It requires a secure context (HTTPS or localhost). ' +
+                'If running locally, use "localhost" instead of "127.0.0.1".'
+            );
+        }
+    },
+
     async generateKey() {
         return await window.crypto.subtle.generateKey(
             { name: this.ALGORITHM, length: this.KEY_LENGTH },

@@ -1,7 +1,7 @@
 import sgraph_ai_app_send__ui__user
 from unittest                                                                   import TestCase
 from osbot_utils.utils.Files                                                    import path_combine, file_contents, file_exists
-from sgraph_ai_app_send.lambda__user.user__config                               import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE
+from sgraph_ai_app_send.lambda__user.user__config                               import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE, APP_SEND__UI__USER__LOCALE
 from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User       import setup__fast_api__user__test_objs
 
 
@@ -25,7 +25,7 @@ class test__App_Send__UI__User__static_pages(TestCase):
     def test__send(self):
         response__no_redirects     = self.client.get('/send', follow_redirects=False )
         response__redirects        = self.client.get('/send', follow_redirects=True  )
-        expected_file_virtual_path = f'{APP_SEND__UI__USER__MAJOR__VERSION}/{APP_SEND__UI__USER__LATEST__VERSION}/{APP_SEND__UI__USER__START_PAGE}.html'
+        expected_file_virtual_path = f'{APP_SEND__UI__USER__MAJOR__VERSION}/{APP_SEND__UI__USER__LATEST__VERSION}/{APP_SEND__UI__USER__LOCALE}/{APP_SEND__UI__USER__START_PAGE}.html'
         expected_file_path         = path_combine(sgraph_ai_app_send__ui__user.path, expected_file_virtual_path)
         expected_redirect          = f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}/{expected_file_virtual_path}'
 
