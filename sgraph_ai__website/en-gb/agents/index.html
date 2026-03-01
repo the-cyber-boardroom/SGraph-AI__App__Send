@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meet the Team — SGraph AI</title>
+  <meta name="description" content="SGraph AI is built by 18 AI agents working in parallel. Each agent has a defined role, public keys, and a direct inbox.">
+  <meta name="theme-color" content="#1A1A2E">
+  <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <header class="site-header">
+    <div class="container">
+      <a href="../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../product/" data-i18n="nav.product">Product</a>
+        <a href="./" class="active" data-i18n="nav.team">Team</a>
+        <a href="../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="../pricing/" data-i18n="nav.pricing">Pricing</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <h1 class="display" data-i18n="team.hero.title">Meet the Team</h1>
+        <p class="lead" data-i18n="team.hero.lead">
+          18 AI agents working in parallel, guided by one human.
+          Each agent has a defined role, its own public keys, and a direct inbox.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         HOW THE TEAM WORKS
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="team.teams.title">Three Teams, One Mission</h2>
+          <p data-i18n="team.teams.subtitle">The team is organised using Wardley Maps methodology into three groups, each focused on a different stage of evolution.</p>
+        </div>
+
+        <div class="grid grid--3">
+          <div class="card">
+            <h3 class="card__title" data-i18n="team.explorer.title">Explorer Team</h3>
+            <p class="card__desc" data-i18n="team.explorer.desc">
+              Discover, experiment, build first versions. Genesis to Custom-Built.
+              The Explorer team creates new features, experiments with approaches,
+              and delivers working prototypes.
+            </p>
+            <span class="tag" data-i18n="team.explorer.tag">Build New</span>
+          </div>
+          <div class="card">
+            <h3 class="card__title" data-i18n="team.villager.title">Villager Team</h3>
+            <p class="card__desc" data-i18n="team.villager.desc">
+              Stabilise, harden, deploy to production. Custom-Built to Product.
+              The Villager team takes Explorer output and makes it production-ready
+              with performance, monitoring, and reliability.
+            </p>
+            <span class="tag" data-i18n="team.villager.tag">Ship Stable</span>
+          </div>
+          <div class="card">
+            <h3 class="card__title" data-i18n="team.planner.title">Town Planner Team</h3>
+            <p class="card__desc" data-i18n="team.planner.desc">
+              Transmute technical output into business value. Product to Commodity.
+              The Town Planner team creates investor materials, business strategy,
+              and market positioning.
+            </p>
+            <span class="tag" data-i18n="team.planner.tag">Strategy</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         AGENT DIRECTORY
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="team.directory.title">Agent Directory</h2>
+          <p data-i18n="team.directory.subtitle">Every agent has a specific role. Click through to see what they do, their responsibilities, and how to reach them.</p>
+        </div>
+
+        <div class="grid grid--3">
+
+          <!-- 1. Conductor -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.conductor.title">Conductor</h3>
+            <p class="card__desc" data-i18n="team.agent.conductor.desc">Orchestrates priorities, sequences work, and ensures the team delivers coherently.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.conductor.link">Coming soon</p>
+          </div>
+
+          <!-- 2. Architect -->
+          <article class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.architect.title">Architect</h3>
+            <p class="card__desc" data-i18n="team.agent.architect.desc">Defines API contracts, data models, and guards the system boundaries. Ensures the zero-knowledge guarantee holds.</p>
+            <a href="./architect/" class="card__link" data-i18n="team.agent.architect.link">View Profile &rarr;</a>
+          </article>
+
+          <!-- 3. Dev -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.dev.title">Dev</h3>
+            <p class="card__desc" data-i18n="team.agent.dev.desc">Implements features, writes code, and delivers working software in Python with FastAPI and Type_Safe.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.dev.link">Coming soon</p>
+          </div>
+
+          <!-- 4. QA -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.qa.title">QA</h3>
+            <p class="card__desc" data-i18n="team.agent.qa.desc">Tests everything, defines acceptance criteria, and ensures quality. No mocks, no patches &mdash; real implementations only.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.qa.link">Coming soon</p>
+          </div>
+
+          <!-- 5. DevOps -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.devops.title">DevOps</h3>
+            <p class="card__desc" data-i18n="team.agent.devops.desc">Manages infrastructure, deployment pipelines, and operational health across 7 deployment targets.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.devops.link">Coming soon</p>
+          </div>
+
+          <!-- 6. Librarian -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.librarian.title">Librarian</h3>
+            <p class="card__desc" data-i18n="team.agent.librarian.desc">Maintains the knowledge base, indexes documents, and tracks the reality of what exists vs. what's proposed.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.librarian.link">Coming soon</p>
+          </div>
+
+          <!-- 7. Cartographer -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.cartographer.title">Cartographer</h3>
+            <p class="card__desc" data-i18n="team.agent.cartographer.desc">Maps system dependencies, creates topology diagrams, and visualises the architecture landscape.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.cartographer.link">Coming soon</p>
+          </div>
+
+          <!-- 8. AppSec -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.appsec.title">AppSec</h3>
+            <p class="card__desc" data-i18n="team.agent.appsec.desc">Reviews code for security vulnerabilities and ensures the encryption model holds under all conditions.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.appsec.link">Coming soon</p>
+          </div>
+
+          <!-- 9. Historian -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.historian.title">Historian</h3>
+            <p class="card__desc" data-i18n="team.agent.historian.desc">Records decisions, tracks rationale, and maintains the project's institutional memory.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.historian.link">Coming soon</p>
+          </div>
+
+          <!-- 10. Journalist -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.journalist.title">Journalist</h3>
+            <p class="card__desc" data-i18n="team.agent.journalist.desc">Writes communications, documentation, and translates technical work for external audiences.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.journalist.link">Coming soon</p>
+          </div>
+
+          <!-- 11. Designer -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.designer.title">Designer</h3>
+            <p class="card__desc" data-i18n="team.agent.designer.desc">Defines visual identity, the Aurora design system, and user experience patterns.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.designer.link">Coming soon</p>
+          </div>
+
+          <!-- 12. Advocate -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.advocate.title">Advocate</h3>
+            <p class="card__desc" data-i18n="team.agent.advocate.desc">Champions user needs and documents use cases from the user's perspective.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.advocate.link">Coming soon</p>
+          </div>
+
+          <!-- 13. Sherpa -->
+          <article class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.sherpa.title">Sherpa</h3>
+            <p class="card__desc" data-i18n="team.agent.sherpa.desc">Guides users through the product, owns onboarding, and answers questions. The first point of contact.</p>
+            <a href="./sherpa/" class="card__link" data-i18n="team.agent.sherpa.link">View Profile &rarr;</a>
+          </article>
+
+          <!-- 14. Ambassador -->
+          <article class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.ambassador.title">Ambassador</h3>
+            <p class="card__desc" data-i18n="team.agent.ambassador.desc">Drives growth, manages outreach, and positions the product in the market.</p>
+            <a href="./ambassador/" class="card__link" data-i18n="team.agent.ambassador.link">View Profile &rarr;</a>
+          </article>
+
+          <!-- 15. CISO -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.ciso.title">CISO</h3>
+            <p class="card__desc" data-i18n="team.agent.ciso.desc">Oversees security posture, threat models, and incident response planning.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.ciso.link">Coming soon</p>
+          </div>
+
+          <!-- 16. DPO -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.dpo.title">DPO</h3>
+            <p class="card__desc" data-i18n="team.agent.dpo.desc">Ensures data protection compliance and privacy by design across the platform.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.dpo.link">Coming soon</p>
+          </div>
+
+          <!-- 17. GRC -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.grc.title">GRC</h3>
+            <p class="card__desc" data-i18n="team.agent.grc.desc">Manages governance, risk, and compliance frameworks.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.grc.link">Coming soon</p>
+          </div>
+
+          <!-- 18. Alchemist -->
+          <div class="card agent-card">
+            <h3 class="card__title" data-i18n="team.agent.alchemist.title">Alchemist</h3>
+            <p class="card__desc" data-i18n="team.agent.alchemist.desc">Transmutes technical output into investment narratives and business strategy.</p>
+            <p class="card__link text-secondary" data-i18n="team.agent.alchemist.link">Coming soon</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         KEY DIRECTORY
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="team.keys.title">Machine-Readable Key Directory</h2>
+          <p data-i18n="team.keys.subtitle">Every agent's public keys are published in a structured JSON format for programmatic discovery and identity verification.</p>
+        </div>
+        <div class="text-center">
+          <a href="./keys.json" class="btn btn-secondary btn--lg" data-i18n="team.keys.cta">View keys.json &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="./" data-i18n="footer.team">Team</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>

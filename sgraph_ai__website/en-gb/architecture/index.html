@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Architecture — SGraph AI</title>
   <meta name="description" content="How SG/Send encryption works: AES-256-GCM symmetric encryption in the browser, zero-knowledge server architecture, and the complete security model.">
-  <link rel="icon" type="image/svg+xml" href="../_common/favicon.svg">
-  <link rel="stylesheet" href="../_common/fonts/fonts.css">
-  <link rel="stylesheet" href="../_common/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
 </head>
 <body class="theme-aurora i18n-loading">
 
@@ -37,8 +37,8 @@
          ============================================================ -->
     <section class="hero hero--small">
       <div class="container">
-        <h1 class="display">How the Encryption Works</h1>
-        <p class="lead">
+        <h1 class="display" data-i18n="arch.hero.title">How the Encryption Works</h1>
+        <p class="lead" data-i18n="arch.hero.lead">
           SG/Send uses AES-256-GCM symmetric encryption, performed entirely in your browser.
           The server never sees your plaintext data, your file names, or your encryption keys.
           This page explains exactly how.
@@ -52,14 +52,14 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2>Symmetric Encryption: One Key, Two Operations</h2>
-          <p>SG/Send uses symmetric encryption &mdash; the same key encrypts and decrypts the file. This is the simplest and fastest encryption model, and when done correctly, the most secure for file transfer.</p>
+          <h2 data-i18n="arch.symmetric.title">Symmetric Encryption: One Key, Two Operations</h2>
+          <p data-i18n="arch.symmetric.subtitle">SG/Send uses symmetric encryption &mdash; the same key encrypts and decrypts the file. This is the simplest and fastest encryption model, and when done correctly, the most secure for file transfer.</p>
         </div>
 
         <div class="grid grid--2">
           <div class="card">
-            <h3 class="card__title">What is AES-256-GCM?</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.aes.title">What is AES-256-GCM?</h3>
+            <p class="card__desc" data-i18n="arch.aes.desc">
               <strong>AES</strong> (Advanced Encryption Standard) is the encryption algorithm used by governments,
               banks, and militaries worldwide. <strong>256</strong> is the key size in bits &mdash; there are
               2<sup>256</sup> possible keys, making brute force computationally impossible.
@@ -68,8 +68,8 @@
             </p>
           </div>
           <div class="card">
-            <h3 class="card__title">Why Symmetric?</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.why_symmetric.title">Why Symmetric?</h3>
+            <p class="card__desc" data-i18n="arch.why_symmetric.desc">
               Symmetric encryption uses <strong>one key</strong> for both encryption and decryption.
               This is different from asymmetric encryption (like RSA) which uses a key pair.
               For file transfer, symmetric is the right choice: it's fast, well-understood,
@@ -78,7 +78,7 @@
           </div>
         </div>
 
-        <div class="callout mt-8">
+        <div class="callout mt-8" data-i18n="arch.symmetric.callout">
           The key insight: if you control where the key is generated and where it travels,
           symmetric encryption gives you perfect confidentiality. SG/Send generates the key
           in your browser, and the key never touches the server.
@@ -92,8 +92,8 @@
     <section class="section">
       <div class="container">
         <div class="section-header">
-          <h2>The Encryption Flow: Step by Step</h2>
-          <p>Here's exactly what happens when you send a file through SG/Send.</p>
+          <h2 data-i18n="arch.flow.title">The Encryption Flow: Step by Step</h2>
+          <p data-i18n="arch.flow.subtitle">Here's exactly what happens when you send a file through SG/Send.</p>
         </div>
 
         <div class="encryption-flow">
@@ -101,8 +101,8 @@
           <!-- Step 1 -->
           <div class="card mb-6">
             <div class="card__icon">1</div>
-            <h3 class="card__title">Key Generation</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.step1.title">Key Generation</h3>
+            <p class="card__desc" data-i18n="arch.step1.desc">
               When you select a file, your browser generates a <strong>random 256-bit AES key</strong>
               using the Web Crypto API (<code>crypto.subtle.generateKey</code>).
               This uses the operating system's cryptographically secure random number generator.
@@ -124,8 +124,8 @@
           <!-- Step 2 -->
           <div class="card mb-6">
             <div class="card__icon">2</div>
-            <h3 class="card__title">IV Generation</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.step2.title">IV Generation</h3>
+            <p class="card__desc" data-i18n="arch.step2.desc">
               A <strong>12-byte Initialisation Vector (IV)</strong> is generated randomly
               (<code>crypto.getRandomValues</code>). The IV ensures that encrypting the same
               file twice produces different ciphertext. The IV is not secret &mdash; it is prepended
@@ -136,8 +136,8 @@
           <!-- Step 3 -->
           <div class="card mb-6">
             <div class="card__icon">3</div>
-            <h3 class="card__title">Encryption</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.step3.title">Encryption</h3>
+            <p class="card__desc" data-i18n="arch.step3.desc">
               The file is encrypted in the browser using <code>crypto.subtle.encrypt</code>
               with the AES-GCM algorithm, the generated key, and the IV. The output is
               <strong>ciphertext + a 128-bit authentication tag</strong>. The authentication tag
@@ -160,8 +160,8 @@
           <!-- Step 4 -->
           <div class="card mb-6">
             <div class="card__icon">4</div>
-            <h3 class="card__title">Upload</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.step4.title">Upload</h3>
+            <p class="card__desc" data-i18n="arch.step4.desc">
               Only the <strong>encrypted output</strong> (IV + ciphertext + auth tag) is uploaded
               to the server. The server receives a blob of random-looking bytes.
               It assigns a <strong>Transfer ID</strong> (12 random characters) and stores the ciphertext.
@@ -183,8 +183,8 @@
           <!-- Step 5 -->
           <div class="card mb-6">
             <div class="card__icon">5</div>
-            <h3 class="card__title">Link Sharing</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.step5.title">Link Sharing</h3>
+            <p class="card__desc" data-i18n="arch.step5.desc">
               The sender gets a download link. The decryption key is placed in the
               <strong>URL fragment</strong> (the part after <code>#</code>). URL fragments are
               never sent to the server by the browser &mdash; this is defined in
@@ -205,8 +205,8 @@
           <!-- Step 6 -->
           <div class="card">
             <div class="card__icon">6</div>
-            <h3 class="card__title">Decryption</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.step6.title">Decryption</h3>
+            <p class="card__desc" data-i18n="arch.step6.desc">
               The recipient opens the link. Their browser downloads the encrypted bytes from
               the server, extracts the key from the URL fragment, separates the IV from the
               ciphertext, and decrypts using <code>crypto.subtle.decrypt</code>. If the auth tag
@@ -241,14 +241,14 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2>What the Server Sees vs. What It Doesn't</h2>
-          <p>This is the zero-knowledge guarantee. Here is exactly what data exists on the server.</p>
+          <h2 data-i18n="arch.server.title">What the Server Sees vs. What It Doesn't</h2>
+          <p data-i18n="arch.server.subtitle">This is the zero-knowledge guarantee. Here is exactly what data exists on the server.</p>
         </div>
 
         <div class="grid grid--2">
           <div class="card">
-            <h3 class="card__title" style="color: var(--accent);">Server stores</h3>
-            <p class="card__desc">
+            <h3 class="card__title" style="color: var(--accent);" data-i18n="arch.server_stores.title">Server stores</h3>
+            <p class="card__desc" data-i18n="arch.server_stores.desc">
               <strong>Transfer ID</strong> &mdash; random 12 characters<br>
               <strong>Encrypted bytes</strong> &mdash; indistinguishable from random data<br>
               <strong>IP hash</strong> &mdash; SHA-256 of IP + daily rotating salt<br>
@@ -257,8 +257,8 @@
             </p>
           </div>
           <div class="card">
-            <h3 class="card__title" style="color: var(--danger);">Server never sees</h3>
-            <p class="card__desc">
+            <h3 class="card__title" style="color: var(--danger);" data-i18n="arch.server_never.title">Server never sees</h3>
+            <p class="card__desc" data-i18n="arch.server_never.desc">
               <strong>Encryption key</strong> &mdash; stays in browser, shared via URL fragment<br>
               <strong>File name</strong> &mdash; never sent to server<br>
               <strong>File type</strong> &mdash; no content-type metadata stored<br>
@@ -268,7 +268,7 @@
           </div>
         </div>
 
-        <div class="callout mt-8">
+        <div class="callout mt-8" data-i18n="arch.server.callout">
           A complete server compromise &mdash; full database access, all backups, all logs &mdash;
           reveals nothing about the content of transferred files. The ciphertext is computationally
           indistinguishable from random noise without the key.
@@ -282,63 +282,63 @@
     <section class="section">
       <div class="container">
         <div class="section-header">
-          <h2>Technology Stack</h2>
-          <p>Every layer is chosen for simplicity, security, and zero-dependency deployment.</p>
+          <h2 data-i18n="arch.stack.title">Technology Stack</h2>
+          <p data-i18n="arch.stack.subtitle">Every layer is chosen for simplicity, security, and zero-dependency deployment.</p>
         </div>
 
         <table class="stack-table">
           <thead>
             <tr>
-              <th>Layer</th>
-              <th>Technology</th>
-              <th>Purpose</th>
+              <th data-i18n="arch.stack.col_layer">Layer</th>
+              <th data-i18n="arch.stack.col_tech">Technology</th>
+              <th data-i18n="arch.stack.col_purpose">Purpose</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>Runtime</td>
-              <td>Python 3.12 / arm64</td>
-              <td>Application server language</td>
+              <td data-i18n="arch.stack.runtime.layer">Runtime</td>
+              <td data-i18n="arch.stack.runtime.tech">Python 3.12 / arm64</td>
+              <td data-i18n="arch.stack.runtime.purpose">Application server language</td>
             </tr>
             <tr>
-              <td>Web Framework</td>
-              <td>FastAPI via osbot-fast-api</td>
-              <td>HTTP routing and request handling</td>
+              <td data-i18n="arch.stack.framework.layer">Web Framework</td>
+              <td data-i18n="arch.stack.framework.tech">FastAPI via osbot-fast-api</td>
+              <td data-i18n="arch.stack.framework.purpose">HTTP routing and request handling</td>
             </tr>
             <tr>
-              <td>Compute</td>
-              <td>AWS Lambda + Mangum</td>
-              <td>Serverless execution, pay-per-use</td>
+              <td data-i18n="arch.stack.compute.layer">Compute</td>
+              <td data-i18n="arch.stack.compute.tech">AWS Lambda + Mangum</td>
+              <td data-i18n="arch.stack.compute.purpose">Serverless execution, pay-per-use</td>
             </tr>
             <tr>
-              <td>Storage</td>
-              <td>Memory-FS (Storage_FS)</td>
-              <td>Pluggable backend: memory, disk, or S3</td>
+              <td data-i18n="arch.stack.storage.layer">Storage</td>
+              <td data-i18n="arch.stack.storage.tech">Memory-FS (Storage_FS)</td>
+              <td data-i18n="arch.stack.storage.purpose">Pluggable backend: memory, disk, or S3</td>
             </tr>
             <tr>
-              <td>Encryption</td>
-              <td>Web Crypto API (AES-256-GCM)</td>
-              <td>Client-side encryption in the browser</td>
+              <td data-i18n="arch.stack.encryption.layer">Encryption</td>
+              <td data-i18n="arch.stack.encryption.tech">Web Crypto API (AES-256-GCM)</td>
+              <td data-i18n="arch.stack.encryption.purpose">Client-side encryption in the browser</td>
             </tr>
             <tr>
-              <td>Type System</td>
-              <td>Type_Safe (osbot-utils)</td>
-              <td>Schema definitions without Pydantic</td>
+              <td data-i18n="arch.stack.types.layer">Type System</td>
+              <td data-i18n="arch.stack.types.tech">Type_Safe (osbot-utils)</td>
+              <td data-i18n="arch.stack.types.purpose">Schema definitions without Pydantic</td>
             </tr>
             <tr>
-              <td>Frontend</td>
-              <td>Vanilla JS + Web Components</td>
-              <td>Zero framework dependencies (IFD)</td>
+              <td data-i18n="arch.stack.frontend.layer">Frontend</td>
+              <td data-i18n="arch.stack.frontend.tech">Vanilla JS + Web Components</td>
+              <td data-i18n="arch.stack.frontend.purpose">Zero framework dependencies (IFD)</td>
             </tr>
             <tr>
-              <td>Testing</td>
-              <td>pytest, in-memory stack</td>
-              <td>No mocks, no patches, real implementations</td>
+              <td data-i18n="arch.stack.testing.layer">Testing</td>
+              <td data-i18n="arch.stack.testing.tech">pytest, in-memory stack</td>
+              <td data-i18n="arch.stack.testing.purpose">No mocks, no patches, real implementations</td>
             </tr>
             <tr>
-              <td>CI/CD</td>
-              <td>GitHub Actions</td>
-              <td>Test, tag, deploy pipeline</td>
+              <td data-i18n="arch.stack.cicd.layer">CI/CD</td>
+              <td data-i18n="arch.stack.cicd.tech">GitHub Actions</td>
+              <td data-i18n="arch.stack.cicd.purpose">Test, tag, deploy pipeline</td>
             </tr>
           </tbody>
         </table>
@@ -351,46 +351,46 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2>System Architecture</h2>
-          <p>Two Lambda functions, one storage layer, one CDN. Simple by design.</p>
+          <h2 data-i18n="arch.system.title">System Architecture</h2>
+          <p data-i18n="arch.system.subtitle">Two Lambda functions, one storage layer, one CDN. Simple by design.</p>
         </div>
 
         <div class="grid grid--2">
           <div class="card">
-            <h3 class="card__title">User Lambda (Public)</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.system.user_lambda.title">User Lambda (Public)</h3>
+            <p class="card__desc" data-i18n="arch.system.user_lambda.desc">
               Public-facing function that handles file transfers, health checks,
               presigned uploads, personal vaults, and MCP integration.
               Accessed via Lambda Function URL behind CloudFront.
             </p>
-            <span class="tag">18 endpoints</span>
+            <span class="tag" data-i18n="arch.system.user_lambda.tag">18 endpoints</span>
           </div>
           <div class="card">
-            <h3 class="card__title">Admin Lambda (Authenticated)</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.system.admin_lambda.title">Admin Lambda (Authenticated)</h3>
+            <p class="card__desc" data-i18n="arch.system.admin_lambda.desc">
               Admin-only function for token management, analytics, server stats,
               and MCP admin tools. Requires authentication.
               Separate Lambda = separate security boundary.
             </p>
-            <span class="tag">55 endpoints</span>
+            <span class="tag" data-i18n="arch.system.admin_lambda.tag">55 endpoints</span>
           </div>
           <div class="card">
-            <h3 class="card__title">Memory-FS (Storage_FS)</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.system.memfs.title">Memory-FS (Storage_FS)</h3>
+            <p class="card__desc" data-i18n="arch.system.memfs.desc">
               All storage goes through an abstraction layer. Application code
               never knows if the backend is in-memory, on disk, or S3.
               Same codebase across all 7 deployment targets.
             </p>
-            <span class="tag">Pluggable Backend</span>
+            <span class="tag" data-i18n="arch.system.memfs.tag">Pluggable Backend</span>
           </div>
           <div class="card">
-            <h3 class="card__title">CloudFront CDN</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.system.cdn.title">CloudFront CDN</h3>
+            <p class="card__desc" data-i18n="arch.system.cdn.desc">
               Static assets, caching, SSL termination, and WAF.
               Lambda URLs provide the HTTPS endpoints directly &mdash;
               no API Gateway needed.
             </p>
-            <span class="tag">Edge Network</span>
+            <span class="tag" data-i18n="arch.system.cdn.tag">Edge Network</span>
           </div>
         </div>
       </div>
@@ -402,63 +402,63 @@
     <section class="section">
       <div class="container">
         <div class="section-header">
-          <h2>Deployment Targets</h2>
-          <p>One codebase, seven deployment targets grouped into four patterns.</p>
+          <h2 data-i18n="arch.deploy.title">Deployment Targets</h2>
+          <p data-i18n="arch.deploy.subtitle">One codebase, seven deployment targets grouped into four patterns.</p>
         </div>
 
         <div class="grid grid--2">
           <div class="card">
-            <h3 class="card__title">Lambda</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.deploy.lambda.title">Lambda</h3>
+            <p class="card__desc" data-i18n="arch.deploy.lambda.desc">
               Primary deployment. Two Lambda functions behind Lambda Function URLs.
               Direct HTTPS endpoints, no API Gateway needed.
             </p>
-            <span class="tag">Production</span>
+            <span class="tag" data-i18n="arch.deploy.lambda.tag">Production</span>
           </div>
           <div class="card">
-            <h3 class="card__title">Container</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.deploy.container.title">Container</h3>
+            <p class="card__desc" data-i18n="arch.deploy.container.desc">
               Docker, AWS Fargate, and GCP Cloud Run. The same application packaged as a container.
             </p>
-            <span class="tag">Docker / Fargate / GCP</span>
+            <span class="tag" data-i18n="arch.deploy.container.tag">Docker / Fargate / GCP</span>
           </div>
           <div class="card">
-            <h3 class="card__title">Server</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.deploy.server.title">Server</h3>
+            <p class="card__desc" data-i18n="arch.deploy.server.desc">
               EC2 instances and AMI builds. For teams that need full control of the runtime environment.
             </p>
-            <span class="tag">EC2 / AMI</span>
+            <span class="tag" data-i18n="arch.deploy.server.tag">EC2 / AMI</span>
           </div>
           <div class="card">
-            <h3 class="card__title">CLI</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="arch.deploy.cli.title">CLI</h3>
+            <p class="card__desc" data-i18n="arch.deploy.cli.desc">
               Command-line interface for scripted transfers, CI/CD pipelines, and power users.
             </p>
-            <span class="tag">Terminal</span>
+            <span class="tag" data-i18n="arch.deploy.cli.tag">Terminal</span>
           </div>
         </div>
 
         <div class="stats-row mt-8">
           <div class="stat">
             <div class="stat__value">18</div>
-            <div class="stat__label">AI Agents</div>
+            <div class="stat__label" data-i18n="arch.stats.agents">AI Agents</div>
           </div>
           <div class="stat">
             <div class="stat__value">73</div>
-            <div class="stat__label">HTTP Endpoints</div>
+            <div class="stat__label" data-i18n="arch.stats.endpoints">HTTP Endpoints</div>
           </div>
           <div class="stat">
             <div class="stat__value">393</div>
-            <div class="stat__label">Passing Tests</div>
+            <div class="stat__label" data-i18n="arch.stats.tests">Passing Tests</div>
           </div>
           <div class="stat">
             <div class="stat__value">7</div>
-            <div class="stat__label">Deploy Targets</div>
+            <div class="stat__label" data-i18n="arch.stats.targets">Deploy Targets</div>
           </div>
         </div>
 
         <div class="text-center mt-8">
-          <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-secondary" target="_blank" rel="noopener">View Source on GitHub &rarr;</a>
+          <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-secondary" target="_blank" rel="noopener" data-i18n="arch.deploy.cta">View Source on GitHub &rarr;</a>
         </div>
       </div>
     </section>
@@ -505,7 +505,7 @@
     </div>
   </footer>
 
-  <script src="../_common/js/i18n.js"></script>
+  <script src="../../_common/js/i18n.js"></script>
   <script>
     SgI18n.init().then(() => {
       document.body.classList.remove('i18n-loading');

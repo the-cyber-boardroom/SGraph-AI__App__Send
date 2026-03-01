@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Successful — SG/Send</title>
-  <meta name="description" content="Your SG/Send credit purchase was successful. You'll receive your access token via email shortly.">
-  <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
-  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
-  <link rel="stylesheet" href="../../_common/css/style.css">
+  <title>Payment Cancelled — SG/Send</title>
+  <meta name="description" content="Your SG/Send payment was cancelled. No charges have been made. You can try again anytime.">
+  <link rel="icon" type="image/svg+xml" href="../../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../../_common/css/style.css">
   <style>
-    .success-card {
+    .cancel-card {
       background-color: var(--bg-surface);
-      border: 1px solid var(--accent);
+      border: 1px solid var(--border-color);
       border-radius: var(--radius-card);
       padding: var(--sp-8);
       max-width: 560px;
@@ -19,62 +19,26 @@
       text-align: center;
     }
 
-    .success-card__icon {
+    .cancel-card__icon {
       font-size: 3rem;
       margin-bottom: var(--sp-4);
+      color: var(--text-secondary);
     }
 
-    .success-card__title {
+    .cancel-card__title {
       font-size: var(--fs-h1);
       color: var(--text-heading);
       margin-bottom: var(--sp-4);
     }
 
-    .success-card__message {
+    .cancel-card__message {
       color: var(--text-secondary);
       font-size: 1.05rem;
-      margin-bottom: var(--sp-6);
+      margin-bottom: var(--sp-8);
       line-height: 1.7;
     }
 
-    .next-steps {
-      text-align: left;
-      background-color: rgba(0, 0, 0, 0.2);
-      border-radius: var(--radius-btn);
-      padding: var(--sp-6);
-      margin-bottom: var(--sp-6);
-    }
-
-    .next-steps__title {
-      font-size: var(--fs-h3);
-      color: var(--text-heading);
-      margin-bottom: var(--sp-4);
-    }
-
-    .next-steps ol {
-      counter-reset: next-step;
-      display: flex;
-      flex-direction: column;
-      gap: var(--sp-3);
-    }
-
-    .next-steps li {
-      counter-increment: next-step;
-      display: flex;
-      gap: var(--sp-3);
-      align-items: baseline;
-      font-size: 0.95rem;
-      color: var(--text-primary);
-    }
-
-    .next-steps li::before {
-      content: counter(next-step) '.';
-      color: var(--accent);
-      font-weight: var(--fw-bold);
-      flex-shrink: 0;
-    }
-
-    .success-actions {
+    .cancel-actions {
       display: flex;
       gap: var(--sp-4);
       justify-content: center;
@@ -106,30 +70,21 @@
   <main>
 
     <!-- ============================================================
-         SUCCESS MESSAGE
+         CANCEL MESSAGE
          ============================================================ -->
     <section class="section" style="padding-block: var(--sp-24) var(--sp-16);">
       <div class="container">
-        <div class="success-card">
-          <div class="success-card__icon">&#10003;</div>
-          <h1 class="success-card__title" data-i18n="payment.success.heading">Payment successful</h1>
-          <p class="success-card__message" data-i18n="payment.success.message">
-            Thank you for purchasing SG/Send credits.
-            A receipt has been sent to your email by Stripe.
+        <div class="cancel-card">
+          <div class="cancel-card__icon">&#8592;</div>
+          <h1 class="cancel-card__title" data-i18n="payment.cancel.heading">Payment cancelled</h1>
+          <p class="cancel-card__message" data-i18n="payment.cancel.message">
+            No worries — no charges have been made.
+            You can try again anytime, or join our free Early Access Programme instead.
           </p>
 
-          <div class="next-steps">
-            <h2 class="next-steps__title" data-i18n="payment.success.next_title">What happens next</h2>
-            <ol>
-              <li data-i18n="payment.success.step1">We'll create your access token (typically within a few hours)</li>
-              <li data-i18n="payment.success.step2">You'll receive an email from Sherpa with your token and instructions</li>
-              <li data-i18n="payment.success.step3">Visit <a href="https://send.sgraph.ai">send.sgraph.ai</a> and start sending encrypted files</li>
-            </ol>
-          </div>
-
-          <div class="success-actions">
-            <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg" data-i18n="payment.success.cta_send">Go to SG/Send &rarr;</a>
-            <a href="../../pricing/" class="btn btn-secondary btn--lg" data-i18n="payment.success.cta_pricing">Back to Pricing</a>
+          <div class="cancel-actions">
+            <a href="../../pricing/" class="btn btn-primary btn--lg" data-i18n="payment.cancel.cta_pricing">Back to Pricing</a>
+            <a href="mailto:sherpa@sgraph.ai?subject=Question%20about%20SG%2FSend" class="btn btn-secondary btn--lg" data-i18n="payment.cancel.cta_sherpa">Ask the Sherpa</a>
           </div>
         </div>
       </div>
@@ -182,7 +137,7 @@
     </div>
   </footer>
 
-  <script src="../../_common/js/i18n.js"></script>
+  <script src="../../../_common/js/i18n.js"></script>
   <script>
     SgI18n.init().then(() => {
       document.body.classList.remove('i18n-loading');
