@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SGraph AI — AI Agents That Build, Use, and Secure the Same Platform</title>
-  <meta name="description" content="SG/Send is a zero-knowledge encrypted file sharing platform, built entirely by AI agents working in parallel. The same agents that built it use it every day.">
-  <meta name="i18n-title-key" content="home.title">
+  <title>SG/Send — Zero-Knowledge Encrypted File Sharing</title>
+  <meta name="description" content="Send files with zero-knowledge encryption. Files are encrypted in your browser before upload — we never see your data. Free to try, open source, from £5 for 500 transfers.">
+  <meta name="i18n-title-key" content="home.title2">
   <link rel="icon" type="image/svg+xml" href="../_common/favicon.svg">
   <link rel="stylesheet" href="../_common/fonts/fonts.css">
   <link rel="stylesheet" href="../_common/css/style.css">
@@ -34,33 +34,37 @@
   <main>
 
     <!-- ============================================================
-         HERO
+         HERO — Product-led: Zero-Knowledge Encrypted File Sharing
          ============================================================ -->
     <section class="hero">
       <div class="container">
-        <h1 class="display" data-i18n="home.hero.title">AI agents that build, use, and secure the same platform.</h1>
-        <p class="lead" data-i18n="home.hero.lead">
+        <h1 class="display" data-i18n="home.hero.title2">Send files. Nobody can read them. Not even us.</h1>
+        <p class="lead" data-i18n="home.hero.lead2">
           <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
-          is a zero-knowledge encrypted file sharing platform,
-          built entirely by AI agents working in parallel.
-          The same agents that built it use it every day.
+          encrypts files in your browser before upload. The server only stores ciphertext.
+          Your decryption key never leaves your device.
         </p>
         <div class="hero-ctas">
-          <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg" data-i18n="home.hero.cta_try">Try SG/Send &rarr;</a>
-          <a href="./agents/" class="btn btn-secondary btn--lg" data-i18n="home.hero.cta_team">Meet the Team &rarr;</a>
+          <a href="./pricing/free/" class="btn btn-primary btn--lg" data-i18n="home.hero.cta_free">Get Started Free &rarr;</a>
+          <a href="./pricing/" class="btn btn-secondary btn--lg" data-i18n="home.hero.cta_pricing">See Pricing &rarr;</a>
         </div>
+        <p class="hero-sub" style="margin-top: var(--sp-4); font-size: 0.9rem; color: var(--text-secondary);">
+          <span data-i18n="home.hero.sub">Free Early Access available. Open source. From &pound;0.01 per file.</span>
+          &nbsp;&middot;&nbsp;
+          <a href="https://send.sgraph.ai" style="color: var(--accent);" data-i18n="home.hero.sub_existing">Already have a token? Go to send.sgraph.ai &rarr;</a>
+        </p>
       </div>
     </section>
 
     <!-- ============================================================
-         THE PLATFORM
+         HOW IT WORKS — The zero-knowledge proposition
          ============================================================ -->
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2 data-i18n="home.platform.title"><span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span> &mdash; Zero-Knowledge File Sharing</h2>
-          <p data-i18n="home.platform.desc">
-            Files are encrypted in your browser using AES-256-GCM before upload.
+          <h2 data-i18n="home.platform.title2">Zero-Knowledge Encryption</h2>
+          <p data-i18n="home.platform.desc2">
+            Your files are encrypted in your browser using AES-256-GCM before upload.
             The server stores only encrypted ciphertext. Your decryption key never leaves your device.
           </p>
         </div>
@@ -81,110 +85,72 @@
           <div class="card">
             <div class="card__icon">&#128683;</div>
             <h3 class="card__title" data-i18n="home.feature.zero_knowledge.title">Zero Knowledge</h3>
-            <p class="card__desc" data-i18n="home.feature.zero_knowledge.desc">
+            <p class="card__desc" data-i18n="home.feature.zero_knowledge.desc2">
               The server never sees your plaintext data, your file names, or your encryption keys.
-              By design, we cannot access your content.
+              Even if someone accessed our servers, they would only find meaningless encrypted data.
             </p>
           </div>
           <div class="card">
-            <div class="card__icon">&#9889;</div>
-            <h3 class="card__title" data-i18n="home.feature.serverless.title">Serverless Pricing</h3>
-            <p class="card__desc" data-i18n="home.feature.serverless.desc">
-              Runs on AWS Lambda — you only pay for what you use.
-              No idle servers, no minimum commitments, scales to zero.
+            <div class="card__icon">&#127760;</div>
+            <h3 class="card__title" data-i18n="home.feature.open_source.title">Open Source</h3>
+            <p class="card__desc" data-i18n="home.feature.open_source.desc">
+              The entire codebase is public on GitHub. Inspect the encryption yourself.
+              Deploy on your own infrastructure. Free forever.
             </p>
           </div>
-        </div>
-
-        <div class="text-center mt-8">
-          <a href="https://send.sgraph.ai" class="btn btn-primary" data-i18n="home.platform.cta">Try SG/Send &rarr;</a>
         </div>
       </div>
     </section>
 
     <!-- ============================================================
-         THE AGENTS
+         GET STARTED — Conversion section
          ============================================================ -->
     <section class="section">
       <div class="container">
         <div class="section-header">
-          <h2 data-i18n="home.team.title">Meet the Team</h2>
-          <p data-i18n="home.team.subtitle">18 AI agents. One human. Everything in public.</p>
+          <h2 data-i18n="home.getstarted.title">Get Started</h2>
+          <p data-i18n="home.getstarted.desc">Try SG/Send for free or buy credits to start sending encrypted files immediately.</p>
         </div>
 
-        <div class="grid grid--3">
-          <article class="card agent-card">
-            <h3 class="card__title" data-i18n="home.agent.sherpa.title">Sherpa</h3>
-            <p class="card__desc" data-i18n="home.agent.sherpa.desc">
-              Guides users through SG/Send and answers questions.
-              The first point of contact for anyone who needs help.
+        <div class="grid grid--2 mt-8" style="max-width: 720px; margin-left: auto; margin-right: auto;">
+          <div class="card pricing-card pricing-card--featured" style="text-align: center;">
+            <div class="pricing-card__badge" data-i18n="home.getstarted.eap_badge">Recommended</div>
+            <h3 class="card__title" data-i18n="home.getstarted.eap_title">Early Access Programme</h3>
+            <p class="card__desc" data-i18n="home.getstarted.eap_desc">
+              Get a free access token with evaluation credits.
+              No payment required. No credit card needed.
             </p>
-            <a href="./agents/sherpa/" class="card__link" data-i18n="home.agent.sherpa.link">View Profile &rarr;</a>
-          </article>
+            <div class="pricing-card__price" data-i18n="home.getstarted.eap_price">Free</div>
+            <a href="./pricing/free/" class="btn btn-primary" data-i18n="home.getstarted.eap_cta">Join Early Access &rarr;</a>
+          </div>
 
-          <article class="card agent-card">
-            <h3 class="card__title" data-i18n="home.agent.ambassador.title">Ambassador</h3>
-            <p class="card__desc" data-i18n="home.agent.ambassador.desc">
-              Represents SGraph AI to the outside world.
-              Translates technical capability into clear communication.
+          <div class="card pricing-card" style="text-align: center;">
+            <h3 class="card__title" data-i18n="home.getstarted.starter_title">Starter Pack</h3>
+            <p class="card__desc" data-i18n="home.getstarted.starter_desc">
+              500 encrypted file transfers. Pay once, use within 3 months.
+              That's &pound;0.01 per file.
             </p>
-            <a href="./agents/ambassador/" class="card__link" data-i18n="home.agent.ambassador.link">View Profile &rarr;</a>
-          </article>
-
-          <article class="card agent-card">
-            <h3 class="card__title" data-i18n="home.agent.architect.title">Architect</h3>
-            <p class="card__desc" data-i18n="home.agent.architect.desc">
-              Designs the system topology, API contracts, and data models.
-              Ensures every component fits together coherently.
-            </p>
-            <a href="./agents/architect/" class="card__link" data-i18n="home.agent.architect.link">View Profile &rarr;</a>
-          </article>
-
-          <article class="card agent-card">
-            <h3 class="card__title" data-i18n="home.agent.librarian.title">Librarian</h3>
-            <p class="card__desc" data-i18n="home.agent.librarian.desc">
-              Maintains the knowledge base, master index, and reality document.
-              The single source of truth for what actually exists.
-            </p>
-            <a href="./agents/librarian/" class="card__link" data-i18n="home.agent.librarian.link">View Profile &rarr;</a>
-          </article>
-
-          <article class="card agent-card">
-            <h3 class="card__title" data-i18n="home.agent.dev.title">Dev</h3>
-            <p class="card__desc" data-i18n="home.agent.dev.desc">
-              Writes the application code, implements features, and fixes bugs.
-              Works in Python with FastAPI, Type_Safe, and Memory-FS.
-            </p>
-            <a href="./agents/dev/" class="card__link" data-i18n="home.agent.dev.link">View Profile &rarr;</a>
-          </article>
-
-          <article class="card agent-card">
-            <h3 class="card__title" data-i18n="home.agent.appsec.title">AppSec</h3>
-            <p class="card__desc" data-i18n="home.agent.appsec.desc">
-              Reviews every change for security vulnerabilities.
-              Verifies the zero-knowledge model holds under all conditions.
-            </p>
-            <a href="./agents/appsec/" class="card__link" data-i18n="home.agent.appsec.link">View Profile &rarr;</a>
-          </article>
+            <div class="pricing-card__price">&pound;5</div>
+            <a href="./pricing/cloud/" class="btn btn-secondary" data-i18n="home.getstarted.starter_cta">Buy Credits &rarr;</a>
+          </div>
         </div>
 
         <div class="text-center mt-8">
-          <a href="./agents/" class="btn btn-secondary" data-i18n="home.team.cta">View All Team Members &rarr;</a>
+          <a href="./pricing/" style="color: var(--accent);" data-i18n="home.getstarted.more">See all pricing options including self-hosted and enterprise &rarr;</a>
         </div>
       </div>
     </section>
 
     <!-- ============================================================
-         HOW IT'S BUILT
+         BUILT BY AI — The agentic team story (supporting narrative)
          ============================================================ -->
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2 data-i18n="home.built.title">Built in Public</h2>
-          <p data-i18n="home.built.desc">
-            SG/Send is developed using an agentic model: 18 specialised AI agents
-            collaborate under human oversight, with every decision, review,
-            and line of code tracked in the open.
+          <h2 data-i18n="home.built.title2">Built Entirely by AI Agents</h2>
+          <p data-i18n="home.built.desc2">
+            SG/Send is developed by 18 specialised AI agents collaborating under human oversight.
+            Every decision, review, and line of code is tracked in the open.
           </p>
         </div>
 
@@ -202,14 +168,14 @@
             <div class="stat__label" data-i18n="home.stat.tests">Passing Tests</div>
           </div>
           <div class="stat">
-            <div class="stat__value">6</div>
-            <div class="stat__label" data-i18n="home.stat.pages">User-Facing Pages</div>
+            <div class="stat__value">1</div>
+            <div class="stat__label" data-i18n="home.stat.human">Human</div>
           </div>
         </div>
 
         <div class="text-center mt-8" style="display: flex; justify-content: center; gap: var(--sp-4); flex-wrap: wrap;">
-          <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-secondary" target="_blank" rel="noopener" data-i18n="home.built.cta_github">View on GitHub &rarr;</a>
-          <a href="./architecture/" class="btn btn-ghost" data-i18n="home.built.cta_arch">Explore Architecture &rarr;</a>
+          <a href="./agents/" class="btn btn-secondary" data-i18n="home.built.cta_team">Meet the Team &rarr;</a>
+          <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-ghost" target="_blank" rel="noopener" data-i18n="home.built.cta_github">View on GitHub &rarr;</a>
         </div>
       </div>
     </section>
@@ -226,7 +192,7 @@
           <a href="./" class="site-logo">
             <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
           </a>
-          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+          <p data-i18n="footer.brand_desc2">Zero-knowledge encrypted file sharing. Files are encrypted in your browser before upload. Open source, built by AI agents.</p>
         </div>
 
         <div class="footer-col">
