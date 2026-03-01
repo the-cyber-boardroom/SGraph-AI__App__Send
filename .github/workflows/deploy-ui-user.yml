@@ -1,15 +1,23 @@
 name: Deploy User UI to S3
 
-# Publishes static UI files to S3 for CloudFront distribution.
+# Publishes v0.2.x static UI files to S3 for CloudFront distribution.
 # CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
-# Reuses scripts/deploy_static_site.py for S3 sync + CloudFront invalidation.
+#
+# Only the current version (v0.2.0) is deployed — v0.1.x, assets/, and tools/
+# are NOT included. The deploy syncs v0.2.0/ content directly.
+#
+# Steps:
+#   1. Generate i18n locale pages (pt-PT/, de/, fr/, etc.) from en-gb/ templates
+#   2. Sync v0.2.0/ content to S3 under the IFD version path
+#   3. Invalidate CloudFront cache
 
 on:
   push:
     branches:
       - dev
     paths:
-      - 'sgraph_ai_app_send__ui__user/**'
+      - 'sgraph_ai_app_send__ui__user/v0/v0.2/**'
+      - 'scripts/generate_send_i18n_pages.py'
       - '.github/workflows/deploy-ui-user.yml'
   workflow_dispatch:
     inputs:
@@ -27,7 +35,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION : eu-west-2
+  AWS_REGION  : eu-west-2
+  UI_VERSION  : v0.2.0
+  # Source: only the v0.2.0 folder (excludes v0.1, assets, tools)
+  SOURCE_DIR  : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.0
 
 jobs:
   deploy:
@@ -44,6 +55,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Generate i18n locale pages
+        run: python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION }}
 
       - name: Check AWS credentials
         id: check-creds
@@ -63,17 +77,13 @@ jobs:
           aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region            : ${{ env.AWS_REGION }}
 
-      - name: Read version
-        id: version
-        run: echo "version=$(cat sgraph_ai_app_send/version)" >> $GITHUB_OUTPUT
-
       - name: Deploy User UI to S3
         if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
           python scripts/deploy_static_site.py \
             --site sgraph-send \
-            --version ${{ steps.version.outputs.version }} \
-            --source-dir sgraph_ai_app_send__ui__user \
+            --version ${{ env.UI_VERSION }} \
+            --source-dir ${{ env.SOURCE_DIR }} \
             --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
             --region ${{ env.AWS_REGION }} \
             --cloudfront-distribution-id ${{ secrets.SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID }} \

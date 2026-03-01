@@ -1,0 +1,57 @@
+{
+  "_comment": "SGraph Send — Italiano",
+
+  "app.title":            "SG/Send",
+  "app.tagline":          "I tuoi file, le tue chiavi, la tua privacy",
+  "app.subtitle":         "Condivisione file con crittografia zero-knowledge",
+  "app.disclaimer":       "Questo è un servizio beta. Non caricare contenuti riservati o illegali.",
+
+  "upload.mode.file":     "File",
+  "upload.mode.text":     "Testo",
+
+  "upload.drop_zone.label":           "Trascina il tuo file qui",
+  "upload.drop_zone.hint":            "o clicca per sfogliare",
+  "upload.drop_zone.encrypted_hint":  "Crittografato nel tuo browser prima del caricamento",
+
+  "upload.button.encrypt_upload":     "Crittografa e Carica",
+  "upload.button.encrypt_send":       "Crittografa e Invia",
+
+  "upload.progress.encrypting":       "Crittografia...",
+  "upload.progress.uploading":        "Caricamento...",
+
+  "upload.result.file_success":       "Il tuo file è stato crittografato e caricato.",
+  "upload.result.text_success":       "Il tuo testo è stato crittografato e caricato.",
+  "upload.result.share_link":         "Condividi questo link",
+  "upload.result.copy_link":          "Copia link",
+  "upload.result.decryption_key":     "Chiave di decrittazione",
+  "upload.result.copy":               "Copia",
+  "upload.result.send_another":       "Invia un altro",
+
+  "download.loading":                 "Caricamento informazioni trasferimento...",
+  "download.key.label":               "Chiave di decrittazione",
+  "download.key.placeholder":         "Incolla la chiave di decrittazione qui",
+  "download.button.decrypt_download": "Scarica e Decritta",
+  "download.button.decrypt_view":     "Decritta e Visualizza",
+  "download.result.file_success":     "File decrittato e salvato con successo.",
+  "download.result.text_success":     "Testo decrittato con successo.",
+  "download.result.copy_text":        "Copia negli appunti",
+  "download.result.send_another":     "Invia un nuovo file o testo",
+
+  "access_gate.title":                "Accesso Beta",
+  "access_gate.subtitle":             "Inserisci il tuo token di accesso per iniziare a inviare file.",
+  "access_gate.placeholder":          "Incolla il tuo token di accesso",
+  "access_gate.button":               "Vai",
+
+  "transparency.title":               "Cosa abbiamo memorizzato su questo trasferimento",
+  "transparency.section.stored":      "Memorizzato dal server",
+  "transparency.section.encrypted":   "Memorizzato crittografato (solo tu puoi leggerlo)",
+  "transparency.section.not_stored":  "Mai inviato al server",
+
+  "common.copied":                    "Copiato!",
+
+  "test_files.title":                 "File di test",
+  "test_files.description":           "Scarica un file di test e trascinalo nella zona di caricamento sopra.",
+
+  "cta.title":                        "Vuoi anche tu inviare file?",
+  "cta.description":                  "Unisciti al programma di accesso anticipato di SGraph Send."
+}

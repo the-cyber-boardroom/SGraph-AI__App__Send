@@ -1,0 +1,140 @@
+{
+  "_comment": "SGraph Send — Português (Brasil)",
+
+  "app.title":            "SG/Send",
+  "app.tagline":          "Seus arquivos, suas chaves, sua privacidade",
+  "app.subtitle":         "Compartilhamento de arquivos com criptografia zero-knowledge",
+  "app.disclaimer":       "Este é um serviço beta. Não envie conteúdo confidencial ou ilegal.",
+
+  "upload.mode.file":     "Arquivo",
+  "upload.mode.text":     "Texto",
+
+  "upload.drop_zone.label":           "Arraste o arquivo para aqui",
+  "upload.drop_zone.hint":            "ou clique para procurar",
+  "upload.drop_zone.encrypted_hint":  "Criptografado no seu navegador antes do envio",
+  "upload.drop_zone.size_limit":      "Tamanho máximo do arquivo: {limit}",
+
+  "upload.text.placeholder":          "Digite ou cole o seu texto aqui",
+  "upload.text.char_count":           "{count} caracteres",
+  "upload.text.drop_hint":            "Você também pode arrastar um arquivo de texto aqui",
+
+  "upload.button.encrypt_upload":     "Criptografar e Enviar",
+  "upload.button.encrypt_send":       "Criptografar e Enviar",
+
+  "upload.progress.reading":          "Lendo arquivo...",
+  "upload.progress.encrypting":       "Criptografando...",
+  "upload.progress.creating":         "Preparando transferência...",
+  "upload.progress.uploading":        "Enviando...",
+  "upload.progress.uploading_part":   "Enviando parte {current} de {total}...",
+  "upload.progress.completing":       "Finalizando...",
+
+  "upload.result.file_success":       "Seu arquivo foi criptografado e enviado.",
+  "upload.result.text_success":       "Seu texto foi criptografado e enviado.",
+  "upload.result.share_link":         "Compartilhe este link",
+  "upload.result.copy_link":          "Copiar link",
+  "upload.result.show_separate_key":  "Compartilhar chave separadamente",
+  "upload.result.hide_key":           "Ocultar chave",
+  "upload.result.link_only":          "Apenas link",
+  "upload.result.decryption_key":     "Chave de descriptografia",
+  "upload.result.copy":               "Copiar",
+  "upload.result.open_tab":           "Abrir em nova aba",
+  "upload.result.send_another":       "Enviar outro",
+  "upload.guidance.split_channels":   "Para maior segurança, compartilhe o link e a chave por <strong>canais diferentes</strong> (ex: link por email, chave por mensagem).",
+
+  "upload.error.empty_text":          "Por favor digite um texto para criptografar.",
+  "upload.error.upload_failed":       "O envio falhou. Por favor tente novamente.",
+  "upload.error.file_too_large":      "O arquivo é grande demais. Tamanho máximo: {limit}.",
+
+  "upload.token.unlimited":           "Usos ilimitados restantes",
+  "upload.token.remaining":           "{remaining} usos restantes",
+
+  "upload.timing.title":              "Envio concluído em",
+  "download.timing.title":            "Download concluído em",
+
+  "download.loading":                 "Carregando informação da transferência...",
+
+  "download.info.encrypted_file":     "Arquivo criptografado",
+  "download.info.encrypted_text":     "Texto criptografado",
+  "download.info.uploaded":           "Enviado {timestamp}",
+  "download.info.download_count":     "Baixado {count} vez(es)",
+
+  "download.key.label":               "Chave de descriptografia",
+  "download.key.placeholder":         "Cole a chave de descriptografia aqui",
+  "download.button.decrypt_download": "Baixar e Descriptografar",
+  "download.button.decrypt_view":     "Descriptografar e Ver",
+
+  "download.progress.decrypting":     "Baixando e descriptografando...",
+
+  "download.result.file_success":     "Arquivo descriptografado e salvo com sucesso.",
+  "download.result.text_success":     "Texto descriptografado com sucesso.",
+  "download.result.copy_text":        "Copiar para a área de transferência",
+  "download.result.download_file":    "Baixar como arquivo",
+  "download.result.send_another":     "Enviar novo arquivo ou texto",
+  "download.result.decrypted_message": "Mensagem Descriptografada",
+
+  "download.history.title":           "Downloads recentes",
+  "download.history.privacy":         "Armazenado no seu navegador. Qualquer pessoa com acesso a este dispositivo pode ver estes itens.",
+  "download.history.clear":           "Limpar histórico",
+  "download.history.empty":           "Nenhum download recente.",
+  "download.history.text_preview":    "Texto",
+  "download.history.file_label":      "Arquivo",
+
+  "download.token.uses_remaining":    "{remaining} usos restantes",
+
+  "download.error.no_id":             "ID de transferência não encontrado no URL. Por favor verifique o link.",
+  "download.error.not_ready":         "Esta transferência ainda não está disponível para download.",
+  "download.error.not_found":         "Transferência não encontrada. O link pode ter expirado.",
+  "download.error.no_key":            "Por favor digite a chave de descriptografia.",
+  "download.error.failed":            "O download ou descriptografia falhou.",
+  "download.error.token_not_found":   "Este link não é válido. O token de acesso não foi encontrado.",
+  "download.error.token_exhausted":   "Este link expirou. O token de acesso foi totalmente utilizado.",
+  "download.error.token_revoked":     "Este link foi desativado. O token de acesso foi revogado.",
+
+  "access_gate.title":                "Acesso Beta",
+  "access_gate.subtitle":             "Digite seu token de acesso para começar a enviar arquivos.",
+  "access_gate.placeholder":          "Cole seu token de acesso",
+  "access_gate.button":               "Ir",
+  "access_gate.invalid":              "Token inválido ou ausente. Por favor verifique e tente novamente.",
+  "access_gate.not_found":            "Token não encontrado. Por favor verifique e tente novamente.",
+  "access_gate.exhausted":            "Este token foi totalmente utilizado. Por favor solicite um novo.",
+  "access_gate.revoked":              "Este token foi revogado.",
+  "access_gate.uses_remaining":       "{remaining} usos restantes",
+  "access_gate.change_token":         "Alterar Token",
+  "access_gate.signup_title":         "Junte-se ao Programa de Acesso Antecipado",
+  "access_gate.signup_subtitle":      "Cadastre-se para ser notificado quando o SGraph Send estiver disponível.",
+
+  "transparency.title":               "O que armazenamos sobre esta transferência",
+  "transparency.section.stored":      "Armazenado pelo servidor",
+  "transparency.section.encrypted":   "Armazenado criptografado (só você pode ler)",
+  "transparency.section.not_stored":  "Nunca enviado ao servidor",
+  "transparency.footer":              "Isso é tudo. Nada mais foi capturado.",
+  "transparency.ip_address":          "Seu endereço IP",
+  "transparency.upload_time":         "Hora do envio",
+  "transparency.download_time":       "Hora do download",
+  "transparency.file_size":           "Tamanho do arquivo",
+  "transparency.encryption_method":   "Criptografia",
+  "transparency.label.file_name":     "Nome do arquivo",
+  "transparency.label.file_content":  "Conteúdo do arquivo",
+  "transparency.label.decryption_key":"Chave de descriptografia",
+  "transparency.label.raw_ip":        "Endereço IP original",
+  "transparency.not_stored":          "NÃO armazenado",
+  "transparency.encrypted":           "Criptografado (só você pode ler)",
+  "transparency.key_not_stored":      "NÃO armazenado (só você a tem)",
+
+  "crypto.error.unavailable":         "A Web Crypto API não está disponível. Requer um contexto seguro (HTTPS ou localhost).",
+  "crypto.error.read_failed":         "Falha ao ler o arquivo",
+
+  "common.copied":                    "Copiado!",
+
+  "nav.docs":                         "Documentação",
+  "nav.github":                       "GitHub",
+
+  "footer.powered_by":                "Desenvolvido por",
+  "footer.sgraph":                    "SGraph",
+
+  "test_files.title":                 "Arquivos de Teste",
+  "test_files.description":           "Baixe um arquivo de teste e arraste-o para a zona de envio acima.",
+
+  "cta.title":                        "Quer enviar arquivos também?",
+  "cta.description":                  "Junte-se ao programa de acesso antecipado do SGraph Send."
+}

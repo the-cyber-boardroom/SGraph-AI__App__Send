@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Send — Download & Decrypt</title>
+    <meta name="description" content="Decrypt and download your file. Zero-knowledge encryption — decryption happens in your browser.">
+
+    <!-- Fonts (vendored — no external CDN) -->
+    <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+
+    <!-- Design tokens -->
+    <link rel="stylesheet" href="../../_common/css/design-tokens.css">
+
+    <!-- Component styles -->
+    <link rel="stylesheet" href="../../_common/css/shared-components.css">
+    <link rel="stylesheet" href="../../_common/js/components/send-download/send-download.css">
+    <link rel="stylesheet" href="../../_common/js/components/send-transparency/send-transparency.css">
+    <link rel="stylesheet" href="../../_common/js/components/send-header/send-header.css">
+    <link rel="stylesheet" href="../../_common/js/components/send-footer/send-footer.css">
+    <link rel="stylesheet" href="../../_common/js/components/send-locale/send-locale.css">
+    <meta name="i18n-prerendered" content="true" />
+</head>
+<body>
+
+    <send-header></send-header>
+
+    <main>
+        <send-download></send-download>
+
+        <div class="card" style="margin-top: 1.5rem; text-align: center;">
+            <h3 style="font-size: var(--text-body); margin-bottom: 0.25rem;" data-i18n="cta.title">Também quer enviar ficheiros?</h3>
+            <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: 1rem;" data-i18n="cta.description">Junte-se ao programa de acesso antecipado do SGraph Send.</p>
+            <form class="launchlist-form" action="https://getlaunchlist.com/s/zSa8gI" method="POST">
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
+                    <input name="name" type="text" class="input" placeholder="Name" style="flex: 1; min-width: 120px;">
+                    <input name="email" type="email" class="input" placeholder="Email" required style="flex: 1; min-width: 180px;">
+                    <button type="submit" class="btn btn-primary">Sign Up</button>
+                </div>
+            </form>
+        </div>
+
+        <p class="disclaimer" data-i18n="app.disclaimer">Este é um serviço beta. Não envie conteúdo confidencial ou ilegal.</p>
+    </main>
+
+    <send-footer></send-footer>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Script Loading Order
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- 1. Utilities -->
+    <script src="../../_common/js/i18n.js"></script>
+    <script src="../../_common/js/crypto.js"></script>
+    <script src="../../_common/js/api-client.js"></script>
+    <script src="../../_common/js/file-type-detect.js"></script>
+    <script src="../../_common/js/markdown-parser.js"></script>
+
+    <!-- 2. Base system -->
+    <script src="../../_common/js/base/send-helpers.js"></script>
+    <script src="../../_common/js/base/send-component-paths.js"></script>
+    <script src="../../_common/js/base/send-component.js"></script>
+
+    <!-- 3. Components -->
+    <script src="../../_common/js/components/send-locale/send-locale.js"></script>
+    <script src="../../_common/js/components/send-header/send-header.js"></script>
+    <script src="../../_common/js/components/send-footer/send-footer.js"></script>
+    <script src="../../_common/js/components/send-transparency/send-transparency.js"></script>
+    <script src="../../_common/js/components/send-download/send-download.js"></script>
+
+    <!-- 4. Init -->
+    <script>
+        SendComponentPaths.init('../../_common');
+        I18n.init('../../_common/js/i18n').then(() => {
+            // Update static text after i18n loads
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (key) el.textContent = I18n.t(key);
+            });
+        });
+    </script>
+
+</body>
+</html>
