@@ -15,7 +15,7 @@ class test_Routes__Transfers(TestCase):
             cls.client = _.fast_api__client
 
     def test__create_transfer(self):
-        response = self.client.post('/transfers/create',
+        response = self.client.post('/api/transfers/create',
                                     json=dict(file_size_bytes   = 2048,
                                               content_type_hint = 'text/plain'))
         assert response.status_code           == 200
@@ -25,10 +25,10 @@ class test_Routes__Transfers(TestCase):
         assert len(data['transfer_id'])        == 12
 
     def test__upload_payload(self):
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes = 4)).json()
         tid      = create['transfer_id']
-        response = self.client.post(f'/transfers/upload/{tid}',
+        response = self.client.post(f'/api/transfers/upload/{tid}',
                                     content = b'\xde\xad\xbe\xef',
                                     headers = {'content-type': 'application/octet-stream'})
         assert response.status_code           == 200
@@ -37,19 +37,19 @@ class test_Routes__Transfers(TestCase):
         assert data['size']                    == 4
 
     def test__upload_payload__not_found(self):
-        response = self.client.post('/transfers/upload/nonexistent',
+        response = self.client.post('/api/transfers/upload/nonexistent',
                                     content = b'data',
                                     headers = {'content-type': 'application/octet-stream'})
         assert response.status_code           == 404
 
     def test__complete_transfer(self):
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes = 8)).json()
         tid = create['transfer_id']
-        self.client.post(f'/transfers/upload/{tid}',
+        self.client.post(f'/api/transfers/upload/{tid}',
                          content = b'\x00' * 8,
                          headers = {'content-type': 'application/octet-stream'})
-        response = self.client.post(f'/transfers/complete/{tid}')
+        response = self.client.post(f'/api/transfers/complete/{tid}')
         assert response.status_code           == 200
         data = response.json()
         assert data['transfer_id']             == tid
@@ -57,10 +57,10 @@ class test_Routes__Transfers(TestCase):
         assert 'transparency'                  in data
 
     def test__transfer_info(self):
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes = 512)).json()
         tid      = create['transfer_id']
-        response = self.client.get(f'/transfers/info/{tid}')
+        response = self.client.get(f'/api/transfers/info/{tid}')
         assert response.status_code           == 200
         data = response.json()
         assert data['transfer_id']             == tid
@@ -68,40 +68,40 @@ class test_Routes__Transfers(TestCase):
         assert data['file_size_bytes']         == 512
 
     def test__transfer_info__not_found(self):
-        response = self.client.get('/transfers/info/nonexistent')
+        response = self.client.get('/api/transfers/info/nonexistent')
         assert response.status_code           == 404
 
     def test__download_payload(self):
         payload = b'\x89PNG\x00\x01\x02\x03'
-        create  = self.client.post('/transfers/create',
+        create  = self.client.post('/api/transfers/create',
                                    json=dict(file_size_bytes = len(payload))).json()
         tid = create['transfer_id']
-        self.client.post(f'/transfers/upload/{tid}',
+        self.client.post(f'/api/transfers/upload/{tid}',
                          content = payload,
                          headers = {'content-type': 'application/octet-stream'})
-        self.client.post(f'/transfers/complete/{tid}')
+        self.client.post(f'/api/transfers/complete/{tid}')
 
-        response = self.client.get(f'/transfers/download/{tid}')
+        response = self.client.get(f'/api/transfers/download/{tid}')
         assert response.status_code           == 200
         assert response.content               == payload
         assert response.headers['content-type'] == 'application/octet-stream'
 
     def test__download_payload__not_found(self):
-        response = self.client.get('/transfers/download/nonexistent')
+        response = self.client.get('/api/transfers/download/nonexistent')
         assert response.status_code           == 404
 
     def test__download_base64(self):
         import base64
         payload = b'\x89PNG\x00\x01\x02\x03'
-        create  = self.client.post('/transfers/create',
+        create  = self.client.post('/api/transfers/create',
                                    json=dict(file_size_bytes = len(payload))).json()
         tid = create['transfer_id']
-        self.client.post(f'/transfers/upload/{tid}',
+        self.client.post(f'/api/transfers/upload/{tid}',
                          content = payload,
                          headers = {'content-type': 'application/octet-stream'})
-        self.client.post(f'/transfers/complete/{tid}')
+        self.client.post(f'/api/transfers/complete/{tid}')
 
-        response = self.client.get(f'/transfers/download-base64/{tid}')
+        response = self.client.get(f'/api/transfers/download-base64/{tid}')
         assert response.status_code           == 200
         data = response.json()
         assert data['transfer_id']             == tid
@@ -109,13 +109,13 @@ class test_Routes__Transfers(TestCase):
         assert base64.b64decode(data['data'])  == payload
 
     def test__download_base64__not_found(self):
-        response = self.client.get('/transfers/download-base64/nonexistent')
+        response = self.client.get('/api/transfers/download-base64/nonexistent')
         assert response.status_code           == 404
 
     def test__create_with_access_token_query_param(self):
         from starlette.testclient import TestClient
         unauthenticated_client = TestClient(self.client.app)                    # No default auth header
-        response = unauthenticated_client.post(f'/transfers/create?access_token={TEST_ACCESS_TOKEN}',
+        response = unauthenticated_client.post(f'/api/transfers/create?access_token={TEST_ACCESS_TOKEN}',
                                                json=dict(file_size_bytes   = 1024,
                                                          content_type_hint = 'text/plain'))
         assert response.status_code           == 200
@@ -126,34 +126,34 @@ class test_Routes__Transfers(TestCase):
         payload = b'encrypted_file_content_here'
 
         # Create
-        create   = self.client.post('/transfers/create',
+        create   = self.client.post('/api/transfers/create',
                                     json=dict(file_size_bytes   = len(payload),
                                               content_type_hint = 'application/pdf')).json()
         tid = create['transfer_id']
         assert len(tid) == 12
 
         # Upload
-        upload   = self.client.post(f'/transfers/upload/{tid}',
+        upload   = self.client.post(f'/api/transfers/upload/{tid}',
                                     content = payload,
                                     headers = {'content-type': 'application/octet-stream'}).json()
         assert upload['status'] == 'uploaded'
 
         # Complete
-        complete = self.client.post(f'/transfers/complete/{tid}').json()
+        complete = self.client.post(f'/api/transfers/complete/{tid}').json()
         assert complete['transfer_id']           == tid
         assert 'raw_ip' in complete['transparency']['not_stored']
 
         # Info
-        info     = self.client.get(f'/transfers/info/{tid}').json()
+        info     = self.client.get(f'/api/transfers/info/{tid}').json()
         assert info['status']                    == 'completed'
         assert info['download_count']            == 0
 
         # Download
-        download = self.client.get(f'/transfers/download/{tid}')
+        download = self.client.get(f'/api/transfers/download/{tid}')
         assert download.content                  == payload
 
         # Download count incremented
-        info     = self.client.get(f'/transfers/info/{tid}').json()
+        info     = self.client.get(f'/api/transfers/info/{tid}').json()
         assert info['download_count']            == 1
 
     # --- MCP upload: JSON-wrapped base64 must be unwrapped ---
@@ -165,16 +165,16 @@ class test_Routes__Transfers(TestCase):
         raw_payload = b'\xde\xad\xbe\xef\x01\x02\x03\x04'
         mcp_body    = b'{"data": "' + base64.b64encode(raw_payload) + b'"}'
 
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes = len(raw_payload))).json()
         tid = create['transfer_id']
-        self.client.post(f'/transfers/upload/{tid}',
+        self.client.post(f'/api/transfers/upload/{tid}',
                          content = mcp_body,
                          headers = {'content-type': 'application/json'})
-        self.client.post(f'/transfers/complete/{tid}')
+        self.client.post(f'/api/transfers/complete/{tid}')
 
         # Download must return raw bytes, not the JSON wrapper
-        response = self.client.get(f'/transfers/download/{tid}')
+        response = self.client.get(f'/api/transfers/download/{tid}')
         assert response.status_code  == 200
         assert response.content      == raw_payload
 
@@ -182,15 +182,15 @@ class test_Routes__Transfers(TestCase):
         """Browser uploads send raw bytes — these must NOT be altered by unwrap logic."""
         raw_payload = b'\x7b\x00\x01\x02'                                     # starts with '{' but is NOT valid JSON
 
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes = len(raw_payload))).json()
         tid = create['transfer_id']
-        self.client.post(f'/transfers/upload/{tid}',
+        self.client.post(f'/api/transfers/upload/{tid}',
                          content = raw_payload,
                          headers = {'content-type': 'application/octet-stream'})
-        self.client.post(f'/transfers/complete/{tid}')
+        self.client.post(f'/api/transfers/complete/{tid}')
 
-        response = self.client.get(f'/transfers/download/{tid}')
+        response = self.client.get(f'/api/transfers/download/{tid}')
         assert response.status_code  == 200
         assert response.content      == raw_payload
 
@@ -200,23 +200,23 @@ class test_Routes__Transfers(TestCase):
         raw_payload = b'hello from claude.ai web!'
         mcp_body    = b'{"data": "' + base64.b64encode(raw_payload) + b'"}'
 
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes   = len(raw_payload),
                                             content_type_hint = 'text/plain')).json()
         tid = create['transfer_id']
-        upload = self.client.post(f'/transfers/upload/{tid}',
+        upload = self.client.post(f'/api/transfers/upload/{tid}',
                                   content = mcp_body,
                                   headers = {'content-type': 'application/json'})
         assert upload.json()['size'] == len(raw_payload)                       # size reflects unwrapped payload
 
-        self.client.post(f'/transfers/complete/{tid}')
+        self.client.post(f'/api/transfers/complete/{tid}')
 
         # Direct download returns raw bytes
-        download = self.client.get(f'/transfers/download/{tid}')
+        download = self.client.get(f'/api/transfers/download/{tid}')
         assert download.content == raw_payload
 
         # Base64 download returns base64 of raw bytes (not base64 of JSON)
-        b64_download = self.client.get(f'/transfers/download-base64/{tid}')
+        b64_download = self.client.get(f'/api/transfers/download-base64/{tid}')
         b64_data     = b64_download.json()
         assert base64.b64decode(b64_data['data']) == raw_payload
 
@@ -230,18 +230,18 @@ class test_Routes__Transfers(TestCase):
         raw_payload = b'\xde\xad\xbe\xef\x01\x02\x03\x04'
         b64_payload = base64.b64encode(raw_payload).decode('ascii')
 
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes = len(raw_payload))).json()
         tid = create['transfer_id']
-        upload = self.client.post(f'/transfers/upload/{tid}',
+        upload = self.client.post(f'/api/transfers/upload/{tid}',
                                   json=dict(data = b64_payload))
         assert upload.status_code    == 200
         assert upload.json()['size'] == len(raw_payload)
 
-        self.client.post(f'/transfers/complete/{tid}')
+        self.client.post(f'/api/transfers/complete/{tid}')
 
         # Download must return the decoded raw bytes
-        response = self.client.get(f'/transfers/download/{tid}')
+        response = self.client.get(f'/api/transfers/download/{tid}')
         assert response.status_code == 200
         assert response.content     == raw_payload
 
@@ -265,19 +265,19 @@ class test_Routes__Transfers(TestCase):
         # SGMETA-wrapped payload directly (encryption is client-side, transparent to server).
         b64_payload = base64.b64encode(sgmeta_payload).decode('ascii')
 
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes   = len(sgmeta_payload),
                                             content_type_hint = 'application/pdf')).json()
         tid = create['transfer_id']
-        upload = self.client.post(f'/transfers/upload/{tid}',
+        upload = self.client.post(f'/api/transfers/upload/{tid}',
                                   json=dict(data = b64_payload))
         assert upload.status_code    == 200
         assert upload.json()['size'] == len(sgmeta_payload)
 
-        self.client.post(f'/transfers/complete/{tid}')
+        self.client.post(f'/api/transfers/complete/{tid}')
 
         # Download returns the full SGMETA-wrapped payload
-        response = self.client.get(f'/transfers/download/{tid}')
+        response = self.client.get(f'/api/transfers/download/{tid}')
         assert response.status_code == 200
         downloaded = response.content
         assert downloaded            == sgmeta_payload
@@ -296,22 +296,22 @@ class test_Routes__Transfers(TestCase):
         raw_payload = b'hello from claude.ai web via data param!'
         b64_payload = base64.b64encode(raw_payload).decode('ascii')
 
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes   = len(raw_payload),
                                             content_type_hint = 'text/plain')).json()
         tid = create['transfer_id']
-        upload = self.client.post(f'/transfers/upload/{tid}',
+        upload = self.client.post(f'/api/transfers/upload/{tid}',
                                   json=dict(data = b64_payload))
         assert upload.json()['size'] == len(raw_payload)
 
-        self.client.post(f'/transfers/complete/{tid}')
+        self.client.post(f'/api/transfers/complete/{tid}')
 
         # Direct download returns raw bytes
-        download = self.client.get(f'/transfers/download/{tid}')
+        download = self.client.get(f'/api/transfers/download/{tid}')
         assert download.content == raw_payload
 
         # Base64 download returns base64 of raw bytes
-        b64_download = self.client.get(f'/transfers/download-base64/{tid}')
+        b64_download = self.client.get(f'/api/transfers/download-base64/{tid}')
         b64_data     = b64_download.json()
         assert base64.b64decode(b64_data['data']) == raw_payload
 
@@ -319,13 +319,13 @@ class test_Routes__Transfers(TestCase):
 
     def test__complete__does_not_leak_token(self):
         """Regression test: shareable URLs must never contain access tokens (incident 19 Feb 2026)"""
-        create = self.client.post('/transfers/create',
+        create = self.client.post('/api/transfers/create',
                                   json=dict(file_size_bytes=4)).json()
         tid = create['transfer_id']
-        self.client.post(f'/transfers/upload/{tid}',
+        self.client.post(f'/api/transfers/upload/{tid}',
                          content = b'\x00\x01\x02\x03',
                          headers = {'content-type': 'application/octet-stream'})
-        response = self.client.post(f'/transfers/complete/{tid}')
+        response = self.client.post(f'/api/transfers/complete/{tid}')
         data = response.json()
 
         # token_name must never appear in complete response (it was leaking into shareable URLs)

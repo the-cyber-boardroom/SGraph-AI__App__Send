@@ -8,10 +8,12 @@
 #   GET    /vault/permissions/{vault_cache_key}
 # ===============================================================================
 
+import unittest
 from unittest                                                                        import TestCase
 from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User            import setup__fast_api__user__test_objs
 
 
+@unittest.skip("Vault routes removed from User Lambda for v0.2.0 CloudFront separation — re-enable when vault moves to admin Lambda")
 class test_Routes__Vault__ACL(TestCase):
 
     @classmethod

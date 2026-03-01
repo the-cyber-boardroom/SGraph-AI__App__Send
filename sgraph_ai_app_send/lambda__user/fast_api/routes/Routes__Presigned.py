@@ -11,7 +11,7 @@ from sgraph_ai_app_send.lambda__user.schemas.Schema__Presigned                  
 from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls                 import Service__Presigned_Urls
 from sgraph_ai_app_send.lambda__user.user__config                                    import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_SEND__ACCESS_TOKEN
 
-TAG__ROUTES_PRESIGNED = 'presigned'
+TAG__ROUTES_PRESIGNED = 'api/presigned'
 
 ROUTES_PATHS__PRESIGNED = [f'/{TAG__ROUTES_PRESIGNED}/capabilities'                        ,
                            f'/{TAG__ROUTES_PRESIGNED}/initiate'                            ,

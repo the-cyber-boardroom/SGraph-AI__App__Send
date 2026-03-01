@@ -1,0 +1,80 @@
+name: Deploy User UI to S3
+
+# Publishes static UI files to S3 for CloudFront distribution.
+# CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
+# Reuses scripts/deploy_static_site.py for S3 sync + CloudFront invalidation.
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'sgraph_ai_app_send__ui__user/**'
+      - '.github/workflows/deploy-ui-user.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: "ui-user-deploy"
+  cancel-in-progress: false
+
+env:
+  AWS_REGION : eu-west-2
+
+jobs:
+  deploy:
+    name: Publish UI to S3 + CloudFront
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check AWS credentials
+        id: check-creds
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+            echo "WARNING: AWS credentials not configured — skipping deployment"
+          else
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region            : ${{ env.AWS_REGION }}
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat sgraph_ai_app_send/version)" >> $GITHUB_OUTPUT
+
+      - name: Deploy User UI to S3
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        run: |
+          python scripts/deploy_static_site.py \
+            --site sgraph-send \
+            --version ${{ steps.version.outputs.version }} \
+            --source-dir sgraph_ai_app_send__ui__user \
+            --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --cloudfront-distribution-id ${{ secrets.SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID }} \
+            --skip-validation

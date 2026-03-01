@@ -1,4 +1,3 @@
-from osbot_fast_api.api.routes.Routes__Set_Cookie import Routes__Set_Cookie
 from osbot_fast_api_serverless.fast_api.routes.Routes__Info import Routes__Info
 
 import sgraph_ai_app_send__ui__user
@@ -12,18 +11,6 @@ from sgraph_ai_app_send.lambda__user.service.Transfer__Service                  
 from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls               import Service__Presigned_Urls
 from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE, APP_SEND__UI__USER__LOCALE
-from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client                   import Send__Cache__Client
-from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Setup                    import create_send_cache_client
-from sgraph_ai_app_send.lambda__admin.service.Send__Cache__Client__Vault            import Send__Cache__Client__Vault
-from sgraph_ai_app_send.lambda__admin.service.Middleware__Analytics                  import Middleware__Analytics
-from sgraph_ai_app_send.lambda__admin.service.Service__Vault                        import Service__Vault
-from sgraph_ai_app_send.lambda__admin.service.Service__Vault__ACL                  import Service__Vault__ACL
-from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Vault                 import Routes__Vault
-from sgraph_ai_app_send.lambda__admin.service.Service__Data_Room                   import Service__Data_Room
-from sgraph_ai_app_send.lambda__admin.service.Service__Invites                     import Service__Invites
-from sgraph_ai_app_send.lambda__admin.service.Service__Room__Session               import Service__Room__Session
-from sgraph_ai_app_send.lambda__admin.service.Service__Audit                       import Service__Audit
-from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Join                  import Routes__Join
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
 from sgraph_ai_app_send.lambda__user.user__config                                   import HEADER__SGRAPH_SEND__ACCESS_TOKEN
@@ -39,9 +26,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
     send_config          : Send__Config          = None                              # Storage configuration (auto-detects mode)
     transfer_service     : Transfer__Service      = None                            # Shared transfer service instance
     presigned_service    : Service__Presigned_Urls = None                           # Presigned URL service (S3 mode only)
-    send_cache_client    : Send__Cache__Client    = None                            # Cache service client (IN_MEMORY mode)
     admin_service_client : Admin__Service__Client = None                            # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
-    service_vault        : Service__Vault         = None                            # Vault lifecycle service
 
     def setup(self):
         with self.config as _:
@@ -68,54 +53,11 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                 presigned_kwargs['s3_prefix'] = storage_fs.s3_prefix
             self.presigned_service = Service__Presigned_Urls(**presigned_kwargs)
 
-        if self.send_cache_client is None:                                          # Auto-create cache client in IN_MEMORY mode
-            try:
-                self.send_cache_client = create_send_cache_client()
-            except Exception:                                                       # Cache setup failure must not block the user Lambda
-                self.send_cache_client = None
-
         if self.admin_service_client is None:                                      # Auto-create admin client (REMOTE mode via env vars)
             try:
                 self.admin_service_client = setup_admin_service_client__remote()
             except Exception:                                                       # Admin client setup failure must not block user Lambda
                 self.admin_service_client = None
-
-        if self.service_vault is None and self.send_cache_client is not None:      # Auto-create vault service
-            try:
-                vault_cache_client = Send__Cache__Client__Vault(
-                    cache_client   = self.send_cache_client.cache_client   ,
-                    hash_generator = self.send_cache_client.hash_generator )
-                self.service_vault = Service__Vault(vault_cache_client=vault_cache_client)
-            except Exception:                                                       # Vault setup failure must not block user Lambda
-                self.service_vault = None
-
-        self.service_vault_acl = None                                              # ACL service (auto-created if vault available)
-        if self.service_vault is not None and self.send_cache_client is not None:
-            try:
-                vault_cache_client_acl = Send__Cache__Client__Vault(
-                    cache_client   = self.send_cache_client.cache_client   ,
-                    hash_generator = self.send_cache_client.hash_generator )
-                self.service_vault_acl = Service__Vault__ACL(
-                    vault_cache_client = vault_cache_client_acl )
-            except Exception:
-                self.service_vault_acl = None
-
-        # Data room services (invites, sessions, audit — for join flow)
-        self.service_data_room  = None
-        self.service_invites    = None
-        self.service_session    = None
-        self.service_audit      = None
-        if self.send_cache_client is not None:
-            try:
-                self.service_data_room = Service__Data_Room(send_cache_client=self.send_cache_client)
-                self.service_invites   = Service__Invites(send_cache_client=self.send_cache_client,
-                                                          service_data_room=self.service_data_room)
-                self.service_session   = Service__Room__Session(send_cache_client=self.send_cache_client)
-                self.service_audit     = Service__Audit(send_cache_client=self.send_cache_client)
-            except Exception:
-                self.service_invites = None
-                self.service_session = None
-                self.service_audit   = None
 
         return super().setup()
 
@@ -139,27 +81,17 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         self.add_routes(Routes__Presigned        ,
                         presigned_service    = self.presigned_service    ,
                         admin_service_client = self.admin_service_client )
-        if self.service_vault is not None:                                          # Add vault routes if vault service available
-            self.add_routes(Routes__Vault          ,
-                            service_vault     = self.service_vault     ,
-                            service_vault_acl = self.service_vault_acl )
-        if self.service_invites is not None:                                     # Add join routes if invite service available
-            self.add_routes(Routes__Join           ,
-                            service_invites = self.service_invites ,
-                            service_session = self.service_session ,
-                            service_audit   = self.service_audit   )
-        self.add_routes(Routes__Set_Cookie)
 
-        # if self.send_cache_client is not None:                                      # Add analytics middleware if cache client available  # disabled: creates 5 files per request, caused 65k+ file buildup — redesign needed
-        #     self.app().add_middleware(Middleware__Analytics,
-        #                              send_cache_client = self.send_cache_client)
+        # Vault, Join, Set-Cookie routes removed from User Lambda for v0.2.0
+        # CloudFront separation: /api/* → Lambda, /* → S3 static files
+        # Vault and Join are auxiliary features — re-add when needed via admin Lambda
 
         self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
 
     def setup_mcp(self):                                                              # Mount MCP server on /mcp endpoint
         from sgraph_ai_app_send.lambda__user.user__config import HEADER__SGRAPH_SEND__ACCESS_TOKEN
         mcp_setup = MCP__Setup(name            = 'sgraph-send-user'                              ,
-                               include_tags    = ['transfers', 'presigned', 'vault']             ,
+                               include_tags    = ['api/transfers', 'api/presigned']              ,
                                forward_headers = ['authorization', HEADER__SGRAPH_SEND__ACCESS_TOKEN],
                                stateless       = True                                            )  # Lambda-compatible: no session state, authless discovery
         self.mcp = mcp_setup.mount_mcp(self.app())
