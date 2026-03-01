@@ -245,7 +245,7 @@ code, .mono {
 .site-header .container {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--sp-6);
 }
 
 .site-logo {
