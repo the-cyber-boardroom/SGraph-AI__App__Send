@@ -96,7 +96,8 @@ const SgI18n = {
     _detectLocale() {
         const path = window.location.pathname;
         const slugs = Object.values(this.localeToSlug);
-        const pattern = new RegExp('^\\/(' + slugs.join('|') + ')\\/');
+        // Match locale slug with or without trailing slash
+        const pattern = new RegExp('^\\/(' + slugs.join('|') + ')(?:\\/|$)');
         const match = path.match(pattern);
         return match ? match[1] : 'en-gb';
     },
@@ -109,7 +110,9 @@ const SgI18n = {
         let currentPath = window.location.pathname;
 
         // Strip current locale prefix to get the base page path
-        currentPath = currentPath.replace(new RegExp('^/' + currentLocale + '/'), '/');
+        // Handle both /en-gb/ and /en-gb (with or without trailing slash)
+        currentPath = currentPath.replace(new RegExp('^/' + currentLocale + '(?=/|$)'), '');
+        if (!currentPath || currentPath === '') currentPath = '/';
 
         // Build target URL — all locales have URL prefixes
         const slug = this.localeToSlug[code];

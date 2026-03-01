@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SG/Send Cloud — Shared</title>
+  <meta name="i18n-title-key" content="pricing.cloudpage.page.title">
+  <meta name="description" content="SG/Send Cloud shared hosting — £5 for 500 encrypted file transfers. Zero-knowledge encryption on shared multi-tenant infrastructure.">
+  <meta name="theme-color" content="#1A1A2E">
+  <link rel="icon" type="image/svg+xml" href="../../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../../_common/css/style.css">
+  <style>
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-2);
+      color: var(--accent);
+      font-size: var(--fs-small);
+      font-weight: var(--fw-medium);
+      text-decoration: none;
+      margin-bottom: var(--sp-6);
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--sp-6);
+    }
+
+    .feature-item {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-card);
+      padding: var(--sp-6);
+      transition: border-color var(--transition-normal);
+    }
+
+    .feature-item:hover {
+      border-color: var(--accent);
+    }
+
+    .feature-item__label {
+      font-size: var(--fs-small);
+      font-weight: var(--fw-medium);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      margin-bottom: var(--sp-2);
+    }
+
+    .feature-item__value {
+      font-size: 1rem;
+      color: var(--text-heading);
+      font-weight: var(--fw-bold);
+      margin-bottom: var(--sp-2);
+    }
+
+    .feature-item__desc {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--sp-6);
+      counter-reset: credit-step;
+    }
+
+    @media (max-width: 768px) {
+      .steps-grid {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        margin-inline: auto;
+      }
+    }
+
+    .step-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-card);
+      padding: var(--sp-6);
+      text-align: center;
+      counter-increment: credit-step;
+    }
+
+    .step-card__number {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(78, 205, 196, 0.12);
+      color: var(--accent);
+      font-family: var(--font-display);
+      font-weight: var(--fw-bold);
+      font-size: 1.2rem;
+      border-radius: 50%;
+      margin: 0 auto var(--sp-4);
+    }
+
+    .step-card__number::before {
+      content: counter(credit-step);
+    }
+
+    .step-card h3 {
+      margin-bottom: var(--sp-2);
+    }
+
+    .step-card p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .encryption-callout {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-6);
+      background-color: var(--bg-surface);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-card);
+      padding: var(--sp-6);
+    }
+
+    .encryption-callout__icon {
+      font-size: 2.5rem;
+      flex-shrink: 0;
+    }
+
+    .encryption-callout__text p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .encryption-callout__text strong {
+      color: var(--text-heading);
+    }
+
+    @media (max-width: 480px) {
+      .encryption-callout {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <header class="site-header">
+    <div class="container">
+      <a href="../../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../../product/" data-i18n="nav.product">Product</a>
+        <a href="../../agents/" data-i18n="nav.team">Team</a>
+        <a href="../../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="../" class="active" data-i18n="nav.pricing">Pricing</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <a href="../" class="back-link" data-i18n="pricing.cloudpage.hero.back">&larr; Back to Pricing</a>
+        <h1 class="display" data-i18n="pricing.cloudpage.hero.title">SG/Send Cloud &mdash; Shared</h1>
+        <p class="lead" data-i18n="pricing.cloudpage.hero.lead">
+          The send.sgraph.ai hosted service. &pound;5 for 500 encrypted file transfers.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         WHAT'S INCLUDED
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.cloudpage.included.title">What&rsquo;s Included</h2>
+        </div>
+
+        <div class="feature-grid">
+          <div class="feature-item">
+            <div class="feature-item__label" data-i18n="pricing.cloudpage.included.infra_label">Infrastructure</div>
+            <div class="feature-item__value" data-i18n="pricing.cloudpage.included.infra_value">Shared (Multi-Tenant)</div>
+            <p class="feature-item__desc" data-i18n="pricing.cloudpage.included.infra_desc">Runs on SG/Send&rsquo;s managed AWS infrastructure alongside other customers. Every file is encrypted with its own unique key.</p>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-item__label" data-i18n="pricing.cloudpage.included.encryption_label">Encryption</div>
+            <div class="feature-item__value" data-i18n="pricing.cloudpage.included.encryption_value">Zero-Knowledge, AES-256-GCM</div>
+            <p class="feature-item__desc" data-i18n="pricing.cloudpage.included.encryption_desc">Client-side encryption using the Web Crypto API. The server never sees your plaintext data or encryption keys.</p>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-item__label" data-i18n="pricing.cloudpage.included.pricing_label">Pricing</div>
+            <div class="feature-item__value" data-i18n="pricing.cloudpage.included.pricing_value">&pound;5 for 500 Transfers</div>
+            <p class="feature-item__desc" data-i18n="pricing.cloudpage.included.pricing_desc">That&rsquo;s &pound;0.01 per encrypted file transfer. Each upload uses one credit. Downloads are free.</p>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-item__label" data-i18n="pricing.cloudpage.included.expiry_label">Credit Expiry</div>
+            <div class="feature-item__value" data-i18n="pricing.cloudpage.included.expiry_value">3 Months</div>
+            <p class="feature-item__desc" data-i18n="pricing.cloudpage.included.expiry_desc">Credits are valid for 3 months from the date of purchase. Use them at your own pace.</p>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-item__label" data-i18n="pricing.cloudpage.included.payment_label">Payment</div>
+            <div class="feature-item__value" data-i18n="pricing.cloudpage.included.payment_value">Stripe</div>
+            <p class="feature-item__desc" data-i18n="pricing.cloudpage.included.payment_desc">Secure payment via Stripe. Accepts card, Apple Pay, and Google Pay.</p>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-item__label" data-i18n="pricing.cloudpage.included.support_label">Support</div>
+            <div class="feature-item__value" data-i18n="pricing.cloudpage.included.support_value">Email (Sherpa)</div>
+            <p class="feature-item__desc" data-i18n="pricing.cloudpage.included.support_desc">Email support from our Sherpa team. Best-effort SLA with responsive, human support.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         HOW CREDITS WORK
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.cloudpage.credits.title">How Credits Work</h2>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-card__number"></div>
+            <h3 data-i18n="pricing.cloudpage.credits.step1_title">Buy Credits via Stripe</h3>
+            <p data-i18n="pricing.cloudpage.credits.step1_desc">Purchase a Starter Pack (&pound;5 for 500 credits) using card, Apple Pay, or Google Pay. Payment is processed securely by Stripe.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-card__number"></div>
+            <h3 data-i18n="pricing.cloudpage.credits.step2_title">Each Upload Uses One Credit</h3>
+            <p data-i18n="pricing.cloudpage.credits.step2_desc">Every file you encrypt and upload uses one credit. Downloads by your recipients are free and unlimited.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-card__number"></div>
+            <h3 data-i18n="pricing.cloudpage.credits.step3_title">Credits Valid for 3 Months</h3>
+            <p data-i18n="pricing.cloudpage.credits.step3_desc">Use your credits at your own pace. They remain valid for 3 months from the date of purchase.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         CTA
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container text-center">
+        <h2 data-i18n="pricing.cloudpage.cta.title">Ready to get started?</h2>
+        <p class="lead" style="margin-bottom: var(--sp-8);" data-i18n="pricing.cloudpage.cta.desc">&pound;5 for 500 encrypted file transfers. No subscription, no commitment.</p>
+        <a href="mailto:sherpa@sgraph.ai?subject=Buy%20Credits%20%E2%80%94%20SG%2FSend%20Cloud%20Starter%20Pack" class="btn btn-primary btn--lg" data-i18n="pricing.cloudpage.cta.button">Buy Credits &mdash; &pound;5 &rarr;</a>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ENCRYPTION CALLOUT
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="encryption-callout">
+          <div class="encryption-callout__icon">&#128274;</div>
+          <div class="encryption-callout__text">
+            <p data-i18n="pricing.cloudpage.encryption.text">
+              <strong>Every mode uses the same zero-knowledge encryption.</strong>
+              Whether you use our hosted service or deploy in your own environment,
+              files are encrypted in the browser before they leave your device.
+              We never see your data. Your cloud provider never sees your data.
+              Nobody sees your data except you and your recipient.
+              The only difference between modes is who manages the infrastructure.
+              The encryption is identical.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="../../agents/" data-i18n="footer.team">Team</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>
