@@ -1,0 +1,14 @@
+# robots.txt — sgraph.ai
+# https://sgraph.ai/robots.txt
+
+User-agent: *
+Allow: /
+
+# Post-checkout redirect pages — not indexable content
+Disallow: /payment/
+
+# Static shared assets — not pages
+Disallow: /_common/
+
+# Sitemap location
+Sitemap: https://sgraph.ai/sitemap.xml

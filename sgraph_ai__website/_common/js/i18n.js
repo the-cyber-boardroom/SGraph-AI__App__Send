@@ -129,6 +129,17 @@ const SgI18n = {
                      || this.availableLocales[0];
 
         container.innerHTML = '';
+
+        // Quick-switch to English — visible on all non-English pages
+        if (!this.locale.startsWith('en')) {
+            const engLink = document.createElement('a');
+            engLink.className = 'locale-english-switch';
+            engLink.href = '/en-gb' + window.location.pathname.replace(
+                new RegExp('^/' + this.locale + '(?=/|$)'), '');
+            engLink.textContent = '\uD83C\uDDEC\uD83C\uDDE7 English';
+            container.appendChild(engLink);
+        }
+
         const dropdown = document.createElement('div');
         dropdown.className = 'locale-dropdown';
 

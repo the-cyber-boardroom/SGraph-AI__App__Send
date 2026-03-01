@@ -2,28 +2,67 @@
 <html lang="en-GB">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0;url=/en-gb/">
-  <title>SGraph AI</title>
-  <style>
-    body {
-      margin: 0;
-      background-color: #1A1A2E;
-      color: #E0E0E0;
-      font-family: system-ui, -apple-system, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
-    a { color: #4ECDC4; }
-    .brand { font-size: 1.5rem; font-weight: 700; letter-spacing: 0.04em; }
-    .brand-slash { color: #4ECDC4; }
-  </style>
+  <meta http-equiv="refresh" content="1;url=/en-gb/">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SGraph AI — Zero-Knowledge Encrypted File Sharing</title>
+  <meta name="description" content="SG/Send is a zero-knowledge encrypted file sharing platform, built entirely by AI agents working in parallel. The same agents that built it use it every day.">
+
+  <!-- Open Graph — social preview cards (WhatsApp, LinkedIn, etc.) -->
+  <meta property="og:title"       content="SGraph AI — Zero-Knowledge Encrypted File Sharing">
+  <meta property="og:description" content="SG/Send is a zero-knowledge encrypted file sharing platform. Files are encrypted in your browser — we never see your data.">
+  <meta property="og:url"         content="https://sgraph.ai/">
+  <meta property="og:type"        content="website">
+  <meta property="og:site_name"   content="SGraph AI">
+
+  <style>body{margin:0;background:#1A1A2E;}</style>
+
+  <script>
+    // Locale autodetection — runs before meta-refresh, wins the redirect race.
+    // Maps browser languages to our supported locale URL slugs.
+    (function () {
+      var supported = [
+        'en-gb','en-us','pt-pt','pt-br',
+        'es-es','es-ar','es-mx',
+        'fr-fr','fr-ca',
+        'de-de','de-ch',
+        'it-it','pl-pl','ro-ro','nl-nl','hr-hr'
+      ];
+
+      // language prefix → default regional variant
+      var fallbackMap = {
+        'en': 'en-gb',
+        'pt': 'pt-pt',
+        'es': 'es-es',
+        'fr': 'fr-fr',
+        'de': 'de-de',
+        'it': 'it-it',
+        'pl': 'pl-pl',
+        'ro': 'ro-ro',
+        'nl': 'nl-nl',
+        'hr': 'hr-hr'
+      };
+
+      var langs = (navigator.languages || [navigator.language || '']);
+      for (var i = 0; i < langs.length; i++) {
+        var tag = langs[i].toLowerCase();
+
+        // exact match  (e.g. "pt-BR" → "pt-br")
+        if (supported.indexOf(tag) !== -1) {
+          window.location.replace('/' + tag + '/');
+          return;
+        }
+
+        // prefix match (e.g. "pt" → "pt-pt")
+        var prefix = tag.split('-')[0];
+        if (fallbackMap[prefix]) {
+          window.location.replace('/' + fallbackMap[prefix] + '/');
+          return;
+        }
+      }
+
+      // no match — meta-refresh fallback to /en-gb/ kicks in
+    })();
+  </script>
 </head>
-<body>
-  <div style="text-align:center">
-    <p class="brand">SG<span class="brand-slash">/</span></p>
-    <p>Redirecting to <a href="/en-gb/">sgraph.ai</a>&hellip;</p>
-  </div>
-</body>
+<body></body>
 </html>
