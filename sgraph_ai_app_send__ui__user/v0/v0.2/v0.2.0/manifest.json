@@ -1,0 +1,60 @@
+{
+    "version": "0.2.0",
+    "name": "SGraph Send User UI",
+    "description": "v0.2.0 — Consolidated IFD release (symmetric encryption only)",
+    "scope": "symmetric-encryption",
+    "base_locale": "en-gb",
+    "files": {
+        "_common/js/base/send-component.js":       { "type": "js",   "role": "base-class" },
+        "_common/js/base/send-component-paths.js":  { "type": "js",   "role": "path-registry" },
+        "_common/js/base/send-helpers.js":           { "type": "js",   "role": "utilities" },
+        "_common/js/crypto.js":                      { "type": "js",   "role": "encryption" },
+        "_common/js/api-client.js":                  { "type": "js",   "role": "api-client" },
+        "_common/js/i18n.js":                        { "type": "js",   "role": "i18n" },
+        "_common/js/file-type-detect.js":            { "type": "js",   "role": "file-detection" },
+        "_common/js/markdown-parser.js":             { "type": "js",   "role": "markdown" },
+        "_common/js/components/send-upload/send-upload.js":         { "type": "js",   "role": "component" },
+        "_common/js/components/send-upload/send-upload.html":       { "type": "html", "role": "template" },
+        "_common/js/components/send-upload/send-upload.css":        { "type": "css",  "role": "styles" },
+        "_common/js/components/send-download/send-download.js":     { "type": "js",   "role": "component" },
+        "_common/js/components/send-download/send-download.html":   { "type": "html", "role": "template" },
+        "_common/js/components/send-download/send-download.css":    { "type": "css",  "role": "styles" },
+        "_common/js/components/send-access-gate/send-access-gate.js":   { "type": "js",   "role": "component" },
+        "_common/js/components/send-transparency/send-transparency.js": { "type": "js",   "role": "component" },
+        "_common/js/components/send-transparency/send-transparency.css": { "type": "css",  "role": "styles" },
+        "_common/js/components/send-header/send-header.js":         { "type": "js",   "role": "component" },
+        "_common/js/components/send-header/send-header.css":        { "type": "css",  "role": "styles" },
+        "_common/js/components/send-footer/send-footer.js":         { "type": "js",   "role": "component" },
+        "_common/js/components/send-footer/send-footer.css":        { "type": "css",  "role": "styles" },
+        "_common/js/components/send-locale/send-locale.js":         { "type": "js",   "role": "component" },
+        "_common/js/components/send-locale/send-locale.css":        { "type": "css",  "role": "styles" },
+        "_common/css/design-tokens.css":             { "type": "css",  "role": "design-tokens" },
+        "_common/css/shared-components.css":         { "type": "css",  "role": "shared-styles" },
+        "_common/fonts/fonts.css":                   { "type": "css",  "role": "font-declarations" },
+        "en-gb/index.html":                          { "type": "html", "role": "page", "page": "upload" },
+        "en-gb/download/index.html":                 { "type": "html", "role": "page", "page": "download" }
+    },
+    "components": [
+        "send-upload",
+        "send-download",
+        "send-access-gate",
+        "send-transparency",
+        "send-header",
+        "send-footer",
+        "send-locale"
+    ],
+    "ifd": {
+        "consolidated_from": ["v0.1.0", "v0.1.1", "v0.1.2", "v0.1.3", "v0.1.4", "v0.1.5", "v0.1.6", "v0.1.7", "v0.1.8"],
+        "frozen": true,
+        "next_version": "v0.2.1",
+        "override_note": "All changes go to v0.2.1+ as surgical IFD overrides"
+    },
+    "architecture": {
+        "serving": "S3 + CloudFront (static files) + Lambda (API only)",
+        "api_prefix": "/api",
+        "cloudfront_behaviors": [
+            { "pattern": "/api/*", "origin": "lambda" },
+            { "pattern": "*",      "origin": "s3" }
+        ]
+    }
+}

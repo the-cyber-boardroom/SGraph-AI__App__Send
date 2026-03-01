@@ -1,0 +1,72 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Header Styles
+   v0.2.0 — Aurora dark theme
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.sg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-4, 1rem) var(--space-6, 1.5rem);
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.sg-header__brand {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3, 0.75rem);
+}
+
+.sg-header__logo {
+    text-decoration: none;
+    font-size: var(--text-h2, 1.6rem);
+    font-weight: var(--weight-bold, 700);
+    letter-spacing: -0.02em;
+}
+
+.sg-header__logo-sg {
+    color: var(--accent, #4ECDC4);
+}
+
+.sg-header__logo-sep {
+    color: var(--color-text-secondary, #8892A0);
+    font-weight: var(--weight-regular, 400);
+}
+
+.sg-header__logo-send {
+    color: var(--color-text, #E0E0E0);
+}
+
+.sg-header__tagline {
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.sg-header__nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4, 1rem);
+}
+
+.sg-header__nav a {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-secondary, #8892A0);
+    text-decoration: none;
+    transition: color var(--transition, 150ms ease);
+}
+
+.sg-header__nav a:hover {
+    color: var(--accent, #4ECDC4);
+}
+
+@media (max-width: 640px) {
+    .sg-header {
+        flex-direction: column;
+        gap: var(--space-2, 0.5rem);
+        text-align: center;
+    }
+    .sg-header__tagline {
+        display: none;
+    }
+}
