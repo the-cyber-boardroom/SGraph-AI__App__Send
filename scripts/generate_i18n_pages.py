@@ -2,11 +2,11 @@
 """
 Generate locale-specific HTML pages for sgraph.ai website.
 
-Reads English source HTML files + locale JSON translation files,
+Reads English (en-GB) source HTML files + locale JSON translation files,
 produces pre-rendered locale folder trees (e.g., /pt-pt/pricing/index.html).
 
-Shared assets (CSS, JS, fonts) are NOT duplicated — locale pages reference
-the originals via adjusted relative paths.
+Shared assets live in _common/ (CSS, JS, fonts) and are NOT duplicated —
+locale pages reference the originals via adjusted relative paths.
 
 Usage:
     python scripts/generate_i18n_pages.py
@@ -29,6 +29,7 @@ SITE_URL    = 'https://sgraph.ai'
 
 # Locale code → URL slug → JSON file mapping
 LOCALES = [
+    { 'code': 'en-us', 'slug': 'en-us', 'json': 'en-us.json', 'lang': 'en-US', 'hreflang': 'en-US' },
     { 'code': 'pt-pt', 'slug': 'pt-pt', 'json': 'pt-pt.json', 'lang': 'pt-PT', 'hreflang': 'pt-PT' },
     { 'code': 'pt-br', 'slug': 'pt-br', 'json': 'pt-br.json', 'lang': 'pt-BR', 'hreflang': 'pt-BR' },
     { 'code': 'es-es', 'slug': 'es-es', 'json': 'es-es.json', 'lang': 'es-ES', 'hreflang': 'es-ES' },
@@ -36,14 +37,21 @@ LOCALES = [
     { 'code': 'es-mx', 'slug': 'es-mx', 'json': 'es-mx.json', 'lang': 'es-MX', 'hreflang': 'es-MX' },
     { 'code': 'fr-fr', 'slug': 'fr-fr', 'json': 'fr-fr.json', 'lang': 'fr-FR', 'hreflang': 'fr-FR' },
     { 'code': 'fr-ca', 'slug': 'fr-ca', 'json': 'fr-ca.json', 'lang': 'fr-CA', 'hreflang': 'fr-CA' },
+    { 'code': 'de-de', 'slug': 'de-de', 'json': 'de-de.json', 'lang': 'de-DE', 'hreflang': 'de-DE' },
+    { 'code': 'de-ch', 'slug': 'de-ch', 'json': 'de-ch.json', 'lang': 'de-CH', 'hreflang': 'de-CH' },
+    { 'code': 'it-it', 'slug': 'it-it', 'json': 'it-it.json', 'lang': 'it-IT', 'hreflang': 'it-IT' },
+    { 'code': 'pl-pl', 'slug': 'pl-pl', 'json': 'pl-pl.json', 'lang': 'pl-PL', 'hreflang': 'pl-PL' },
+    { 'code': 'ro-ro', 'slug': 'ro-ro', 'json': 'ro-ro.json', 'lang': 'ro-RO', 'hreflang': 'ro-RO' },
+    { 'code': 'nl-nl', 'slug': 'nl-nl', 'json': 'nl-nl.json', 'lang': 'nl-NL', 'hreflang': 'nl-NL' },
+    { 'code': 'hr-hr', 'slug': 'hr-hr', 'json': 'hr-hr.json', 'lang': 'hr-HR', 'hreflang': 'hr-HR' },
     { 'code': 'tlh',   'slug': 'tlh',   'json': 'tlh.json',   'lang': 'tlh',   'hreflang': 'tlh'   },
 ]
 
 # Files to skip (not user-facing content pages)
 SKIP_FILES = {'404.html'}
 
-# Directories to skip (locale output dirs, assets)
-SKIP_DIRS = {loc['slug'] for loc in LOCALES} | {'css', 'js', 'fonts', 'i18n', 'images', 'cloudfront'}
+# Directories to skip (locale output dirs, assets, common)
+SKIP_DIRS = {loc['slug'] for loc in LOCALES} | {'_common', 'i18n', 'cloudfront'}
 
 
 # ── Translation Loading ───────────────────────────────────────────────────
@@ -61,8 +69,8 @@ def load_translations(locale_info):
 
 
 def load_english():
-    """Load the English master translation file."""
-    en_path = I18N_DIR / 'en.json'
+    """Load the English (en-GB) master translation file."""
+    en_path = I18N_DIR / 'en-gb.json'
     if not en_path.exists():
         print(f"  WARNING: English translation file not found: {en_path}")
         return {}
@@ -160,7 +168,7 @@ def translate_html(html_content, translations, en_translations, locale_info, rel
         if translated_title:
             result = re.sub(r'<title>[^<]*</title>', f'<title>{_escape_html(translated_title)}</title>', result)
 
-    # 5. Adjust relative asset paths (CSS, JS, fonts, favicon)
+    # 5. Adjust relative asset paths (CSS, JS, fonts, favicon in _common/)
     #    Locale pages are one directory deeper than their English counterparts
     result = _adjust_asset_paths(result, rel_path, locale_info['slug'])
 
@@ -196,34 +204,31 @@ def add_hreflang_to_english(html_content, rel_path, all_locales):
 # ── Asset Path Adjustment ─────────────────────────────────────────────────
 
 def _adjust_asset_paths(html, rel_path, locale_slug):
-    """Adjust relative paths to shared assets.
+    """Adjust relative paths to shared assets in _common/.
 
     Locale pages are one directory level deeper than their English counterparts
     (e.g., /pt-pt/pricing/ vs /pricing/), so all relative paths to shared assets
-    (CSS, JS, fonts, favicon, i18n) need one extra ../ prepended.
+    need one extra ../ prepended.
 
     Internal navigation links are NOT adjusted because the mirrored folder
     structure means relative nav links resolve correctly within the locale.
     """
-    # Asset directory/file patterns that live at the website root
-    ASSET_PATTERNS = ('css/', 'js/', 'fonts/', 'i18n/', 'favicon')
+    # Asset paths that live in _common/
+    ASSET_PATTERNS = ('_common/',)
 
     def prepend_parent(match):
         attr_prefix = match.group(1)   # e.g., 'href="' or 'src="'
-        rel_value   = match.group(2)   # e.g., '../css/style.css' or './favicon.svg'
+        rel_value   = match.group(2)   # e.g., '../_common/css/style.css'
 
-        # Check if this path points to a shared asset
-        # Strip all leading ../ and ./ to get the target path
+        # Check if this path points to a shared asset in _common/
         stripped = re.sub(r'^(\.\./|\./)+'  , '', rel_value)
         if not any(stripped.startswith(p) for p in ASSET_PATTERNS):
             return match.group(0)  # Not an asset path — don't adjust
 
         # Prepend one more ../
         if rel_value.startswith('./'):
-            # ./css/style.css → ../css/style.css
             new_value = '../' + rel_value[2:]
         elif rel_value.startswith('../'):
-            # ../css/style.css → ../../css/style.css
             new_value = '../' + rel_value
         else:
             return match.group(0)  # Absolute or other — don't touch
@@ -250,9 +255,9 @@ def _build_hreflang_tags(rel_path, all_locales):
         page_path = '/'
 
     tags = []
-    # English (x-default and en)
+    # English GB (default and x-default)
     en_url = SITE_URL + page_path
-    tags.append(f'  <link rel="alternate" hreflang="en" href="{en_url}" />')
+    tags.append(f'  <link rel="alternate" hreflang="en-GB" href="{en_url}" />')
     tags.append(f'  <link rel="alternate" hreflang="x-default" href="{en_url}" />')
 
     # Other locales
@@ -307,7 +312,7 @@ def main():
 
     # Load translations
     en_translations = load_english()
-    print(f"  English keys: {len(en_translations)}")
+    print(f"  English (en-GB) keys: {len(en_translations)}")
 
     locale_translations = {}
     for loc in LOCALES:

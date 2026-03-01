@@ -3,7 +3,8 @@
    URL-based locale routing with pre-rendered HTML.
 
    Locales are served at path prefixes:
-     /            → English (default)
+     /            → English GB (default)
+     /en-us/      → English (United States)
      /pt-pt/      → Portuguese (Portugal)
      /pt-br/      → Portuguese (Brazil)
      /es-es/      → Español (España)
@@ -11,6 +12,13 @@
      /es-mx/      → Español (México)
      /fr-fr/      → Français (France)
      /fr-ca/      → Français (Canada)
+     /de-de/      → Deutsch (Deutschland)
+     /de-ch/      → Deutsch (Schweiz)
+     /it-it/      → Italiano (Italia)
+     /pl-pl/      → Polski (Polska)
+     /ro-ro/      → Română (România)
+     /nl-nl/      → Nederlands (Nederland)
+     /hr-hr/      → Hrvatski (Hrvatska)
      /tlh/        → Klingon
 
    All pages (English and locale) are pre-rendered with translations baked
@@ -27,11 +35,12 @@
 
 const SgI18n = {
 
-    locale: 'en',
+    locale: 'en-gb',
 
     // Locale code → URL slug mapping
     localeToSlug: {
-        'en':    '',
+        'en-gb': '',
+        'en-us': 'en-us',
         'pt-pt': 'pt-pt',
         'pt-br': 'pt-br',
         'es-es': 'es-es',
@@ -39,19 +48,34 @@ const SgI18n = {
         'es-mx': 'es-mx',
         'fr-fr': 'fr-fr',
         'fr-ca': 'fr-ca',
+        'de-de': 'de-de',
+        'de-ch': 'de-ch',
+        'it-it': 'it-it',
+        'pl-pl': 'pl-pl',
+        'ro-ro': 'ro-ro',
+        'nl-nl': 'nl-nl',
+        'hr-hr': 'hr-hr',
         'tlh':   'tlh'
     },
 
     availableLocales: [
-        { code: 'en',    name: 'English',              flag: '\uD83C\uDDEC\uD83C\uDDE7' },
-        { code: 'pt-br', name: 'Português (Brasil)',    flag: '\uD83C\uDDE7\uD83C\uDDF7' },
-        { code: 'pt-pt', name: 'Português (Portugal)',  flag: '\uD83C\uDDF5\uD83C\uDDF9' },
-        { code: 'es-es', name: 'Español (España)',      flag: '\uD83C\uDDEA\uD83C\uDDF8' },
-        { code: 'es-ar', name: 'Español (Argentina)',   flag: '\uD83C\uDDE6\uD83C\uDDF7' },
-        { code: 'es-mx', name: 'Español (México)',      flag: '\uD83C\uDDF2\uD83C\uDDFD' },
-        { code: 'fr-fr', name: 'Français (France)',     flag: '\uD83C\uDDEB\uD83C\uDDF7' },
-        { code: 'fr-ca', name: 'Français (Canada)',     flag: '\uD83C\uDDE8\uD83C\uDDE6' },
-        { code: 'tlh',   name: 'tlhIngan Hol',         flag: '\uD83D\uDD96' }
+        { code: 'en-gb', name: 'English (UK)',             flag: '\uD83C\uDDEC\uD83C\uDDE7' },
+        { code: 'en-us', name: 'English (US)',             flag: '\uD83C\uDDFA\uD83C\uDDF8' },
+        { code: 'de-de', name: 'Deutsch (Deutschland)',    flag: '\uD83C\uDDE9\uD83C\uDDEA' },
+        { code: 'de-ch', name: 'Deutsch (Schweiz)',        flag: '\uD83C\uDDE8\uD83C\uDDED' },
+        { code: 'es-es', name: 'Espa\u00f1ol (Espa\u00f1a)',         flag: '\uD83C\uDDEA\uD83C\uDDF8' },
+        { code: 'es-ar', name: 'Espa\u00f1ol (Argentina)',      flag: '\uD83C\uDDE6\uD83C\uDDF7' },
+        { code: 'es-mx', name: 'Espa\u00f1ol (M\u00e9xico)',         flag: '\uD83C\uDDF2\uD83C\uDDFD' },
+        { code: 'fr-fr', name: 'Fran\u00e7ais (France)',        flag: '\uD83C\uDDEB\uD83C\uDDF7' },
+        { code: 'fr-ca', name: 'Fran\u00e7ais (Canada)',        flag: '\uD83C\uDDE8\uD83C\uDDE6' },
+        { code: 'hr-hr', name: 'Hrvatski (Hrvatska)',      flag: '\uD83C\uDDED\uD83C\uDDF7' },
+        { code: 'it-it', name: 'Italiano (Italia)',        flag: '\uD83C\uDDEE\uD83C\uDDF9' },
+        { code: 'nl-nl', name: 'Nederlands (Nederland)',   flag: '\uD83C\uDDF3\uD83C\uDDF1' },
+        { code: 'pl-pl', name: 'Polski (Polska)',          flag: '\uD83C\uDDF5\uD83C\uDDF1' },
+        { code: 'pt-br', name: 'Portugu\u00eas (Brasil)',       flag: '\uD83C\uDDE7\uD83C\uDDF7' },
+        { code: 'pt-pt', name: 'Portugu\u00eas (Portugal)',     flag: '\uD83C\uDDF5\uD83C\uDDF9' },
+        { code: 'ro-ro', name: 'Rom\u00e2n\u0103 (Rom\u00e2nia)',          flag: '\uD83C\uDDF7\uD83C\uDDF4' },
+        { code: 'tlh',   name: 'tlhIngan Hol',            flag: '\uD83D\uDD96' }
     ],
 
     // ─── Initialisation ────────────────────────────────────────────────────
@@ -74,7 +98,7 @@ const SgI18n = {
         const slugs = Object.values(this.localeToSlug).filter(s => s);
         const pattern = new RegExp('^\\/(' + slugs.join('|') + ')\\/');
         const match = path.match(pattern);
-        return match ? match[1] : 'en';
+        return match ? match[1] : 'en-gb';
     },
 
     // ─── Locale Navigation ──────────────────────────────────────────────
@@ -85,7 +109,7 @@ const SgI18n = {
         let currentPath = window.location.pathname;
 
         // Strip current locale prefix to get the base page path
-        if (currentLocale !== 'en') {
+        if (currentLocale !== 'en-gb') {
             currentPath = currentPath.replace(new RegExp('^/' + currentLocale + '/'), '/');
         }
 
@@ -94,7 +118,7 @@ const SgI18n = {
         if (slug) {
             window.location.href = '/' + slug + currentPath;
         } else {
-            // English — no prefix
+            // en-GB — no prefix
             window.location.href = currentPath;
         }
     },
@@ -122,7 +146,7 @@ const SgI18n = {
             '<path d="M3 5l3 3 3-3"/></svg>';
         dropdown.appendChild(trigger);
 
-        // Menu
+        // Menu (two-column grid for 17 locales)
         const menu = document.createElement('div');
         menu.className = 'locale-dropdown__menu';
         this.availableLocales.forEach(loc => {
