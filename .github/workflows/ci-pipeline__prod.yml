@@ -1,4 +1,4 @@
-name: CI Pipeline - RELEASE
+name: CI Pipeline - PROD
 on:
   workflow_dispatch:
 
@@ -9,5 +9,5 @@ jobs:
       git_branch          : 'main'
       should_increment_tag: false
       should_publish_pypi : false
-      target_deploy       : ''
+      target_deploy       : 'prod'
     secrets: inherit
