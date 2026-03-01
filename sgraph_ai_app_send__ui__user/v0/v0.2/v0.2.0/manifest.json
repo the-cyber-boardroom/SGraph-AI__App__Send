@@ -25,10 +25,18 @@
         ],
         "ci_generate_command": "python scripts/generate_send_i18n_pages.py",
         "root_files": [
+            "index.html",
+            "404.html",
+            "robots.txt",
+            "sitemap.xml",
             "manifest.json"
         ]
     },
     "files": {
+        "index.html":                               { "type": "html", "role": "locale-redirect", "page": "root" },
+        "404.html":                                  { "type": "html", "role": "error-page" },
+        "robots.txt":                                { "type": "txt",  "role": "seo" },
+        "sitemap.xml":                               { "type": "xml",  "role": "seo" },
         "_common/js/base/send-component.js":       { "type": "js",   "role": "base-class" },
         "_common/js/base/send-component-paths.js":  { "type": "js",   "role": "path-registry" },
         "_common/js/base/send-helpers.js":           { "type": "js",   "role": "utilities" },
