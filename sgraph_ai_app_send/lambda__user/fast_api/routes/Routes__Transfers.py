@@ -14,7 +14,7 @@ from sgraph_ai_app_send.lambda__user.schemas.Schema__Transfer                   
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                   import Transfer__Service
 from sgraph_ai_app_send.lambda__user.user__config                                import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_SEND__ACCESS_TOKEN
 
-TAG__ROUTES_TRANSFERS = 'transfers'
+TAG__ROUTES_TRANSFERS = 'api/transfers'
 
 ROUTES_PATHS__TRANSFERS = [f'/{TAG__ROUTES_TRANSFERS}/create'                                ,
                            f'/{TAG__ROUTES_TRANSFERS}/upload/{{transfer_id}}'                ,

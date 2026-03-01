@@ -65,12 +65,14 @@ class test_MCP__Mount__User(TestCase):
             tool_names = [t['name'] for t in tools]
             assert len(tools) > 0                                                    # At least some tools discovered
 
-            # User routes should be present (transfers, presigned, vault)
+            # User routes should be present (transfers, presigned)
             has_transfers = any('transfer' in name.lower() or 'create' in name.lower() for name in tool_names)
-            has_vault     = any('vault'    in name.lower() for name in tool_names)
             assert has_transfers, f'Expected transfer tools in {tool_names}'
-            assert has_vault    , f'Expected vault tools in {tool_names}'
 
-            # Internal routes should NOT be present (info, set-cookie)
+            # Vault routes removed from User Lambda for v0.2.0
+            has_vault = any('vault' in name.lower() for name in tool_names)
+            assert not has_vault, f'Vault tools should not be in User Lambda MCP, found in {tool_names}'
+
+            # Internal routes should NOT be present (info)
             has_info = any('health' in name.lower() for name in tool_names)
             assert not has_info, f'info routes should be excluded, found in {tool_names}'
