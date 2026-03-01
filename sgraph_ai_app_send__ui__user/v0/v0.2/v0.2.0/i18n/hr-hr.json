@@ -1,0 +1,55 @@
+{
+  "_comment": "SGraph Send — Hrvatski (Hrvatska)",
+
+  "app.title":            "SG/Send",
+  "app.tagline":          "Vaše datoteke, Vaši ključevi, Vaša privatnost",
+  "app.subtitle":         "Dijeljenje datoteka sa zero-knowledge enkripcijom",
+  "app.disclaimer":       "Ovo je beta usluga. Ne učitavajte povjerljiv ili ilegalan sadržaj.",
+
+  "upload.mode.file":     "Datoteka",
+  "upload.mode.text":     "Tekst",
+
+  "upload.drop_zone.label":           "Povucite datoteku ovdje",
+  "upload.drop_zone.hint":            "ili kliknite za pregled",
+  "upload.drop_zone.encrypted_hint":  "Enkriptirana u Vašem pregledniku prije učitavanja",
+
+  "upload.button.encrypt_upload":     "Enkriptiraj i Učitaj",
+  "upload.button.encrypt_send":       "Enkriptiraj i Pošalji",
+
+  "upload.result.file_success":       "Vaša datoteka je enkriptirana i učitana.",
+  "upload.result.text_success":       "Vaš tekst je enkriptiran i učitan.",
+  "upload.result.share_link":         "Podijelite ovu poveznicu",
+  "upload.result.copy_link":          "Kopiraj poveznicu",
+  "upload.result.decryption_key":     "Ključ za dekriptiranje",
+  "upload.result.copy":               "Kopiraj",
+  "upload.result.send_another":       "Pošalji još",
+
+  "download.loading":                 "Učitavanje informacija o prijenosu...",
+  "download.key.label":               "Ključ za dekriptiranje",
+  "download.key.placeholder":         "Zalijepite ključ za dekriptiranje ovdje",
+  "download.button.decrypt_download": "Preuzmi i Dekriptiraj",
+  "download.button.decrypt_view":     "Dekriptiraj i Prikaži",
+  "download.result.file_success":     "Datoteka uspješno dekriptirana i spremljena.",
+  "download.result.text_success":     "Tekst uspješno dekriptiran.",
+  "download.result.copy_text":        "Kopiraj u međuspremnik",
+  "download.result.send_another":     "Pošalji novu datoteku ili tekst",
+
+  "access_gate.title":                "Beta Pristup",
+  "access_gate.subtitle":             "Unesite Vaš pristupni token za slanje datoteka.",
+  "access_gate.placeholder":          "Zalijepite pristupni token",
+  "access_gate.button":               "Idi",
+
+  "transparency.title":               "Što smo pohranili o ovom prijenosu",
+  "transparency.section.stored":      "Pohranjeno na serveru",
+  "transparency.section.encrypted":   "Pohranjeno enkriptirano (samo Vi možete čitati)",
+  "transparency.section.not_stored":  "Nikada poslano na server",
+  "transparency.footer":              "To je sve. Ništa drugo nije zabilježeno.",
+
+  "common.copied":                    "Kopirano!",
+
+  "test_files.title":                 "Testne datoteke",
+  "test_files.description":           "Preuzmite testnu datoteku i povucite je u zonu za učitavanje iznad.",
+
+  "cta.title":                        "Želite i Vi slati datoteke?",
+  "cta.description":                  "Pridružite se programu ranog pristupa za SGraph Send."
+}

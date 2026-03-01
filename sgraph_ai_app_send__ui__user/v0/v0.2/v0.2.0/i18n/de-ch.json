@@ -1,0 +1,114 @@
+{
+  "_comment": "SGraph Send — Deutsch (Schweiz)",
+
+  "app.title":            "SG/Send",
+  "app.tagline":          "Ihre Dateien, Ihre Schlüssel, Ihre Privatsphäre",
+  "app.subtitle":         "Zero-Knowledge-verschlüsselte Dateifreigabe",
+  "app.disclaimer":       "Dies ist ein Beta-Dienst. Laden Sie keine vertraulichen oder illegalen Inhalte hoch.",
+
+  "upload.mode.file":     "Datei",
+  "upload.mode.text":     "Text",
+
+  "upload.drop_zone.label":           "Datei hierher ziehen",
+  "upload.drop_zone.hint":            "oder klicken zum Durchsuchen",
+  "upload.drop_zone.encrypted_hint":  "Wird in Ihrem Browser vor dem Hochladen verschlüsselt",
+  "upload.drop_zone.size_limit":      "Maximale Dateigrösse: {limit}",
+
+  "upload.text.placeholder":          "Geben Sie Ihren Text hier ein oder fügen Sie ihn ein",
+  "upload.text.char_count":           "{count} Zeichen",
+  "upload.text.drop_hint":            "Sie können auch eine Textdatei hierher ziehen",
+
+  "upload.button.encrypt_upload":     "Verschlüsseln & Hochladen",
+  "upload.button.encrypt_send":       "Verschlüsseln & Senden",
+
+  "upload.progress.reading":          "Datei wird gelesen...",
+  "upload.progress.encrypting":       "Verschlüsselung...",
+  "upload.progress.creating":         "Übertragung wird vorbereitet...",
+  "upload.progress.uploading":        "Hochladen...",
+  "upload.progress.uploading_part":   "Teil {current} von {total} wird hochgeladen...",
+  "upload.progress.completing":       "Wird abgeschlossen...",
+
+  "upload.result.file_success":       "Ihre Datei wurde verschlüsselt und hochgeladen.",
+  "upload.result.text_success":       "Ihr Text wurde verschlüsselt und hochgeladen.",
+  "upload.result.share_link":         "Diesen Link teilen",
+  "upload.result.copy_link":          "Link kopieren",
+  "upload.result.show_separate_key":  "Schlüssel separat teilen",
+  "upload.result.hide_key":           "Schlüssel ausblenden",
+  "upload.result.link_only":          "Nur Link",
+  "upload.result.decryption_key":     "Entschlüsselungsschlüssel",
+  "upload.result.copy":               "Kopieren",
+  "upload.result.open_tab":           "In neuem Tab öffnen",
+  "upload.result.send_another":       "Weitere senden",
+  "upload.guidance.split_channels":   "Für beste Sicherheit teilen Sie den Link und den Schlüssel über <strong>verschiedene Kanäle</strong> (z.B. Link per E-Mail, Schlüssel per Messenger).",
+
+  "upload.error.empty_text":          "Bitte geben Sie einen Text zum Verschlüsseln ein.",
+  "upload.error.upload_failed":       "Hochladen fehlgeschlagen. Bitte versuchen Sie es erneut.",
+  "upload.error.file_too_large":      "Datei ist zu gross. Maximale Grösse: {limit}.",
+
+  "upload.token.unlimited":           "Unbegrenzte Nutzungen verbleibend",
+  "upload.token.remaining":           "{remaining} Nutzungen verbleibend",
+
+  "upload.timing.title":              "Hochladen abgeschlossen in",
+  "download.timing.title":            "Download abgeschlossen in",
+
+  "download.loading":                 "Übertragungsinformationen werden geladen...",
+
+  "download.info.encrypted_file":     "Verschlüsselte Datei",
+  "download.info.encrypted_text":     "Verschlüsselter Text",
+  "download.info.uploaded":           "Hochgeladen {timestamp}",
+  "download.info.download_count":     "{count} Mal heruntergeladen",
+
+  "download.key.label":               "Entschlüsselungsschlüssel",
+  "download.key.placeholder":         "Entschlüsselungsschlüssel hier einfügen",
+  "download.button.decrypt_download": "Herunterladen & Entschlüsseln",
+  "download.button.decrypt_view":     "Entschlüsseln & Anzeigen",
+
+  "download.progress.decrypting":     "Wird heruntergeladen und entschlüsselt...",
+
+  "download.result.file_success":     "Datei erfolgreich entschlüsselt und gespeichert.",
+  "download.result.text_success":     "Text erfolgreich entschlüsselt.",
+  "download.result.copy_text":        "In Zwischenablage kopieren",
+  "download.result.download_file":    "Als Datei herunterladen",
+  "download.result.send_another":     "Neue Datei oder Text senden",
+  "download.result.decrypted_message": "Entschlüsselte Nachricht",
+
+  "download.history.title":           "Letzte Downloads",
+  "download.history.privacy":         "In Ihrem Browser gespeichert. Jeder mit Zugang zu diesem Gerät kann diese sehen.",
+  "download.history.clear":           "Verlauf löschen",
+  "download.history.empty":           "Keine letzten Downloads.",
+  "download.history.text_preview":    "Text",
+  "download.history.file_label":      "Datei",
+
+  "download.token.uses_remaining":    "{remaining} Nutzungen verbleibend",
+
+  "download.error.no_id":             "Keine Übertragungs-ID in der URL gefunden. Bitte überprüfen Sie Ihren Link.",
+  "download.error.not_ready":         "Diese Übertragung ist noch nicht zum Download verfügbar.",
+  "download.error.not_found":         "Übertragung nicht gefunden. Der Link ist möglicherweise abgelaufen.",
+  "download.error.no_key":            "Bitte geben Sie den Entschlüsselungsschlüssel ein.",
+  "download.error.failed":            "Download oder Entschlüsselung fehlgeschlagen.",
+  "download.error.token_not_found":   "Dieser Link ist ungültig. Das Zugriffstoken wurde nicht gefunden.",
+  "download.error.token_exhausted":   "Dieser Link ist abgelaufen. Das Zugriffstoken wurde vollständig verwendet.",
+  "download.error.token_revoked":     "Dieser Link wurde deaktiviert. Das Zugriffstoken wurde widerrufen.",
+
+  "access_gate.title":                "Beta-Zugang",
+  "access_gate.subtitle":             "Geben Sie Ihr Zugriffstoken ein, um Dateien zu senden.",
+  "access_gate.placeholder":          "Zugriffstoken einfügen",
+  "access_gate.button":               "Los",
+
+  "transparency.title":               "Was wir über diese Übertragung gespeichert haben",
+  "transparency.section.stored":      "Vom Server gespeichert",
+  "transparency.section.encrypted":   "Verschlüsselt gespeichert (nur Sie können es lesen)",
+  "transparency.section.not_stored":  "Nie an den Server gesendet",
+  "transparency.footer":              "Das ist alles. Nichts anderes wurde erfasst.",
+
+  "crypto.error.unavailable":         "Die Web Crypto API ist nicht verfügbar. Sie erfordert einen sicheren Kontext (HTTPS oder localhost).",
+  "crypto.error.read_failed":         "Datei konnte nicht gelesen werden",
+
+  "common.copied":                    "Kopiert!",
+
+  "test_files.title":                 "Testdateien",
+  "test_files.description":           "Laden Sie eine Testdatei herunter und ziehen Sie sie in die Upload-Zone oben.",
+
+  "cta.title":                        "Möchten Sie auch Dateien senden?",
+  "cta.description":                  "Treten Sie dem Early-Access-Programm für SGraph Send bei."
+}
