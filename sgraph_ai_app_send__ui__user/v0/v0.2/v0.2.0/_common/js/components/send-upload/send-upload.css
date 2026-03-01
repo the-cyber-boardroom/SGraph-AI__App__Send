@@ -1,0 +1,33 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Upload Component Styles
+   v0.2.0 — Drop zone, file info, and upload-specific styling
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.drop-zone {
+    border: 2px dashed var(--color-drop-zone-border, rgba(78, 205, 196, 0.25));
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-drop-zone-bg, #16213E);
+    padding: var(--space-8, 2rem) var(--space-6, 1.5rem);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--transition, 150ms ease),
+                background-color var(--transition, 150ms ease);
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+    border-color: var(--color-drop-zone-active, #4ECDC4);
+    background: rgba(78, 205, 196, 0.05);
+}
+
+.drop-zone__label {
+    font-size: var(--text-h3, 1.25rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--accent, #4ECDC4);
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.drop-zone__hint {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-secondary, #8892A0);
+}

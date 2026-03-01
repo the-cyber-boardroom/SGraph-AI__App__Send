@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Send — Zero-knowledge encrypted file sharing</title>
+    <meta name="description" content="Share files securely with zero-knowledge encryption. Your files are encrypted in your browser before upload. The server never sees your data.">
+
+    <!-- Fonts (vendored — no external CDN) -->
+    <link rel="stylesheet" href="../_common/fonts/fonts.css">
+
+    <!-- Design tokens (defines CSS custom properties on :root) -->
+    <link rel="stylesheet" href="../_common/css/design-tokens.css">
+
+    <!-- Component styles loaded by page (not Shadow DOM — these components use innerHTML) -->
+    <link rel="stylesheet" href="../_common/css/shared-components.css">
+    <link rel="stylesheet" href="../_common/js/components/send-upload/send-upload.css">
+    <link rel="stylesheet" href="../_common/js/components/send-transparency/send-transparency.css">
+    <link rel="stylesheet" href="../_common/js/components/send-header/send-header.css">
+    <link rel="stylesheet" href="../_common/js/components/send-footer/send-footer.css">
+    <link rel="stylesheet" href="../_common/js/components/send-locale/send-locale.css">
+</head>
+<body>
+
+    <send-header></send-header>
+
+    <main>
+        <send-access-gate>
+            <send-upload></send-upload>
+        </send-access-gate>
+
+        <p class="disclaimer">${I18n.t('app.disclaimer')}</p>
+    </main>
+
+    <send-footer></send-footer>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Script Loading Order:
+         1. Utilities (no dependencies)
+         2. Base system (SendHelpers, SendComponentPaths, SendComponent)
+         3. Components (depend on utilities + base)
+         4. Init script (depends on everything)
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- 1. Utilities -->
+    <script src="../_common/js/i18n.js"></script>
+    <script src="../_common/js/crypto.js"></script>
+    <script src="../_common/js/api-client.js"></script>
+
+    <!-- 2. Base system -->
+    <script src="../_common/js/base/send-helpers.js"></script>
+    <script src="../_common/js/base/send-component-paths.js"></script>
+    <script src="../_common/js/base/send-component.js"></script>
+
+    <!-- 3. Components -->
+    <script src="../_common/js/components/send-locale/send-locale.js"></script>
+    <script src="../_common/js/components/send-header/send-header.js"></script>
+    <script src="../_common/js/components/send-footer/send-footer.js"></script>
+    <script src="../_common/js/components/send-transparency/send-transparency.js"></script>
+    <script src="../_common/js/components/send-access-gate/send-access-gate.js"></script>
+    <script src="../_common/js/components/send-upload/send-upload.js"></script>
+
+    <!-- 4. Init -->
+    <script>
+        // Set base path for component resource loading
+        SendComponentPaths.init('../_common');
+
+        // Initialise i18n (loads saved locale preference)
+        I18n.init('../_common/js/i18n').then(() => {
+            // Update disclaimer after i18n loads
+            const disclaimer = document.querySelector('.disclaimer');
+            if (disclaimer) disclaimer.textContent = I18n.t('app.disclaimer');
+        });
+    </script>
+
+</body>
+</html>
