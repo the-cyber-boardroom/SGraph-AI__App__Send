@@ -595,6 +595,7 @@ class SendDownload extends HTMLElement {
         const keyString = keyOverride || (this.querySelector('#key-input') ? this.querySelector('#key-input').value.trim() : '');
 
         if (!keyString) { this.errorMessage = this.t('download.error.no_key'); this.state = 'error'; this.render(); this.setupEventListeners(); return; }
+        // Check crypto.subtle requires a secure context (HTTPS or localhost)
         if (!SendCrypto.isAvailable()) { this.errorMessage = this.t('crypto.error.unavailable'); this.state = 'error'; this.render(); this.setupEventListeners(); return; }
 
         try {

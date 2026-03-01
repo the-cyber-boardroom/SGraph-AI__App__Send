@@ -428,6 +428,7 @@ class SendUpload extends HTMLElement {
 
     async startUpload() {
         if (this.state !== 'idle') return;
+        // Check crypto.subtle requires a secure context (HTTPS or localhost)
         if (!SendCrypto.isAvailable()) {
             this.errorMessage = this.t('crypto.error.unavailable');
             this.state = 'error'; this.render(); this.setupEventListeners(); return;
