@@ -942,6 +942,30 @@ body.i18n-loading {
 #locale-picker {
   margin-left: auto;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* English quick-switch — visible on non-English pages */
+.locale-english-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-btn);
+  color: var(--accent);
+  text-decoration: none;
+  font-family: var(--font-body);
+  line-height: var(--lh-body);
+  white-space: nowrap;
+  margin-right: 0.4rem;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.locale-english-switch:hover {
+  background: rgba(78, 205, 196, 0.15);
+  color: var(--text-heading);
 }
 
 /* Locale Dropdown */
