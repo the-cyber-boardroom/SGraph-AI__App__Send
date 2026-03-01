@@ -1,0 +1,19 @@
+# Generated locale pages (built by scripts/generate_send_i18n_pages.py)
+# These are CI-only build artifacts — generated before deployment to S3.
+# Only en-gb/ (source pages) and i18n/*.json (translations) live in git.
+/en-us/
+/pt-pt/
+/pt-br/
+/es-es/
+/es-ar/
+/es-mx/
+/fr-fr/
+/fr-ca/
+/de-de/
+/de-ch/
+/it-it/
+/nl-nl/
+/pl-pl/
+/hr-hr/
+/ro-ro/
+/tlh/

@@ -1,0 +1,140 @@
+{
+  "_comment": "SGraph Send — Italiano (Italia)",
+
+  "app.title":            "SG/Send",
+  "app.tagline":          "I tuoi file, le tue chiavi, la tua privacy",
+  "app.subtitle":         "Condivisione file con crittografia zero-knowledge",
+  "app.disclaimer":       "Questo è un servizio beta. Non caricare contenuti riservati o illegali.",
+
+  "upload.mode.file":     "File",
+  "upload.mode.text":     "Testo",
+
+  "upload.drop_zone.label":           "Trascina il tuo file qui",
+  "upload.drop_zone.hint":            "o clicca per sfogliare",
+  "upload.drop_zone.encrypted_hint":  "Crittografato nel tuo browser prima del caricamento",
+  "upload.drop_zone.size_limit":      "Dimensione massima del file: {limit}",
+
+  "upload.text.placeholder":          "Digita o incolla il tuo testo qui",
+  "upload.text.char_count":           "{count} caratteri",
+  "upload.text.drop_hint":            "Puoi anche trascinare un file di testo qui",
+
+  "upload.button.encrypt_upload":     "Crittografa e Carica",
+  "upload.button.encrypt_send":       "Crittografa e Invia",
+
+  "upload.progress.reading":          "Lettura del file...",
+  "upload.progress.encrypting":       "Crittografia...",
+  "upload.progress.creating":         "Preparazione del trasferimento...",
+  "upload.progress.uploading":        "Caricamento...",
+  "upload.progress.uploading_part":   "Caricamento parte {current} di {total}...",
+  "upload.progress.completing":       "Finalizzazione...",
+
+  "upload.result.file_success":       "Il tuo file è stato crittografato e caricato.",
+  "upload.result.text_success":       "Il tuo testo è stato crittografato e caricato.",
+  "upload.result.share_link":         "Condividi questo link",
+  "upload.result.copy_link":          "Copia link",
+  "upload.result.show_separate_key":  "Condividi la chiave separatamente",
+  "upload.result.hide_key":           "Nascondi chiave",
+  "upload.result.link_only":          "Solo link",
+  "upload.result.decryption_key":     "Chiave di decrittazione",
+  "upload.result.copy":               "Copia",
+  "upload.result.open_tab":           "Apri in una nuova scheda",
+  "upload.result.send_another":       "Invia un altro",
+  "upload.guidance.split_channels":   "Per una maggiore sicurezza, condividi il link e la chiave tramite <strong>canali diversi</strong> (es: link via email, chiave via messaggistica).",
+
+  "upload.error.empty_text":          "Inserisci un testo da crittografare.",
+  "upload.error.upload_failed":       "Caricamento fallito. Riprova.",
+  "upload.error.file_too_large":      "Il file è troppo grande. Dimensione massima: {limit}.",
+
+  "upload.token.unlimited":           "Utilizzi illimitati rimanenti",
+  "upload.token.remaining":           "{remaining} utilizzi rimanenti",
+
+  "upload.timing.title":              "Caricamento completato in",
+  "download.timing.title":            "Download completato in",
+
+  "download.loading":                 "Caricamento informazioni del trasferimento...",
+
+  "download.info.encrypted_file":     "File crittografato",
+  "download.info.encrypted_text":     "Testo crittografato",
+  "download.info.uploaded":           "Caricato {timestamp}",
+  "download.info.download_count":     "Scaricato {count} volta/e",
+
+  "download.key.label":               "Chiave di decrittazione",
+  "download.key.placeholder":         "Incolla la chiave di decrittazione qui",
+  "download.button.decrypt_download": "Scarica e Decrittografa",
+  "download.button.decrypt_view":     "Decrittografa e Visualizza",
+
+  "download.progress.decrypting":     "Download e decrittazione...",
+
+  "download.result.file_success":     "File decrittografato e salvato con successo.",
+  "download.result.text_success":     "Testo decrittografato con successo.",
+  "download.result.copy_text":        "Copia negli appunti",
+  "download.result.download_file":    "Scarica come file",
+  "download.result.send_another":     "Invia un nuovo file o testo",
+  "download.result.decrypted_message": "Messaggio Decrittografato",
+
+  "download.history.title":           "Download recenti",
+  "download.history.privacy":         "Memorizzato nel tuo browser. Chiunque abbia accesso a questo dispositivo può vedere questi elementi.",
+  "download.history.clear":           "Cancella cronologia",
+  "download.history.empty":           "Nessun download recente.",
+  "download.history.text_preview":    "Testo",
+  "download.history.file_label":      "File",
+
+  "download.token.uses_remaining":    "{remaining} utilizzi rimanenti",
+
+  "download.error.no_id":             "Nessun ID di trasferimento trovato nell'URL. Controlla il tuo link.",
+  "download.error.not_ready":         "Questo trasferimento non è ancora disponibile per il download.",
+  "download.error.not_found":         "Trasferimento non trovato. Il link potrebbe essere scaduto.",
+  "download.error.no_key":            "Inserisci la chiave di decrittazione.",
+  "download.error.failed":            "Download o decrittazione fallita.",
+  "download.error.token_not_found":   "Questo link non è valido. Il token di accesso non è stato trovato.",
+  "download.error.token_exhausted":   "Questo link è scaduto. Il token di accesso è stato completamente utilizzato.",
+  "download.error.token_revoked":     "Questo link è stato disattivato. Il token di accesso è stato revocato.",
+
+  "access_gate.title":                "Accesso Beta",
+  "access_gate.subtitle":             "Inserisci il tuo token di accesso per iniziare a inviare file.",
+  "access_gate.placeholder":          "Incolla il tuo token di accesso",
+  "access_gate.button":               "Vai",
+  "access_gate.invalid":              "Token non valido o mancante. Controlla e riprova.",
+  "access_gate.not_found":            "Token non trovato. Controlla e riprova.",
+  "access_gate.exhausted":            "Questo token è stato completamente utilizzato. Richiedine uno nuovo.",
+  "access_gate.revoked":              "Questo token è stato revocato.",
+  "access_gate.uses_remaining":       "{remaining} utilizzi rimanenti",
+  "access_gate.change_token":         "Cambia Token",
+  "access_gate.signup_title":         "Unisciti al Programma di Accesso Anticipato",
+  "access_gate.signup_subtitle":      "Registrati per essere avvisato quando SGraph Send sarà disponibile.",
+
+  "transparency.title":               "Cosa abbiamo memorizzato su questo trasferimento",
+  "transparency.section.stored":      "Memorizzato dal server",
+  "transparency.section.encrypted":   "Memorizzato crittografato (solo tu puoi leggerlo)",
+  "transparency.section.not_stored":  "Mai inviato al server",
+  "transparency.footer":              "Questo è tutto. Nient'altro è stato registrato.",
+  "transparency.ip_address":          "Il tuo indirizzo IP",
+  "transparency.upload_time":         "Ora di caricamento",
+  "transparency.download_time":       "Ora di download",
+  "transparency.file_size":           "Dimensione del file",
+  "transparency.encryption_method":   "Crittografia",
+  "transparency.label.file_name":     "Nome del file",
+  "transparency.label.file_content":  "Contenuto del file",
+  "transparency.label.decryption_key":"Chiave di decrittazione",
+  "transparency.label.raw_ip":        "Indirizzo IP originale",
+  "transparency.not_stored":          "NON memorizzato",
+  "transparency.encrypted":           "Crittografato (solo tu puoi leggerlo)",
+  "transparency.key_not_stored":      "NON memorizzato (solo tu ce l'hai)",
+
+  "crypto.error.unavailable":         "L'API Web Crypto non è disponibile. Richiede un contesto sicuro (HTTPS o localhost).",
+  "crypto.error.read_failed":         "Impossibile leggere il file",
+
+  "common.copied":                    "Copiato!",
+
+  "nav.docs":                         "Documentazione",
+  "nav.github":                       "GitHub",
+
+  "footer.powered_by":                "Realizzato da",
+  "footer.sgraph":                    "SGraph",
+
+  "test_files.title":                 "File di test",
+  "test_files.description":           "Scarica un file di test e trascinalo nella zona di caricamento qui sopra.",
+
+  "cta.title":                        "Vuoi anche tu inviare file?",
+  "cta.description":                  "Unisciti al programma di accesso anticipato di SGraph Send."
+}
