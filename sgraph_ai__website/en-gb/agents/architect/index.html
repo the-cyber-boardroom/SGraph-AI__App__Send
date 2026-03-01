@@ -6,9 +6,9 @@
   <title>Architect — SGraph AI</title>
   <meta name="description" content="The Architect defines and guards system boundaries, owns API contracts and data models, and ensures all technology decisions serve the zero-knowledge encryption guarantee.">
   <meta name="theme-color" content="#1A1A2E">
-  <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
-  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
-  <link rel="stylesheet" href="../../_common/css/style.css">
+  <link rel="icon" type="image/svg+xml" href="../../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../../_common/css/style.css">
 </head>
 <body class="theme-aurora i18n-loading">
 
@@ -35,9 +35,9 @@
          ============================================================ -->
     <section class="hero hero--small">
       <div class="container">
-        <p class="text-secondary mb-4"><a href="../">&larr; Back to Team</a></p>
-        <h1 class="display">Architect</h1>
-        <p class="lead">
+        <p class="text-secondary mb-4"><a href="../" data-i18n="agent.architect.hero.back">&larr; Back to Team</a></p>
+        <h1 class="display" data-i18n="agent.architect.hero.title">Architect</h1>
+        <p class="lead" data-i18n="agent.architect.hero.lead">
           The Architect defines and guards the boundaries between components,
           owns API contracts and data models, and ensures all technology decisions
           serve the zero-knowledge encryption guarantee. Thinks in interfaces and contracts, never implementations.
@@ -51,36 +51,36 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2>What the Architect Does</h2>
-          <p>The Architect is responsible for the structural integrity of the entire platform.</p>
+          <h2 data-i18n="agent.architect.overview.title">What the Architect Does</h2>
+          <p data-i18n="agent.architect.overview.subtitle">The Architect is responsible for the structural integrity of the entire platform.</p>
         </div>
 
         <div class="grid grid--2">
           <div class="card">
-            <h3 class="card__title">System Boundaries</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="agent.architect.card1.title">System Boundaries</h3>
+            <p class="card__desc" data-i18n="agent.architect.card1.desc">
               Defines where each component starts and stops. The two-Lambda architecture
               (User + Admin), the Memory-FS storage abstraction, and the client-server
               encryption boundary are all Architect decisions.
             </p>
           </div>
           <div class="card">
-            <h3 class="card__title">API Contracts</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="agent.architect.card2.title">API Contracts</h3>
+            <p class="card__desc" data-i18n="agent.architect.card2.desc">
               Owns the 73 HTTP endpoints across the platform. Every route, request schema,
               and response format is specified by the Architect before Dev writes a line of code.
             </p>
           </div>
           <div class="card">
-            <h3 class="card__title">Data Models</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="agent.architect.card3.title">Data Models</h3>
+            <p class="card__desc" data-i18n="agent.architect.card3.desc">
               Designs the Type_Safe schemas for transfers, vaults, rooms, tokens, and audit events.
               All models use osbot-utils Type_Safe &mdash; never Pydantic, never raw dicts.
             </p>
           </div>
           <div class="card">
-            <h3 class="card__title">Encryption Guarantees</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="agent.architect.card4.title">Encryption Guarantees</h3>
+            <p class="card__desc" data-i18n="agent.architect.card4.desc">
               Ensures the zero-knowledge model holds at every layer: client-side AES-256-GCM encryption,
               no plaintext on server, no file names stored, hashed IP addresses with daily salt.
             </p>
@@ -95,38 +95,38 @@
     <section class="section">
       <div class="container">
         <div class="section-header">
-          <h2>Key Architectural Decisions</h2>
-          <p>Major decisions the Architect has made and why.</p>
+          <h2 data-i18n="agent.architect.decisions.title">Key Architectural Decisions</h2>
+          <p data-i18n="agent.architect.decisions.subtitle">Major decisions the Architect has made and why.</p>
         </div>
 
         <div class="grid grid--2">
           <div class="card">
-            <h3 class="card__title">Two Lambdas, Not One</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="agent.architect.decision1.title">Two Lambdas, Not One</h3>
+            <p class="card__desc" data-i18n="agent.architect.decision1.desc">
               Separate User and Admin Lambda functions with different security boundaries.
               The User Lambda is public-facing. The Admin Lambda requires authentication.
               A compromise of one cannot access the other.
             </p>
           </div>
           <div class="card">
-            <h3 class="card__title">Memory-FS Abstraction</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="agent.architect.decision2.title">Memory-FS Abstraction</h3>
+            <p class="card__desc" data-i18n="agent.architect.decision2.desc">
               All storage goes through Storage_FS. Application code never knows if the backend
               is in-memory, on disk, or S3. This enables the same codebase to run across all
               7 deployment targets without changing a line of application logic.
             </p>
           </div>
           <div class="card">
-            <h3 class="card__title">Lambda URLs, Not API Gateway</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="agent.architect.decision3.title">Lambda URLs, Not API Gateway</h3>
+            <p class="card__desc" data-i18n="agent.architect.decision3.desc">
               Direct HTTPS endpoints via Lambda Function URLs instead of API Gateway.
               Simpler topology, lower latency, lower cost. CloudFront sits in front
               for CDN, caching, and WAF.
             </p>
           </div>
           <div class="card">
-            <h3 class="card__title">Key in URL Fragment</h3>
-            <p class="card__desc">
+            <h3 class="card__title" data-i18n="agent.architect.decision4.title">Key in URL Fragment</h3>
+            <p class="card__desc" data-i18n="agent.architect.decision4.desc">
               The decryption key is placed in the URL fragment (#), which browsers
               never send to the server. This is how the zero-knowledge model works
               for shared links &mdash; the server literally cannot intercept the key.
@@ -142,21 +142,21 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2>Details</h2>
+          <h2 data-i18n="agent.architect.details.title">Details</h2>
         </div>
 
         <div class="grid grid--3">
           <div class="card">
-            <h3 class="card__title">Email</h3>
+            <h3 class="card__title" data-i18n="agent.architect.email.title">Email</h3>
             <p class="card__desc"><a href="mailto:architect.explorer@sgraph.ai">architect.explorer@sgraph.ai</a></p>
           </div>
           <div class="card">
-            <h3 class="card__title">Active Since</h3>
-            <p class="card__desc">v0.1.x &mdash; one of the founding agents</p>
+            <h3 class="card__title" data-i18n="agent.architect.since.title">Active Since</h3>
+            <p class="card__desc" data-i18n="agent.architect.since.value">v0.1.x &mdash; one of the founding agents</p>
           </div>
           <div class="card">
-            <h3 class="card__title">Team</h3>
-            <p class="card__desc">Explorer Team (Genesis &rarr; Custom-Built)</p>
+            <h3 class="card__title" data-i18n="agent.architect.team.title">Team</h3>
+            <p class="card__desc" data-i18n="agent.architect.team.value">Explorer Team (Genesis &rarr; Custom-Built)</p>
           </div>
         </div>
       </div>
@@ -168,11 +168,11 @@
     <section class="section">
       <div class="container">
         <div class="section-header">
-          <h2>Public Keys</h2>
-          <p>Use these keys to verify the Architect's identity and encrypt messages to this agent.</p>
+          <h2 data-i18n="agent.architect.keys.title">Public Keys</h2>
+          <p data-i18n="agent.architect.keys.subtitle">Use these keys to verify the Architect's identity and encrypt messages to this agent.</p>
         </div>
 
-        <div class="callout">
+        <div class="callout" data-i18n="agent.architect.keys.pending">
           Key generation pending &mdash; public keys will be published when PKI infrastructure is deployed.
           See <a href="./../../agents/keys.json">keys.json</a> for the machine-readable directory.
         </div>
@@ -185,11 +185,11 @@
     <section class="section section--alt">
       <div class="container">
         <div class="section-header">
-          <h2>Send a file to the Architect</h2>
-          <p>Use SG/Send to share encrypted files directly with this agent.</p>
+          <h2 data-i18n="agent.architect.cta.title">Send a file to the Architect</h2>
+          <p data-i18n="agent.architect.cta.subtitle">Use SG/Send to share encrypted files directly with this agent.</p>
         </div>
         <div class="text-center">
-          <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg">Send via SG/Send &rarr;</a>
+          <a href="https://send.sgraph.ai" class="btn btn-primary btn--lg" data-i18n="agent.architect.cta.button">Send via SG/Send &rarr;</a>
         </div>
       </div>
     </section>
@@ -236,7 +236,7 @@
     </div>
   </footer>
 
-  <script src="../../_common/js/i18n.js"></script>
+  <script src="../../../_common/js/i18n.js"></script>
   <script>
     SgI18n.init().then(() => {
       document.body.classList.remove('i18n-loading');
