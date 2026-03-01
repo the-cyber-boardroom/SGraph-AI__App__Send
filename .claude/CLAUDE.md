@@ -228,7 +228,19 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 - **Path:** `team/humans/dinis_cruz/debriefs/MM/DD/{version}__debrief__{topic}.md`
 - **Purpose:** Single document Dinis can read to see what was delivered, what decisions were made, and what to review
-- **Links:** All links must be **relative** to the debrief file. **COUNT THE DIRECTORY DEPTH CAREFULLY.** Debriefs live at `debriefs/MM/DD/file.md` — that's 3 directories deep from `dinis_cruz/`. To link to briefs at `briefs/MM/DD/file.md`, you need `../../../briefs/MM/DD/file.md` (3 levels up to reach `dinis_cruz/`, then down into `briefs/`). Similarly, to link to role reviews at `team/roles/{role}/reviews/`, count from the debrief's directory to the repo root. **Always verify relative links resolve correctly before committing** — use `realpath` or manually trace each `../` level. Common mistake: using `../../` (2 levels) when `../../../` (3 levels) is needed.
+- **Links:** All links must be **relative** to the debrief file and **must work in GitHub's web UI**. **COUNT THE DIRECTORY DEPTH CAREFULLY.** Debriefs live at `team/humans/dinis_cruz/debriefs/MM/DD/file.md` — that's **5 directories deep** from the repo root. Use this reference table:
+
+  | Link target | Levels up | Prefix | Example |
+  |---|---|---|---|
+  | Another debrief (`debriefs/MM/DD/`) | 2 | `../../` | `../../02/14/v0.3.0__debrief__topic.md` |
+  | Briefs (`briefs/MM/DD/`) | 3 + down | `../../../briefs/` | `../../../briefs/02/14/v0.3.2__brief.md` |
+  | Claude-code-web (`claude-code-web/MM/DD/`) | 3 + down | `../../../claude-code-web/` | `../../../claude-code-web/02/14/file.md` |
+  | Role reviews (`team/roles/{role}/reviews/`) | **5** + down | `../../../../../roles/` | `../../../../../roles/architect/reviews/26-03-01/file.md` |
+  | Library (`library/`) | **6** + down | `../../../../../../library/` | `../../../../../../library/docs/specs/README.md` |
+
+  **The most common mistake** is linking to `team/roles/` with only 3 levels (`../../../roles/...`). This resolves to `team/humans/dinis_cruz/roles/...` which does not exist. You need **5 levels** (`../../../../../roles/...`) to reach `team/` and then down into `roles/`.
+
+  **Always verify** relative links resolve correctly before committing — run: `cd team/humans/dinis_cruz/debriefs/MM/DD && ls -la ../../../../../roles/{role}/reviews/YY-MM-DD/filename.md`
 - **When:** Create a debrief whenever a session produces multiple deliverables
 - **Content:** Executive summary, recommended reading order, key decisions, what's next
 
