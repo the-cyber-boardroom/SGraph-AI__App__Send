@@ -41,8 +41,10 @@ const I18n = {
             'upload.mode.text':     'Text',
 
             // ─── Upload: Drop Zone ────────────────────────────────────────
-            'upload.drop_zone.label':           'Drop your file here',
+            'upload.drop_zone.label':           'Drop a file or folder here',
             'upload.drop_zone.hint':            'or click to browse',
+            'upload.drop_zone.browse_file':     'Browse File',
+            'upload.drop_zone.browse_folder':   'Browse Folder',
             'upload.drop_zone.encrypted_hint':  'Encrypted in your browser before upload',
             'upload.drop_zone.size_limit':      'Maximum file size: {limit}',
 
@@ -61,7 +63,24 @@ const I18n = {
             'upload.progress.creating':         'Preparing transfer...',
             'upload.progress.uploading':        'Uploading...',
             'upload.progress.uploading_part':   'Uploading part {current} of {total}...',
+            'upload.progress.zipping':          'Compressing folder...',
             'upload.progress.completing':       'Finalising...',
+
+            // ─── Upload: Folder ─────────────────────────────────────────
+            'upload.folder.title':              'Folder: {name}',
+            'upload.folder.summary':            '{files} files, {folders} folders, {size}',
+            'upload.folder.compression':        'Compression level',
+            'upload.folder.level_0':            '0 — Store (fastest, no compression)',
+            'upload.folder.level_4':            '4 — Fast (default)',
+            'upload.folder.level_6':            '6 — Balanced',
+            'upload.folder.level_9':            '9 — Maximum (slowest, smallest)',
+            'upload.folder.include_empty':      'Include empty folders',
+            'upload.folder.include_hidden':     'Include hidden files (dotfiles)',
+            'upload.folder.compress_upload':    'Compress & Upload',
+            'upload.folder.cancel':             'Cancel',
+            'upload.folder.error_too_large':    'Folder is too large. Maximum size is {limit}.',
+            'upload.folder.error_zip_failed':   'Failed to create zip file.',
+            'upload.folder.error_jszip':        'Failed to load compression library.',
 
             // ─── Upload: Result ───────────────────────────────────────────
             'upload.result.file_success':       'Your file has been encrypted and uploaded.',
