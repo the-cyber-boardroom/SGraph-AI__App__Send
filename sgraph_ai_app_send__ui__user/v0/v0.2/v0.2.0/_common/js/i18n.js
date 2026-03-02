@@ -1,16 +1,32 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — i18n Module
-   v0.2.0 — Consolidated from v0.1.4 + v0.1.5 + v0.1.6 overlays
+   v0.2.0 — URL-based locale routing with pre-rendered HTML
 
-   English strings embedded inline. Additional locales load from locale files.
-   Components use I18n.t('key') for all user-facing text.
+   Locales are served at path prefixes:
+     /en-gb/      → English (UK) — default
+     /en-us/      → English (US)
+     /pt-pt/      → Português (Portugal)
+     /pt-br/      → Português (Brasil)
+     /de-de/      → Deutsch (Deutschland)
+     /de-ch/      → Deutsch (Schweiz)
+     /es-es/      → Español (España)
+     ... (16 locales total)
+
+   All pages are pre-rendered with translations baked into the HTML at build
+   time. This module handles:
+     - Locale detection from URL path
+     - English strings for runtime component rendering
+     - Translation lookup via t()
+     - URL-based navigation between locale versions
+
+   No JSON files are fetched at runtime.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 const I18n = {
 
     locale: 'en-gb',
 
-    // All English strings — consolidated from v0.1.4 base + v0.1.5 + v0.1.6 overlays
+    // All English strings — used by components that render via innerHTML at runtime
     strings: {
         'en-gb': {
 
@@ -66,50 +82,48 @@ const I18n = {
             'upload.error.upload_failed':       'Upload failed. Please try again.',
             'upload.error.file_too_large':      'File is too large. Maximum size is {limit}.',
 
-            // ─── Upload: Token (v0.1.5) ───────────────────────────────────
+            // ─── Upload: Token ────────────────────────────────────────────
             'upload.token.unlimited':           'Unlimited uses remaining',
             'upload.token.remaining':           '{remaining} uses remaining',
 
-            // ─── Upload: Timing (v0.1.5) ──────────────────────────────────
+            // ─── Upload: Timing ───────────────────────────────────────────
             'upload.timing.title':              'Upload completed in',
             'download.timing.title':            'Download completed in',
 
-            // ─── Download: Loading ────────────────────────────────────────
+            // ─── Download ─────────────────────────────────────────────────
             'download.loading':                 'Loading transfer info...',
-
-            // ─── Download: Info ───────────────────────────────────────────
             'download.info.encrypted_file':     'Encrypted file',
             'download.info.encrypted_text':     'Encrypted text',
             'download.info.uploaded':           'Uploaded {timestamp}',
             'download.info.download_count':     'Downloaded {count} time(s)',
-
-            // ─── Download: Key Input ──────────────────────────────────────
             'download.key.label':               'Decryption key',
             'download.key.placeholder':         'Paste the decryption key here',
             'download.button.decrypt_download': 'Download & Decrypt',
             'download.button.decrypt_view':     'Decrypt & View',
-
-            // ─── Download: Progress ───────────────────────────────────────
             'download.progress.decrypting':     'Downloading and decrypting...',
-
-            // ─── Download: Result ─────────────────────────────────────────
             'download.result.file_success':     'File decrypted and saved successfully.',
             'download.result.text_success':     'Text decrypted successfully.',
             'download.result.copy_text':        'Copy to clipboard',
             'download.result.download_file':    'Download as file',
             'download.result.send_another':     'Send a new File or Text',
             'download.result.decrypted_message': 'Decrypted Message',
-
-            // ─── Download: History ────────────────────────────────────────
             'download.history.title':           'Recent downloads',
             'download.history.privacy':         'Stored in your browser. Anyone with access to this device can view these.',
             'download.history.clear':           'Clear history',
             'download.history.empty':           'No recent downloads.',
             'download.history.text_preview':    'Text',
             'download.history.file_label':      'File',
-
-            // ─── Download: Token ──────────────────────────────────────────
             'download.token.uses_remaining':    '{remaining} uses remaining',
+
+            // ─── Download: Errors ─────────────────────────────────────────
+            'download.error.no_id':             'No transfer ID found in URL. Please check your link.',
+            'download.error.not_ready':         'This transfer is not yet available for download.',
+            'download.error.not_found':         'Transfer not found. The link may have expired.',
+            'download.error.no_key':            'Please enter the decryption key.',
+            'download.error.failed':            'Download or decryption failed.',
+            'download.error.token_not_found':   'This link is not valid. The access token was not found.',
+            'download.error.token_exhausted':   'This link has expired. The access token has been fully used.',
+            'download.error.token_revoked':     'This link has been disabled. The access token was revoked.',
 
             // ─── Access Gate ──────────────────────────────────────────────
             'access_gate.title':                'Beta Access',
@@ -122,10 +136,10 @@ const I18n = {
             'access_gate.revoked':              'This token has been revoked.',
             'access_gate.uses_remaining':       '{remaining} uses remaining',
             'access_gate.change_token':         'Change Token',
-            'access_gate.signup_title':         'Join the Early Access Program',
+            'access_gate.signup_title':         'Join the Early Access Programme',
             'access_gate.signup_subtitle':      'Sign up to get notified when SGraph Send is available.',
 
-            // ─── Transparency Panel (v0.1.6) ─────────────────────────────
+            // ─── Transparency Panel ───────────────────────────────────────
             'transparency.title':               'What we stored about this transfer',
             'transparency.section.stored':      'Stored by the server',
             'transparency.section.encrypted':   'Stored encrypted (only you can read it)',
@@ -155,73 +169,61 @@ const I18n = {
             'nav.docs':                         'Docs',
             'nav.github':                       'GitHub',
 
-            // ─── Footer ───────────────────────────────────────────────────
+            // ─── Footer ─────────────────────────────────────────────────
             'footer.powered_by':                'Powered by',
             'footer.sgraph':                    'SGraph',
 
-            // ─── Test Files ───────────────────────────────────────────────
+            // ─── Test Files ─────────────────────────────────────────────
             'test_files.title':                 'Test Files',
             'test_files.description':           'Download a test file, then drag it into the upload zone above.',
 
-            // ─── CTA ─────────────────────────────────────────────────────
+            // ─── CTA ────────────────────────────────────────────────────
             'cta.title':                        'Want to send files too?',
-            'cta.description':                  'Join the early access program for SGraph Send.'
+            'cta.description':                  'Join the early access programme for SGraph Send.'
         }
     },
 
+    // Locale definitions — matches sgraph.ai website convention exactly
     availableLocales: [
-        { code: 'en-gb', name: 'English (UK)',           flag: '\uD83C\uDDEC\uD83C\uDDE7' },
-        { code: 'en',    name: 'English',                flag: '\uD83C\uDDEC\uD83C\uDDE7' },
-        { code: 'pt',    name: 'Português (Brasil)',      flag: '\uD83C\uDDE7\uD83C\uDDF7' },
-        { code: 'pt-PT', name: 'Português (Portugal)',    flag: '\uD83C\uDDF5\uD83C\uDDF9' },
-        { code: 'de',    name: 'Deutsch',                 flag: '\uD83C\uDDE9\uD83C\uDDEA' },
-        { code: 'fr',    name: 'Français',                flag: '\uD83C\uDDEB\uD83C\uDDF7' },
-        { code: 'es',    name: 'Español',                 flag: '\uD83C\uDDEA\uD83C\uDDF8' },
-        { code: 'it',    name: 'Italiano',                flag: '\uD83C\uDDEE\uD83C\uDDF9' },
-        { code: 'nl',    name: 'Nederlands',              flag: '\uD83C\uDDF3\uD83C\uDDF1' },
-        { code: 'pl',    name: 'Polski',                  flag: '\uD83C\uDDF5\uD83C\uDDF1' },
-        { code: 'sv',    name: 'Svenska',                 flag: '\uD83C\uDDF8\uD83C\uDDEA' },
-        { code: 'da',    name: 'Dansk',                   flag: '\uD83C\uDDE9\uD83C\uDDF0' },
-        { code: 'fi',    name: 'Suomi',                   flag: '\uD83C\uDDEB\uD83C\uDDEE' },
-        { code: 'el',    name: 'Ελληνικά',                flag: '\uD83C\uDDEC\uD83C\uDDF7' },
-        { code: 'ro',    name: 'Română',                  flag: '\uD83C\uDDF7\uD83C\uDDF4' }
+        { code: 'en-gb', name: 'English (UK)',             flag: '\uD83C\uDDEC\uD83C\uDDE7' },
+        { code: 'en-us', name: 'English (US)',             flag: '\uD83C\uDDFA\uD83C\uDDF8' },
+        { code: 'de-de', name: 'Deutsch (Deutschland)',    flag: '\uD83C\uDDE9\uD83C\uDDEA' },
+        { code: 'de-ch', name: 'Deutsch (Schweiz)',        flag: '\uD83C\uDDE8\uD83C\uDDED' },
+        { code: 'es-es', name: 'Espa\u00f1ol (Espa\u00f1a)',         flag: '\uD83C\uDDEA\uD83C\uDDF8' },
+        { code: 'es-ar', name: 'Espa\u00f1ol (Argentina)',      flag: '\uD83C\uDDE6\uD83C\uDDF7' },
+        { code: 'es-mx', name: 'Espa\u00f1ol (M\u00e9xico)',         flag: '\uD83C\uDDF2\uD83C\uDDFD' },
+        { code: 'fr-fr', name: 'Fran\u00e7ais (France)',        flag: '\uD83C\uDDEB\uD83C\uDDF7' },
+        { code: 'fr-ca', name: 'Fran\u00e7ais (Canada)',        flag: '\uD83C\uDDE8\uD83C\uDDE6' },
+        { code: 'hr-hr', name: 'Hrvatski (Hrvatska)',      flag: '\uD83C\uDDED\uD83C\uDDF7' },
+        { code: 'it-it', name: 'Italiano (Italia)',        flag: '\uD83C\uDDEE\uD83C\uDDF9' },
+        { code: 'nl-nl', name: 'Nederlands (Nederland)',   flag: '\uD83C\uDDF3\uD83C\uDDF1' },
+        { code: 'pl-pl', name: 'Polski (Polska)',          flag: '\uD83C\uDDF5\uD83C\uDDF1' },
+        { code: 'pt-br', name: 'Portugu\u00eas (Brasil)',       flag: '\uD83C\uDDE7\uD83C\uDDF7' },
+        { code: 'pt-pt', name: 'Portugu\u00eas (Portugal)',     flag: '\uD83C\uDDF5\uD83C\uDDF9' },
+        { code: 'ro-ro', name: 'Rom\u00e2n\u0103 (Rom\u00e2nia)',          flag: '\uD83C\uDDF7\uD83C\uDDF4' },
+        { code: 'tlh',   name: 'tlhIngan Hol',            flag: '\uD83D\uDD96' }
     ],
-
-    // ─── Locale File Base Path ────────────────────────────────────────────
-    localePath: '',
 
     // ─── Initialisation ──────────────────────────────────────────────────
 
     async init(localePath) {
-        if (localePath) this.localePath = localePath;
-
-        const saved = localStorage.getItem('sgraph-send-locale');
-        if (saved && saved !== 'en-gb' && this.isSupported(saved)) {
-            this.locale = saved;
-            await this.loadLocale(saved);
-            document.dispatchEvent(new CustomEvent('locale-changed', {
-                detail: { locale: saved }
-            }));
-        }
+        // Detect locale from URL path — translations are pre-rendered,
+        // so no JSON files need to be fetched.
+        this.locale = this._detectLocale();
     },
 
     isSupported(code) {
         return this.availableLocales.some(l => l.code === code);
     },
 
-    // ─── Locale Loading ──────────────────────────────────────────────────
+    // ─── Locale Detection from URL ───────────────────────────────────────
 
-    async loadLocale(code) {
-        if (this.strings[code]) return true;
-        try {
-            const path = this.localePath ? `${this.localePath}/${code}.json` : `i18n/${code}.json`;
-            const resp = await fetch(path);
-            if (resp.ok) {
-                this.strings[code] = await resp.json();
-                return true;
-            }
-        } catch (e) { /* fallback to en-gb */ }
-        return false;
+    _detectLocale() {
+        const path = window.location.pathname;
+        const codes = this.availableLocales.map(l => l.code);
+        const pattern = new RegExp('^\\/(' + codes.join('|') + ')\\/');
+        const match = path.match(pattern);
+        return match ? match[1] : 'en-gb';
     },
 
     // ─── Translation ─────────────────────────────────────────────────────
@@ -238,17 +240,26 @@ const I18n = {
         return str;
     },
 
-    // ─── Locale Switching ────────────────────────────────────────────────
+    // ─── URL-based Locale Navigation ─────────────────────────────────────
+
+    navigateToLocale(code) {
+        if (!this.isSupported(code)) return;
+
+        const currentLocale = this._detectLocale();
+        let currentPath = window.location.pathname;
+
+        // Strip current locale prefix to get the base page path
+        if (currentLocale) {
+            currentPath = currentPath.replace(new RegExp('^/' + currentLocale + '/'), '/');
+        }
+
+        // Build target URL — all locales use /{code}/ prefix
+        window.location.href = '/' + code + currentPath;
+    },
+
+    // ─── Legacy setLocale (now navigates) ────────────────────────────────
 
     async setLocale(code) {
-        if (!this.isSupported(code)) return;
-        if (!this.strings[code]) {
-            await this.loadLocale(code);
-        }
-        this.locale = code;
-        localStorage.setItem('sgraph-send-locale', code);
-        document.dispatchEvent(new CustomEvent('locale-changed', {
-            detail: { locale: code }
-        }));
+        this.navigateToLocale(code);
     }
 };

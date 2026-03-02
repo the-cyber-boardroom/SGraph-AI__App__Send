@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SG/Send — Zero-Knowledge Encrypted File Sharing</title>
+  <meta name="description" content="Send files with zero-knowledge encryption. Files are encrypted in your browser before upload — we never see your data. Free to try, open source, from £5 for 500 transfers.">
+  <link rel="canonical" href="https://sgraph.ai/en-gb/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SGraph AI">
+  <meta property="og:title" content="SG/Send — Zero-Knowledge Encrypted File Sharing">
+  <meta property="og:description" content="Send files with zero-knowledge encryption. Files are encrypted in your browser before upload — we never see your data. Free to try, open source, from £5 for 500 transfers.">
+  <meta property="og:url" content="https://sgraph.ai/en-gb/">
+  <meta property="og:locale" content="en_GB">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="SG/Send — Zero-Knowledge Encrypted File Sharing">
+  <meta name="twitter:description" content="Send files with zero-knowledge encryption. Files are encrypted in your browser before upload — we never see your data. Free to try, open source, from £5 for 500 transfers.">
+  <link rel="alternate" hreflang="en-gb" href="https://sgraph.ai/en-gb/">
+  <link rel="alternate" hreflang="en-us" href="https://sgraph.ai/en-us/">
+  <link rel="alternate" hreflang="pt-pt" href="https://sgraph.ai/pt-pt/">
+  <link rel="alternate" hreflang="pt-br" href="https://sgraph.ai/pt-br/">
+  <link rel="alternate" hreflang="es-es" href="https://sgraph.ai/es-es/">
+  <link rel="alternate" hreflang="es-ar" href="https://sgraph.ai/es-ar/">
+  <link rel="alternate" hreflang="es-mx" href="https://sgraph.ai/es-mx/">
+  <link rel="alternate" hreflang="fr-fr" href="https://sgraph.ai/fr-fr/">
+  <link rel="alternate" hreflang="fr-ca" href="https://sgraph.ai/fr-ca/">
+  <link rel="alternate" hreflang="de-de" href="https://sgraph.ai/de-de/">
+  <link rel="alternate" hreflang="de-ch" href="https://sgraph.ai/de-ch/">
+  <link rel="alternate" hreflang="it-it" href="https://sgraph.ai/it-it/">
+  <link rel="alternate" hreflang="nl-nl" href="https://sgraph.ai/nl-nl/">
+  <link rel="alternate" hreflang="pl-pl" href="https://sgraph.ai/pl-pl/">
+  <link rel="alternate" hreflang="ro-ro" href="https://sgraph.ai/ro-ro/">
+  <link rel="alternate" hreflang="hr-hr" href="https://sgraph.ai/hr-hr/">
+  <link rel="alternate" hreflang="x-default" href="https://sgraph.ai/en-gb/">
+  <meta name="i18n-title-key" content="home.title2">
+  <link rel="icon" type="image/svg+xml" href="../_common/favicon.svg">
+  <link rel="stylesheet" href="../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../_common/css/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "SGraph AI",
+    "url": "https://sgraph.ai",
+    "description": "Zero-knowledge encrypted file sharing platform",
+    "sameAs": ["https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"]
+  }
+  </script>
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <header class="site-header">
+    <div class="container">
+      <a href="./" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="./product/" data-i18n="nav.product">Product</a>
+        <a href="./agents/" data-i18n="nav.team">Team</a>
+        <a href="./architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="./pricing/" data-i18n="nav.pricing">Pricing</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO — Product-led: Zero-Knowledge Encrypted File Sharing
+         ============================================================ -->
+    <section class="hero">
+      <div class="container">
+        <h1 class="display" data-i18n="home.hero.title2">Send files. Nobody can read them. Not even us.</h1>
+        <p class="lead" data-i18n="home.hero.lead2">
+          <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+          encrypts files in your browser before upload. The server only stores ciphertext.
+          Your decryption key never leaves your device.
+        </p>
+        <div class="hero-ctas">
+          <a href="./pricing/free/" class="btn btn-primary btn--lg" data-i18n="home.hero.cta_free">Get Started Free &rarr;</a>
+          <a href="./pricing/" class="btn btn-secondary btn--lg" data-i18n="home.hero.cta_pricing">See Pricing &rarr;</a>
+        </div>
+        <p class="hero-sub" style="margin-top: var(--sp-4); font-size: 0.9rem; color: var(--text-secondary);">
+          <span data-i18n="home.hero.sub">Free Early Access available. Open source. From &pound;0.01 per file.</span>
+          &nbsp;&middot;&nbsp;
+          <a href="https://send.sgraph.ai" style="color: var(--accent);" data-i18n="home.hero.sub_existing">Already have a token? Go to send.sgraph.ai &rarr;</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         HOW IT WORKS — The zero-knowledge proposition
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="home.platform.title2">Zero-Knowledge Encryption</h2>
+          <p data-i18n="home.platform.desc2">
+            Your files are encrypted in your browser using AES-256-GCM before upload.
+            The server stores only encrypted ciphertext. Your decryption key never leaves your device.
+          </p>
+        </div>
+
+        <div class="callout text-center" data-i18n="home.platform.callout">
+          We literally cannot read your files.
+        </div>
+
+        <div class="grid grid--3 mt-8">
+          <div class="card">
+            <div class="card__icon">&#128274;</div>
+            <h3 class="card__title" data-i18n="home.feature.encryption.title">Browser Encryption</h3>
+            <p class="card__desc" data-i18n="home.feature.encryption.desc">
+              AES-256-GCM encryption runs entirely in your browser via the Web Crypto API.
+              Files are encrypted before they ever leave your device.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card__icon">&#128683;</div>
+            <h3 class="card__title" data-i18n="home.feature.zero_knowledge.title">Zero Knowledge</h3>
+            <p class="card__desc" data-i18n="home.feature.zero_knowledge.desc2">
+              The server never sees your plaintext data, your file names, or your encryption keys.
+              Even if someone accessed our servers, they would only find meaningless encrypted data.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card__icon">&#127760;</div>
+            <h3 class="card__title" data-i18n="home.feature.open_source.title">Open Source</h3>
+            <p class="card__desc" data-i18n="home.feature.open_source.desc">
+              The entire codebase is public on GitHub. Inspect the encryption yourself.
+              Deploy on your own infrastructure. Free forever.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         GET STARTED — Conversion section
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="home.getstarted.title">Get Started</h2>
+          <p data-i18n="home.getstarted.desc">Try SG/Send for free or buy credits to start sending encrypted files immediately.</p>
+        </div>
+
+        <div class="grid grid--2 mt-8" style="max-width: 720px; margin-left: auto; margin-right: auto;">
+          <div class="card pricing-card pricing-card--featured" style="text-align: center;">
+            <div class="pricing-card__badge" data-i18n="home.getstarted.eap_badge">Recommended</div>
+            <h3 class="card__title" data-i18n="home.getstarted.eap_title">Early Access Programme</h3>
+            <p class="card__desc" data-i18n="home.getstarted.eap_desc">
+              Get a free access token with evaluation credits.
+              No payment required. No credit card needed.
+            </p>
+            <div class="pricing-card__price" data-i18n="home.getstarted.eap_price">Free</div>
+            <a href="./pricing/free/" class="btn btn-primary" data-i18n="home.getstarted.eap_cta">Join Early Access &rarr;</a>
+          </div>
+
+          <div class="card pricing-card" style="text-align: center;">
+            <h3 class="card__title" data-i18n="home.getstarted.starter_title">Starter Pack</h3>
+            <p class="card__desc" data-i18n="home.getstarted.starter_desc">
+              500 encrypted file transfers. Pay once, use within 3 months.
+              That's &pound;0.01 per file.
+            </p>
+            <div class="pricing-card__price">&pound;5</div>
+            <a href="./pricing/cloud/" class="btn btn-secondary" data-i18n="home.getstarted.starter_cta">Buy Credits &rarr;</a>
+          </div>
+        </div>
+
+        <div class="text-center mt-8">
+          <a href="./pricing/" style="color: var(--accent);" data-i18n="home.getstarted.more">See all pricing options including self-hosted and enterprise &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         BUILT BY AI — The agentic team story (supporting narrative)
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="home.built.title2">Built Entirely by AI Agents</h2>
+          <p data-i18n="home.built.desc2">
+            SG/Send is developed by 18 specialised AI agents collaborating under human oversight.
+            Every decision, review, and line of code is tracked in the open.
+          </p>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat">
+            <div class="stat__value">18</div>
+            <div class="stat__label" data-i18n="home.stat.agents">AI Agents</div>
+          </div>
+          <div class="stat">
+            <div class="stat__value">73</div>
+            <div class="stat__label" data-i18n="home.stat.endpoints">HTTP Endpoints</div>
+          </div>
+          <div class="stat">
+            <div class="stat__value">393</div>
+            <div class="stat__label" data-i18n="home.stat.tests">Passing Tests</div>
+          </div>
+          <div class="stat">
+            <div class="stat__value">1</div>
+            <div class="stat__label" data-i18n="home.stat.human">Human</div>
+          </div>
+        </div>
+
+        <div class="text-center mt-8" style="display: flex; justify-content: center; gap: var(--sp-4); flex-wrap: wrap;">
+          <a href="./agents/" class="btn btn-secondary" data-i18n="home.built.cta_team">Meet the Team &rarr;</a>
+          <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" class="btn btn-ghost" target="_blank" rel="noopener" data-i18n="home.built.cta_github">View on GitHub &rarr;</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="./" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc2">Zero-knowledge encrypted file sharing. Files are encrypted in your browser before upload. Open source, built by AI agents.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="./pricing/" data-i18n="footer.pricing">Pricing</a></li>
+            <li><a href="./architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="./agents/" data-i18n="footer.team">Team</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>

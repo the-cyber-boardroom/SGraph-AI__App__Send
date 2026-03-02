@@ -1,14 +1,16 @@
 name: Deploy User UI to S3
 
-# Publishes v0.2.x static UI files to S3 for CloudFront distribution.
+# Publishes v0.2.0 static UI files to S3 for CloudFront distribution.
 # CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
 #
-# Only the current version (v0.2.0) is deployed — v0.1.x, assets/, and tools/
-# are NOT included. The deploy syncs v0.2.0/ content directly.
+# Deploy is manifest-driven — manifest.json lists exactly what gets deployed:
+#   - source_folders: _common/, en-gb/, i18n/ (in git)
+#   - ci_generated_folders: locale HTML pages (generated here, never in git)
+#   - root_files: manifest.json
 #
 # Steps:
-#   1. Generate i18n locale pages (pt-PT/, de/, fr/, etc.) from en-gb/ templates
-#   2. Sync v0.2.0/ content to S3 under the IFD version path
+#   1. Generate i18n locale pages from en-gb/ templates + i18n/*.json
+#   2. Sync v0.2.0/ content (source + generated) to S3
 #   3. Invalidate CloudFront cache
 
 on:

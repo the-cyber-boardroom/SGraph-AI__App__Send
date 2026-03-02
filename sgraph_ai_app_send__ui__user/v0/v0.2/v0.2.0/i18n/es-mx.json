@@ -1,0 +1,26 @@
+{
+  "_comment": "SGraph Send — Español (México)",
+
+  "app.tagline":          "Tus archivos, tus llaves, tu privacidad",
+  "app.subtitle":         "Compartir archivos con cifrado zero-knowledge",
+  "app.disclaimer":       "Este es un servicio beta. No subas contenido confidencial o ilegal.",
+
+  "upload.drop_zone.label":           "Arrastra tu archivo aquí",
+  "upload.drop_zone.hint":            "o haz clic para buscar",
+  "upload.drop_zone.encrypted_hint":  "Cifrado en tu navegador antes de subir",
+
+  "upload.result.decryption_key":     "Llave de descifrado",
+  "upload.guidance.split_channels":   "Para mayor seguridad, comparte el enlace y la llave por <strong>canales diferentes</strong> (ej: enlace por correo, llave por mensajería).",
+
+  "download.key.label":               "Llave de descifrado",
+  "download.key.placeholder":         "Pega la llave de descifrado aquí",
+  "download.error.no_key":            "Por favor, introduce la llave de descifrado.",
+
+  "access_gate.subtitle":             "Introduce tu token de acceso para empezar a enviar archivos.",
+  "access_gate.placeholder":          "Pega tu token de acceso",
+
+  "test_files.description":           "Descarga un archivo de prueba y arrástralo a la zona de subida de arriba.",
+
+  "cta.title":                        "¿También quieres enviar archivos?",
+  "cta.description":                  "Únete al programa de acceso anticipado de SGraph Send."
+}

@@ -4,7 +4,39 @@
     "description": "v0.2.0 — Consolidated IFD release (symmetric encryption only)",
     "scope": "symmetric-encryption",
     "base_locale": "en-gb",
+    "locales": [
+        "en-gb", "en-us", "pt-pt", "pt-br",
+        "de-de", "de-ch", "es-es", "es-ar", "es-mx",
+        "fr-fr", "fr-ca", "it-it", "nl-nl", "pl-pl",
+        "hr-hr", "ro-ro", "tlh"
+    ],
+    "deploy": {
+        "_comment": "Folders and files to sync to S3. This is the source of truth for what gets deployed.",
+        "source_folders": [
+            "_common",
+            "en-gb",
+            "i18n"
+        ],
+        "ci_generated_folders": [
+            "en-us", "pt-pt", "pt-br",
+            "de-de", "de-ch", "es-es", "es-ar", "es-mx",
+            "fr-fr", "fr-ca", "it-it", "nl-nl", "pl-pl",
+            "hr-hr", "ro-ro", "tlh"
+        ],
+        "ci_generate_command": "python scripts/generate_send_i18n_pages.py",
+        "root_files": [
+            "index.html",
+            "404.html",
+            "robots.txt",
+            "sitemap.xml",
+            "manifest.json"
+        ]
+    },
     "files": {
+        "index.html":                               { "type": "html", "role": "locale-redirect", "page": "root" },
+        "404.html":                                  { "type": "html", "role": "error-page" },
+        "robots.txt":                                { "type": "txt",  "role": "seo" },
+        "sitemap.xml":                               { "type": "xml",  "role": "seo" },
         "_common/js/base/send-component.js":       { "type": "js",   "role": "base-class" },
         "_common/js/base/send-component-paths.js":  { "type": "js",   "role": "path-registry" },
         "_common/js/base/send-helpers.js":           { "type": "js",   "role": "utilities" },
@@ -32,7 +64,25 @@
         "_common/css/shared-components.css":         { "type": "css",  "role": "shared-styles" },
         "_common/fonts/fonts.css":                   { "type": "css",  "role": "font-declarations" },
         "en-gb/index.html":                          { "type": "html", "role": "page", "page": "upload" },
-        "en-gb/download/index.html":                 { "type": "html", "role": "page", "page": "download" }
+        "en-gb/download/index.html":                 { "type": "html", "role": "page", "page": "download" },
+        "i18n/en-gb.json":                           { "type": "json", "role": "i18n-master" },
+        "i18n/en.json":                              { "type": "json", "role": "i18n" },
+        "i18n/en-us.json":                           { "type": "json", "role": "i18n" },
+        "i18n/pt-pt.json":                           { "type": "json", "role": "i18n" },
+        "i18n/pt-br.json":                           { "type": "json", "role": "i18n" },
+        "i18n/de-de.json":                           { "type": "json", "role": "i18n" },
+        "i18n/de-ch.json":                           { "type": "json", "role": "i18n" },
+        "i18n/es-es.json":                           { "type": "json", "role": "i18n" },
+        "i18n/es-ar.json":                           { "type": "json", "role": "i18n" },
+        "i18n/es-mx.json":                           { "type": "json", "role": "i18n" },
+        "i18n/fr-fr.json":                           { "type": "json", "role": "i18n" },
+        "i18n/fr-ca.json":                           { "type": "json", "role": "i18n" },
+        "i18n/it-it.json":                           { "type": "json", "role": "i18n" },
+        "i18n/nl-nl.json":                           { "type": "json", "role": "i18n" },
+        "i18n/pl-pl.json":                           { "type": "json", "role": "i18n" },
+        "i18n/hr-hr.json":                           { "type": "json", "role": "i18n" },
+        "i18n/ro-ro.json":                           { "type": "json", "role": "i18n" },
+        "i18n/tlh.json":                             { "type": "json", "role": "i18n" }
     },
     "components": [
         "send-upload",

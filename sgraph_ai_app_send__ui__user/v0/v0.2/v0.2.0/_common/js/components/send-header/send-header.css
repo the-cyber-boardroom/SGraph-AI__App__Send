@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — Header Styles
-   v0.2.0 — Aurora dark theme
+   v0.2.0 — Aurora dark theme, aligned with sgraph.ai (1200px)
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 .sg-header {
@@ -8,21 +8,34 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--space-4, 1rem) var(--space-6, 1.5rem);
-    max-width: 960px;
+    max-width: 1200px;
     margin: 0 auto;
 }
 
 .sg-header__brand {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-3, 0.75rem);
+}
+
+.sg-header__favicon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
 }
 
 .sg-header__logo {
     text-decoration: none;
-    font-size: var(--text-h2, 1.6rem);
+    font-size: 1.5rem;
     font-weight: var(--weight-bold, 700);
     letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.sg-header__logo:hover {
+    text-decoration: none;
 }
 
 .sg-header__logo-sg {
@@ -46,18 +59,19 @@
 .sg-header__nav {
     display: flex;
     align-items: center;
-    gap: var(--space-4, 1rem);
+    gap: var(--space-6, 1.5rem);
 }
 
 .sg-header__nav a {
-    font-size: var(--text-sm, 0.875rem);
     color: var(--color-text-secondary, #8892A0);
+    font-weight: 500;
+    font-size: 0.95rem;
     text-decoration: none;
-    transition: color var(--transition, 150ms ease);
+    transition: color 150ms ease;
 }
 
 .sg-header__nav a:hover {
-    color: var(--accent, #4ECDC4);
+    color: #FFFFFF;
 }
 
 @media (max-width: 640px) {
@@ -68,5 +82,9 @@
     }
     .sg-header__tagline {
         display: none;
+    }
+    .sg-header__favicon {
+        width: 24px;
+        height: 24px;
     }
 }

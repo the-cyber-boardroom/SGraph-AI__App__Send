@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS Marketplace — SG/Send</title>
+  <meta name="i18n-title-key" content="pricing.awspage.page.title">
+  <meta name="description" content="Deploy SG/Send via the AWS Marketplace. Pay through AWS billing, counts against committed spend. Coming soon.">
+  <link rel="canonical" href="https://sgraph.ai/en-gb/pricing/aws-marketplace/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SGraph AI">
+  <meta property="og:title" content="AWS Marketplace — SG/Send">
+  <meta property="og:description" content="Deploy SG/Send via the AWS Marketplace. Pay through AWS billing, counts against committed spend. Coming soon.">
+  <meta property="og:url" content="https://sgraph.ai/en-gb/pricing/aws-marketplace/">
+  <meta property="og:locale" content="en_GB">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="AWS Marketplace — SG/Send">
+  <meta name="twitter:description" content="Deploy SG/Send via the AWS Marketplace. Pay through AWS billing, counts against committed spend. Coming soon.">
+  <link rel="alternate" hreflang="en-gb" href="https://sgraph.ai/en-gb/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="en-us" href="https://sgraph.ai/en-us/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="pt-pt" href="https://sgraph.ai/pt-pt/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="pt-br" href="https://sgraph.ai/pt-br/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="es-es" href="https://sgraph.ai/es-es/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="es-ar" href="https://sgraph.ai/es-ar/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="es-mx" href="https://sgraph.ai/es-mx/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="fr-fr" href="https://sgraph.ai/fr-fr/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="fr-ca" href="https://sgraph.ai/fr-ca/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="de-de" href="https://sgraph.ai/de-de/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="de-ch" href="https://sgraph.ai/de-ch/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="it-it" href="https://sgraph.ai/it-it/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="nl-nl" href="https://sgraph.ai/nl-nl/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="pl-pl" href="https://sgraph.ai/pl-pl/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="ro-ro" href="https://sgraph.ai/ro-ro/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="hr-hr" href="https://sgraph.ai/hr-hr/pricing/aws-marketplace/">
+  <link rel="alternate" hreflang="x-default" href="https://sgraph.ai/en-gb/pricing/aws-marketplace/">
+  <meta name="theme-color" content="#1A1A2E">
+  <link rel="icon" type="image/svg+xml" href="../../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../../_common/css/style.css">
+  <style>
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-2);
+      color: var(--accent);
+      font-size: var(--fs-small);
+      font-weight: var(--fw-medium);
+      text-decoration: none;
+      margin-bottom: var(--sp-6);
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--sp-6);
+    }
+
+    @media (max-width: 768px) {
+      .why-grid {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        margin-inline: auto;
+      }
+    }
+
+    .why-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-card);
+      padding: var(--sp-8) var(--sp-6);
+      transition: border-color var(--transition-normal), transform var(--transition-normal);
+    }
+
+    .why-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .why-card h3 {
+      color: var(--accent);
+      margin-bottom: var(--sp-3);
+    }
+
+    .why-card p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .coming-soon-callout {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-6);
+      background-color: var(--bg-surface);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-card);
+      padding: var(--sp-6);
+    }
+
+    .coming-soon-callout__icon {
+      font-size: 2.5rem;
+      flex-shrink: 0;
+    }
+
+    .coming-soon-callout__text h3 {
+      color: var(--text-heading);
+      margin-bottom: var(--sp-2);
+    }
+
+    .coming-soon-callout__text p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .coming-soon-callout__text strong {
+      color: var(--text-heading);
+    }
+
+    @media (max-width: 480px) {
+      .coming-soon-callout {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <header class="site-header">
+    <div class="container">
+      <a href="../../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../../product/" data-i18n="nav.product">Product</a>
+        <a href="../../agents/" data-i18n="nav.team">Team</a>
+        <a href="../../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="../" class="active" data-i18n="nav.pricing">Pricing</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <section class="hero hero--small">
+      <div class="container">
+        <a href="../" class="back-link" data-i18n="pricing.awspage.hero.back">&larr; Back to Pricing</a>
+        <h1 class="display" data-i18n="pricing.awspage.hero.title">AWS Marketplace</h1>
+        <p class="lead" data-i18n="pricing.awspage.hero.lead">
+          Deploy SG/Send via the AWS Marketplace. Pay through AWS billing. Coming soon.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         WHY AWS MARKETPLACE?
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="pricing.awspage.why.title">Why AWS Marketplace?</h2>
+        </div>
+
+        <div class="why-grid">
+          <div class="why-card">
+            <h3 data-i18n="pricing.awspage.why.billing_title">Consolidated Billing</h3>
+            <p data-i18n="pricing.awspage.why.billing_desc">Pay through your existing AWS account. Counts against committed spend. One invoice, one vendor relationship for all your AWS services.</p>
+          </div>
+
+          <div class="why-card">
+            <h3 data-i18n="pricing.awspage.why.onboarding_title">No Vendor Onboarding</h3>
+            <p data-i18n="pricing.awspage.why.onboarding_desc">Purchase through AWS Marketplace simplifies procurement &mdash; no new vendor setup needed. Skip the PO process and get started immediately.</p>
+          </div>
+
+          <div class="why-card">
+            <h3 data-i18n="pricing.awspage.why.deploy_title">One-Click Deployment</h3>
+            <p data-i18n="pricing.awspage.why.deploy_desc">Deploy in your AWS account with a single click from the Marketplace listing. Pre-configured CloudFormation templates handle the infrastructure.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         COMING SOON
+         ============================================================ -->
+    <section class="section">
+      <div class="container">
+        <div class="coming-soon-callout">
+          <div class="coming-soon-callout__icon">&#128640;</div>
+          <div class="coming-soon-callout__text">
+            <h3 data-i18n="pricing.awspage.soon.title">Coming Soon</h3>
+            <p data-i18n="pricing.awspage.soon.desc">
+              <strong>SG/Send on the AWS Marketplace is currently in preparation.</strong>
+              We are working on the listing and deployment automation.
+              Register your interest below and we will notify you as soon as the listing is live.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         CTA
+         ============================================================ -->
+    <section class="section section--alt">
+      <div class="container text-center">
+        <h2 data-i18n="pricing.awspage.cta.title">Interested in SG/Send on AWS Marketplace?</h2>
+        <p class="lead" style="margin-bottom: var(--sp-8);" data-i18n="pricing.awspage.cta.desc">Register your interest and we will contact you when the listing is available.</p>
+        <a href="mailto:sherpa@sgraph.ai?subject=AWS%20Marketplace%20%E2%80%94%20Register%20Interest%20for%20SG%2FSend" class="btn btn-primary btn--lg" data-i18n="pricing.awspage.cta.button">Register Your Interest &rarr;</a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="../../agents/" data-i18n="footer.team">Team</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <a href="mailto:sherpa@sgraph.ai" class="btn btn-sherpa btn--sm" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../../../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>

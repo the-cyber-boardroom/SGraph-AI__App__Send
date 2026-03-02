@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact — SGraph AI</title>
+  <meta name="description" content="Get in touch with the SGraph AI team. Your message goes to our Sherpa who guides users and answers questions.">
+  <link rel="canonical" href="https://sgraph.ai/en-gb/contact/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SGraph AI">
+  <meta property="og:title" content="Contact — SGraph AI">
+  <meta property="og:description" content="Get in touch with the SGraph AI team. Your message goes to our Sherpa who guides users and answers questions.">
+  <meta property="og:url" content="https://sgraph.ai/en-gb/contact/">
+  <meta property="og:locale" content="en_GB">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Contact — SGraph AI">
+  <meta name="twitter:description" content="Get in touch with the SGraph AI team. Your message goes to our Sherpa who guides users and answers questions.">
+  <link rel="alternate" hreflang="en-gb" href="https://sgraph.ai/en-gb/contact/">
+  <link rel="alternate" hreflang="en-us" href="https://sgraph.ai/en-us/contact/">
+  <link rel="alternate" hreflang="pt-pt" href="https://sgraph.ai/pt-pt/contact/">
+  <link rel="alternate" hreflang="pt-br" href="https://sgraph.ai/pt-br/contact/">
+  <link rel="alternate" hreflang="es-es" href="https://sgraph.ai/es-es/contact/">
+  <link rel="alternate" hreflang="es-ar" href="https://sgraph.ai/es-ar/contact/">
+  <link rel="alternate" hreflang="es-mx" href="https://sgraph.ai/es-mx/contact/">
+  <link rel="alternate" hreflang="fr-fr" href="https://sgraph.ai/fr-fr/contact/">
+  <link rel="alternate" hreflang="fr-ca" href="https://sgraph.ai/fr-ca/contact/">
+  <link rel="alternate" hreflang="de-de" href="https://sgraph.ai/de-de/contact/">
+  <link rel="alternate" hreflang="de-ch" href="https://sgraph.ai/de-ch/contact/">
+  <link rel="alternate" hreflang="it-it" href="https://sgraph.ai/it-it/contact/">
+  <link rel="alternate" hreflang="nl-nl" href="https://sgraph.ai/nl-nl/contact/">
+  <link rel="alternate" hreflang="pl-pl" href="https://sgraph.ai/pl-pl/contact/">
+  <link rel="alternate" hreflang="ro-ro" href="https://sgraph.ai/ro-ro/contact/">
+  <link rel="alternate" hreflang="hr-hr" href="https://sgraph.ai/hr-hr/contact/">
+  <link rel="alternate" hreflang="x-default" href="https://sgraph.ai/en-gb/contact/">
+  <meta name="i18n-title-key" content="contact.title">
+  <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+</head>
+<body class="theme-aurora i18n-loading">
+
+  <header class="site-header">
+    <div class="container">
+      <a href="../" class="site-logo" aria-label="SGraph AI Home">
+        <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="../product/" data-i18n="nav.product">Product</a>
+        <a href="../agents/" data-i18n="nav.team">Team</a>
+        <a href="../architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="../pricing/" data-i18n="nav.pricing">Pricing</a>
+        <a href="./" class="active" data-i18n="nav.contact">Contact</a>
+      </nav>
+      <div id="locale-picker"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <section class="hero hero--small">
+      <div class="container">
+        <h1 class="display" data-i18n="contact.hero.title">Get in Touch</h1>
+        <p class="lead" data-i18n="contact.hero.lead">
+          Have a question, feedback, or want to learn more about SGraph AI?
+          Send us a message and our Sherpa will get back to you.
+        </p>
+      </div>
+    </section>
+
+    <section class="section section--alt">
+      <div class="container">
+        <div class="contact-form-page">
+          <p class="text-secondary mb-8" data-i18n="contact.form.intro">
+            Your message goes to <strong class="text-primary">sherpa@sgraph.ai</strong> &mdash;
+            our Sherpa guides users and answers questions. They are the first point of contact
+            for anyone who needs help with SG/Send.
+          </p>
+
+          <form id="contact-form-page" novalidate>
+            <input type="hidden" name="page" value="/contact/">
+
+            <div class="form-group">
+              <label class="form-label" for="page-message"><span data-i18n="contact.form.message_label">Message</span> <span class="text-accent" data-i18n="contact.form.message_required">*</span></label>
+              <textarea
+                class="form-textarea"
+                id="page-message"
+                name="message"
+                placeholder="Tell us what you need help with, what you think, or what you'd like to know..."
+                data-i18n-placeholder="contact.form.message_placeholder"
+                required
+                minlength="10"
+                maxlength="5000"
+                rows="8"
+              ></textarea>
+              <p class="form-hint" data-i18n="contact.form.message_hint">10 &ndash; 5,000 characters. Be as detailed as you like.</p>
+              <p class="form-error hidden" id="page-message-error"></p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="page-email"><span data-i18n="contact.form.email_label">Email</span> <span class="text-secondary" data-i18n="contact.form.email_optional">(optional)</span></label>
+              <input
+                class="form-input"
+                type="email"
+                id="page-email"
+                name="email"
+                placeholder="you@example.com"
+                data-i18n-placeholder="contact.form.email_placeholder"
+              >
+              <p class="form-hint" data-i18n="contact.form.email_hint">If you'd like a reply, leave your email address.</p>
+              <p class="form-error hidden" id="page-email-error"></p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label"><span data-i18n="contact.form.screenshot_label">Screenshot</span> <span class="text-secondary" data-i18n="contact.form.screenshot_optional">(optional)</span></label>
+              <label class="form-file-label">
+                <span id="file-label-text" data-i18n="contact.form.screenshot_choose">Choose an image...</span>
+                <input
+                  type="file"
+                  id="page-screenshot"
+                  name="screenshot"
+                  accept="image/*"
+                >
+              </label>
+              <p class="form-hint" data-i18n="contact.form.screenshot_hint">If applicable, attach a screenshot to help explain your question.</p>
+            </div>
+
+            <div id="page-alert" class="hidden"></div>
+
+            <div class="mt-6">
+              <button type="submit" class="btn btn-primary btn--lg w-full" data-i18n="contact.form.submit">Send Message</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../" class="site-logo">
+            <span class="brand-prefix">SG</span><span class="brand-slash">/</span>
+          </a>
+          <p data-i18n="footer.brand_desc">AI agents that build, use, and secure the same platform. Zero-knowledge encrypted file sharing by SGraph AI.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Product</h4>
+          <ul>
+            <li><a href="https://send.sgraph.ai" target="_blank" rel="noopener">send.sgraph.ai</a></li>
+            <li><a href="../architecture/" data-i18n="footer.architecture">Architecture</a></li>
+            <li><a href="../agents/" data-i18n="footer.team">Team</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.open_source">Open Source</h4>
+          <ul>
+            <li><a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.connect">Connect</h4>
+          <ul>
+            <li><a href="./" data-i18n="footer.contact">Contact</a></li>
+            <li><a href="mailto:sherpa@sgraph.ai">sherpa@sgraph.ai</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p data-i18n="footer.copyright_short">&copy; 2026 SGraph AI. All rights reserved.</p>
+        <button class="btn btn-sherpa btn--sm" onclick="openContactModal()" data-i18n="footer.sherpa_cta">Got a question? Email the Sherpa</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Contact Modal -->
+  <div id="contact-modal" class="modal-overlay" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 class="modal__title" id="modal-title" data-i18n="contact.modal.title">Contact the Sherpa</h2>
+        <button class="modal__close" onclick="closeContactModal()" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal__body">
+        <p class="text-secondary mb-6" data-i18n="contact.modal.intro">Your message goes to <strong>sherpa@sgraph.ai</strong> &mdash; our Sherpa guides users and answers questions.</p>
+        <form id="contact-form-modal" novalidate>
+          <input type="hidden" name="page" value="/contact/">
+          <div class="form-group">
+            <label class="form-label" for="modal-message"><span data-i18n="contact.form.message_label">Message</span> <span class="text-accent" data-i18n="contact.form.message_required">*</span></label>
+            <textarea class="form-textarea" id="modal-message" name="message" placeholder="What can we help you with?" data-i18n-placeholder="contact.form.message_placeholder" required minlength="10" maxlength="5000" rows="5"></textarea>
+            <p class="form-hint" data-i18n="contact.form.message_hint">10 &ndash; 5,000 characters</p>
+            <p class="form-error hidden" id="modal-message-error"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="modal-email"><span data-i18n="contact.form.email_label">Email</span> <span class="text-secondary" data-i18n="contact.form.email_optional">(optional)</span></label>
+            <input class="form-input" type="email" id="modal-email" name="email" placeholder="you@example.com" data-i18n-placeholder="contact.form.email_placeholder">
+            <p class="form-error hidden" id="modal-email-error"></p>
+          </div>
+          <div id="modal-alert" class="hidden"></div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-ghost" onclick="closeContactModal()" data-i18n="contact.modal.cancel">Cancel</button>
+        <button class="btn btn-primary" type="submit" form="contact-form-modal" data-i18n="contact.form.submit">Send Message</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../_common/js/contact-form.js"></script>
+  <script src="../../_common/js/i18n.js"></script>
+  <script>
+    SgI18n.init().then(() => {
+      document.body.classList.remove('i18n-loading');
+      SgI18n.renderLocaleSelector();
+    });
+  </script>
+</body>
+</html>

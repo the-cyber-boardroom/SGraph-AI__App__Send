@@ -1,5 +1,5 @@
 {
-  "_comment": "SGraph Send — English (United Kingdom) — master translation file",
+  "_comment": "SGraph Send — English (Master)",
 
   "app.title":            "SG/Send",
   "app.tagline":          "Your files, your keys, your privacy",
@@ -100,7 +100,7 @@
   "access_gate.revoked":              "This token has been revoked.",
   "access_gate.uses_remaining":       "{remaining} uses remaining",
   "access_gate.change_token":         "Change Token",
-  "access_gate.signup_title":         "Join the Early Access Program",
+  "access_gate.signup_title":         "Join the Early Access Programme",
   "access_gate.signup_subtitle":      "Sign up to get notified when SGraph Send is available.",
 
   "transparency.title":               "What we stored about this transfer",
@@ -136,5 +136,5 @@
   "test_files.description":           "Download a test file, then drag it into the upload zone above.",
 
   "cta.title":                        "Want to send files too?",
-  "cta.description":                  "Join the early access program for SGraph Send."
+  "cta.description":                  "Join the early access programme for SGraph Send."
 }

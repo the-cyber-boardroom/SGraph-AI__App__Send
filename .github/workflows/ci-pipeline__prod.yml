@@ -1,0 +1,13 @@
+name: CI Pipeline - PROD
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-qa:
+    uses: ./.github/workflows/ci-pipeline.yml
+    with:
+      git_branch          : 'main'
+      should_increment_tag: false
+      should_publish_pypi : false
+      target_deploy       : 'prod'
+    secrets: inherit

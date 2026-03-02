@@ -1,0 +1,63 @@
+{
+  "_comment": "SGraph Send — Polski (Polska)",
+
+  "app.title":            "SG/Send",
+  "app.tagline":          "Twoje pliki, Twoje klucze, Twoja prywatność",
+  "app.subtitle":         "Udostępnianie plików z szyfrowaniem zero-knowledge",
+  "app.disclaimer":       "To jest usługa beta. Nie przesyłaj treści poufnych ani nielegalnych.",
+
+  "upload.mode.file":     "Plik",
+  "upload.mode.text":     "Tekst",
+
+  "upload.drop_zone.label":           "Przeciągnij plik tutaj",
+  "upload.drop_zone.hint":            "lub kliknij, aby przeglądać",
+  "upload.drop_zone.encrypted_hint":  "Zaszyfrowane w Twojej przeglądarce przed przesłaniem",
+  "upload.drop_zone.size_limit":      "Maksymalny rozmiar pliku: {limit}",
+
+  "upload.text.placeholder":          "Wpisz lub wklej tekst tutaj",
+  "upload.text.char_count":           "{count} znaków",
+
+  "upload.button.encrypt_upload":     "Zaszyfruj i Prześlij",
+  "upload.button.encrypt_send":       "Zaszyfruj i Wyślij",
+
+  "upload.progress.encrypting":       "Szyfrowanie...",
+  "upload.progress.uploading":        "Przesyłanie...",
+  "upload.progress.completing":       "Finalizowanie...",
+
+  "upload.result.file_success":       "Twój plik został zaszyfrowany i przesłany.",
+  "upload.result.text_success":       "Twój tekst został zaszyfrowany i przesłany.",
+  "upload.result.share_link":         "Udostępnij ten link",
+  "upload.result.copy_link":          "Kopiuj link",
+  "upload.result.decryption_key":     "Klucz deszyfrowania",
+  "upload.result.copy":               "Kopiuj",
+  "upload.result.send_another":       "Wyślij kolejny",
+
+  "download.loading":                 "Ładowanie informacji o transferze...",
+  "download.key.label":               "Klucz deszyfrowania",
+  "download.key.placeholder":         "Wklej klucz deszyfrowania tutaj",
+  "download.button.decrypt_download": "Pobierz i Odszyfruj",
+  "download.button.decrypt_view":     "Odszyfruj i Wyświetl",
+  "download.result.file_success":     "Plik odszyfrowany i zapisany pomyślnie.",
+  "download.result.text_success":     "Tekst odszyfrowany pomyślnie.",
+  "download.result.copy_text":        "Kopiuj do schowka",
+  "download.result.send_another":     "Wyślij nowy plik lub tekst",
+
+  "access_gate.title":                "Dostęp Beta",
+  "access_gate.subtitle":             "Wprowadź token dostępu, aby zacząć wysyłać pliki.",
+  "access_gate.placeholder":          "Wklej token dostępu",
+  "access_gate.button":               "Dalej",
+
+  "transparency.title":               "Co przechowaliśmy o tym transferze",
+  "transparency.section.stored":      "Przechowywane przez serwer",
+  "transparency.section.encrypted":   "Przechowywane zaszyfrowane (tylko Ty możesz to odczytać)",
+  "transparency.section.not_stored":  "Nigdy nie wysłane na serwer",
+  "transparency.footer":              "To wszystko. Nic więcej nie zostało zarejestrowane.",
+
+  "common.copied":                    "Skopiowano!",
+
+  "test_files.title":                 "Pliki testowe",
+  "test_files.description":           "Pobierz plik testowy i przeciągnij go do strefy przesyłania powyżej.",
+
+  "cta.title":                        "Chcesz też wysyłać pliki?",
+  "cta.description":                  "Dołącz do programu wczesnego dostępu SGraph Send."
+}

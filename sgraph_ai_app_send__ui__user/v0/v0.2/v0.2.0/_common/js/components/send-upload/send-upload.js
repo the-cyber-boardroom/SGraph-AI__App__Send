@@ -191,42 +191,54 @@ class SendUpload extends HTMLElement {
         const { combinedUrl, linkOnlyUrl, keyString, transparency } = this.result;
         const successKey = this.result.isText ? 'upload.result.text_success' : 'upload.result.file_success';
 
+        const monoStyle   = "font-family: var(--font-mono, monospace); font-size: var(--text-sm, 0.875rem);";
+        const valueBoxStyle = `${monoStyle} flex: 1; min-width: 0; background: var(--bg-secondary, #16213E); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: var(--radius-sm, 6px); padding: 0.375rem 0.5rem; white-space: nowrap; overflow-x: auto; color: var(--color-text, #E0E0E0);`;
+
         const separateSection = this._showSeparateKey ? `
-            <div class="result-panel" style="margin-top: 0.75rem;">
-                <div class="result-row">
-                    <label>${this.escapeHtml(this.t('upload.result.link_only'))}</label>
-                    <span class="value" id="link-only">${this.escapeHtml(linkOnlyUrl)}</span>
-                    <button class="btn btn-copy btn-sm" data-copy="link-only">${this.escapeHtml(this.t('upload.result.copy'))}</button>
+            <div style="margin-top: var(--space-3, 0.75rem); padding: var(--space-4, 1rem); background: var(--bg-secondary, #16213E); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: var(--radius-md, 12px);">
+                <div style="margin-bottom: var(--space-3, 0.75rem);">
+                    <label style="display: block; font-weight: var(--weight-semibold, 600); font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0); margin-bottom: var(--space-1, 0.25rem);">
+                        ${this.escapeHtml(this.t('upload.result.link_only'))}
+                    </label>
+                    <div style="display: flex; gap: var(--space-2, 0.5rem); align-items: center;">
+                        <div style="${valueBoxStyle}" id="link-only">${this.escapeHtml(linkOnlyUrl)}</div>
+                        <button class="btn btn-copy btn-sm" data-copy="link-only">${this.escapeHtml(this.t('upload.result.copy'))}</button>
+                    </div>
                 </div>
-                <div class="result-row">
-                    <label>${this.escapeHtml(this.t('upload.result.decryption_key'))}</label>
-                    <span class="value" id="decryption-key">${this.escapeHtml(keyString)}</span>
-                    <button class="btn btn-copy btn-sm" data-copy="decryption-key">${this.escapeHtml(this.t('upload.result.copy'))}</button>
+                <div style="margin-bottom: var(--space-3, 0.75rem);">
+                    <label style="display: block; font-weight: var(--weight-semibold, 600); font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0); margin-bottom: var(--space-1, 0.25rem);">
+                        ${this.escapeHtml(this.t('upload.result.decryption_key'))}
+                    </label>
+                    <div style="display: flex; gap: var(--space-2, 0.5rem); align-items: center;">
+                        <div style="${valueBoxStyle}" id="decryption-key">${this.escapeHtml(keyString)}</div>
+                        <button class="btn btn-copy btn-sm" data-copy="decryption-key">${this.escapeHtml(this.t('upload.result.copy'))}</button>
+                    </div>
                 </div>
+                <div class="guidance">${this.t('upload.guidance.split_channels')}</div>
             </div>
-            <div class="guidance">${this.t('upload.guidance.split_channels')}</div>
         ` : '';
 
         return `
             <div class="status status--success">${this.escapeHtml(this.t(successKey))}</div>
-            <div class="result-panel">
-                <div class="result-row">
-                    <label>${this.escapeHtml(this.t('upload.result.share_link'))}</label>
-                    <span class="value" id="combined-link">${this.escapeHtml(combinedUrl)}</span>
-                    <button class="btn btn-copy btn-sm" data-copy="combined-link">${this.escapeHtml(this.t('upload.result.copy_link'))}</button>
-                    <a href="${this.escapeHtml(combinedUrl)}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration: none; margin-left: 0.25rem;">${this.escapeHtml(this.t('upload.result.open_tab'))}</a>
+            <div id="token-usage" class="token-usage" style="display: none; margin-top: var(--space-2, 0.5rem); font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0); text-align: center;"></div>
+            <div style="margin-top: var(--space-4, 1rem);">
+                <label style="display: block; font-weight: var(--weight-semibold, 600); font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0); margin-bottom: var(--space-2, 0.5rem);">
+                    ${this.escapeHtml(this.t('upload.result.share_link'))}
+                </label>
+                <div style="background: var(--bg-secondary, #16213E); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: var(--radius-sm, 6px); padding: 0.5rem 0.75rem; ${monoStyle} white-space: nowrap; overflow-x: auto; color: var(--color-text, #E0E0E0);" id="combined-link">${this.escapeHtml(combinedUrl)}</div>
+                <div style="display: flex; gap: var(--space-2, 0.5rem); margin-top: var(--space-3, 0.75rem); flex-wrap: wrap; align-items: center;">
+                    <button class="btn btn-primary btn-sm" data-copy="combined-link">${this.escapeHtml(this.t('upload.result.copy_link'))}</button>
+                    <a href="${this.escapeHtml(combinedUrl)}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary" style="text-decoration: none;">${this.escapeHtml(this.t('upload.result.open_tab'))}</a>
+                    <button class="btn btn-sm" id="toggle-separate-key" style="margin-left: auto; font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0);">
+                        ${this.escapeHtml(this._showSeparateKey ? this.t('upload.result.hide_key') : this.t('upload.result.show_separate_key'))}
+                    </button>
                 </div>
             </div>
-            <div style="margin-top: 0.5rem; text-align: right;">
-                <button class="btn btn-sm" id="toggle-separate-key" style="font-size: var(--text-sm); color: var(--color-text-secondary);">
-                    ${this.escapeHtml(this._showSeparateKey ? this.t('upload.result.hide_key') : this.t('upload.result.show_separate_key'))}
-                </button>
-            </div>
             ${separateSection}
-            ${transparency ? '<send-transparency id="transparency-panel"></send-transparency>' : ''}
             ${this._renderTimings()}
-            <div style="margin-top: 1.5rem; text-align: center;">
-                <button class="btn btn-sm" id="send-another-btn" style="color: var(--accent);">
+            ${transparency ? '<send-transparency id="transparency-panel"></send-transparency>' : ''}
+            <div style="margin-top: var(--space-6, 1.5rem); text-align: center;">
+                <button class="btn btn-sm" id="send-another-btn" style="color: var(--accent, var(--color-primary, #4ECDC4));">
                     ${this.escapeHtml(this.t('upload.result.send_another'))}
                 </button>
             </div>
@@ -245,23 +257,37 @@ class SendUpload extends HTMLElement {
 
         const stages = ['reading', 'encrypting', 'creating', 'uploading', 'completing', 'complete'];
         const totalMs = this._stageTimestamps.complete - this._stageTimestamps.reading;
-        const items = [];
+        const rows = [];
 
         for (let i = 0; i < stages.length - 1; i++) {
             const from = stages[i];
             const to   = stages[i + 1];
             if (this._stageTimestamps[from] && this._stageTimestamps[to]) {
-                const ms = this._stageTimestamps[to] - this._stageTimestamps[from];
-                items.push(`<span style="color: var(--color-text-secondary); font-size: var(--text-small);">${this.t(SendUpload.PROGRESS_STAGES[from]?.label || from)} ${ms}ms</span>`);
+                const ms  = this._stageTimestamps[to] - this._stageTimestamps[from];
+                const pct = totalMs > 0 ? Math.round((ms / totalMs) * 100) : 0;
+                const label = this.t(SendUpload.PROGRESS_STAGES[from]?.label || from).replace('...', '');
+                rows.push(`
+                    <div style="display: flex; align-items: center; gap: var(--space-2, 0.5rem); font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0);">
+                        <span style="min-width: 110px;">${this.escapeHtml(label)}</span>
+                        <div style="flex: 1; height: 4px; background: var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: 2px; overflow: hidden;">
+                            <div style="width: ${pct}%; height: 100%; background: var(--accent, #4ECDC4); border-radius: 2px;"></div>
+                        </div>
+                        <span style="min-width: 50px; text-align: right; font-family: var(--font-mono, monospace);">${ms}ms</span>
+                    </div>
+                `);
             }
         }
 
+        if (rows.length === 0) return '';
+
         return `
-            <div style="margin-top: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--accent-subtle); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--text-small);">
-                <div style="color: var(--accent); font-weight: var(--weight-semibold); margin-bottom: var(--space-2);">
-                    ${this.t('upload.timing.title')} ${(totalMs / 1000).toFixed(2)}s
+            <div style="margin-top: var(--space-3, 0.75rem); padding: var(--space-3, 0.75rem); background: var(--bg-secondary, #16213E); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: var(--radius-sm, 6px);">
+                <div style="font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0); margin-bottom: var(--space-2, 0.5rem); font-weight: var(--weight-semibold, 600);">
+                    ${this.escapeHtml(this.t('upload.timing.title'))} ${(totalMs / 1000).toFixed(2)}s
                 </div>
-                <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);">${items.join('')}</div>
+                <div style="display: flex; flex-direction: column; gap: var(--space-1, 0.25rem);">
+                    ${rows.join('')}
+                </div>
             </div>
         `;
     }
@@ -586,12 +612,21 @@ class SendUpload extends HTMLElement {
 
     /** Override this method in v0.2.1+ to change download URL */
     buildCombinedUrl(tid, key) {
-        return `${window.location.origin}/en-gb/download/#${tid}/${key}`;
+        const locale = this._detectLocalePrefix();
+        return `${window.location.origin}/${locale}/download/#${tid}/${key}`;
     }
 
     /** Override this method in v0.2.1+ to change download URL */
     buildLinkOnlyUrl(tid) {
-        return `${window.location.origin}/en-gb/download/#${tid}`;
+        const locale = this._detectLocalePrefix();
+        return `${window.location.origin}/${locale}/download/#${tid}`;
+    }
+
+    /** Detect the locale prefix from the current URL path */
+    _detectLocalePrefix() {
+        const path = window.location.pathname;
+        const match = path.match(/^\/([a-z]{2}(?:-[a-z]{2})?)\//);
+        return match ? match[1] : 'en-gb';
     }
 
     async copyToClipboard(text, button) {

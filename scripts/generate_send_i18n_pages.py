@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
-"""Generate locale-specific HTML pages for SGraph Send v0.2.0 UI.
+"""Generate locale-specific HTML pages for SGraph Send UI.
 
 Reads English (en-GB) source HTML files + locale JSON translation files,
 produces pre-rendered locale folder trees alongside en-gb/.
 
 Shared assets live in _common/ and are NOT duplicated —
-locale pages reference the originals via adjusted relative paths.
+locale pages reference the originals via the same relative paths (../_common/).
 
 The i18n.js client-side module continues to work for runtime locale switching.
 Pre-rendered pages give correct initial content per locale and improve SEO.
+
+Generated locale folders are CI-only artifacts — they are listed in
+.gitignore and never committed to git. Only the en-gb/ source pages and
+i18n/*.json translation files live in the repo.
+
+Locale codes match the main sgraph.ai website convention (language-country,
+all lowercase): en-us, pt-pt, pt-br, de-de, de-ch, es-es, es-ar, es-mx,
+fr-fr, fr-ca, it-it, nl-nl, pl-pl, hr-hr, ro-ro, tlh.
 
 Usage:
     python scripts/generate_send_i18n_pages.py
@@ -28,14 +36,25 @@ from pathlib import Path
 UI_BASE    = Path(__file__).parent.parent / 'sgraph_ai_app_send__ui__user'
 SOURCE_DIR = 'en-gb'
 
-# Locale definitions — slug is the folder name, lang is the HTML lang attribute
+# Locale definitions — matches main website convention exactly.
+# slug = folder name (lowercase), lang = HTML lang attribute, json = filename in i18n/
 LOCALES = [
-    { 'slug': 'pt-PT', 'json': 'pt-PT.json', 'lang': 'pt-PT' },
+    { 'slug': 'en-us', 'json': 'en-us.json', 'lang': 'en-US' },
+    { 'slug': 'pt-pt', 'json': 'pt-pt.json', 'lang': 'pt-PT' },
     { 'slug': 'pt-br', 'json': 'pt-br.json', 'lang': 'pt-BR' },
-    { 'slug': 'de',    'json': 'de.json',     'lang': 'de'    },
-    { 'slug': 'fr',    'json': 'fr.json',     'lang': 'fr'    },
-    { 'slug': 'es',    'json': 'es.json',     'lang': 'es'    },
-    { 'slug': 'it',    'json': 'it.json',     'lang': 'it'    },
+    { 'slug': 'de-de', 'json': 'de-de.json', 'lang': 'de-DE' },
+    { 'slug': 'de-ch', 'json': 'de-ch.json', 'lang': 'de-CH' },
+    { 'slug': 'es-es', 'json': 'es-es.json', 'lang': 'es-ES' },
+    { 'slug': 'es-ar', 'json': 'es-ar.json', 'lang': 'es-AR' },
+    { 'slug': 'es-mx', 'json': 'es-mx.json', 'lang': 'es-MX' },
+    { 'slug': 'fr-fr', 'json': 'fr-fr.json', 'lang': 'fr-FR' },
+    { 'slug': 'fr-ca', 'json': 'fr-ca.json', 'lang': 'fr-CA' },
+    { 'slug': 'it-it', 'json': 'it-it.json', 'lang': 'it-IT' },
+    { 'slug': 'nl-nl', 'json': 'nl-nl.json', 'lang': 'nl-NL' },
+    { 'slug': 'pl-pl', 'json': 'pl-pl.json', 'lang': 'pl-PL' },
+    { 'slug': 'hr-hr', 'json': 'hr-hr.json', 'lang': 'hr-HR' },
+    { 'slug': 'ro-ro', 'json': 'ro-ro.json', 'lang': 'ro-RO' },
+    { 'slug': 'tlh',   'json': 'tlh.json',   'lang': 'tlh'   },
 ]
 
 
@@ -114,9 +133,8 @@ def translate_html(html_content, translations, en_translations, locale_info):
         result
     )
 
-    # 5. Adjust asset paths — locale pages are sibling folders to en-gb,
-    #    so relative paths to _common/ are the same depth (../_common/)
-    #    No adjustment needed since locale folders are at the same level as en-gb
+    # 5. Asset paths: locale folders are siblings of en-gb, so ../_common/ paths
+    #    resolve correctly without adjustment.
 
     return result
 
@@ -154,6 +172,7 @@ def main():
     print(f"  Version:    {args.version}")
     print(f"  Source:     {en_dir}")
     print(f"  i18n dir:   {i18n_dir}")
+    print(f"  Locales:    {', '.join(loc['slug'] for loc in LOCALES)}")
     print()
 
     if not en_dir.is_dir():
@@ -174,7 +193,7 @@ def main():
         t = load_json(i18n_dir / loc['json'])
         locale_translations[loc['slug']] = t
         missing = set(en_translations.keys()) - set(t.keys())
-        print(f"  {loc['slug']} keys: {len(t)}, missing: {len(missing)}")
+        print(f"  {loc['slug']:6s} keys: {len(t):3d}, missing: {len(missing)}")
     print()
 
     # Find HTML source files

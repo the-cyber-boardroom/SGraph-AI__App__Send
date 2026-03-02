@@ -3,7 +3,7 @@
    URL-based locale routing with pre-rendered HTML.
 
    Locales are served at path prefixes:
-     /            → English GB (default)
+     /en-gb/      → English GB (default)
      /en-us/      → English (United States)
      /pt-pt/      → Portuguese (Portugal)
      /pt-br/      → Portuguese (Brazil)
@@ -39,7 +39,7 @@ const SgI18n = {
 
     // Locale code → URL slug mapping
     localeToSlug: {
-        'en-gb': '',
+        'en-gb': 'en-gb',
         'en-us': 'en-us',
         'pt-pt': 'pt-pt',
         'pt-br': 'pt-br',
@@ -95,8 +95,9 @@ const SgI18n = {
 
     _detectLocale() {
         const path = window.location.pathname;
-        const slugs = Object.values(this.localeToSlug).filter(s => s);
-        const pattern = new RegExp('^\\/(' + slugs.join('|') + ')\\/');
+        const slugs = Object.values(this.localeToSlug);
+        // Match locale slug with or without trailing slash
+        const pattern = new RegExp('^\\/(' + slugs.join('|') + ')(?:\\/|$)');
         const match = path.match(pattern);
         return match ? match[1] : 'en-gb';
     },
@@ -109,18 +110,13 @@ const SgI18n = {
         let currentPath = window.location.pathname;
 
         // Strip current locale prefix to get the base page path
-        if (currentLocale !== 'en-gb') {
-            currentPath = currentPath.replace(new RegExp('^/' + currentLocale + '/'), '/');
-        }
+        // Handle both /en-gb/ and /en-gb (with or without trailing slash)
+        currentPath = currentPath.replace(new RegExp('^/' + currentLocale + '(?=/|$)'), '');
+        if (!currentPath || currentPath === '') currentPath = '/';
 
-        // Build target URL
+        // Build target URL — all locales have URL prefixes
         const slug = this.localeToSlug[code];
-        if (slug) {
-            window.location.href = '/' + slug + currentPath;
-        } else {
-            // en-GB — no prefix
-            window.location.href = currentPath;
-        }
+        window.location.href = '/' + slug + currentPath;
     },
 
     // ─── Locale Selector Rendering ──────────────────────────────────────────
@@ -133,6 +129,17 @@ const SgI18n = {
                      || this.availableLocales[0];
 
         container.innerHTML = '';
+
+        // Quick-switch to English — visible on all non-English pages
+        if (!this.locale.startsWith('en')) {
+            const engLink = document.createElement('a');
+            engLink.className = 'locale-english-switch';
+            engLink.href = '/en-gb' + window.location.pathname.replace(
+                new RegExp('^/' + this.locale + '(?=/|$)'), '');
+            engLink.textContent = '\uD83C\uDDEC\uD83C\uDDE7 English';
+            container.appendChild(engLink);
+        }
+
         const dropdown = document.createElement('div');
         dropdown.className = 'locale-dropdown';
 

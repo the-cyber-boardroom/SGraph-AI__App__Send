@@ -24,6 +24,7 @@ from pathlib import Path
 # ── Configuration ──────────────────────────────────────────────────────────
 
 WEBSITE_DIR = Path(__file__).parent.parent / 'sgraph_ai__website'
+SOURCE_DIR  = WEBSITE_DIR / 'en-gb'
 I18N_DIR    = WEBSITE_DIR / 'i18n'
 SITE_URL    = 'https://sgraph.ai'
 
@@ -50,8 +51,8 @@ LOCALES = [
 # Files to skip (not user-facing content pages)
 SKIP_FILES = {'404.html'}
 
-# Directories to skip (locale output dirs, assets, common)
-SKIP_DIRS = {loc['slug'] for loc in LOCALES} | {'_common', 'i18n', 'cloudfront'}
+# Directories to skip (locale output dirs, assets, common, en-gb source)
+SKIP_DIRS = {loc['slug'] for loc in LOCALES} | {'_common', 'i18n', 'cloudfront', 'en-gb'}
 
 
 # ── Translation Loading ───────────────────────────────────────────────────
@@ -81,20 +82,13 @@ def load_english():
 
 # ── HTML Discovery ────────────────────────────────────────────────────────
 
-def find_html_files(website_dir):
-    """Find all HTML files to process, relative to website_dir."""
+def find_html_files(source_dir):
+    """Find all HTML files to process, relative to source_dir (en-gb/)."""
     html_files = []
-    for root, dirs, files in os.walk(website_dir):
-        # Skip locale output dirs and asset dirs
-        rel_root = Path(root).relative_to(website_dir)
-        parts = rel_root.parts
-        if parts and parts[0] in SKIP_DIRS:
-            dirs.clear()
-            continue
-
+    for root, dirs, files in os.walk(source_dir):
         for f in files:
             if f.endswith('.html') and f not in SKIP_FILES:
-                rel_path = (Path(root) / f).relative_to(website_dir)
+                rel_path = (Path(root) / f).relative_to(source_dir)
                 html_files.append(rel_path)
 
     return sorted(html_files)
@@ -168,9 +162,8 @@ def translate_html(html_content, translations, en_translations, locale_info, rel
         if translated_title:
             result = re.sub(r'<title>[^<]*</title>', f'<title>{_escape_html(translated_title)}</title>', result)
 
-    # 5. Adjust relative asset paths (CSS, JS, fonts, favicon in _common/)
-    #    Locale pages are one directory deeper than their English counterparts
-    result = _adjust_asset_paths(result, rel_path, locale_info['slug'])
+    # 5. Asset paths: no adjustment needed — source (en-gb/) and target
+    #    locale folders are at the same depth, so relative paths are identical.
 
     # 6. Inject hreflang tags into <head>
     hreflang_tags = _build_hreflang_tags(rel_path, all_locales)
@@ -194,55 +187,11 @@ def add_hreflang_to_english(html_content, rel_path, all_locales):
         result = result.replace('</head>', hreflang_tags + '\n</head>')
 
     if 'rel="canonical"' not in result:
-        page_url = _page_url(rel_path, '')
+        page_url = _page_url(rel_path, 'en-gb')
         canonical = f'  <link rel="canonical" href="{page_url}" />'
         result = result.replace('</head>', canonical + '\n</head>')
 
     return result
-
-
-# ── Asset Path Adjustment ─────────────────────────────────────────────────
-
-def _adjust_asset_paths(html, rel_path, locale_slug):
-    """Adjust relative paths to shared assets in _common/.
-
-    Locale pages are one directory level deeper than their English counterparts
-    (e.g., /pt-pt/pricing/ vs /pricing/), so all relative paths to shared assets
-    need one extra ../ prepended.
-
-    Internal navigation links are NOT adjusted because the mirrored folder
-    structure means relative nav links resolve correctly within the locale.
-    """
-    # Asset paths that live in _common/
-    ASSET_PATTERNS = ('_common/',)
-
-    def prepend_parent(match):
-        attr_prefix = match.group(1)   # e.g., 'href="' or 'src="'
-        rel_value   = match.group(2)   # e.g., '../_common/css/style.css'
-
-        # Check if this path points to a shared asset in _common/
-        stripped = re.sub(r'^(\.\./|\./)+'  , '', rel_value)
-        if not any(stripped.startswith(p) for p in ASSET_PATTERNS):
-            return match.group(0)  # Not an asset path — don't adjust
-
-        # Prepend one more ../
-        if rel_value.startswith('./'):
-            new_value = '../' + rel_value[2:]
-        elif rel_value.startswith('../'):
-            new_value = '../' + rel_value
-        else:
-            return match.group(0)  # Absolute or other — don't touch
-
-        return attr_prefix + new_value
-
-    # Match href="<relative>" and src="<relative>" attributes
-    html = re.sub(
-        r'((?:href|src)=")(\.\.?/[^"]*)',
-        prepend_parent,
-        html
-    )
-
-    return html
 
 
 # ── Hreflang Tags ─────────────────────────────────────────────────────────
@@ -255,8 +204,8 @@ def _build_hreflang_tags(rel_path, all_locales):
         page_path = '/'
 
     tags = []
-    # English GB (default and x-default)
-    en_url = SITE_URL + page_path
+    # English GB (default and x-default) — now lives at /en-gb/ prefix
+    en_url = SITE_URL + '/en-gb' + page_path
     tags.append(f'  <link rel="alternate" hreflang="en-GB" href="{en_url}" />')
     tags.append(f'  <link rel="alternate" hreflang="x-default" href="{en_url}" />')
 
@@ -306,6 +255,7 @@ def main():
 
     print(f"SGraph AI — i18n Page Generator")
     print(f"  Website dir: {WEBSITE_DIR}")
+    print(f"  Source dir:  {SOURCE_DIR}")
     print(f"  Output dir:  {output_dir}")
     print(f"  Locales:     {', '.join(loc['slug'] for loc in LOCALES)}")
     print()
@@ -325,8 +275,8 @@ def main():
                 print(f"    - {k}")
     print()
 
-    # Find HTML files
-    html_files = find_html_files(WEBSITE_DIR)
+    # Find HTML files in the en-gb source folder
+    html_files = find_html_files(SOURCE_DIR)
     print(f"  Found {len(html_files)} HTML pages to process:")
     for f in html_files:
         print(f"    {f}")
@@ -336,7 +286,7 @@ def main():
     if args.update_english:
         print("  Updating English source pages with hreflang tags...")
         for rel_path in html_files:
-            source_path = WEBSITE_DIR / rel_path
+            source_path = SOURCE_DIR / rel_path
             html = source_path.read_text(encoding='utf-8')
             updated = add_hreflang_to_english(html, rel_path, LOCALES)
             if updated != html:
@@ -352,7 +302,7 @@ def main():
         print(f"  Generating {loc['slug']}/ ...")
 
         for rel_path in html_files:
-            source_path = WEBSITE_DIR / rel_path
+            source_path = SOURCE_DIR / rel_path
             target_path = output_dir / loc['slug'] / rel_path
 
             html = source_path.read_text(encoding='utf-8')

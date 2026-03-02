@@ -1,9 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — Locale Selector Component
-   v0.2.0 — Dropdown language picker
+   v0.2.0 — Grid dropdown language picker (matches sgraph.ai design)
 
-   Renders a dropdown of available locales. Changing the locale updates
-   the I18n module and fires 'locale-changed' on document.
+   Renders a trigger button showing current locale flag + code.
+   Opens a two-column grid dropdown of available locales.
+   Clicking a locale navigates to the locale-specific URL path.
 
    Usage:
      <send-locale></send-locale>
@@ -13,33 +14,65 @@ class SendLocale extends HTMLElement {
 
     connectedCallback() {
         this.render();
-        this.setupEventListeners();
+        this._onOutsideClick = () => {
+            const dropdown = this.querySelector('.locale-dropdown');
+            if (dropdown) dropdown.classList.remove('open');
+        };
+        document.addEventListener('click', this._onOutsideClick);
+    }
+
+    disconnectedCallback() {
+        if (this._onOutsideClick) {
+            document.removeEventListener('click', this._onOutsideClick);
+        }
     }
 
     render() {
-        const current = (typeof I18n !== 'undefined') ? I18n.locale : 'en-gb';
+        const currentCode = (typeof I18n !== 'undefined') ? I18n.locale : 'en-gb';
         const locales = (typeof I18n !== 'undefined') ? I18n.availableLocales : [];
+        const current = locales.find(l => l.code === currentCode) || locales[0] || { flag: '', code: 'en-gb', name: 'English' };
+        const isEnglish = currentCode === 'en-gb' || currentCode === 'en';
 
-        const options = locales.map(l =>
-            `<option value="${l.code}" ${l.code === current ? 'selected' : ''}>${l.flag} ${l.name}</option>`
+        const items = locales.map(l =>
+            `<button type="button" class="locale-dropdown__item${l.code === currentCode ? ' locale-dropdown__item--active' : ''}" data-locale="${l.code}">${l.flag}\u2002${l.name}</button>`
         ).join('');
 
-        this.innerHTML = `
-            <select id="locale-select" class="sg-locale-select" aria-label="Select language">
-                ${options}
-            </select>
-        `;
-    }
+        // On non-English pages, show a permanent English link before the dropdown
+        const englishLink = !isEnglish
+            ? `<a href="/" class="locale-dropdown__english-link">\uD83C\uDDEC\uD83C\uDDE7 English</a>`
+            : '';
 
-    setupEventListeners() {
-        const select = this.querySelector('#locale-select');
-        if (select) {
-            select.addEventListener('change', async (e) => {
-                if (typeof I18n !== 'undefined') {
-                    await I18n.setLocale(e.target.value);
-                }
+        this.innerHTML = `
+            <div class="locale-dropdown" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                ${englishLink}
+                <button type="button" class="locale-dropdown__trigger" aria-label="Select language">
+                    ${current.flag} ${current.code.toUpperCase()} <svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5l3 3 3-3"/></svg>
+                </button>
+                <div class="locale-dropdown__menu">
+                    ${items}
+                </div>
+            </div>
+        `;
+
+        // Trigger toggle
+        const trigger = this.querySelector('.locale-dropdown__trigger');
+        if (trigger) {
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.querySelector('.locale-dropdown').classList.toggle('open');
             });
         }
+
+        // Item click → navigate to locale URL
+        this.querySelectorAll('.locale-dropdown__item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const code = btn.getAttribute('data-locale');
+                this.querySelector('.locale-dropdown').classList.remove('open');
+                if (code !== currentCode && typeof I18n !== 'undefined') {
+                    I18n.navigateToLocale(code);
+                }
+            });
+        });
     }
 }
 
