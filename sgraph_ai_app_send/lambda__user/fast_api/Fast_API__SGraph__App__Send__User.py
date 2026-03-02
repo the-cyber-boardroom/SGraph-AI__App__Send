@@ -31,6 +31,13 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
     admin_service_client : Admin__Service__Client = None                            # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
     early_access_service : Service__Early_Access  = None                            # Early Access signup (n8n webhook)
 
+    def app_kwargs(self, **kwargs):                                                   # Override: move docs under /api/ so CloudFront routes them to Lambda
+        kwargs = super().app_kwargs(**kwargs)
+        kwargs['docs_url'   ] = '/api/docs'
+        kwargs['redoc_url'  ] = '/api/redoc'
+        kwargs['openapi_url'] = '/api/openapi.json'
+        return kwargs
+
     def setup(self):
         with self.config as _:
             _.name           = APP__SEND__USER__FAST_API__TITLE
