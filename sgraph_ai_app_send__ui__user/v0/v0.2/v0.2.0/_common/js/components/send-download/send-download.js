@@ -879,22 +879,33 @@ class SendDownload extends HTMLElement {
 
             if (this._renderType === 'zip' && typeof JSZip !== 'undefined') {
                 // Parse zip for browsable tree viewer
-                this._zipOrigBytes = new Uint8Array(content);
-                this._zipOrigName  = this.fileName || 'archive.zip';
-                const parsed = await this._parseZip(content);
-                this._zipInstance = parsed.zip;
-                this._zipTree     = parsed.tree;
-                // Auto-preview first previewable file
-                const first = parsed.tree.find(e => !e.dir);
-                if (first) {
-                    this._selectedZipPath = first.path;
-                    const bytes = await first.entry.async('arraybuffer');
-                    this._currentEntryBytes    = bytes;
-                    this._currentEntryFilename = first.name;
-                    this.decryptedBytes = bytes;
-                    this.fileName       = first.name;
-                    this._renderType    = 'zip';
+                try {
+                    this._zipOrigBytes = new Uint8Array(content);
+                    this._zipOrigName  = this.fileName || 'archive.zip';
+                    const parsed = await this._parseZip(content);
+                    this._zipInstance = parsed.zip;
+                    this._zipTree     = parsed.tree;
+                    // Auto-preview first previewable file
+                    const first = parsed.tree.find(e => !e.dir);
+                    if (first) {
+                        this._selectedZipPath = first.path;
+                        const bytes = await first.entry.async('arraybuffer');
+                        this._currentEntryBytes    = bytes;
+                        this._currentEntryFilename = first.name;
+                        this.decryptedBytes = bytes;
+                        this.fileName       = first.name;
+                        this._renderType    = 'zip';
+                    }
+                } catch (zipErr) {
+                    // Zip parsing failed — fall back to auto-download
+                    this._zipInstance = null; this._zipTree = null;
+                    this._renderType = null;
+                    this.saveFile(content, this._zipOrigName || this.fileName || 'download.zip');
                 }
+            } else if (this._renderType === 'zip') {
+                // JSZip not available — auto-download the zip file
+                this._renderType = null;
+                this.saveFile(content, this.fileName || 'download.zip');
             } else if (this.isTextContent()) {
                 this.decryptedText = new TextDecoder().decode(content);
             } else if (!this._renderType || this._renderType === 'text') {
