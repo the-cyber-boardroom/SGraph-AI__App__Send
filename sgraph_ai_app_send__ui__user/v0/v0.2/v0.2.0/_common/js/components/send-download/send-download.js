@@ -498,8 +498,9 @@ class SendDownload extends HTMLElement {
             const result = await mammoth.convertToHtml({ arrayBuffer: this.decryptedBytes });
             const html = result.value;
             const iframeDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*,*::before,*::after{box-sizing:border-box}body{font-family:'DM Sans',system-ui,sans-serif;font-size:1rem;line-height:1.7;color:#E0E0E0;background:#1E2A4A;margin:0;padding:1.25rem;word-wrap:break-word}h1,h2,h3,h4,h5,h6{color:#fff;margin:1.5em 0 .5em;line-height:1.3}h1{font-size:1.6rem;border-bottom:1px solid rgba(78,205,196,.2);padding-bottom:.3em}h2{font-size:1.35rem}h3{font-size:1.15rem}p{margin:.8em 0}a{color:#4ECDC4;text-decoration:none}a:hover{text-decoration:underline}table{border-collapse:collapse;width:100%;margin:1em 0}th,td{border:1px solid rgba(78,205,196,.2);padding:.5em .75em;text-align:left}th{background:rgba(78,205,196,.1);font-weight:600;color:#fff}ul,ol{padding-left:1.5em;margin:.8em 0}li{margin:.3em 0}img{max-width:100%;height:auto}strong{color:#fff}</style></head><body>${html}</body></html>`;
-            const encoded = btoa(unescape(encodeURIComponent(iframeDoc)));
-            container.innerHTML = `<iframe id="docx-iframe" sandbox="allow-same-origin" style="width:100%;height:100%;border:none;background:#1E2A4A;display:block;" src="data:text/html;base64,${encoded}" title="Word document"></iframe>`;
+            const blob = new Blob([iframeDoc], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            container.innerHTML = `<iframe id="docx-iframe" sandbox="allow-same-origin" style="width:100%;height:100%;border:none;background:#1E2A4A;display:block;" src="${blobUrl}" title="Word document"></iframe>`;
         } catch (err) {
             container.innerHTML = `<div class="office-error">${this.escapeHtml(this.t('download.office.error'))}<br><small>${this.escapeHtml(err.message)}</small></div>`;
         }
