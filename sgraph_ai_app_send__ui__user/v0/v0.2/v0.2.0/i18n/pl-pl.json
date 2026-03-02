@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "Folder jest za duży. Maksymalny rozmiar: {limit}.",
   "upload.folder.error_zip_failed": "Nie udało się utworzyć pliku zip.",
   "upload.folder.error_jszip": "Nie udało się załadować biblioteki kompresji.",
-  "test_files.folder_hint": "Aby przetestować przesyłanie folderów, przeciągnij dowolny folder z pulpitu do strefy przesyłania."
+  "test_files.folder_hint": "Aby przetestować przesyłanie folderów, przeciągnij dowolny folder z pulpitu do strefy przesyłania.",
+  "download.zip.summary": "{files} plików, {folders} folderów",
+  "download.zip.contents": "Zawartość",
+  "download.zip.save_all": "Zapisz wszystko (zip)",
+  "download.zip.save_file": "Zapisz ten plik",
+  "download.zip.no_preview": "Podgląd niedostępny. Kliknij \"Zapisz ten plik\".",
+  "download.zip.select_file": "Kliknij plik w drzewie, aby wyświetlić podgląd."
 }

@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "La carpeta es demasiado grande. Tamaño máximo: {limit}.",
   "upload.folder.error_zip_failed": "Error al crear el archivo zip.",
   "upload.folder.error_jszip": "Error al cargar la librería de compresión.",
-  "test_files.folder_hint": "Para probar la subida de carpetas, arrastra cualquier carpeta desde tu escritorio a la zona de subida."
+  "test_files.folder_hint": "Para probar la subida de carpetas, arrastra cualquier carpeta desde tu escritorio a la zona de subida.",
+  "download.zip.summary": "{files} archivos, {folders} carpetas",
+  "download.zip.contents": "Contenido",
+  "download.zip.save_all": "Guardar todo (zip)",
+  "download.zip.save_file": "Guardar este archivo",
+  "download.zip.no_preview": "Vista previa no disponible. Haga clic en \"Guardar este archivo\".",
+  "download.zip.select_file": "Haga clic en un archivo del árbol para previsualizarlo."
 }

@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "Map is te groot. Maximale grootte: {limit}.",
   "upload.folder.error_zip_failed": "Kan zip-bestand niet aanmaken.",
   "upload.folder.error_jszip": "Kan compressiebibliotheek niet laden.",
-  "test_files.folder_hint": "Om het uploaden van mappen te testen, sleep een map van uw bureaublad naar de uploadzone."
+  "test_files.folder_hint": "Om het uploaden van mappen te testen, sleep een map van uw bureaublad naar de uploadzone.",
+  "download.zip.summary": "{files} bestanden, {folders} mappen",
+  "download.zip.contents": "Inhoud",
+  "download.zip.save_all": "Alles opslaan (zip)",
+  "download.zip.save_file": "Dit bestand opslaan",
+  "download.zip.no_preview": "Geen voorbeeld beschikbaar. Klik op \"Dit bestand opslaan\".",
+  "download.zip.select_file": "Klik op een bestand in de boom om het te bekijken."
 }

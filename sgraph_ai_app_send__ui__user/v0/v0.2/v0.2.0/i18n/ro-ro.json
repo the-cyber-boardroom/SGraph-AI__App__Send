@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "Dosarul este prea mare. Dimensiune maximă: {limit}.",
   "upload.folder.error_zip_failed": "Nu s-a putut crea fișierul zip.",
   "upload.folder.error_jszip": "Nu s-a putut încărca biblioteca de compresie.",
-  "test_files.folder_hint": "Pentru a testa încărcarea dosarelor, trageți orice dosar de pe desktop în zona de încărcare."
+  "test_files.folder_hint": "Pentru a testa încărcarea dosarelor, trageți orice dosar de pe desktop în zona de încărcare.",
+  "download.zip.summary": "{files} fișiere, {folders} dosare",
+  "download.zip.contents": "Conținut",
+  "download.zip.save_all": "Salvați tot (zip)",
+  "download.zip.save_file": "Salvați acest fișier",
+  "download.zip.no_preview": "Previzualizare indisponibilă. Faceți clic pe \"Salvați acest fișier\".",
+  "download.zip.select_file": "Faceți clic pe un fișier din arbore pentru previzualizare."
 }

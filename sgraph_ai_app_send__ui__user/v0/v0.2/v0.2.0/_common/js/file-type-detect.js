@@ -10,6 +10,7 @@
      'image'     — .png, .jpg, .jpeg, .gif, .webp, .svg
      'pdf'       — .pdf
      'code'      — .js, .ts, .py, .json, .yaml, .yml, .xml, .html, .css, .sh, etc.
+     'zip'       — .zip (browsable archive viewer)
      'text'      — text/* content type (existing behaviour)
      null        — binary/unknown (auto-download)
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -21,6 +22,7 @@ const FileTypeDetect = {
         '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.gif': 'image',
         '.webp': 'image', '.svg': 'image',
         '.pdf': 'pdf',
+        '.zip': 'zip',
         '.js': 'code', '.mjs': 'code', '.cjs': 'code', '.ts': 'code',
         '.tsx': 'code', '.jsx': 'code', '.py': 'code', '.json': 'code',
         '.yaml': 'code', '.yml': 'code', '.xml': 'code', '.html': 'code',
@@ -34,6 +36,8 @@ const FileTypeDetect = {
     _contentTypeMap: {
         'image/': 'image',
         'application/pdf': 'pdf',
+        'application/zip': 'zip',
+        'application/x-zip-compressed': 'zip',
         'text/markdown': 'markdown',
         'text/x-markdown': 'markdown',
     },

@@ -27,5 +27,11 @@
   "upload.folder.error_too_large": "Folder is too large. Maximum size is {limit}.",
   "upload.folder.error_zip_failed": "Failed to create zip file.",
   "upload.folder.error_jszip": "Failed to load compression library.",
-  "test_files.folder_hint": "To test folder upload, drag any folder from your desktop into the upload zone."
+  "test_files.folder_hint": "To test folder upload, drag any folder from your desktop into the upload zone.",
+  "download.zip.summary": "{files} files, {folders} folders",
+  "download.zip.contents": "Contents",
+  "download.zip.save_all": "Save All (zip)",
+  "download.zip.save_file": "Save This File",
+  "download.zip.no_preview": "No preview available. Click \"Save This File\" to download.",
+  "download.zip.select_file": "Click a file in the tree to preview it."
 }

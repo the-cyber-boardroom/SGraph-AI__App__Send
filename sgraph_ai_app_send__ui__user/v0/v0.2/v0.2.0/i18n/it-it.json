@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "La cartella è troppo grande. Dimensione massima: {limit}.",
   "upload.folder.error_zip_failed": "Impossibile creare il file zip.",
   "upload.folder.error_jszip": "Impossibile caricare la libreria di compressione.",
-  "test_files.folder_hint": "Per testare il caricamento di cartelle, trascina una cartella qualsiasi dal desktop nella zona di caricamento."
+  "test_files.folder_hint": "Per testare il caricamento di cartelle, trascina una cartella qualsiasi dal desktop nella zona di caricamento.",
+  "download.zip.summary": "{files} file, {folders} cartelle",
+  "download.zip.contents": "Contenuto",
+  "download.zip.save_all": "Salva tutto (zip)",
+  "download.zip.save_file": "Salva questo file",
+  "download.zip.no_preview": "Anteprima non disponibile. Clicca \"Salva questo file\".",
+  "download.zip.select_file": "Clicca su un file nell'albero per visualizzarlo."
 }
