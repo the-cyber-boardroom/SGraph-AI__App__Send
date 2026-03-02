@@ -9,7 +9,13 @@
 class SendFooter extends HTMLElement {
 
     connectedCallback() {
+        this._onLocaleChanged = () => this.render();
+        document.addEventListener('locale-changed', this._onLocaleChanged);
         this.render();
+    }
+
+    disconnectedCallback() {
+        if (this._onLocaleChanged) document.removeEventListener('locale-changed', this._onLocaleChanged);
     }
 
     t(key, params) { return (typeof I18n !== 'undefined') ? I18n.t(key, params) : key; }

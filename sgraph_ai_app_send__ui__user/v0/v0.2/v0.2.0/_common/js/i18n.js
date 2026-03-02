@@ -95,7 +95,9 @@ const I18n = {
             'download.info.encrypted_file':     'Encrypted file',
             'download.info.encrypted_text':     'Encrypted text',
             'download.info.uploaded':           'Uploaded {timestamp}',
+            'download.info.uploaded_label':     'Uploaded',
             'download.info.download_count':     'Downloaded {count} time(s)',
+            'download.info.downloads_label':    'Downloads',
             'download.key.label':               'Decryption key',
             'download.key.placeholder':         'Paste the decryption key here',
             'download.button.decrypt_download': 'Download & Decrypt',
@@ -114,6 +116,11 @@ const I18n = {
             'download.history.text_preview':    'Text',
             'download.history.file_label':      'File',
             'download.token.uses_remaining':    '{remaining} uses remaining',
+
+            // ─── Download: Preview ──────────────────────────────────────
+            'download.preview.save_locally':    'Save Locally',
+            'download.preview.view_raw':        'View Raw',
+            'download.preview.view_rendered':   'View Rendered',
 
             // ─── Download: Errors ─────────────────────────────────────────
             'download.error.no_id':             'No transfer ID found in URL. Please check your link.',
@@ -138,6 +145,8 @@ const I18n = {
             'access_gate.change_token':         'Change Token',
             'access_gate.signup_title':         'Join the Early Access Programme',
             'access_gate.signup_subtitle':      'Sign up to get notified when SGraph Send is available.',
+            'access_gate.show_token':           'Show access token',
+            'access_gate.hide_token':           'Hide access token',
 
             // ─── Transparency Panel ───────────────────────────────────────
             'transparency.title':               'What we stored about this transfer',
@@ -164,6 +173,12 @@ const I18n = {
 
             // ─── Common ───────────────────────────────────────────────────
             'common.copied':                    'Copied!',
+            'common.copy':                      'Copy',
+
+            // ─── Forms ──────────────────────────────────────────────────
+            'form.name_placeholder':            'Name',
+            'form.email_placeholder':           'Email',
+            'form.signup_button':               'Sign Up',
 
             // ─── Header / Navigation ──────────────────────────────────────
             'nav.docs':                         'Docs',
@@ -206,14 +221,56 @@ const I18n = {
 
     // ─── Initialisation ──────────────────────────────────────────────────
 
-    async init(localePath) {
-        // Detect locale from URL path — translations are pre-rendered,
-        // so no JSON files need to be fetched.
+    async init() {
+        // Locale was already detected synchronously at script load time
+        // (see bottom of file). Now load the translation strings.
         this.locale = this._detectLocale();
+
+        // Load locale-specific translations for non-English pages
+        if (this.locale !== 'en-gb') {
+            await this._loadLocaleStrings(this.locale);
+        }
+
+        // Update static data-i18n elements in the page
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (key) el.textContent = this.t(key);
+        });
+
+        // Update data-i18n-placeholder elements (input placeholders)
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            if (key) el.placeholder = this.t(key);
+        });
+
+        // Notify all components that translations are ready
+        document.dispatchEvent(new CustomEvent('locale-changed', {
+            detail: { locale: this.locale }
+        }));
     },
 
     isSupported(code) {
         return this.availableLocales.some(l => l.code === code);
+    },
+
+    // ─── Locale String Loading ─────────────────────────────────────────
+
+    async _loadLocaleStrings(locale) {
+        try {
+            const basePath = (typeof SendComponentPaths !== 'undefined')
+                ? SendComponentPaths.basePath
+                : '../_common';
+            const i18nPath = basePath.replace(/_common\/?$/, 'i18n');
+            const jsonUrl  = `${i18nPath}/${locale}.json`;
+            const response = await fetch(jsonUrl);
+            if (response.ok) {
+                const translations = await response.json();
+                delete translations._comment;
+                this.strings[locale] = translations;
+            }
+        } catch (e) {
+            console.warn(`[i18n] Could not load ${locale}.json — using English fallback`);
+        }
     },
 
     // ─── Locale Detection from URL ───────────────────────────────────────
@@ -263,3 +320,8 @@ const I18n = {
         this.navigateToLocale(code);
     }
 };
+
+// Auto-detect locale from URL on script load — synchronous, no fetch needed.
+// This ensures components that render during DOM parsing (connectedCallback)
+// already see the correct locale before init() loads the translation strings.
+I18n.locale = I18n._detectLocale();
