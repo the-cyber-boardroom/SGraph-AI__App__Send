@@ -16,6 +16,12 @@ eggs/
 .eggs/
 lib/
 lib64/
+
+# Un-ignore lib/ inside UI static asset folders (JS libraries, not Python)
+!sgraph_ai_app_send__ui__user/**/lib/
+!sgraph_ai_app_send__ui__user/**/lib/**
+!sgraph_ai_app_send__ui__vault/**/lib/
+!sgraph_ai_app_send__ui__vault/**/lib/**
 parts/
 sdist/
 var/
