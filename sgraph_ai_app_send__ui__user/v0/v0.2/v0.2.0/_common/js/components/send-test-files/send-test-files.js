@@ -100,6 +100,7 @@ class SendTestFiles extends HTMLElement {
                 <div class="test-files__grid">
                     ${cards}
                 </div>
+                <p class="test-files__desc" style="margin-top: var(--space-3, 0.75rem);">${this.t('test_files.folder_hint')}</p>
             </div>
         `;
 

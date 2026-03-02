@@ -37,7 +37,7 @@ const I18n = {
             'app.disclaimer':       'This is a beta service. Do not upload confidential or illegal content.',
 
             // ─── Upload: Mode ─────────────────────────────────────────────
-            'upload.mode.file':     'File',
+            'upload.mode.file':     'File or Folder',
             'upload.mode.text':     'Text',
 
             // ─── Upload: Drop Zone ────────────────────────────────────────
@@ -210,6 +210,7 @@ const I18n = {
             // ─── Test Files ─────────────────────────────────────────────
             'test_files.title':                 'Test Files',
             'test_files.description':           'Drag a file into the upload zone, or click to download.',
+            'test_files.folder_hint':           'To test folder upload, drag any folder from your desktop into the upload zone.',
 
             // ─── CTA ────────────────────────────────────────────────────
             'cta.title':                        'Want to send files too?',

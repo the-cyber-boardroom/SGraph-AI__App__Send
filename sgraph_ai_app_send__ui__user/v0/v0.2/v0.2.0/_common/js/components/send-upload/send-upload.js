@@ -185,20 +185,29 @@ class SendUpload extends HTMLElement {
         const { fileCount, folderCount, totalSize } = this._folderScan;
         const opts = this._folderOptions;
 
+        const selectStyle = `width: 100%; background: var(--bg-secondary, #16213E); color: var(--color-text, #E0E0E0); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: var(--radius-sm, 6px); padding: 0.5rem 0.625rem; font-size: var(--text-sm, 0.875rem); appearance: auto;`;
+        const sectionBorder = `border-top: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); padding-top: var(--space-3, 0.75rem); margin-top: var(--space-3, 0.75rem);`;
+
         return `
-            <div class="status status--info" style="text-align: left;">
-                <div style="font-weight: var(--weight-semibold, 600); margin-bottom: var(--space-2, 0.5rem);">
-                    ${this.escapeHtml(this.t('upload.folder.title', { name: this._folderName }))}
+            <div style="background: var(--bg-secondary, #16213E); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: var(--radius-md, 12px); padding: var(--space-4, 1rem); text-align: left;">
+
+                <!-- Folder header -->
+                <div style="display: flex; align-items: center; gap: var(--space-2, 0.5rem); margin-bottom: var(--space-1, 0.25rem);">
+                    <span style="font-size: 1.25rem; line-height: 1;">&#128193;</span>
+                    <span style="font-weight: var(--weight-semibold, 600); font-size: var(--text-body, 1rem);">
+                        ${this.escapeHtml(this._folderName)}
+                    </span>
                 </div>
-                <div style="font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0); margin-bottom: var(--space-3, 0.75rem);">
+                <div style="font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0); margin-bottom: var(--space-2, 0.5rem); padding-left: 1.75rem;">
                     ${this.escapeHtml(this.t('upload.folder.summary', { files: fileCount, folders: folderCount, size: this.formatBytes(totalSize) }))}
                 </div>
 
-                <div style="margin-bottom: var(--space-3, 0.75rem);">
-                    <label style="display: block; font-size: var(--text-sm, 0.875rem); margin-bottom: var(--space-1, 0.25rem);">
+                <!-- Compression -->
+                <div style="${sectionBorder}">
+                    <label for="folder-compression" style="display: block; font-size: var(--text-sm, 0.875rem); font-weight: var(--weight-semibold, 600); color: var(--color-text-secondary, #8892A0); margin-bottom: var(--space-2, 0.5rem);">
                         ${this.escapeHtml(this.t('upload.folder.compression'))}
                     </label>
-                    <select id="folder-compression" style="background: var(--bg-secondary, #16213E); color: var(--color-text, #E0E0E0); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: var(--radius-sm, 6px); padding: 0.375rem 0.5rem; font-size: var(--text-sm, 0.875rem);">
+                    <select id="folder-compression" style="${selectStyle}">
                         <option value="0" ${opts.level === 0 ? 'selected' : ''}>${this.escapeHtml(this.t('upload.folder.level_0'))}</option>
                         <option value="4" ${opts.level === 4 ? 'selected' : ''}>${this.escapeHtml(this.t('upload.folder.level_4'))}</option>
                         <option value="6" ${opts.level === 6 ? 'selected' : ''}>${this.escapeHtml(this.t('upload.folder.level_6'))}</option>
@@ -206,7 +215,8 @@ class SendUpload extends HTMLElement {
                     </select>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: var(--space-2, 0.5rem); margin-bottom: var(--space-3, 0.75rem);">
+                <!-- Options -->
+                <div style="${sectionBorder} display: flex; flex-direction: column; gap: var(--space-2, 0.5rem);">
                     <label style="display: flex; align-items: center; gap: var(--space-2, 0.5rem); font-size: var(--text-sm, 0.875rem); cursor: pointer;">
                         <input type="checkbox" id="folder-include-empty" ${opts.includeEmpty ? 'checked' : ''}>
                         ${this.escapeHtml(this.t('upload.folder.include_empty'))}
@@ -217,12 +227,13 @@ class SendUpload extends HTMLElement {
                     </label>
                 </div>
 
-                <div style="display: flex; gap: var(--space-2, 0.5rem);">
-                    <button class="btn btn-primary btn-sm" id="folder-upload-btn">
-                        ${this.escapeHtml(this.t('upload.folder.compress_upload'))}
-                    </button>
+                <!-- Actions -->
+                <div style="${sectionBorder} display: flex; gap: var(--space-2, 0.5rem); justify-content: flex-end;">
                     <button class="btn btn-sm" id="folder-cancel-btn">
                         ${this.escapeHtml(this.t('upload.folder.cancel'))}
+                    </button>
+                    <button class="btn btn-primary btn-sm" id="folder-upload-btn">
+                        ${this.escapeHtml(this.t('upload.folder.compress_upload'))}
                     </button>
                 </div>
             </div>
