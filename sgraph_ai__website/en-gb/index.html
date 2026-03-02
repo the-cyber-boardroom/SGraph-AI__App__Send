@@ -60,9 +60,9 @@
       <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" onclick="this.nextElementSibling.classList.toggle('is-open'); this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('is-open'))">&#9776;</button>
       <nav class="site-nav" aria-label="Main navigation">
         <a href="./product/" data-i18n="nav.product">Product</a>
-        <a href="./agents/" data-i18n="nav.team">Team</a>
-        <a href="./architecture/" data-i18n="nav.architecture">Architecture</a>
         <a href="./pricing/" data-i18n="nav.pricing">Pricing</a>
+        <a href="./architecture/" data-i18n="nav.architecture">Architecture</a>
+        <a href="./agents/" data-i18n="nav.team">Team</a>
       </nav>
       <div id="locale-picker"></div>
     </div>
@@ -82,11 +82,11 @@
           Your decryption key never leaves your device.
         </p>
         <div class="hero-ctas">
-          <a href="./pricing/free/" class="btn btn-primary btn--lg" data-i18n="home.hero.cta_free">Get Started Free &rarr;</a>
-          <a href="./pricing/" class="btn btn-secondary btn--lg" data-i18n="home.hero.cta_pricing">See Pricing &rarr;</a>
+          <a href="https://buy.stripe.com/fZu8wHdv23nN1Z85jn5os02" class="btn btn-primary btn--lg" data-i18n="home.hero.cta_buy">Buy Credits &mdash; &pound;5 &rarr;</a>
+          <a href="./early-access/" class="btn btn-secondary btn--lg" data-i18n="home.hero.cta_free">Try Free &rarr;</a>
         </div>
         <p class="hero-sub" style="margin-top: var(--sp-4); font-size: 0.9rem; color: var(--text-secondary);">
-          <span data-i18n="home.hero.sub">Free Early Access available. Open source. From &pound;0.01 per file.</span>
+          <span data-i18n="home.hero.sub">Open source &middot; &pound;0.01/file &middot; 500 transfers</span>
           &nbsp;&middot;&nbsp;
           <a href="https://send.sgraph.ai" style="color: var(--accent);" data-i18n="home.hero.sub_existing">Already have a token? Go to send.sgraph.ai &rarr;</a>
         </p>
@@ -151,24 +151,24 @@
 
         <div class="grid grid--2 mt-8" style="max-width: 720px; margin-left: auto; margin-right: auto;">
           <div class="card pricing-card pricing-card--featured" style="text-align: center;">
-            <div class="pricing-card__badge" data-i18n="home.getstarted.eap_badge">Recommended</div>
-            <h3 class="card__title" data-i18n="home.getstarted.eap_title">Early Access Programme</h3>
-            <p class="card__desc" data-i18n="home.getstarted.eap_desc">
-              Get a free access token with evaluation credits.
-              No payment required. No credit card needed.
-            </p>
-            <div class="pricing-card__price" data-i18n="home.getstarted.eap_price">Free</div>
-            <a href="./pricing/free/" class="btn btn-primary" data-i18n="home.getstarted.eap_cta">Join Early Access &rarr;</a>
-          </div>
-
-          <div class="card pricing-card" style="text-align: center;">
+            <div class="pricing-card__badge" data-i18n="home.getstarted.starter_badge">Recommended</div>
             <h3 class="card__title" data-i18n="home.getstarted.starter_title">Starter Pack</h3>
             <p class="card__desc" data-i18n="home.getstarted.starter_desc">
               500 encrypted file transfers. Pay once, use within 3 months.
               That's &pound;0.01 per file.
             </p>
             <div class="pricing-card__price">&pound;5</div>
-            <a href="./pricing/cloud/" class="btn btn-secondary" data-i18n="home.getstarted.starter_cta">Buy Credits &rarr;</a>
+            <a href="https://buy.stripe.com/fZu8wHdv23nN1Z85jn5os02" class="btn btn-primary" data-i18n="home.getstarted.starter_cta">Buy Credits &rarr;</a>
+          </div>
+
+          <div class="card pricing-card" style="text-align: center;">
+            <h3 class="card__title" data-i18n="home.getstarted.eap_title">Early Access Programme</h3>
+            <p class="card__desc" data-i18n="home.getstarted.eap_desc">
+              Get a free access token with evaluation credits.
+              No payment required. No credit card needed.
+            </p>
+            <div class="pricing-card__price" data-i18n="home.getstarted.eap_price">Free</div>
+            <a href="./early-access/" class="btn btn-secondary" data-i18n="home.getstarted.eap_cta">Join Early Access &rarr;</a>
           </div>
         </div>
 
