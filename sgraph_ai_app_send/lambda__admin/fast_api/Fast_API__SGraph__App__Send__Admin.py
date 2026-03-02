@@ -56,9 +56,9 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
 
     def app_kwargs(self, **kwargs):                                                      # Override: move docs under /api/ so CloudFront routes them to Lambda
         kwargs = super().app_kwargs(**kwargs)
-        kwargs['docs_url'   ] = '/api/docs'
-        kwargs['redoc_url'  ] = '/api/redoc'
-        kwargs['openapi_url'] = '/api/openapi.json'
+        # kwargs['docs_url'   ] = '/api/docs'
+        # kwargs['redoc_url'  ] = '/api/redoc'
+        # kwargs['openapi_url'] = '/api/openapi.json'
         return kwargs
 
     def setup(self):

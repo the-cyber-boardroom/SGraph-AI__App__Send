@@ -15,8 +15,8 @@ class test__App_Send__UI__Admin__static_pages(TestCase):
 
     def test__root(self):
         assert self.client.get('/'                                       ).status_code == 404          # not wired in
-        assert self.client.get('/api/docs'                                ).status_code == 200          # swagger page at /api/docs (CloudFront-routable)
-        assert self.client.get('/api/openapi.json'                      ).status_code == 200          # openapi.json spec at /api/ path
+        assert self.client.get('/docs'                                   ).status_code == 200          # swagger page at /docs
+        assert self.client.get('/openapi.json'                           ).status_code == 200          # openapi.json spec at / path
         assert self.client.get('/admin/index.html'                       ).status_code == 200          # confirm static route is working
         assert self.client.get('/admin'         , follow_redirects=False ).status_code == 307          # confirm redirect is working
         assert self.client.get('/admin'         , follow_redirects=True  ).status_code == 200          # confirm base page is there
