@@ -33,6 +33,9 @@ class SendUpload extends HTMLElement {
         this._boundUploadClick = null;
         this._showSeparateKey  = false;
         this._stageTimestamps  = {};
+        this._folderScan       = null;          // { entries, fileCount, folderCount, totalSize }
+        this._folderName       = null;          // Name of the dropped/selected folder
+        this._folderOptions    = { level: 4, includeEmpty: false, includeHidden: false };
         this._localeHandler    = () => { if (this.state === 'idle' || this.state === 'complete') { this.render(); this.setupEventListeners(); } };
     }
 
@@ -83,6 +86,7 @@ class SendUpload extends HTMLElement {
                 ${this.renderModeTabs()}
                 ${this.renderDropZone()}
                 ${this.renderTextInput()}
+                ${this.renderFolderOptions()}
                 ${this.renderFileInfo()}
                 ${this.renderProgress()}
                 ${this.renderResult()}
@@ -106,15 +110,19 @@ class SendUpload extends HTMLElement {
     _isUploading() { return !!SendUpload.PROGRESS_STAGES[this.state]; }
 
     renderDropZone() {
-        if (this.state === 'complete' || this._mode !== 'file') return '';
-        const hidden = this._isUploading() ? 'hidden' : '';
+        if (this.state === 'complete' || this.state === 'folder-options' || this._mode !== 'file') return '';
+        const hidden = this._isUploading() || this.state === 'zipping' ? 'hidden' : '';
         return `
             <div class="drop-zone ${hidden}" id="drop-zone">
                 <div class="drop-zone__label">${this.escapeHtml(this.t('upload.drop_zone.label'))}</div>
-                <div class="drop-zone__hint">${this.escapeHtml(this.t('upload.drop_zone.hint'))}</div>
+                <div style="display: flex; gap: var(--space-2, 0.5rem); margin-top: var(--space-2, 0.5rem); justify-content: center;">
+                    <button class="btn btn-sm" id="browse-file-btn">${this.escapeHtml(this.t('upload.drop_zone.browse_file'))}</button>
+                    <button class="btn btn-sm" id="browse-folder-btn">${this.escapeHtml(this.t('upload.drop_zone.browse_folder'))}</button>
+                </div>
                 <div class="drop-zone__hint" style="margin-top: 0.5rem;">${this.escapeHtml(this.t('upload.drop_zone.encrypted_hint'))}</div>
                 <div class="drop-zone__hint" style="margin-top: 0.25rem; font-size: var(--text-small); opacity: 0.7;">${this.escapeHtml(this.t('upload.drop_zone.size_limit', { limit: this.formatBytes(SendUpload.MAX_FILE_SIZE) }))}</div>
                 <input type="file" id="file-input" style="display: none;">
+                <input type="file" id="folder-input" style="display: none;" webkitdirectory>
             </div>
         `;
     }
@@ -164,12 +172,62 @@ class SendUpload extends HTMLElement {
     static MAX_FILE_SIZE           = 5 * 1024 * 1024;
 
     static PROGRESS_STAGES = {
+        'zipping':    { label: 'upload.progress.zipping',    pct: 5  },
         'reading':    { label: 'upload.progress.reading',    pct: 10 },
         'encrypting': { label: 'upload.progress.encrypting', pct: 30 },
         'creating':   { label: 'upload.progress.creating',   pct: 50 },
         'uploading':  { label: 'upload.progress.uploading',  pct: 70 },
         'completing': { label: 'upload.progress.completing', pct: 90 },
     };
+
+    renderFolderOptions() {
+        if (this.state !== 'folder-options' || !this._folderScan) return '';
+        const { fileCount, folderCount, totalSize } = this._folderScan;
+        const opts = this._folderOptions;
+
+        return `
+            <div class="status status--info" style="text-align: left;">
+                <div style="font-weight: var(--weight-semibold, 600); margin-bottom: var(--space-2, 0.5rem);">
+                    ${this.escapeHtml(this.t('upload.folder.title', { name: this._folderName }))}
+                </div>
+                <div style="font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary, #8892A0); margin-bottom: var(--space-3, 0.75rem);">
+                    ${this.escapeHtml(this.t('upload.folder.summary', { files: fileCount, folders: folderCount, size: this.formatBytes(totalSize) }))}
+                </div>
+
+                <div style="margin-bottom: var(--space-3, 0.75rem);">
+                    <label style="display: block; font-size: var(--text-sm, 0.875rem); margin-bottom: var(--space-1, 0.25rem);">
+                        ${this.escapeHtml(this.t('upload.folder.compression'))}
+                    </label>
+                    <select id="folder-compression" style="background: var(--bg-secondary, #16213E); color: var(--color-text, #E0E0E0); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: var(--radius-sm, 6px); padding: 0.375rem 0.5rem; font-size: var(--text-sm, 0.875rem);">
+                        <option value="0" ${opts.level === 0 ? 'selected' : ''}>${this.escapeHtml(this.t('upload.folder.level_0'))}</option>
+                        <option value="4" ${opts.level === 4 ? 'selected' : ''}>${this.escapeHtml(this.t('upload.folder.level_4'))}</option>
+                        <option value="6" ${opts.level === 6 ? 'selected' : ''}>${this.escapeHtml(this.t('upload.folder.level_6'))}</option>
+                        <option value="9" ${opts.level === 9 ? 'selected' : ''}>${this.escapeHtml(this.t('upload.folder.level_9'))}</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: var(--space-2, 0.5rem); margin-bottom: var(--space-3, 0.75rem);">
+                    <label style="display: flex; align-items: center; gap: var(--space-2, 0.5rem); font-size: var(--text-sm, 0.875rem); cursor: pointer;">
+                        <input type="checkbox" id="folder-include-empty" ${opts.includeEmpty ? 'checked' : ''}>
+                        ${this.escapeHtml(this.t('upload.folder.include_empty'))}
+                    </label>
+                    <label style="display: flex; align-items: center; gap: var(--space-2, 0.5rem); font-size: var(--text-sm, 0.875rem); cursor: pointer;">
+                        <input type="checkbox" id="folder-include-hidden" ${opts.includeHidden ? 'checked' : ''}>
+                        ${this.escapeHtml(this.t('upload.folder.include_hidden'))}
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: var(--space-2, 0.5rem);">
+                    <button class="btn btn-primary btn-sm" id="folder-upload-btn">
+                        ${this.escapeHtml(this.t('upload.folder.compress_upload'))}
+                    </button>
+                    <button class="btn btn-sm" id="folder-cancel-btn">
+                        ${this.escapeHtml(this.t('upload.folder.cancel'))}
+                    </button>
+                </div>
+            </div>
+        `;
+    }
 
     renderProgress() {
         const stage = SendUpload.PROGRESS_STAGES[this.state];
@@ -253,10 +311,12 @@ class SendUpload extends HTMLElement {
     // ─── Timing Display (from v0.1.5/v0.1.6) ────────────────────────────
 
     _renderTimings() {
-        if (!this._stageTimestamps || !this._stageTimestamps.reading || !this._stageTimestamps.complete) return '';
+        if (!this._stageTimestamps || !this._stageTimestamps.complete) return '';
 
-        const stages = ['reading', 'encrypting', 'creating', 'uploading', 'completing', 'complete'];
-        const totalMs = this._stageTimestamps.complete - this._stageTimestamps.reading;
+        const allStages = ['zipping', 'reading', 'encrypting', 'creating', 'uploading', 'completing', 'complete'];
+        const stages = allStages.filter(s => this._stageTimestamps[s] !== undefined);
+        if (stages.length < 2) return '';
+        const totalMs = this._stageTimestamps.complete - this._stageTimestamps[stages[0]];
         const rows = [];
 
         for (let i = 0; i < stages.length - 1; i++) {
@@ -306,21 +366,37 @@ class SendUpload extends HTMLElement {
         const fileInput = this.querySelector('#file-input');
 
         if (dropZone) {
-            this._boundDragOver = (e) => this.handleDragOver(e);
+            this._boundDragOver  = (e) => this.handleDragOver(e);
             this._boundDragLeave = (e) => this.handleDragLeave(e);
-            this._boundDrop = (e) => this.handleDrop(e);
-            this._boundDropClick = () => fileInput && fileInput.click();
+            this._boundDrop      = (e) => this.handleDrop(e);
 
             dropZone.addEventListener('dragover',  this._boundDragOver);
             dropZone.addEventListener('dragleave', this._boundDragLeave);
             dropZone.addEventListener('drop',      this._boundDrop);
-            dropZone.addEventListener('click',     this._boundDropClick);
         }
+
+        const browseFileBtn   = this.querySelector('#browse-file-btn');
+        const browseFolderBtn = this.querySelector('#browse-folder-btn');
+        if (browseFileBtn)   browseFileBtn.addEventListener('click',   (e) => { e.stopPropagation(); fileInput && fileInput.click(); });
+        if (browseFolderBtn) browseFolderBtn.addEventListener('click', (e) => { e.stopPropagation(); const fi = this.querySelector('#folder-input'); if (fi) fi.click(); });
 
         if (fileInput) {
             this._boundFileInput = (e) => this.handleFileSelect(e);
             fileInput.addEventListener('change', this._boundFileInput);
         }
+
+        const folderInput = this.querySelector('#folder-input');
+        if (folderInput) {
+            this._boundFolderInput = (e) => this.handleFolderSelect(e);
+            folderInput.addEventListener('change', this._boundFolderInput);
+        }
+
+        // Folder options panel listeners
+        const folderUploadBtn = this.querySelector('#folder-upload-btn');
+        if (folderUploadBtn) folderUploadBtn.addEventListener('click', () => this._startFolderZip());
+
+        const folderCancelBtn = this.querySelector('#folder-cancel-btn');
+        if (folderCancelBtn) folderCancelBtn.addEventListener('click', () => this.resetForNew());
 
         const textInput = this.querySelector('#text-input');
         if (textInput) {
@@ -395,21 +471,25 @@ class SendUpload extends HTMLElement {
         this.errorMessage     = null;
         this._showSeparateKey = false;
         this._stageTimestamps = {};
+        this._folderScan      = null;
+        this._folderName      = null;
+        this._folderOptions   = { level: 4, includeEmpty: false, includeHidden: false };
         this.render();
         this.setupEventListeners();
     }
 
     cleanup() {
-        const dropZone  = this.querySelector('#drop-zone');
-        const fileInput = this.querySelector('#file-input');
+        const dropZone    = this.querySelector('#drop-zone');
+        const fileInput   = this.querySelector('#file-input');
+        const folderInput = this.querySelector('#folder-input');
         if (dropZone) {
             if (this._boundDragOver)  dropZone.removeEventListener('dragover',  this._boundDragOver);
             if (this._boundDragLeave) dropZone.removeEventListener('dragleave', this._boundDragLeave);
             if (this._boundDrop)      dropZone.removeEventListener('drop',      this._boundDrop);
-            if (this._boundDropClick) dropZone.removeEventListener('click',     this._boundDropClick);
         }
-        if (fileInput && this._boundFileInput) fileInput.removeEventListener('change', this._boundFileInput);
-        this._boundDragOver = this._boundDragLeave = this._boundDrop = this._boundFileInput = this._boundDropClick = this._boundUploadClick = null;
+        if (fileInput   && this._boundFileInput)   fileInput.removeEventListener('change',   this._boundFileInput);
+        if (folderInput && this._boundFolderInput) folderInput.removeEventListener('change', this._boundFolderInput);
+        this._boundDragOver = this._boundDragLeave = this._boundDrop = this._boundFileInput = this._boundUploadClick = this._boundFolderInput = null;
     }
 
     switchMode(mode) {
@@ -429,6 +509,18 @@ class SendUpload extends HTMLElement {
     handleDrop(e) {
         e.preventDefault(); e.stopPropagation();
         const dz = this.querySelector('#drop-zone'); if (dz) dz.classList.remove('dragover');
+
+        // Check if a folder was dropped
+        const items = e.dataTransfer && e.dataTransfer.items;
+        if (items && items.length > 0) {
+            const entry = items[0].webkitGetAsEntry && items[0].webkitGetAsEntry();
+            if (entry && entry.isDirectory) {
+                this._handleFolderEntry(entry);
+                return;
+            }
+        }
+
+        // Single file (existing path)
         const files = e.dataTransfer && e.dataTransfer.files;
         if (files && files.length > 0) {
             this.selectedFile = files[0]; this.state = 'idle'; this.render(); this.setupEventListeners();
@@ -450,6 +542,42 @@ class SendUpload extends HTMLElement {
     handleFileSelect(e) {
         const files = e.target.files;
         if (files && files.length > 0) { this.selectedFile = files[0]; this.state = 'idle'; this.render(); this.setupEventListeners(); }
+    }
+
+    handleFolderSelect(e) {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        // Build entries from the flat file list (webkitdirectory gives webkitRelativePath)
+        const entries = [];
+        const folderPaths = new Set();
+        for (const file of files) {
+            const relPath = file.webkitRelativePath || file.name;
+            entries.push({ path: relPath.replace(/^[^/]+\//, ''), file, isDir: false, name: file.name });
+            // Track folder paths
+            const parts = relPath.split('/');
+            for (let i = 1; i < parts.length; i++) {
+                folderPaths.add(parts.slice(1, i).join('/') + '/');
+            }
+        }
+        for (const fp of folderPaths) {
+            if (fp && fp !== '/') entries.push({ path: fp, file: null, isDir: true, name: fp.split('/').filter(Boolean).pop() });
+        }
+
+        // Folder name is the common root
+        const firstPath = files[0].webkitRelativePath || '';
+        this._folderName = firstPath.split('/')[0] || 'folder';
+
+        this._folderScan = {
+            entries,
+            fileCount:   entries.filter(e => !e.isDir).length,
+            folderCount: entries.filter(e => e.isDir).length,
+            totalSize:   entries.reduce((sum, e) => sum + (e.file ? e.file.size : 0), 0)
+        };
+
+        this.state = 'folder-options';
+        this.render();
+        this.setupEventListeners();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -609,6 +737,143 @@ class SendUpload extends HTMLElement {
         result.set(metaBytes, magic.length + 4);
         result.set(new Uint8Array(contentBuffer), magic.length + 4 + metaLen);
         return result.buffer;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Folder Upload
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /** Lazy-load JSZip only when folder upload is needed */
+    async _loadJSZip() {
+        if (typeof JSZip !== 'undefined') return;
+        return new Promise((resolve, reject) => {
+            const script  = document.createElement('script');
+            const basePath = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.base) || '../_common';
+            script.src    = `${basePath}/js/vendor/jszip.min.js`;
+            script.onload = resolve;
+            script.onerror = () => reject(new Error(this.t('upload.folder.error_jszip')));
+            document.head.appendChild(script);
+        });
+    }
+
+    /** Handle a dropped folder (FileSystemDirectoryEntry from webkitGetAsEntry) */
+    async _handleFolderEntry(directoryEntry) {
+        this._folderName = directoryEntry.name;
+        const entries = await this._readDirectoryTree(directoryEntry);
+
+        this._folderScan = {
+            entries,
+            fileCount:   entries.filter(e => !e.isDir).length,
+            folderCount: entries.filter(e => e.isDir).length,
+            totalSize:   entries.reduce((sum, e) => sum + (e.file ? e.file.size : 0), 0)
+        };
+
+        this.state = 'folder-options';
+        this.render();
+        this.setupEventListeners();
+    }
+
+    /** Recursively read all files from a FileSystemDirectoryEntry */
+    async _readDirectoryTree(directoryEntry) {
+        const results = [];
+
+        const readEntries = (dirEntry, path) => {
+            return new Promise((resolve, reject) => {
+                const reader  = dirEntry.createReader();
+                const allEntries = [];
+
+                const readBatch = () => {
+                    reader.readEntries(async (entries) => {
+                        if (entries.length === 0) {
+                            // Process all collected entries
+                            for (const entry of allEntries) {
+                                if (entry.isFile) {
+                                    try {
+                                        const file = await new Promise((res, rej) => entry.file(res, rej));
+                                        results.push({ path: path + entry.name, file, isDir: false, name: entry.name });
+                                    } catch (e) { /* skip unreadable files */ }
+                                } else if (entry.isDirectory) {
+                                    results.push({ path: path + entry.name + '/', file: null, isDir: true, name: entry.name });
+                                    await readEntries(entry, path + entry.name + '/');
+                                }
+                            }
+                            resolve();
+                        } else {
+                            allEntries.push(...entries);
+                            readBatch();   // readEntries may not return all entries in one call
+                        }
+                    }, reject);
+                };
+                readBatch();
+            });
+        };
+
+        await readEntries(directoryEntry, '');
+        return results;
+    }
+
+    /** Read options from the folder options panel and start zipping */
+    async _startFolderZip() {
+        // Read current option values from the DOM
+        const levelSelect     = this.querySelector('#folder-compression');
+        const includeEmptyChk = this.querySelector('#folder-include-empty');
+        const includeHiddenChk = this.querySelector('#folder-include-hidden');
+
+        this._folderOptions = {
+            level:         levelSelect     ? parseInt(levelSelect.value, 10) : 4,
+            includeEmpty:  includeEmptyChk ? includeEmptyChk.checked : false,
+            includeHidden: includeHiddenChk ? includeHiddenChk.checked : false
+        };
+
+        // Check total size
+        const totalSize = this._folderScan.totalSize;
+        if (totalSize > SendUpload.MAX_FILE_SIZE) {
+            this.errorMessage = this.t('upload.folder.error_too_large', { limit: this.formatBytes(SendUpload.MAX_FILE_SIZE) });
+            this.state = 'error'; this.render(); this.setupEventListeners();
+            return;
+        }
+
+        try {
+            this.state = 'zipping'; this.render();
+
+            // Lazy-load JSZip
+            await this._loadJSZip();
+
+            const opts    = this._folderOptions;
+            const entries = this._folderScan.entries.filter(e => {
+                if (!opts.includeHidden && e.name.startsWith('.')) return false;
+                if (e.isDir && !opts.includeEmpty) return false;
+                return true;
+            });
+
+            const zip = new JSZip();
+            for (const entry of entries) {
+                if (entry.isDir) {
+                    zip.folder(entry.path);
+                } else {
+                    const buffer = await entry.file.arrayBuffer();
+                    zip.file(entry.path, buffer);
+                }
+            }
+
+            const compression = opts.level === 0 ? 'STORE' : 'DEFLATE';
+            const zipBlob = await zip.generateAsync({
+                type: 'blob',
+                compression,
+                compressionOptions: { level: opts.level }
+            });
+
+            // Feed into existing pipeline as a File object
+            this.selectedFile = new File([zipBlob], `${this._folderName}.zip`, { type: 'application/zip' });
+
+            // Clear folder state and go straight to upload
+            this._folderScan = null;
+            this.state = 'idle';
+            this.startUpload();
+        } catch (err) {
+            this.errorMessage = err.message || this.t('upload.folder.error_zip_failed');
+            this.state = 'error'; this.render(); this.setupEventListeners();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

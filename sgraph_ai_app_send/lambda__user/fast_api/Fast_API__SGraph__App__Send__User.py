@@ -23,6 +23,8 @@ ROUTES_PATHS__APP_SEND__STATIC__USER  = ['/',
                                          f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}',
                                          '/tools/ssh-keygen'                            ]
 
+ROUTES_PATHS__API_DOCS                = ['/api/docs', '/api/openapi.json', '/api/redoc']
+
 class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
     send_config          : Send__Config          = None                              # Storage configuration (auto-detects mode)
