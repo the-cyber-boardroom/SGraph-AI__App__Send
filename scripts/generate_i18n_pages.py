@@ -165,6 +165,18 @@ def translate_html(html_content, translations, en_translations, locale_info, rel
     # 5. Asset paths: no adjustment needed — source (en-gb/) and target
     #    locale folders are at the same depth, so relative paths are identical.
 
+    # 5b. Rewrite cross-site send.sgraph.ai links to include locale prefix
+    #     e.g., https://send.sgraph.ai → https://send.sgraph.ai/pt-pt/
+    locale_slug = locale_info['slug']
+    result = result.replace(
+        'href="https://send.sgraph.ai"',
+        f'href="https://send.sgraph.ai/{locale_slug}/"'
+    )
+    result = result.replace(
+        "href='https://send.sgraph.ai'",
+        f"href='https://send.sgraph.ai/{locale_slug}/'"
+    )
+
     # 6. Inject hreflang tags into <head>
     hreflang_tags = _build_hreflang_tags(rel_path, all_locales)
     result = result.replace('</head>', hreflang_tags + '\n</head>')

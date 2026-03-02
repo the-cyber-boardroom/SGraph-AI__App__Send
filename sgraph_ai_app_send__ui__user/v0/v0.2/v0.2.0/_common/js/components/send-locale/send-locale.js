@@ -39,7 +39,7 @@ class SendLocale extends HTMLElement {
 
         // On non-English pages, show a permanent English link before the dropdown
         const englishLink = !isEnglish
-            ? `<a href="/" class="locale-dropdown__english-link">\uD83C\uDDEC\uD83C\uDDE7 English</a>`
+            ? `<a href="/en-gb/" class="locale-dropdown__english-link">\uD83C\uDDEC\uD83C\uDDE7 English</a>`
             : '';
 
         this.innerHTML = `
