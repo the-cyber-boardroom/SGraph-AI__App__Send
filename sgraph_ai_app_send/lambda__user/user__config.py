@@ -26,8 +26,3 @@ ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE = 'SGRAPH_SEND__ADMIN__API_KEY__VALU
 
 ENV_VAR__N8N_WEBHOOK_URL                    = 'N8N_WEBHOOK_URL'
 ENV_VAR__N8N_WEBHOOK_SECRET                 = 'N8N_WEBHOOK_SECRET'
-
-
-ROUTES__PATHS__USER__DOCS__IN_API           = [ '/api/docs'        ,
-                                                '/api/openapi.json',
-                                                '/api/redoc'       ]

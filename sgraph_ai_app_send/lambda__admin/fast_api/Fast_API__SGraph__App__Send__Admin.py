@@ -40,7 +40,7 @@ ROUTES_PATHS__ANALYTICS = ['/health/pulse']
 
 ROUTES_PATHS__APP_SEND__STATIC__ADMIN  = [f'/{APP_SEND__UI__ADMIN__ROUTE__PATH__CONSOLE}']
 
-ROUTES_PATHS__API_DOCS                 = ['/api/docs', '/api/openapi.json', '/api/redoc']
+#ROUTES_PATHS__API_DOCS                 = ['/api/docs', '/api/openapi.json', '/api/redoc']
 
 class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
 
