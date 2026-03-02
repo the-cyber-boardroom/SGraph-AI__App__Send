@@ -12,6 +12,10 @@
     "vault.entry.or":               "or",
     "vault.entry.error.wrong_key":  "Wrong vault key. Please check and try again.",
     "vault.entry.error.not_found":  "Vault not found. The link may have expired.",
+    "vault.entry.access_label":     "Access Key",
+    "vault.entry.access_placeholder": "Paste your access key",
+    "vault.entry.access_hint":      "Required to use the SGraph Send API",
+    "vault.entry.error.no_access_key": "Please enter your access key first.",
     "vault.entry.error.network":    "Network error. Please check your connection.",
 
     "vault.create.title":               "Create New Vault",

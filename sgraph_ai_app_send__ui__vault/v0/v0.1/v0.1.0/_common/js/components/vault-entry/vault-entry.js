@@ -6,6 +6,7 @@
 class VaultEntry extends VaultComponent {
 
     bindElements() {
+        this._accessKeyInput  = this.$('#access-key-input')
         this._keyInput        = this.$('#vault-key-input')
         this._openBtn         = this.$('#vault-open-btn')
         this._createToggle    = this.$('#vault-create-toggle')
@@ -18,13 +19,18 @@ class VaultEntry extends VaultComponent {
     }
 
     setupEventListeners() {
-        this.addTrackedListener(this._openBtn,      'click',    this._onOpen)
-        this.addTrackedListener(this._createToggle,  'click',    this._onToggleCreate)
-        this.addTrackedListener(this._createBtn,     'click',    this._onCreate)
-        this.addTrackedListener(this._keyInput,      'keydown',  this._onKeyDown)
+        this.addTrackedListener(this._openBtn,        'click',    this._onOpen)
+        this.addTrackedListener(this._createToggle,    'click',    this._onToggleCreate)
+        this.addTrackedListener(this._createBtn,       'click',    this._onCreate)
+        this.addTrackedListener(this._keyInput,        'keydown',  this._onKeyDown)
+        this.addTrackedListener(this._accessKeyInput,  'input',    this._onAccessKeyChange)
     }
 
     onReady() {
+        // Restore access key from sessionStorage
+        const saved = sessionStorage.getItem('sg-vault-access-key')
+        if (saved) this._accessKeyInput.value = saved
+
         // Check URL hash for vault key
         const hash = window.location.hash.slice(1)
         if (hash) {
@@ -33,11 +39,22 @@ class VaultEntry extends VaultComponent {
         }
     }
 
+    _onAccessKeyChange() {
+        const key = this._accessKeyInput.value.trim()
+        if (key) {
+            sessionStorage.setItem('sg-vault-access-key', key)
+        } else {
+            sessionStorage.removeItem('sg-vault-access-key')
+        }
+    }
+
     _onKeyDown(e) {
         if (e.key === 'Enter') this._onOpen()
     }
 
     async _onOpen() {
+        if (!this._requireAccessKey()) return
+
         const vaultKey = this._keyInput.value.trim()
         if (!vaultKey) {
             this._showError(this.t('vault.entry.error.wrong_key'))
@@ -80,6 +97,8 @@ class VaultEntry extends VaultComponent {
     }
 
     async _onCreate() {
+        if (!this._requireAccessKey()) return
+
         const name       = this._nameInput.value.trim() || 'Untitled Vault'
         const passphrase = this._passphraseInput.value.trim()
 
@@ -110,10 +129,21 @@ class VaultEntry extends VaultComponent {
     }
 
     _getSGSend() {
-        // Endpoint defaults to send.sgraph.ai, override via data attribute
         const endpoint = this.getAttribute('data-endpoint') || 'https://send.sgraph.ai'
-        const token    = this.getAttribute('data-token')    || ''
+        const token    = this._accessKeyInput.value.trim()
+                      || this.getAttribute('data-token')
+                      || ''
         return new SGSend({ endpoint, token })
+    }
+
+    _requireAccessKey() {
+        const key = this._accessKeyInput.value.trim()
+        if (!key) {
+            this._showError(this.t('vault.entry.error.no_access_key'))
+            this._accessKeyInput.focus()
+            return false
+        }
+        return true
     }
 
     _showStatus(msg) {
