@@ -147,7 +147,7 @@
   "footer.sgraph":                    "SGraph",
 
   "test_files.title":                 "Ficheiros de Teste",
-  "test_files.description":           "Descarregue um ficheiro de teste e arraste-o para a zona de envio acima.",
+  "test_files.description":           "Arraste um ficheiro para a zona de envio, ou clique para descarregar.",
 
   "cta.title":                        "Também quer enviar ficheiros?",
   "cta.description":                  "Junte-se ao programa de acesso antecipado do SGraph Send."
