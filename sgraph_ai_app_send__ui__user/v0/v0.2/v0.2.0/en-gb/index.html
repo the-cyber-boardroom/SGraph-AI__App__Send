@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="../_common/js/components/send-header/send-header.css">
     <link rel="stylesheet" href="../_common/js/components/send-footer/send-footer.css">
     <link rel="stylesheet" href="../_common/js/components/send-locale/send-locale.css">
+    <link rel="stylesheet" href="../_common/js/components/send-test-files/send-test-files.css">
 </head>
 <body>
 
@@ -32,18 +33,9 @@
             <send-upload></send-upload>
         </send-access-gate>
 
-        <!-- Test files for quick testing -->
-        <div class="card" style="margin-top: var(--space-4, 1rem);">
-            <h3 style="margin: 0 0 var(--space-2) 0; font-size: var(--text-body); font-weight: var(--weight-semibold);" data-i18n="test_files.title">Test Files</h3>
-            <p style="font-size: var(--text-small); color: var(--color-text-secondary); margin: 0 0 var(--space-3) 0;" data-i18n="test_files.description">Download a test file, then drag it into the upload zone above.</p>
-            <div style="display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center;">
-                <a href="../../v0.1/v0.1.0/test-files/test-text.txt" download class="btn btn-sm btn-secondary" style="text-decoration: none;">test-text.txt</a>
-                <a href="../../v0.1/v0.1.0/test-files/test-data.json" download class="btn btn-sm btn-secondary" style="text-decoration: none;">test-data.json</a>
-            </div>
-            <p style="font-size: var(--text-small); color: var(--color-text-secondary); margin: var(--space-3) 0 0 0;" data-i18n="test_files.folder_hint">To test folder upload, drag any folder from your desktop into the upload zone.</p>
-        </div>
+        <send-test-files></send-test-files>
 
-        <p class="disclaimer">${I18n.t('app.disclaimer')}</p>
+        <p class="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
     </main>
 
     <send-footer></send-footer>
@@ -73,18 +65,12 @@
     <script src="../_common/js/components/send-transparency/send-transparency.js"></script>
     <script src="../_common/js/components/send-access-gate/send-access-gate.js"></script>
     <script src="../_common/js/components/send-upload/send-upload.js"></script>
+    <script src="../_common/js/components/send-test-files/send-test-files.js"></script>
 
     <!-- 4. Init -->
     <script>
-        // Set base path for component resource loading
         SendComponentPaths.init('../_common');
-
-        // Initialise i18n (loads saved locale preference)
-        I18n.init('../_common/js/i18n').then(() => {
-            // Update disclaimer after i18n loads
-            const disclaimer = document.querySelector('.disclaimer');
-            if (disclaimer) disclaimer.textContent = I18n.t('app.disclaimer');
-        });
+        I18n.init();
     </script>
 
 </body>

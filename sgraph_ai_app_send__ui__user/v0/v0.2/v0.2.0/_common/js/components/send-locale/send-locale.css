@@ -9,7 +9,7 @@
     display: inline-block;
 }
 
-/* Trigger button */
+/* Trigger button — teal border matches sgraph.ai design */
 .locale-dropdown__trigger {
     -webkit-appearance: none;
     appearance: none;
@@ -17,11 +17,11 @@
     align-items: center;
     gap: 4px;
     font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.6rem;
     border-radius: var(--radius-sm, 6px);
-    color: var(--color-text-secondary, #8892A0);
+    color: var(--accent, #4ECDC4);
     background: transparent;
-    border: 1px solid transparent;
+    border: 1px solid var(--accent, #4ECDC4);
     cursor: pointer;
     font-family: var(--font-body, 'DM Sans', system-ui, sans-serif);
     line-height: 1.6;

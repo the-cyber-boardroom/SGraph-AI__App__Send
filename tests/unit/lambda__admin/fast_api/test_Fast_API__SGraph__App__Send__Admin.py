@@ -5,7 +5,7 @@ from starlette.testclient                                                       
 from osbot_fast_api.api.Fast_API                                                    import ENV_VAR__FAST_API__AUTH__API_KEY__NAME, ENV_VAR__FAST_API__AUTH__API_KEY__VALUE
 from osbot_fast_api.api.schemas.consts.consts__Fast_API                             import EXPECTED_ROUTES__SET_COOKIE
 from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE, ROUTES_PATHS__INFO
-from sgraph_ai_app_send.lambda__admin.fast_api.Fast_API__SGraph__App__Send__Admin   import Fast_API__SGraph__App__Send__Admin, ROUTES_PATHS__APP_SEND__STATIC__ADMIN, ROUTES_PATHS__ANALYTICS, ROUTES_PATHS__API_DOCS
+from sgraph_ai_app_send.lambda__admin.fast_api.Fast_API__SGraph__App__Send__Admin   import Fast_API__SGraph__App__Send__Admin, ROUTES_PATHS__APP_SEND__STATIC__ADMIN, ROUTES_PATHS__ANALYTICS
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser        import ROUTES_PATHS__CACHE
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import ROUTES_PATHS__TOKENS
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Keys                  import ROUTES_PATHS__KEYS
@@ -69,7 +69,6 @@ class test_Fast_API__SGraph__App__Send__Admin(TestCase):
                                 ROUTES_PATHS__INVITES                 +
                                 ROUTES_PATHS__ANALYTICS               +
                                 ROUTES_PATHS__CACHE                   +
-                                ROUTES_PATHS__API_DOCS                +
                                 ROUTES_PATHS__MCP                     )
 
         for fast_api_path in self.fast_api.routes_paths():

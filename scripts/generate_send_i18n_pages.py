@@ -121,7 +121,25 @@ def translate_html(html_content, translations, en_translations, locale_info):
         flags=re.DOTALL
     )
 
-    # 4. Translate inline I18n.t() calls in template literals (e.g., ${I18n.t('key')})
+    # 4. Translate data-i18n-placeholder attribute values (input placeholders)
+    def replace_i18n_placeholder(match):
+        tag = match.group(0)
+        key_match = re.search(r'data-i18n-placeholder="([\w.]+)"', tag)
+        if not key_match:
+            return tag
+        key = key_match.group(1)
+        translated = translations.get(key, en_translations.get(key, ''))
+        if translated:
+            return re.sub(r'(?<!i18n-)placeholder="[^"]*"', f'placeholder="{_escape_html(translated)}"', tag)
+        return tag
+
+    result = re.sub(
+        r'<[^>]*data-i18n-placeholder="[\w.]+"[^>]*>',
+        replace_i18n_placeholder,
+        result
+    )
+
+    # 5. Translate inline I18n.t() calls in template literals (e.g., ${I18n.t('key')})
     def replace_inline_i18n(match):
         key = match.group(1)
         translated = translations.get(key, en_translations.get(key, match.group(0)))
@@ -133,7 +151,7 @@ def translate_html(html_content, translations, en_translations, locale_info):
         result
     )
 
-    # 5. Asset paths: locale folders are siblings of en-gb, so ../_common/ paths
+    # 6. Asset paths: locale folders are siblings of en-gb, so ../_common/ paths
     #    resolve correctly without adjustment.
 
     return result

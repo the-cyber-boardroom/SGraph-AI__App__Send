@@ -78,10 +78,3 @@ class test__App_Send__UI__User__static_pages(TestCase):
 
         assert response_json.status_code == 200                                                      # JSON test file is served
         assert 'test_file'               in response_json.text                                       # JSON file has expected content
-
-    def test__upload_page__test_files_section(self):
-        response = self.client.get('/send', follow_redirects=True)
-        assert response.status_code == 200
-        assert 'Test Files'               in response.text                                           # test files section is present
-        assert 'test-text.txt'            in response.text                                           # text file link present
-        assert 'test-data.json'           in response.text                                           # JSON file link present
