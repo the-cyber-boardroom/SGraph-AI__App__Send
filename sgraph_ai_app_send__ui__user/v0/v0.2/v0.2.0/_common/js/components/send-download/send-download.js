@@ -419,9 +419,10 @@ class SendDownload extends HTMLElement {
         if (this._showRaw) return this._renderRawContent();
         const rawText  = new TextDecoder().decode(this.decryptedBytes);
         const safeHtml = (typeof MarkdownParser !== 'undefined') ? MarkdownParser.parse(rawText) : this.escapeHtml(rawText);
-        const iframeDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*,*::before,*::after{box-sizing:border-box}body{font-family:'DM Sans',system-ui,sans-serif;font-size:1rem;line-height:1.7;color:#E0E0E0;background:#1E2A4A;margin:0;padding:1.25rem;word-wrap:break-word}h1,h2,h3,h4,h5,h6{color:#fff;margin:1.5em 0 .5em;line-height:1.3}h1{font-size:1.6rem;border-bottom:1px solid rgba(78,205,196,.2);padding-bottom:.3em}h2{font-size:1.35rem}h3{font-size:1.15rem}p{margin:.8em 0}a{color:#4ECDC4;text-decoration:none}a:hover{text-decoration:underline}code{font-family:'JetBrains Mono',monospace;font-size:.88em;background:rgba(78,205,196,.1);padding:.15em .4em;border-radius:4px;color:#4ECDC4}pre{background:#16213E;border:1px solid rgba(78,205,196,.15);border-radius:8px;padding:1em;overflow-x:auto;margin:1em 0}pre code{background:none;padding:0;color:#E0E0E0;font-size:.85em}blockquote{border-left:3px solid #4ECDC4;margin:1em 0;padding:.5em 1em;background:rgba(78,205,196,.05);color:#8892A0}ul,ol{padding-left:1.5em;margin:.8em 0}li{margin:.3em 0}hr{border:none;border-top:1px solid rgba(78,205,196,.2);margin:1.5em 0}table{border-collapse:collapse;width:100%;margin:1em 0}th,td{border:1px solid rgba(78,205,196,.2);padding:.5em .75em;text-align:left}th{background:rgba(78,205,196,.1);font-weight:600;color:#fff}del{color:#8892A0}strong{color:#fff}</style></head><body>${safeHtml}</body></html>`;
-        const encoded = btoa(unescape(encodeURIComponent(iframeDoc)));
-        return `<iframe id="md-iframe" sandbox="allow-same-origin" style="width:100%;height:100%;border:none;background:#1E2A4A;display:block;" src="data:text/html;base64,${encoded}" title="Rendered markdown"></iframe>`;
+        const iframeDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*,*::before,*::after{box-sizing:border-box}body{font-family:'DM Sans',system-ui,sans-serif;font-size:1rem;line-height:1.7;color:#E0E0E0;background:#1E2A4A;margin:0;padding:1.25rem;word-wrap:break-word}h1,h2,h3,h4,h5,h6{color:#fff;margin:1.5em 0 .5em;line-height:1.3}h1{font-size:1.6rem;border-bottom:1px solid rgba(78,205,196,.2);padding-bottom:.3em}h2{font-size:1.35rem}h3{font-size:1.15rem}p{margin:.8em 0}a{color:#4ECDC4;text-decoration:none}a:hover{text-decoration:underline}code{font-family:'JetBrains Mono',monospace;font-size:.88em;background:rgba(78,205,196,.1);padding:.15em .4em;border-radius:4px;color:#4ECDC4}pre{background:#16213E;border:1px solid rgba(78,205,196,.15);border-radius:8px;padding:1em;overflow-x:auto;margin:1em 0}pre code{background:none;padding:0;color:#E0E0E0;font-size:.85em}blockquote{border-left:3px solid #4ECDC4;margin:1em 0;padding:.5em 1em;background:rgba(78,205,196,.05);color:#8892A0}ul,ol{padding-left:1.5em;margin:.8em 0}li{margin:.3em 0}hr{border:none;border-top:1px solid rgba(78,205,196,.2);margin:1.5em 0}table{border-collapse:collapse;width:100%;margin:1em 0}th,td{border:1px solid rgba(78,205,196,.2);padding:.5em .75em;text-align:left}th{background:rgba(78,205,196,.1);font-weight:600;color:#fff}del{color:#8892A0}strong{color:#fff}@media print{body{color:#222;background:#fff}h1,h2,h3,h4,h5,h6,strong{color:#000}a{color:#0066cc}code{background:#f0f0f0;color:#333}pre{background:#f5f5f5;border-color:#ddd}pre code{color:#222}blockquote{border-left-color:#666;color:#555;background:#f9f9f9}th{background:#eee;color:#000}th,td{border-color:#ccc}}</style></head><body>${safeHtml}</body></html>`;
+        const blob = new Blob([iframeDoc], { type: 'text/html' });
+        const blobUrl = URL.createObjectURL(blob);
+        return `<iframe id="md-iframe" sandbox="allow-same-origin" style="width:100%;height:100%;border:none;background:#1E2A4A;display:block;" src="${blobUrl}" title="Rendered markdown"></iframe>`;
     }
 
     _renderImageContent() {
@@ -554,15 +555,19 @@ class SendDownload extends HTMLElement {
     _printPreview() {
         const iframe = this.querySelector('#preview-panel iframe') || this.querySelector('#md-iframe') || this.querySelector('#docx-iframe') || this.querySelector('#xlsx-iframe');
         if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.print();
-            return;
+            try { iframe.contentWindow.print(); return; } catch (_) { /* cross-origin — fall through to popup */ }
         }
-        // Fallback: open a print window with the preview panel content
+        // Fallback: open the iframe's blob/data src directly (printable in its own tab)
+        if (iframe && iframe.src && iframe.src.startsWith('blob:')) {
+            const printWindow = window.open(iframe.src, '_blank');
+            if (printWindow) { printWindow.addEventListener('load', () => printWindow.print()); return; }
+        }
+        // Last resort: build a print-friendly page from preview panel HTML
         const panel = this.querySelector('#preview-panel');
         if (!panel) return;
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
-        printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Print</title><style>body{font-family:system-ui,sans-serif;padding:1em;}img{max-width:100%;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ccc;padding:4px 8px;}</style></head><body>${panel.innerHTML}</body></html>`);
+        printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Print</title><style>body{font-family:system-ui,sans-serif;padding:1em;color:#222;background:#fff;}img{max-width:100%;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ccc;padding:4px 8px;}th{background:#eee;}</style></head><body>${panel.innerHTML}</body></html>`);
         printWindow.document.close();
         printWindow.print();
     }
