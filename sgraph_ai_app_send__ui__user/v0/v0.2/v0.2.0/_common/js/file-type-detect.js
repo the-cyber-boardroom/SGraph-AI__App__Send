@@ -9,6 +9,8 @@
      'markdown'  — .md files
      'image'     — .png, .jpg, .jpeg, .gif, .webp, .svg
      'pdf'       — .pdf
+     'audio'     — .wav, .mp3, .ogg, .flac, .aac, .m4a, .wma, .webm (audio)
+     'video'     — .mp4, .webm, .ogv, .mov, .avi, .mkv
      'code'      — .js, .ts, .py, .json, .yaml, .yml, .xml, .html, .css, .sh, etc.
      'zip'       — .zip (browsable archive viewer)
      'text'      — text/* content type (existing behaviour)
@@ -22,6 +24,10 @@ const FileTypeDetect = {
         '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.gif': 'image',
         '.webp': 'image', '.svg': 'image',
         '.pdf': 'pdf',
+        '.wav': 'audio', '.mp3': 'audio', '.ogg': 'audio', '.flac': 'audio',
+        '.aac': 'audio', '.m4a': 'audio', '.wma': 'audio',
+        '.mp4': 'video', '.webm': 'video', '.ogv': 'video', '.mov': 'video',
+        '.avi': 'video', '.mkv': 'video',
         '.zip': 'zip',
         '.js': 'code', '.mjs': 'code', '.cjs': 'code', '.ts': 'code',
         '.tsx': 'code', '.jsx': 'code', '.py': 'code', '.json': 'code',
@@ -35,11 +41,24 @@ const FileTypeDetect = {
 
     _contentTypeMap: {
         'image/': 'image',
+        'audio/': 'audio',
+        'video/': 'video',
         'application/pdf': 'pdf',
         'application/zip': 'zip',
         'application/x-zip-compressed': 'zip',
         'text/markdown': 'markdown',
         'text/x-markdown': 'markdown',
+    },
+
+    _audioMimeMap: {
+        '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
+        '.flac': 'audio/flac', '.aac': 'audio/aac', '.m4a': 'audio/mp4',
+        '.wma': 'audio/x-ms-wma', '.webm': 'audio/webm',
+    },
+
+    _videoMimeMap: {
+        '.mp4': 'video/mp4', '.webm': 'video/webm', '.ogv': 'video/ogg',
+        '.mov': 'video/quicktime', '.avi': 'video/x-msvideo', '.mkv': 'video/x-matroska',
     },
 
     _langMap: {
@@ -84,6 +103,18 @@ const FileTypeDetect = {
         if (!filename) return 'application/octet-stream';
         const ext = this._getExtension(filename);
         return (ext && this._imageMimeMap[ext]) || 'application/octet-stream';
+    },
+
+    getAudioMime(filename) {
+        if (!filename) return 'audio/mpeg';
+        const ext = this._getExtension(filename);
+        return (ext && this._audioMimeMap[ext]) || 'audio/mpeg';
+    },
+
+    getVideoMime(filename) {
+        if (!filename) return 'video/mp4';
+        const ext = this._getExtension(filename);
+        return (ext && this._videoMimeMap[ext]) || 'video/mp4';
     },
 
     isSvg(filename) {
