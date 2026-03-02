@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — Zero-knowledge encrypted vault</title>
+    <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
+
+    <!-- Fonts (vendored — no external CDN) -->
+    <link rel="stylesheet" href="../_common/fonts/fonts.css">
+
+    <!-- Design tokens (defines CSS custom properties on :root) -->
+    <link rel="stylesheet" href="../_common/css/design-tokens.css">
+</head>
+<body>
+
+    <vault-app></vault-app>
+
+    <!-- ===================================================================
+         Script Loading Order:
+         1. Utilities (no dependencies)
+         2. Libraries (sg-send-crypto, sg-send, sg-vault)
+         3. Base system (VaultHelpers, VaultComponentPaths, VaultComponent)
+         4. Components (depend on utilities + base + libraries)
+         5. Init script (depends on everything)
+         =================================================================== -->
+
+    <!-- 1. i18n -->
+    <script src="../_common/js/vault-i18n.js"></script>
+
+    <!-- 2. Libraries -->
+    <script src="../_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="../_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault.js"></script>
+
+    <!-- 3. Base system -->
+    <script src="../_common/js/base/vault-helpers.js"></script>
+    <script src="../_common/js/base/vault-component-paths.js"></script>
+    <script src="../_common/js/base/vault-component.js"></script>
+
+    <!-- 4. Components -->
+    <script src="../_common/js/components/vault-entry/vault-entry.js"></script>
+    <script src="../_common/js/components/vault-browser/vault-browser.js"></script>
+    <script src="../_common/js/components/vault-upload/vault-upload.js"></script>
+    <script src="../_common/js/components/vault-share/vault-share.js"></script>
+    <script src="../_common/js/components/vault-app/vault-app.js"></script>
+
+    <!-- 5. Init -->
+    <script>
+        VaultComponentPaths.init('../_common');
+        VaultI18n.init();
+    </script>
+
+</body>
+</html>

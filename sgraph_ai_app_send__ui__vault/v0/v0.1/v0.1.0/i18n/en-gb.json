@@ -1,0 +1,60 @@
+{
+    "_comment": "SGraph Vault — English (UK) translations v0.1.0",
+
+    "app.title":            "SG/Vault",
+    "app.tagline":          "Zero-knowledge encrypted vault",
+    "app.subtitle":         "Your files, encrypted in your browser. The server sees nothing.",
+
+    "vault.entry.label":            "Enter your Vault Key",
+    "vault.entry.placeholder":      "Paste your vault key here",
+    "vault.entry.open":             "Open Vault",
+    "vault.entry.create":           "Create New Vault",
+    "vault.entry.or":               "or",
+    "vault.entry.error.wrong_key":  "Wrong vault key. Please check and try again.",
+    "vault.entry.error.not_found":  "Vault not found. The link may have expired.",
+    "vault.entry.error.network":    "Network error. Please check your connection.",
+
+    "vault.create.title":               "Create New Vault",
+    "vault.create.name_label":          "Vault name",
+    "vault.create.name_placeholder":    "My Vault",
+    "vault.create.passphrase_label":    "Vault passphrase",
+    "vault.create.passphrase_placeholder": "Choose a strong passphrase",
+    "vault.create.create_button":       "Create Vault",
+    "vault.create.creating":            "Creating vault...",
+
+    "vault.browser.upload":         "Upload",
+    "vault.browser.new_folder":     "New Folder",
+    "vault.browser.empty":          "This folder is empty",
+    "vault.browser.drop_hint":      "Drop files here to encrypt & upload",
+    "vault.browser.name":           "Name",
+    "vault.browser.type":           "Type",
+    "vault.browser.size":           "Size",
+    "vault.browser.uploaded":       "Uploaded",
+    "vault.browser.folder":         "Folder",
+    "vault.browser.file":           "File",
+    "vault.browser.root":           "Vault",
+    "vault.browser.delete_confirm": "Delete \"{name}\"?",
+    "vault.browser.delete":         "Delete",
+    "vault.browser.cancel":         "Cancel",
+    "vault.browser.download":       "Download",
+
+    "vault.upload.select":          "Select files or drag & drop",
+    "vault.upload.encrypting":      "Encrypting...",
+    "vault.upload.uploading":       "Uploading...",
+    "vault.upload.success":         "\"{name}\" uploaded and encrypted",
+    "vault.upload.failed":          "Upload failed: {error}",
+
+    "vault.share.title":            "Vault Key",
+    "vault.share.warning":          "Anyone with this key can access all files in this vault.",
+    "vault.share.copy":             "Copy Vault Key",
+    "vault.share.copied":           "Copied!",
+
+    "vault.stats.summary":          "{folders} folders, {files} files, {size}",
+
+    "crypto.error.unavailable":     "Web Crypto API is not available. It requires a secure context (HTTPS or localhost).",
+
+    "common.copied":               "Copied!",
+    "common.copy":                 "Copy",
+    "common.close":                "Close",
+    "common.back":                 "Back"
+}
