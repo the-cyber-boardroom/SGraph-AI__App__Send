@@ -11,6 +11,9 @@
      'pdf'       — .pdf
      'audio'     — .wav, .mp3, .ogg, .flac, .aac, .m4a, .wma, .webm (audio)
      'video'     — .mp4, .webm, .ogv, .mov, .avi, .mkv
+     'docx'      — .docx, .doc (Word — rendered via mammoth.js from CDN)
+     'xlsx'      — .xlsx, .xls (Excel — rendered via SheetJS from CDN)
+     'pptx'      — .pptx, .ppt (PowerPoint — download-to-view)
      'code'      — .js, .ts, .py, .json, .yaml, .yml, .xml, .html, .css, .sh, etc.
      'zip'       — .zip (browsable archive viewer)
      'text'      — text/* content type (existing behaviour)
@@ -28,6 +31,9 @@ const FileTypeDetect = {
         '.aac': 'audio', '.m4a': 'audio', '.wma': 'audio',
         '.mp4': 'video', '.webm': 'video', '.ogv': 'video', '.mov': 'video',
         '.avi': 'video', '.mkv': 'video',
+        '.docx': 'docx', '.doc': 'docx',
+        '.xlsx': 'xlsx', '.xls': 'xlsx',
+        '.pptx': 'pptx', '.ppt': 'pptx',
         '.zip': 'zip',
         '.js': 'code', '.mjs': 'code', '.cjs': 'code', '.ts': 'code',
         '.tsx': 'code', '.jsx': 'code', '.py': 'code', '.json': 'code',
@@ -48,6 +54,12 @@ const FileTypeDetect = {
         'application/x-zip-compressed': 'zip',
         'text/markdown': 'markdown',
         'text/x-markdown': 'markdown',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+        'application/msword': 'docx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+        'application/vnd.ms-excel': 'xlsx',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+        'application/vnd.ms-powerpoint': 'pptx',
     },
 
     _audioMimeMap: {
