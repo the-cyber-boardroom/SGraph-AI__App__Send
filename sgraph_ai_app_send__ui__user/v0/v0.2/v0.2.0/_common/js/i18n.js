@@ -147,7 +147,8 @@ const I18n = {
             'download.zip.save_all':            'Save All (zip)',
             'download.zip.save_file':           'Save This File',
             'download.zip.no_preview':          'No preview available. Click "Save This File" to download.',
-            'download.zip.select_file':         'Click a file in the tree to preview it.',
+            'download.zip.select_file':         'Click a file to preview it.',
+            'download.zip.no_files':            'No files in this folder.',
 
             // ─── Download: Errors ─────────────────────────────────────────
             'download.error.no_id':             'No transfer ID found in URL. Please check your link.',

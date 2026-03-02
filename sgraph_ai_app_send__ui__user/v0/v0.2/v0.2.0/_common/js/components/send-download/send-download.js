@@ -205,12 +205,12 @@ class SendDownload extends HTMLElement {
         `;
 
         // Fill available viewport height for preview
-        const split = this.querySelector('#preview-split');
-        if (split && isPreview) {
+        const sizable = this.querySelector('#preview-split') || this.querySelector('#preview-panel');
+        if (sizable && isPreview) {
             requestAnimationFrame(() => {
-                const rect = split.getBoundingClientRect();
+                const rect = sizable.getBoundingClientRect();
                 const available = window.innerHeight - rect.top - 16;
-                split.style.height = Math.max(available, 300) + 'px';
+                sizable.style.height = Math.max(available, 300) + 'px';
             });
         }
     }
@@ -369,6 +369,8 @@ class SendDownload extends HTMLElement {
             case 'image':    contentHtml = this._renderImageContent();    break;
             case 'pdf':      contentHtml = this._renderPdfContent();      break;
             case 'code':     contentHtml = this._renderCodeContent();     break;
+            case 'audio':    contentHtml = this._renderAudioContent();    break;
+            case 'video':    contentHtml = this._renderVideoContent();    break;
             default:         contentHtml = this._renderRawContent();
         }
 
@@ -481,122 +483,174 @@ class SendDownload extends HTMLElement {
     }
 
     _renderZipLayout(timingHtml, sendAnotherHtml) {
-        const zipName  = this._zipOrigName || 'archive.zip';
-        const sizeStr  = this.transferInfo ? this.formatBytes(this.transferInfo.file_size_bytes) : '';
-        const uploadDate = this.transferInfo ? this.formatTimestamp(this.transferInfo.created_at) : '';
-        const downloads  = this.transferInfo ? (this.transferInfo.download_count || 0) : 0;
-        const files   = this._zipTree.filter(e => !e.dir);
-        const folders = this._zipTree.filter(e => e.dir);
-        const summary = this.t('download.zip.summary', { files: files.length, folders: folders.length });
-        const treeHtml = this._buildZipTreeHtml();
+        const zipName    = this._zipOrigName || 'archive.zip';
+        const sizeStr    = this.transferInfo ? this.formatBytes(this.transferInfo.file_size_bytes) : '';
+        const allFiles   = this._zipTree.filter(e => !e.dir);
+        const allFolders = this._zipTree.filter(e => e.dir);
+        const summary    = this.t('download.zip.summary', { files: allFiles.length, folders: allFolders.length });
 
-        // Determine right-panel content
-        let previewHtml = '';
-        let previewFilename = '';
-        if (this._currentEntryBytes) {
-            previewFilename = this._currentEntryFilename || '';
-            const entryType = (typeof FileTypeDetect !== 'undefined') ? FileTypeDetect.detect(previewFilename, null) : null;
-            // Temporarily swap for renderers
-            const savedBytes = this.decryptedBytes;
-            const savedName  = this.fileName;
-            this.decryptedBytes = this._currentEntryBytes;
-            this.fileName       = previewFilename;
-            if (entryType === 'pdf')           previewHtml = this._renderPdfContent();
-            else if (entryType === 'image')    previewHtml = this._renderImageContent();
-            else if (entryType === 'markdown') previewHtml = this._renderMarkdownContent();
-            else if (entryType === 'code')     previewHtml = this._renderCodeContent();
-            else {
-                // Try to show as text
-                try {
-                    const text = new TextDecoder('utf-8', { fatal: true }).decode(this._currentEntryBytes);
-                    previewHtml = `<pre style="height:100%;overflow:auto;margin:0;padding:var(--space-6);white-space:pre-wrap;word-wrap:break-word;font-family:var(--font-mono);font-size:0.85rem;line-height:1.6;color:var(--color-text);">${this.escapeHtml(text)}</pre>`;
-                } catch (e) {
-                    previewHtml = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--color-text-secondary);font-size:var(--text-sm);padding:var(--space-6);text-align:center;">${this.escapeHtml(this.t('download.zip.no_preview'))}</div>`;
-                }
-            }
-            // Restore originals
-            this.decryptedBytes = savedBytes;
-            this.fileName       = savedName;
-        } else {
-            previewHtml = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--color-text-secondary);font-size:var(--text-sm);padding:var(--space-6);text-align:center;">${this.escapeHtml(this.t('download.zip.select_file'))}</div>`;
-        }
+        // Build folder structure for the browser
+        const folderStructure = this._buildFolderStructure();
+        const currentFolder   = this._selectedZipFolder || '';
+        const folderTreeHtml  = this._renderFolderTree(folderStructure, currentFolder);
+        const fileListHtml    = this._renderFileList(currentFolder);
 
-        const savedWidth = this._loadSplitWidth();
+        // Preview content
+        const previewHtml = this._renderZipPreview();
 
         return `
             <div class="status status--success" style="font-size: var(--text-sm); padding: 0.5rem 0.75rem; margin-bottom: var(--space-4);">
                 ${this.escapeHtml(this.t('download.result.file_success'))}
             </div>
-            <div id="preview-split" style="display: grid; grid-template-columns: ${savedWidth}px 4px 1fr; gap: 0; min-height: 300px;">
-                <div id="details-panel" style="overflow-y: auto; padding-right: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3);">
-                    <div>
-                        <h3 style="margin: 0 0 var(--space-2) 0; font-size: var(--text-h3); font-weight: var(--weight-bold); color: var(--color-text); word-break: break-all;">${this.escapeHtml(zipName)}</h3>
-                        <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3);">
-                            <span style="font-size: var(--text-small); color: var(--accent); font-family: var(--font-mono); background: var(--accent-subtle); padding: 2px 8px; border-radius: var(--radius-sm);">zip</span>
-                            <span style="font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono);">${this.escapeHtml(sizeStr)}</span>
-                        </div>
-                        <div style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">${this.escapeHtml(summary)}</div>
-                        <div style="font-size: var(--text-sm); color: var(--color-text-secondary); display: flex; flex-direction: column; gap: var(--space-1);">
-                            <div>${this.escapeHtml(this.t('download.info.uploaded_label'))}: ${this.escapeHtml(uploadDate)}</div>
-                            ${downloads > 0 ? `<div>${this.escapeHtml(this.t('download.info.downloads_label'))}: ${downloads}</div>` : ''}
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" id="save-file-btn" style="width: 100%; padding: var(--space-3) var(--space-4); font-size: var(--text-sm); font-weight: var(--weight-bold); border-radius: var(--radius-md);">${this.escapeHtml(this.t('download.zip.save_all'))}</button>
-                    ${this._currentEntryBytes ? `<button class="btn btn-sm btn-secondary" id="save-entry-btn" style="width: 100%;">${this.escapeHtml(this.t('download.zip.save_file'))}:  ${this.escapeHtml(this._currentEntryFilename || '')}</button>` : ''}
-                    <div style="border-top: 1px solid var(--color-border, rgba(78,205,196,0.15)); padding-top: var(--space-3);">
-                        <div style="font-size: var(--text-small); font-weight: var(--weight-semibold); color: var(--accent); margin-bottom: var(--space-2);">${this.escapeHtml(this.t('download.zip.contents'))}</div>
-                        <div class="zip-tree" id="zip-tree">
-                            ${treeHtml}
-                        </div>
-                    </div>
-                    <send-transparency id="transparency-panel"></send-transparency>
-                    ${timingHtml}
-                    ${sendAnotherHtml}
+
+            <div class="zip-header">
+                <div class="zip-header__info">
+                    <h3 class="zip-header__name">${this.escapeHtml(zipName)}</h3>
+                    <span class="zip-header__badge">zip</span>
+                    <span class="zip-header__size">${this.escapeHtml(sizeStr)}</span>
+                    <span class="zip-header__summary">${this.escapeHtml(summary)}</span>
                 </div>
-                <div id="split-resize" style="cursor: col-resize; background: transparent; transition: background 0.15s; z-index: 10; border-radius: 2px;"></div>
-                <div id="preview-panel" style="overflow: auto; border: 2px solid var(--accent); border-radius: var(--radius-md); background: var(--bg-secondary);">
-                    ${previewHtml}
+                <div class="zip-header__actions">
+                    <button class="btn btn-primary btn-sm" id="save-file-btn">${this.escapeHtml(this.t('download.zip.save_all'))}</button>
+                    ${this._currentEntryBytes ? `<button class="btn btn-sm btn-secondary" id="save-entry-btn">${this.escapeHtml(this.t('download.zip.save_file'))}: ${this.escapeHtml(this._currentEntryFilename || '')}</button>` : ''}
                 </div>
             </div>
+
+            <div class="zip-browser" id="zip-browser">
+                <div class="zip-browser__folders" id="zip-folder-tree">
+                    ${folderTreeHtml}
+                </div>
+                <div class="zip-browser__files" id="zip-file-list">
+                    ${fileListHtml}
+                </div>
+            </div>
+
+            <div id="preview-panel" class="zip-preview">
+                ${previewHtml}
+            </div>
+
+            <send-transparency id="transparency-panel"></send-transparency>
+            ${timingHtml}
+            ${sendAnotherHtml}
         `;
     }
 
-    _buildZipTreeHtml() {
-        const tree = this._zipTree;
-        // Build parent→children map
-        const children = {};
-        for (const item of tree) {
-            const parts  = item.path.replace(/\/$/, '').split('/');
-            const parent = parts.length > 1 ? parts.slice(0, -1).join('/') + '/' : '';
-            if (!children[parent]) children[parent] = [];
-            children[parent].push(item);
+    _buildFolderStructure() {
+        const root = { name: '/', path: '', children: [] };
+        const folderMap = { '': root };
+
+        for (const item of this._zipTree) {
+            const parts = item.path.replace(/\/$/, '').split('/');
+            for (let i = 0; i < (item.dir ? parts.length : parts.length - 1); i++) {
+                const folderPath = parts.slice(0, i + 1).join('/') + '/';
+                if (!folderMap[folderPath]) {
+                    const parentPath = i > 0 ? parts.slice(0, i).join('/') + '/' : '';
+                    const node = { name: parts[i], path: folderPath, children: [] };
+                    folderMap[folderPath] = node;
+                    if (folderMap[parentPath]) folderMap[parentPath].children.push(node);
+                }
+            }
+        }
+        return root;
+    }
+
+    _renderFolderTree(node, selectedFolder) {
+        const isSelected = node.path === selectedFolder;
+        const cls = `zip-folder-item${isSelected ? ' zip-folder-item--selected' : ''}`;
+        let html = `<div class="${cls}" data-folder="${this.escapeHtml(node.path)}">${this.escapeHtml(node.name)}</div>`;
+
+        if (node.children.length > 0) {
+            const sorted = [...node.children].sort((a, b) => a.name.localeCompare(b.name));
+            html += '<div class="zip-folder-nested">';
+            for (const child of sorted) {
+                html += this._renderFolderTree(child, selectedFolder);
+            }
+            html += '</div>';
+        }
+        return html;
+    }
+
+    _renderFileList(folderPath) {
+        const files = this._zipTree.filter(e => {
+            if (e.dir) return false;
+            const parts = e.path.split('/');
+            const fileFolder = parts.length > 1 ? parts.slice(0, -1).join('/') + '/' : '';
+            return fileFolder === folderPath;
+        });
+
+        if (files.length === 0) {
+            return `<div class="zip-file-list__empty">${this.escapeHtml(this.t('download.zip.no_files'))}</div>`;
         }
 
-        const renderLevel = (parentPath) => {
-            const items = children[parentPath] || [];
-            // Sort: folders first, then files, alphabetical
-            items.sort((a, b) => {
-                if (a.dir !== b.dir) return a.dir ? -1 : 1;
-                return a.name.localeCompare(b.name);
-            });
-            return items.map(item => {
-                if (item.dir) {
-                    const nested = renderLevel(item.path);
-                    const folderName = item.name;
-                    return `<details open class="zip-tree__folder">
-                        <summary class="zip-tree__folder-name" data-path="${this.escapeHtml(item.path)}">${this.escapeHtml(folderName)}/</summary>
-                        <div class="zip-tree__nested">${nested}</div>
-                    </details>`;
-                }
-                const isSelected = this._selectedZipPath === item.path;
-                return `<div class="zip-tree__file${isSelected ? ' zip-tree__file--selected' : ''}" data-path="${this.escapeHtml(item.path)}">
-                    <span class="zip-tree__file-name">${this.escapeHtml(item.name)}</span>
-                    <span class="zip-tree__file-size">${this.formatBytes(item.size)}</span>
-                </div>`;
-            }).join('');
-        };
+        files.sort((a, b) => a.name.localeCompare(b.name));
+        return files.map(file => {
+            const isSelected = this._selectedZipPath === file.path;
+            const type = (typeof FileTypeDetect !== 'undefined') ? FileTypeDetect.detect(file.name, null) : null;
+            const typeIcon = this._fileTypeIcon(type);
+            return `<div class="zip-file-item${isSelected ? ' zip-file-item--selected' : ''}" data-path="${this.escapeHtml(file.path)}">
+                <span class="zip-file-item__icon">${typeIcon}</span>
+                <span class="zip-file-item__name">${this.escapeHtml(file.name)}</span>
+                <span class="zip-file-item__size">${this.formatBytes(file.size)}</span>
+            </div>`;
+        }).join('');
+    }
 
-        return renderLevel('');
+    _fileTypeIcon(type) {
+        const icons = { audio: '\u{1F3B5}', video: '\u{1F3AC}', image: '\u{1F5BC}', pdf: '\u{1F4C4}', markdown: '\u{1F4DD}', code: '\u{1F4BB}' };
+        return icons[type] || '\u{1F4CE}';
+    }
+
+    _renderZipPreview() {
+        if (!this._currentEntryBytes) {
+            return `<div class="zip-preview__empty">${this.escapeHtml(this.t('download.zip.select_file'))}</div>`;
+        }
+        const entryType = (typeof FileTypeDetect !== 'undefined') ? FileTypeDetect.detect(this._currentEntryFilename, null) : null;
+        const savedBytes = this.decryptedBytes;
+        const savedName  = this.fileName;
+        this.decryptedBytes = this._currentEntryBytes;
+        this.fileName       = this._currentEntryFilename;
+
+        let html;
+        if (entryType === 'pdf')           html = this._renderPdfContent();
+        else if (entryType === 'image')    html = this._renderImageContent();
+        else if (entryType === 'markdown') html = this._renderMarkdownContent();
+        else if (entryType === 'code')     html = this._renderCodeContent();
+        else if (entryType === 'audio')    html = this._renderAudioContent();
+        else if (entryType === 'video')    html = this._renderVideoContent();
+        else {
+            try {
+                const text = new TextDecoder('utf-8', { fatal: true }).decode(this._currentEntryBytes);
+                html = `<pre style="height:100%;overflow:auto;margin:0;padding:var(--space-6);white-space:pre-wrap;word-wrap:break-word;font-family:var(--font-mono);font-size:0.85rem;line-height:1.6;color:var(--color-text);">${this.escapeHtml(text)}</pre>`;
+            } catch (e) {
+                html = `<div class="zip-preview__empty">${this.escapeHtml(this.t('download.zip.no_preview'))}</div>`;
+            }
+        }
+        this.decryptedBytes = savedBytes;
+        this.fileName       = savedName;
+        return html;
+    }
+
+    _renderAudioContent() {
+        const filename = this.fileName || 'audio';
+        const mime = (typeof FileTypeDetect !== 'undefined') ? FileTypeDetect.getAudioMime(filename) : 'audio/mpeg';
+        const blob = new Blob([this.decryptedBytes], { type: mime });
+        if (this._objectUrl) URL.revokeObjectURL(this._objectUrl);
+        this._objectUrl = URL.createObjectURL(blob);
+        return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:var(--space-4);padding:var(--space-6);">
+            <div style="font-size:var(--text-sm);color:var(--color-text);font-weight:var(--weight-semibold);word-break:break-all;text-align:center;">${this.escapeHtml(filename)}</div>
+            <audio controls preload="auto" style="width:100%;max-width:500px;" src="${this._objectUrl}"></audio>
+        </div>`;
+    }
+
+    _renderVideoContent() {
+        const filename = this.fileName || 'video';
+        const mime = (typeof FileTypeDetect !== 'undefined') ? FileTypeDetect.getVideoMime(filename) : 'video/mp4';
+        const blob = new Blob([this.decryptedBytes], { type: mime });
+        if (this._objectUrl) URL.revokeObjectURL(this._objectUrl);
+        this._objectUrl = URL.createObjectURL(blob);
+        return `<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:var(--space-4);">
+            <video controls preload="auto" style="max-width:100%;max-height:100%;border-radius:var(--radius-sm);" src="${this._objectUrl}"></video>
+        </div>`;
     }
 
     async _previewZipEntry(path) {
@@ -608,59 +662,75 @@ class SendDownload extends HTMLElement {
         this._currentEntryBytes    = bytes;
         this._currentEntryFilename = entry.name;
 
-        // Update just the preview panel and the file tree selection + save-entry button
+        // Also select the folder this file is in
+        const parts = path.split('/');
+        this._selectedZipFolder = parts.length > 1 ? parts.slice(0, -1).join('/') + '/' : '';
+
+        // Update preview panel
         const previewPanel = this.querySelector('#preview-panel');
-        if (!previewPanel) return;
+        if (previewPanel) {
+            const savedBytes = this.decryptedBytes;
+            const savedName  = this.fileName;
+            this.decryptedBytes = bytes;
+            this.fileName       = entry.name;
 
-        // Determine render type for this entry
-        const entryType = (typeof FileTypeDetect !== 'undefined') ? FileTypeDetect.detect(entry.name, null) : null;
-
-        // Temporarily swap for renderers
-        const savedBytes = this.decryptedBytes;
-        const savedName  = this.fileName;
-        this.decryptedBytes = bytes;
-        this.fileName       = entry.name;
-
-        let html;
-        if (entryType === 'pdf')           html = this._renderPdfContent();
-        else if (entryType === 'image')    html = this._renderImageContent();
-        else if (entryType === 'markdown') html = this._renderMarkdownContent();
-        else if (entryType === 'code')     html = this._renderCodeContent();
-        else {
-            try {
-                const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-                html = `<pre style="height:100%;overflow:auto;margin:0;padding:var(--space-6);white-space:pre-wrap;word-wrap:break-word;font-family:var(--font-mono);font-size:0.85rem;line-height:1.6;color:var(--color-text);">${this.escapeHtml(text)}</pre>`;
-            } catch (e) {
-                html = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--color-text-secondary);font-size:var(--text-sm);padding:var(--space-6);text-align:center;">${this.escapeHtml(this.t('download.zip.no_preview'))}</div>`;
+            const entryType = (typeof FileTypeDetect !== 'undefined') ? FileTypeDetect.detect(entry.name, null) : null;
+            let html;
+            if (entryType === 'pdf')           html = this._renderPdfContent();
+            else if (entryType === 'image')    html = this._renderImageContent();
+            else if (entryType === 'markdown') html = this._renderMarkdownContent();
+            else if (entryType === 'code')     html = this._renderCodeContent();
+            else if (entryType === 'audio')    html = this._renderAudioContent();
+            else if (entryType === 'video')    html = this._renderVideoContent();
+            else {
+                try {
+                    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+                    html = `<pre style="height:100%;overflow:auto;margin:0;padding:var(--space-6);white-space:pre-wrap;word-wrap:break-word;font-family:var(--font-mono);font-size:0.85rem;line-height:1.6;color:var(--color-text);">${this.escapeHtml(text)}</pre>`;
+                } catch (e) {
+                    html = `<div class="zip-preview__empty">${this.escapeHtml(this.t('download.zip.no_preview'))}</div>`;
+                }
             }
+            this.decryptedBytes = savedBytes;
+            this.fileName       = savedName;
+            previewPanel.innerHTML = html;
         }
 
-        // Restore
-        this.decryptedBytes = savedBytes;
-        this.fileName       = savedName;
-
-        previewPanel.innerHTML = html;
-
-        // Update tree selection highlighting
-        this.querySelectorAll('.zip-tree__file').forEach(el => {
-            el.classList.toggle('zip-tree__file--selected', el.dataset.path === path);
+        // Update file list highlighting
+        this.querySelectorAll('.zip-file-item').forEach(el => {
+            el.classList.toggle('zip-file-item--selected', el.dataset.path === path);
         });
 
         // Update save-entry button
         const existing = this.querySelector('#save-entry-btn');
         if (existing) {
-            existing.textContent = `${this.t('download.zip.save_file')}:  ${entry.name}`;
+            existing.textContent = `${this.t('download.zip.save_file')}: ${entry.name}`;
         } else {
             const saveAll = this.querySelector('#save-file-btn');
             if (saveAll) {
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-sm btn-secondary';
                 btn.id = 'save-entry-btn';
-                btn.style.width = '100%';
-                btn.textContent = `${this.t('download.zip.save_file')}:  ${entry.name}`;
+                btn.textContent = `${this.t('download.zip.save_file')}: ${entry.name}`;
                 btn.addEventListener('click', () => this._saveCurrentEntry());
-                saveAll.parentNode.insertBefore(btn, saveAll.nextSibling);
+                saveAll.insertAdjacentElement('afterend', btn);
             }
+        }
+    }
+
+    _selectZipFolder(folderPath) {
+        this._selectedZipFolder = folderPath;
+        this.querySelectorAll('.zip-folder-item').forEach(el => {
+            el.classList.toggle('zip-folder-item--selected', el.dataset.folder === folderPath);
+        });
+        const fileList = this.querySelector('#zip-file-list');
+        if (fileList) {
+            fileList.innerHTML = this._renderFileList(folderPath);
+            fileList.querySelectorAll('.zip-file-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const p = el.dataset.path;
+                    if (p) this._previewZipEntry(p);
+                });
+            });
         }
     }
 
@@ -772,11 +842,18 @@ class SendDownload extends HTMLElement {
             }
         }
 
-        // Zip tree: file click → preview, save-entry button
+        // Zip browser: folder clicks, file clicks, save-entry button
         const saveEntryBtn = this.querySelector('#save-entry-btn');
         if (saveEntryBtn) saveEntryBtn.addEventListener('click', () => this._saveCurrentEntry());
 
-        this.querySelectorAll('.zip-tree__file').forEach(el => {
+        this.querySelectorAll('.zip-folder-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const folder = el.dataset.folder;
+                if (folder !== undefined) this._selectZipFolder(folder);
+            });
+        });
+
+        this.querySelectorAll('.zip-file-item').forEach(el => {
             el.addEventListener('click', () => {
                 const path = el.dataset.path;
                 if (path) this._previewZipEntry(path);
@@ -860,6 +937,7 @@ class SendDownload extends HTMLElement {
             this._renderType = null; this._objectUrl = null; this._showRaw = false;
             this._zipInstance = null; this._zipTree = null; this._zipOrigBytes = null; this._zipOrigName = null;
             this._currentEntryBytes = null; this._currentEntryFilename = null; this._selectedZipPath = null;
+            this._selectedZipFolder = '';
             this._stageTimestamps = {};
             this.state = 'decrypting'; this._setBeforeUnload(true); this.render();
 
@@ -889,6 +967,8 @@ class SendDownload extends HTMLElement {
                     const first = parsed.tree.find(e => !e.dir);
                     if (first) {
                         this._selectedZipPath = first.path;
+                        const firstParts = first.path.split('/');
+                        this._selectedZipFolder = firstParts.length > 1 ? firstParts.slice(0, -1).join('/') + '/' : '';
                         const bytes = await first.entry.async('arraybuffer');
                         this._currentEntryBytes    = bytes;
                         this._currentEntryFilename = first.name;
