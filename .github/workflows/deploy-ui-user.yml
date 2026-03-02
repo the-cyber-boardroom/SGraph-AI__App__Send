@@ -12,6 +12,15 @@ name: Deploy User UI to S3
 #   1. Generate i18n locale pages from en-gb/ templates + i18n/*.json
 #   2. Sync v0.2.0/ content (source + generated) to S3
 #   3. Invalidate CloudFront cache
+#
+# Environments:
+#   - dev:        dev.send.sgraph.ai   (default — push to dev branch)
+#   - production: send.sgraph.ai       (manual dispatch)
+#
+# Secrets per environment:
+#   - SGRAPH_SEND__UI_S3_BUCKET                   (shared — same bucket for now)
+#   - SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID      (production CF distribution)
+#   - SGRAPH_SEND__DEV__CLOUDFRONT_DISTRIBUTION_ID (dev CF distribution)
 
 on:
   push:
@@ -26,14 +35,14 @@ on:
       environment:
         description: 'Deployment environment'
         required: false
-        default: 'production'
+        default: 'dev'
         type: choice
         options:
+          - dev
           - production
-          - staging
 
 concurrency:
-  group: "ui-user-deploy"
+  group: "ui-user-deploy-${{ inputs.environment || 'dev' }}"
   cancel-in-progress: false
 
 env:
@@ -44,10 +53,10 @@ env:
 
 jobs:
   deploy:
-    name: Publish UI to S3 + CloudFront
+    name: "Publish UI to S3 + CloudFront (${{ inputs.environment || 'dev' }})"
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: ${{ inputs.environment || 'production' }}
+    environment: ${{ inputs.environment || 'dev' }}
 
     steps:
       - name: Checkout
@@ -79,6 +88,18 @@ jobs:
           aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region            : ${{ env.AWS_REGION }}
 
+      - name: Resolve CloudFront distribution ID
+        id: cf
+        run: |
+          DEPLOY_ENV="${{ inputs.environment || 'dev' }}"
+          if [ "$DEPLOY_ENV" == "production" ]; then
+            echo "dist_id=${{ secrets.SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying to PRODUCTION (send.sgraph.ai)"
+          else
+            echo "dist_id=${{ secrets.SGRAPH_SEND__DEV__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying to DEV (dev.send.sgraph.ai)"
+          fi
+
       - name: Deploy User UI to S3
         if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
@@ -88,5 +109,5 @@ jobs:
             --source-dir ${{ env.SOURCE_DIR }} \
             --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
             --region ${{ env.AWS_REGION }} \
-            --cloudfront-distribution-id ${{ secrets.SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID }} \
+            --cloudfront-distribution-id ${{ steps.cf.outputs.dist_id }} \
             --skip-validation
