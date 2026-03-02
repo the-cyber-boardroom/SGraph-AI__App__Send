@@ -141,6 +141,14 @@ const I18n = {
             'download.preview.view_raw':        'View Raw',
             'download.preview.view_rendered':   'View Rendered',
 
+            // ─── Download: Zip Viewer ─────────────────────────────────────
+            'download.zip.summary':             '{files} files, {folders} folders',
+            'download.zip.contents':            'Contents',
+            'download.zip.save_all':            'Save All (zip)',
+            'download.zip.save_file':           'Save This File',
+            'download.zip.no_preview':          'No preview available. Click "Save This File" to download.',
+            'download.zip.select_file':         'Click a file in the tree to preview it.',
+
             // ─── Download: Errors ─────────────────────────────────────────
             'download.error.no_id':             'No transfer ID found in URL. Please check your link.',
             'download.error.not_ready':         'This transfer is not yet available for download.',

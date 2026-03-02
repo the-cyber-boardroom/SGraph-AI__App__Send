@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "A pasta é grande demais. Tamanho máximo: {limit}.",
   "upload.folder.error_zip_failed": "Falha ao criar o arquivo zip.",
   "upload.folder.error_jszip": "Falha ao carregar a biblioteca de compressão.",
-  "test_files.folder_hint": "Para testar o envio de pastas, arraste qualquer pasta da área de trabalho para a zona de envio."
+  "test_files.folder_hint": "Para testar o envio de pastas, arraste qualquer pasta da área de trabalho para a zona de envio.",
+  "download.zip.summary": "{files} arquivos, {folders} pastas",
+  "download.zip.contents": "Conteúdo",
+  "download.zip.save_all": "Salvar tudo (zip)",
+  "download.zip.save_file": "Salvar este arquivo",
+  "download.zip.no_preview": "Pré-visualização indisponível. Clique em \"Salvar este arquivo\".",
+  "download.zip.select_file": "Clique em um arquivo na árvore para pré-visualizar."
 }

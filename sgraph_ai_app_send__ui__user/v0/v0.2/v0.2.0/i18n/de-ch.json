@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "Ordner ist zu gross. Maximale Grösse: {limit}.",
   "upload.folder.error_zip_failed": "Zip-Datei konnte nicht erstellt werden.",
   "upload.folder.error_jszip": "Komprimierungsbibliothek konnte nicht geladen werden.",
-  "test_files.folder_hint": "Um den Ordner-Upload zu testen, ziehen Sie einen beliebigen Ordner vom Desktop in die Upload-Zone."
+  "test_files.folder_hint": "Um den Ordner-Upload zu testen, ziehen Sie einen beliebigen Ordner vom Desktop in die Upload-Zone.",
+  "download.zip.summary": "{files} Dateien, {folders} Ordner",
+  "download.zip.contents": "Inhalt",
+  "download.zip.save_all": "Alle speichern (zip)",
+  "download.zip.save_file": "Diese Datei speichern",
+  "download.zip.no_preview": "Keine Vorschau verfügbar. Klicken Sie auf \"Diese Datei speichern\".",
+  "download.zip.select_file": "Klicken Sie auf eine Datei im Baum, um sie anzuzeigen."
 }

@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "Dol tIn law'. {limit} mach law'.",
   "upload.folder.error_zip_failed": "zip De'wI' chenmoHlaHbe'.",
   "upload.folder.error_jszip": "ngev De'wI' laDlaHbe'.",
-  "test_files.folder_hint": "Dol ngeH DanIDmeH, naDev Dol yIchugh."
+  "test_files.folder_hint": "Dol ngeH DanIDmeH, naDev Dol yIchugh.",
+  "download.zip.summary": "{files} De'mey, {folders} qogh",
+  "download.zip.contents": "bI'reS",
+  "download.zip.save_all": "Hoch choq (zip)",
+  "download.zip.save_file": "De' choq",
+  "download.zip.no_preview": "leghlaHbe'. \"De' choq\" yIchel.",
+  "download.zip.select_file": "Sor De' yIwIv 'ej yIlegh."
 }

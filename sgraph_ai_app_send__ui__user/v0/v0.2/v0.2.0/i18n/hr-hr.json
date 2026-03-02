@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "Mapa je prevelika. Maksimalna veličina: {limit}.",
   "upload.folder.error_zip_failed": "Stvaranje zip datoteke nije uspjelo.",
   "upload.folder.error_jszip": "Učitavanje biblioteke za kompresiju nije uspjelo.",
-  "test_files.folder_hint": "Za testiranje učitavanja mapa, povucite bilo koju mapu s radne površine u zonu za učitavanje."
+  "test_files.folder_hint": "Za testiranje učitavanja mapa, povucite bilo koju mapu s radne površine u zonu za učitavanje.",
+  "download.zip.summary": "{files} datoteka, {folders} mapa",
+  "download.zip.contents": "Sadržaj",
+  "download.zip.save_all": "Spremi sve (zip)",
+  "download.zip.save_file": "Spremi ovu datoteku",
+  "download.zip.no_preview": "Pretpregled nije dostupan. Kliknite \"Spremi ovu datoteku\".",
+  "download.zip.select_file": "Kliknite na datoteku u stablu za pretpregled."
 }

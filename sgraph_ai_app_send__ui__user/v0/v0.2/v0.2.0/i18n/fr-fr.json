@@ -139,5 +139,11 @@
   "upload.folder.error_too_large": "Le dossier est trop volumineux. Taille maximale : {limit}.",
   "upload.folder.error_zip_failed": "Échec de la création du fichier zip.",
   "upload.folder.error_jszip": "Échec du chargement de la bibliothèque de compression.",
-  "test_files.folder_hint": "Pour tester l'envoi de dossiers, glissez n'importe quel dossier de votre bureau dans la zone d'envoi."
+  "test_files.folder_hint": "Pour tester l'envoi de dossiers, glissez n'importe quel dossier de votre bureau dans la zone d'envoi.",
+  "download.zip.summary": "{files} fichiers, {folders} dossiers",
+  "download.zip.contents": "Contenu",
+  "download.zip.save_all": "Tout enregistrer (zip)",
+  "download.zip.save_file": "Enregistrer ce fichier",
+  "download.zip.no_preview": "Aperçu non disponible. Cliquez sur \"Enregistrer ce fichier\".",
+  "download.zip.select_file": "Cliquez sur un fichier dans l'arborescence pour l'apercevoir."
 }
