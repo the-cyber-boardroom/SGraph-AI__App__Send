@@ -1,35 +1,44 @@
 {
   "_comment": "SGraph Send — Español (Argentina)",
-
-  "app.tagline":          "Tus archivos, tus claves, tu privacidad",
-  "app.subtitle":         "Compartir archivos con cifrado zero-knowledge",
-  "app.disclaimer":       "Este es un servicio beta. No subas contenido confidencial o ilegal.",
-
-  "upload.drop_zone.label":           "Arrastrá tu archivo acá",
-  "upload.drop_zone.hint":            "o hacé clic para buscar",
-  "upload.drop_zone.encrypted_hint":  "Cifrado en tu navegador antes de subir",
-
-  "upload.text.placeholder":          "Escribí o pegá tu texto acá",
-
-  "upload.button.encrypt_upload":     "Cifrar y Subir",
-  "upload.button.encrypt_send":       "Cifrar y Enviar",
-
-  "upload.result.share_link":         "Compartí este enlace",
-  "upload.guidance.split_channels":   "Para mayor seguridad, compartí el enlace y la clave por <strong>canales diferentes</strong> (ej: enlace por email, clave por mensajería).",
-
-  "upload.error.empty_text":          "Por favor, ingresá un texto para cifrar.",
-  "upload.error.upload_failed":       "La subida falló. Por favor, intentá de nuevo.",
-
-  "download.key.placeholder":         "Pegá la clave de descifrado acá",
-  "download.error.no_key":            "Por favor, ingresá la clave de descifrado.",
-
-  "access_gate.subtitle":             "Ingresá tu token de acceso para empezar a enviar archivos.",
-  "access_gate.placeholder":          "Pegá tu token de acceso",
-  "access_gate.invalid":              "Token inválido o faltante. Por favor, verificá e intentá de nuevo.",
-  "access_gate.signup_subtitle":      "Registrate para recibir notificaciones cuando SGraph Send esté disponible.",
-
-  "test_files.description":           "Descargá un archivo de prueba y arrastralo a la zona de subida de arriba.",
-
-  "cta.title":                        "¿Vos también querés enviar archivos?",
-  "cta.description":                  "Unite al programa de acceso anticipado de SGraph Send."
+  "app.tagline": "Tus archivos, tus claves, tu privacidad",
+  "app.subtitle": "Compartir archivos con cifrado zero-knowledge",
+  "app.disclaimer": "Este es un servicio beta. No subas contenido confidencial o ilegal.",
+  "upload.drop_zone.label": "Arrastrá un archivo o carpeta acá",
+  "upload.drop_zone.hint": "o hacé clic para buscar",
+  "upload.drop_zone.encrypted_hint": "Cifrado en tu navegador antes de subir",
+  "upload.text.placeholder": "Escribí o pegá tu texto acá",
+  "upload.button.encrypt_upload": "Cifrar y Subir",
+  "upload.button.encrypt_send": "Cifrar y Enviar",
+  "upload.result.share_link": "Compartí este enlace",
+  "upload.guidance.split_channels": "Para mayor seguridad, compartí el enlace y la clave por <strong>canales diferentes</strong> (ej: enlace por email, clave por mensajería).",
+  "upload.error.empty_text": "Por favor, ingresá un texto para cifrar.",
+  "upload.error.upload_failed": "La subida falló. Por favor, intentá de nuevo.",
+  "download.key.placeholder": "Pegá la clave de descifrado acá",
+  "download.error.no_key": "Por favor, ingresá la clave de descifrado.",
+  "access_gate.subtitle": "Ingresá tu token de acceso para empezar a enviar archivos.",
+  "access_gate.placeholder": "Pegá tu token de acceso",
+  "access_gate.invalid": "Token inválido o faltante. Por favor, verificá e intentá de nuevo.",
+  "access_gate.signup_subtitle": "Registrate para recibir notificaciones cuando SGraph Send esté disponible.",
+  "test_files.description": "Descargá un archivo de prueba y arrastralo a la zona de subida de arriba.",
+  "cta.title": "¿Vos también querés enviar archivos?",
+  "cta.description": "Unite al programa de acceso anticipado de SGraph Send.",
+  "upload.mode.file": "Archivo o Carpeta",
+  "upload.drop_zone.browse_file": "Buscar Archivo",
+  "upload.drop_zone.browse_folder": "Buscar Carpeta",
+  "upload.progress.zipping": "Comprimiendo carpeta...",
+  "upload.folder.title": "Carpeta: {name}",
+  "upload.folder.summary": "{files} archivos, {folders} carpetas, {size}",
+  "upload.folder.compression": "Nivel de compresión",
+  "upload.folder.level_0": "0 — Almacenar (más rápido, sin compresión)",
+  "upload.folder.level_4": "4 — Rápido (predeterminado)",
+  "upload.folder.level_6": "6 — Equilibrado",
+  "upload.folder.level_9": "9 — Máximo (más lento, más pequeño)",
+  "upload.folder.include_empty": "Incluir carpetas vacías",
+  "upload.folder.include_hidden": "Incluir archivos ocultos (dotfiles)",
+  "upload.folder.compress_upload": "Comprimir y Subir",
+  "upload.folder.cancel": "Cancelar",
+  "upload.folder.error_too_large": "La carpeta es demasiado grande. Tamaño máximo: {limit}.",
+  "upload.folder.error_zip_failed": "Error al crear el archivo zip.",
+  "upload.folder.error_jszip": "Error al cargar la librería de compresión.",
+  "test_files.folder_hint": "Para probar la subida de carpetas, arrastrá cualquier carpeta desde tu escritorio a la zona de subida."
 }

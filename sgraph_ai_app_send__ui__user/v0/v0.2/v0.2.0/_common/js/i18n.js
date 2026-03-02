@@ -37,7 +37,7 @@ const I18n = {
             'app.disclaimer':       'This is a beta service. Do not upload confidential or illegal content.',
 
             // ─── Upload: Mode ─────────────────────────────────────────────
-            'upload.mode.file':     'File',
+            'upload.mode.file':     'File or Folder',
             'upload.mode.text':     'Text',
 
             // ─── Upload: Drop Zone ────────────────────────────────────────
@@ -195,6 +195,7 @@ const I18n = {
             // ─── Test Files ─────────────────────────────────────────────
             'test_files.title':                 'Test Files',
             'test_files.description':           'Download a test file, then drag it into the upload zone above.',
+            'test_files.folder_hint':           'To test folder upload, drag any folder from your desktop into the upload zone.',
 
             // ─── CTA ────────────────────────────────────────────────────
             'cta.title':                        'Want to send files too?',
@@ -226,9 +227,34 @@ const I18n = {
     // ─── Initialisation ──────────────────────────────────────────────────
 
     async init(localePath) {
-        // Detect locale from URL path — translations are pre-rendered,
-        // so no JSON files need to be fetched.
         this.locale = this._detectLocale();
+        // Load locale-specific strings for runtime web component rendering.
+        // Pre-rendered HTML covers static text; this covers innerHTML-based components.
+        if (this.locale !== 'en-gb' && !this.strings[this.locale]) {
+            try {
+                const basePath = this._resolveBasePath();
+                const res = await fetch(`${basePath}/i18n/${this.locale}.json`);
+                if (res.ok) {
+                    const data = await res.json();
+                    delete data._comment;
+                    this.strings[this.locale] = data;
+                }
+            } catch (e) { /* fall back to en-gb */ }
+        }
+    },
+
+    /** Resolve base path to the v0.2.0 root from any locale page */
+    _resolveBasePath() {
+        const path = window.location.pathname;
+        // URL pattern: /{locale}/send/ or /send/ — i18n/ is at v0.2.0 root
+        // Find the _common sibling by looking for the script tag
+        const scripts = document.querySelectorAll('script[src*="_common"]');
+        if (scripts.length > 0) {
+            const src = scripts[0].getAttribute('src');
+            const idx = src.indexOf('_common');
+            return idx > 0 ? src.substring(0, idx - 1) : '';
+        }
+        return '..';
     },
 
     isSupported(code) {
