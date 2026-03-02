@@ -1,6 +1,8 @@
 # Generated locale pages (built by scripts/generate_send_i18n_pages.py)
 # These are CI-only build artifacts — generated before deployment to S3.
 # Only en-gb/ (source pages) and i18n/*.json (translations) live in git.
+
+# Current convention (language-country lowercase)
 /en-us/
 /pt-pt/
 /pt-br/
@@ -17,3 +19,10 @@
 /hr-hr/
 /ro-ro/
 /tlh/
+
+# Old convention (short codes, mixed case) — prevent accidental re-commit
+/de/
+/es/
+/fr/
+/it/
+/pt-PT/
