@@ -125,7 +125,6 @@
   "crypto.error.read_failed":         "Falha ao ler o ficheiro",
 
   "common.copied":                    "Copiado!",
-
   "common.copy":                      "Copiar",
 
   "form.name_placeholder":            "Nome",
