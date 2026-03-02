@@ -239,6 +239,60 @@ main.preview-expanded > *:not(send-download) {
     text-align: center;
 }
 
+/* ─── Office Document Renderer States ──────────────────────────────── */
+
+.office-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 200px;
+    color: var(--accent, #4ECDC4);
+    font-size: var(--text-sm, 0.875rem);
+    padding: var(--space-6, 1.5rem);
+    text-align: center;
+}
+.office-loading::before {
+    content: '';
+    display: inline-block;
+    width: 1.2em;
+    height: 1.2em;
+    border: 2px solid var(--accent, #4ECDC4);
+    border-top-color: transparent;
+    border-radius: 50%;
+    margin-right: var(--space-2, 0.5rem);
+    animation: office-spin 0.8s linear infinite;
+}
+@keyframes office-spin { to { transform: rotate(360deg); } }
+
+.office-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 200px;
+    color: var(--color-danger, #FF6B6B);
+    font-size: var(--text-sm, 0.875rem);
+    padding: var(--space-6, 1.5rem);
+    text-align: center;
+}
+.office-error small {
+    color: var(--color-text-secondary, #8892A0);
+    margin-top: var(--space-2, 0.5rem);
+}
+
+.office-fallback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 200px;
+    padding: var(--space-6, 1.5rem);
+    text-align: center;
+}
+
 /* ─── Mobile Responsive ────────────────────────────────────────────── */
 
 /* Two-column preview: stack vertically on mobile */
