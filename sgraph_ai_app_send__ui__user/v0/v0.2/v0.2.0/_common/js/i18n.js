@@ -190,7 +190,7 @@ const I18n = {
 
             // ─── Test Files ─────────────────────────────────────────────
             'test_files.title':                 'Test Files',
-            'test_files.description':           'Download a test file, then drag it into the upload zone above.',
+            'test_files.description':           'Drag a file into the upload zone, or click to download.',
 
             // ─── CTA ────────────────────────────────────────────────────
             'cta.title':                        'Want to send files too?',

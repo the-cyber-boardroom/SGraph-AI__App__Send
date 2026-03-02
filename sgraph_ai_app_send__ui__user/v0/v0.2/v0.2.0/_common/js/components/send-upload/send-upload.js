@@ -430,7 +430,21 @@ class SendUpload extends HTMLElement {
         e.preventDefault(); e.stopPropagation();
         const dz = this.querySelector('#drop-zone'); if (dz) dz.classList.remove('dragover');
         const files = e.dataTransfer && e.dataTransfer.files;
-        if (files && files.length > 0) { this.selectedFile = files[0]; this.state = 'idle'; this.render(); this.setupEventListeners(); }
+        if (files && files.length > 0) {
+            this.selectedFile = files[0]; this.state = 'idle'; this.render(); this.setupEventListeners();
+            return;
+        }
+        // Handle drag from test-files component (link drag, no File objects)
+        const testFileData = e.dataTransfer && e.dataTransfer.getData('application/x-sgraph-test-file');
+        if (testFileData) {
+            try {
+                const { url, name, mime } = JSON.parse(testFileData);
+                fetch(url).then(r => r.arrayBuffer()).then(buf => {
+                    this.selectedFile = new File([buf], name, { type: mime });
+                    this.state = 'idle'; this.render(); this.setupEventListeners();
+                });
+            } catch (err) { /* ignore malformed data */ }
+        }
     }
 
     handleFileSelect(e) {
