@@ -269,7 +269,7 @@ class SendDownload extends HTMLElement {
 
         const sendAnotherHtml = `
             <div style="margin-top: var(--space-6); text-align: center;">
-                <a href="${window.location.origin}/en-gb/" class="btn btn-sm" style="color: var(--accent); text-decoration: none;">
+                <a href="${window.location.origin}/${I18n.locale}/" class="btn btn-sm" style="color: var(--accent); text-decoration: none;">
                     ${this.escapeHtml(this.t('download.result.send_another'))}
                 </a>
             </div>
@@ -349,7 +349,7 @@ class SendDownload extends HTMLElement {
         const uploadDate = this.transferInfo ? this.formatTimestamp(this.transferInfo.created_at) : '';
         const downloads  = this.transferInfo ? (this.transferInfo.download_count || 0) : 0;
         const rawToggle  = (type === 'markdown' || type === 'code')
-            ? `<button class="btn btn-sm btn-secondary" id="toggle-raw-btn" style="width: 100%; font-size: var(--text-sm);">${this._showRaw ? 'View Rendered' : 'View Raw'}</button>` : '';
+            ? `<button class="btn btn-sm btn-secondary" id="toggle-raw-btn" style="width: 100%; font-size: var(--text-sm);">${this.escapeHtml(this._showRaw ? this.t('download.preview.view_rendered') : this.t('download.preview.view_raw'))}</button>` : '';
 
         let contentHtml = '';
         switch (type) {
@@ -375,12 +375,12 @@ class SendDownload extends HTMLElement {
                             <span style="font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono);">${this.escapeHtml(sizeStr)}</span>
                         </div>
                         <div style="font-size: var(--text-sm); color: var(--color-text-secondary); display: flex; flex-direction: column; gap: var(--space-1);">
-                            <div>Uploaded: ${this.escapeHtml(uploadDate)}</div>
-                            ${downloads > 0 ? `<div>Downloads: ${downloads}</div>` : ''}
+                            <div>${this.escapeHtml(this.t('download.info.uploaded_label'))}: ${this.escapeHtml(uploadDate)}</div>
+                            ${downloads > 0 ? `<div>${this.escapeHtml(this.t('download.info.downloads_label'))}: ${downloads}</div>` : ''}
                         </div>
                     </div>
-                    <button class="btn btn-primary" id="save-file-btn" style="width: 100%; padding: var(--space-4) var(--space-6); font-size: var(--text-body); font-weight: var(--weight-bold); border-radius: var(--radius-md); letter-spacing: 0.02em;">Save Locally</button>
-                    <div style="display: flex; gap: var(--space-2);"><button class="btn btn-sm btn-secondary" id="copy-content-btn" style="flex: 1;">Copy</button></div>
+                    <button class="btn btn-primary" id="save-file-btn" style="width: 100%; padding: var(--space-4) var(--space-6); font-size: var(--text-body); font-weight: var(--weight-bold); border-radius: var(--radius-md); letter-spacing: 0.02em;">${this.escapeHtml(this.t('download.preview.save_locally'))}</button>
+                    <div style="display: flex; gap: var(--space-2);"><button class="btn btn-sm btn-secondary" id="copy-content-btn" style="flex: 1;">${this.escapeHtml(this.t('common.copy'))}</button></div>
                     ${rawToggle}
                     <send-transparency id="transparency-panel"></send-transparency>
                     ${timingHtml}

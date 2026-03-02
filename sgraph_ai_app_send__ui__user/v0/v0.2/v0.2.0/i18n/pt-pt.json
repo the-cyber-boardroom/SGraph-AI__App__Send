@@ -125,6 +125,20 @@
   "crypto.error.read_failed":         "Falha ao ler o ficheiro",
 
   "common.copied":                    "Copiado!",
+  "common.copy":                      "Copiar",
+
+  "form.name_placeholder":            "Nome",
+  "form.email_placeholder":           "Email",
+  "form.signup_button":               "Registar",
+
+  "access_gate.show_token":           "Mostrar token de acesso",
+  "access_gate.hide_token":           "Ocultar token de acesso",
+
+  "download.preview.save_locally":    "Guardar Localmente",
+  "download.preview.view_raw":        "Ver Original",
+  "download.preview.view_rendered":   "Ver Renderizado",
+  "download.info.uploaded_label":     "Enviado",
+  "download.info.downloads_label":    "Transferências",
 
   "nav.docs":                         "Documentação",
   "nav.github":                       "GitHub",

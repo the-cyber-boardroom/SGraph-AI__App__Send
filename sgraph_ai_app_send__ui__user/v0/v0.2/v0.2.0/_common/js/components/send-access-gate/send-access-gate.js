@@ -20,7 +20,12 @@ class SendAccessGate extends HTMLElement {
 
         this._onLocaleChanged = () => {
             const bar = this.querySelector('#token-status-bar');
-            if (bar) this.updateTokenBar(bar, this._cachedRemaining);
+            if (bar) {
+                this.updateTokenBar(bar, this._cachedRemaining);
+            } else if (!ApiClient.hasAccessToken()) {
+                // In gate mode — re-render with new translations
+                this.showGate();
+            }
         };
         document.addEventListener('locale-changed', this._onLocaleChanged);
 
@@ -64,7 +69,7 @@ class SendAccessGate extends HTMLElement {
                                placeholder="${this.t('access_gate.placeholder')}"
                                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                         <button type="button" id="toggle-token-vis"
-                                title="Show access token"
+                                title="${this.t('access_gate.show_token')}"
                                 style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; font-size: 1rem; color: var(--color-text-secondary); line-height: 1;">&#128065;</button>
                     </div>
                     <button class="btn btn-primary" id="access-token-submit">${this.t('access_gate.button')}</button>
@@ -81,9 +86,9 @@ class SendAccessGate extends HTMLElement {
                 </p>
                 <form class="launchlist-form" action="https://getlaunchlist.com/s/zSa8gI" method="POST">
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
-                        <input name="name" type="text" class="input" placeholder="Name" style="flex: 1; min-width: 120px;">
-                        <input name="email" type="email" class="input" placeholder="Email" required style="flex: 1; min-width: 180px;">
-                        <button type="submit" class="btn btn-primary">Sign Up</button>
+                        <input name="name" type="text" class="input" placeholder="${this.t('form.name_placeholder')}" style="flex: 1; min-width: 120px;">
+                        <input name="email" type="email" class="input" placeholder="${this.t('form.email_placeholder')}" required style="flex: 1; min-width: 180px;">
+                        <button type="submit" class="btn btn-primary">${this.t('form.signup_button')}</button>
                     </div>
                 </form>
             </div>
@@ -99,7 +104,7 @@ class SendAccessGate extends HTMLElement {
         toggleBtn.addEventListener('click', () => {
             const isHidden = input.type === 'password';
             input.type        = isHidden ? 'text' : 'password';
-            toggleBtn.title   = isHidden ? 'Hide access token' : 'Show access token';
+            toggleBtn.title   = isHidden ? this.t('access_gate.hide_token') : this.t('access_gate.show_token');
             toggleBtn.innerHTML = isHidden ? '&#128064;' : '&#128065;';
         });
 

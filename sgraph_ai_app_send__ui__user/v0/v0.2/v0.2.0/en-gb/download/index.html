@@ -35,9 +35,9 @@
             <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: 1rem;" data-i18n="cta.description">Join the early access program for SGraph Send.</p>
             <form class="launchlist-form" action="https://getlaunchlist.com/s/zSa8gI" method="POST">
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
-                    <input name="name" type="text" class="input" placeholder="Name" style="flex: 1; min-width: 120px;">
-                    <input name="email" type="email" class="input" placeholder="Email" required style="flex: 1; min-width: 180px;">
-                    <button type="submit" class="btn btn-primary">Sign Up</button>
+                    <input name="name" type="text" class="input" placeholder="Name" data-i18n-placeholder="form.name_placeholder" style="flex: 1; min-width: 120px;">
+                    <input name="email" type="email" class="input" placeholder="Email" data-i18n-placeholder="form.email_placeholder" required style="flex: 1; min-width: 180px;">
+                    <button type="submit" class="btn btn-primary" data-i18n="form.signup_button">Sign Up</button>
                 </div>
             </form>
         </div>
@@ -73,13 +73,7 @@
     <!-- 4. Init -->
     <script>
         SendComponentPaths.init('../../_common');
-        I18n.init('../../_common/js/i18n').then(() => {
-            // Update static text after i18n loads
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                if (key) el.textContent = I18n.t(key);
-            });
-        });
+        I18n.init();
     </script>
 
 </body>

@@ -125,6 +125,20 @@
   "crypto.error.read_failed":         "Failed to read file",
 
   "common.copied":                    "Copied!",
+  "common.copy":                      "Copy",
+
+  "form.name_placeholder":            "Name",
+  "form.email_placeholder":           "Email",
+  "form.signup_button":               "Sign Up",
+
+  "access_gate.show_token":           "Show access token",
+  "access_gate.hide_token":           "Hide access token",
+
+  "download.preview.save_locally":    "Save Locally",
+  "download.preview.view_raw":        "View Raw",
+  "download.preview.view_rendered":   "View Rendered",
+  "download.info.uploaded_label":     "Uploaded",
+  "download.info.downloads_label":    "Downloads",
 
   "nav.docs":                         "Docs",
   "nav.github":                       "GitHub",

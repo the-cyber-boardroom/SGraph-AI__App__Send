@@ -42,7 +42,7 @@
             </div>
         </div>
 
-        <p class="disclaimer">${I18n.t('app.disclaimer')}</p>
+        <p class="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
     </main>
 
     <send-footer></send-footer>
@@ -75,15 +75,8 @@
 
     <!-- 4. Init -->
     <script>
-        // Set base path for component resource loading
         SendComponentPaths.init('../_common');
-
-        // Initialise i18n (loads saved locale preference)
-        I18n.init('../_common/js/i18n').then(() => {
-            // Update disclaimer after i18n loads
-            const disclaimer = document.querySelector('.disclaimer');
-            if (disclaimer) disclaimer.textContent = I18n.t('app.disclaimer');
-        });
+        I18n.init();
     </script>
 
 </body>
