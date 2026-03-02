@@ -9,7 +9,6 @@ class test__Vault_UI__static_files(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        skip_pytest("Needs sg-send.js file")
         cls.vault_ui_path = sgraph_ai_app_send__ui__vault.path
         cls.v010_path     = path_combine(cls.vault_ui_path, 'v0/v0.1/v0.1.0')
 
