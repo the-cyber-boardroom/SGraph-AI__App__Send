@@ -291,6 +291,10 @@
             const preview = this.querySelector('vault-file-preview');
             if (preview) preview.clearPreview();
 
+            // Navigate browser into the selected folder
+            const browser = this.querySelector('vault-browser');
+            if (browser) browser.navigateTo(path);
+
             // Keep dropzone path in sync
             const dropzone = this.querySelector('vault-upload-dropzone');
             if (dropzone) dropzone.targetPath = path;
@@ -451,6 +455,34 @@
             }
         }
 
+        async _onDeleteFolder(folderPath) {
+            if (!this._vault || !folderPath || folderPath === '/') return;
+            const folderName = folderPath.split('/').filter(Boolean).pop();
+            if (!confirm(`Delete folder "${folderName}" and all its contents?`)) return;
+            this._showLoading();
+            try {
+                await this._vault.removeFolder(folderPath);
+                window.sgraphVault.messages.success(`Folder "${folderName}" deleted`);
+                this._selectedFile = null;
+                // If we were inside the deleted folder, navigate to parent
+                if (this._currentPath === folderPath || this._currentPath.startsWith(folderPath + '/')) {
+                    const parts = folderPath.split('/').filter(Boolean);
+                    parts.pop();
+                    this._currentPath = '/' + parts.join('/') || '/';
+                }
+                const tree = this.querySelector('vault-tree-view');
+                if (tree) tree.refresh();
+                const browser = this.querySelector('vault-browser');
+                if (browser) browser.navigateTo(this._currentPath);
+                this._updateVaultKey();
+                this._updateStatusBar();
+            } catch (err) {
+                window.sgraphVault.messages.error(`Delete failed: ${err.message}`);
+            } finally {
+                this._hideLoading();
+            }
+        }
+
         async _onMoveFile(fileName, srcFolderPath, destFolderPath) {
             if (!this._vault || !fileName) return;
             this._showLoading();
@@ -576,6 +608,9 @@
             });
             this.addEventListener('file-delete-request', (e) => {
                 this._onDeleteFile(e.detail.fileName, e.detail.folderPath);
+            });
+            this.addEventListener('folder-delete-request', (e) => {
+                this._onDeleteFolder(e.detail.folderPath);
             });
             this.addEventListener('file-rename-request', (e) => {
                 this._onRenameFile(e.detail.oldName, e.detail.newName, e.detail.folderPath);

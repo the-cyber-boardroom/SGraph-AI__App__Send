@@ -40,6 +40,18 @@
                 this._onNewFolder();
             });
 
+            // Inject context menu styles into document head (once)
+            if (!document.getElementById('vt-context-styles')) {
+                const style = document.createElement('style');
+                style.id = 'vt-context-styles';
+                style.textContent = VaultTreeView.contextMenuStyles;
+                document.head.appendChild(style);
+            }
+
+            // Close context menu on any outside click
+            document.addEventListener('click', () => this._closeContextMenu());
+            document.addEventListener('contextmenu', () => this._closeContextMenu());
+
             // Root folder is a drop target (drop items to move to /)
             const treeEl = this.querySelector('.vt-tree');
             treeEl.addEventListener('dragover', (e) => {
@@ -142,6 +154,7 @@
                         this._handleDrop(fullPath);
                     });
 
+                    // Single click: toggle expand + select folder
                     row.addEventListener('click', () => {
                         if (isExpanded) {
                             this._expandedPaths.delete(fullPath);
@@ -156,10 +169,11 @@
                         }));
                     });
 
-                    // Double-click to rename folder
-                    row.addEventListener('dblclick', (e) => {
+                    // Right-click: context menu with rename/delete
+                    row.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
                         e.stopPropagation();
-                        this._startInlineRename(row, name, fullPath, 'folder');
+                        this._showContextMenu(e.pageX, e.pageY, name, fullPath, 'folder');
                     });
                 } else {
                     const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
@@ -179,10 +193,11 @@
                         }));
                     });
 
-                    // Double-click to rename file
-                    row.addEventListener('dblclick', (e) => {
+                    // Right-click: context menu with rename/delete
+                    row.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
                         e.stopPropagation();
-                        this._startInlineRename(row, name, path, 'file');
+                        this._showContextMenu(e.pageX, e.pageY, name, path, 'file');
                     });
                 }
 
@@ -210,13 +225,10 @@
 
         async _onNewFolder() {
             if (!this._vault) return;
-            const name = prompt('Folder name:');
-            if (!name || !name.trim()) return;
 
             const currentPath = this._selectedPath || '/';
             // Determine the target parent folder
             let targetPath = currentPath;
-            // If selected path is a file, use its parent
             const node = this._vault._findNode(currentPath);
             if (node && node.type !== 'folder') {
                 const parts = currentPath.split('/').filter(Boolean);
@@ -224,17 +236,78 @@
                 targetPath = '/' + parts.join('/');
             }
 
-            const folderPath = targetPath === '/' ? '/' + name.trim() : targetPath + '/' + name.trim();
-            try {
-                await this._vault.createFolder(folderPath);
-                this._expandedPaths.add(targetPath);
-                this.refresh();
-                window.sgraphVault.messages.success(`Folder "${name.trim()}" created`);
-                // Emit key change since tree was saved
-                this.dispatchEvent(new CustomEvent('vault-key-changed', { bubbles: true, composed: true }));
-            } catch (err) {
-                window.sgraphVault.messages.error(err.message);
+            // Expand parent so the new inline row is visible
+            this._expandedPaths.add(targetPath);
+            this.refresh();
+
+            // Find the container where child rows live
+            const treeEl = this.querySelector('.vt-tree');
+            if (!treeEl) return;
+
+            // Find the insert position: after the parent folder row, or at end
+            let insertBefore = null;
+            if (targetPath !== '/') {
+                const parentRow = treeEl.querySelector(`[data-path="${CSS.escape(targetPath)}"]`);
+                if (parentRow) {
+                    // Skip over all children of this parent to find the insert spot
+                    let sibling = parentRow.nextElementSibling;
+                    while (sibling && sibling.classList.contains('vt-row')) {
+                        const siblingPath = sibling.dataset.path || '';
+                        if (!siblingPath.startsWith(targetPath + '/') && siblingPath !== targetPath) break;
+                        sibling = sibling.nextElementSibling;
+                    }
+                    insertBefore = sibling;
+                }
             }
+
+            // Calculate depth
+            const depth = targetPath === '/' ? 0 : targetPath.split('/').filter(Boolean).length;
+
+            // Create inline input row
+            const row = document.createElement('div');
+            row.className = 'vt-row vt-row--new-folder';
+            row.style.paddingLeft = (depth * 16 + 8) + 'px';
+            row.innerHTML = `<span class="vt-chevron">\u00A0\u00A0</span><span class="vt-icon">\uD83D\uDCC1</span>`;
+
+            const input = document.createElement('input');
+            input.className = 'vt-rename-input';
+            input.placeholder = 'folder name';
+            input.style.cssText = 'flex:1; padding:1px 4px; font-size:inherit; font-family:inherit; background:var(--bg-primary); border:1px solid var(--color-primary); border-radius:3px; color:var(--color-text); outline:none;';
+            row.appendChild(input);
+
+            if (insertBefore) {
+                treeEl.insertBefore(row, insertBefore);
+            } else {
+                treeEl.appendChild(row);
+            }
+
+            input.focus();
+
+            const commit = async () => {
+                const name = input.value.trim();
+                row.remove();
+                if (!name) return;
+
+                const folderPath = targetPath === '/' ? '/' + name : targetPath + '/' + name;
+                try {
+                    await this._vault.createFolder(folderPath);
+                    this._expandedPaths.add(targetPath);
+                    this.refresh();
+                    window.sgraphVault.messages.success(`Folder "${name}" created`);
+                    this.dispatchEvent(new CustomEvent('vault-key-changed', { bubbles: true, composed: true }));
+                } catch (err) {
+                    window.sgraphVault.messages.error(err.message);
+                }
+            };
+
+            const cancel = () => { row.remove(); };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter')  { e.stopPropagation(); commit(); }
+                if (e.key === 'Escape') { e.stopPropagation(); cancel(); }
+            });
+            input.addEventListener('blur', () => commit());
+            input.addEventListener('click', (e) => e.stopPropagation());
         }
 
         _startInlineRename(row, currentName, parentPath, type) {
@@ -289,6 +362,70 @@
             input.addEventListener('click', (e) => e.stopPropagation());
         }
 
+        // --- Context Menu --------------------------------------------------------
+
+        _showContextMenu(x, y, name, pathOrParent, type) {
+            this._closeContextMenu();
+
+            const menu = document.createElement('div');
+            menu.className = 'vt-context-menu';
+            menu.style.left = x + 'px';
+            menu.style.top  = y + 'px';
+
+            const renameBtn = document.createElement('div');
+            renameBtn.className = 'vt-context-item';
+            renameBtn.textContent = 'Rename';
+            renameBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._closeContextMenu();
+                // Find the row and start inline rename
+                const fullPath = type === 'folder' ? pathOrParent : pathOrParent + (pathOrParent === '/' ? '' : '/') + name;
+                const selector = type === 'folder'
+                    ? `[data-path="${CSS.escape(pathOrParent)}"]`
+                    : `[data-path="${CSS.escape(fullPath)}"]`;
+                const row = this.querySelector(selector);
+                if (row) this._startInlineRename(row, name, pathOrParent, type);
+            });
+
+            const deleteBtn = document.createElement('div');
+            deleteBtn.className = 'vt-context-item vt-context-item--danger';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._closeContextMenu();
+                if (type === 'folder') {
+                    this.dispatchEvent(new CustomEvent('folder-delete-request', {
+                        detail: { folderPath: pathOrParent },
+                        bubbles: true, composed: true
+                    }));
+                } else {
+                    this.dispatchEvent(new CustomEvent('file-delete-request', {
+                        detail: { fileName: name, folderPath: pathOrParent },
+                        bubbles: true, composed: true
+                    }));
+                }
+            });
+
+            menu.appendChild(renameBtn);
+            menu.appendChild(deleteBtn);
+            document.body.appendChild(menu);
+            this._contextMenu = menu;
+
+            // Adjust if menu goes off-screen
+            requestAnimationFrame(() => {
+                const rect = menu.getBoundingClientRect();
+                if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 4) + 'px';
+                if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 4) + 'px';
+            });
+        }
+
+        _closeContextMenu() {
+            if (this._contextMenu) {
+                this._contextMenu.remove();
+                this._contextMenu = null;
+            }
+        }
+
         _handleDrop(destFolderPath) {
             if (!this._dragging) return;
             const { path, name, type, parentPath } = this._dragging;
@@ -332,6 +469,16 @@
                 .vt-row[draggable="true"]:active { cursor: grabbing; }
                 .vt-row--dragging { opacity: 0.4; }
                 .vt-row--drop-target { outline: 2px dashed var(--color-primary, #4ECDC4); outline-offset: -2px; background: rgba(78, 205, 196, 0.08); border-radius: 3px; }
+            `;
+        }
+
+        static get contextMenuStyles() {
+            // Injected once into document head for the context menu (which lives in document.body)
+            return `
+                .vt-context-menu { position: fixed; z-index: 9999; min-width: 120px; background: var(--bg-secondary, #16213E); border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15)); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); padding: 4px 0; font-size: 0.8125rem; font-family: inherit; }
+                .vt-context-item { padding: 6px 12px; cursor: pointer; color: var(--color-text, #E0E0E0); white-space: nowrap; }
+                .vt-context-item:hover { background: var(--accent-subtle, rgba(78, 205, 196, 0.12)); color: var(--accent, #4ECDC4); }
+                .vt-context-item--danger:hover { background: rgba(233, 69, 96, 0.1); color: var(--danger, #E94560); }
             `;
         }
     }
