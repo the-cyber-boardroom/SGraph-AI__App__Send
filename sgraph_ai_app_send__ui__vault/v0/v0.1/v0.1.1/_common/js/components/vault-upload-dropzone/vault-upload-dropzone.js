@@ -11,6 +11,13 @@
 
     class VaultUploadDropzone extends HTMLElement {
 
+        constructor() {
+            super();
+            this._targetPath = '/';
+        }
+
+        set targetPath(p) { this._targetPath = p || '/'; }
+
         connectedCallback() {
             this.innerHTML = `
                 <style>${this.getStyles()}</style>
@@ -46,15 +53,17 @@
                 const files = e.dataTransfer?.files;
                 if (!files || files.length === 0) return;
 
+                const path = this._targetPath || '/';
                 for (const file of files) {
                     this.dispatchEvent(new CustomEvent('vault-upload-file', {
-                        detail: { file },
+                        detail: { file, path },
                         bubbles: true, composed: true
                     }));
                 }
 
                 // Also trigger upload panel
                 this.dispatchEvent(new CustomEvent('vault-upload-request', {
+                    detail: { path },
                     bubbles: true, composed: true
                 }));
             });

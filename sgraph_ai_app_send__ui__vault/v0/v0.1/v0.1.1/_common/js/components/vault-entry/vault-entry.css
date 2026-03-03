@@ -101,3 +101,10 @@
     color: var(--color-text-secondary, #8892A0);
     margin-top: var(--space-1, 4px);
 }
+
+.vault-entry__optional {
+    font-weight: 400;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.8;
+}
