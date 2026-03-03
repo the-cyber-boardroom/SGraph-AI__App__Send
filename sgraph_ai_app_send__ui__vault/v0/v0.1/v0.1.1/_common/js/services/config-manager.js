@@ -10,7 +10,7 @@
 
     class ConfigManager {
         constructor() {
-            this.version  = 'v0.1.1';
+            this.version  = 'v0.1.3';
             this.appName  = 'SG/Vault';
             this.appTitle = 'Zero-knowledge encrypted vault';
         }
