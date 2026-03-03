@@ -236,3 +236,6 @@ sgraph_ai_app_send__ui__vault/**/pl-pl/
 sgraph_ai_app_send__ui__vault/**/hr-hr/
 sgraph_ai_app_send__ui__vault/**/ro-ro/
 sgraph_ai_app_send__ui__vault/**/tlh/
+
+# Generated build info (injected by CI via scripts/inject_build_version.py)
+**/build-info.js

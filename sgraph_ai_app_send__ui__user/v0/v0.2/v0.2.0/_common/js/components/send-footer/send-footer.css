@@ -20,3 +20,12 @@
 .sg-footer__link:hover {
     text-decoration: underline;
 }
+
+.sg-footer__version {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.03em;
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.6;
+}
