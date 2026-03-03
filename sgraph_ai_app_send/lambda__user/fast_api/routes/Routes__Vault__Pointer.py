@@ -1,0 +1,112 @@
+# ===============================================================================
+# SGraph Send - Vault Pointer Routes
+# Mutable vault file endpoints: write, read, delete
+# ===============================================================================
+
+from fastapi                                                                     import HTTPException, Request, Response
+from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
+from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
+from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.user__config                                import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY
+
+TAG__ROUTES_VAULT = 'api/vault'
+
+ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id}}'  ,
+                       f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}/{{file_id}}'   ,
+                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id}}' ]
+
+
+class Routes__Vault__Pointer(Fast_API__Routes):                                  # Vault file endpoints (write, read, delete)
+    tag                  : str = TAG__ROUTES_VAULT
+    vault_service        : Service__Vault__Pointer                               # Auto-initialized by Type_Safe
+    admin_service_client : object = None                                         # Optional Admin__Service__Client
+
+    def check_access_token(self, request: Request):                              # Validate access token from header
+        from osbot_utils.utils.Env import get_env
+        from sgraph_ai_app_send.lambda__user.user__config import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN
+        provided_token = request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '')
+
+        if self.admin_service_client is not None:                                # Admin service available — validate via token_lookup
+            if not provided_token:
+                raise HTTPException(status_code = 401,
+                                    detail      = 'Access token required')
+            try:
+                response = self.admin_service_client.token_lookup(provided_token)
+                if response.status_code == 404:
+                    raise HTTPException(status_code = 401,
+                                        detail      = 'Invalid access token')
+                data = response.json()
+                if data.get('status') != 'active':
+                    raise HTTPException(status_code = 401,
+                                        detail      = f'Access token {data.get("status", "invalid")}')
+                return provided_token
+            except HTTPException:
+                raise
+            except Exception:
+                raise HTTPException(status_code = 503,
+                                    detail      = 'Token validation service unavailable')
+
+        # Fallback to env-var check (no admin service configured)
+        expected_token = get_env(ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, '')
+        if not expected_token:                                                   # No token configured — allow all (local dev)
+            return provided_token or None
+        if provided_token != expected_token:
+            raise HTTPException(status_code = 401,
+                                detail      = 'Access token required')
+        return provided_token
+
+    async def write__vault_id__file_id(self, vault_id : Safe_Str__Id,            # PUT /vault/{vault_id}/write/{file_id}
+                                             file_id  : Safe_Str__Id,
+                                             request  : Request
+                                       ) -> dict:
+        self.check_access_token(request)
+        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
+        if not write_key:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Missing write key')
+        payload = await request.body()
+        if not payload:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Empty payload')
+        result = self.vault_service.write(vault_id    = str(vault_id)  ,
+                                          file_id     = str(file_id)   ,
+                                          write_key_hex = write_key    ,
+                                          payload_bytes = payload      )
+        if result is None:
+            raise HTTPException(status_code = 403,
+                                detail      = 'Write key mismatch')
+        return result
+
+    def read__vault_id__file_id(self, vault_id : Safe_Str__Id,                   # GET /vault/{vault_id}/read/{file_id}
+                                      file_id  : Safe_Str__Id
+                               ) -> Response:
+        payload = self.vault_service.read(vault_id = str(vault_id),
+                                          file_id  = str(file_id) )
+        if payload is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Vault file not found')
+        return Response(content    = payload                    ,
+                        media_type = 'application/octet-stream')
+
+    async def delete__vault_id__file_id(self, vault_id : Safe_Str__Id,           # DELETE /vault/{vault_id}/file/{file_id}
+                                              file_id  : Safe_Str__Id,
+                                              request  : Request
+                                        ) -> dict:
+        self.check_access_token(request)
+        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
+        if not write_key:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Missing write key')
+        result = self.vault_service.delete(vault_id      = str(vault_id) ,
+                                           file_id       = str(file_id)  ,
+                                           write_key_hex = write_key     )
+        if result is None:
+            raise HTTPException(status_code = 403,
+                                detail      = 'Write key mismatch or file not found')
+        return result
+
+    def setup_routes(self):                                                      # Register all endpoints
+        self.add_route_put   (self.write__vault_id__file_id  )
+        self.add_route_get   (self.read__vault_id__file_id   )
+        self.add_route_delete(self.delete__vault_id__file_id )
+        return self
