@@ -131,6 +131,63 @@
         getRenderType()  { return this._renderType; }
         getVersion()     { return this._version; }
 
+        /** Save current content to vault as a new encrypted file */
+        async saveToVault() {
+            if (!this._content || !this._filename) {
+                window.sgraphWorkspace.messages.warning('Nothing to save');
+                return;
+            }
+
+            const vaultPanel = document.querySelector('vault-panel');
+            if (!vaultPanel || vaultPanel.getState() !== 'open') {
+                window.sgraphWorkspace.messages.error('Vault is not open — cannot save');
+                return;
+            }
+
+            // Derive a filename for the transformed version
+            const baseName  = this._filename.replace(/\.[^.]+$/, '');
+            const ext       = this._filename.includes('.') ? '.' + this._filename.split('.').pop() : '.md';
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const saveName  = `${baseName}__transformed__${timestamp}${ext}`;
+
+            this._setSaveState('saving');
+            window.sgraphWorkspace.messages.info('Encrypting and saving to vault...');
+
+            try {
+                const result = await vaultPanel.saveFile(this._content, saveName);
+                this._setSaveState('saved');
+                window.sgraphWorkspace.messages.success(`"${saveName}" saved to vault`);
+                window.sgraphWorkspace.events.emit('file-saved', {
+                    role: this._role, guid: result.guid, name: saveName
+                });
+
+                // Reset save button after 2s
+                setTimeout(() => this._setSaveState('idle'), 2000);
+            } catch (e) {
+                console.error('[document-viewer] Save to vault failed:', e);
+                this._setSaveState('idle');
+                window.sgraphWorkspace.messages.error('Save failed: ' + e.message);
+            }
+        }
+
+        _setSaveState(state) {
+            this._saveState = state;
+            const btn = this.querySelector('.dv-save-btn');
+            if (!btn) return;
+            if (state === 'saving') {
+                btn.disabled = true;
+                btn.textContent = 'Saving...';
+            } else if (state === 'saved') {
+                btn.disabled = true;
+                btn.textContent = 'Saved!';
+                btn.classList.add('dv-save-btn--saved');
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Save to Vault';
+                btn.classList.remove('dv-save-btn--saved');
+            }
+        }
+
         // --- File detection ----------------------------------------------------
 
         _detectType() {
@@ -245,7 +302,8 @@
             const lang = typeof FileTypeDetect !== 'undefined'
                 ? FileTypeDetect.getLanguage(this._filename) : 'text';
 
-            // Toolbar: filename + source/rendered toggle
+            // Toolbar: filename + source/rendered toggle + save button (transform only)
+            const canSave = this._role === 'transform' && this._content;
             const toolbar = `
                 <div class="dv-toolbar">
                     <span class="dv-filename">${esc(this._filename || 'untitled')}</span>
@@ -259,6 +317,7 @@
                         </div>
                     ` : ''}
                     ${this._content ? `<span class="dv-filesize">${formatSize(this._content.byteLength)}</span>` : ''}
+                    ${canSave ? `<button class="dv-save-btn">Save to Vault</button>` : ''}
                 </div>`;
 
             let body = '';
@@ -360,6 +419,9 @@
                     this._renderContent();
                 });
             });
+
+            const saveBtn = this.querySelector('.dv-save-btn');
+            if (saveBtn) saveBtn.addEventListener('click', () => this.saveToVault());
         }
 
         // --- Styles ------------------------------------------------------------
@@ -418,6 +480,23 @@
                     color: var(--ws-primary, #4ECDC4);
                 }
                 .dv-toggle + .dv-filesize { margin-left: 0; }
+
+                .dv-save-btn {
+                    padding: 0.1875rem 0.625rem; font-size: 0.6875rem; font-weight: 600;
+                    border: 1px solid var(--ws-primary, #4ECDC4);
+                    background: var(--ws-primary-bg, rgba(78,205,196,0.1));
+                    color: var(--ws-primary, #4ECDC4);
+                    border-radius: var(--ws-radius, 6px); cursor: pointer;
+                    font-family: inherit; transition: background 100ms;
+                    flex-shrink: 0; margin-left: auto;
+                }
+                .dv-save-btn:hover:not(:disabled) { background: rgba(78,205,196,0.2); }
+                .dv-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+                .dv-save-btn--saved {
+                    background: rgba(78,205,196,0.15);
+                    border-color: var(--ws-success, #4ECDC4);
+                    color: var(--ws-success, #4ECDC4);
+                }
 
                 .dv-body { flex: 1; overflow-y: auto; }
 
