@@ -84,7 +84,7 @@
         router : null,    // set by workspace-shell on connectedCallback
         config : {
             version      : 'v0.1.0',
-            appVersion   : 'v0.10.44',
+            appVersion   : (window.SGRAPH_BUILD && window.SGRAPH_BUILD.appVersion) || 'dev',
             sendEndpoint : localStorage.getItem('workspace-send-endpoint') || 'https://send.sgraph.ai',
         }
     };

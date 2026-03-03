@@ -105,6 +105,13 @@ jobs:
             echo "Deploying to DEV (dev.workspace.sgraph.ai) → S3: websites/sgraph-workspace/dev/"
           fi
 
+      - name: Inject build version
+        run: |
+          python scripts/inject_build_version.py \
+            --ui-base sgraph_ai_app_send__ui__workspace \
+            --version ${{ env.UI_VERSION }} \
+            --output-subdir js
+
       - name: Deploy Workspace UI to S3
         if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
