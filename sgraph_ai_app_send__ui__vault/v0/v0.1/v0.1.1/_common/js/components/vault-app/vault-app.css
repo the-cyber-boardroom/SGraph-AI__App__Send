@@ -1,0 +1,102 @@
+:host {
+    display: block;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.vault-app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* --- Header --- */
+.vault-app__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4, 16px) var(--space-6, 24px);
+    border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+}
+
+.vault-app__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 12px);
+}
+
+.sg-brand-logo {
+    font-family: var(--font-display, system-ui);
+    font-size: var(--text-h2, 1.6rem);
+    font-weight: var(--weight-bold, 700);
+    letter-spacing: -0.02em;
+}
+
+.sg-brand-logo__sg      { color: var(--accent, #4ECDC4); }
+.sg-brand-logo__slash   { color: var(--color-text-secondary, #8892A0); margin: 0 2px; }
+.sg-brand-logo__product { color: var(--color-text, #E0E0E0); }
+
+.vault-app__vault-name {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.vault-app__header-actions {
+    display: flex;
+    gap: var(--space-2, 8px);
+}
+
+/* --- Views --- */
+.vault-app__view {
+    flex: 1;
+    max-width: 960px;
+    width: 100%;
+    margin: 0 auto;
+    padding: var(--space-6, 24px);
+}
+
+#view-entry {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vault-app__browser-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.vault-app__upload-card {
+    margin-top: var(--space-4, 16px);
+}
+
+/* --- Footer --- */
+.vault-app__footer {
+    text-align: center;
+    padding: var(--space-4, 16px);
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.vault-app__footer a {
+    color: var(--accent, #4ECDC4);
+    text-decoration: none;
+}
+
+.vault-app__footer a:hover {
+    text-decoration: underline;
+}
+
+/* --- Responsive --- */
+@media (max-width: 600px) {
+    .vault-app__header {
+        padding: var(--space-3, 12px);
+    }
+    .vault-app__view {
+        padding: var(--space-3, 12px);
+    }
+    .sg-brand-logo {
+        font-size: var(--text-h3, 1.25rem);
+    }
+}
