@@ -13,7 +13,12 @@
 
         constructor() {
             super();
-            this._blobUrl = null;
+            this._blobUrl    = null;
+            this._vault      = null;
+            this._folderPath = '/';
+            this._fileName   = null;
+            this._fileData   = null;
+            this._editing    = false;
         }
 
         connectedCallback() {
@@ -26,10 +31,20 @@
                     <div class="vfpv-loading" style="display:none">
                         Decrypting and loading...
                     </div>
+                    <div class="vfpv-toolbar" style="display:none">
+                        <button class="vfpv-edit-btn">Edit</button>
+                        <button class="vfpv-save-btn" style="display:none">Save</button>
+                        <button class="vfpv-cancel-btn" style="display:none">Cancel</button>
+                    </div>
                     <div class="vfpv-content" style="display:none"></div>
+                    <textarea class="vfpv-editor" style="display:none"></textarea>
                     <div class="vfpv-error" style="display:none"></div>
                 </div>
             `;
+
+            this.querySelector('.vfpv-edit-btn').addEventListener('click', () => this._startEditing());
+            this.querySelector('.vfpv-save-btn').addEventListener('click', () => this._saveEdit());
+            this.querySelector('.vfpv-cancel-btn').addEventListener('click', () => this._cancelEdit());
         }
 
         disconnectedCallback() {
@@ -38,26 +53,44 @@
 
         async loadFile(vault, folderPath, fileName, fileEntry) {
             this._revokeBlob();
+            this._vault      = vault;
+            this._folderPath = folderPath;
+            this._fileName   = fileName;
+            this._editing    = false;
 
             const placeholder = this.querySelector('.vfpv-placeholder');
             const loading     = this.querySelector('.vfpv-loading');
             const content     = this.querySelector('.vfpv-content');
             const errorEl     = this.querySelector('.vfpv-error');
+            const toolbar     = this.querySelector('.vfpv-toolbar');
+            const editor      = this.querySelector('.vfpv-editor');
 
             placeholder.style.display = 'none';
             errorEl.style.display     = 'none';
             content.style.display     = 'none';
             content.innerHTML         = '';
             loading.style.display     = '';
+            toolbar.style.display     = 'none';
+            editor.style.display      = 'none';
 
             try {
                 const data = await vault.getFile(folderPath, fileName);
+                this._fileData = data;
                 const type = typeof FileTypeDetect !== 'undefined'
                     ? FileTypeDetect.detect(fileName)
                     : null;
 
                 loading.style.display = 'none';
                 content.style.display = '';
+
+                // Show edit button for text-editable types
+                const editable = ['markdown', 'code', 'text'].includes(type) || fileName.endsWith('.json');
+                if (editable) {
+                    toolbar.style.display = '';
+                    this.querySelector('.vfpv-edit-btn').style.display = '';
+                    this.querySelector('.vfpv-save-btn').style.display = 'none';
+                    this.querySelector('.vfpv-cancel-btn').style.display = 'none';
+                }
 
                 switch (type) {
                     case 'markdown':
@@ -227,6 +260,79 @@
             `;
         }
 
+        // --- Inline Editing -----------------------------------------------------
+
+        _startEditing() {
+            if (!this._fileData || this._editing) return;
+            this._editing = true;
+
+            const text = new TextDecoder().decode(this._fileData);
+            const content  = this.querySelector('.vfpv-content');
+            const editor   = this.querySelector('.vfpv-editor');
+
+            content.style.display = 'none';
+            editor.style.display  = '';
+            editor.value = text;
+            editor.focus();
+
+            this.querySelector('.vfpv-edit-btn').style.display   = 'none';
+            this.querySelector('.vfpv-save-btn').style.display   = '';
+            this.querySelector('.vfpv-cancel-btn').style.display = '';
+        }
+
+        _cancelEdit() {
+            this._editing = false;
+            const content = this.querySelector('.vfpv-content');
+            const editor  = this.querySelector('.vfpv-editor');
+
+            editor.style.display  = 'none';
+            content.style.display = '';
+
+            this.querySelector('.vfpv-edit-btn').style.display   = '';
+            this.querySelector('.vfpv-save-btn').style.display   = 'none';
+            this.querySelector('.vfpv-cancel-btn').style.display = 'none';
+        }
+
+        async _saveEdit() {
+            if (!this._editing || !this._vault || !this._fileName) return;
+
+            const editor   = this.querySelector('.vfpv-editor');
+            const newText  = editor.value;
+            const newData  = new TextEncoder().encode(newText);
+
+            try {
+                // Remove old file, add updated one
+                await this._vault.removeFile(this._folderPath, this._fileName);
+                await this._vault.addFile(this._folderPath, this._fileName, newData);
+
+                this._fileData = newData;
+                this._editing  = false;
+
+                // Re-render preview
+                const content = this.querySelector('.vfpv-content');
+                content.innerHTML = '';
+                editor.style.display  = 'none';
+                content.style.display = '';
+
+                const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(this._fileName) : 'text';
+                switch (type) {
+                    case 'markdown': this._renderMarkdown(content, newData, this._fileName); break;
+                    case 'code':     this._renderCode(content, newData, this._fileName);     break;
+                    default:         this._renderText(content, newData);                      break;
+                }
+
+                this.querySelector('.vfpv-edit-btn').style.display   = '';
+                this.querySelector('.vfpv-save-btn').style.display   = 'none';
+                this.querySelector('.vfpv-cancel-btn').style.display = 'none';
+
+                // Notify shell to update vault key
+                this.dispatchEvent(new CustomEvent('vault-file-added', { bubbles: true, composed: true }));
+                window.sgraphVault.messages.success(`"${this._fileName}" saved`);
+            } catch (err) {
+                window.sgraphVault.messages.error(`Save failed: ${err.message}`);
+            }
+        }
+
         // --- Helpers ------------------------------------------------------------
 
         _revokeBlob() {
@@ -244,7 +350,14 @@
 
         getStyles() {
             return `
-                .vfpv-container { min-height: 200px; }
+                .vfpv-container { min-height: 200px; display: flex; flex-direction: column; }
+                .vfpv-toolbar { display: flex; gap: var(--space-2); justify-content: flex-end; margin-bottom: var(--space-2); }
+                .vfpv-edit-btn, .vfpv-save-btn, .vfpv-cancel-btn { font-size: var(--text-small); padding: 0.25rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family); }
+                .vfpv-edit-btn:hover { background: var(--bg-secondary); color: var(--color-primary); border-color: var(--color-primary); }
+                .vfpv-save-btn { background: var(--color-primary); color: var(--bg-primary); border-color: var(--color-primary); font-weight: 600; }
+                .vfpv-save-btn:hover { opacity: 0.9; }
+                .vfpv-cancel-btn:hover { background: var(--bg-secondary); color: var(--color-text); }
+                .vfpv-editor { width: 100%; min-height: 400px; max-height: 70vh; padding: 1rem; font-family: var(--font-mono); font-size: var(--text-small); background: var(--bg-secondary); border: 1px solid var(--color-primary); border-radius: var(--radius-sm); color: var(--color-text); resize: vertical; outline: none; line-height: 1.5; tab-size: 4; box-sizing: border-box; }
                 .vfpv-placeholder { padding: 3rem; text-align: center; color: var(--color-text-secondary); font-size: var(--text-sm); }
                 .vfpv-loading { padding: 2rem; text-align: center; color: var(--color-primary); font-size: var(--text-sm); }
                 .vfpv-error { padding: 1rem; background: rgba(233,69,96,0.1); border: 1px solid rgba(233,69,96,0.2); border-radius: var(--radius-sm); color: var(--color-error); font-size: var(--text-sm); }

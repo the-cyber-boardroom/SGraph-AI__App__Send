@@ -7,15 +7,15 @@
         <p class="vault-entry__tagline" data-i18n="app.subtitle">Your files, encrypted in your browser. The server sees nothing.</p>
     </div>
 
-    <!-- Access key (required to connect to send.sgraph.ai) -->
+    <!-- Access key (optional for browsing, required for uploads) -->
     <div class="vault-entry__section vault-entry__access" id="access-section">
-        <label class="vault-entry__label" data-i18n="vault.entry.access_label">Access Key</label>
+        <label class="vault-entry__label" data-i18n="vault.entry.access_label">Access Key <span class="vault-entry__optional">(optional for browsing)</span></label>
         <input class="input vault-entry__input" type="password"
                data-i18n-placeholder="vault.entry.access_placeholder"
                placeholder="Paste your access key"
                id="access-key-input"
                autocomplete="off">
-        <p class="vault-entry__hint" data-i18n="vault.entry.access_hint">Required to use the SGraph Send API</p>
+        <p class="vault-entry__hint" data-i18n="vault.entry.access_hint">Only needed for uploading files. Browse and download without it.</p>
     </div>
 
     <!-- Open existing vault -->

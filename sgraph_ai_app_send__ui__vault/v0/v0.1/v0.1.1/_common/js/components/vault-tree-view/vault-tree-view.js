@@ -98,6 +98,12 @@
                             bubbles: true, composed: true
                         }));
                     });
+
+                    // Double-click to rename folder
+                    row.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        this._startInlineRename(row, name, fullPath, 'folder');
+                    });
                 } else {
                     const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
                     const icon = this._getFileIcon(ext);
@@ -114,6 +120,12 @@
                             },
                             bubbles: true, composed: true
                         }));
+                    });
+
+                    // Double-click to rename file
+                    row.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        this._startInlineRename(row, name, path, 'file');
                     });
                 }
 
@@ -166,6 +178,58 @@
             } catch (err) {
                 window.sgraphVault.messages.error(err.message);
             }
+        }
+
+        _startInlineRename(row, currentName, parentPath, type) {
+            const nameEl = row.querySelector('.vt-name');
+            if (!nameEl) return;
+
+            const input = document.createElement('input');
+            input.className = 'vt-rename-input';
+            input.value = currentName;
+            input.style.cssText = 'flex:1; padding:1px 4px; font-size:inherit; font-family:inherit; background:var(--bg-primary); border:1px solid var(--color-primary); border-radius:3px; color:var(--color-text); outline:none;';
+
+            nameEl.style.display = 'none';
+            nameEl.parentNode.insertBefore(input, nameEl.nextSibling);
+            input.focus();
+
+            if (type === 'file') {
+                const dotIndex = currentName.lastIndexOf('.');
+                input.setSelectionRange(0, dotIndex > 0 ? dotIndex : currentName.length);
+            } else {
+                input.select();
+            }
+
+            const commit = () => {
+                const newName = input.value.trim();
+                input.remove();
+                nameEl.style.display = '';
+                if (!newName || newName === currentName) return;
+
+                if (type === 'folder') {
+                    this.dispatchEvent(new CustomEvent('folder-rename-request', {
+                        detail: { oldPath: parentPath, newName },
+                        bubbles: true, composed: true
+                    }));
+                } else {
+                    this.dispatchEvent(new CustomEvent('file-rename-request', {
+                        detail: { oldName: currentName, newName, folderPath: parentPath },
+                        bubbles: true, composed: true
+                    }));
+                }
+            };
+
+            const cancel = () => {
+                input.remove();
+                nameEl.style.display = '';
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter')  { e.stopPropagation(); commit(); }
+                if (e.key === 'Escape') { e.stopPropagation(); cancel(); }
+            });
+            input.addEventListener('blur', () => commit());
+            input.addEventListener('click', (e) => e.stopPropagation());
         }
 
         _escapeHtml(str) {

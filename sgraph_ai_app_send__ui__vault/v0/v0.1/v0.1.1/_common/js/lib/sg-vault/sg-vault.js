@@ -160,6 +160,16 @@ class SGVault {
         await this._saveTree()
     }
 
+    async renameFile(folderPath, oldName, newName) {
+        const folder = this._findNode(folderPath)
+        if (!folder) throw new Error(`Folder not found: ${folderPath}`)
+        if (!folder.children[oldName]) throw new Error(`File not found: ${oldName}`)
+        if (folder.children[newName]) throw new Error(`Already exists: ${newName}`)
+        folder.children[newName] = folder.children[oldName]
+        delete folder.children[oldName]
+        await this._saveTree()
+    }
+
     // --- Folder Operations ----------------------------------------------------
 
     async createFolder(folderPath) {
@@ -198,6 +208,24 @@ class SGVault {
             throw new Error(`Folder not found: ${name}`)
         }
         delete parent.children[name]
+        await this._saveTree()
+    }
+
+    async renameFolder(folderPath, newName) {
+        const parts  = folderPath.split('/').filter(Boolean)
+        const oldName = parts.pop()
+        const parent = this._findNode('/' + parts.join('/'))
+        if (!parent || parent.type !== 'folder') {
+            throw new Error(`Parent folder not found`)
+        }
+        if (!parent.children[oldName]) {
+            throw new Error(`Folder not found: ${oldName}`)
+        }
+        if (parent.children[newName]) {
+            throw new Error(`Already exists: ${newName}`)
+        }
+        parent.children[newName] = parent.children[oldName]
+        delete parent.children[oldName]
         await this._saveTree()
     }
 

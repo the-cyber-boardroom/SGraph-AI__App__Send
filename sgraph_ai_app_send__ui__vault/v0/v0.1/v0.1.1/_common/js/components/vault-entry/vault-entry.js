@@ -53,8 +53,7 @@ class VaultEntry extends VaultComponent {
     }
 
     async _onOpen() {
-        if (!this._requireAccessKey()) return
-
+        // Access key is NOT required for opening/browsing — only for uploads
         const vaultKey = this._keyInput.value.trim()
         if (!vaultKey) {
             this._showError(this.t('vault.entry.error.wrong_key'))
@@ -72,7 +71,9 @@ class VaultEntry extends VaultComponent {
             // Update URL hash (vault key may have changed due to save)
             window.history.replaceState(null, '', '#' + encodeURIComponent(vaultKey))
 
-            this.emit('vault-opened', { vault, vaultKey })
+            // Pass access key availability so shell knows if uploads are possible
+            const accessKey = this._accessKeyInput.value.trim()
+            this.emit('vault-opened', { vault, vaultKey, accessKey })
         } catch (err) {
             if (err.message.includes('Decryption failed')) {
                 this._showError(this.t('vault.entry.error.wrong_key'))
