@@ -211,10 +211,68 @@
             window.sgraphWorkspace.messages.info('Loading "' + meta.name + '"...');
         }
 
-        // --- Public API (for document-viewer to decrypt files) -----------------
+        // --- Public API (for document-viewer to decrypt files / save new ones) --
 
         getKeyPair()  { return this._keyPair; }
         getVaultKey() { return this._vaultKey; }
+        getState()    { return this._state; }
+
+        /**
+         * Save a new file into the vault (encrypt + upload + update index).
+         * Returns { guid, name } on success, null on failure.
+         */
+        async saveFile(bytes, filename) {
+            if (this._state !== 'open' || !this._keyPair || !this._vaultKey) {
+                throw new Error('Vault is not open');
+            }
+
+            // Generate unique file GUID (8 hex chars)
+            const fileGuid = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // Encrypt with public key (hybrid AES-256-GCM + RSA-OAEP)
+            const encrypted = await VaultCrypto.encrypt(this._keyPair.publicKey, new Uint8Array(bytes));
+            const b64       = VaultCrypto.arrayBufToB64(encrypted);
+
+            // Upload encrypted data
+            const result = await VaultAPI.storeFile(this._vaultKey, fileGuid, b64);
+            if (!result) throw new Error('Vault API storeFile failed');
+
+            // Add to current folder
+            const folder = await VaultAPI.getFolder(this._vaultKey, this._currentFolder);
+            if (folder) {
+                const children = folder.children || [];
+                children.push(fileGuid);
+                folder.children = children;
+                await VaultAPI.storeFolder(this._vaultKey, this._currentFolder, folder);
+            }
+
+            // Update in-memory index
+            this._index[fileGuid] = {
+                name:    filename,
+                type:    'application/octet-stream',
+                size:    bytes.byteLength || bytes.length,
+                kind:    'file',
+                _parent: this._currentFolder,
+            };
+
+            // Encrypt and save index
+            await this._saveIndex();
+
+            // Re-render file list
+            this._render();
+
+            return { guid: fileGuid, name: filename };
+        }
+
+        /** Encrypt and persist the vault index */
+        async _saveIndex() {
+            const json  = JSON.stringify(this._index);
+            const data  = new TextEncoder().encode(json);
+            const enc   = await VaultCrypto.encrypt(this._keyPair.publicKey, data);
+            const b64   = VaultCrypto.arrayBufToB64(enc);
+            await VaultAPI.storeIndex(this._vaultKey, b64);
+        }
 
         // --- Render: State-based -----------------------------------------------
 
