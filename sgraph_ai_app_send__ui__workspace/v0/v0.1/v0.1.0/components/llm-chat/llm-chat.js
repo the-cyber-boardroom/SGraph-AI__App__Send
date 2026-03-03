@@ -422,7 +422,7 @@
         static get styles() {
             return `
                 .lcc-panel {
-                    display: flex; flex-direction: column; height: 100%;
+                    display: flex; flex-direction: column; flex: 1; min-height: 0;
                     padding: 0.5rem 0.75rem; gap: 0.375rem;
                 }
                 .lcc-top-bar {
