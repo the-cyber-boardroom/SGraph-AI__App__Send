@@ -229,6 +229,47 @@ class SGVault {
         await this._saveTree()
     }
 
+    async moveFile(srcFolderPath, fileName, destFolderPath) {
+        if (srcFolderPath === destFolderPath) return
+        const srcFolder  = this._findNode(srcFolderPath)
+        if (!srcFolder || srcFolder.type !== 'folder') throw new Error(`Source folder not found: ${srcFolderPath}`)
+        const entry = srcFolder.children[fileName]
+        if (!entry || entry.type !== 'file') throw new Error(`File not found: ${fileName}`)
+
+        const destFolder = this._findNode(destFolderPath)
+        if (!destFolder || destFolder.type !== 'folder') throw new Error(`Destination folder not found: ${destFolderPath}`)
+        if (destFolder.children[fileName]) throw new Error(`Already exists in destination: ${fileName}`)
+
+        destFolder.children[fileName] = entry
+        delete srcFolder.children[fileName]
+        await this._saveTree()
+    }
+
+    async moveFolder(srcPath, destParentPath) {
+        const srcParts  = srcPath.split('/').filter(Boolean)
+        const folderName = srcParts.pop()
+        const srcParentPath = '/' + srcParts.join('/')
+        if (srcParentPath === destParentPath) return
+
+        const srcParent = this._findNode(srcParentPath)
+        if (!srcParent || srcParent.type !== 'folder') throw new Error(`Source parent not found`)
+        const folderNode = srcParent.children[folderName]
+        if (!folderNode || folderNode.type !== 'folder') throw new Error(`Folder not found: ${folderName}`)
+
+        // Prevent moving a folder into itself or its descendants
+        if (destParentPath === srcPath || destParentPath.startsWith(srcPath + '/')) {
+            throw new Error(`Cannot move folder into itself`)
+        }
+
+        const destParent = this._findNode(destParentPath)
+        if (!destParent || destParent.type !== 'folder') throw new Error(`Destination folder not found: ${destParentPath}`)
+        if (destParent.children[folderName]) throw new Error(`Already exists in destination: ${folderName}`)
+
+        destParent.children[folderName] = folderNode
+        delete srcParent.children[folderName]
+        await this._saveTree()
+    }
+
     // --- Stats ----------------------------------------------------------------
 
     getStats() {
