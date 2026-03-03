@@ -193,17 +193,17 @@
         _detectType() {
             if (typeof FileTypeDetect !== 'undefined') {
                 this._renderType = FileTypeDetect.detect(this._filename, null);
-            } else {
-                // Fallback: basic extension detection
+            }
+            // Fallback for types FileTypeDetect doesn't cover (e.g. .txt) or if it's not loaded
+            if (!this._renderType && this._filename) {
                 const ext = (this._filename || '').split('.').pop().toLowerCase();
-                const textExts = ['md', 'markdown', 'txt', 'json', 'yaml', 'yml', 'xml', 'csv', 'log'];
+                const textExts = ['md', 'markdown', 'txt', 'json', 'yaml', 'yml', 'xml', 'csv', 'log', 'cfg', 'conf'];
                 const codeExts = ['js', 'ts', 'py', 'html', 'css', 'sh', 'sql', 'go', 'rs', 'java', 'c', 'cpp', 'rb', 'php'];
                 if (['md', 'markdown'].includes(ext)) this._renderType = 'markdown';
                 else if (codeExts.includes(ext))       this._renderType = 'code';
                 else if (textExts.includes(ext))       this._renderType = 'text';
                 else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) this._renderType = 'image';
                 else if (ext === 'pdf')                this._renderType = 'pdf';
-                else                                   this._renderType = null;
             }
         }
 
