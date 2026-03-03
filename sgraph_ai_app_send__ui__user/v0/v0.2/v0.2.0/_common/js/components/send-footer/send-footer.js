@@ -1,9 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — Footer Component
-   v0.2.0 — Links back to sgraph.ai
+   v0.2.0 — Links back to sgraph.ai, shows build version
 
    Usage:
      <send-footer></send-footer>
+
+   Version display:
+     Reads window.SGRAPH_BUILD (injected at build time by scripts/inject_build_version.py).
+     Shows: "Powered by SGraph  ·  v0.10.13  ·  UI v0.2.0"
+     Falls back gracefully when build-info.js is absent (local dev).
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 class SendFooter extends HTMLElement {
@@ -23,6 +28,10 @@ class SendFooter extends HTMLElement {
     render() {
         const locale = (typeof I18n !== 'undefined') ? I18n.locale : 'en-gb';
         const sgraphUrl = `https://sgraph.ai/${locale}/`;
+        const build    = window.SGRAPH_BUILD;
+        const version  = build
+            ? `<span class="sg-footer__version">${build.appVersion}  ·  UI ${build.uiVersion}</span>`
+            : '';
 
         this.innerHTML = `
             <footer class="sg-footer">
@@ -30,6 +39,7 @@ class SendFooter extends HTMLElement {
                     ${this.t('footer.powered_by')}
                     <a href="${sgraphUrl}" target="_blank" rel="noopener" class="sg-footer__link">${this.t('footer.sgraph')}</a>
                 </span>
+                ${version}
             </footer>
         `;
     }

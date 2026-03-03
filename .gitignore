@@ -212,3 +212,6 @@ tests/unit/lambda__admin/server_analytics/aws/cloud_front/_cf_cache
 sgraph_ai__website/pt-pt/
 sgraph_ai__website/pt-br/
 sgraph_ai__website/tlh/
+
+# Generated build info (injected by CI via scripts/inject_build_version.py)
+**/build-info.js
