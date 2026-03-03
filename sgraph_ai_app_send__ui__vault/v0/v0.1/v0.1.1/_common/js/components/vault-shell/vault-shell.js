@@ -1,10 +1,18 @@
 /* =============================================================================
    SGraph Vault — Shell Component
-   v0.1.1 — Light DOM, EventBus, 3-column layout
+   v0.1.3 — Light DOM, EventBus, 5-column layout with left navigation
 
    Pattern adapted from Admin Console v0.1.3 admin-shell.js.
-   Three-column layout:
-     Left (tree)  |  Main content (preview/browser)  |  Right sidebar (debug)
+   Five-column layout:
+     Nav  |  Left (tree)  |  Main content (preview/browser)  |  resize  |  Right sidebar (debug)
+
+   Nav panel provides top-level view switching: Files, Settings, (future views).
+
+   Design guidelines:
+     - Avoid modal windows unless truly necessary (e.g. destructive confirm).
+       Prefer inline panels, top-level views, or expanding sections.
+     - Show visual loading indicators for all API requests to give feedback
+       during cold starts or slow network conditions.
 
    Manages vault lifecycle: entry → browser → lock.
    ============================================================================= */
@@ -25,6 +33,9 @@
             this._selectedFile  = null;
             this._currentPath   = '/';
             this._pendingUploadAction = null;
+            this._activeView    = 'files';       // 'files' | 'settings'
+            this._loadingCount  = 0;             // track concurrent API requests
+            this._appVersion    = '';            // fetched from /api/health
             this._loadPreferences();
         }
 
@@ -35,6 +46,10 @@
             this._setupMessageBadge();
             this._applyDebugWidth();
             this._updateDebugSidebar();
+            this._fetchAppVersion();
+
+            // Hook loading bar into fetch interceptor (api-call events)
+            this._setupLoadingHook();
 
             window.sgraphVault.shell = this;
             window.sgraphVault.events.emit('shell-ready', {});
@@ -75,6 +90,115 @@
             if (tabId) this._switchDebugTab(tabId);
         }
 
+        // --- App Version --------------------------------------------------------
+
+        async _fetchAppVersion() {
+            try {
+                // Try the admin API health endpoint to get the app version
+                const origin = window.location.origin;
+                const resp = await fetch(`${origin}/api/health`, { method: 'GET' });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    this._appVersion = data.version || '';
+                    this._updateVersionDisplay();
+                }
+            } catch (_) {
+                // Silently fail — version display will just show vault UI version
+            }
+        }
+
+        _updateVersionDisplay() {
+            const el = this.querySelector('.vs-header-version');
+            if (!el) return;
+            const vaultVersion = 'v0.1.3';
+            el.textContent = this._appVersion
+                ? `${vaultVersion} / ${this._appVersion}`
+                : vaultVersion;
+        }
+
+        // --- View Switching (nav) -----------------------------------------------
+
+        _switchView(viewId) {
+            this._activeView = viewId;
+
+            // Toggle view containers
+            const filesView    = this.querySelector('.vs-view-files');
+            const settingsView = this.querySelector('.vs-view-settings');
+            const sidebar      = this.querySelector('.vs-sidebar');
+
+            if (filesView)    filesView.style.display    = viewId === 'files' ? '' : 'none';
+            if (settingsView) settingsView.style.display = viewId === 'settings' ? '' : 'none';
+            if (sidebar)      sidebar.style.display      = viewId === 'files' ? '' : 'none';
+
+            // Update nav active state
+            this.querySelectorAll('.vs-nav-item').forEach(item => {
+                item.classList.toggle('vs-nav-item--active', item.dataset.view === viewId);
+            });
+
+            // Populate settings view when switching to it
+            if (viewId === 'settings') this._populateSettings();
+        }
+
+        _populateSettings() {
+            if (!this._vault) return;
+
+            const nameInput = this.querySelector('.vs-settings-name-input');
+            if (nameInput) nameInput.value = this._vault.name || '';
+
+            const keyInput = this.querySelector('.vs-settings-key-input');
+            if (keyInput) keyInput.value = this._vaultKey;
+
+            const accessInput = this.querySelector('.vs-settings-access-input');
+            if (accessInput) accessInput.value = this._accessKey || '';
+
+            // Stats
+            const stats = this._vault.getStats();
+            const statsEl = this.querySelector('.vs-settings-stats');
+            if (statsEl) {
+                statsEl.innerHTML = `
+                    <div class="vs-stats-grid">
+                        <span class="vs-stats-label">Files</span><span class="vs-stats-value">${stats.files}</span>
+                        <span class="vs-stats-label">Folders</span><span class="vs-stats-value">${stats.folders}</span>
+                        <span class="vs-stats-label">Total size</span><span class="vs-stats-value">${VaultHelpers.formatBytes(stats.totalSize)}</span>
+                        <span class="vs-stats-label">Created</span><span class="vs-stats-value">${this._vault.created ? VaultHelpers.formatTimestamp(this._vault.created) : '--'}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // --- Loading Indicator --------------------------------------------------
+
+        _setupLoadingHook() {
+            // Wrap the global fetch to show/hide loading bar automatically
+            const shell = this;
+            const originalFetch = window.fetch.__vaultOriginal || window.fetch;
+
+            const wrappedFetch = async function() {
+                shell._showLoading();
+                try {
+                    return await originalFetch.apply(window, arguments);
+                } finally {
+                    shell._hideLoading();
+                }
+            };
+            wrappedFetch.__vaultOriginal = originalFetch;
+            window.fetch = wrappedFetch;
+        }
+
+        _showLoading() {
+            this._loadingCount++;
+            const bar = this.querySelector('.vs-loading-bar');
+            if (bar) bar.style.display = '';
+        }
+
+        _hideLoading() {
+            this._loadingCount = Math.max(0, this._loadingCount - 1);
+            if (this._loadingCount === 0) {
+                const bar = this.querySelector('.vs-loading-bar');
+                if (bar) bar.style.display = 'none';
+            }
+        }
+
         // --- Vault Lifecycle ----------------------------------------------------
 
         _onVaultOpened(vault, vaultKey, accessKey) {
@@ -111,6 +235,9 @@
             // Show read-only indicator if no access key
             const readOnlyBadge = this.querySelector('.vs-readonly-badge');
             if (readOnlyBadge) readOnlyBadge.style.display = this._accessKey ? 'none' : '';
+
+            // Ensure we're on the files view
+            this._switchView('files');
 
             window.sgraphVault.events.emit('vault-opened', { vaultName: vault.name });
             const mode = this._accessKey ? '' : ' (read-only)';
@@ -242,6 +369,7 @@
 
         async _onDownload(fileName) {
             if (!this._vault || !fileName) return;
+            this._showLoading();
             try {
                 const data = await this._vault.getFile(this._currentPath, fileName);
                 const blob = new Blob([data]);
@@ -253,6 +381,8 @@
                 URL.revokeObjectURL(url);
             } catch (err) {
                 window.sgraphVault.messages.error(`Download failed: ${err.message}`);
+            } finally {
+                this._hideLoading();
             }
         }
 
@@ -260,6 +390,7 @@
 
         async _onDeleteFile(fileName, folderPath) {
             if (!this._vault || !fileName) return;
+            this._showLoading();
             try {
                 await this._vault.removeFile(folderPath || this._currentPath, fileName);
                 window.sgraphVault.messages.success(`"${fileName}" deleted`);
@@ -274,12 +405,15 @@
                 this._updateStatusBar();
             } catch (err) {
                 window.sgraphVault.messages.error(`Delete failed: ${err.message}`);
+            } finally {
+                this._hideLoading();
             }
         }
 
         async _onRenameFile(oldName, newName, folderPath) {
             if (!this._vault || !oldName || !newName) return;
             const path = folderPath || this._currentPath;
+            this._showLoading();
             try {
                 await this._vault.renameFile(path, oldName, newName);
                 window.sgraphVault.messages.success(`Renamed "${oldName}" to "${newName}"`);
@@ -296,11 +430,14 @@
                 this._updateVaultKey();
             } catch (err) {
                 window.sgraphVault.messages.error(`Rename failed: ${err.message}`);
+            } finally {
+                this._hideLoading();
             }
         }
 
         async _onRenameFolder(oldPath, newName) {
             if (!this._vault || !oldPath || !newName) return;
+            this._showLoading();
             try {
                 await this._vault.renameFolder(oldPath, newName);
                 window.sgraphVault.messages.success(`Folder renamed to "${newName}"`);
@@ -309,6 +446,8 @@
                 this._updateVaultKey();
             } catch (err) {
                 window.sgraphVault.messages.error(`Rename failed: ${err.message}`);
+            } finally {
+                this._hideLoading();
             }
         }
 
@@ -326,45 +465,15 @@
             if (share) share.updateKey(this._vaultKey);
         }
 
-        // --- Settings Panel -----------------------------------------------------
+        // --- Settings Panel (now inline view, not modal) -------------------------
 
         _toggleSettings() {
-            const overlay = this.querySelector('.vs-settings-overlay');
-            if (!overlay) return;
-
-            const isVisible = overlay.style.display !== 'none';
-            if (isVisible) {
-                overlay.style.display = 'none';
-                return;
+            // Toggle between settings and files view
+            if (this._activeView === 'settings') {
+                this._switchView('files');
+            } else {
+                this._switchView('settings');
             }
-
-            // Populate settings
-            const nameInput = overlay.querySelector('.vs-settings-name-input');
-            if (nameInput && this._vault) nameInput.value = this._vault.name || '';
-
-            const keyInput = overlay.querySelector('.vs-settings-key-input');
-            if (keyInput) keyInput.value = this._vaultKey;
-
-            const accessInput = overlay.querySelector('.vs-settings-access-input');
-            if (accessInput) accessInput.value = this._accessKey || '';
-
-            // Stats
-            if (this._vault) {
-                const stats = this._vault.getStats();
-                const statsEl = overlay.querySelector('.vs-settings-stats');
-                if (statsEl) {
-                    statsEl.innerHTML = `
-                        <div class="vs-stats-grid">
-                            <span class="vs-stats-label">Files</span><span class="vs-stats-value">${stats.files}</span>
-                            <span class="vs-stats-label">Folders</span><span class="vs-stats-value">${stats.folders}</span>
-                            <span class="vs-stats-label">Total size</span><span class="vs-stats-value">${VaultHelpers.formatBytes(stats.totalSize)}</span>
-                            <span class="vs-stats-label">Created</span><span class="vs-stats-value">${this._vault.created ? VaultHelpers.formatTimestamp(this._vault.created) : '--'}</span>
-                        </div>
-                    `;
-                }
-            }
-
-            overlay.style.display = '';
         }
 
         // --- Status Bar ---------------------------------------------------------
@@ -433,16 +542,19 @@
 
             // Click delegation
             this.addEventListener('click', (e) => {
+                // Nav item clicks
+                const navItem = e.target.closest('.vs-nav-item[data-view]');
+                if (navItem) {
+                    e.preventDefault();
+                    this._switchView(navItem.dataset.view);
+                    return;
+                }
                 if (e.target.closest('.vs-lock-btn')) {
                     this._onLock();
                     return;
                 }
                 if (e.target.closest('.vs-upload-btn')) {
                     this._onUploadRequest();
-                    return;
-                }
-                if (e.target.closest('.vs-settings-btn')) {
-                    this._toggleSettings();
                     return;
                 }
                 if (e.target.closest('.vs-debug-toggle')) {
@@ -481,13 +593,8 @@
                 });
             }
 
-            // Settings panel handlers
+            // Settings panel handlers (now inline view, not modal)
             this.addEventListener('click', (e) => {
-                if (e.target.closest('.vs-settings-close')) {
-                    const overlay = this.querySelector('.vs-settings-overlay');
-                    if (overlay) overlay.style.display = 'none';
-                    return;
-                }
                 if (e.target.closest('.vs-settings-copy-key')) {
                     const keyInput = this.querySelector('.vs-settings-key-input');
                     if (keyInput) {
@@ -523,10 +630,6 @@
                             if (treeEl)     treeEl.textContent = JSON.stringify(this._vault._tree, null, 2);
                         }
                     }
-                    return;
-                }
-                if (e.target.classList?.contains('vs-settings-overlay')) {
-                    e.target.style.display = 'none';
                     return;
                 }
             });
@@ -659,30 +762,87 @@
                         <div class="vs-header-right">
                             <span class="vs-readonly-badge" style="display:none">Read-only</span>
                             <button class="vs-upload-btn">Upload</button>
-                            <button class="vs-settings-btn">Settings</button>
                             <button class="vs-debug-toggle">Debug</button>
                             <button class="vs-lock-btn" style="display:none">Lock</button>
-                            <span class="vs-header-version">v0.1.2</span>
+                            <span class="vs-header-version">v0.1.3</span>
                         </div>
+                        <!-- Loading bar (shown during API requests) -->
+                        <div class="vs-loading-bar" style="display:none"><div class="vs-loading-bar-inner"></div></div>
                     </header>
 
-                    <nav class="vs-sidebar">
-                        <vault-tree-view></vault-tree-view>
+                    <!-- Left navigation -->
+                    <nav class="vs-nav">
+                        <a class="vs-nav-item vs-nav-item--active" data-view="files" href="#">
+                            <span class="vs-nav-icon">&#128194;</span>
+                            <span class="vs-nav-label">Files</span>
+                        </a>
+                        <a class="vs-nav-item" data-view="settings" href="#">
+                            <span class="vs-nav-icon">&#9881;</span>
+                            <span class="vs-nav-label">Settings</span>
+                        </a>
                     </nav>
 
-                    <main class="vs-main">
-                        <vault-file-properties></vault-file-properties>
-                        <vault-file-preview></vault-file-preview>
-                        <vault-upload-dropzone></vault-upload-dropzone>
+                    <!-- Tree sidebar (visible in files view) -->
+                    <div class="vs-sidebar">
+                        <vault-tree-view></vault-tree-view>
+                    </div>
 
-                        <!-- Upload panel (shown on demand) -->
-                        <div class="vs-upload-panel" style="display:none">
-                            <vault-upload></vault-upload>
+                    <main class="vs-main">
+                        <!-- Files view (default) -->
+                        <div class="vs-view-files">
+                            <vault-file-properties></vault-file-properties>
+                            <vault-file-preview></vault-file-preview>
+                            <vault-upload-dropzone></vault-upload-dropzone>
+
+                            <!-- Upload panel (shown on demand) -->
+                            <div class="vs-upload-panel" style="display:none">
+                                <vault-upload></vault-upload>
+                            </div>
+
+                            <!-- Share panel -->
+                            <div class="vs-share-panel">
+                                <vault-share></vault-share>
+                            </div>
                         </div>
 
-                        <!-- Share panel -->
-                        <div class="vs-share-panel">
-                            <vault-share></vault-share>
+                        <!-- Settings view (shown when nav selects Settings) -->
+                        <div class="vs-view-settings" style="display:none">
+                            <div class="vs-settings-panel">
+                                <h2 class="vs-settings-panel-title">Vault Settings</h2>
+
+                                <div class="vs-settings-section">
+                                    <label class="vs-settings-label">Vault Name</label>
+                                    <input class="vs-settings-name-input" type="text" placeholder="Vault name">
+                                </div>
+                                <div class="vs-settings-section">
+                                    <label class="vs-settings-label">Vault Key</label>
+                                    <div class="vs-settings-key-row">
+                                        <input class="vs-settings-key-input" type="text" readonly>
+                                        <button class="vs-settings-copy-key">Copy</button>
+                                    </div>
+                                </div>
+                                <div class="vs-settings-section">
+                                    <label class="vs-settings-label">Access Key</label>
+                                    <div class="vs-settings-key-row">
+                                        <input class="vs-settings-access-input" type="password" placeholder="Enter access key for uploads">
+                                        <button class="vs-settings-save-access">Set</button>
+                                    </div>
+                                    <p class="vs-settings-hint">Only needed for uploading files.</p>
+                                </div>
+                                <div class="vs-settings-section">
+                                    <label class="vs-settings-label">Statistics</label>
+                                    <div class="vs-settings-stats"></div>
+                                </div>
+                                <div class="vs-settings-section">
+                                    <label class="vs-settings-label">Raw JSON <button class="vs-settings-json-toggle">(show)</button></label>
+                                    <div class="vs-settings-json" style="display:none">
+                                        <h4>vault-settings.json</h4>
+                                        <pre class="vs-settings-json-settings"></pre>
+                                        <h4>vault-tree.json</h4>
+                                        <pre class="vs-settings-json-tree"></pre>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </main>
 
@@ -718,7 +878,7 @@
                     </footer>
                 </div>
 
-                <!-- Auth Token Prompt Modal -->
+                <!-- Auth Token Prompt Modal (kept as modal — destructive action gate) -->
                 <div class="vs-auth-overlay vs-auth-modal" style="display:none">
                     <div class="vs-auth-dialog">
                         <h3 class="vs-auth-title">Access Key Required</h3>
@@ -727,50 +887,6 @@
                         <div class="vs-auth-actions">
                             <button class="vs-auth-cancel">Cancel</button>
                             <button class="vs-auth-submit">Continue</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Settings Panel (overlay) -->
-                <div class="vs-settings-overlay" style="display:none">
-                    <div class="vs-settings-dialog">
-                        <div class="vs-settings-header">
-                            <h3 class="vs-settings-title">Vault Settings</h3>
-                            <button class="vs-settings-close">&times;</button>
-                        </div>
-                        <div class="vs-settings-body">
-                            <div class="vs-settings-section">
-                                <label class="vs-settings-label">Vault Name</label>
-                                <input class="vs-settings-name-input" type="text" placeholder="Vault name">
-                            </div>
-                            <div class="vs-settings-section">
-                                <label class="vs-settings-label">Vault Key</label>
-                                <div class="vs-settings-key-row">
-                                    <input class="vs-settings-key-input" type="text" readonly>
-                                    <button class="vs-settings-copy-key">Copy</button>
-                                </div>
-                            </div>
-                            <div class="vs-settings-section">
-                                <label class="vs-settings-label">Access Key</label>
-                                <div class="vs-settings-key-row">
-                                    <input class="vs-settings-access-input" type="password" placeholder="Enter access key for uploads">
-                                    <button class="vs-settings-save-access">Set</button>
-                                </div>
-                                <p class="vs-settings-hint">Only needed for uploading files.</p>
-                            </div>
-                            <div class="vs-settings-section">
-                                <label class="vs-settings-label">Statistics</label>
-                                <div class="vs-settings-stats"></div>
-                            </div>
-                            <div class="vs-settings-section">
-                                <label class="vs-settings-label">Raw JSON <button class="vs-settings-json-toggle">(show)</button></label>
-                                <div class="vs-settings-json" style="display:none">
-                                    <h4>vault-settings.json</h4>
-                                    <pre class="vs-settings-json-settings"></pre>
-                                    <h4>vault-tree.json</h4>
-                                    <pre class="vs-settings-json-tree"></pre>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -793,20 +909,21 @@
                 /* --- Shell Grid --- */
                 .vs-shell {
                     --debug-width: 320px;
-                    --sidebar-width: 260px;
+                    --sidebar-width: 240px;
+                    --nav-width: 56px;
                     display: grid;
                     grid-template-areas:
-                        "header  header  header  header"
-                        "sidebar main   resize  debug"
-                        "status  status  status  status";
-                    grid-template-columns: var(--sidebar-width) 1fr 4px var(--debug-width);
+                        "header  header  header  header  header"
+                        "nav     sidebar main   resize  debug"
+                        "status  status  status  status  status";
+                    grid-template-columns: var(--nav-width) var(--sidebar-width) 1fr 4px var(--debug-width);
                     grid-template-rows: 48px 1fr auto;
                     height: 100vh;
                     overflow: hidden;
                 }
 
                 .vs-shell--no-debug {
-                    grid-template-columns: var(--sidebar-width) 1fr 0 0;
+                    grid-template-columns: var(--nav-width) var(--sidebar-width) 1fr 0 0;
                 }
 
                 .vs-shell--no-debug .vs-debug-sidebar,
@@ -824,6 +941,7 @@
                     background: var(--bg-surface);
                     border-bottom: 1px solid var(--color-border);
                     z-index: 20;
+                    position: relative;
                 }
 
                 .vs-header-title {
@@ -884,6 +1002,79 @@
                 .vs-upload-btn:hover {
                     background: var(--color-primary-hover);
                     color: var(--bg-primary);
+                }
+
+                /* --- Loading Bar --- */
+                .vs-loading-bar {
+                    position: absolute;
+                    bottom: -2px;
+                    left: 0;
+                    right: 0;
+                    height: 2px;
+                    overflow: hidden;
+                    z-index: 30;
+                }
+
+                .vs-loading-bar-inner {
+                    width: 30%;
+                    height: 100%;
+                    background: var(--color-primary);
+                    animation: vs-loading-slide 1.2s ease-in-out infinite;
+                }
+
+                @keyframes vs-loading-slide {
+                    0%   { transform: translateX(-100%); }
+                    50%  { transform: translateX(230%); }
+                    100% { transform: translateX(-100%); }
+                }
+
+                /* --- Left Navigation --- */
+                .vs-nav {
+                    grid-area: nav;
+                    background: var(--bg-surface);
+                    border-right: 1px solid var(--color-border);
+                    display: flex;
+                    flex-direction: column;
+                    padding: var(--space-2) 0;
+                    gap: var(--space-1);
+                    overflow: hidden;
+                }
+
+                .vs-nav-item {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 0.125rem;
+                    padding: 0.5rem 0.25rem;
+                    font-size: 0.625rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    color: var(--color-text-secondary);
+                    text-decoration: none;
+                    cursor: pointer;
+                    border-left: 3px solid transparent;
+                    transition: background var(--transition), color var(--transition);
+                }
+
+                .vs-nav-item:hover {
+                    background: var(--bg-secondary);
+                    color: var(--color-text);
+                }
+
+                .vs-nav-item--active {
+                    color: var(--color-primary);
+                    background: rgba(79, 143, 247, 0.08);
+                    border-left-color: var(--color-primary);
+                }
+
+                .vs-nav-icon {
+                    font-size: 1.125rem;
+                    line-height: 1;
+                }
+
+                .vs-nav-label {
+                    line-height: 1;
                 }
 
                 /* --- Left Sidebar (Tree) --- */
@@ -1021,22 +1212,6 @@
                     letter-spacing: 0.02em;
                 }
 
-                .vs-settings-btn {
-                    font-size: var(--text-small);
-                    padding: 0.25rem 0.625rem;
-                    border-radius: var(--radius-sm);
-                    border: 1px solid var(--color-border);
-                    background: transparent;
-                    color: var(--color-text-secondary);
-                    cursor: pointer;
-                    font-family: var(--font-family);
-                }
-
-                .vs-settings-btn:hover {
-                    background: var(--bg-secondary);
-                    color: var(--color-text);
-                }
-
                 /* --- Auth Modal --- */
                 .vs-auth-overlay {
                     position: fixed;
@@ -1116,60 +1291,16 @@
                     font-weight: 600;
                 }
 
-                /* --- Settings Panel --- */
-                .vs-settings-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: rgba(0, 0, 0, 0.5);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 100;
-                    backdrop-filter: blur(4px);
+                /* --- Settings Panel (inline view) --- */
+                .vs-settings-panel {
+                    max-width: 640px;
                 }
 
-                .vs-settings-dialog {
-                    background: var(--bg-surface);
-                    border: 1px solid var(--color-border);
-                    border-radius: var(--radius);
-                    max-width: 560px;
-                    width: 90%;
-                    max-height: 80vh;
-                    display: flex;
-                    flex-direction: column;
-                }
-
-                .vs-settings-header {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: var(--space-4) var(--space-5);
-                    border-bottom: 1px solid var(--color-border);
-                    flex-shrink: 0;
-                }
-
-                .vs-settings-title {
+                .vs-settings-panel-title {
                     font-size: var(--text-h3);
                     font-weight: 700;
                     color: var(--color-text);
-                    margin: 0;
-                }
-
-                .vs-settings-close {
-                    font-size: 1.5rem;
-                    background: none;
-                    border: none;
-                    color: var(--color-text-secondary);
-                    cursor: pointer;
-                    padding: 0;
-                    line-height: 1;
-                }
-
-                .vs-settings-close:hover { color: var(--color-text); }
-
-                .vs-settings-body {
-                    padding: var(--space-5);
-                    overflow-y: auto;
+                    margin: 0 0 var(--space-5);
                 }
 
                 .vs-settings-section {
@@ -1284,15 +1415,18 @@
                 /* --- Responsive --- */
                 @media (max-width: 1024px) {
                     .vs-shell {
-                        grid-template-columns: var(--sidebar-width) 1fr 0 0;
+                        grid-template-columns: var(--nav-width) var(--sidebar-width) 1fr 0 0;
                     }
                     .vs-debug-sidebar, .vs-debug-resize { display: none; }
                 }
 
                 @media (max-width: 768px) {
                     .vs-shell {
-                        grid-template-columns: 1fr;
-                        grid-template-areas: "header" "main" "status";
+                        grid-template-columns: var(--nav-width) 1fr;
+                        grid-template-areas:
+                            "header header"
+                            "nav    main"
+                            "status status";
                     }
                     .vs-sidebar { display: none; }
                     .vs-debug-sidebar, .vs-debug-resize { display: none; }
