@@ -1,9 +1,10 @@
 /* =================================================================================
    SGraph Send — API Client Library
-   v0.1.0 — Transfer API abstraction for send.sgraph.ai
+   v0.1.1 — Transfer API + Vault Pointer API abstraction for send.sgraph.ai
 
    Provides upload, download, encrypt+upload, download+decrypt convenience methods.
    Uses the 3-step transfer flow: create → upload → complete.
+   Vault pointer methods use PUT write / GET read / DELETE endpoints.
    Auth via x-sgraph-access-token header.
 
    Depends on: SGSendCrypto (sg-send-crypto.js)
@@ -103,5 +104,36 @@ class SGSend {
     async downloadAndDecrypt(transferId, key) {
         const encrypted = await this.download(transferId)
         return this.decrypt(encrypted, key)
+    }
+
+    // --- Vault Pointer API ------------------------------------------------------
+
+    async vaultWrite(vaultId, fileId, writeKey, data) {
+        const response = await this._fetch('PUT', `/api/vault/write/${vaultId}/${fileId}`, {
+            headers: {
+                'Content-Type':              'application/octet-stream',
+                'x-sgraph-vault-write-key':  writeKey
+            },
+            body: data
+        })
+        return response.json()
+    }
+
+    async vaultRead(vaultId, fileId) {
+        const url      = `${this.endpoint}/api/vault/read/${vaultId}/${fileId}`
+        const response = await fetch(url, { method: 'GET', mode: 'cors' })     // No auth required (zero-knowledge)
+        if (response.status === 404) return null
+        if (!response.ok) {
+            const detail = await response.text().catch(() => response.statusText)
+            throw new Error(`GET /api/vault/read/${vaultId}/${fileId} failed (${response.status}): ${detail}`)
+        }
+        return response.arrayBuffer()
+    }
+
+    async vaultDelete(vaultId, fileId, writeKey) {
+        const response = await this._fetch('DELETE', `/api/vault/delete/${vaultId}/${fileId}`, {
+            headers: { 'x-sgraph-vault-write-key': writeKey }
+        })
+        return response.json()
     }
 }

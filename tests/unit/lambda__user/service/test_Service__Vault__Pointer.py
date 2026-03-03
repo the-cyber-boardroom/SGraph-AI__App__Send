@@ -1,6 +1,7 @@
 # ===============================================================================
 # SGraph Send - Service__Vault__Pointer Tests
 # Vault file lifecycle: write, read, overwrite, delete with write-key auth
+# Including vault manifest protection tests
 # ===============================================================================
 
 from unittest                                                                    import TestCase
@@ -159,8 +160,9 @@ class test_Service__Vault__Pointer(TestCase):
     # --- Storage paths ---
 
     def test__storage_paths(self):
-        assert self.service.vault_meta_path('v1', 'f1')    == 'transfers/vault/v1/f1/meta.json'
-        assert self.service.vault_payload_path('v1', 'f1')  == 'transfers/vault/v1/f1/payload'
+        assert self.service.vault_meta_path('v1', 'f1')     == 'transfers/vault/v1/f1/meta.json'
+        assert self.service.vault_payload_path('v1', 'f1')   == 'transfers/vault/v1/f1/payload'
+        assert self.service.vault_manifest_path('v1')        == 'transfers/vault/v1/manifest.json'
 
     # --- Full lifecycle ---
 
@@ -202,3 +204,73 @@ class test_Service__Vault__Pointer(TestCase):
             self.service.vault_meta_path(self.vault_id, self.file_id))
         assert self.write_key not in str(meta)                                   # Raw key not in metadata
         assert len(meta['write_key_hash']) == 64                                 # SHA-256 hex digest
+
+    # === Vault Manifest Protection ===
+
+    def test__manifest__created_on_first_write(self):
+        self.service.write(self.vault_id, 'first-file', self.write_key, b'data')
+        manifest_path = self.service.vault_manifest_path(self.vault_id)
+        assert self.service.storage_fs.file__exists(manifest_path)
+        manifest = self.service.storage_fs.file__json(manifest_path)
+        assert manifest['vault_id'] == self.vault_id
+        assert 'write_key_hash'     in manifest
+        assert 'created_at'         in manifest
+
+    def test__manifest__not_created_before_write(self):
+        manifest_path = self.service.vault_manifest_path(self.vault_id)
+        assert not self.service.storage_fs.file__exists(manifest_path)
+
+    def test__manifest__second_file_same_key_allowed(self):
+        self.service.write(self.vault_id, 'file-1', self.write_key, b'data-1')
+        result = self.service.write(self.vault_id, 'file-2', self.write_key, b'data-2')
+        assert result is not None
+        assert result['file_id'] == 'file-2'
+        assert self.service.read(self.vault_id, 'file-2') == b'data-2'
+
+    def test__manifest__second_file_wrong_key_rejected(self):
+        """Core manifest protection: attacker can't create files in an owned vault."""
+        self.service.write(self.vault_id, 'file-1', self.write_key, b'data-1')
+        result = self.service.write(self.vault_id, 'file-2', 'attacker-key', b'malicious')
+        assert result is None                                                    # Rejected by manifest
+        assert self.service.read(self.vault_id, 'file-2') is None               # File was NOT created
+
+    def test__manifest__delete_wrong_key_rejected_by_manifest(self):
+        """Attacker can't delete files even if they guess a file_id."""
+        self.service.write(self.vault_id, 'file-1', self.write_key, b'data-1')
+        result = self.service.delete(self.vault_id, 'file-1', 'attacker-key')
+        assert result is None
+        assert self.service.read(self.vault_id, 'file-1') == b'data-1'          # Still intact
+
+    def test__manifest__delete_nonexistent_file_wrong_key(self):
+        """Even deleting a nonexistent file is rejected if manifest key doesn't match."""
+        self.service.write(self.vault_id, 'file-1', self.write_key, b'data-1')
+        result = self.service.delete(self.vault_id, 'ghost-file', 'attacker-key')
+        assert result is None
+
+    def test__manifest__different_vaults_different_owners(self):
+        """Two vaults can have different write keys."""
+        self.service.write('vault-aaa', 'file-1', 'key-alice', b'alice-data')
+        self.service.write('vault-bbb', 'file-1', 'key-bob',   b'bob-data')
+
+        # Each owner can write to their own vault
+        assert self.service.write('vault-aaa', 'file-2', 'key-alice', b'alice-2') is not None
+        assert self.service.write('vault-bbb', 'file-2', 'key-bob',   b'bob-2')   is not None
+
+        # Cross-vault writes rejected
+        assert self.service.write('vault-aaa', 'file-3', 'key-bob',   b'intruder') is None
+        assert self.service.write('vault-bbb', 'file-3', 'key-alice', b'intruder') is None
+
+    def test__manifest__write_key_hash_matches_file_meta(self):
+        """Manifest and file meta store the same write_key_hash."""
+        self.service.write(self.vault_id, self.file_id, self.write_key, self.payload)
+        manifest = self.service.storage_fs.file__json(
+            self.service.vault_manifest_path(self.vault_id))
+        file_meta = self.service.storage_fs.file__json(
+            self.service.vault_meta_path(self.vault_id, self.file_id))
+        assert manifest['write_key_hash'] == file_meta['write_key_hash']
+
+    def test__manifest__raw_write_key_not_in_manifest(self):
+        self.service.write(self.vault_id, self.file_id, self.write_key, self.payload)
+        manifest = self.service.storage_fs.file__json(
+            self.service.vault_manifest_path(self.vault_id))
+        assert self.write_key not in str(manifest)                               # Only hash stored
