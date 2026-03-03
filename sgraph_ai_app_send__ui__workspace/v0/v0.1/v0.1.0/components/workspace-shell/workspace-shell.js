@@ -384,6 +384,9 @@
                         <llm-connection></llm-connection>
                     </div>
 
+                    <!-- Hidden data components -->
+                    <prompt-library style="display:none"></prompt-library>
+
                     <!-- Debug resize handle -->
                     <div class="ws-debug-resize"></div>
 
