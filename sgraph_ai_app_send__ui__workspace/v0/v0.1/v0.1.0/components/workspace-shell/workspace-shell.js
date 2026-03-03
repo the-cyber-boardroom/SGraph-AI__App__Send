@@ -335,7 +335,7 @@
                         </div>
                         <div class="ws-header-right">
                             <button class="ws-debug-toggle">Debug</button>
-                            <span class="ws-header-version">${window.sgraphWorkspace.config.version}</span>
+                            <span class="ws-header-version">${window.sgraphWorkspace.config.appVersion}</span>
                         </div>
                     </header>
 
@@ -375,6 +375,9 @@
                             </div>
                         </div>
                         <div class="ws-chat-zone">
+                            <div class="ws-chat-header">
+                                <span class="ws-chat-label">Chat</span>
+                            </div>
                             <llm-chat></llm-chat>
                         </div>
                     </div>

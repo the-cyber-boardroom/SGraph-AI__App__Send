@@ -76,10 +76,10 @@ html, body {
 .ws-shell {
     display: grid;
     grid-template-areas:
-        "header  header    header       header      header    header"
-        "nav     vault     source       transform   resize    debug"
-        "nav     vault     chat         chat        resize    debug"
-        "status  status    status       status      status    status";
+        "header  header    header    header    header    header"
+        "nav     vault     main      main      resize    debug"
+        "nav     vault     main      main      resize    debug"
+        "status  status    status    status    status    status";
     grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 1fr 1fr 4px var(--ws-debug-width);
     grid-template-rows: var(--ws-header-height) 1fr var(--ws-chat-height) var(--ws-status-height);
     height: 100vh;
@@ -250,7 +250,14 @@ html, body {
 /* --- Source & Transform Panels -------------------------------------------- */
 
 .ws-transform-area {
-    display: contents;
+    grid-area: main;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr var(--ws-chat-height);
+    grid-template-areas:
+        "source transform"
+        "chat   chat";
+    overflow: hidden;
 }
 
 .ws-source-zone    { grid-area: source; }
@@ -320,13 +327,29 @@ vault-panel {
     flex-direction: column;
     overflow: hidden;
     background: var(--ws-surface);
-    border-top: 1px solid var(--ws-border);
+    border-top: 2px solid var(--ws-border);
+}
+
+.ws-chat-header {
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-bottom: 1px solid var(--ws-border-subtle);
+    flex-shrink: 0;
+}
+
+.ws-chat-label {
+    font-size: var(--ws-font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ws-text-muted);
 }
 
 /* --- Settings Area -------------------------------------------------------- */
 
 .ws-settings-area {
-    grid-area: source / source / chat / transform;
+    grid-area: main;
     overflow-y: auto;
     padding: 1.5rem;
     background: var(--ws-bg);
