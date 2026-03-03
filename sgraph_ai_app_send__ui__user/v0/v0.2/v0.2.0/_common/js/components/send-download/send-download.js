@@ -362,8 +362,7 @@ class SendDownload extends HTMLElement {
         const downloads  = this.transferInfo ? (this.transferInfo.download_count || 0) : 0;
         const rawToggle  = (type === 'markdown' || type === 'code')
             ? `<button class="btn btn-sm btn-secondary" id="toggle-raw-btn" style="width: 100%; font-size: var(--text-sm);">${this.escapeHtml(this._showRaw ? this.t('download.preview.view_rendered') : this.t('download.preview.view_raw'))}</button>` : '';
-        const printBtn = (type === 'markdown' || type === 'docx' || type === 'xlsx')
-            ? `<button class="btn btn-sm btn-secondary" id="print-btn" style="flex: 1;">${this.escapeHtml(this.t('download.preview.print'))}</button>` : '';
+        const printBtn = '';
 
         let contentHtml = '';
         switch (type) {
@@ -373,9 +372,6 @@ class SendDownload extends HTMLElement {
             case 'code':     contentHtml = this._renderCodeContent();     break;
             case 'audio':    contentHtml = this._renderAudioContent();    break;
             case 'video':    contentHtml = this._renderVideoContent();    break;
-            case 'docx':     contentHtml = this._renderDocxContent();     break;
-            case 'xlsx':     contentHtml = this._renderXlsxContent();     break;
-            case 'pptx':     contentHtml = this._renderPptxContent();     break;
             default:         contentHtml = this._renderRawContent();
         }
 
@@ -461,115 +457,6 @@ class SendDownload extends HTMLElement {
     _renderRawContent() {
         const rawText = new TextDecoder().decode(this.decryptedBytes);
         return `<pre style="height:100%;overflow:auto;margin:0;padding:var(--space-6);white-space:pre-wrap;word-wrap:break-word;font-family:var(--font-mono);font-size:0.85rem;line-height:1.6;color:var(--color-text);">${this.escapeHtml(rawText)}</pre>`;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // CDN Script Loader (lazy, on-demand)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    static _cdnCache = {};
-
-    static _loadCdnScript(url, globalName) {
-        if (window[globalName]) return Promise.resolve(window[globalName]);
-        if (SendDownload._cdnCache[url]) return SendDownload._cdnCache[url];
-        SendDownload._cdnCache[url] = new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = url;
-            script.onload = () => resolve(window[globalName]);
-            script.onerror = () => reject(new Error(`Failed to load ${globalName} from CDN`));
-            document.head.appendChild(script);
-        });
-        return SendDownload._cdnCache[url];
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Office Document Renderers (DOCX, XLSX, PPTX)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _renderDocxContent() {
-        // Show loading state; actual rendering is async and will replace this
-        return `<div id="office-render" class="office-loading">${this.escapeHtml(this.t('download.office.loading'))}</div>`;
-    }
-
-    async _renderDocxAsync(container) {
-        try {
-            const mammoth = await SendDownload._loadCdnScript(
-                'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js', 'mammoth'
-            );
-            const result = await mammoth.convertToHtml({ arrayBuffer: this.decryptedBytes });
-            const html = result.value;
-            const iframeDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*,*::before,*::after{box-sizing:border-box}body{font-family:'DM Sans',system-ui,sans-serif;font-size:1rem;line-height:1.7;color:#E0E0E0;background:#1E2A4A;margin:0;padding:1.25rem;word-wrap:break-word}h1,h2,h3,h4,h5,h6{color:#fff;margin:1.5em 0 .5em;line-height:1.3}h1{font-size:1.6rem;border-bottom:1px solid rgba(78,205,196,.2);padding-bottom:.3em}h2{font-size:1.35rem}h3{font-size:1.15rem}p{margin:.8em 0}a{color:#4ECDC4;text-decoration:none}a:hover{text-decoration:underline}table{border-collapse:collapse;width:100%;margin:1em 0}th,td{border:1px solid rgba(78,205,196,.2);padding:.5em .75em;text-align:left}th{background:rgba(78,205,196,.1);font-weight:600;color:#fff}ul,ol{padding-left:1.5em;margin:.8em 0}li{margin:.3em 0}img{max-width:100%;height:auto}strong{color:#fff}</style></head><body>${html}</body></html>`;
-            const blob = new Blob([iframeDoc], { type: 'text/html' });
-            const blobUrl = URL.createObjectURL(blob);
-            container.innerHTML = `<iframe id="docx-iframe" sandbox="allow-same-origin" style="width:100%;height:100%;border:none;background:#1E2A4A;display:block;" src="${blobUrl}" title="Word document"></iframe>`;
-        } catch (err) {
-            container.innerHTML = `<div class="office-error">${this.escapeHtml(this.t('download.office.error'))}<br><small>${this.escapeHtml(err.message)}</small></div>`;
-        }
-    }
-
-    _renderXlsxContent() {
-        return `<div id="office-render" class="office-loading">${this.escapeHtml(this.t('download.office.loading'))}</div>`;
-    }
-
-    async _renderXlsxAsync(container) {
-        try {
-            const XLSX = await SendDownload._loadCdnScript(
-                'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js', 'XLSX'
-            );
-            const workbook = XLSX.read(this.decryptedBytes, { type: 'array' });
-            const sheetNames = workbook.SheetNames;
-
-            // Build tab bar + HTML tables for each sheet
-            let tabsHtml = '';
-            let sheetsHtml = '';
-            sheetNames.forEach((name, idx) => {
-                const isActive = idx === 0;
-                tabsHtml += `<button class="xlsx-tab${isActive ? ' xlsx-tab--active' : ''}" data-sheet="${idx}">${this.escapeHtml(name)}</button>`;
-                const sheet = workbook.Sheets[name];
-                const tableHtml = XLSX.utils.sheet_to_html(sheet, { editable: false });
-                sheetsHtml += `<div class="xlsx-sheet${isActive ? ' xlsx-sheet--active' : ''}" data-sheet="${idx}">${tableHtml}</div>`;
-            });
-
-            const iframeDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}body{font-family:'DM Sans',system-ui,sans-serif;font-size:0.85rem;color:#E0E0E0;background:#1E2A4A;margin:0;padding:0;display:flex;flex-direction:column;height:100vh}.tabs{display:flex;gap:2px;padding:6px 8px;background:#16213E;border-bottom:1px solid rgba(78,205,196,.15);flex-shrink:0;flex-wrap:wrap}.xlsx-tab{background:transparent;border:1px solid rgba(78,205,196,.2);color:#8892A0;padding:4px 12px;border-radius:4px 4px 0 0;cursor:pointer;font-size:0.8rem;font-family:inherit}.xlsx-tab--active{background:rgba(78,205,196,.15);color:#4ECDC4;border-color:#4ECDC4;font-weight:600}.xlsx-tab:hover{color:#4ECDC4}.sheets{flex:1;overflow:auto;padding:8px}.xlsx-sheet{display:none}.xlsx-sheet--active{display:block}table{border-collapse:collapse;width:100%}td,th{border:1px solid rgba(78,205,196,.15);padding:4px 8px;text-align:left;white-space:nowrap}th{background:rgba(78,205,196,.1);color:#fff;font-weight:600;position:sticky;top:0}tr:hover td{background:rgba(78,205,196,.04)}</style></head><body><div class="tabs">${tabsHtml}</div><div class="sheets">${sheetsHtml}</div><script>document.querySelectorAll('.xlsx-tab').forEach(t=>{t.addEventListener('click',()=>{document.querySelectorAll('.xlsx-tab').forEach(b=>b.classList.remove('xlsx-tab--active'));document.querySelectorAll('.xlsx-sheet').forEach(s=>s.classList.remove('xlsx-sheet--active'));t.classList.add('xlsx-tab--active');document.querySelector('.xlsx-sheet[data-sheet=\"'+t.dataset.sheet+'\"]').classList.add('xlsx-sheet--active')})});</script></body></html>`;
-            const encoded = btoa(unescape(encodeURIComponent(iframeDoc)));
-            container.innerHTML = `<iframe id="xlsx-iframe" sandbox="allow-scripts allow-same-origin" style="width:100%;height:100%;border:none;background:#1E2A4A;display:block;" src="data:text/html;base64,${encoded}" title="Excel spreadsheet"></iframe>`;
-        } catch (err) {
-            container.innerHTML = `<div class="office-error">${this.escapeHtml(this.t('download.office.error'))}<br><small>${this.escapeHtml(err.message)}</small></div>`;
-        }
-    }
-
-    _renderPptxContent() {
-        const filename = this.fileName || 'presentation.pptx';
-        return `<div class="office-fallback">
-            <div style="font-size:2.5rem;margin-bottom:var(--space-3);opacity:0.5;">&#x1F4CA;</div>
-            <div style="font-weight:var(--weight-semibold);color:var(--color-text);margin-bottom:var(--space-2);">${this.escapeHtml(filename)}</div>
-            <div style="color:var(--color-text-secondary);margin-bottom:var(--space-4);">${this.escapeHtml(this.t('download.office.pptx_no_preview'))}</div>
-            <button class="btn btn-primary btn-sm" id="save-file-btn">${this.escapeHtml(this.t('download.preview.save_locally'))}</button>
-        </div>`;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Print Support (for rendered content — markdown, docx, xlsx)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _printPreview() {
-        const iframe = this.querySelector('#preview-panel iframe') || this.querySelector('#md-iframe') || this.querySelector('#docx-iframe') || this.querySelector('#xlsx-iframe');
-        if (iframe && iframe.contentWindow) {
-            try { iframe.contentWindow.print(); return; } catch (_) { /* cross-origin — fall through to popup */ }
-        }
-        // Fallback: open the iframe's blob/data src directly (printable in its own tab)
-        if (iframe && iframe.src && iframe.src.startsWith('blob:')) {
-            const printWindow = window.open(iframe.src, '_blank');
-            if (printWindow) { printWindow.addEventListener('load', () => printWindow.print()); return; }
-        }
-        // Last resort: build a print-friendly page from preview panel HTML
-        const panel = this.querySelector('#preview-panel');
-        if (!panel) return;
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
-        printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Print</title><style>body{font-family:system-ui,sans-serif;padding:1em;color:#222;background:#fff;}img{max-width:100%;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ccc;padding:4px 8px;}th{background:#eee;}</style></head><body>${panel.innerHTML}</body></html>`);
-        printWindow.document.close();
-        printWindow.print();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -711,7 +598,7 @@ class SendDownload extends HTMLElement {
     }
 
     _fileTypeIcon(type) {
-        const icons = { audio: '\u{1F3B5}', video: '\u{1F3AC}', image: '\u{1F5BC}', pdf: '\u{1F4C4}', markdown: '\u{1F4DD}', code: '\u{1F4BB}', docx: '\u{1F4C3}', xlsx: '\u{1F4CA}', pptx: '\u{1F4CA}' };
+        const icons = { audio: '\u{1F3B5}', video: '\u{1F3AC}', image: '\u{1F5BC}', pdf: '\u{1F4C4}', markdown: '\u{1F4DD}', code: '\u{1F4BB}' };
         return icons[type] || '\u{1F4CE}';
     }
 
@@ -732,9 +619,6 @@ class SendDownload extends HTMLElement {
         else if (entryType === 'code')     html = this._renderCodeContent();
         else if (entryType === 'audio')    html = this._renderAudioContent();
         else if (entryType === 'video')    html = this._renderVideoContent();
-        else if (entryType === 'docx')     html = this._renderDocxContent();
-        else if (entryType === 'xlsx')     html = this._renderXlsxContent();
-        else if (entryType === 'pptx')     html = this._renderPptxContent();
         else {
             try {
                 const text = new TextDecoder('utf-8', { fatal: true }).decode(this._currentEntryBytes);
@@ -800,9 +684,6 @@ class SendDownload extends HTMLElement {
             else if (entryType === 'code')     html = this._renderCodeContent();
             else if (entryType === 'audio')    html = this._renderAudioContent();
             else if (entryType === 'video')    html = this._renderVideoContent();
-            else if (entryType === 'docx')     html = this._renderDocxContent();
-            else if (entryType === 'xlsx')     html = this._renderXlsxContent();
-            else if (entryType === 'pptx')     html = this._renderPptxContent();
             else {
                 try {
                     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -814,11 +695,6 @@ class SendDownload extends HTMLElement {
             this.decryptedBytes = savedBytes;
             this.fileName       = savedName;
             previewPanel.innerHTML = html;
-
-            // Trigger async rendering for office docs
-            const officeRender = previewPanel.querySelector('#office-render');
-            if (officeRender && entryType === 'docx') this._renderDocxAsync(officeRender);
-            if (officeRender && entryType === 'xlsx') this._renderXlsxAsync(officeRender);
         }
 
         // Update file list highlighting
@@ -986,14 +862,6 @@ class SendDownload extends HTMLElement {
             });
         });
 
-        // Print button
-        const printBtn = this.querySelector('#print-btn');
-        if (printBtn) printBtn.addEventListener('click', () => this._printPreview());
-
-        // Async office rendering (CDN-loaded libraries)
-        const officeRender = this.querySelector('#office-render');
-        if (officeRender && this._renderType === 'docx') this._renderDocxAsync(officeRender);
-        if (officeRender && this._renderType === 'xlsx') this._renderXlsxAsync(officeRender);
     }
 
     _setupResize() {

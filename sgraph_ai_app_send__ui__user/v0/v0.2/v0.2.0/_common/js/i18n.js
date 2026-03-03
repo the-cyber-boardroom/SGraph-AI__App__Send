@@ -140,12 +140,6 @@ const I18n = {
             'download.preview.save_locally':    'Save Locally',
             'download.preview.view_raw':        'View Raw',
             'download.preview.view_rendered':   'View Rendered',
-            'download.preview.print':           'Print',
-
-            // ─── Download: Office Documents ───────────────────────────────
-            'download.office.loading':          'Loading document viewer...',
-            'download.office.error':            'Could not render this document.',
-            'download.office.pptx_no_preview':  'PowerPoint preview is not yet supported. Save the file to view it.',
 
             // ─── Download: Zip Viewer ─────────────────────────────────────
             'download.zip.summary':             '{files} files, {folders} folders',
