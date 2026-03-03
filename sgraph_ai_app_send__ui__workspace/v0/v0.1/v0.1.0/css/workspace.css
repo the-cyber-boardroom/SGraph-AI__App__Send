@@ -291,11 +291,23 @@ html, body {
     flex-direction: column;
 }
 
-/* document-viewer fills its container */
+/* Web components fill their containers */
 document-viewer {
     flex: 1;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+llm-chat {
+    display: block;
+    height: 100%;
+    overflow: hidden;
+}
+
+vault-panel {
+    display: block;
+    height: 100%;
     overflow: hidden;
 }
 

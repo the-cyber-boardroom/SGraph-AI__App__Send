@@ -158,7 +158,7 @@
                 this._setSaveState('saved');
                 window.sgraphWorkspace.messages.success(`"${saveName}" saved to vault`);
                 window.sgraphWorkspace.events.emit('file-saved', {
-                    role: this._role, guid: result.guid, name: saveName
+                    role: this._role, fileId: result.fileId, name: saveName
                 });
 
                 // Reset save button after 2s
@@ -216,24 +216,18 @@
             this._renderLoading(data.name);
 
             try {
-                // Get vault panel reference for decryption keys
+                // Get vault panel reference for file decryption via SGVault
                 const vaultPanel = document.querySelector('vault-panel');
                 if (!vaultPanel) throw new Error('Vault panel not found');
 
-                const keyPair  = vaultPanel.getKeyPair();
-                const vaultKey = data.vaultKey;
-                if (!keyPair) throw new Error('No key pair available');
+                const vault = vaultPanel.getVault();
+                if (!vault) throw new Error('Vault is not open');
 
-                // Download encrypted file from vault API
-                const resp = await VaultAPI.getFile(vaultKey, data.guid);
-                if (!resp || !resp.data) throw new Error('File data not found on server');
-
-                // Decrypt
-                const packed    = VaultCrypto.b64ToArrayBuf(resp.data);
-                const plaintext = await VaultCrypto.decrypt(keyPair.privateKey, packed);
+                // Download + decrypt file via SGVault (Transfer API)
+                const plaintext = await vault.getFile(data.folderPath, data.name);
 
                 // Load into viewer
-                this.loadBytes(plaintext, data.name, data.type);
+                this.loadBytes(new Uint8Array(plaintext), data.name, data.type);
 
                 window.sgraphWorkspace.messages.success('"' + data.name + '" loaded');
             } catch (e) {

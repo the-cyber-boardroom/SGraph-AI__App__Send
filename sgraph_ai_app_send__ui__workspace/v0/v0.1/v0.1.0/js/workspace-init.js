@@ -83,8 +83,8 @@
         messages,
         router : null,    // set by workspace-shell on connectedCallback
         config : {
-            version   : 'v0.1.0',
-            vaultApi  : localStorage.getItem('workspace-vault-api') || 'https://admin.send.sgraph.ai',
+            version      : 'v0.1.0',
+            sendEndpoint : localStorage.getItem('workspace-send-endpoint') || 'https://send.sgraph.ai',
         }
     };
 

@@ -26,10 +26,13 @@
         Layer 2: Shared infrastructure — linked from vault.sgraph.ai
         Development: relative paths within the repo (cross-directory).
         Production: replace with vault.sgraph.ai URLs, e.g.:
-          https://vault.sgraph.ai/v0/v0.1/v0.1.7/js/vault-crypto.js
+          https://vault.sgraph.ai/_common/js/lib/sg-send/sg-send-crypto.js
     -->
-    <script src="../../../../sgraph_ai_app_send__ui__user/v0/v0.1/v0.1.7/js/vault-crypto.js"></script>
-    <script src="../../../../sgraph_ai_app_send__ui__user/v0/v0.1/v0.1.7/js/vault-api.js"></script>
+    <!-- Vault libraries (same as vault.sgraph.ai — SGSendCrypto + SGSend + SGVault) -->
+    <script src="../../../../sgraph_ai_app_send__ui__vault/v0/v0.1/v0.1.1/_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="../../../../sgraph_ai_app_send__ui__vault/v0/v0.1/v0.1.1/_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="../../../../sgraph_ai_app_send__ui__vault/v0/v0.1/v0.1.1/_common/js/lib/sg-vault/sg-vault.js"></script>
+    <!-- File utilities (from user UI) -->
     <script src="../../../../sgraph_ai_app_send__ui__user/v0/v0.1/v0.1.8/js/file-type-detect.js"></script>
     <script src="../../../../sgraph_ai_app_send__ui__user/v0/v0.1/v0.1.8/js/markdown-parser.js"></script>
 
