@@ -530,12 +530,8 @@
         // --- Key Management -----------------------------------------------------
 
         _updateVaultKey() {
-            if (!this._vault || !this._vaultKey) return;
-            const parts = this._vaultKey.split(':');
-            const settingsId = this._vault._settingsTransferId;
-            const vaultId    = this._vault._vaultId;
-            parts.splice(-2, 2, vaultId, settingsId);
-            this._vaultKey = parts.join(':');
+            if (!this._vault) return;
+            this._vaultKey = this._vault.getVaultKey();
 
             const share = this.querySelector('vault-share');
             if (share) share.updateKey(this._vaultKey);
