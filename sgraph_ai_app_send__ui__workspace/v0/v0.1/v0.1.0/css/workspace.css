@@ -286,8 +286,17 @@ html, body {
 
 .ws-panel-content {
     flex: 1;
-    overflow-y: auto;
-    padding: 0.75rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* document-viewer fills its container */
+document-viewer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 /* --- Chat Zone ------------------------------------------------------------ */
