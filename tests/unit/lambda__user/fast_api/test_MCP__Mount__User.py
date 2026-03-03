@@ -69,9 +69,9 @@ class test_MCP__Mount__User(TestCase):
             has_transfers = any('transfer' in name.lower() or 'create' in name.lower() for name in tool_names)
             assert has_transfers, f'Expected transfer tools in {tool_names}'
 
-            # Vault routes removed from User Lambda for v0.2.0
+            # Vault pointer routes added to User Lambda for v0.10.35
             has_vault = any('vault' in name.lower() for name in tool_names)
-            assert not has_vault, f'Vault tools should not be in User Lambda MCP, found in {tool_names}'
+            assert has_vault, f'Expected vault pointer tools in User Lambda MCP, not found in {tool_names}'
 
             # Internal routes should NOT be present (info)
             has_info = any('health' in name.lower() for name in tool_names)

@@ -8,14 +8,16 @@ from starlette.staticfiles                                                      
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import Routes__Transfers
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned             import Routes__Presigned
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Early_Access          import Routes__Early_Access
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Vault__Pointer        import Routes__Vault__Pointer
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                      import Transfer__Service
 from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls               import Service__Presigned_Urls
 from sgraph_ai_app_send.lambda__user.service.Service__Early_Access                 import Service__Early_Access
+from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer               import Service__Vault__Pointer
 from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE, APP_SEND__UI__USER__LOCALE
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
-from sgraph_ai_app_send.lambda__user.user__config                                   import HEADER__SGRAPH_SEND__ACCESS_TOKEN, ENV_VAR__N8N_WEBHOOK_URL, ENV_VAR__N8N_WEBHOOK_SECRET
+from sgraph_ai_app_send.lambda__user.user__config                                   import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY, ENV_VAR__N8N_WEBHOOK_URL, ENV_VAR__N8N_WEBHOOK_SECRET
 from sgraph_ai_app_send.utils.MCP__Setup                                            import MCP__Setup
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
@@ -32,6 +34,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
     presigned_service    : Service__Presigned_Urls = None                           # Presigned URL service (S3 mode only)
     admin_service_client : Admin__Service__Client = None                            # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
     early_access_service : Service__Early_Access  = None                            # Early Access signup (n8n webhook)
+    vault_service        : Service__Vault__Pointer = None                            # Vault pointer service (mutable files)
 
     def app_kwargs(self, **kwargs):                                                   # Override: move docs under /api/ so CloudFront routes them to Lambda
         kwargs = super().app_kwargs(**kwargs)
@@ -77,6 +80,9 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                 n8n_webhook_url    = get_env(ENV_VAR__N8N_WEBHOOK_URL   , ''),
                 n8n_webhook_secret = get_env(ENV_VAR__N8N_WEBHOOK_SECRET, ''))
 
+        if self.vault_service is None:                                           # Auto-create vault pointer service (shares storage backend)
+            self.vault_service = Service__Vault__Pointer(storage_fs=storage_fs)
+
         return super().setup()
 
 
@@ -86,8 +92,8 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             self.app().add_middleware(CORSMiddleware,
                                       allow_origins     = ["*"]                                                                                                      ,
                                       allow_credentials = True                                                                                                       ,
-                                      allow_methods     = ["GET", "POST", "HEAD", "OPTIONS"]                                                                         ,
-                                      allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization", HEADER__SGRAPH_SEND__ACCESS_TOKEN],
+                                      allow_methods     = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]                                                          ,
+                                      allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization", HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY],
                                       expose_headers    = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization"]                                  )
 
     def setup_routes(self):
@@ -101,17 +107,16 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                         admin_service_client = self.admin_service_client )
         self.add_routes(Routes__Early_Access   ,
                         service_early_access = self.early_access_service )
-
-        # Vault, Join, Set-Cookie routes removed from User Lambda for v0.2.0
-        # CloudFront separation: /api/* → Lambda, /* → S3 static files
-        # Vault and Join are auxiliary features — re-add when needed via admin Lambda
+        self.add_routes(Routes__Vault__Pointer ,
+                        vault_service        = self.vault_service        ,
+                        admin_service_client = self.admin_service_client )
 
         self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
 
     def setup_mcp(self):                                                              # Mount MCP server on /mcp endpoint
         from sgraph_ai_app_send.lambda__user.user__config import HEADER__SGRAPH_SEND__ACCESS_TOKEN
         mcp_setup = MCP__Setup(name            = 'sgraph-send-user'                              ,
-                               include_tags    = ['api/transfers', 'api/presigned', 'api/early-access'],
+                               include_tags    = ['api/transfers', 'api/presigned', 'api/early-access', 'api/vault'],
                                forward_headers = ['authorization', HEADER__SGRAPH_SEND__ACCESS_TOKEN],
                                stateless       = True                                            )  # Lambda-compatible: no session state, authless discovery
         self.mcp = mcp_setup.mount_mcp(self.app())
