@@ -253,7 +253,7 @@ html, body {
     grid-area: main;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr var(--ws-chat-height);
+    grid-template-rows: minmax(0, 1fr) var(--ws-chat-height);
     grid-template-areas:
         "source transform"
         "chat   chat";

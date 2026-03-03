@@ -335,7 +335,7 @@
                         </div>
                         <div class="ws-header-right">
                             <button class="ws-debug-toggle">Debug</button>
-                            <span class="ws-header-version">${window.sgraphWorkspace.config.appVersion}</span>
+                            <span class="ws-header-version">${window.sgraphWorkspace.config.appVersion} · ${window.sgraphWorkspace.config.version}</span>
                         </div>
                     </header>
 
