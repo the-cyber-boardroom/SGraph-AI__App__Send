@@ -1,55 +1,59 @@
 /* =================================================================================
    SGraph Vault — Client-Side Encrypted Vault Logic
-   v0.1.0 — Vault operations on top of sg-send.js transfer API
+   v0.1.1 — Deterministic vault pointers with read/write key separation
 
-   A vault is a collection of encrypted transfers. The server sees only encrypted
-   blobs with hex IDs — it has no concept of vaults, folders, or file names.
+   A vault is a collection of encrypted files stored via the vault pointer API.
+   The server sees only encrypted blobs — it has no concept of folders or file names.
 
-   Vault structure (all encrypted, stored as transfers):
+   Vault structure (all encrypted, stored as vault pointer files):
      - settings: vault metadata (name, id, created, tree pointer)
-     - tree:     folder/file hierarchy with transfer ID references
+     - tree:     folder/file hierarchy with file ID references
 
-   Vault key format (shareable): {passphrase}:{vault_id}:{settings_transfer_id}
-   KDF salt: sg-vault-v1:{vault_id}
+   Vault key format: {passphrase}:{vault_id}
+   Key derivation: SGVaultCrypto.deriveKeys() → read_key, write_key, file IDs
 
-   Depends on: SGSend (sg-send.js), SGSendCrypto (sg-send-crypto.js)
+   Depends on: SGSend (sg-send.js), SGSendCrypto (sg-send-crypto.js),
+               SGVaultCrypto (sg-vault-crypto.js)
    ================================================================================= */
 
 class SGVault {
 
     constructor(sgSend) {
         this._sgSend             = sgSend
-        this._derivedKey         = null
+        this._passphrase         = null
+        this._readKey            = null                                         // AES-256-GCM CryptoKey
+        this._writeKey           = null                                         // Hex string for server auth
         this._vaultId            = null
         this._settings           = null
         this._tree               = null
-        this._settingsTransferId = null
-        this._treeTransferId     = null
+        this._treeFileId         = null                                         // Deterministic (from HMAC)
+        this._settingsFileId     = null                                         // Deterministic (from HMAC)
     }
 
     // --- Vault Lifecycle ------------------------------------------------------
 
     static async create(sgSend, passphrase, options = {}) {
         const vault = new SGVault(sgSend)
+        vault._passphrase = passphrase
 
         // 1. Generate vault ID (8 hex chars)
         vault._vaultId = Array.from(crypto.getRandomValues(new Uint8Array(4)))
             .map(b => b.toString(16).padStart(2, '0')).join('')
 
-        // 2. Derive AES key from passphrase + vault ID
-        vault._derivedKey = await sgSend.deriveKey(
-            passphrase,
-            `sg-vault-v1:${vault._vaultId}`
-        )
+        // 2. Derive all keys and deterministic file IDs
+        const keys = await SGVaultCrypto.deriveKeys(passphrase, vault._vaultId)
+        vault._readKey        = keys.readKey
+        vault._writeKey       = keys.writeKey
+        vault._treeFileId     = keys.treeFileId
+        vault._settingsFileId = keys.settingsFileId
 
         // 3. Create settings
         vault._settings = {
-            vault_name:        options.name || 'Untitled Vault',
-            vault_id:          vault._vaultId,
-            created:           new Date().toISOString(),
-            version:           1,
-            description:       options.description || '',
-            _tree_transfer_id: null
+            vault_name:  options.name || 'Untitled Vault',
+            vault_id:    vault._vaultId,
+            created:     new Date().toISOString(),
+            version:     1,
+            description: options.description || ''
         }
 
         // 4. Create initial empty tree
@@ -59,58 +63,49 @@ class SGVault {
             tree: { '/': { type: 'folder', children: {} } }
         }
 
-        // 5. Encrypt and upload tree
-        const treeData      = new TextEncoder().encode(JSON.stringify(vault._tree))
-        const encryptedTree = await sgSend.encrypt(treeData, vault._derivedKey)
-        const treeResult    = await sgSend.upload(new Uint8Array(encryptedTree))
-        vault._treeTransferId = treeResult.transferId
-
-        // 6. Store tree pointer in settings, encrypt and upload settings
-        vault._settings._tree_transfer_id = vault._treeTransferId
-        const settingsData      = new TextEncoder().encode(JSON.stringify(vault._settings))
-        const encryptedSettings = await sgSend.encrypt(settingsData, vault._derivedKey)
-        const settingsResult    = await sgSend.upload(new Uint8Array(encryptedSettings))
-        vault._settingsTransferId = settingsResult.transferId
+        // 5. Save tree and settings via vault pointer API (overwrite in-place)
+        await vault._saveTree()
 
         return vault
     }
 
     static async open(sgSend, fullVaultKey) {
-        // Parse vault key: "passphrase:vaultId:settingsTransferId"
-        const parts = fullVaultKey.split(':')
-        if (parts.length < 3) {
-            throw new Error('Invalid vault key format. Expected passphrase:vaultId:settingsTransferId')
-        }
-        const settingsId = parts.pop()
-        const vaultId    = parts.pop()
-        const passphrase = parts.join(':')   // passphrase may contain colons
+        // Parse vault key: "{passphrase}:{vault_id}"
+        const { passphrase, vaultId } = SGVaultCrypto.parseVaultKey(fullVaultKey)
 
         const vault = new SGVault(sgSend)
-        vault._vaultId            = vaultId
-        vault._settingsTransferId = settingsId
+        vault._passphrase = passphrase
+        vault._vaultId    = vaultId
 
-        // Derive AES key
-        vault._derivedKey = await sgSend.deriveKey(
-            passphrase,
-            `sg-vault-v1:${vaultId}`
-        )
+        // Derive all keys and deterministic file IDs
+        const keys = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
+        vault._readKey        = keys.readKey
+        vault._writeKey       = keys.writeKey
+        vault._treeFileId     = keys.treeFileId
+        vault._settingsFileId = keys.settingsFileId
 
-        // Download and decrypt settings
-        const encSettings   = await sgSend.download(settingsId)
-        const settingsPlain = await sgSend.decrypt(encSettings, vault._derivedKey)
+        // Download and decrypt settings + tree in parallel
+        const [encSettings, encTree] = await Promise.all([
+            sgSend.vaultRead(vaultId, vault._settingsFileId),
+            sgSend.vaultRead(vaultId, vault._treeFileId)
+        ])
+
+        if (!encSettings) throw new Error('Vault not found: settings file missing')
+        if (!encTree)     throw new Error('Vault not found: tree file missing')
+
+        const settingsPlain = await sgSend.decrypt(encSettings, vault._readKey)
         vault._settings     = JSON.parse(new TextDecoder().decode(settingsPlain))
 
-        // Download and decrypt tree
-        vault._treeTransferId = vault._settings._tree_transfer_id
-        await vault._loadTree()
+        const treePlain = await sgSend.decrypt(encTree, vault._readKey)
+        vault._tree     = JSON.parse(new TextDecoder().decode(treePlain))
 
         return vault
     }
 
     // --- Vault Key ------------------------------------------------------------
 
-    getVaultKey(passphrase) {
-        return `${passphrase}:${this._vaultId}:${this._settingsTransferId}`
+    getVaultKey() {
+        return `${this._passphrase}:${this._vaultId}`
     }
 
     get vaultId()   { return this._vaultId                  }
@@ -120,12 +115,14 @@ class SGVault {
     // --- File Operations ------------------------------------------------------
 
     async addFile(folderPath, fileName, fileData) {
-        const encrypted = await this._sgSend.encrypt(
-            fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData,
-            this._derivedKey
-        )
-        const result = await this._sgSend.upload(new Uint8Array(encrypted))
-        const fileId = result.transferId
+        const data = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData
+        const encrypted = await this._sgSend.encrypt(data, this._readKey)
+
+        // Generate a random file ID for user files (not deterministic)
+        const fileId = Array.from(crypto.getRandomValues(new Uint8Array(6)))
+            .map(b => b.toString(16).padStart(2, '0')).join('')
+
+        await this._sgSend.vaultWrite(this._vaultId, fileId, this._writeKey, new Uint8Array(encrypted))
 
         const folder = this._findNode(folderPath)
         if (!folder || folder.type !== 'folder') {
@@ -135,7 +132,7 @@ class SGVault {
         folder.children[fileName] = {
             type:     'file',
             file_id:  fileId,
-            size:     fileData.byteLength || fileData.length,
+            size:     data.byteLength || data.length,
             uploaded: new Date().toISOString()
         }
 
@@ -149,13 +146,21 @@ class SGVault {
         const entry = folder.children[fileName]
         if (!entry || entry.type !== 'file') throw new Error(`File not found: ${fileName}`)
 
-        const encrypted = await this._sgSend.download(entry.file_id)
-        return this._sgSend.decrypt(encrypted, this._derivedKey)
+        const encrypted = await this._sgSend.vaultRead(this._vaultId, entry.file_id)
+        if (!encrypted) throw new Error(`File data not found on server: ${entry.file_id}`)
+        return this._sgSend.decrypt(encrypted, this._readKey)
     }
 
     async removeFile(folderPath, fileName) {
         const folder = this._findNode(folderPath)
         if (!folder) throw new Error(`Folder not found: ${folderPath}`)
+        const entry = folder.children[fileName]
+
+        // Delete from server if file_id is present
+        if (entry?.file_id) {
+            await this._sgSend.vaultDelete(this._vaultId, entry.file_id, this._writeKey)
+        }
+
         delete folder.children[fileName]
         await this._saveTree()
     }
@@ -301,26 +306,18 @@ class SGVault {
         return node
     }
 
-    async _loadTree() {
-        const encrypted = await this._sgSend.download(this._treeTransferId)
-        const plain     = await this._sgSend.decrypt(encrypted, this._derivedKey)
-        this._tree      = JSON.parse(new TextDecoder().decode(plain))
-    }
-
     async _saveTree() {
         this._tree.version = (this._tree.version || 0) + 1
         this._tree.updated = new Date().toISOString()
 
+        // Encrypt tree and overwrite in-place (no new transfer IDs, no orphans)
         const treeData      = new TextEncoder().encode(JSON.stringify(this._tree))
-        const encrypted     = await this._sgSend.encrypt(treeData, this._derivedKey)
-        const result        = await this._sgSend.upload(new Uint8Array(encrypted))
-        this._treeTransferId = result.transferId
+        const encryptedTree = await this._sgSend.encrypt(treeData, this._readKey)
+        await this._sgSend.vaultWrite(this._vaultId, this._treeFileId, this._writeKey, new Uint8Array(encryptedTree))
 
-        // Update settings to point to new tree, re-upload
-        this._settings._tree_transfer_id = this._treeTransferId
-        const settingsData  = new TextEncoder().encode(JSON.stringify(this._settings))
-        const encSettings   = await this._sgSend.encrypt(settingsData, this._derivedKey)
-        const settingsResult = await this._sgSend.upload(new Uint8Array(encSettings))
-        this._settingsTransferId = settingsResult.transferId
+        // Encrypt settings and overwrite in-place
+        const settingsData      = new TextEncoder().encode(JSON.stringify(this._settings))
+        const encryptedSettings = await this._sgSend.encrypt(settingsData, this._readKey)
+        await this._sgSend.vaultWrite(this._vaultId, this._settingsFileId, this._writeKey, new Uint8Array(encryptedSettings))
     }
 }
