@@ -6,9 +6,15 @@ GitHub Actions is just the trigger and executor.
 
 Deployment model:
   1. Validate required files exist
-  2. Sync to S3: websites/{site}/releases/{version}/
-  3. Copy release to: websites/{site}/latest/
+  2. Sync to S3: websites/{site}/{env}/releases/{version}/
+  3. Copy release to: websites/{site}/{env}/latest/
   4. Invalidate CloudFront cache
+
+When --deploy-env is provided (e.g. dev, main, prod), content is isolated
+under that environment prefix. Each branch deploys to its own S3 folder:
+  websites/sgraph-vault/dev/    — dev branch
+  websites/sgraph-vault/main/   — main branch
+  websites/sgraph-vault/prod/   — production
 
 S3 bucket naming convention: {account-id}--static-sgraph-ai--{region}
 
@@ -231,17 +237,21 @@ def s3_sync_by_type(source_dir, s3_prefix, file_type, extensions, cache_control,
     run_cmd(cmd, description=description)
 
 
-def deploy_to_s3(source_dir, bucket, site, version):
+def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None):
     """Deploy the static site to S3 using the versioned deployment model.
 
-    Step 1: Sync to websites/{site}/releases/{ifd_path}/  (IFD versioning)
-    Step 2: Copy the release to websites/{site}/latest/
+    Step 1: Sync to websites/{site}/{env}/releases/{ifd_path}/  (IFD versioning)
+    Step 2: Copy the release to websites/{site}/{env}/latest/
+
+    When deploy_env is provided (e.g. 'dev', 'main', 'prod'), files are isolated
+    under that environment prefix. Without it, files go to the site root (legacy).
 
     IFD versioning: v0.7.7 -> releases/v0/v0.7/v0.7.7/
     """
     ifd_path = version_to_ifd_path(version)
-    release_prefix = f"s3://{bucket}/websites/{site}/releases/{ifd_path}/"
-    latest_prefix  = f"s3://{bucket}/websites/{site}/latest/"
+    env_segment = f"{deploy_env}/" if deploy_env else ""
+    release_prefix = f"s3://{bucket}/websites/{site}/{env_segment}releases/{ifd_path}/"
+    latest_prefix  = f"s3://{bucket}/websites/{site}/{env_segment}latest/"
 
     # ----- Deploy to releases/{ifd_path}/ -----
     print(f"\n{'='*60}")
@@ -390,6 +400,13 @@ def parse_args():
         help="Skip file validation checks before deployment.",
     )
     parser.add_argument(
+        "--deploy-env",
+        default=None,
+        help="Environment prefix for S3 path isolation (e.g. 'dev', 'main', 'prod'). "
+             "Creates websites/{site}/{env}/releases/ and websites/{site}/{env}/latest/. "
+             "Without this, deploys to websites/{site}/ directly (legacy behaviour).",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print what would be done without executing S3 commands.",
@@ -417,6 +434,9 @@ def main():
     print(f"Source     : {source_dir}")
     print(f"Bucket     : {bucket}")
     print(f"Region     : {args.region}")
+    if args.deploy_env:
+        print(f"Deploy Env : {args.deploy_env}")
+        print(f"S3 Path    : websites/{args.site}/{args.deploy_env}/")
 
     # CloudFront TTL reference
     print_cloudfront_ttl_config()
@@ -434,15 +454,16 @@ def main():
 
     if args.dry_run:
         ifd_path = version_to_ifd_path(args.version)
-        print(f"\n[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/releases/{ifd_path}/")
-        print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/latest/")
+        env_segment = f"{args.deploy_env}/" if args.deploy_env else ""
+        print(f"\n[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/{env_segment}releases/{ifd_path}/")
+        print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/{env_segment}latest/")
         for dist_id in args.cloudfront_distribution_id:
             print(f"[dry-run] Would invalidate CloudFront {dist_id}")
         print("\nDry run complete.")
         sys.exit(0)
 
     # --- Deploy ---
-    deploy_to_s3(source_dir, bucket, args.site, args.version)
+    deploy_to_s3(source_dir, bucket, args.site, args.version, deploy_env=args.deploy_env)
 
     # --- CloudFront ---
     for dist_id in args.cloudfront_distribution_id:
@@ -453,10 +474,11 @@ def main():
         smoke_test(args.smoke_test_url)
 
     ifd_path = version_to_ifd_path(args.version)
+    env_segment = f"{args.deploy_env}/" if args.deploy_env else ""
     print(f"\n{'='*60}")
-    print(f"Deployment complete: {args.site} {args.version}")
-    print(f"  Release : s3://{bucket}/websites/{args.site}/releases/{ifd_path}/")
-    print(f"  Latest  : s3://{bucket}/websites/{args.site}/latest/")
+    print(f"Deployment complete: {args.site} {args.version}" + (f" [{args.deploy_env}]" if args.deploy_env else ""))
+    print(f"  Release : s3://{bucket}/websites/{args.site}/{env_segment}releases/{ifd_path}/")
+    print(f"  Latest  : s3://{bucket}/websites/{args.site}/{env_segment}latest/")
     print(f"{'='*60}")
 
 

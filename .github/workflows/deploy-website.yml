@@ -2,11 +2,17 @@ name: Deploy Website - sgraph.ai
 
 # v0.7.6 architecture: GitHub Actions is the trigger and executor.
 # All deployment logic lives in Python scripts under scripts/.
+#
+# S3 path isolation by branch/environment:
+#   websites/sgraph-ai/dev/    — dev branch (automatic)
+#   websites/sgraph-ai/main/   — main branch (automatic)
+#   websites/sgraph-ai/prod/   — production (manual dispatch)
 
 on:
   push:
     branches:
       - dev
+      - main
     paths:
       - 'sgraph_ai__website/**'
       - 'scripts/deploy_static_site.py'
@@ -25,7 +31,7 @@ on:
           - staging
 
 concurrency:
-  group: "website-deploy"
+  group: "website-deploy-${{ inputs.environment || github.ref_name || 'dev' }}"
   cancel-in-progress: false
 
 env:
@@ -35,10 +41,10 @@ env:
 
 jobs:
   deploy:
-    name: Deploy to S3 + CloudFront
+    name: "Deploy to S3 + CloudFront (${{ inputs.environment || github.ref_name || 'dev' }})"
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: ${{ inputs.environment || 'production' }}
+    environment: ${{ inputs.environment || (github.ref_name == 'main' && 'main') || 'dev' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +68,21 @@ jobs:
       - name: Generate i18n locale pages
         run: python scripts/generate_i18n_pages.py
 
+      - name: Resolve deployment environment
+        id: env
+        run: |
+          DEPLOY_ENV="${{ inputs.environment || github.ref_name }}"
+          if [ "$DEPLOY_ENV" == "production" ]; then
+            echo "deploy_env=prod" >> $GITHUB_OUTPUT
+            echo "Deploying to PRODUCTION (sgraph.ai) → S3: websites/sgraph-ai/prod/"
+          elif [ "$DEPLOY_ENV" == "main" ]; then
+            echo "deploy_env=main" >> $GITHUB_OUTPUT
+            echo "Deploying to MAIN → S3: websites/sgraph-ai/main/"
+          else
+            echo "deploy_env=dev" >> $GITHUB_OUTPUT
+            echo "Deploying to DEV → S3: websites/sgraph-ai/dev/"
+          fi
+
       - name: Deploy static site
         run: |
           python scripts/deploy_static_site.py \
@@ -70,6 +91,7 @@ jobs:
             --source-dir ${{ env.WEBSITE_DIR }} \
             --bucket ${{ secrets.WEBSITE_S3_BUCKET }} \
             --region ${{ env.AWS_REGION }} \
+            --deploy-env ${{ steps.env.outputs.deploy_env }} \
             --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }} \
             --smoke-test-url "https://sgraph.ai"
 
