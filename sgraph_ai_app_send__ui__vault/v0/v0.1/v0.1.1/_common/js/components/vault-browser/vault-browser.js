@@ -7,11 +7,12 @@ class VaultBrowser extends VaultComponent {
 
     constructor() {
         super()
-        this._vault       = null
-        this._currentPath = '/'
-        this._sortField   = 'name'
-        this._sortAsc     = true
+        this._vault        = null
+        this._currentPath  = '/'
+        this._sortField    = 'name'
+        this._sortAsc      = true
         this._deleteTarget = null
+        this._draggingItem = null  // { name, type } for internal drag
     }
 
     set vault(v) {
@@ -103,7 +104,7 @@ class VaultBrowser extends VaultComponent {
             const rowClass = isFolder ? 'vault-browser__row vault-browser__row--folder' : 'vault-browser__row'
 
             return `
-                <tr class="${rowClass}" data-name="${this.escapeHtml(item.name)}" data-type="${item.type}">
+                <tr class="${rowClass}" data-name="${this.escapeHtml(item.name)}" data-type="${item.type}" draggable="true">
                     <td class="vault-browser__td"><span class="icon">${icon}</span>${this.escapeHtml(item.name)}</td>
                     <td class="vault-browser__td">${typeLabel}</td>
                     <td class="vault-browser__td">${size}</td>
@@ -125,6 +126,52 @@ class VaultBrowser extends VaultComponent {
                     : this._currentPath + '/' + name
                 this.refresh()
             })
+        })
+
+        // Bind drag source on all rows
+        this._fileList.querySelectorAll('tr[draggable]').forEach(row => {
+            const name = row.getAttribute('data-name')
+            const type = row.getAttribute('data-type')
+
+            row.addEventListener('dragstart', (e) => {
+                this._draggingItem = { name, type }
+                row.classList.add('vault-browser__row--dragging')
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('application/x-vault-item', JSON.stringify({ name, type }))
+            })
+            row.addEventListener('dragend', () => {
+                row.classList.remove('vault-browser__row--dragging')
+                this._draggingItem = null
+                this._fileList.querySelectorAll('.vault-browser__row--drop-target').forEach(n =>
+                    n.classList.remove('vault-browser__row--drop-target')
+                )
+            })
+
+            // Folder rows are drop targets
+            if (type === 'folder') {
+                row.addEventListener('dragover', (e) => {
+                    if (!this._draggingItem) return
+                    if (this._draggingItem.name === name) return  // can't drop on self
+                    e.preventDefault()
+                    e.stopPropagation()
+                    e.dataTransfer.dropEffect = 'move'
+                    row.classList.add('vault-browser__row--drop-target')
+                })
+                row.addEventListener('dragleave', () => {
+                    row.classList.remove('vault-browser__row--drop-target')
+                })
+                row.addEventListener('drop', (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    row.classList.remove('vault-browser__row--drop-target')
+                    if (!this._draggingItem) return
+                    const destPath = this._currentPath === '/'
+                        ? '/' + name
+                        : this._currentPath + '/' + name
+                    this._emitMoveRequest(this._draggingItem, destPath)
+                    this._draggingItem = null
+                })
+            }
         })
 
         // Bind action buttons
@@ -277,6 +324,8 @@ class VaultBrowser extends VaultComponent {
     // --- Drag and Drop ---------------------------------------------------------
 
     _onDragEnter(e) {
+        // Only show upload drop zone for external file drags (not internal moves)
+        if (this._draggingItem) return
         e.preventDefault()
         this._dropZone.hidden = false
     }
@@ -295,6 +344,9 @@ class VaultBrowser extends VaultComponent {
         e.preventDefault()
         this._dropZone.hidden = true
 
+        // If this is an internal drag, ignore (handled by row drop targets)
+        if (this._draggingItem) return
+
         const files = e.dataTransfer?.files
         if (!files || files.length === 0) return
 
@@ -302,6 +354,24 @@ class VaultBrowser extends VaultComponent {
             this.emit('vault-upload-file', {
                 path: this._currentPath,
                 file
+            })
+        }
+    }
+
+    _emitMoveRequest(item, destFolderPath) {
+        if (item.type === 'file') {
+            this.emit('file-move-request', {
+                fileName:      item.name,
+                srcFolderPath: this._currentPath,
+                destFolderPath
+            })
+        } else {
+            const srcPath = this._currentPath === '/'
+                ? '/' + item.name
+                : this._currentPath + '/' + item.name
+            this.emit('folder-move-request', {
+                srcPath,
+                destParentPath: destFolderPath
             })
         }
     }

@@ -451,6 +451,44 @@
             }
         }
 
+        async _onMoveFile(fileName, srcFolderPath, destFolderPath) {
+            if (!this._vault || !fileName) return;
+            try {
+                await this._vault.moveFile(srcFolderPath, fileName, destFolderPath);
+                window.sgraphVault.messages.success(`Moved "${fileName}" to ${destFolderPath === '/' ? 'root' : destFolderPath}`);
+                this._selectedFile = null;
+                const props = this.querySelector('vault-file-properties');
+                if (props) props.clearFile();
+                const preview = this.querySelector('vault-file-preview');
+                if (preview) preview.clearPreview();
+                const tree = this.querySelector('vault-tree-view');
+                if (tree) tree.refresh();
+                const browser = this.querySelector('vault-browser');
+                if (browser) browser.refresh();
+                this._updateVaultKey();
+                this._updateStatusBar();
+            } catch (err) {
+                window.sgraphVault.messages.error(`Move failed: ${err.message}`);
+            }
+        }
+
+        async _onMoveFolder(srcPath, destParentPath) {
+            if (!this._vault || !srcPath) return;
+            try {
+                await this._vault.moveFolder(srcPath, destParentPath);
+                const folderName = srcPath.split('/').filter(Boolean).pop();
+                window.sgraphVault.messages.success(`Moved "${folderName}" to ${destParentPath === '/' ? 'root' : destParentPath}`);
+                const tree = this.querySelector('vault-tree-view');
+                if (tree) tree.refresh();
+                const browser = this.querySelector('vault-browser');
+                if (browser) browser.refresh();
+                this._updateVaultKey();
+                this._updateStatusBar();
+            } catch (err) {
+                window.sgraphVault.messages.error(`Move failed: ${err.message}`);
+            }
+        }
+
         // --- Key Management -----------------------------------------------------
 
         _updateVaultKey() {
@@ -538,6 +576,12 @@
             });
             this.addEventListener('folder-rename-request', (e) => {
                 this._onRenameFolder(e.detail.oldPath, e.detail.newName);
+            });
+            this.addEventListener('file-move-request', (e) => {
+                this._onMoveFile(e.detail.fileName, e.detail.srcFolderPath, e.detail.destFolderPath);
+            });
+            this.addEventListener('folder-move-request', (e) => {
+                this._onMoveFolder(e.detail.srcPath, e.detail.destParentPath);
             });
 
             // Click delegation

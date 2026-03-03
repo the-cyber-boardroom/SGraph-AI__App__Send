@@ -17,6 +17,7 @@
             this._vault       = null;
             this._expandedPaths = new Set(['/']);
             this._selectedPath  = null;
+            this._dragging      = null;  // { path, name, type, parentPath }
         }
 
         set vault(v) {
@@ -37,6 +38,21 @@
 
             this.querySelector('.vt-new-folder-btn').addEventListener('click', () => {
                 this._onNewFolder();
+            });
+
+            // Root folder is a drop target (drop items to move to /)
+            const treeEl = this.querySelector('.vt-tree');
+            treeEl.addEventListener('dragover', (e) => {
+                if (!this._dragging) return;
+                // Only handle drops on the tree container itself (not on child rows)
+                if (e.target !== treeEl) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            treeEl.addEventListener('drop', (e) => {
+                if (!this._dragging || e.target !== treeEl) return;
+                e.preventDefault();
+                this._handleDrop('/');
             });
         }
 
@@ -79,11 +95,52 @@
                 row.dataset.path = fullPath;
                 row.dataset.type = entry.type;
                 row.dataset.name = name;
+                row.setAttribute('draggable', 'true');
+
+                // --- Drag source (all items) ---
+                row.addEventListener('dragstart', (e) => {
+                    e.stopPropagation();
+                    this._dragging = {
+                        path:       fullPath,
+                        name:       name,
+                        type:       entry.type,
+                        parentPath: path
+                    };
+                    row.classList.add('vt-row--dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', fullPath);
+                });
+                row.addEventListener('dragend', () => {
+                    row.classList.remove('vt-row--dragging');
+                    this._dragging = null;
+                    this.querySelectorAll('.vt-row--drop-target').forEach(n =>
+                        n.classList.remove('vt-row--drop-target')
+                    );
+                });
 
                 if (isFolder) {
                     const hasChildren = Object.keys(entry.children || {}).length > 0;
                     const chevron = hasChildren ? (isExpanded ? '\u25BE' : '\u25B8') : '\u00A0\u00A0';
                     row.innerHTML = `<span class="vt-chevron">${chevron}</span><span class="vt-icon">\uD83D\uDCC1</span><span class="vt-name">${this._escapeHtml(name)}</span>`;
+
+                    // --- Drop target (folders only) ---
+                    row.addEventListener('dragover', (e) => {
+                        if (!this._dragging) return;
+                        if (this._dragging.path === fullPath) return;  // can't drop on self
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.dataTransfer.dropEffect = 'move';
+                        row.classList.add('vt-row--drop-target');
+                    });
+                    row.addEventListener('dragleave', () => {
+                        row.classList.remove('vt-row--drop-target');
+                    });
+                    row.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        row.classList.remove('vt-row--drop-target');
+                        this._handleDrop(fullPath);
+                    });
 
                     row.addEventListener('click', () => {
                         if (isExpanded) {
@@ -232,6 +289,24 @@
             input.addEventListener('click', (e) => e.stopPropagation());
         }
 
+        _handleDrop(destFolderPath) {
+            if (!this._dragging) return;
+            const { path, name, type, parentPath } = this._dragging;
+            this._dragging = null;
+
+            if (type === 'file') {
+                this.dispatchEvent(new CustomEvent('file-move-request', {
+                    detail: { fileName: name, srcFolderPath: parentPath, destFolderPath },
+                    bubbles: true, composed: true
+                }));
+            } else {
+                this.dispatchEvent(new CustomEvent('folder-move-request', {
+                    detail: { srcPath: path, destParentPath: destFolderPath },
+                    bubbles: true, composed: true
+                }));
+            }
+        }
+
         _escapeHtml(str) {
             const d = document.createElement('div');
             d.textContent = String(str);
@@ -253,6 +328,10 @@
                 .vt-chevron { font-size: 0.6rem; flex-shrink: 0; width: 0.75rem; text-align: center; color: var(--color-text-secondary); }
                 .vt-icon { flex-shrink: 0; font-size: 0.875rem; }
                 .vt-name { overflow: hidden; text-overflow: ellipsis; }
+                .vt-row[draggable="true"] { cursor: grab; }
+                .vt-row[draggable="true"]:active { cursor: grabbing; }
+                .vt-row--dragging { opacity: 0.4; }
+                .vt-row--drop-target { outline: 2px dashed var(--color-primary, #4ECDC4); outline-offset: -2px; background: rgba(78, 205, 196, 0.08); border-radius: 3px; }
             `;
         }
     }
