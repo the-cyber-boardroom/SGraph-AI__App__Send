@@ -453,6 +453,7 @@
 
         async _onMoveFile(fileName, srcFolderPath, destFolderPath) {
             if (!this._vault || !fileName) return;
+            this._showLoading();
             try {
                 await this._vault.moveFile(srcFolderPath, fileName, destFolderPath);
                 window.sgraphVault.messages.success(`Moved "${fileName}" to ${destFolderPath === '/' ? 'root' : destFolderPath}`);
@@ -469,11 +470,14 @@
                 this._updateStatusBar();
             } catch (err) {
                 window.sgraphVault.messages.error(`Move failed: ${err.message}`);
+            } finally {
+                this._hideLoading();
             }
         }
 
         async _onMoveFolder(srcPath, destParentPath) {
             if (!this._vault || !srcPath) return;
+            this._showLoading();
             try {
                 await this._vault.moveFolder(srcPath, destParentPath);
                 const folderName = srcPath.split('/').filter(Boolean).pop();
@@ -486,6 +490,8 @@
                 this._updateStatusBar();
             } catch (err) {
                 window.sgraphVault.messages.error(`Move failed: ${err.message}`);
+            } finally {
+                this._hideLoading();
             }
         }
 
