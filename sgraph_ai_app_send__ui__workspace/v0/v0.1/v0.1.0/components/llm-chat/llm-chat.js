@@ -36,7 +36,14 @@
         }
 
         connectedCallback() {
-            this._render();
+            try {
+                this._render();
+            } catch (e) {
+                console.error('[llm-chat] Render failed:', e);
+                if (window.sgraphWorkspace?.messages) {
+                    window.sgraphWorkspace.messages.error('LLM Chat render failed: ' + e.message);
+                }
+            }
 
             // Listen for connection events
             const onConnected = (data) => {
@@ -63,7 +70,7 @@
 
             // Check if already connected
             const conn = document.querySelector('llm-connection');
-            if (conn && conn.isConnected()) {
+            if (conn && typeof conn.isConnected === 'function' && conn.isConnected()) {
                 this._connected = true;
                 this._models = conn.getModels();
                 this._render();
@@ -327,13 +334,14 @@
 
         _render() {
             const conn = document.querySelector('llm-connection');
-            const models = conn ? conn.getModels() : [];
-            const selectedModel = conn ? conn.getSelectedModel() : null;
-            const isConnected = conn && conn.isConnected();
+            const isUpgraded = conn && typeof conn.getModels === 'function';
+            const models = isUpgraded ? conn.getModels() : [];
+            const selectedModel = isUpgraded ? conn.getSelectedModel() : null;
+            const isConnected = isUpgraded && conn.isConnected();
 
             // Get prompts from library
             const library = document.querySelector('prompt-library');
-            const prompts = library ? library.getPrompts() : [];
+            const prompts = library && typeof library.getPrompts === 'function' ? library.getPrompts() : [];
 
             this.innerHTML = `<style>${LlmChat.styles}</style>
             <div class="lcc-panel">
@@ -422,7 +430,7 @@
         static get styles() {
             return `
                 .lcc-panel {
-                    display: flex; flex-direction: column; height: 100%;
+                    display: flex; flex-direction: column; flex: 1; min-height: 0;
                     padding: 0.5rem 0.75rem; gap: 0.375rem;
                 }
                 .lcc-top-bar {
