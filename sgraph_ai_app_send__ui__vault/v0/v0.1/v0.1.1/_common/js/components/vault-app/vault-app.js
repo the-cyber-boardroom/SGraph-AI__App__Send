@@ -111,14 +111,8 @@ class VaultApp extends VaultComponent {
     }
 
     _updateVaultKey() {
-        // Reconstruct vault key with new settings transfer ID
-        // Parse existing key to get passphrase
-        const parts = this._vaultKey.split(':')
-        const settingsId = this._vault._settingsTransferId
-        const vaultId    = this._vault._vaultId
-        // Replace last two parts (vaultId:settingsId)
-        parts.splice(-2, 2, vaultId, settingsId)
-        this._vaultKey = parts.join(':')
+        if (!this._vault) return
+        this._vaultKey = this._vault.getVaultKey()
         this._share.updateKey(this._vaultKey)
     }
 

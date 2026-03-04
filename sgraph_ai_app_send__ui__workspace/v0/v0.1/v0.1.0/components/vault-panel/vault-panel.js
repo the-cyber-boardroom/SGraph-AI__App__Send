@@ -3,7 +3,7 @@
    v0.1.0 — File browser using SGVault (same model as vault.sgraph.ai)
 
    Uses SGSend + SGVault (imported from vault.sgraph.ai) to:
-   - Open a vault via vault key (passphrase:vault_id:settings_transfer_id)
+   - Open a vault via vault key (passphrase:vault_id)
    - Create a new vault with passphrase
    - Browse folders and files via the encrypted vault tree
    - Emit 'file-selected' on click → document-viewer loads the content
@@ -300,7 +300,7 @@
                 <div class="vp-section">
                     <label class="vp-label">Vault Key</label>
                     <input type="password" class="vp-input" id="vp-vault-key"
-                           placeholder="passphrase:vault_id:settings_id">
+                           placeholder="passphrase:vault_id">
                     <button class="vp-btn vp-btn--primary" id="vp-open">Open Vault</button>
                 </div>
                 <div class="vp-divider">or</div>
