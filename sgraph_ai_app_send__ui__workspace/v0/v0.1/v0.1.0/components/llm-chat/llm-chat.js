@@ -24,15 +24,31 @@
         return d.innerHTML;
     }
 
+    const DEFAULT_SYSTEM_PROMPT = 'You are an HTML transformation agent. You will receive HTML source code and a transformation instruction. Reply with ONLY the transformed HTML. Do not include markdown backtick fences. Do not include any explanation or commentary. Start your response with `<!DOCTYPE html>`.';
+    const SYSTEM_PROMPT_KEY = 'sgraph-workspace-system-prompt';
+
     class LlmChat extends HTMLElement {
 
         constructor() {
             super();
-            this._sending    = false;
-            this._abortCtrl  = null;
-            this._connected  = false;
-            this._models     = [];
-            this._unsubs     = [];
+            this._sending       = false;
+            this._abortCtrl     = null;
+            this._connected     = false;
+            this._models        = [];
+            this._unsubs        = [];
+            this._systemPrompt  = this._loadSystemPrompt();
+            this._sysPromptOpen = false;
+        }
+
+        _loadSystemPrompt() {
+            try {
+                const saved = localStorage.getItem(SYSTEM_PROMPT_KEY);
+                return saved !== null ? saved : DEFAULT_SYSTEM_PROMPT;
+            } catch (_) { return DEFAULT_SYSTEM_PROMPT; }
+        }
+
+        _saveSystemPrompt() {
+            try { localStorage.setItem(SYSTEM_PROMPT_KEY, this._systemPrompt); } catch (_) { /* ignore */ }
         }
 
         connectedCallback() {
@@ -56,16 +72,19 @@
                 this._models = [];
                 this._render();
             };
-            const onModelChanged = () => this._updateModelSelect();
+            const onModelChanged  = () => this._updateModelSelect();
+            const onPromptsUpdate = () => this._updatePromptSelect();
 
             window.sgraphWorkspace.events.on('llm-connected', onConnected);
             window.sgraphWorkspace.events.on('llm-disconnected', onDisconnected);
             window.sgraphWorkspace.events.on('llm-model-changed', onModelChanged);
+            window.sgraphWorkspace.events.on('prompt-library-updated', onPromptsUpdate);
 
             this._unsubs.push(
                 () => window.sgraphWorkspace.events.off('llm-connected', onConnected),
                 () => window.sgraphWorkspace.events.off('llm-disconnected', onDisconnected),
                 () => window.sgraphWorkspace.events.off('llm-model-changed', onModelChanged),
+                () => window.sgraphWorkspace.events.off('prompt-library-updated', onPromptsUpdate),
             );
 
             // Check if already connected
@@ -135,9 +154,11 @@
             const transformViewer = document.querySelector('document-viewer[data-role="transform"]');
             let accumulated = '';
 
+            const systemPrompt = this._systemPrompt ? this._systemPrompt.trim() : '';
+
             try {
                 if (provider === 'openrouter') {
-                    accumulated = await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, (chunk) => {
+                    accumulated = await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, (chunk) => {
                         accumulated += chunk;
                         if (transformViewer) {
                             const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
@@ -145,7 +166,7 @@
                         }
                     });
                 } else if (provider === 'ollama') {
-                    accumulated = await this._streamOllama(baseUrl, model, finalPrompt, (chunk) => {
+                    accumulated = await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, (chunk) => {
                         accumulated += chunk;
                         if (transformViewer) {
                             const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
@@ -176,7 +197,11 @@
 
         // --- Streaming: OpenRouter (OpenAI-compatible SSE) ----------------------
 
-        async _streamOpenRouter(baseUrl, apiKey, model, prompt, onChunk) {
+        async _streamOpenRouter(baseUrl, apiKey, model, prompt, systemPrompt, onChunk) {
+            const messages = [];
+            if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+            messages.push({ role: 'user', content: prompt });
+
             const resp = await fetch(`${baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -185,11 +210,7 @@
                     'HTTP-Referer':  location.origin,
                     'X-Title':       'SGraph Workspace',
                 },
-                body: JSON.stringify({
-                    model,
-                    messages: [{ role: 'user', content: prompt }],
-                    stream: true,
-                }),
+                body: JSON.stringify({ model, messages, stream: true }),
                 signal: this._abortCtrl.signal,
             });
 
@@ -203,12 +224,14 @@
 
         // --- Streaming: Ollama (NDJSON) -----------------------------------------
 
-        async _streamOllama(baseUrl, model, prompt, onChunk) {
+        async _streamOllama(baseUrl, model, prompt, systemPrompt, onChunk) {
             const base = baseUrl.replace(/\/+$/, '');
+            const body = { model, prompt, stream: true };
+            if (systemPrompt) body.system = systemPrompt;
             const resp = await fetch(`${base}/api/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model, prompt, stream: true }),
+                body: JSON.stringify(body),
                 signal: this._abortCtrl.signal,
             });
 
@@ -317,6 +340,18 @@
             if (textarea)  textarea.disabled  = this._sending;
         }
 
+        _updatePromptSelect() {
+            const select = this.querySelector('#lc-prompt-lib');
+            if (!select) return;
+            const library = document.querySelector('prompt-library');
+            const prompts = library && typeof library.getPrompts === 'function' ? library.getPrompts() : [];
+            select.innerHTML = `<option value="">Custom prompt...</option>`
+                + prompts.map(p => {
+                    const prefix = p.builtin ? '' : '\u{1F4C1} ';
+                    return `<option value="${esc(p.id)}">${prefix}${esc(p.name)}</option>`;
+                }).join('');
+        }
+
         _updateModelSelect() {
             const conn = document.querySelector('llm-connection');
             if (!conn) return;
@@ -345,6 +380,22 @@
 
             this.innerHTML = `<style>${LlmChat.styles}</style>
             <div class="lcc-panel">
+                <!-- System prompt (collapsible) -->
+                <div class="lcc-sys-row">
+                    <button class="lcc-sys-toggle" id="lc-sys-toggle">
+                        ${this._sysPromptOpen ? '&#9660;' : '&#9654;'} System Prompt
+                        <span class="lcc-sys-status">${this._systemPrompt ? 'Active' : 'None'}</span>
+                    </button>
+                </div>
+                ${this._sysPromptOpen ? `
+                <div class="lcc-sys-editor">
+                    <textarea class="lcc-sys-textarea" id="lc-sys-prompt"
+                              placeholder="System prompt sent with every request...">${esc(this._systemPrompt || '')}</textarea>
+                    <div class="lcc-sys-actions">
+                        <button class="lcc-sys-reset" id="lc-sys-reset" title="Reset to default">Reset</button>
+                    </div>
+                </div>` : ''}
+
                 <!-- Prompt library quick-select -->
                 <div class="lcc-top-bar">
                     <select class="lcc-prompt-select" id="lc-prompt-lib">
@@ -380,6 +431,29 @@
         }
 
         _bind() {
+            // System prompt toggle
+            const sysToggle = this.querySelector('#lc-sys-toggle');
+            if (sysToggle) sysToggle.addEventListener('click', () => {
+                this._sysPromptOpen = !this._sysPromptOpen;
+                this._render();
+            });
+
+            // System prompt textarea — save on input
+            const sysTextarea = this.querySelector('#lc-sys-prompt');
+            if (sysTextarea) sysTextarea.addEventListener('input', () => {
+                this._systemPrompt = sysTextarea.value;
+                this._saveSystemPrompt();
+            });
+
+            // System prompt reset
+            const sysReset = this.querySelector('#lc-sys-reset');
+            if (sysReset) sysReset.addEventListener('click', () => {
+                this._systemPrompt = DEFAULT_SYSTEM_PROMPT;
+                this._saveSystemPrompt();
+                const ta = this.querySelector('#lc-sys-prompt');
+                if (ta) ta.value = DEFAULT_SYSTEM_PROMPT;
+            });
+
             // Send button
             const sendBtn = this.querySelector('#lc-send');
             if (sendBtn) sendBtn.addEventListener('click', () => this._send());
@@ -433,6 +507,42 @@
                     display: flex; flex-direction: column; flex: 1; min-height: 0;
                     padding: 0.5rem 0.75rem; gap: 0.375rem;
                 }
+                .lcc-sys-row { flex-shrink: 0; }
+                .lcc-sys-toggle {
+                    background: none; border: none; cursor: pointer;
+                    font-size: 0.6875rem; font-weight: 600;
+                    color: var(--ws-text-muted, #5a6478); font-family: inherit;
+                    padding: 0.125rem 0; display: flex; align-items: center; gap: 0.375rem;
+                }
+                .lcc-sys-toggle:hover { color: var(--ws-text-secondary, #8892A0); }
+                .lcc-sys-status {
+                    font-size: 0.625rem; font-weight: 600;
+                    padding: 0.0625rem 0.375rem; border-radius: 9999px;
+                    background: var(--ws-primary-bg, rgba(78,205,196,0.1));
+                    color: var(--ws-primary, #4ECDC4);
+                }
+                .lcc-sys-editor {
+                    display: flex; gap: 0.375rem; flex-shrink: 0;
+                }
+                .lcc-sys-textarea {
+                    flex: 1; resize: none; height: 3.5rem;
+                    font-family: var(--ws-font-mono, monospace); font-size: 0.75rem;
+                    padding: 0.375rem 0.5rem;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-secondary, #8892A0);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px);
+                    outline: none; line-height: 1.4;
+                }
+                .lcc-sys-textarea:focus { border-color: var(--ws-primary, #4ECDC4); }
+                .lcc-sys-actions { display: flex; flex-direction: column; justify-content: flex-end; }
+                .lcc-sys-reset {
+                    padding: 0.25rem 0.5rem; font-size: 0.6875rem;
+                    background: transparent; border: 1px solid var(--ws-border, #2C3E6B);
+                    color: var(--ws-text-muted, #5a6478); border-radius: var(--ws-radius, 6px);
+                    cursor: pointer; font-family: inherit;
+                }
+                .lcc-sys-reset:hover { color: var(--ws-text-secondary, #8892A0); background: var(--ws-surface-hover, #253254); }
                 .lcc-top-bar {
                     display: flex; gap: 0.5rem; flex-shrink: 0;
                 }

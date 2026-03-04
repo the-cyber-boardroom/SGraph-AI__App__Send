@@ -255,9 +255,10 @@
 
         // --- Public API (for document-viewer to load/save files) ---------------
 
-        getVault()    { return this._vault; }
-        getSgSend()   { return this._sgSend; }
-        getState()    { return this._state; }
+        getVault()       { return this._vault; }
+        getSgSend()      { return this._sgSend; }
+        getState()       { return this._state; }
+        getCurrentPath() { return this._currentPath; }
 
         /**
          * Save a new file into the vault (encrypt + upload via Transfer API).
@@ -367,11 +368,18 @@
                 itemsHtml = items.map(item => {
                     const isSelected = item.name === this._selectedFile;
                     const isFolder   = item.type === 'folder';
-                    return `<div class="vp-item ${isSelected ? 'vp-item--selected' : ''}"
+                    const isSource   = !isFolder && item.name === 'source.html';
+                    const isView     = !isFolder && /^view-/.test(item.name);
+                    const extraClass = isSource ? ' vp-item--source' : isView ? ' vp-item--view' : '';
+                    const badge      = isSource ? '<span class="vp-item-badge vp-item-badge--source">SRC</span>'
+                                     : isView   ? '<span class="vp-item-badge vp-item-badge--view">VIEW</span>'
+                                     : '';
+                    return `<div class="vp-item ${isSelected ? 'vp-item--selected' : ''}${extraClass}"
                                 data-name="${esc(item.name)}"
                                 data-kind="${item.type}">
                         <span class="vp-item-icon">${isFolder ? ICON_FOLDER : ICON_FILE}</span>
                         <span class="vp-item-name">${esc(item.name)}</span>
+                        ${badge}
                         ${!isFolder && item.size ? `<span class="vp-item-size">${formatSize(item.size)}</span>` : ''}
                     </div>`;
                 }).join('');
@@ -575,6 +583,18 @@
                     flex: 1; font-size: 0.8125rem; color: var(--ws-text, #F0F0F5);
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
+                .vp-item-badge {
+                    font-size: 0.5625rem; font-weight: 700; letter-spacing: 0.04em;
+                    padding: 0.0625rem 0.25rem; border-radius: 3px;
+                    flex-shrink: 0;
+                }
+                .vp-item-badge--source {
+                    background: rgba(78,205,196,0.15); color: var(--ws-primary, #4ECDC4);
+                }
+                .vp-item-badge--view {
+                    background: rgba(139,92,246,0.15); color: #a78bfa;
+                }
+                .vp-item--source .vp-item-name { color: var(--ws-primary, #4ECDC4); font-weight: 600; }
                 .vp-item-size {
                     font-size: 0.6875rem; color: var(--ws-text-muted, #5a6478);
                     font-family: var(--ws-font-mono, monospace); flex-shrink: 0;
