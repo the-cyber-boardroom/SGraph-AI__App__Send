@@ -63,6 +63,8 @@
             this.render();
             this._setupListeners();
             this._setupResize();
+            this._setupColResize();
+            this._setupRowResize();
             this._setupMessageBadge();
 
             this._applyDebugWidth();
@@ -78,6 +80,8 @@
 
         disconnectedCallback() {
             if (this._resizeCleanup) this._resizeCleanup();
+            if (this._colResizeCleanup) this._colResizeCleanup();
+            if (this._rowResizeCleanup) this._rowResizeCleanup();
             if (this._badgeUnsub) this._badgeUnsub();
         }
 
@@ -290,6 +294,103 @@
             };
         }
 
+        // --- Column Resize (between source and transform) -------------------------
+
+        _setupColResize() {
+            const handle = this.querySelector('.ws-col-resize');
+            const area   = this.querySelector('.ws-transform-area');
+            if (!handle || !area) return;
+
+            let isResizing = false;
+            let startX, startLeftWidth, totalWidth;
+
+            const onMouseDown = (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                const source = this.querySelector('.ws-source-zone');
+                startLeftWidth = source ? source.offsetWidth : area.offsetWidth / 2;
+                totalWidth = area.offsetWidth - 4; // minus handle width
+                handle.classList.add('ws-col-resize--active');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff = e.clientX - startX;
+                const newLeft = Math.min(Math.max(startLeftWidth + diff, 100), totalWidth - 100);
+                const leftFr  = newLeft / totalWidth;
+                const rightFr = 1 - leftFr;
+                area.style.gridTemplateColumns = `${leftFr}fr 4px ${rightFr}fr`;
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('ws-col-resize--active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            };
+
+            handle.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            this._colResizeCleanup = () => {
+                handle.removeEventListener('mousedown', onMouseDown);
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+        }
+
+        // --- Row Resize (between panels and chat) ---------------------------------
+
+        _setupRowResize() {
+            const handle = this.querySelector('.ws-row-resize');
+            const area   = this.querySelector('.ws-transform-area');
+            if (!handle || !area) return;
+
+            let isResizing = false;
+            let startY, startTopHeight, totalHeight;
+
+            const onMouseDown = (e) => {
+                isResizing = true;
+                startY = e.clientY;
+                const source = this.querySelector('.ws-source-zone');
+                startTopHeight = source ? source.offsetHeight : area.offsetHeight * 0.7;
+                totalHeight = area.offsetHeight - 4; // minus handle height
+                handle.classList.add('ws-row-resize--active');
+                document.body.style.cursor = 'row-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff = e.clientY - startY;
+                const newTop = Math.min(Math.max(startTopHeight + diff, 80), totalHeight - 80);
+                const bottomH = totalHeight - newTop;
+                area.style.gridTemplateRows = `${newTop}px 4px ${bottomH}px`;
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('ws-row-resize--active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            };
+
+            handle.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            this._rowResizeCleanup = () => {
+                handle.removeEventListener('mousedown', onMouseDown);
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+        }
+
         // --- Status Bar ---------------------------------------------------------
 
         _updateStatusBar() {
@@ -366,6 +467,7 @@
                                 <document-viewer data-role="source"></document-viewer>
                             </div>
                         </div>
+                        <div class="ws-col-resize" title="Drag to resize"></div>
                         <div class="ws-transform-zone">
                             <div class="ws-panel-header">
                                 <span class="ws-panel-label">Transformation</span>
@@ -374,6 +476,7 @@
                                 <document-viewer data-role="transform"></document-viewer>
                             </div>
                         </div>
+                        <div class="ws-row-resize" title="Drag to resize"></div>
                         <div class="ws-chat-zone">
                             <div class="ws-chat-header">
                                 <span class="ws-chat-label">Chat</span>

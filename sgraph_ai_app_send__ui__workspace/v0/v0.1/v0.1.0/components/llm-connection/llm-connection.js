@@ -173,7 +173,6 @@
             if (data.data && Array.isArray(data.data)) {
                 this._models = data.data
                     .filter(m => m.id && !m.id.includes('image'))
-                    .slice(0, 50)
                     .map(m => ({ id: m.id, name: m.name || m.id }))
                     .sort((a, b) => a.name.localeCompare(b.name));
             } else {

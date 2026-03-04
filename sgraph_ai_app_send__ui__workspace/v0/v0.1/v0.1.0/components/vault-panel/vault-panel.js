@@ -233,8 +233,11 @@
             // Always show New File
             menu.innerHTML = `<div class="vp-ctx-item" data-action="new-file">New File</div>`;
 
-            // Show Rename and Delete only when a specific item is targeted
+            // Show Duplicate, Rename and Delete only when a specific item is targeted
             if (targetName) {
+                if (targetKind !== 'folder') {
+                    menu.innerHTML += `<div class="vp-ctx-item" data-action="duplicate">Duplicate</div>`;
+                }
                 menu.innerHTML += `<div class="vp-ctx-item" data-action="rename">Rename</div>`;
                 menu.innerHTML += `<div class="vp-ctx-item vp-ctx-item--danger" data-action="delete">Delete</div>`;
             }
@@ -243,6 +246,7 @@
                 const action = e.target.closest('.vp-ctx-item')?.dataset.action;
                 this._hideContextMenu();
                 if (action === 'new-file')  this._createNewFile();
+                if (action === 'duplicate') this._duplicateFile(targetName);
                 if (action === 'rename')    this._renameItem(targetName);
                 if (action === 'delete')    this._deleteItem(targetName, targetKind);
             });
@@ -274,6 +278,37 @@
             } catch (e) {
                 console.error('[vault-panel] Create file failed:', e);
                 window.sgraphWorkspace.messages.error('Create failed: ' + e.message);
+            }
+        }
+
+        async _duplicateFile(name) {
+            if (!this._vault || !name) return;
+
+            try {
+                // Download the file content
+                const content = await this._vault.getFile(this._currentPath, name);
+
+                // Generate duplicate name: file.html → file-copy.html
+                const dot = name.lastIndexOf('.');
+                const base = dot > 0 ? name.slice(0, dot) : name;
+                const ext  = dot > 0 ? name.slice(dot) : '';
+                let copyName = `${base}-copy${ext}`;
+
+                // Avoid collisions
+                const items = this._vault.listFolder(this._currentPath) || [];
+                const names = new Set(items.map(i => i.name));
+                let n = 2;
+                while (names.has(copyName)) {
+                    copyName = `${base}-copy-${n}${ext}`;
+                    n++;
+                }
+
+                await this._vault.addFile(this._currentPath, copyName, new Uint8Array(content));
+                this._render();
+                window.sgraphWorkspace.messages.success(`Duplicated as "${copyName}"`);
+            } catch (e) {
+                console.error('[vault-panel] Duplicate failed:', e);
+                window.sgraphWorkspace.messages.error('Duplicate failed: ' + e.message);
             }
         }
 

@@ -260,17 +260,40 @@ html, body {
 .ws-transform-area {
     grid-area: main;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: minmax(0, 1fr) var(--ws-chat-height);
+    grid-template-columns: 1fr 4px 1fr;
+    grid-template-rows: minmax(0, 1fr) 4px var(--ws-chat-height);
     grid-template-areas:
-        "source transform"
-        "chat   chat";
+        "source   col-resize transform"
+        "row-resize row-resize row-resize"
+        "chat     chat       chat";
     overflow: hidden;
 }
 
 .ws-source-zone    { grid-area: source; }
+.ws-col-resize     { grid-area: col-resize; }
 .ws-transform-zone { grid-area: transform; }
+.ws-row-resize     { grid-area: row-resize; }
 .ws-chat-zone      { grid-area: chat; }
+
+/* Column resize handle (between source and transform) */
+.ws-col-resize {
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 5;
+}
+.ws-col-resize:hover,
+.ws-col-resize.ws-col-resize--active { background: var(--ws-primary); }
+
+/* Row resize handle (between panels and chat) */
+.ws-row-resize {
+    cursor: row-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 5;
+}
+.ws-row-resize:hover,
+.ws-row-resize.ws-row-resize--active { background: var(--ws-primary); }
 
 .ws-source-zone,
 .ws-transform-zone {
@@ -279,8 +302,6 @@ html, body {
     overflow: hidden;
     background: var(--ws-bg);
 }
-
-.ws-source-zone    { border-right: 1px solid var(--ws-border-subtle); }
 
 .ws-panel-header {
     display: flex;
@@ -486,6 +507,7 @@ vault-panel {
     }
 
     .ws-vault-zone { display: none; }
+    .ws-col-resize, .ws-row-resize { display: none; }
     .ws-debug-sidebar, .ws-debug-resize { display: none; }
     .ws-menu-btn { display: block; }
     .ws-source-zone { border-right: none; border-bottom: 1px solid var(--ws-border-subtle); }
