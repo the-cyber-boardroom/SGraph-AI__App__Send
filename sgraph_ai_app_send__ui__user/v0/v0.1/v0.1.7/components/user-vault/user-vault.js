@@ -306,6 +306,15 @@
             this._render();
         }
 
+        // --- Refresh ---------------------------------------------------------
+
+        async _refreshVault() {
+            this._showStatus('info', 'Refreshing vault...');
+            await this._loadIndex();
+            this._showStatus('success', 'Vault refreshed');
+            this._render();
+        }
+
         // --- Sort ------------------------------------------------------------
 
         _toggleSort(col) {
@@ -454,6 +463,10 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
                         New Folder
                     </button>
+                    <button class="btn btn-sm btn-secondary" id="uv-refresh-btn" title="Refresh vault (sync changes from CLI or other clients)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                        Refresh
+                    </button>
                     <input type="file" id="uv-file-input" multiple style="display: none;">
                     <!-- Sort controls -->
                     <div style="margin-left: auto; display: flex; gap: var(--space-1); align-items: center;">
@@ -589,6 +602,10 @@
                     for (const f of e.target.files) this._uploadFile(f);
                 });
             }
+
+            // Refresh vault
+            const refreshBtn = this.querySelector('#uv-refresh-btn');
+            if (refreshBtn) refreshBtn.addEventListener('click', () => this._refreshVault());
 
             // New folder: show inline input
             const newFolderBtn = this.querySelector('#uv-newfolder-btn');
