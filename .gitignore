@@ -16,6 +16,12 @@ eggs/
 .eggs/
 lib/
 lib64/
+
+# Un-ignore lib/ inside UI static asset folders (JS libraries, not Python)
+!sgraph_ai_app_send__ui__user/**/lib/
+!sgraph_ai_app_send__ui__user/**/lib/**
+!sgraph_ai_app_send__ui__vault/**/lib/
+!sgraph_ai_app_send__ui__vault/**/lib/**
 parts/
 sdist/
 var/
@@ -212,3 +218,24 @@ tests/unit/lambda__admin/server_analytics/aws/cloud_front/_cf_cache
 sgraph_ai__website/pt-pt/
 sgraph_ai__website/pt-br/
 sgraph_ai__website/tlh/
+
+# Vault UI: generated locale pages (all except en-gb source)
+sgraph_ai_app_send__ui__vault/**/en-us/
+sgraph_ai_app_send__ui__vault/**/pt-pt/
+sgraph_ai_app_send__ui__vault/**/pt-br/
+sgraph_ai_app_send__ui__vault/**/de-de/
+sgraph_ai_app_send__ui__vault/**/de-ch/
+sgraph_ai_app_send__ui__vault/**/es-es/
+sgraph_ai_app_send__ui__vault/**/es-ar/
+sgraph_ai_app_send__ui__vault/**/es-mx/
+sgraph_ai_app_send__ui__vault/**/fr-fr/
+sgraph_ai_app_send__ui__vault/**/fr-ca/
+sgraph_ai_app_send__ui__vault/**/it-it/
+sgraph_ai_app_send__ui__vault/**/nl-nl/
+sgraph_ai_app_send__ui__vault/**/pl-pl/
+sgraph_ai_app_send__ui__vault/**/hr-hr/
+sgraph_ai_app_send__ui__vault/**/ro-ro/
+sgraph_ai_app_send__ui__vault/**/tlh/
+
+# Generated build info (injected by CI via scripts/inject_build_version.py)
+**/build-info.js

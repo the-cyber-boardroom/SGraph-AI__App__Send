@@ -1,0 +1,42 @@
+:host {
+    display: block;
+}
+
+.vault-share {
+    padding: var(--space-3, 12px) var(--space-4, 16px);
+    border-top: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+}
+
+.vault-share__title {
+    margin: 0 0 var(--space-2, 8px);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.vault-share__key-display {
+    background: var(--bg-secondary, #16213E);
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius-sm, 6px);
+    padding: var(--space-2, 8px) var(--space-3, 12px);
+    margin-bottom: var(--space-3, 12px);
+    overflow-x: auto;
+}
+
+.vault-share__key {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text, #E0E0E0);
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+.vault-share__copy-btn {
+    margin-bottom: var(--space-2, 8px);
+}
+
+.vault-share__warning {
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-warning, #E07C4F);
+    margin: 0;
+}

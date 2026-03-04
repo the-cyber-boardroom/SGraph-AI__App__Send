@@ -1,0 +1,132 @@
+name: Deploy User UI to S3
+
+# Publishes v0.2.0 static UI files to S3 for CloudFront distribution.
+# CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
+#
+# Deploy is manifest-driven — manifest.json lists exactly what gets deployed:
+#   - source_folders: _common/, en-gb/, i18n/ (in git)
+#   - ci_generated_folders: locale HTML pages (generated here, never in git)
+#   - root_files: manifest.json
+#
+# S3 path isolation by branch/environment:
+#   websites/sgraph-send/dev/    — dev branch (automatic)
+#   websites/sgraph-send/main/   — main branch (automatic)
+#   websites/sgraph-send/prod/   — production (manual dispatch)
+#
+# Steps:
+#   1. Generate i18n locale pages from en-gb/ templates + i18n/*.json
+#   2. Sync content (source + generated) to S3 under the environment prefix
+#   3. Invalidate CloudFront cache
+#
+# Environments:
+#   - dev:        dev.send.sgraph.ai   (default — push to dev branch)
+#   - main:       main.send.sgraph.ai  (push to main branch)
+#   - production: send.sgraph.ai       (manual dispatch)
+#
+# Secrets per environment:
+#   - SGRAPH_SEND__UI_S3_BUCKET                   (shared — same bucket for now)
+#   - SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID      (production CF distribution)
+#   - SGRAPH_SEND__DEV__CLOUDFRONT_DISTRIBUTION_ID (dev CF distribution)
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'sgraph_ai_app_send__ui__user/v0/v0.2/**'
+      - 'sgraph_ai_app_send/version'
+      - 'scripts/generate_send_i18n_pages.py'
+      - 'scripts/inject_build_version.py'
+      - '.github/workflows/deploy-ui-user.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - production
+
+concurrency:
+  group: "ui-user-deploy-${{ inputs.environment || github.ref_name || 'dev' }}"
+  cancel-in-progress: false
+
+env:
+  AWS_REGION  : eu-west-2
+  UI_VERSION  : v0.2.0
+  # Source: only the v0.2.0 folder (excludes v0.1, assets, tools)
+  SOURCE_DIR  : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.0
+
+jobs:
+  deploy:
+    name: "Publish UI to S3 + CloudFront (${{ inputs.environment || github.ref_name || 'dev' }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment || (github.ref_name == 'main' && 'main') || 'dev' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Inject build version into UI
+        run: python scripts/inject_build_version.py --version ${{ env.UI_VERSION }}
+
+      - name: Generate i18n locale pages
+        run: python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION }}
+
+      - name: Check AWS credentials
+        id: check-creds
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+            echo "WARNING: AWS credentials not configured — skipping deployment"
+          else
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region            : ${{ env.AWS_REGION }}
+
+      - name: Resolve deployment environment
+        id: env
+        run: |
+          DEPLOY_ENV="${{ inputs.environment || github.ref_name }}"
+          if [ "$DEPLOY_ENV" == "production" ]; then
+            echo "deploy_env=prod" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying to PRODUCTION (send.sgraph.ai) → S3: websites/sgraph-send/prod/"
+          elif [ "$DEPLOY_ENV" == "main" ]; then
+            echo "deploy_env=main" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_SEND__DEV__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying to MAIN → S3: websites/sgraph-send/main/"
+          else
+            echo "deploy_env=dev" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_SEND__DEV__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying to DEV (dev.send.sgraph.ai) → S3: websites/sgraph-send/dev/"
+          fi
+
+      - name: Deploy User UI to S3
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        run: |
+          python scripts/deploy_static_site.py \
+            --site sgraph-send \
+            --version ${{ env.UI_VERSION }} \
+            --source-dir ${{ env.SOURCE_DIR }} \
+            --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --deploy-env ${{ steps.env.outputs.deploy_env }} \
+            --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} \
+            --skip-validation

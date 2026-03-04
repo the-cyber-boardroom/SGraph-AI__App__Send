@@ -6,7 +6,7 @@ jobs:
   deploy-qa:
     uses: ./.github/workflows/ci-pipeline.yml
     with:
-      git_branch          : 'main'
+      git_branch          : 'dev'
       should_increment_tag: false
       should_publish_pypi : false
       target_deploy       : 'prod'

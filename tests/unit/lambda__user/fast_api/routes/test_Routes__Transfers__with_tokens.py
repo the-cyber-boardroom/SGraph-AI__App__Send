@@ -38,14 +38,14 @@ class test_Routes__Transfers__with_tokens(TestCase):
     # --- check-token endpoint ---
 
     def test__check_token__valid(self):
-        response = self.client.get(f'/transfers/check-token/{self.test_token_name}')
+        response = self.client.get(f'/api/transfers/check-token/{self.test_token_name}')
         assert response.status_code == 200
         data = response.json()
         assert data['valid']  is True
         assert data['status'] == 'active'
 
     def test__check_token__not_found(self):
-        response = self.client.get('/transfers/check-token/nonexistent-token')
+        response = self.client.get('/api/transfers/check-token/nonexistent-token')
         assert response.status_code == 200
         data = response.json()
         assert data['valid'] is False
@@ -56,7 +56,7 @@ class test_Routes__Transfers__with_tokens(TestCase):
     def test__validate_token__valid(self):
         # Create a dedicated token for this test
         self.admin_service_client.token_create('validate-test-token', usage_limit=10)
-        response = self.client.post('/transfers/validate-token/validate-test-token')
+        response = self.client.post('/api/transfers/validate-token/validate-test-token')
         assert response.status_code == 200
         data = response.json()
         assert data['success']     is True
@@ -64,7 +64,7 @@ class test_Routes__Transfers__with_tokens(TestCase):
         assert data['remaining']   == 9
 
     def test__validate_token__not_found(self):
-        response = self.client.post('/transfers/validate-token/nonexistent-for-validate')
+        response = self.client.post('/api/transfers/validate-token/nonexistent-for-validate')
         assert response.status_code == 200
         data = response.json()
         assert data['success'] is False
@@ -73,8 +73,8 @@ class test_Routes__Transfers__with_tokens(TestCase):
     def test__validate_token__exhausted(self):
         # Create a token with limit of 1, use it, then try again
         self.admin_service_client.token_create('exhaust-test-token', usage_limit=1)
-        self.client.post('/transfers/validate-token/exhaust-test-token')          # First use (succeeds)
-        response = self.client.post('/transfers/validate-token/exhaust-test-token')  # Second use (exhausted)
+        self.client.post('/api/transfers/validate-token/exhaust-test-token')          # First use (succeeds)
+        response = self.client.post('/api/transfers/validate-token/exhaust-test-token')  # Second use (exhausted)
         data = response.json()
         assert data['success'] is False
         assert data['reason']  == 'exhausted'
@@ -82,7 +82,7 @@ class test_Routes__Transfers__with_tokens(TestCase):
     # --- upload with admin token validation ---
 
     def test__create_transfer__with_valid_token(self):
-        response = self.client.post('/transfers/create',
+        response = self.client.post('/api/transfers/create',
                                     json    = dict(file_size_bytes=1024, content_type_hint='text/plain'),
                                     headers = {HEADER__SGRAPH_SEND__ACCESS_TOKEN: self.test_token_name})
         assert response.status_code == 200
@@ -90,13 +90,13 @@ class test_Routes__Transfers__with_tokens(TestCase):
         assert 'transfer_id' in data
 
     def test__create_transfer__with_invalid_token(self):
-        response = self.client.post('/transfers/create',
+        response = self.client.post('/api/transfers/create',
                                     json    = dict(file_size_bytes=1024),
                                     headers = {HEADER__SGRAPH_SEND__ACCESS_TOKEN: 'bad-token-name'})
         assert response.status_code == 401
 
     def test__create_transfer__no_token(self):
-        response = self.client.post('/transfers/create',
+        response = self.client.post('/api/transfers/create',
                                     json = dict(file_size_bytes=1024))
         assert response.status_code == 401
 
@@ -105,16 +105,16 @@ class test_Routes__Transfers__with_tokens(TestCase):
     def test__complete_does_not_return_token_name(self):
         headers = {HEADER__SGRAPH_SEND__ACCESS_TOKEN: self.test_token_name}
 
-        create  = self.client.post('/transfers/create',
+        create  = self.client.post('/api/transfers/create',
                                    json    = dict(file_size_bytes=4),
                                    headers = headers).json()
         tid = create['transfer_id']
 
-        self.client.post(f'/transfers/upload/{tid}',
+        self.client.post(f'/api/transfers/upload/{tid}',
                          content = b'\x00\x01\x02\x03',
                          headers = {**headers, 'content-type': 'application/octet-stream'})
 
-        response = self.client.post(f'/transfers/complete/{tid}', headers=headers)
+        response = self.client.post(f'/api/transfers/complete/{tid}', headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert 'token_name' not in data
@@ -130,22 +130,22 @@ class test_Routes__Transfers__with_tokens(TestCase):
         payload = b'encrypted-content-for-token-flow'
 
         # Upload with token
-        create   = self.client.post('/transfers/create',
+        create   = self.client.post('/api/transfers/create',
                                     json    = dict(file_size_bytes=len(payload), content_type_hint='application/pdf'),
                                     headers = headers).json()
         tid = create['transfer_id']
 
-        self.client.post(f'/transfers/upload/{tid}',
+        self.client.post(f'/api/transfers/upload/{tid}',
                          content = payload,
                          headers = {**headers, 'content-type': 'application/octet-stream'})
 
-        complete = self.client.post(f'/transfers/complete/{tid}', headers=headers).json()
+        complete = self.client.post(f'/api/transfers/complete/{tid}', headers=headers).json()
         assert 'token_name' not in complete
 
         # Validate token (simulates download page visit)
-        validate = self.client.post(f'/transfers/validate-token/{flow_token}').json()
+        validate = self.client.post(f'/api/transfers/validate-token/{flow_token}').json()
         assert validate['success'] is True
 
         # Download payload (public endpoint)
-        download = self.client.get(f'/transfers/download/{tid}')
+        download = self.client.get(f'/api/transfers/download/{tid}')
         assert download.content == payload

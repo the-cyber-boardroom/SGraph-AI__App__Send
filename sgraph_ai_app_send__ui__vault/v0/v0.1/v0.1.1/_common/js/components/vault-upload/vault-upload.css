@@ -1,0 +1,76 @@
+:host {
+    display: block;
+}
+
+.vault-upload {
+    padding: var(--space-4, 16px);
+}
+
+.vault-upload__header {
+    margin-bottom: var(--space-3, 12px);
+}
+
+.vault-upload__title {
+    margin: 0;
+    font-size: var(--text-h3, 1.25rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text, #E0E0E0);
+}
+
+.vault-upload__drop-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    padding: var(--space-6, 24px);
+    border: 2px dashed var(--color-border, rgba(78, 205, 196, 0.25));
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-drop-zone-bg, #16213E);
+    color: var(--color-text-secondary, #8892A0);
+    font-size: var(--text-sm, 0.875rem);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--transition, 150ms ease), background var(--transition, 150ms ease);
+}
+
+.vault-upload__drop-zone:hover,
+.vault-upload__drop-zone.active {
+    border-color: var(--accent, #4ECDC4);
+    background: rgba(78, 205, 196, 0.06);
+}
+
+.vault-upload__drop-zone a {
+    color: var(--accent, #4ECDC4);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.vault-upload__queue {
+    margin-top: var(--space-3, 12px);
+}
+
+.vault-upload__queue-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 8px);
+    padding: var(--space-2, 8px) var(--space-3, 12px);
+    background: var(--bg-secondary, #16213E);
+    border-radius: var(--radius-sm, 6px);
+    margin-bottom: var(--space-2, 8px);
+    font-size: var(--text-sm, 0.875rem);
+}
+
+.vault-upload__queue-item .name { flex: 1; color: var(--color-text, #E0E0E0); }
+.vault-upload__queue-item .size { color: var(--color-text-secondary, #8892A0); }
+.vault-upload__queue-item .status-icon { width: 20px; text-align: center; }
+
+.vault-upload__progress {
+    margin-top: var(--space-3, 12px);
+}
+
+.vault-upload__stage {
+    display: block;
+    margin-top: var(--space-1, 4px);
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+}

@@ -40,6 +40,8 @@ ROUTES_PATHS__ANALYTICS = ['/health/pulse']
 
 ROUTES_PATHS__APP_SEND__STATIC__ADMIN  = [f'/{APP_SEND__UI__ADMIN__ROUTE__PATH__CONSOLE}']
 
+#ROUTES_PATHS__API_DOCS                 = ['/api/docs', '/api/openapi.json', '/api/redoc']
+
 class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
 
     send_cache_client    : Send__Cache__Client      = None                             # Cache service client (IN_MEMORY mode)
@@ -53,6 +55,13 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
     service_room_session : Service__Room__Session    = None                             # Room session service (Phase 3)
     service_audit        : Service__Audit            = None                             # Audit trail service (Phase 3)
     metrics_cache        : Service__Metrics__Cache   = None                             # Metrics cache service
+
+    def app_kwargs(self, **kwargs):                                                      # Override: move docs under /api/ so CloudFront routes them to Lambda
+        kwargs = super().app_kwargs(**kwargs)
+        # kwargs['docs_url'   ] = '/api/docs'
+        # kwargs['redoc_url'  ] = '/api/redoc'
+        # kwargs['openapi_url'] = '/api/openapi.json'
+        return kwargs
 
     def setup(self):
         with self.config as _:

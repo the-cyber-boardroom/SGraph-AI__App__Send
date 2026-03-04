@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGraph Workspace — Document Transformation</title>
+
+    <!-- Workspace CSS -->
+    <link rel="stylesheet" href="css/workspace.css">
+
+    <!--
+        Shared fonts & CSS — will be linked from vault.sgraph.ai once available.
+        For now using local fallbacks (system fonts via workspace.css).
+        Production:
+          <link rel="stylesheet" href="https://vault.sgraph.ai/_common/fonts/fonts.css">
+          <link rel="stylesheet" href="https://vault.sgraph.ai/_common/css/sg-brand.css">
+    -->
+</head>
+<body>
+    <workspace-shell></workspace-shell>
+
+    <!-- Layer 0: Build info (CI-generated — sets window.SGRAPH_BUILD) -->
+    <script src="js/build-info.js"></script>
+
+    <!-- Layer 1: Workspace initialisation (EventBus, MessagesService, config) -->
+    <script src="js/workspace-init.js"></script>
+
+    <!--
+        Layer 2: Shared infrastructure from static.sgraph.ai
+        Vault libraries: SGSendCrypto + SGSend + SGVault (from sgraph-vault site)
+        File utilities: FileTypeDetect + MarkdownParser (from sgraph-send site)
+    -->
+    <script src="https://static.sgraph.ai/websites/sgraph-vault/dev/releases/v0/v0.1/v0.1.1/_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-vault/dev/releases/v0/v0.1/v0.1.1/_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-vault/dev/releases/v0/v0.1/v0.1.1/_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-vault/dev/releases/v0/v0.1/v0.1.1/_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-send/dev/releases/v0/v0.2/v0.2.0/_common/js/file-type-detect.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-send/dev/releases/v0/v0.2/v0.2.0/_common/js/markdown-parser.js"></script>
+
+    <!-- Layer 3: Debug panels (workspace-local lightweight versions) -->
+    <script src="components/debug/messages-panel.js"></script>
+    <script src="components/debug/events-viewer.js"></script>
+    <script src="components/debug/api-logger.js"></script>
+
+    <!-- Layer 4: Workspace components -->
+    <script src="components/vault-panel/vault-panel.js"></script>
+    <script src="components/document-viewer/document-viewer.js"></script>
+    <script src="components/prompt-library/prompt-library.js"></script>
+    <script src="components/llm-connection/llm-connection.js"></script>
+    <script src="components/llm-chat/llm-chat.js"></script>
+
+    <!-- Layer 5: Shell (reads components, builds layout) — must load last -->
+    <script src="components/workspace-shell/workspace-shell.js"></script>
+</body>
+</html>

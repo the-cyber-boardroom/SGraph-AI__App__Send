@@ -1,0 +1,126 @@
+name: Deploy Workspace UI to S3
+
+# Publishes workspace static UI files to S3 for CloudFront distribution.
+# CloudFront serves workspace.sgraph.ai from S3.
+#
+# Uses the same deploy_static_site.py as vault and send UIs —
+# consistent cache-control, IFD versioning, and invalidation.
+#
+# S3 path isolation by branch/environment:
+#   websites/sgraph-workspace/dev/    — dev branch (automatic)
+#   websites/sgraph-workspace/main/   — main branch (automatic)
+#   websites/sgraph-workspace/prod/   — production (manual dispatch)
+#
+# Steps:
+#   1. Sync workspace static files to S3 under the environment prefix
+#   2. Invalidate CloudFront cache
+#
+# Environments:
+#   - dev:        dev.workspace.sgraph.ai  (default — push to dev branch)
+#   - main:       main.workspace.sgraph.ai (push to main branch)
+#   - production: workspace.sgraph.ai      (manual dispatch)
+#
+# Secrets per environment:
+#   - SGRAPH_WORKSPACE__UI_S3_BUCKET                   (S3 bucket for workspace static files)
+#   - SGRAPH_WORKSPACE__CLOUDFRONT_DISTRIBUTION_ID      (production CF distribution)
+#   - SGRAPH_WORKSPACE__DEV__CLOUDFRONT_DISTRIBUTION_ID (dev CF distribution)
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'sgraph_ai_app_send__ui__workspace/v0/v0.1/**'
+      - '.github/workflows/deploy-ui-workspace.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - production
+
+concurrency:
+  group: "ui-workspace-deploy-${{ inputs.environment || github.ref_name || 'dev' }}"
+  cancel-in-progress: false
+
+env:
+  AWS_REGION  : eu-west-2
+  UI_VERSION  : v0.1.0
+  SOURCE_DIR  : sgraph_ai_app_send__ui__workspace/v0/v0.1/v0.1.0
+
+jobs:
+  deploy:
+    name: "Publish Workspace UI to S3 + CloudFront (${{ inputs.environment || github.ref_name || 'dev' }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment || (github.ref_name == 'main' && 'main') || 'dev' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check AWS credentials
+        id: check-creds
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+            echo "WARNING: AWS credentials not configured — skipping deployment"
+          else
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region            : ${{ env.AWS_REGION }}
+
+      - name: Resolve deployment environment
+        id: env
+        run: |
+          DEPLOY_ENV="${{ inputs.environment || github.ref_name }}"
+          if [ "$DEPLOY_ENV" == "production" ]; then
+            echo "deploy_env=prod" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_WORKSPACE__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying to PRODUCTION (workspace.sgraph.ai) → S3: websites/sgraph-workspace/prod/"
+          elif [ "$DEPLOY_ENV" == "main" ]; then
+            echo "deploy_env=main" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_WORKSPACE__DEV__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying to MAIN → S3: websites/sgraph-workspace/main/"
+          else
+            echo "deploy_env=dev" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_WORKSPACE__DEV__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying to DEV (dev.workspace.sgraph.ai) → S3: websites/sgraph-workspace/dev/"
+          fi
+
+      - name: Inject build version
+        run: |
+          python scripts/inject_build_version.py \
+            --ui-base sgraph_ai_app_send__ui__workspace \
+            --version ${{ env.UI_VERSION }} \
+            --output-subdir js
+
+      - name: Deploy Workspace UI to S3
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        run: |
+          python scripts/deploy_static_site.py \
+            --site sgraph-workspace \
+            --version ${{ env.UI_VERSION }} \
+            --source-dir ${{ env.SOURCE_DIR }} \
+            --bucket ${{ secrets.SGRAPH_WORKSPACE__UI_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --deploy-env ${{ steps.env.outputs.deploy_env }} \
+            --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} \
+            --skip-validation
