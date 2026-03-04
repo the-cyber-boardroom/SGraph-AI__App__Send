@@ -63,6 +63,7 @@
             this.render();
             this._setupListeners();
             this._setupResize();
+            this._setupVaultResize();
             this._setupColResize();
             this._setupRowResize();
             this._setupMessageBadge();
@@ -80,6 +81,7 @@
 
         disconnectedCallback() {
             if (this._resizeCleanup) this._resizeCleanup();
+            if (this._vaultResizeCleanup) this._vaultResizeCleanup();
             if (this._colResizeCleanup) this._colResizeCleanup();
             if (this._rowResizeCleanup) this._rowResizeCleanup();
             if (this._badgeUnsub) this._badgeUnsub();
@@ -294,6 +296,54 @@
             };
         }
 
+        // --- Vault Resize (between vault and main content) -------------------------
+
+        _setupVaultResize() {
+            const handle = this.querySelector('.ws-vault-resize');
+            const shell  = this.querySelector('.ws-shell');
+            if (!handle || !shell) return;
+
+            let isResizing = false;
+            let startX, startWidth;
+
+            const onMouseDown = (e) => {
+                if (!this._vaultOpen) return;
+                isResizing = true;
+                startX = e.clientX;
+                const vault = this.querySelector('.ws-vault-zone');
+                startWidth = vault ? vault.offsetWidth : 240;
+                handle.classList.add('ws-vault-resize--active');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff = e.clientX - startX;
+                const newWidth = Math.min(Math.max(startWidth + diff, 120), 500);
+                shell.style.setProperty('--ws-vault-width', newWidth + 'px');
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('ws-vault-resize--active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                this._savePreferences();
+            };
+
+            handle.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            this._vaultResizeCleanup = () => {
+                handle.removeEventListener('mousedown', onMouseDown);
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+        }
+
         // --- Column Resize (between source and transform) -------------------------
 
         _setupColResize() {
@@ -456,6 +506,9 @@
                             <vault-panel></vault-panel>
                         </div>
                     </div>
+
+                    <!-- Vault resize handle -->
+                    <div class="ws-vault-resize" title="Drag to resize vault"></div>
 
                     <!-- Main content: transform view (default) -->
                     <div class="ws-transform-area">

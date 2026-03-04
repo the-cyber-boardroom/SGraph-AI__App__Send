@@ -134,27 +134,16 @@
                 filename = slug + '.txt';
             }
 
-            // Ensure we're in /prompts/ folder — navigate there or save in current path
+            // Save in current vault folder
             const currentPath = vaultPanel.getCurrentPath ? vaultPanel.getCurrentPath() : '/';
-            const savePath = currentPath === '/prompts' || currentPath.startsWith('/prompts/') ? currentPath : '/prompts';
 
             try {
                 const bytes = new TextEncoder().encode(content);
-
-                // Try to ensure /prompts folder exists
                 const vault = vaultPanel.getVault();
-                if (vault && savePath === '/prompts') {
-                    try { vault.createFolder('/', 'prompts'); } catch (_) { /* already exists */ }
-                }
-
-                await vault.addFile(savePath, filename, bytes);
-                window.sgraphWorkspace.messages.success(`Prompt saved as "${filename}" in ${savePath}`);
+                await vault.addFile(currentPath, filename, bytes);
+                window.sgraphWorkspace.messages.success(`Prompt saved as "${filename}" in ${currentPath}`);
                 if (nameInput) nameInput.value = '';
-
-                // Refresh vault panel
-                if (typeof vaultPanel._refreshVault === 'function') {
-                    vaultPanel._render();
-                }
+                vaultPanel._render();
             } catch (e) {
                 console.error('[llm-stats] Save prompt failed:', e);
                 window.sgraphWorkspace.messages.error('Save prompt failed: ' + e.message);
@@ -259,8 +248,8 @@
                     <div class="ls-section-title">Save Prompt</div>
                     <input type="text" class="ls-prompt-name" id="ls-prompt-name"
                            placeholder="filename..." title="Leave empty for auto-name">
-                    <button class="ls-save-btn" id="ls-save-prompt">Save to /prompts</button>
-                    <div class="ls-hint">Saves system + user prompt to vault</div>
+                    <button class="ls-save-btn" id="ls-save-prompt">Save Prompt</button>
+                    <div class="ls-hint">Saves system + user prompt to current vault folder</div>
                 </div>
             </div>`;
 

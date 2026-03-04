@@ -333,7 +333,11 @@
             const lang = typeof FileTypeDetect !== 'undefined'
                 ? FileTypeDetect.getLanguage(this._filename) : 'text';
 
-            // Toolbar: filename + source/rendered/edit toggle + save button
+            // Toolbar: filename + toggle + save button
+            // HTML files get custom labels: "Browser" (iframe) and "HTML Code" (source)
+            const isHtml  = this._renderType === 'html';
+            const renderedLabel = isHtml ? 'Browser'   : 'Rendered';
+            const sourceLabel   = isHtml ? 'HTML Code'  : 'Source';
             const canSave = this._content;
             const toolbar = `
                 <div class="dv-toolbar">
@@ -343,9 +347,9 @@
                     ${isTextBased ? `
                         <div class="dv-toggle">
                             <button class="dv-toggle-btn ${this._mode === 'rendered' ? 'dv-toggle-btn--active' : ''}"
-                                    data-mode="rendered">Rendered</button>
+                                    data-mode="rendered">${renderedLabel}</button>
                             <button class="dv-toggle-btn ${this._mode === 'source' ? 'dv-toggle-btn--active' : ''}"
-                                    data-mode="source">Source</button>
+                                    data-mode="source">${sourceLabel}</button>
                             <button class="dv-toggle-btn ${this._mode === 'edit' ? 'dv-toggle-btn--active' : ''}"
                                     data-mode="edit">Edit</button>
                         </div>
@@ -363,8 +367,9 @@
                 // Edit mode: editable textarea
                 body = `<div class="dv-edit"><textarea class="dv-editor" spellcheck="false">${esc(this._textContent || '')}</textarea></div>`;
             } else if (this._mode === 'source' && isTextBased && this._textContent) {
-                // Source mode: raw text
-                body = `<div class="dv-source"><pre class="dv-pre"><code>${esc(this._textContent)}</code></pre></div>`;
+                // Source mode: show as code block with language label
+                const srcLang = isHtml ? 'html' : (lang || 'text');
+                body = this._renderCode(srcLang);
             } else {
                 // Rendered mode: type-specific
                 switch (this._renderType) {
