@@ -481,7 +481,10 @@
                             <div class="ws-chat-header">
                                 <span class="ws-chat-label">Chat</span>
                             </div>
-                            <llm-chat></llm-chat>
+                            <div class="ws-chat-body">
+                                <llm-chat></llm-chat>
+                                <llm-stats></llm-stats>
+                            </div>
                         </div>
                     </div>
 
