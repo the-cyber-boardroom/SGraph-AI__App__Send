@@ -230,8 +230,9 @@
             menu.style.left = x + 'px';
             menu.style.top  = y + 'px';
 
-            // Always show New File
-            menu.innerHTML = `<div class="vp-ctx-item" data-action="new-file">New File</div>`;
+            // Always show New File and New Folder
+            menu.innerHTML = `<div class="vp-ctx-item" data-action="new-file">New File</div>
+                              <div class="vp-ctx-item" data-action="new-folder">New Folder</div>`;
 
             // Show Duplicate, Rename and Delete only when a specific item is targeted
             if (targetName) {
@@ -245,10 +246,11 @@
             menu.addEventListener('click', (e) => {
                 const action = e.target.closest('.vp-ctx-item')?.dataset.action;
                 this._hideContextMenu();
-                if (action === 'new-file')  this._createNewFile();
-                if (action === 'duplicate') this._duplicateFile(targetName);
-                if (action === 'rename')    this._renameItem(targetName);
-                if (action === 'delete')    this._deleteItem(targetName, targetKind);
+                if (action === 'new-file')   this._createNewFile();
+                if (action === 'new-folder') this._createNewFolder();
+                if (action === 'duplicate')  this._duplicateFile(targetName);
+                if (action === 'rename')     this._renameItem(targetName);
+                if (action === 'delete')     this._deleteItem(targetName, targetKind);
             });
 
             this.appendChild(menu);
@@ -278,6 +280,23 @@
             } catch (e) {
                 console.error('[vault-panel] Create file failed:', e);
                 window.sgraphWorkspace.messages.error('Create failed: ' + e.message);
+            }
+        }
+
+        async _createNewFolder() {
+            if (!this._vault || this._state !== 'open') return;
+            const folderName = prompt('Folder name:', 'new-folder');
+            if (!folderName || !folderName.trim()) return;
+            const name = folderName.trim();
+
+            try {
+                this._vault.createFolder(this._currentPath, name);
+                this._render();
+                window.sgraphWorkspace.messages.success(`Folder "${name}" created`);
+                window.sgraphWorkspace.events.emit('folder-created', { name, path: this._currentPath });
+            } catch (e) {
+                console.error('[vault-panel] Create folder failed:', e);
+                window.sgraphWorkspace.messages.error('Create folder failed: ' + e.message);
             }
         }
 

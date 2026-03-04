@@ -76,25 +76,25 @@ html, body {
 .ws-shell {
     display: grid;
     grid-template-areas:
-        "header  header    header    header    header    header"
-        "nav     vault     main      main      resize    debug"
-        "nav     vault     main      main      resize    debug"
-        "status  status    status    status    status    status";
-    grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 1fr 1fr 4px var(--ws-debug-width);
+        "header  header    header      header    header    header    header"
+        "nav     vault     vault-resize main      main      resize    debug"
+        "nav     vault     vault-resize main      main      resize    debug"
+        "status  status    status      status    status    status    status";
+    grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 4px 1fr 1fr 4px var(--ws-debug-width);
     grid-template-rows: var(--ws-header-height) 1fr var(--ws-chat-height) var(--ws-status-height);
     height: 100vh;
     overflow: hidden;
 }
 
 .ws-shell--no-debug {
-    grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 1fr 1fr 0 0;
+    grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 4px 1fr 1fr 0 0;
 }
 
 .ws-shell--no-debug .ws-debug-sidebar,
 .ws-shell--no-debug .ws-debug-resize { display: none; }
 
 .ws-shell--vault-collapsed {
-    grid-template-columns: var(--ws-nav-width) 28px 1fr 1fr 4px var(--ws-debug-width);
+    grid-template-columns: var(--ws-nav-width) 28px 0 1fr 1fr 4px var(--ws-debug-width);
 }
 
 .ws-shell--vault-collapsed .ws-vault-content,
@@ -109,8 +109,10 @@ html, body {
 .ws-shell--vault-collapsed .ws-vault-toggle { margin-left: 0; }
 
 .ws-shell--vault-collapsed.ws-shell--no-debug {
-    grid-template-columns: var(--ws-nav-width) 28px 1fr 1fr 0 0;
+    grid-template-columns: var(--ws-nav-width) 28px 0 1fr 1fr 0 0;
 }
+
+.ws-shell--vault-collapsed .ws-vault-resize { display: none; }
 
 /* --- Header --------------------------------------------------------------- */
 
@@ -254,6 +256,20 @@ html, body {
     flex: 1;
     overflow-y: auto;
 }
+
+/* --- Vault Resize Handle ------------------------------------------------- */
+
+.ws-vault-resize {
+    grid-area: vault-resize;
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 5;
+}
+
+.ws-vault-resize:hover,
+.ws-vault-resize.ws-vault-resize--active { background: var(--ws-primary); }
 
 /* --- Source & Transform Panels -------------------------------------------- */
 
@@ -522,6 +538,7 @@ llm-stats {
     }
 
     .ws-vault-zone { display: none; }
+    .ws-vault-resize { display: none; }
     .ws-col-resize, .ws-row-resize { display: none; }
     .ws-debug-sidebar, .ws-debug-resize { display: none; }
     llm-stats { display: none; }
