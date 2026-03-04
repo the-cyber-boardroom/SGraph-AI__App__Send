@@ -131,7 +131,7 @@
         getRenderType()  { return this._renderType; }
         getVersion()     { return this._version; }
 
-        /** Save current content to vault as a new encrypted file */
+        /** Save current content to vault as a view file (view-N.html) */
         async saveToVault() {
             if (!this._content || !this._filename) {
                 window.sgraphWorkspace.messages.warning('Nothing to save');
@@ -144,14 +144,38 @@
                 return;
             }
 
-            // Derive a filename for the transformed version
-            const baseName  = this._filename.replace(/\.[^.]+$/, '');
-            const ext       = this._filename.includes('.') ? '.' + this._filename.split('.').pop() : '.md';
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            const saveName  = `${baseName}__transformed__${timestamp}${ext}`;
+            // Use custom name from input if provided, else auto-number
+            const nameInput = this.querySelector('.dv-view-name');
+            const customName = nameInput ? nameInput.value.trim() : '';
+
+            let saveName;
+            if (customName) {
+                // Ensure it has the right extension
+                const ext = this._filename.includes('.') ? '.' + this._filename.split('.').pop() : '.html';
+                saveName = customName.endsWith(ext) ? customName
+                         : customName.startsWith('view-') ? customName + ext
+                         : 'view-' + customName + ext;
+            } else {
+                // Auto-number: find next available view-N
+                const ext = this._filename.includes('.') ? '.' + this._filename.split('.').pop() : '.html';
+                const vault = vaultPanel.getVault();
+                const currentPath = vaultPanel.getCurrentPath ? vaultPanel.getCurrentPath() : '/';
+                let nextNum = 1;
+                if (vault) {
+                    try {
+                        const items = vault.listFolder(currentPath) || [];
+                        const viewNums = items
+                            .map(i => i.name.match(/^view-(\d+)\./))
+                            .filter(Boolean)
+                            .map(m => parseInt(m[1]));
+                        if (viewNums.length > 0) nextNum = Math.max(...viewNums) + 1;
+                    } catch (_) { /* ignore */ }
+                }
+                saveName = `view-${nextNum}${ext}`;
+            }
 
             this._setSaveState('saving');
-            window.sgraphWorkspace.messages.info('Encrypting and saving to vault...');
+            window.sgraphWorkspace.messages.info(`Saving as "${saveName}"...`);
 
             try {
                 const result = await vaultPanel.saveFile(this._content, saveName);
@@ -160,6 +184,9 @@
                 window.sgraphWorkspace.events.emit('file-saved', {
                     role: this._role, fileId: result.fileId, name: saveName
                 });
+
+                // Clear custom name input
+                if (nameInput) nameInput.value = '';
 
                 // Reset save button after 2s
                 setTimeout(() => this._setSaveState('idle'), 2000);
@@ -183,7 +210,7 @@
                 btn.classList.add('dv-save-btn--saved');
             } else {
                 btn.disabled = false;
-                btn.textContent = 'Save to Vault';
+                btn.textContent = 'Save';
                 btn.classList.remove('dv-save-btn--saved');
             }
         }
@@ -198,8 +225,9 @@
             if (!this._renderType && this._filename) {
                 const ext = (this._filename || '').split('.').pop().toLowerCase();
                 const textExts = ['md', 'markdown', 'txt', 'json', 'yaml', 'yml', 'xml', 'csv', 'log', 'cfg', 'conf'];
-                const codeExts = ['js', 'ts', 'py', 'html', 'css', 'sh', 'sql', 'go', 'rs', 'java', 'c', 'cpp', 'rb', 'php'];
+                const codeExts = ['js', 'ts', 'py', 'css', 'sh', 'sql', 'go', 'rs', 'java', 'c', 'cpp', 'rb', 'php'];
                 if (['md', 'markdown'].includes(ext)) this._renderType = 'markdown';
+                else if (['html', 'htm'].includes(ext)) this._renderType = 'html';
                 else if (codeExts.includes(ext))       this._renderType = 'code';
                 else if (textExts.includes(ext))       this._renderType = 'text';
                 else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) this._renderType = 'image';
@@ -311,7 +339,10 @@
                         </div>
                     ` : ''}
                     ${this._content ? `<span class="dv-filesize">${formatSize(this._content.byteLength)}</span>` : ''}
-                    ${canSave ? `<button class="dv-save-btn">Save to Vault</button>` : ''}
+                    ${canSave ? `
+                        <input class="dv-view-name" type="text" placeholder="view name..." title="Custom view name (e.g. dark-mode). Leave empty for auto-numbering.">
+                        <button class="dv-save-btn">Save</button>
+                    ` : ''}
                 </div>`;
 
             let body = '';
@@ -474,6 +505,18 @@
                     color: var(--ws-primary, #4ECDC4);
                 }
                 .dv-toggle + .dv-filesize { margin-left: 0; }
+
+                .dv-view-name {
+                    width: 7rem; padding: 0.1875rem 0.5rem; font-size: 0.6875rem;
+                    font-family: var(--ws-font-mono, monospace);
+                    background: var(--ws-bg, #1A1A2E);
+                    color: var(--ws-text, #F0F0F5);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px);
+                    outline: none; flex-shrink: 0;
+                }
+                .dv-view-name:focus { border-color: var(--ws-primary, #4ECDC4); }
+                .dv-view-name::placeholder { color: var(--ws-text-muted, #5a6478); }
 
                 .dv-save-btn {
                     padding: 0.1875rem 0.625rem; font-size: 0.6875rem; font-weight: 600;

@@ -94,14 +94,22 @@ html, body {
 .ws-shell--no-debug .ws-debug-resize { display: none; }
 
 .ws-shell--vault-collapsed {
-    grid-template-columns: var(--ws-nav-width) 0px 1fr 1fr 4px var(--ws-debug-width);
+    grid-template-columns: var(--ws-nav-width) 28px 1fr 1fr 4px var(--ws-debug-width);
 }
 
 .ws-shell--vault-collapsed .ws-vault-content,
-.ws-shell--vault-collapsed .ws-vault-title { display: none; }
+.ws-shell--vault-collapsed .ws-vault-title,
+.ws-shell--vault-collapsed .ws-vault-icon { display: none; }
+
+.ws-shell--vault-collapsed .ws-vault-header {
+    padding: 0.5rem 0.25rem;
+    justify-content: center;
+}
+
+.ws-shell--vault-collapsed .ws-vault-toggle { margin-left: 0; }
 
 .ws-shell--vault-collapsed.ws-shell--no-debug {
-    grid-template-columns: var(--ws-nav-width) 0px 1fr 1fr 0 0;
+    grid-template-columns: var(--ws-nav-width) 28px 1fr 1fr 0 0;
 }
 
 /* --- Header --------------------------------------------------------------- */
