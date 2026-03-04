@@ -50,11 +50,12 @@
             this._filename   = null;
             this._fileType   = null;    // from FileTypeDetect
             this._renderType = null;    // 'markdown' | 'code' | 'text' | 'html' | 'image' | 'pdf' | null
-            this._mode       = 'rendered';  // 'rendered' | 'source'
+            this._mode       = 'rendered';  // 'rendered' | 'source' | 'edit'
             this._blobUrl    = null;
             this._version    = 0;
             this._loading    = false;
             this._unsub      = null;
+            this._dirty      = false;       // true when user has edited content
         }
 
         connectedCallback() {
@@ -121,6 +122,7 @@
             this._filename    = null;
             this._renderType  = null;
             this._mode        = 'rendered';
+            this._dirty       = false;
             this._revokeBlobUrl();
             this._renderEmpty();
         }
@@ -221,13 +223,20 @@
             if (typeof FileTypeDetect !== 'undefined') {
                 this._renderType = FileTypeDetect.detect(this._filename, null);
             }
+
+            // Override: HTML files must render as 'html' (iframe), not 'code'
+            // FileTypeDetect may classify .html as 'code' — force correct type
+            const ext = (this._filename || '').split('.').pop().toLowerCase();
+            if (['html', 'htm'].includes(ext)) {
+                this._renderType = 'html';
+                return;
+            }
+
             // Fallback for types FileTypeDetect doesn't cover (e.g. .txt) or if it's not loaded
             if (!this._renderType && this._filename) {
-                const ext = (this._filename || '').split('.').pop().toLowerCase();
                 const textExts = ['md', 'markdown', 'txt', 'json', 'yaml', 'yml', 'xml', 'csv', 'log', 'cfg', 'conf'];
                 const codeExts = ['js', 'ts', 'py', 'css', 'sh', 'sql', 'go', 'rs', 'java', 'c', 'cpp', 'rb', 'php'];
                 if (['md', 'markdown'].includes(ext)) this._renderType = 'markdown';
-                else if (['html', 'htm'].includes(ext)) this._renderType = 'html';
                 else if (codeExts.includes(ext))       this._renderType = 'code';
                 else if (textExts.includes(ext))       this._renderType = 'text';
                 else if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) this._renderType = 'image';
@@ -324,18 +333,21 @@
             const lang = typeof FileTypeDetect !== 'undefined'
                 ? FileTypeDetect.getLanguage(this._filename) : 'text';
 
-            // Toolbar: filename + source/rendered toggle + save button (transform only)
-            const canSave = this._role === 'transform' && this._content;
+            // Toolbar: filename + source/rendered/edit toggle + save button
+            const canSave = this._content;
             const toolbar = `
                 <div class="dv-toolbar">
                     <span class="dv-filename">${esc(this._filename || 'untitled')}</span>
                     <span class="dv-filetype">${esc(this._renderType || 'binary')}</span>
+                    ${this._dirty ? '<span class="dv-dirty-badge">modified</span>' : ''}
                     ${isTextBased ? `
                         <div class="dv-toggle">
                             <button class="dv-toggle-btn ${this._mode === 'rendered' ? 'dv-toggle-btn--active' : ''}"
                                     data-mode="rendered">Rendered</button>
                             <button class="dv-toggle-btn ${this._mode === 'source' ? 'dv-toggle-btn--active' : ''}"
                                     data-mode="source">Source</button>
+                            <button class="dv-toggle-btn ${this._mode === 'edit' ? 'dv-toggle-btn--active' : ''}"
+                                    data-mode="edit">Edit</button>
                         </div>
                     ` : ''}
                     ${this._content ? `<span class="dv-filesize">${formatSize(this._content.byteLength)}</span>` : ''}
@@ -347,7 +359,10 @@
 
             let body = '';
 
-            if (this._mode === 'source' && isTextBased && this._textContent) {
+            if (this._mode === 'edit' && isTextBased) {
+                // Edit mode: editable textarea
+                body = `<div class="dv-edit"><textarea class="dv-editor" spellcheck="false">${esc(this._textContent || '')}</textarea></div>`;
+            } else if (this._mode === 'source' && isTextBased && this._textContent) {
                 // Source mode: raw text
                 body = `<div class="dv-source"><pre class="dv-pre"><code>${esc(this._textContent)}</code></pre></div>`;
             } else {
@@ -440,13 +455,56 @@
         _bindToggle() {
             this.querySelectorAll('.dv-toggle-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
+                    // Before leaving edit mode, capture textarea content
+                    if (this._mode === 'edit') this._captureEditorContent();
                     this._mode = btn.dataset.mode;
                     this._renderContent();
                 });
             });
 
             const saveBtn = this.querySelector('.dv-save-btn');
-            if (saveBtn) saveBtn.addEventListener('click', () => this.saveToVault());
+            if (saveBtn) saveBtn.addEventListener('click', () => {
+                // Capture editor content if in edit mode before saving
+                if (this._mode === 'edit') this._captureEditorContent();
+                this.saveToVault();
+            });
+
+            // Bind editor textarea events
+            const editor = this.querySelector('.dv-editor');
+            if (editor) {
+                editor.addEventListener('input', () => {
+                    this._dirty = true;
+                    // Update dirty badge without full re-render
+                    const badge = this.querySelector('.dv-dirty-badge');
+                    if (!badge) {
+                        const filetype = this.querySelector('.dv-filetype');
+                        if (filetype) {
+                            const span = document.createElement('span');
+                            span.className = 'dv-dirty-badge';
+                            span.textContent = 'modified';
+                            filetype.after(span);
+                        }
+                    }
+                });
+                // Focus the editor
+                editor.focus();
+            }
+        }
+
+        /** Capture content from the editor textarea back into internal state */
+        _captureEditorContent() {
+            const editor = this.querySelector('.dv-editor');
+            if (!editor) return;
+            const text = editor.value;
+            if (text !== this._textContent) {
+                this._textContent = text;
+                this._content     = new TextEncoder().encode(text);
+                this._dirty       = true;
+                this._version++;
+                window.sgraphWorkspace.events.emit('document-edited', {
+                    role: this._role, filename: this._filename, type: this._renderType
+                });
+            }
         }
 
         // --- Styles ------------------------------------------------------------
@@ -535,7 +593,25 @@
                     color: var(--ws-success, #4ECDC4);
                 }
 
+                .dv-dirty-badge {
+                    font-size: 0.6875rem; font-weight: 600; padding: 0.0625rem 0.375rem;
+                    border-radius: 9999px; background: var(--ws-warning-bg, rgba(251,191,36,0.08));
+                    color: var(--ws-warning, #fbbf24); flex-shrink: 0;
+                }
+
                 .dv-body { flex: 1; overflow-y: auto; }
+
+                /* Edit mode */
+                .dv-edit { height: 100%; display: flex; flex-direction: column; }
+                .dv-editor {
+                    flex: 1; width: 100%; resize: none; border: none; outline: none;
+                    padding: 0.75rem;
+                    font-family: var(--ws-font-mono, monospace); font-size: 0.8125rem;
+                    line-height: 1.6; color: var(--ws-text, #F0F0F5);
+                    background: var(--ws-bg, #1A1A2E);
+                    white-space: pre-wrap; word-wrap: break-word;
+                    tab-size: 2;
+                }
 
                 /* Markdown rendered output */
                 .dv-markdown {
