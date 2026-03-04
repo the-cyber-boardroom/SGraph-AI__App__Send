@@ -375,6 +375,21 @@ vault-panel {
     color: var(--ws-text-muted);
 }
 
+.ws-chat-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+llm-stats {
+    width: 200px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--ws-border-subtle);
+    overflow-y: auto;
+    background: var(--ws-surface);
+}
+
 /* --- Settings Area -------------------------------------------------------- */
 
 .ws-settings-area {
@@ -509,6 +524,7 @@ vault-panel {
     .ws-vault-zone { display: none; }
     .ws-col-resize, .ws-row-resize { display: none; }
     .ws-debug-sidebar, .ws-debug-resize { display: none; }
+    llm-stats { display: none; }
     .ws-menu-btn { display: block; }
     .ws-source-zone { border-right: none; border-bottom: 1px solid var(--ws-border-subtle); }
 }

@@ -1,16 +1,16 @@
 /* =============================================================================
    SGraph Workspace — LLM Chat Panel
-   v0.1.0 — prompt input, prompt library, streaming LLM calls
+   v0.1.0 — prompt input, streaming/non-streaming LLM calls
 
    Reads the source document-viewer content, combines with user prompt,
-   sends to the connected LLM, and streams the response into the
-   transform document-viewer.
+   sends to the connected LLM, and streams (or fetches) the response into
+   the transform document-viewer.
 
    Supports:
      - Free-text prompts
-     - Prompt library selector (5 built-in prompts)
+     - Prompt loading from vault /prompts/ folder (click to load)
      - Model selector (from llm-connection)
-     - Streaming responses (SSE via OpenRouter or Ollama)
+     - Streaming & non-streaming responses
      - Ctrl+Enter to send
      - Cancel in-flight requests
    ============================================================================= */
@@ -26,6 +26,7 @@
 
     const DEFAULT_SYSTEM_PROMPT = 'You are an HTML transformation agent. You will receive HTML source code and a transformation instruction. Reply with ONLY the transformed HTML. Do not include markdown backtick fences. Do not include any explanation or commentary. Start your response with `<!DOCTYPE html>`.';
     const SYSTEM_PROMPT_KEY = 'sgraph-workspace-system-prompt';
+    const STREAM_KEY        = 'sgraph-workspace-llm-streaming';
 
     class LlmChat extends HTMLElement {
 
@@ -51,6 +52,13 @@
             try { localStorage.setItem(SYSTEM_PROMPT_KEY, this._systemPrompt); } catch (_) { /* ignore */ }
         }
 
+        _isStreaming() {
+            try {
+                const v = localStorage.getItem(STREAM_KEY);
+                return v !== null ? v === 'true' : true;
+            } catch (_) { return true; }
+        }
+
         connectedCallback() {
             try {
                 this._render();
@@ -72,19 +80,21 @@
                 this._models = [];
                 this._render();
             };
-            const onModelChanged  = () => this._updateModelSelect();
-            const onPromptsUpdate = () => this._updatePromptSelect();
+            const onModelChanged = () => this._updateModelSelect();
+
+            // Listen for file-selected events to intercept prompt files
+            const onFileSelected = (data) => this._onFileSelected(data);
 
             window.sgraphWorkspace.events.on('llm-connected', onConnected);
             window.sgraphWorkspace.events.on('llm-disconnected', onDisconnected);
             window.sgraphWorkspace.events.on('llm-model-changed', onModelChanged);
-            window.sgraphWorkspace.events.on('prompt-library-updated', onPromptsUpdate);
+            window.sgraphWorkspace.events.on('file-selected', onFileSelected);
 
             this._unsubs.push(
                 () => window.sgraphWorkspace.events.off('llm-connected', onConnected),
                 () => window.sgraphWorkspace.events.off('llm-disconnected', onDisconnected),
                 () => window.sgraphWorkspace.events.off('llm-model-changed', onModelChanged),
-                () => window.sgraphWorkspace.events.off('prompt-library-updated', onPromptsUpdate),
+                () => window.sgraphWorkspace.events.off('file-selected', onFileSelected),
             );
 
             // Check if already connected
@@ -101,6 +111,48 @@
         disconnectedCallback() {
             for (const unsub of this._unsubs) unsub();
             if (this._abortCtrl) this._abortCtrl.abort();
+        }
+
+        // --- Prompt file loading from vault --------------------------------------
+
+        async _onFileSelected(data) {
+            // Only intercept files from /prompts/ folder
+            if (!data.folderPath || !data.folderPath.startsWith('/prompts')) return;
+            if (!data.name) return;
+
+            // Load the file content from vault
+            const vaultPanel = document.querySelector('vault-panel');
+            if (!vaultPanel) return;
+            const vault = vaultPanel.getVault();
+            if (!vault) return;
+
+            try {
+                const plaintext = await vault.getFile(data.folderPath, data.name);
+                const text = new TextDecoder().decode(new Uint8Array(plaintext));
+
+                // Parse [system] and [user] sections
+                const systemMatch = text.match(/\[system\]\n([\s\S]*?)(?=\n\[user\]|\n*$)/);
+                const userMatch   = text.match(/\[user\]\n([\s\S]*?)$/);
+
+                if (systemMatch || userMatch) {
+                    if (systemMatch) {
+                        this._systemPrompt = systemMatch[1].trim();
+                        this._saveSystemPrompt();
+                    }
+                    if (userMatch) {
+                        const textarea = this.querySelector('#lc-prompt');
+                        if (textarea) textarea.value = userMatch[1].trim();
+                    }
+                    window.sgraphWorkspace.messages.success(`Prompt "${data.name}" loaded`);
+                } else {
+                    // No markers — treat entire file as user prompt
+                    const textarea = this.querySelector('#lc-prompt');
+                    if (textarea) textarea.value = text.trim();
+                    window.sgraphWorkspace.messages.success(`Prompt "${data.name}" loaded`);
+                }
+            } catch (e) {
+                console.error('[llm-chat] Failed to load prompt file:', e);
+            }
         }
 
         // --- Send to LLM -------------------------------------------------------
@@ -125,11 +177,9 @@
             // Build the final prompt
             let finalPrompt = userPrompt;
             if (docContent) {
-                // If the prompt contains {{document}}, replace it
                 if (finalPrompt.includes('{{document}}')) {
                     finalPrompt = finalPrompt.replace('{{document}}', docContent);
                 } else {
-                    // Otherwise append the document
                     finalPrompt = finalPrompt + '\n\n---\n\n' + docContent;
                 }
             }
@@ -138,6 +188,7 @@
             const model    = conn.getSelectedModel();
             const apiKey   = conn.getApiKey();
             const baseUrl  = conn.getBaseUrl();
+            const streaming = this._isStreaming();
 
             if (!model) {
                 window.sgraphWorkspace.messages.error('No model selected.');
@@ -148,36 +199,60 @@
             this._abortCtrl = new AbortController();
             this._updateUI();
 
-            window.sgraphWorkspace.messages.info(`Sending to ${model}...`);
-            window.sgraphWorkspace.events.emit('llm-request-start', { model, provider });
+            const modeLabel = streaming ? 'streaming' : 'non-streaming';
+            window.sgraphWorkspace.messages.info(`Sending to ${model} (${modeLabel})...`);
+            window.sgraphWorkspace.events.emit('llm-request-start', { model, provider, streaming });
 
             const transformViewer = document.querySelector('document-viewer[data-role="transform"]');
-            let accumulated = '';
-
             const systemPrompt = this._systemPrompt ? this._systemPrompt.trim() : '';
 
             try {
+                let result;
+
                 if (provider === 'openrouter') {
-                    accumulated = await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, (chunk) => {
-                        accumulated += chunk;
+                    if (streaming) {
+                        let accumulated = '';
+                        result = { content: await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, (chunk) => {
+                            accumulated += chunk;
+                            if (transformViewer) {
+                                const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
+                                transformViewer.loadText(accumulated, `transform.${ext}`);
+                            }
+                        }) };
+                    } else {
+                        result = await this._callOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt);
                         if (transformViewer) {
                             const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                            transformViewer.loadText(accumulated, `transform.${ext}`);
+                            transformViewer.loadText(result.content, `transform.${ext}`);
                         }
-                    });
+                    }
                 } else if (provider === 'ollama') {
-                    accumulated = await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, (chunk) => {
-                        accumulated += chunk;
+                    if (streaming) {
+                        let accumulated = '';
+                        result = { content: await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, (chunk) => {
+                            accumulated += chunk;
+                            if (transformViewer) {
+                                const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
+                                transformViewer.loadText(accumulated, `transform.${ext}`);
+                            }
+                        }) };
+                    } else {
+                        result = await this._callOllama(baseUrl, model, finalPrompt, systemPrompt);
                         if (transformViewer) {
                             const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                            transformViewer.loadText(accumulated, `transform.${ext}`);
+                            transformViewer.loadText(result.content, `transform.${ext}`);
                         }
-                    });
+                    }
                 }
 
-                window.sgraphWorkspace.messages.success(`Response complete — ${accumulated.length} chars`);
+                const content = result?.content || '';
+                window.sgraphWorkspace.messages.success(`Response complete — ${content.length} chars`);
                 window.sgraphWorkspace.events.emit('llm-request-complete', {
-                    model, provider, length: accumulated.length
+                    model, provider, length: content.length, streaming,
+                    promptTokens:     result?.promptTokens     || null,
+                    completionTokens: result?.completionTokens || null,
+                    totalTokens:      result?.totalTokens      || null,
+                    nativeId:         result?.nativeId          || null,
                 });
 
             } catch (e) {
@@ -193,6 +268,69 @@
             this._sending   = false;
             this._abortCtrl = null;
             this._updateUI();
+        }
+
+        // --- Non-streaming: OpenRouter -------------------------------------------
+
+        async _callOpenRouter(baseUrl, apiKey, model, prompt, systemPrompt) {
+            const messages = [];
+            if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+            messages.push({ role: 'user', content: prompt });
+
+            const resp = await fetch(`${baseUrl}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type':  'application/json',
+                    'HTTP-Referer':  location.origin,
+                    'X-Title':       'SGraph Workspace',
+                },
+                body: JSON.stringify({ model, messages, stream: false }),
+                signal: this._abortCtrl.signal,
+            });
+
+            if (!resp.ok) {
+                const errBody = await resp.text().catch(() => '');
+                throw new Error(`API error ${resp.status}: ${errBody.slice(0, 200)}`);
+            }
+
+            const data = await resp.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            const usage   = data.usage || {};
+
+            return {
+                content,
+                promptTokens:     usage.prompt_tokens     || null,
+                completionTokens: usage.completion_tokens  || null,
+                totalTokens:      usage.total_tokens       || null,
+                nativeId:         data.id                  || null,
+            };
+        }
+
+        // --- Non-streaming: Ollama -----------------------------------------------
+
+        async _callOllama(baseUrl, model, prompt, systemPrompt) {
+            const base = baseUrl.replace(/\/+$/, '');
+            const body = { model, prompt, stream: false };
+            if (systemPrompt) body.system = systemPrompt;
+
+            const resp = await fetch(`${base}/api/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                signal: this._abortCtrl.signal,
+            });
+
+            if (!resp.ok) throw new Error(`Ollama error ${resp.status}`);
+
+            const data = await resp.json();
+            return {
+                content:          data.response || '',
+                promptTokens:     data.prompt_eval_count || null,
+                completionTokens: data.eval_count        || null,
+                totalTokens:      (data.prompt_eval_count || 0) + (data.eval_count || 0) || null,
+                nativeId:         null,
+            };
         }
 
         // --- Streaming: OpenRouter (OpenAI-compatible SSE) ----------------------
@@ -313,21 +451,6 @@
             }
         }
 
-        // --- Prompt library integration -----------------------------------------
-
-        _applyPrompt(promptId) {
-            const library = document.querySelector('prompt-library');
-            if (!library) return;
-            const p = library.getPrompt(promptId);
-            if (!p) return;
-
-            const textarea = this.querySelector('#lc-prompt');
-            if (textarea) {
-                textarea.value = p.prompt;
-                textarea.focus();
-            }
-        }
-
         // --- UI update (enable/disable during send) -----------------------------
 
         _updateUI() {
@@ -338,18 +461,6 @@
             if (sendBtn)   sendBtn.disabled   = this._sending || !this._connected;
             if (cancelBtn) cancelBtn.style.display = this._sending ? '' : 'none';
             if (textarea)  textarea.disabled  = this._sending;
-        }
-
-        _updatePromptSelect() {
-            const select = this.querySelector('#lc-prompt-lib');
-            if (!select) return;
-            const library = document.querySelector('prompt-library');
-            const prompts = library && typeof library.getPrompts === 'function' ? library.getPrompts() : [];
-            select.innerHTML = `<option value="">Custom prompt...</option>`
-                + prompts.map(p => {
-                    const prefix = p.builtin ? '' : '\u{1F4C1} ';
-                    return `<option value="${esc(p.id)}">${prefix}${esc(p.name)}</option>`;
-                }).join('');
         }
 
         _updateModelSelect() {
@@ -374,10 +485,6 @@
             const selectedModel = isUpgraded ? conn.getSelectedModel() : null;
             const isConnected = isUpgraded && conn.isConnected();
 
-            // Get prompts from library
-            const library = document.querySelector('prompt-library');
-            const prompts = library && typeof library.getPrompts === 'function' ? library.getPrompts() : [];
-
             this.innerHTML = `<style>${LlmChat.styles}</style>
             <div class="lcc-panel">
                 <!-- System prompt (collapsible) -->
@@ -396,12 +503,8 @@
                     </div>
                 </div>` : ''}
 
-                <!-- Prompt library quick-select -->
+                <!-- Model selector -->
                 <div class="lcc-top-bar">
-                    <select class="lcc-prompt-select" id="lc-prompt-lib">
-                        <option value="">Custom prompt...</option>
-                        ${prompts.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}
-                    </select>
                     <select class="lcc-model-select" id="lc-model-inline" ${!isConnected ? 'disabled' : ''}>
                         ${!isConnected
                             ? '<option>Not connected</option>'
@@ -409,6 +512,7 @@
                                 `<option value="${esc(m.id)}" ${m.id === selectedModel ? 'selected' : ''}>${esc(m.name)}</option>`
                               ).join('')}
                     </select>
+                    <span class="lcc-prompt-hint">Load prompts from vault /prompts/ folder</span>
                 </div>
 
                 <!-- Prompt input + actions -->
@@ -473,17 +577,6 @@
                 });
             }
 
-            // Prompt library selector
-            const promptSelect = this.querySelector('#lc-prompt-lib');
-            if (promptSelect) {
-                promptSelect.addEventListener('change', () => {
-                    if (promptSelect.value) {
-                        this._applyPrompt(promptSelect.value);
-                        promptSelect.value = ''; // reset selector
-                    }
-                });
-            }
-
             // Inline model selector
             const modelSelect = this.querySelector('#lc-model-inline');
             if (modelSelect) {
@@ -544,19 +637,22 @@
                 }
                 .lcc-sys-reset:hover { color: var(--ws-text-secondary, #8892A0); background: var(--ws-surface-hover, #253254); }
                 .lcc-top-bar {
-                    display: flex; gap: 0.5rem; flex-shrink: 0;
+                    display: flex; gap: 0.5rem; flex-shrink: 0; align-items: center;
                 }
-                .lcc-prompt-select, .lcc-model-select {
+                .lcc-model-select {
                     padding: 0.25rem 0.5rem; font-size: 0.75rem;
                     background: var(--ws-surface-raised, #1c2a4a);
                     color: var(--ws-text-secondary, #8892A0);
                     border: 1px solid var(--ws-border, #2C3E6B);
                     border-radius: var(--ws-radius, 6px);
                     outline: none; font-family: inherit;
+                    flex: 1; max-width: 280px;
                 }
-                .lcc-prompt-select { flex: 1; }
-                .lcc-model-select { flex: 1; max-width: 220px; }
                 .lcc-model-select:disabled { opacity: 0.5; }
+                .lcc-prompt-hint {
+                    font-size: 0.625rem; color: var(--ws-text-muted, #5a6478);
+                    font-style: italic;
+                }
 
                 .lcc-input-row {
                     display: flex; gap: 0.5rem; flex: 1; min-height: 0;
