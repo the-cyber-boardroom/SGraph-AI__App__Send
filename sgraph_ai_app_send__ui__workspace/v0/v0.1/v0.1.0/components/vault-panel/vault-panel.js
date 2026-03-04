@@ -189,6 +189,24 @@
             }
         }
 
+        async _refreshVault() {
+            if (!this._vaultKey) return;
+            window.sgraphWorkspace.messages.info('Refreshing vault...');
+            try {
+                const endpoint = window.sgraphWorkspace.config.sendEndpoint;
+                this._sgSend   = new SGSend({ endpoint, token: this._accessToken });
+                this._vault    = await SGVault.open(this._sgSend, this._vaultKey);
+                this._render();
+                const stats = this._vault.getStats();
+                window.sgraphWorkspace.messages.success(
+                    `Vault refreshed — ${stats.files} files`
+                );
+            } catch (e) {
+                console.error('[vault-panel] Refresh failed:', e);
+                window.sgraphWorkspace.messages.error('Refresh failed: ' + e.message);
+            }
+        }
+
         _lockVault() {
             this._vault       = null;
             this._sgSend      = null;
@@ -366,7 +384,8 @@
                 <div class="vp-browser">
                     <div class="vp-browser-header">
                         <div class="vp-breadcrumb">${bc}</div>
-                        <button class="vp-lock-btn" id="vp-lock" title="Lock vault">&#128274;</button>
+                        <button class="vp-header-btn" id="vp-refresh" title="Refresh vault">&#x21bb;</button>
+                        <button class="vp-header-btn" id="vp-lock" title="Lock vault">&#128274;</button>
                     </div>
                     <div class="vp-items">${itemsHtml}</div>
                     <div class="vp-stats">
@@ -429,6 +448,10 @@
                 this._errorMsg = null;
                 this._render();
             });
+
+            // Refresh vault
+            const refreshBtn = this.querySelector('#vp-refresh');
+            if (refreshBtn) refreshBtn.addEventListener('click', () => this._refreshVault());
 
             // Lock vault
             const lockBtn = this.querySelector('#vp-lock');
@@ -522,13 +545,13 @@
                     flex: 1; padding: 0.5rem 0.75rem; font-size: 0.75rem;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
-                .vp-lock-btn {
+                .vp-header-btn {
                     background: none; border: none; cursor: pointer;
                     font-size: 0.75rem; padding: 0.375rem 0.5rem;
                     color: var(--ws-text-muted, #5a6478);
                     border-radius: var(--ws-radius, 6px);
                 }
-                .vp-lock-btn:hover { background: var(--ws-surface-hover, #253254); color: var(--ws-text, #F0F0F5); }
+                .vp-header-btn:hover { background: var(--ws-surface-hover, #253254); color: var(--ws-text, #F0F0F5); }
                 .vp-bc-link { color: var(--ws-primary, #4ECDC4); text-decoration: none; }
                 .vp-bc-link:hover { text-decoration: underline; }
                 .vp-bc-sep { color: var(--ws-text-muted, #5a6478); margin: 0 0.25rem; }
