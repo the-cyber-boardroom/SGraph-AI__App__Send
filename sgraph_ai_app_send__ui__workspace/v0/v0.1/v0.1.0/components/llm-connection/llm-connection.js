@@ -286,9 +286,53 @@
                         ).join('')}
                     </select>
                 </div>` : ''}
+
+                <hr class="lc-divider">
+                <h2 class="lc-title">Workspace Storage</h2>
+                <div class="lc-hint" style="margin-bottom: 0.75rem">Data stored in your browser's localStorage. Never sent to the server.</div>
+                ${this._renderStorageSection()}
             </div>`;
 
             this._bind();
+        }
+
+        // --- Storage display ----------------------------------------------------
+
+        _renderStorageSection() {
+            const KEYS = [
+                { key: 'sgraph-workspace-vault', label: 'Vault Settings' },
+                { key: 'sgraph-workspace-llm',   label: 'LLM Settings' },
+            ];
+
+            let html = '';
+            for (const { key, label } of KEYS) {
+                try {
+                    const raw = localStorage.getItem(key);
+                    if (!raw) {
+                        html += `<div class="lc-section"><label class="lc-label">${esc(label)}</label><div class="lc-hint">Not set</div></div>`;
+                        continue;
+                    }
+                    const data = JSON.parse(raw);
+                    const rows = Object.entries(data).map(([k, v]) => {
+                        let display = v;
+                        // Mask sensitive values (show first/last chars)
+                        if (k === 'apiKey' && typeof v === 'string' && v.length > 8) {
+                            display = v.slice(0, 6) + '...' + v.slice(-4);
+                        }
+                        if (typeof display === 'object') display = JSON.stringify(display);
+                        return `<div class="lc-storage-row">
+                            <span class="lc-storage-key">${esc(k)}</span>
+                            <input type="text" class="lc-storage-value" value="${esc(String(display || ''))}" readonly
+                                   data-storage-key="${esc(key)}" data-field="${esc(k)}" data-full="${esc(String(v || ''))}">
+                            <button class="lc-storage-copy" data-copy="${esc(String(v || ''))}" title="Copy to clipboard">Copy</button>
+                        </div>`;
+                    }).join('');
+                    html += `<div class="lc-section"><label class="lc-label">${esc(label)}</label>${rows}</div>`;
+                } catch (_) {
+                    html += `<div class="lc-section"><label class="lc-label">${esc(label)}</label><div class="lc-hint">Error reading</div></div>`;
+                }
+            }
+            return html;
         }
 
         // --- Event binding -----------------------------------------------------
@@ -321,6 +365,29 @@
 
             const disconnectBtn = this.querySelector('#lc-disconnect');
             if (disconnectBtn) disconnectBtn.addEventListener('click', () => this._disconnect());
+
+            // Copy buttons for storage values
+            this.querySelectorAll('.lc-storage-copy').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const val = btn.dataset.copy;
+                    navigator.clipboard.writeText(val).then(() => {
+                        btn.textContent = 'Copied';
+                        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+                    }).catch(() => {
+                        // Fallback: select the input
+                        const input = btn.previousElementSibling;
+                        if (input) { input.value = btn.dataset.copy; input.select(); }
+                    });
+                });
+            });
+
+            // Clicking on storage value input reveals full value
+            this.querySelectorAll('.lc-storage-value').forEach(input => {
+                input.addEventListener('click', () => {
+                    input.value = input.dataset.full;
+                    input.select();
+                });
+            });
 
             const modelSelect = this.querySelector('#lc-model-select');
             if (modelSelect) {
@@ -410,6 +477,38 @@
                     color: var(--ws-primary, #4ECDC4); border-color: var(--ws-primary, #4ECDC4);
                 }
                 .lc-btn--primary:hover { background: rgba(78,205,196,0.2); }
+                .lc-divider {
+                    border: none; border-top: 1px solid var(--ws-border, #2C3E6B);
+                    margin: 1.5rem 0;
+                }
+                .lc-storage-row {
+                    display: flex; align-items: center; gap: 0.5rem;
+                    margin-bottom: 0.375rem;
+                }
+                .lc-storage-key {
+                    font-size: 0.75rem; font-weight: 600;
+                    color: var(--ws-text-muted, #5a6478);
+                    font-family: var(--ws-font-mono, monospace);
+                    min-width: 100px; flex-shrink: 0;
+                }
+                .lc-storage-value {
+                    flex: 1; padding: 0.25rem 0.5rem;
+                    font-size: 0.75rem; font-family: var(--ws-font-mono, monospace);
+                    background: var(--ws-bg, #1A1A2E); color: var(--ws-text, #F0F0F5);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px);
+                    outline: none; box-sizing: border-box; cursor: pointer;
+                }
+                .lc-storage-value:focus { border-color: var(--ws-primary, #4ECDC4); }
+                .lc-storage-copy {
+                    padding: 0.1875rem 0.5rem; font-size: 0.625rem; font-weight: 600;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-secondary, #8892A0);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px);
+                    cursor: pointer; font-family: inherit; flex-shrink: 0;
+                }
+                .lc-storage-copy:hover { color: var(--ws-text, #F0F0F5); background: var(--ws-surface-hover, #253254); }
             `;
         }
     }

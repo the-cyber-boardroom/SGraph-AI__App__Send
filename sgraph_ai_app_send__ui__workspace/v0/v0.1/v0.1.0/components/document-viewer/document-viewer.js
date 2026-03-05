@@ -304,6 +304,9 @@
         // --- Event handler: file-selected from vault-panel ---------------------
 
         async _onFileSelected(data) {
+            // Skip .js files — those go to the script editor, not source viewer
+            if (data.name && data.name.endsWith('.js')) return;
+
             if (this._loading) return;
             this._loading = true;
             this._filename = data.name;
