@@ -89,5 +89,20 @@
         }
     };
 
+    // --- Global error catching → Messages panel --------------------------------
+
+    window.addEventListener('error', (event) => {
+        const msg  = event.message || 'Unknown error';
+        const src  = event.filename ? event.filename.split('/').pop() : '';
+        const line = event.lineno  || '';
+        const loc  = src ? ` (${src}:${line})` : '';
+        window.sgraphWorkspace.messages.error(`${msg}${loc}`);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        const msg = event.reason?.message || String(event.reason) || 'Unhandled promise rejection';
+        window.sgraphWorkspace.messages.error(msg);
+    });
+
     console.log('[workspace] Initialised — v0.1.0');
 })();
