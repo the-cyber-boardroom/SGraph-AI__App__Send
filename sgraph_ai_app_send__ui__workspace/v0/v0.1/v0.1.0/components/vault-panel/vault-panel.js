@@ -372,6 +372,15 @@
             this._breadcrumb.push({ path, name });
             this._selectedFile = null;
             this._render();
+
+            // Auto-load source.html if present in the folder
+            if (this._vault) {
+                const items = this._vault.listFolder(path) || [];
+                const sourceFile = items.find(i => i.type !== 'folder' && i.name === 'source.html');
+                if (sourceFile) {
+                    this._selectFile('source.html', sourceFile);
+                }
+            }
         }
 
         _navigateBreadcrumb(idx) {

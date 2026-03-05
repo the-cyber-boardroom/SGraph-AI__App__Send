@@ -39,6 +39,7 @@
             this._unsubs        = [];
             this._systemPrompt  = this._loadSystemPrompt();
             this._sysPromptOpen = false;
+            this._vaultPrompts  = [];  // [{ name, folderPath }]
         }
 
         _loadSystemPrompt() {
@@ -85,16 +86,20 @@
             // Listen for file-selected events to intercept prompt files
             const onFileSelected = (data) => this._onFileSelected(data);
 
+            const onVaultOpened = () => this._scanVaultPrompts();
+
             window.sgraphWorkspace.events.on('llm-connected', onConnected);
             window.sgraphWorkspace.events.on('llm-disconnected', onDisconnected);
             window.sgraphWorkspace.events.on('llm-model-changed', onModelChanged);
             window.sgraphWorkspace.events.on('file-selected', onFileSelected);
+            window.sgraphWorkspace.events.on('vault-opened', onVaultOpened);
 
             this._unsubs.push(
                 () => window.sgraphWorkspace.events.off('llm-connected', onConnected),
                 () => window.sgraphWorkspace.events.off('llm-disconnected', onDisconnected),
                 () => window.sgraphWorkspace.events.off('llm-model-changed', onModelChanged),
                 () => window.sgraphWorkspace.events.off('file-selected', onFileSelected),
+                () => window.sgraphWorkspace.events.off('vault-opened', onVaultOpened),
             );
 
             // Check if already connected
@@ -105,12 +110,40 @@
                 this._render();
             }
 
+            // Scan for vault prompts if vault is already open
+            const vaultPanel = document.querySelector('vault-panel');
+            if (vaultPanel && vaultPanel.getState() === 'open') {
+                this._scanVaultPrompts();
+            }
+
             window.sgraphWorkspace.events.emit('llm-chat-ready');
         }
 
         disconnectedCallback() {
             for (const unsub of this._unsubs) unsub();
             if (this._abortCtrl) this._abortCtrl.abort();
+        }
+
+        // --- Vault prompt scanning ------------------------------------------------
+
+        _scanVaultPrompts() {
+            this._vaultPrompts = [];
+            const vaultPanel = document.querySelector('vault-panel');
+            if (!vaultPanel) return;
+            const vault = vaultPanel.getVault();
+            if (!vault) return;
+
+            try {
+                const items = vault.listFolder('/prompts') || [];
+                this._vaultPrompts = items
+                    .filter(i => i.type !== 'folder')
+                    .map(i => ({ name: i.name, folderPath: '/prompts' }));
+            } catch (_) {
+                // /prompts folder may not exist — that's fine
+            }
+
+            // Re-render to update the prompt selector
+            this._render();
         }
 
         // --- Prompt file loading from vault --------------------------------------
@@ -205,43 +238,40 @@
 
             const transformViewer = document.querySelector('document-viewer[data-role="transform"]');
             const systemPrompt = this._systemPrompt ? this._systemPrompt.trim() : '';
+            const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
 
             try {
                 let result;
 
+                if (streaming && transformViewer) {
+                    // Use streaming API: startStreaming → appendStreamChunk → endStreaming
+                    transformViewer.startStreaming(`transform.${ext}`);
+                }
+
+                const onChunk = streaming && transformViewer
+                    ? (chunk) => transformViewer.appendStreamChunk(chunk)
+                    : null;
+
                 if (provider === 'openrouter') {
                     if (streaming) {
-                        let accumulated = '';
-                        result = { content: await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, (chunk) => {
-                            accumulated += chunk;
-                            if (transformViewer) {
-                                const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                                transformViewer.loadText(accumulated, `transform.${ext}`);
-                            }
-                        }) };
+                        result = { content: await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, onChunk) };
                     } else {
                         result = await this._callOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt);
-                        if (transformViewer) {
-                            const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                            transformViewer.loadText(result.content, `transform.${ext}`);
-                        }
                     }
                 } else if (provider === 'ollama') {
                     if (streaming) {
-                        let accumulated = '';
-                        result = { content: await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, (chunk) => {
-                            accumulated += chunk;
-                            if (transformViewer) {
-                                const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                                transformViewer.loadText(accumulated, `transform.${ext}`);
-                            }
-                        }) };
+                        result = { content: await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, onChunk) };
                     } else {
                         result = await this._callOllama(baseUrl, model, finalPrompt, systemPrompt);
-                        if (transformViewer) {
-                            const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                            transformViewer.loadText(result.content, `transform.${ext}`);
-                        }
+                    }
+                }
+
+                // Final render with full content
+                if (transformViewer) {
+                    if (streaming) {
+                        transformViewer.endStreaming();
+                    } else {
+                        transformViewer.loadText(result?.content || '', `transform.${ext}`);
                     }
                 }
 
@@ -503,7 +533,7 @@
                     </div>
                 </div>` : ''}
 
-                <!-- Model selector -->
+                <!-- Model + prompt selector -->
                 <div class="lcc-top-bar">
                     <select class="lcc-model-select" id="lc-model-inline" ${!isConnected ? 'disabled' : ''}>
                         ${!isConnected
@@ -512,7 +542,14 @@
                                 `<option value="${esc(m.id)}" ${m.id === selectedModel ? 'selected' : ''}>${esc(m.name)}</option>`
                               ).join('')}
                     </select>
-                    <span class="lcc-prompt-hint">Load prompts from vault /prompts/ folder</span>
+                    ${this._vaultPrompts.length > 0 ? `
+                        <select class="lcc-prompt-select" id="lc-prompt-select">
+                            <option value="">— Load prompt —</option>
+                            ${this._vaultPrompts.map(p =>
+                                `<option value="${esc(p.name)}">${esc(p.name)}</option>`
+                            ).join('')}
+                        </select>
+                    ` : `<span class="lcc-prompt-hint">Prompts: open vault with /prompts/ folder</span>`}
                 </div>
 
                 <!-- Prompt input + actions -->
@@ -577,16 +614,25 @@
                 });
             }
 
+            // Prompt selector from vault
+            const promptSelect = this.querySelector('#lc-prompt-select');
+            if (promptSelect) {
+                promptSelect.addEventListener('change', () => {
+                    const name = promptSelect.value;
+                    if (!name) return;
+                    promptSelect.value = ''; // reset dropdown
+                    // Trigger file-selected for the prompt, same as clicking in vault
+                    this._onFileSelected({ name, folderPath: '/prompts' });
+                });
+            }
+
             // Inline model selector
             const modelSelect = this.querySelector('#lc-model-inline');
             if (modelSelect) {
                 modelSelect.addEventListener('change', () => {
                     const conn = document.querySelector('llm-connection');
-                    if (conn) {
-                        conn._selectedModel = modelSelect.value;
-                        conn._saveSettings();
-                        conn._updateStatusBar();
-                        window.sgraphWorkspace.events.emit('llm-model-changed', { model: modelSelect.value });
+                    if (conn && typeof conn.setSelectedModel === 'function') {
+                        conn.setSelectedModel(modelSelect.value);
                     }
                 });
             }
@@ -652,6 +698,15 @@
                 .lcc-prompt-hint {
                     font-size: 0.625rem; color: var(--ws-text-muted, #5a6478);
                     font-style: italic;
+                }
+                .lcc-prompt-select {
+                    padding: 0.25rem 0.5rem; font-size: 0.75rem;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-secondary, #8892A0);
+                    border: 1px solid var(--ws-border, #2C3E6B);
+                    border-radius: var(--ws-radius, 6px);
+                    outline: none; font-family: inherit;
+                    max-width: 200px;
                 }
 
                 .lcc-input-row {
