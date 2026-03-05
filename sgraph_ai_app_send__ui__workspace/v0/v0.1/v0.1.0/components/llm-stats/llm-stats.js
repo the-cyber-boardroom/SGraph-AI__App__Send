@@ -4,7 +4,7 @@
 
    Sits to the right of the chat zone. Displays:
      - Stream/Non-stream toggle (persisted in localStorage)
-     - Last request stats: model, tokens in/out, duration, cost
+     - Last request stats: model, tokens in/out, duration, cost, speed
      - Save Prompt button (saves system + user prompt to vault)
    ============================================================================= */
 
@@ -24,7 +24,7 @@
         constructor() {
             super();
             this._streaming  = this._loadStreaming();
-            this._lastStats  = null;   // { model, provider, promptTokens, completionTokens, totalTokens, durationMs, streaming, cost }
+            this._lastStats  = null;
             this._inProgress = false;
             this._startTime  = null;
             this._unsubs     = [];
@@ -167,6 +167,18 @@
                 return String(n);
             };
 
+            const formatCost = (c) => {
+                if (c == null) return '—';
+                if (c < 0.001) return '$ ' + c.toFixed(6);
+                if (c < 0.01)  return '$ ' + c.toFixed(5);
+                return '$ ' + c.toFixed(4);
+            };
+
+            const formatSpeed = (tps) => {
+                if (tps == null) return '—';
+                return tps.toFixed(1) + ' tps';
+            };
+
             let statsHtml = '';
 
             if (this._inProgress) {
@@ -196,21 +208,26 @@
                     </div>
                     ${hasTokens ? `
                     <div class="ls-stat-row">
-                        <span class="ls-stat-label">Tokens In</span>
-                        <span class="ls-stat-value">${formatTokens(s.promptTokens)}</span>
+                        <span class="ls-stat-label">Tokens</span>
+                        <span class="ls-stat-value">${formatTokens(s.promptTokens)} &rarr; ${formatTokens(s.completionTokens)}</span>
                     </div>
                     <div class="ls-stat-row">
-                        <span class="ls-stat-label">Tokens Out</span>
-                        <span class="ls-stat-value">${formatTokens(s.completionTokens)}</span>
+                        <span class="ls-stat-label">Cost</span>
+                        <span class="ls-stat-value">${formatCost(s.cost)}</span>
                     </div>
                     <div class="ls-stat-row">
-                        <span class="ls-stat-label">Total</span>
-                        <span class="ls-stat-value">${formatTokens(s.totalTokens)}</span>
+                        <span class="ls-stat-label">Speed</span>
+                        <span class="ls-stat-value">${formatSpeed(s.speed)}</span>
                     </div>` : `
                     <div class="ls-stat-row">
                         <span class="ls-stat-label">Length</span>
                         <span class="ls-stat-value">${s.length != null ? s.length + ' chars' : '—'}</span>
                     </div>`}
+                    ${s.finishReason ? `
+                    <div class="ls-stat-row">
+                        <span class="ls-stat-label">Finish</span>
+                        <span class="ls-stat-value">${esc(s.finishReason)}</span>
+                    </div>` : ''}
                     ${s.error ? `
                     <div class="ls-stat-row">
                         <span class="ls-stat-label">Error</span>

@@ -144,13 +144,28 @@
 
                 if (provider === 'openrouter') {
                     if (streaming) {
-                        result = { content: await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, onChunk) };
+                        const sr = await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, onChunk);
+                        result = {
+                            content:          sr.content,
+                            promptTokens:     sr.usage?.prompt_tokens     || null,
+                            completionTokens: sr.usage?.completion_tokens || null,
+                            totalTokens:      sr.usage?.total_tokens      || null,
+                            finishReason:     sr.finishReason             || null,
+                            nativeId:         sr.nativeId                 || null,
+                        };
                     } else {
                         result = await this._callOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt);
                     }
                 } else if (provider === 'ollama') {
                     if (streaming) {
-                        result = { content: await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, onChunk) };
+                        const sr = await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, onChunk);
+                        result = {
+                            content:          sr.content,
+                            promptTokens:     sr.usage?.prompt_tokens     || null,
+                            completionTokens: sr.usage?.completion_tokens || null,
+                            totalTokens:      sr.usage?.total_tokens      || null,
+                            finishReason:     sr.finishReason             || null,
+                        };
                     } else {
                         result = await this._callOllama(baseUrl, model, finalPrompt, systemPrompt);
                     }
@@ -195,6 +210,21 @@
                     });
                 }
 
+                // Calculate cost from model pricing
+                let cost = null;
+                const pricing = conn.getModelPricing ? conn.getModelPricing(model) : null;
+                if (pricing && result?.promptTokens && result?.completionTokens) {
+                    const promptCost     = result.promptTokens     * parseFloat(pricing.prompt     || 0);
+                    const completionCost = result.completionTokens * parseFloat(pricing.completion  || 0);
+                    cost = promptCost + completionCost;
+                }
+
+                // Calculate speed (tokens per second)
+                let speed = null;
+                if (result?.completionTokens && latencyMs > 0) {
+                    speed = result.completionTokens / (latencyMs / 1000);
+                }
+
                 window.sgraphWorkspace.messages.success(`Response complete — ${content.length} chars (${latencyMs}ms)`);
                 window.sgraphWorkspace.events.emit('llm-request-complete', {
                     model, provider, length: content.length, streaming,
@@ -202,6 +232,9 @@
                     completionTokens: result?.completionTokens || null,
                     totalTokens:      result?.totalTokens      || null,
                     nativeId:         result?.nativeId          || null,
+                    finishReason:     result?.finishReason      || null,
+                    cost,
+                    speed,
                 });
 
             } catch (e) {
@@ -296,6 +329,7 @@
                 promptTokens:     usage.prompt_tokens     || null,
                 completionTokens: usage.completion_tokens  || null,
                 totalTokens:      usage.total_tokens       || null,
+                finishReason:     data.choices?.[0]?.finish_reason || null,
                 nativeId:         data.id                  || null,
             };
         }
@@ -322,6 +356,7 @@
                 promptTokens:     data.prompt_eval_count || null,
                 completionTokens: data.eval_count        || null,
                 totalTokens:      (data.prompt_eval_count || 0) + (data.eval_count || 0) || null,
+                finishReason:     'stop',
                 nativeId:         null,
             };
         }
@@ -377,8 +412,11 @@
         async _readSSE(body, onChunk) {
             const reader  = body.getReader();
             const decoder = new TextDecoder();
-            let buffer    = '';
-            let full      = '';
+            let buffer       = '';
+            let full         = '';
+            let usage        = null;
+            let finishReason = null;
+            let nativeId     = null;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -391,7 +429,7 @@
                 for (const line of lines) {
                     if (!line.startsWith('data: ')) continue;
                     const data = line.slice(6).trim();
-                    if (data === '[DONE]') return full;
+                    if (data === '[DONE]') return { content: full, usage, finishReason, nativeId };
 
                     try {
                         const parsed = JSON.parse(data);
@@ -400,10 +438,17 @@
                             full += delta;
                             if (onChunk) onChunk(delta);
                         }
+                        // Capture finish_reason from the final chunk
+                        const fr = parsed.choices?.[0]?.finish_reason;
+                        if (fr) finishReason = fr;
+                        // Capture usage from the final chunk
+                        if (parsed.usage) usage = parsed.usage;
+                        // Capture request ID
+                        if (parsed.id && !nativeId) nativeId = parsed.id;
                     } catch (_) {}
                 }
             }
-            return full;
+            return { content: full, usage, finishReason, nativeId };
         }
 
         // --- NDJSON reader ----------------------------------------------------
@@ -413,6 +458,7 @@
             const decoder = new TextDecoder();
             let buffer    = '';
             let full      = '';
+            let usage     = null;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -430,11 +476,20 @@
                             full += parsed.response;
                             if (onChunk) onChunk(parsed.response);
                         }
-                        if (parsed.done) return full;
+                        if (parsed.done) {
+                            const promptTokens     = parsed.prompt_eval_count || 0;
+                            const completionTokens = parsed.eval_count        || 0;
+                            usage = {
+                                prompt_tokens:     promptTokens,
+                                completion_tokens: completionTokens,
+                                total_tokens:      promptTokens + completionTokens,
+                            };
+                            return { content: full, usage, finishReason: 'stop', nativeId: null };
+                        }
                     } catch (_) {}
                 }
             }
-            return full;
+            return { content: full, usage, finishReason: null, nativeId: null };
         }
     }
 

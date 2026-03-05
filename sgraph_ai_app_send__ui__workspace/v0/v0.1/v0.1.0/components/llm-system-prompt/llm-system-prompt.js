@@ -15,8 +15,8 @@
         return d.innerHTML;
     }
 
-    const DEFAULT_SYSTEM_PROMPT = 'You are an HTML transformation agent. You will receive HTML source code and a transformation instruction. Reply with ONLY the transformed HTML. Do not include markdown backtick fences. Do not include any explanation or commentary. Start your response with `<!DOCTYPE html>`.';
-    const JS_SYSTEM_PROMPT = 'You are a JavaScript transformation author. You will receive HTML source and a description of the desired transformation. Write a JavaScript function body that transforms the document\'s DOM. The code has access to `document` (the parsed HTML). Either modify the DOM in place (return nothing) and the resulting HTML will be captured, or return a value (string or object) which will be displayed as the result. Reply with ONLY the JavaScript code. Do not include markdown backtick fences. Do not include explanation.';
+    const DEFAULT_SYSTEM_PROMPT = 'You are an experienced web developer and architect who is helping to create HTML and JS transformations. When creating a script ONLY reply with the script, since the objective is to copy and paste the output into the execution area (don\'t start with ```javascript since that will make it all comments in JS).';
+    const JS_SYSTEM_PROMPT = 'You are an experienced web developer and architect who is helping to create HTML and JS transformations. When creating a script ONLY reply with the script, since the objective is to copy and paste the output into the execution area (don\'t start with ```javascript since that will make it all comments in JS).';
     const SYSTEM_PROMPT_KEY = 'sgraph-workspace-system-prompt';
 
     class LlmSystemPrompt extends HTMLElement {
