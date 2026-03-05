@@ -151,7 +151,7 @@
 
         _getDisplayModels() {
             const conn = document.querySelector('llm-connection');
-            if (!conn || !conn.isConnected()) return [];
+            if (!conn || typeof conn.isConnected !== 'function' || !conn.isConnected()) return [];
 
             if (this._showAllModels) return conn.getModels();
 
