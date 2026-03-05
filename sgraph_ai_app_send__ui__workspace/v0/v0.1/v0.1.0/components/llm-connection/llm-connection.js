@@ -118,6 +118,13 @@
         getSelectedModel() { return this._selectedModel; }
         isConnected()      { return this._status === 'connected'; }
 
+        setSelectedModel(modelId) {
+            this._selectedModel = modelId;
+            this._saveSettings();
+            this._updateStatusBar();
+            window.sgraphWorkspace.events.emit('llm-model-changed', { model: modelId });
+        }
+
         // --- Connection --------------------------------------------------------
 
         async _connect() {

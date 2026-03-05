@@ -123,8 +123,9 @@
                 if (this._statusFilter === 'err') {
                     if (entry.status !== 0 && !entry.error) return false;
                 } else {
-                    const range = parseInt(this._statusFilter);
-                    if (entry.status < range || entry.status >= range + 100) return false;
+                    // '2xx' → 200, '4xx' → 400
+                    const range = parseInt(this._statusFilter) * 100;
+                    if (isNaN(range) || entry.status < range || entry.status >= range + 100) return false;
                 }
             }
             if (this._textFilter) {

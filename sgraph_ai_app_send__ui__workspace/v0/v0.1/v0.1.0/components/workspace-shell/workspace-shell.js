@@ -536,6 +536,7 @@
                             </div>
                             <div class="ws-chat-body">
                                 <llm-chat></llm-chat>
+                                <script-editor></script-editor>
                                 <llm-stats></llm-stats>
                             </div>
                         </div>

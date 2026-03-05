@@ -25,6 +25,7 @@
     }
 
     const DEFAULT_SYSTEM_PROMPT = 'You are an HTML transformation agent. You will receive HTML source code and a transformation instruction. Reply with ONLY the transformed HTML. Do not include markdown backtick fences. Do not include any explanation or commentary. Start your response with `<!DOCTYPE html>`.';
+    const JS_SYSTEM_PROMPT = 'You are a JavaScript transformation author. You will receive HTML source and a description of the desired transformation. Write a JavaScript function body that transforms the document\'s DOM. The code has access to `document` (the parsed HTML). Either modify the DOM in place (return nothing) and the resulting HTML will be captured, or return a value (string or object) which will be displayed as the result. Reply with ONLY the JavaScript code. Do not include markdown backtick fences. Do not include explanation.';
     const SYSTEM_PROMPT_KEY = 'sgraph-workspace-system-prompt';
     const STREAM_KEY        = 'sgraph-workspace-llm-streaming';
 
@@ -39,6 +40,7 @@
             this._unsubs        = [];
             this._systemPrompt  = this._loadSystemPrompt();
             this._sysPromptOpen = false;
+            this._vaultPrompts  = [];  // [{ name, folderPath }]
         }
 
         _loadSystemPrompt() {
@@ -85,16 +87,20 @@
             // Listen for file-selected events to intercept prompt files
             const onFileSelected = (data) => this._onFileSelected(data);
 
+            const onVaultOpened = () => this._scanVaultPrompts();
+
             window.sgraphWorkspace.events.on('llm-connected', onConnected);
             window.sgraphWorkspace.events.on('llm-disconnected', onDisconnected);
             window.sgraphWorkspace.events.on('llm-model-changed', onModelChanged);
             window.sgraphWorkspace.events.on('file-selected', onFileSelected);
+            window.sgraphWorkspace.events.on('vault-opened', onVaultOpened);
 
             this._unsubs.push(
                 () => window.sgraphWorkspace.events.off('llm-connected', onConnected),
                 () => window.sgraphWorkspace.events.off('llm-disconnected', onDisconnected),
                 () => window.sgraphWorkspace.events.off('llm-model-changed', onModelChanged),
                 () => window.sgraphWorkspace.events.off('file-selected', onFileSelected),
+                () => window.sgraphWorkspace.events.off('vault-opened', onVaultOpened),
             );
 
             // Check if already connected
@@ -105,12 +111,40 @@
                 this._render();
             }
 
+            // Scan for vault prompts if vault is already open
+            const vaultPanel = document.querySelector('vault-panel');
+            if (vaultPanel && vaultPanel.getState() === 'open') {
+                this._scanVaultPrompts();
+            }
+
             window.sgraphWorkspace.events.emit('llm-chat-ready');
         }
 
         disconnectedCallback() {
             for (const unsub of this._unsubs) unsub();
             if (this._abortCtrl) this._abortCtrl.abort();
+        }
+
+        // --- Vault prompt scanning ------------------------------------------------
+
+        _scanVaultPrompts() {
+            this._vaultPrompts = [];
+            const vaultPanel = document.querySelector('vault-panel');
+            if (!vaultPanel) return;
+            const vault = vaultPanel.getVault();
+            if (!vault) return;
+
+            try {
+                const items = vault.listFolder('/prompts') || [];
+                this._vaultPrompts = items
+                    .filter(i => i.type !== 'folder')
+                    .map(i => ({ name: i.name, folderPath: '/prompts' }));
+            } catch (_) {
+                // /prompts folder may not exist — that's fine
+            }
+
+            // Re-render to update the prompt selector
+            this._render();
         }
 
         // --- Prompt file loading from vault --------------------------------------
@@ -170,17 +204,44 @@
                 return;
             }
 
-            // Get source document content
-            const sourceViewer = document.querySelector('document-viewer[data-role="source"]');
-            const docContent   = sourceViewer ? sourceViewer.getTextContent() : null;
+            // Read prompt composer toggles
+            const incSource = this.querySelector('#lc-inc-source')?.checked ?? true;
+            const incScript = this.querySelector('#lc-inc-script')?.checked ?? false;
+            const incResult = this.querySelector('#lc-inc-result')?.checked ?? false;
+            const genJS     = this.querySelector('#lc-gen-js')?.checked     ?? false;
 
-            // Build the final prompt
+            // Build the final prompt with selected artifacts
             let finalPrompt = userPrompt;
-            if (docContent) {
-                if (finalPrompt.includes('{{document}}')) {
-                    finalPrompt = finalPrompt.replace('{{document}}', docContent);
-                } else {
-                    finalPrompt = finalPrompt + '\n\n---\n\n' + docContent;
+            const attachments = { source: false, script: false, result: false };
+
+            if (incSource) {
+                const sourceViewer = document.querySelector('document-viewer[data-role="source"]');
+                const sourceContent = sourceViewer ? sourceViewer.getTextContent() : null;
+                if (sourceContent) {
+                    if (finalPrompt.includes('{{document}}')) {
+                        finalPrompt = finalPrompt.replace('{{document}}', sourceContent);
+                    } else {
+                        finalPrompt += '\n\n--- SOURCE HTML ---\n\n' + sourceContent;
+                    }
+                    attachments.source = true;
+                }
+            }
+
+            if (incScript) {
+                const scriptEditor = document.querySelector('script-editor');
+                const scriptContent = scriptEditor ? scriptEditor.getScript() : null;
+                if (scriptContent) {
+                    finalPrompt += '\n\n--- TRANSFORMATION SCRIPT ---\n\n' + scriptContent;
+                    attachments.script = true;
+                }
+            }
+
+            if (incResult) {
+                const transformViewer = document.querySelector('document-viewer[data-role="transform"]');
+                const resultContent = transformViewer ? transformViewer.getTextContent() : null;
+                if (resultContent) {
+                    finalPrompt += '\n\n--- RESULT ---\n\n' + resultContent;
+                    attachments.result = true;
                 }
             }
 
@@ -199,54 +260,84 @@
             this._abortCtrl = new AbortController();
             this._updateUI();
 
+            const startTime = Date.now();
             const modeLabel = streaming ? 'streaming' : 'non-streaming';
             window.sgraphWorkspace.messages.info(`Sending to ${model} (${modeLabel})...`);
             window.sgraphWorkspace.events.emit('llm-request-start', { model, provider, streaming });
 
             const transformViewer = document.querySelector('document-viewer[data-role="transform"]');
-            const systemPrompt = this._systemPrompt ? this._systemPrompt.trim() : '';
+            // Use JS system prompt when Generate JS is checked, otherwise user's system prompt
+            const systemPrompt = genJS
+                ? JS_SYSTEM_PROMPT
+                : (this._systemPrompt ? this._systemPrompt.trim() : '');
+            const sourceViewer = document.querySelector('document-viewer[data-role="source"]');
+            const ext = genJS ? 'js' : (sourceViewer?.getFilename()?.split('.').pop() || 'md');
 
             try {
                 let result;
 
+                if (streaming && transformViewer) {
+                    transformViewer.startStreaming(`transform.${ext}`);
+                }
+
+                const onChunk = streaming && transformViewer
+                    ? (chunk) => transformViewer.appendStreamChunk(chunk)
+                    : null;
+
                 if (provider === 'openrouter') {
                     if (streaming) {
-                        let accumulated = '';
-                        result = { content: await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, (chunk) => {
-                            accumulated += chunk;
-                            if (transformViewer) {
-                                const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                                transformViewer.loadText(accumulated, `transform.${ext}`);
-                            }
-                        }) };
+                        result = { content: await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, onChunk) };
                     } else {
                         result = await this._callOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt);
-                        if (transformViewer) {
-                            const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                            transformViewer.loadText(result.content, `transform.${ext}`);
-                        }
                     }
                 } else if (provider === 'ollama') {
                     if (streaming) {
-                        let accumulated = '';
-                        result = { content: await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, (chunk) => {
-                            accumulated += chunk;
-                            if (transformViewer) {
-                                const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                                transformViewer.loadText(accumulated, `transform.${ext}`);
-                            }
-                        }) };
+                        result = { content: await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, onChunk) };
                     } else {
                         result = await this._callOllama(baseUrl, model, finalPrompt, systemPrompt);
-                        if (transformViewer) {
-                            const ext = sourceViewer?.getFilename()?.split('.').pop() || 'md';
-                            transformViewer.loadText(result.content, `transform.${ext}`);
-                        }
+                    }
+                }
+
+                // Final render with full content
+                if (transformViewer) {
+                    if (streaming) {
+                        transformViewer.endStreaming();
+                    } else {
+                        transformViewer.loadText(result?.content || '', `transform.${ext}`);
                     }
                 }
 
                 const content = result?.content || '';
-                window.sgraphWorkspace.messages.success(`Response complete — ${content.length} chars`);
+                const latencyMs = Date.now() - startTime;
+
+                // If Generate JS mode, extract code and send to script editor
+                if (genJS && content) {
+                    const jsCode = this._extractJS(content);
+                    window.sgraphWorkspace.events.emit('llm-response-js', {
+                        code: jsCode, filename: 'transform.js'
+                    });
+                }
+
+                // Save execution history
+                if (window.sgraphWorkspace.execHistory) {
+                    window.sgraphWorkspace.execHistory.save({
+                        prompt:       userPrompt,
+                        systemPrompt: systemPrompt,
+                        response:     content,
+                        model:        model,
+                        provider:     provider,
+                        tokens: {
+                            prompt:     result?.promptTokens     || null,
+                            completion: result?.completionTokens || null,
+                            total:      result?.totalTokens      || null,
+                        },
+                        latencyMs:    latencyMs,
+                        attachments:  attachments,
+                        responseType: genJS ? 'js' : ext,
+                    });
+                }
+
+                window.sgraphWorkspace.messages.success(`Response complete — ${content.length} chars (${latencyMs}ms)`);
                 window.sgraphWorkspace.events.emit('llm-request-complete', {
                     model, provider, length: content.length, streaming,
                     promptTokens:     result?.promptTokens     || null,
@@ -451,6 +542,16 @@
             }
         }
 
+        // --- Extract JS from LLM response (strips markdown fences if present) ---
+
+        _extractJS(content) {
+            // Try to extract from ```javascript ... ``` or ```js ... ``` fences
+            const fenceMatch = content.match(/```(?:javascript|js)?\s*\n([\s\S]*?)```/);
+            if (fenceMatch) return fenceMatch[1].trim();
+            // If no fences, return as-is (LLM followed instructions)
+            return content.trim();
+        }
+
         // --- UI update (enable/disable during send) -----------------------------
 
         _updateUI() {
@@ -503,7 +604,7 @@
                     </div>
                 </div>` : ''}
 
-                <!-- Model selector -->
+                <!-- Model + prompt selector -->
                 <div class="lcc-top-bar">
                     <select class="lcc-model-select" id="lc-model-inline" ${!isConnected ? 'disabled' : ''}>
                         ${!isConnected
@@ -512,7 +613,24 @@
                                 `<option value="${esc(m.id)}" ${m.id === selectedModel ? 'selected' : ''}>${esc(m.name)}</option>`
                               ).join('')}
                     </select>
-                    <span class="lcc-prompt-hint">Load prompts from vault /prompts/ folder</span>
+                    ${this._vaultPrompts.length > 0 ? `
+                        <select class="lcc-prompt-select" id="lc-prompt-select">
+                            <option value="">— Load prompt —</option>
+                            ${this._vaultPrompts.map(p =>
+                                `<option value="${esc(p.name)}">${esc(p.name)}</option>`
+                            ).join('')}
+                        </select>
+                    ` : `<span class="lcc-prompt-hint">Prompts: open vault with /prompts/ folder</span>`}
+                </div>
+
+                <!-- Prompt composer: artifact toggles + Generate JS mode -->
+                <div class="lcc-composer-row">
+                    <span class="lcc-composer-label">Include:</span>
+                    <label class="lcc-toggle"><input type="checkbox" id="lc-inc-source" checked> Source</label>
+                    <label class="lcc-toggle"><input type="checkbox" id="lc-inc-script"> Script</label>
+                    <label class="lcc-toggle"><input type="checkbox" id="lc-inc-result"> Result</label>
+                    <span class="lcc-mode-sep">|</span>
+                    <label class="lcc-toggle lcc-toggle--accent"><input type="checkbox" id="lc-gen-js"> Generate JS</label>
                 </div>
 
                 <!-- Prompt input + actions -->
@@ -577,16 +695,25 @@
                 });
             }
 
+            // Prompt selector from vault
+            const promptSelect = this.querySelector('#lc-prompt-select');
+            if (promptSelect) {
+                promptSelect.addEventListener('change', () => {
+                    const name = promptSelect.value;
+                    if (!name) return;
+                    promptSelect.value = ''; // reset dropdown
+                    // Trigger file-selected for the prompt, same as clicking in vault
+                    this._onFileSelected({ name, folderPath: '/prompts' });
+                });
+            }
+
             // Inline model selector
             const modelSelect = this.querySelector('#lc-model-inline');
             if (modelSelect) {
                 modelSelect.addEventListener('change', () => {
                     const conn = document.querySelector('llm-connection');
-                    if (conn) {
-                        conn._selectedModel = modelSelect.value;
-                        conn._saveSettings();
-                        conn._updateStatusBar();
-                        window.sgraphWorkspace.events.emit('llm-model-changed', { model: modelSelect.value });
+                    if (conn && typeof conn.setSelectedModel === 'function') {
+                        conn.setSelectedModel(modelSelect.value);
                     }
                 });
             }
@@ -652,6 +779,38 @@
                 .lcc-prompt-hint {
                     font-size: 0.625rem; color: var(--ws-text-muted, #5a6478);
                     font-style: italic;
+                }
+                .lcc-prompt-select {
+                    padding: 0.25rem 0.5rem; font-size: 0.75rem;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-secondary, #8892A0);
+                    border: 1px solid var(--ws-border, #2C3E6B);
+                    border-radius: var(--ws-radius, 6px);
+                    outline: none; font-family: inherit;
+                    max-width: 200px;
+                }
+
+                .lcc-composer-row {
+                    display: flex; align-items: center; gap: 0.5rem;
+                    flex-shrink: 0; padding: 0.125rem 0;
+                }
+                .lcc-composer-label {
+                    font-size: 0.625rem; font-weight: 600;
+                    color: var(--ws-text-muted, #5a6478);
+                    text-transform: uppercase; letter-spacing: 0.05em;
+                }
+                .lcc-toggle {
+                    display: flex; align-items: center; gap: 0.25rem;
+                    font-size: 0.6875rem; color: var(--ws-text-secondary, #8892A0);
+                    cursor: pointer; user-select: none;
+                }
+                .lcc-toggle input[type="checkbox"] {
+                    accent-color: var(--ws-primary, #4ECDC4);
+                    margin: 0; cursor: pointer;
+                }
+                .lcc-toggle--accent { color: var(--ws-primary, #4ECDC4); font-weight: 600; }
+                .lcc-mode-sep {
+                    color: var(--ws-border, #2C3E6B); font-size: 0.75rem;
                 }
 
                 .lcc-input-row {

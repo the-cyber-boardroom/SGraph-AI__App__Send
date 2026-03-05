@@ -84,6 +84,7 @@
             this._textContent = text;
             this._content     = new TextEncoder().encode(text);
             this._filename    = filename || 'output.md';
+            this._streaming   = false;
             this._detectType();
             this._version++;
             this._renderContent();
@@ -91,6 +92,62 @@
             window.sgraphWorkspace.events.emit('document-loaded', {
                 role: this._role, filename: this._filename, type: this._renderType
             });
+        }
+
+        /** Start streaming mode — sets up the viewer for incremental text updates */
+        startStreaming(filename) {
+            this._textContent = '';
+            this._content     = new Uint8Array(0);
+            this._filename    = filename || 'output.md';
+            this._streaming   = true;
+            this._detectType();
+            this._version++;
+            this._renderContent();
+        }
+
+        /** Append a chunk during streaming — updates text without full DOM rebuild */
+        appendStreamChunk(chunk) {
+            if (!this._streaming) return;
+            this._textContent = (this._textContent || '') + chunk;
+            this._content     = new TextEncoder().encode(this._textContent);
+
+            // Update the visible content incrementally based on render type
+            const body = this.querySelector('.dv-body');
+            if (!body) return;
+
+            if (this._mode === 'source' || this._mode === 'edit') {
+                // In source/edit mode, update the pre/textarea content
+                const pre = body.querySelector('.dv-pre code, .dv-pre');
+                if (pre) pre.textContent = this._textContent;
+                const editor = body.querySelector('.dv-editor');
+                if (editor) editor.value = this._textContent;
+            } else if (this._renderType === 'markdown') {
+                const md = body.querySelector('.dv-markdown');
+                if (md) {
+                    md.innerHTML = typeof MarkdownParser !== 'undefined'
+                        ? MarkdownParser.parse(this._textContent)
+                        : `<pre>${esc(this._textContent)}</pre>`;
+                }
+            } else if (this._renderType === 'html') {
+                // For HTML, show as code during streaming (iframe per-chunk is too expensive)
+                const pre = body.querySelector('.dv-pre code');
+                if (pre) pre.textContent = this._textContent;
+            } else {
+                // text, code — update pre content
+                const pre = body.querySelector('.dv-pre');
+                if (pre) pre.textContent = this._textContent;
+            }
+
+            // Update file size in toolbar
+            const sizeEl = this.querySelector('.dv-filesize');
+            if (sizeEl) sizeEl.textContent = formatSize(this._content.byteLength);
+        }
+
+        /** End streaming mode — do a final full render to ensure correct display */
+        endStreaming() {
+            this._streaming = false;
+            this._version++;
+            this._renderContent();
         }
 
         /** Load raw bytes (used by vault decryption pipeline) */
@@ -383,7 +440,7 @@
                         body = `<div class="dv-text"><pre class="dv-pre">${esc(this._textContent || '')}</pre></div>`;
                         break;
                     case 'html':
-                        body = this._renderHtml();
+                        body = this._streaming ? this._renderCode('html') : this._renderHtml();
                         break;
                     case 'image':
                         body = this._renderImage();
