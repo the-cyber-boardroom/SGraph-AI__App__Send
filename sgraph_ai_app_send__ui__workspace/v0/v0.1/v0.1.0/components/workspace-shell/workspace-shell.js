@@ -691,6 +691,7 @@
                             <button class="ws-debug-tab ws-debug-tab--active" data-tab="messages">Msgs</button>
                             <button class="ws-debug-tab" data-tab="events">Events</button>
                             <button class="ws-debug-tab" data-tab="api">API</button>
+                            <button class="ws-debug-tab" data-tab="llm">LLM</button>
                         </div>
                         <div class="ws-debug-content">
                             <div class="ws-debug-panel" data-panel="messages">
@@ -701,6 +702,9 @@
                             </div>
                             <div class="ws-debug-panel" data-panel="api" style="display:none">
                                 <api-logger></api-logger>
+                            </div>
+                            <div class="ws-debug-panel" data-panel="llm" style="display:none">
+                                <llm-debug></llm-debug>
                             </div>
                         </div>
                     </aside>

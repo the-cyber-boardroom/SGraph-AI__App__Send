@@ -118,6 +118,12 @@
                 const txt = rv ? rv.getTextContent() : null;
                 parts.push({ label: 'Result', text: txt ? this._truncate(txt, 120) : '(empty)' });
             }
+            if (flags.incConsole) {
+                const se = document.querySelector('script-editor');
+                const logs = se ? se._consoleLogs : [];
+                const txt = (logs || []).map(l => l.args).join('\n');
+                parts.push({ label: 'Console', text: txt ? this._truncate(txt, 120) : '(empty)' });
+            }
 
             if (parts.length === 0) {
                 preview.innerHTML = '<span class="lsp-preview-empty">No context will be appended</span>';
