@@ -62,9 +62,16 @@
             this._role = this.dataset.role || 'viewer';
             this._renderEmpty();
 
-            // Only the 'source' viewer auto-loads files from the vault
+            // Source viewer: auto-loads non-.js, non-data files from vault
             if (this._role === 'source') {
                 const handler = (data) => this._onFileSelected(data);
+                window.sgraphWorkspace.events.on('file-selected', handler);
+                this._unsub = () => window.sgraphWorkspace.events.off('file-selected', handler);
+            }
+
+            // Data viewer: auto-loads data files (.json, .csv, .xml, .yaml) from vault
+            if (this._role === 'data') {
+                const handler = (data) => this._onDataFileSelected(data);
                 window.sgraphWorkspace.events.on('file-selected', handler);
                 this._unsub = () => window.sgraphWorkspace.events.off('file-selected', handler);
             }
@@ -301,11 +308,53 @@
             }
         }
 
+        // --- Data file extensions (loaded in data viewer, not source) -----------
+
+        static get DATA_EXTS() {
+            return ['json', 'csv', 'xml', 'yaml', 'yml', 'tsv', 'ndjson', 'jsonl'];
+        }
+
+        _isDataFile(name) {
+            if (!name) return false;
+            const ext = name.split('.').pop().toLowerCase();
+            return DocumentViewer.DATA_EXTS.includes(ext);
+        }
+
+        // --- Event handler: file-selected for data viewer ----------------------
+
+        async _onDataFileSelected(data) {
+            if (!data.name || !this._isDataFile(data.name)) return;
+            if (this._loading) return;
+            this._loading = true;
+            this._filename = data.name;
+            this._renderLoading(data.name);
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Loading ' + data.name + '...' });
+
+            try {
+                const vaultPanel = document.querySelector('vault-panel');
+                if (!vaultPanel) throw new Error('Vault panel not found');
+                const vault = vaultPanel.getVault();
+                if (!vault) throw new Error('Vault is not open');
+                const plaintext = await vault.getFile(data.folderPath, data.name);
+                this.loadBytes(new Uint8Array(plaintext), data.name, data.type);
+                window.sgraphWorkspace.messages.success('"' + data.name + '" loaded in Data panel');
+            } catch (e) {
+                console.error('[document-viewer] Failed to load data file:', e);
+                this._renderError(data.name, e.message);
+                window.sgraphWorkspace.messages.error('Failed to load "' + data.name + '": ' + e.message);
+            }
+
+            this._loading = false;
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
         // --- Event handler: file-selected from vault-panel ---------------------
 
         async _onFileSelected(data) {
             // Skip .js files — those go to the script editor, not source viewer
             if (data.name && data.name.endsWith('.js')) return;
+            // Skip data files — those go to the data viewer
+            if (this._isDataFile(data.name)) return;
 
             if (this._loading) return;
             this._loading = true;
@@ -357,14 +406,16 @@
         // --- Render: States ----------------------------------------------------
 
         _renderEmpty() {
+            const icon = this._role === 'source' ? '&#128196;'
+                       : this._role === 'data'   ? '&#128202;'
+                       : '&#10024;';
+            const msg  = this._role === 'source' ? 'Select a file from the vault<br>to load it here.'
+                       : this._role === 'data'   ? 'Data files (.json, .csv, .xml)<br>will appear here.'
+                       : 'Transformation output<br>will appear here.';
             this.innerHTML = `
                 <div class="dv-empty">
-                    <div class="dv-empty-icon">
-                        ${this._role === 'source' ? '&#128196;' : '&#10024;'}
-                    </div>
-                    ${this._role === 'source'
-                        ? 'Select a file from the vault<br>to load it here.'
-                        : 'Transformation output<br>will appear here.'}
+                    <div class="dv-empty-icon">${icon}</div>
+                    ${msg}
                 </div>
                 <style>${DocumentViewer.styles}</style>`;
         }

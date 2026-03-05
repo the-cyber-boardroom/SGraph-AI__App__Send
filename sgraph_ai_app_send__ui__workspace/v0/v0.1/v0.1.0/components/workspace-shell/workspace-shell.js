@@ -66,6 +66,7 @@
             this._setupVaultResize();
             this._setupColResize();
             this._setupRowResize();
+            this._setupSourceSplit();
             this._setupMessageBadge();
             this._setupActivityIndicator();
 
@@ -85,6 +86,7 @@
             if (this._vaultResizeCleanup) this._vaultResizeCleanup();
             if (this._colResizeCleanup) this._colResizeCleanup();
             if (this._rowResizeCleanup) this._rowResizeCleanup();
+            if (this._sourceSplitCleanup) this._sourceSplitCleanup();
             if (this._badgeUnsub) this._badgeUnsub();
             if (this._activityUnsub) this._activityUnsub();
         }
@@ -501,6 +503,54 @@
             };
         }
 
+        // --- Source Split Resize (between HTML and Data) ---------------------------
+
+        _setupSourceSplit() {
+            const handle  = this.querySelector('.ws-source-split-handle');
+            const topEl   = this.querySelector('.ws-source-top');
+            const bottomEl = this.querySelector('.ws-source-bottom');
+            if (!handle || !topEl || !bottomEl) return;
+
+            let isResizing = false;
+            let startY, startTopH, totalH;
+
+            const onMouseDown = (e) => {
+                isResizing = true;
+                startY     = e.clientY;
+                startTopH  = topEl.offsetHeight;
+                totalH     = topEl.offsetHeight + bottomEl.offsetHeight;
+                handle.classList.add('ws-source-split-handle--active');
+                document.body.style.cursor     = 'row-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            };
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff   = e.clientY - startY;
+                const newTop = Math.max(40, Math.min(startTopH + diff, totalH - 40));
+                topEl.style.flex    = String(newTop / totalH);
+                bottomEl.style.flex = String((totalH - newTop) / totalH);
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('ws-source-split-handle--active');
+                document.body.style.cursor     = '';
+                document.body.style.userSelect = '';
+            };
+
+            handle.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            this._sourceSplitCleanup = () => {
+                handle.removeEventListener('mousedown', onMouseDown);
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+        }
+
         // --- Status Bar ---------------------------------------------------------
 
         _updateStatusBar() {
@@ -573,11 +623,22 @@
                     <!-- Main content: 3-column JSFiddle-style layout -->
                     <div class="ws-transform-area">
                         <div class="ws-source-zone">
-                            <div class="ws-panel-header">
-                                <span class="ws-panel-label">Source</span>
+                            <div class="ws-source-top">
+                                <div class="ws-panel-header">
+                                    <span class="ws-panel-label">Source (HTML)</span>
+                                </div>
+                                <div class="ws-panel-content">
+                                    <document-viewer data-role="source"></document-viewer>
+                                </div>
                             </div>
-                            <div class="ws-panel-content">
-                                <document-viewer data-role="source"></document-viewer>
+                            <div class="ws-source-split-handle" title="Drag to resize"></div>
+                            <div class="ws-source-bottom">
+                                <div class="ws-panel-header">
+                                    <span class="ws-panel-label">Data</span>
+                                </div>
+                                <div class="ws-panel-content">
+                                    <document-viewer data-role="data"></document-viewer>
+                                </div>
                             </div>
                         </div>
                         <div class="ws-col-resize" title="Drag to resize"></div>
@@ -604,10 +665,13 @@
                                 <span class="ws-chat-label">Chat</span>
                             </div>
                             <div class="ws-chat-body">
-                                <llm-chat></llm-chat>
+                                <llm-system-prompt></llm-system-prompt>
+                                <llm-prompt-input></llm-prompt-input>
+                                <llm-output></llm-output>
                                 <llm-stats></llm-stats>
                             </div>
                         </div>
+                        <llm-orchestrator style="display:none"></llm-orchestrator>
                     </div>
 
                     <!-- Settings view (hidden by default) -->

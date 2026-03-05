@@ -322,6 +322,25 @@ html, body {
     background: var(--ws-bg);
 }
 
+/* Source split (HTML top + Data bottom) */
+.ws-source-top,
+.ws-source-bottom {
+    flex: 0.5;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.ws-source-split-handle {
+    height: 4px; flex-shrink: 0;
+    cursor: row-resize;
+    background: var(--ws-border-subtle, #222d4d);
+    transition: background 0.15s;
+}
+.ws-source-split-handle:hover,
+.ws-source-split-handle--active { background: var(--ws-primary); }
+
 /* Second column resize handle */
 .ws-col-resize2 {
     cursor: col-resize;
@@ -372,12 +391,18 @@ script-editor {
     overflow: hidden;
 }
 
-llm-chat {
+llm-system-prompt,
+llm-prompt-input,
+llm-output {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
     overflow: hidden;
+}
+
+llm-orchestrator {
+    display: none;
 }
 
 vault-panel {
@@ -549,6 +574,16 @@ llm-stats {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.3; transform: scale(0.75); }
 }
+
+/* --- JS Syntax Highlighting ----------------------------------------------- */
+
+.jsh-keyword     { color: #c678dd; }
+.jsh-string      { color: #98c379; }
+.jsh-number      { color: #d19a66; }
+.jsh-comment     { color: #5c6370; font-style: italic; }
+.jsh-builtin     { color: #e5c07b; }
+.jsh-operator    { color: #56b6c2; }
+.jsh-punctuation { color: #abb2bf; }
 
 /* --- Responsive ----------------------------------------------------------- */
 
