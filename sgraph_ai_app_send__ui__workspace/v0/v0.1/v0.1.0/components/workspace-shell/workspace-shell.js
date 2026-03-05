@@ -344,53 +344,80 @@
             };
         }
 
-        // --- Column Resize (between source and transform) -------------------------
+        // --- Column Resize (3-column: source | script | result) --------------------
 
         _setupColResize() {
-            const handle = this.querySelector('.ws-col-resize');
-            const area   = this.querySelector('.ws-transform-area');
-            if (!handle || !area) return;
+            const area = this.querySelector('.ws-transform-area');
+            if (!area) return;
 
-            let isResizing = false;
-            let startX, startLeftWidth, totalWidth;
+            // Helper to set up a generic column drag handle
+            const setupHandle = (selector, activeClass, getZones) => {
+                const handle = this.querySelector(selector);
+                if (!handle) return null;
 
-            const onMouseDown = (e) => {
-                isResizing = true;
-                startX = e.clientX;
-                const source = this.querySelector('.ws-source-zone');
-                startLeftWidth = source ? source.offsetWidth : area.offsetWidth / 2;
-                totalWidth = area.offsetWidth - 4; // minus handle width
-                handle.classList.add('ws-col-resize--active');
-                document.body.style.cursor = 'col-resize';
-                document.body.style.userSelect = 'none';
-                e.preventDefault();
+                let isResizing = false;
+                let startX, zones, totalW;
+
+                const onMouseDown = (e) => {
+                    isResizing = true;
+                    startX = e.clientX;
+                    zones  = getZones();
+                    totalW = area.offsetWidth - 8; // minus both 4px handles
+                    handle.classList.add(activeClass);
+                    document.body.style.cursor = 'col-resize';
+                    document.body.style.userSelect = 'none';
+                    e.preventDefault();
+                };
+
+                const onMouseMove = (e) => {
+                    if (!isResizing) return;
+                    const diff = e.clientX - startX;
+                    const sourceZ  = this.querySelector('.ws-source-zone');
+                    const scriptZ  = this.querySelector('.ws-script-zone');
+                    const resultZ  = this.querySelector('.ws-transform-zone');
+                    if (!sourceZ || !scriptZ || !resultZ) return;
+
+                    let sw = zones.sourceW, scw = zones.scriptW, rw = zones.resultW;
+                    if (selector === '.ws-col-resize') {
+                        // Dragging between source and script
+                        sw  = Math.max(zones.sourceW + diff, 80);
+                        scw = Math.max(zones.scriptW - diff, 80);
+                    } else {
+                        // Dragging between script and result
+                        scw = Math.max(zones.scriptW + diff, 80);
+                        rw  = Math.max(zones.resultW - diff, 80);
+                    }
+                    const total = sw + scw + rw;
+                    area.style.gridTemplateColumns = `${sw/total}fr 4px ${scw/total}fr 4px ${rw/total}fr`;
+                };
+
+                const onMouseUp = () => {
+                    if (!isResizing) return;
+                    isResizing = false;
+                    handle.classList.remove(activeClass);
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                };
+
+                handle.addEventListener('mousedown', onMouseDown);
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                return () => {
+                    handle.removeEventListener('mousedown', onMouseDown);
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
             };
 
-            const onMouseMove = (e) => {
-                if (!isResizing) return;
-                const diff = e.clientX - startX;
-                const newLeft = Math.min(Math.max(startLeftWidth + diff, 100), totalWidth - 100);
-                const leftFr  = newLeft / totalWidth;
-                const rightFr = 1 - leftFr;
-                area.style.gridTemplateColumns = `${leftFr}fr 4px ${rightFr}fr`;
-            };
+            const getZones = () => ({
+                sourceW: (this.querySelector('.ws-source-zone')?.offsetWidth) || 100,
+                scriptW: (this.querySelector('.ws-script-zone')?.offsetWidth) || 100,
+                resultW: (this.querySelector('.ws-transform-zone')?.offsetWidth) || 100,
+            });
 
-            const onMouseUp = () => {
-                if (!isResizing) return;
-                isResizing = false;
-                handle.classList.remove('ws-col-resize--active');
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-            };
-
-            handle.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-            this._colResizeCleanup = () => {
-                handle.removeEventListener('mousedown', onMouseDown);
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-            };
+            const c1 = setupHandle('.ws-col-resize', 'ws-col-resize--active', getZones);
+            const c2 = setupHandle('.ws-col-resize2', 'ws-col-resize2--active', getZones);
+            this._colResizeCleanup = () => { if (c1) c1(); if (c2) c2(); };
         }
 
         // --- Row Resize (between panels and chat) ---------------------------------
@@ -510,7 +537,7 @@
                     <!-- Vault resize handle -->
                     <div class="ws-vault-resize" title="Drag to resize vault"></div>
 
-                    <!-- Main content: transform view (default) -->
+                    <!-- Main content: 3-column JSFiddle-style layout -->
                     <div class="ws-transform-area">
                         <div class="ws-source-zone">
                             <div class="ws-panel-header">
@@ -521,9 +548,18 @@
                             </div>
                         </div>
                         <div class="ws-col-resize" title="Drag to resize"></div>
+                        <div class="ws-script-zone">
+                            <div class="ws-panel-header">
+                                <span class="ws-panel-label">Script</span>
+                            </div>
+                            <div class="ws-panel-content">
+                                <script-editor></script-editor>
+                            </div>
+                        </div>
+                        <div class="ws-col-resize2" title="Drag to resize"></div>
                         <div class="ws-transform-zone">
                             <div class="ws-panel-header">
-                                <span class="ws-panel-label">Transformation</span>
+                                <span class="ws-panel-label">Result</span>
                             </div>
                             <div class="ws-panel-content">
                                 <document-viewer data-role="transform"></document-viewer>
@@ -536,7 +572,6 @@
                             </div>
                             <div class="ws-chat-body">
                                 <llm-chat></llm-chat>
-                                <script-editor></script-editor>
                                 <llm-stats></llm-stats>
                             </div>
                         </div>

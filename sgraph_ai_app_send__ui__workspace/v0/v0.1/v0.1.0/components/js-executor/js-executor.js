@@ -1,16 +1,17 @@
 /* =============================================================================
    SGraph Workspace — JS Executor
-   v0.1.0 — Sandboxed JavaScript execution against HTML
+   v0.2.0 — Sandboxed JavaScript execution with console capture
 
    Executes user-provided JavaScript against source HTML in a sandboxed iframe.
    The iframe uses sandbox="allow-scripts" (no allow-same-origin) so the
    script cannot access the parent's DOM, localStorage, or cookies.
 
-   Communication is via postMessage only.
+   Console.log/warn/error calls inside the script are intercepted and sent
+   back alongside the result via postMessage.
 
    Usage:
      const result = await window.sgraphWorkspace.executeJS(sourceHtml, userScript);
-     // result = { data: '...', resultType: 'html'|'json', error: null }
+     // result = { data, resultType, error, consoleLogs: [{level, args}] }
    ============================================================================= */
 
 (function() {
@@ -18,19 +19,6 @@
 
     const DEFAULT_TIMEOUT = 10000;
 
-    /**
-     * Execute JavaScript against HTML source in a sandboxed iframe.
-     *
-     * The user script has access to `document` (the parsed source HTML DOM).
-     * It can either:
-     *   - Modify the DOM in place (return nothing) → result is document.documentElement.outerHTML
-     *   - Return a value (string, object, array) → result is that value (stringified if needed)
-     *
-     * @param {string} sourceHtml  - The HTML to load into the iframe
-     * @param {string} userScript  - The JavaScript to execute
-     * @param {number} [timeoutMs] - Timeout in ms (default 10000)
-     * @returns {Promise<{data: string, resultType: string, error: string|null}>}
-     */
     function executeJS(sourceHtml, userScript, timeoutMs) {
         const timeout = timeoutMs || DEFAULT_TIMEOUT;
 
@@ -39,6 +27,7 @@
             let blobUrl = null;
             let timer   = null;
             let settled = false;
+            const consoleLogs = [];
 
             function cleanup() {
                 if (timer) clearTimeout(timer);
@@ -51,18 +40,18 @@
                 if (settled) return;
                 settled = true;
                 cleanup();
+                result.consoleLogs = consoleLogs;
                 resolve(result);
             }
 
             function onMessage(e) {
-                // Only accept messages from our iframe
                 if (!iframe || !iframe.contentWindow) return;
-                // In sandbox="allow-scripts" (no same-origin), e.source may not match
-                // so we check by message type instead
                 const msg = e.data;
                 if (!msg || typeof msg !== 'object') return;
 
-                if (msg.type === 'js-exec-result') {
+                if (msg.type === 'js-exec-console') {
+                    consoleLogs.push({ level: msg.level || 'log', args: msg.args || '' });
+                } else if (msg.type === 'js-exec-result') {
                     settle({
                         data:       msg.data       || '',
                         resultType: msg.resultType || 'html',
@@ -79,7 +68,6 @@
 
             window.addEventListener('message', onMessage);
 
-            // Timeout
             timer = setTimeout(() => {
                 settle({
                     data:       null,
@@ -88,15 +76,10 @@
                 });
             }, timeout);
 
-            // Build the iframe document
-            // We inject the source HTML body content and wrap the user script
             const iframeDoc = buildIframeDocument(sourceHtml, userScript);
-
-            // Create blob URL
             const blob = new Blob([iframeDoc], { type: 'text/html' });
             blobUrl = URL.createObjectURL(blob);
 
-            // Create hidden iframe
             iframe = document.createElement('iframe');
             iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:none;';
             iframe.sandbox = 'allow-scripts';
@@ -106,12 +89,7 @@
         });
     }
 
-    /**
-     * Build the HTML document to load into the iframe.
-     * The user script runs after the DOM is ready.
-     */
     function buildIframeDocument(sourceHtml, userScript) {
-        // Escape closing script tags in user code to prevent breaking out
         const safeScript = userScript.replace(/<\/script>/gi, '<\\/script>');
 
         return `<!DOCTYPE html>
@@ -121,6 +99,23 @@
 ${sourceHtml}
 <script>
 (function() {
+    // Intercept console methods and send to parent
+    var __logs = [];
+    function __capture(level, args) {
+        var msg = Array.prototype.slice.call(args).map(function(a) {
+            if (typeof a === 'object') try { return JSON.stringify(a); } catch(_) {}
+            return String(a);
+        }).join(' ');
+        __logs.push({ level: level, args: msg });
+        parent.postMessage({ type: 'js-exec-console', level: level, args: msg }, '*');
+    }
+    var _origLog   = console.log;
+    var _origWarn  = console.warn;
+    var _origError = console.error;
+    console.log   = function() { __capture('log',   arguments); _origLog.apply(console, arguments); };
+    console.warn  = function() { __capture('warn',  arguments); _origWarn.apply(console, arguments); };
+    console.error = function() { __capture('error', arguments); _origError.apply(console, arguments); };
+
     try {
         var __result = (function() { ${safeScript} })();
 
@@ -150,7 +145,6 @@ ${sourceHtml}
 </html>`;
     }
 
-    // Register on global namespace
     window.sgraphWorkspace = window.sgraphWorkspace || {};
     window.sgraphWorkspace.executeJS = executeJS;
 
