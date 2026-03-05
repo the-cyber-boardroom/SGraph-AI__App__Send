@@ -67,6 +67,7 @@
             this._setupColResize();
             this._setupRowResize();
             this._setupMessageBadge();
+            this._setupActivityIndicator();
 
             this._applyDebugWidth();
             this._updateDebugSidebar();
@@ -85,6 +86,7 @@
             if (this._colResizeCleanup) this._colResizeCleanup();
             if (this._rowResizeCleanup) this._rowResizeCleanup();
             if (this._badgeUnsub) this._badgeUnsub();
+            if (this._activityUnsub) this._activityUnsub();
         }
 
         // --- View Navigation (left nav) ----------------------------------------
@@ -203,6 +205,37 @@
                 window.sgraphWorkspace.events.off('messages-cleared', onMsg);
             };
             update();
+        }
+
+        // --- Activity Indicator --------------------------------------------------
+
+        _setupActivityIndicator() {
+            const el   = this.querySelector('.ws-activity');
+            const text = this.querySelector('.ws-activity-text');
+            if (!el || !text) return;
+
+            let activeCount = 0;
+
+            const onStart = (data) => {
+                activeCount++;
+                text.textContent = (data && data.label) || 'Working...';
+                el.classList.add('ws-activity--active');
+            };
+
+            const onEnd = () => {
+                activeCount = Math.max(0, activeCount - 1);
+                if (activeCount === 0) {
+                    el.classList.remove('ws-activity--active');
+                    text.textContent = '';
+                }
+            };
+
+            window.sgraphWorkspace.events.on('activity-start', onStart);
+            window.sgraphWorkspace.events.on('activity-end', onEnd);
+            this._activityUnsub = () => {
+                window.sgraphWorkspace.events.off('activity-start', onStart);
+                window.sgraphWorkspace.events.off('activity-end', onEnd);
+            };
         }
 
         // --- Listeners ----------------------------------------------------------
@@ -612,6 +645,7 @@
                     <footer class="ws-statusbar">
                         <span class="ws-status-view">View: Document Transform</span>
                         <span class="ws-status-model">Model: not connected</span>
+                        <span class="ws-activity"><span class="ws-activity-dot"></span><span class="ws-activity-text"></span></span>
                         <span class="ws-status-spacer"></span>
                         <button class="ws-msg-badge" title="Messages" style="display:none">0</button>
                     </footer>
