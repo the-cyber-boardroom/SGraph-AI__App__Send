@@ -276,20 +276,22 @@ html, body {
 .ws-transform-area {
     grid-area: main;
     display: grid;
-    grid-template-columns: 1fr 4px 1fr;
+    grid-template-columns: 1fr 4px 1fr 4px 1fr;
     grid-template-rows: minmax(0, 1fr) 4px var(--ws-chat-height);
     grid-template-areas:
-        "source   col-resize transform"
-        "row-resize row-resize row-resize"
-        "chat     chat       chat";
+        "source   col-resize script  col-resize2  transform"
+        "row-resize row-resize row-resize row-resize row-resize"
+        "chat     chat       chat    chat          chat";
     overflow: hidden;
 }
 
-.ws-source-zone    { grid-area: source; }
-.ws-col-resize     { grid-area: col-resize; }
-.ws-transform-zone { grid-area: transform; }
-.ws-row-resize     { grid-area: row-resize; }
-.ws-chat-zone      { grid-area: chat; }
+.ws-source-zone     { grid-area: source; }
+.ws-col-resize      { grid-area: col-resize; }
+.ws-script-zone     { grid-area: script; }
+.ws-col-resize2     { grid-area: col-resize2; }
+.ws-transform-zone  { grid-area: transform; }
+.ws-row-resize      { grid-area: row-resize; }
+.ws-chat-zone       { grid-area: chat; }
 
 /* Column resize handle (between source and transform) */
 .ws-col-resize {
@@ -312,12 +314,23 @@ html, body {
 .ws-row-resize.ws-row-resize--active { background: var(--ws-primary); }
 
 .ws-source-zone,
+.ws-script-zone,
 .ws-transform-zone {
     display: flex;
     flex-direction: column;
     overflow: hidden;
     background: var(--ws-bg);
 }
+
+/* Second column resize handle */
+.ws-col-resize2 {
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 5;
+}
+.ws-col-resize2:hover,
+.ws-col-resize2.ws-col-resize2--active { background: var(--ws-primary); }
 
 .ws-panel-header {
     display: flex;
@@ -539,7 +552,7 @@ llm-stats {
 
     .ws-vault-zone { display: none; }
     .ws-vault-resize { display: none; }
-    .ws-col-resize, .ws-row-resize { display: none; }
+    .ws-col-resize, .ws-col-resize2, .ws-row-resize { display: none; }
     .ws-debug-sidebar, .ws-debug-resize { display: none; }
     llm-stats { display: none; }
     .ws-menu-btn { display: block; }
