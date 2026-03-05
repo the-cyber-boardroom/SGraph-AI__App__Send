@@ -46,7 +46,7 @@
         async _handleSend(data) {
             if (this._sending) return;
 
-            const { userPrompt, incSource, incScript, incData, incResult, genJS } = data;
+            const { userPrompt, incSource, incScript, incData, incResult, incConsole, genJS, images } = data;
             if (!userPrompt) return;
 
             const conn = document.querySelector('llm-connection');
@@ -68,7 +68,7 @@
 
             // Build final prompt with selected artifacts
             let finalPrompt = userPrompt;
-            const attachments = { source: false, script: false, data: false, result: false };
+            const attachments = { source: false, script: false, data: false, result: false, console: false };
 
             if (incSource) {
                 const sourceViewer = document.querySelector('document-viewer[data-role="source"]');
@@ -110,6 +110,19 @@
                 }
             }
 
+            if (incConsole) {
+                const scriptEditor = document.querySelector('script-editor');
+                const logs = scriptEditor ? scriptEditor._consoleLogs : null;
+                if (logs && logs.length > 0) {
+                    const consoleText = logs.map(log => {
+                        const prefix = log.level === 'error' ? '[ERROR] ' : log.level === 'warn' ? '[WARN] ' : '';
+                        return prefix + log.args;
+                    }).join('\n');
+                    finalPrompt += '\n\n--- CONSOLE OUTPUT ---\n\n' + consoleText;
+                    attachments.console = true;
+                }
+            }
+
             // Get system prompt
             const sysPromptEl = document.querySelector('llm-system-prompt');
             const systemPrompt = genJS
@@ -128,6 +141,12 @@
             window.sgraphWorkspace.events.emit('llm-request-start', { model, provider, streaming });
             window.sgraphWorkspace.events.emit('activity-start', { label: 'LLM request...' });
 
+            // Emit full request details for LLM debug panel
+            window.sgraphWorkspace.events.emit('llm-request-sent', {
+                model, provider, systemPrompt, userPrompt, finalPrompt,
+                attachments, streaming, imageCount: images ? images.length : 0,
+            });
+
             // Route response to llm-output component
             const llmOutput = document.querySelector('llm-output');
 
@@ -144,7 +163,7 @@
 
                 if (provider === 'openrouter') {
                     if (streaming) {
-                        const sr = await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, onChunk);
+                        const sr = await this._streamOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, onChunk, images);
                         result = {
                             content:          sr.content,
                             promptTokens:     sr.usage?.prompt_tokens     || null,
@@ -154,11 +173,11 @@
                             nativeId:         sr.nativeId                 || null,
                         };
                     } else {
-                        result = await this._callOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt);
+                        result = await this._callOpenRouter(baseUrl, apiKey, model, finalPrompt, systemPrompt, images);
                     }
                 } else if (provider === 'ollama') {
                     if (streaming) {
-                        const sr = await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, onChunk);
+                        const sr = await this._streamOllama(baseUrl, model, finalPrompt, systemPrompt, onChunk, images);
                         result = {
                             content:          sr.content,
                             promptTokens:     sr.usage?.prompt_tokens     || null,
@@ -167,7 +186,7 @@
                             finishReason:     sr.finishReason             || null,
                         };
                     } else {
-                        result = await this._callOllama(baseUrl, model, finalPrompt, systemPrompt);
+                        result = await this._callOllama(baseUrl, model, finalPrompt, systemPrompt, images);
                     }
                 }
 
@@ -182,6 +201,9 @@
 
                 const content = result?.content || '';
                 const latencyMs = Date.now() - startTime;
+
+                // Emit response text for LLM debug panel
+                window.sgraphWorkspace.events.emit('llm-response-text', { content });
 
                 // If Generate JS mode, extract code and send to script editor
                 if (genJS && content) {
@@ -296,12 +318,24 @@
             } catch (_) { return true; }
         }
 
+        // --- Build OpenRouter user message (text or multimodal) ----------------
+
+        _buildUserContent(prompt, images) {
+            if (!images || images.length === 0) return prompt;
+            // Multimodal: array of content parts
+            const parts = [{ type: 'text', text: prompt }];
+            for (const img of images) {
+                parts.push({ type: 'image_url', image_url: { url: img.dataUrl } });
+            }
+            return parts;
+        }
+
         // --- Non-streaming: OpenRouter ----------------------------------------
 
-        async _callOpenRouter(baseUrl, apiKey, model, prompt, systemPrompt) {
+        async _callOpenRouter(baseUrl, apiKey, model, prompt, systemPrompt, images) {
             const messages = [];
             if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-            messages.push({ role: 'user', content: prompt });
+            messages.push({ role: 'user', content: this._buildUserContent(prompt, images) });
 
             const resp = await fetch(`${baseUrl}/chat/completions`, {
                 method: 'POST',
@@ -336,10 +370,13 @@
 
         // --- Non-streaming: Ollama --------------------------------------------
 
-        async _callOllama(baseUrl, model, prompt, systemPrompt) {
+        async _callOllama(baseUrl, model, prompt, systemPrompt, images) {
             const base = baseUrl.replace(/\/+$/, '');
             const body = { model, prompt, stream: false };
             if (systemPrompt) body.system = systemPrompt;
+            if (images && images.length > 0) {
+                body.images = images.map(img => img.dataUrl.replace(/^data:image\/\w+;base64,/, ''));
+            }
 
             const resp = await fetch(`${base}/api/generate`, {
                 method: 'POST',
@@ -363,10 +400,10 @@
 
         // --- Streaming: OpenRouter (SSE) --------------------------------------
 
-        async _streamOpenRouter(baseUrl, apiKey, model, prompt, systemPrompt, onChunk) {
+        async _streamOpenRouter(baseUrl, apiKey, model, prompt, systemPrompt, onChunk, images) {
             const messages = [];
             if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-            messages.push({ role: 'user', content: prompt });
+            messages.push({ role: 'user', content: this._buildUserContent(prompt, images) });
 
             const resp = await fetch(`${baseUrl}/chat/completions`, {
                 method: 'POST',
@@ -390,10 +427,13 @@
 
         // --- Streaming: Ollama (NDJSON) ---------------------------------------
 
-        async _streamOllama(baseUrl, model, prompt, systemPrompt, onChunk) {
+        async _streamOllama(baseUrl, model, prompt, systemPrompt, onChunk, images) {
             const base = baseUrl.replace(/\/+$/, '');
             const body = { model, prompt, stream: true };
             if (systemPrompt) body.system = systemPrompt;
+            if (images && images.length > 0) {
+                body.images = images.map(img => img.dataUrl.replace(/^data:image\/\w+;base64,/, ''));
+            }
 
             const resp = await fetch(`${base}/api/generate`, {
                 method: 'POST',
@@ -438,12 +478,9 @@
                             full += delta;
                             if (onChunk) onChunk(delta);
                         }
-                        // Capture finish_reason from the final chunk
                         const fr = parsed.choices?.[0]?.finish_reason;
                         if (fr) finishReason = fr;
-                        // Capture usage from the final chunk
                         if (parsed.usage) usage = parsed.usage;
-                        // Capture request ID
                         if (parsed.id && !nativeId) nativeId = parsed.id;
                     } catch (_) {}
                 }

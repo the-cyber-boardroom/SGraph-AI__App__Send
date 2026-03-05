@@ -25,6 +25,8 @@
             this._connected     = false;
             this._models        = [];
             this._vaultPrompts  = [];
+            this._showAllModels = false;
+            this._pastedImages  = [];    // [{ dataUrl, type }]
             this._unsubs        = [];
         }
 
@@ -44,12 +46,14 @@
             const onModelChanged = () => this._updateModelSelect();
             const onFileSelected = (data) => this._onFileSelected(data);
             const onVaultOpened  = () => this._scanVaultPrompts();
+            const onFavChanged   = () => this._render();
 
             window.sgraphWorkspace.events.on('llm-connected', onConnected);
             window.sgraphWorkspace.events.on('llm-disconnected', onDisconnected);
             window.sgraphWorkspace.events.on('llm-model-changed', onModelChanged);
             window.sgraphWorkspace.events.on('file-selected', onFileSelected);
             window.sgraphWorkspace.events.on('vault-opened', onVaultOpened);
+            window.sgraphWorkspace.events.on('llm-favorites-changed', onFavChanged);
 
             this._unsubs.push(
                 () => window.sgraphWorkspace.events.off('llm-connected', onConnected),
@@ -57,6 +61,7 @@
                 () => window.sgraphWorkspace.events.off('llm-model-changed', onModelChanged),
                 () => window.sgraphWorkspace.events.off('file-selected', onFileSelected),
                 () => window.sgraphWorkspace.events.off('vault-opened', onVaultOpened),
+                () => window.sgraphWorkspace.events.off('llm-favorites-changed', onFavChanged),
             );
 
             // Check if already connected
@@ -142,6 +147,21 @@
             }
         }
 
+        // --- Model list (favorites or all) ------------------------------------
+
+        _getDisplayModels() {
+            const conn = document.querySelector('llm-connection');
+            if (!conn || !conn.isConnected()) return [];
+
+            if (this._showAllModels) return conn.getModels();
+
+            const favs = conn.getFavorites();
+            if (favs.length > 0) return favs;
+
+            // No favorites set — show all
+            return conn.getModels();
+        }
+
         // --- Send --------------------------------------------------------------
 
         _send() {
@@ -151,15 +171,21 @@
             const userPrompt = textarea ? textarea.value.trim() : '';
             if (!userPrompt) return;
 
-            const incSource = this.querySelector('#lpi-inc-source')?.checked ?? true;
-            const incScript = this.querySelector('#lpi-inc-script')?.checked ?? false;
-            const incData   = this.querySelector('#lpi-inc-data')?.checked ?? false;
-            const incResult = this.querySelector('#lpi-inc-result')?.checked ?? false;
-            const genJS     = this.querySelector('#lpi-gen-js')?.checked ?? false;
+            const incSource  = this.querySelector('#lpi-inc-source')?.checked ?? true;
+            const incScript  = this.querySelector('#lpi-inc-script')?.checked ?? false;
+            const incData    = this.querySelector('#lpi-inc-data')?.checked ?? false;
+            const incResult  = this.querySelector('#lpi-inc-result')?.checked ?? false;
+            const incConsole = this.querySelector('#lpi-inc-console')?.checked ?? false;
+            const genJS      = this.querySelector('#lpi-gen-js')?.checked ?? false;
 
             window.sgraphWorkspace.events.emit('llm-send', {
-                userPrompt, incSource, incScript, incData, incResult, genJS,
+                userPrompt, incSource, incScript, incData, incResult, incConsole, genJS,
+                images: this._pastedImages.length > 0 ? [...this._pastedImages] : null,
             });
+
+            // Clear images after send
+            this._pastedImages = [];
+            this._renderImagePreviews();
         }
 
         _cancel() {
@@ -167,14 +193,15 @@
         }
 
         _emitContextChanged() {
-            const incSource = this.querySelector('#lpi-inc-source')?.checked ?? true;
-            const incScript = this.querySelector('#lpi-inc-script')?.checked ?? false;
-            const incData   = this.querySelector('#lpi-inc-data')?.checked ?? false;
-            const incResult = this.querySelector('#lpi-inc-result')?.checked ?? false;
-            const genJS     = this.querySelector('#lpi-gen-js')?.checked ?? false;
+            const incSource  = this.querySelector('#lpi-inc-source')?.checked ?? true;
+            const incScript  = this.querySelector('#lpi-inc-script')?.checked ?? false;
+            const incData    = this.querySelector('#lpi-inc-data')?.checked ?? false;
+            const incResult  = this.querySelector('#lpi-inc-result')?.checked ?? false;
+            const incConsole = this.querySelector('#lpi-inc-console')?.checked ?? false;
+            const genJS      = this.querySelector('#lpi-gen-js')?.checked ?? false;
 
             window.sgraphWorkspace.events.emit('prompt-context-changed', {
-                incSource, incScript, incData, incResult, genJS,
+                incSource, incScript, incData, incResult, incConsole, genJS,
             });
         }
 
@@ -208,14 +235,68 @@
             } catch (_) { return true; }
         }
 
+        // --- Image paste -------------------------------------------------------
+
+        _handlePaste(e) {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    const blob = item.getAsFile();
+                    if (!blob) continue;
+
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        this._pastedImages.push({ dataUrl: reader.result, type: item.type });
+                        this._renderImagePreviews();
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        }
+
+        _removeImage(idx) {
+            this._pastedImages.splice(idx, 1);
+            this._renderImagePreviews();
+        }
+
+        _renderImagePreviews() {
+            const container = this.querySelector('.lpi-image-previews');
+            if (!container) return;
+
+            if (this._pastedImages.length === 0) {
+                container.innerHTML = '';
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'flex';
+            container.innerHTML = this._pastedImages.map((img, idx) =>
+                `<div class="lpi-img-thumb">
+                    <img src="${img.dataUrl}" alt="paste ${idx + 1}">
+                    <button class="lpi-img-remove" data-img-idx="${idx}" title="Remove">&times;</button>
+                </div>`
+            ).join('');
+
+            container.querySelectorAll('.lpi-img-remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    this._removeImage(parseInt(btn.dataset.imgIdx, 10));
+                });
+            });
+        }
+
         // --- Render ------------------------------------------------------------
 
         _render() {
             const conn = document.querySelector('llm-connection');
             const isUpgraded = conn && typeof conn.getModels === 'function';
-            const models = isUpgraded ? conn.getModels() : [];
+            const models = this._getDisplayModels();
             const selectedModel = isUpgraded ? conn.getSelectedModel() : null;
             const isConnected = isUpgraded && conn.isConnected();
+            const hasFavs = isUpgraded && conn.getFavorites && conn.getFavorites().length > 0;
+            const showingAll = this._showAllModels;
 
             this.innerHTML = `<style>${LlmPromptInput.styles}</style>
             <div class="lpi-panel">
@@ -227,6 +308,7 @@
                                 `<option value="${esc(m.id)}" ${m.id === selectedModel ? 'selected' : ''}>${esc(m.name)}</option>`
                               ).join('')}
                     </select>
+                    ${hasFavs ? `<button class="lpi-all-btn" title="${showingAll ? 'Show favorites only' : 'Show all models'}">${showingAll ? 'Favs' : 'All'}</button>` : ''}
                     ${this._vaultPrompts.length > 0 ? `
                         <select class="lpi-prompts" id="lpi-prompt-select">
                             <option value="">Prompts</option>
@@ -242,10 +324,12 @@
                     <label class="lpi-toggle"><input type="checkbox" id="lpi-inc-data"> Data</label>
                     <label class="lpi-toggle"><input type="checkbox" id="lpi-inc-script"> Script</label>
                     <label class="lpi-toggle"><input type="checkbox" id="lpi-inc-result"> Result</label>
+                    <label class="lpi-toggle"><input type="checkbox" id="lpi-inc-console"> Console</label>
                     <span class="lpi-sep">|</span>
                     <label class="lpi-toggle lpi-toggle--accent"><input type="checkbox" id="lpi-gen-js"> Gen JS</label>
                 </div>
-                <textarea class="lpi-textarea" placeholder="Describe the transformation... (Ctrl+Enter to send)" ${this._sending ? 'disabled' : ''}></textarea>
+                <div class="lpi-image-previews" style="display:none"></div>
+                <textarea class="lpi-textarea" placeholder="Describe the transformation... (Ctrl+Enter to send, paste images)" ${this._sending ? 'disabled' : ''}></textarea>
                 <div class="lpi-actions">
                     <button class="lpi-send" ${this._sending || !isConnected ? 'disabled' : ''}>Send</button>
                     <button class="lpi-cancel" style="${this._sending ? '' : 'display:none'}">Cancel</button>
@@ -270,11 +354,26 @@
                         this._send();
                     }
                 });
+                textarea.addEventListener('paste', (e) => this._handlePaste(e));
             }
 
             // Checkbox changes emit context-changed
             this.querySelectorAll('.lpi-toggle input[type="checkbox"]').forEach(cb => {
-                cb.addEventListener('change', () => this._emitContextChanged());
+                cb.addEventListener('change', () => {
+                    this._emitContextChanged();
+                    // Auto-select code default when Gen JS is checked
+                    const genJS = this.querySelector('#lpi-gen-js');
+                    if (genJS && genJS === cb && genJS.checked) {
+                        const conn = document.querySelector('llm-connection');
+                        if (conn && conn.getDefault) {
+                            const codeDefault = conn.getDefault('code');
+                            if (codeDefault) {
+                                conn.setSelectedModel(codeDefault);
+                                this._updateModelSelect();
+                            }
+                        }
+                    }
+                });
             });
 
             // Emit initial context state
@@ -291,6 +390,15 @@
                 });
             }
 
+            // All/Favs toggle button
+            const allBtn = this.querySelector('.lpi-all-btn');
+            if (allBtn) {
+                allBtn.addEventListener('click', () => {
+                    this._showAllModels = !this._showAllModels;
+                    this._render();
+                });
+            }
+
             // Prompt selector
             const promptSelect = this.querySelector('#lpi-prompt-select');
             if (promptSelect) {
@@ -300,6 +408,11 @@
                     promptSelect.value = '';
                     this._onFileSelected({ name, folderPath: '/prompts' });
                 });
+            }
+
+            // Re-render image previews if we have any
+            if (this._pastedImages.length > 0) {
+                this._renderImagePreviews();
             }
         }
 
@@ -326,6 +439,15 @@
                 .lpi-model { flex: 1; min-width: 0; }
                 .lpi-model:disabled { opacity: 0.5; }
                 .lpi-prompts { max-width: 120px; }
+                .lpi-all-btn {
+                    padding: 0.1875rem 0.5rem; font-size: 0.625rem; font-weight: 600;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-muted, #5a6478);
+                    border: 1px solid var(--ws-border, #2C3E6B);
+                    border-radius: var(--ws-radius, 6px);
+                    cursor: pointer; font-family: inherit; flex-shrink: 0;
+                }
+                .lpi-all-btn:hover { color: var(--ws-text-secondary, #8892A0); background: var(--ws-surface-hover, #253254); }
                 .lpi-toggles {
                     display: flex; align-items: center; gap: 0.375rem;
                     flex-shrink: 0; flex-wrap: wrap;
@@ -347,6 +469,32 @@
                 }
                 .lpi-toggle--accent { color: var(--ws-primary, #4ECDC4); font-weight: 600; }
                 .lpi-sep { color: var(--ws-border, #2C3E6B); font-size: 0.625rem; }
+
+                /* Image previews */
+                .lpi-image-previews {
+                    display: flex; gap: 0.375rem; flex-wrap: wrap;
+                    flex-shrink: 0; padding: 0.25rem 0;
+                }
+                .lpi-img-thumb {
+                    position: relative; width: 48px; height: 48px;
+                    border-radius: var(--ws-radius, 6px);
+                    border: 1px solid var(--ws-border, #2C3E6B);
+                    overflow: hidden;
+                }
+                .lpi-img-thumb img {
+                    width: 100%; height: 100%; object-fit: cover;
+                }
+                .lpi-img-remove {
+                    position: absolute; top: -2px; right: -2px;
+                    width: 16px; height: 16px;
+                    background: var(--ws-error, #E94560); color: white;
+                    border: none; border-radius: 50%;
+                    font-size: 0.6875rem; line-height: 1;
+                    cursor: pointer; display: flex; align-items: center; justify-content: center;
+                    padding: 0;
+                }
+                .lpi-img-remove:hover { background: #ff5a7a; }
+
                 .lpi-textarea {
                     flex: 1; min-height: 0; resize: none;
                     font-family: var(--ws-font, sans-serif); font-size: 0.8125rem;
