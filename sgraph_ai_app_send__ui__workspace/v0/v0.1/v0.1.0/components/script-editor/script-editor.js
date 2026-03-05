@@ -1,18 +1,13 @@
 /* =============================================================================
    SGraph Workspace — Script Editor
-   v0.2.0 — Full-panel JavaScript editor with Run/Save and console output
+   v0.3.0 — Full-panel JS editor with browser-style console and object browser
 
    Lives in the middle "Script" panel of the 3-column layout (JSFiddle-style).
-   Includes a console output area that captures console.log/warn/error from
-   the executed script.
-
-   Workflow:
-     1. LLM generates JS → emits 'llm-response-js' → auto-loads here
-     2. User reviews/edits the code (or uses sample script)
-     3. User clicks Run (or Ctrl+Enter) → executes against source HTML
-     4. Result displayed in transform document-viewer
-     5. Console output shown below the editor
-     6. User can Save the script to the vault
+   Features:
+     - Resizable split between code editor and console
+     - Browser-style console: logs + errors interleaved chronologically
+     - Expandable object browser (1 level deep) for console.log objects
+     - Auto-loads .js files from vault selection
    ============================================================================= */
 
 (function() {
@@ -39,25 +34,23 @@ articles.forEach(function(el) {
 
         constructor() {
             super();
-            this._script     = SAMPLE_SCRIPT;
-            this._filename   = 'transform.js';
-            this._error      = null;
-            this._running    = false;
-            this._consoleLogs = [];   // [{ level, args }]
-            this._unsubs     = [];
+            this._script       = SAMPLE_SCRIPT;
+            this._filename     = 'transform.js';
+            this._running      = false;
+            this._consoleLogs  = [];   // [{ level, args, data }]  data = structured objects
+            this._unsubs       = [];
+            this._codeFraction = 0.6;  // fraction of height for code editor
         }
 
         connectedCallback() {
             this._render();
 
-            // Listen for LLM-generated JS
             const onJS = (data) => {
                 this.loadScript(data.code || '', data.filename || 'transform.js');
             };
             window.sgraphWorkspace.events.on('llm-response-js', onJS);
             this._unsubs.push(() => window.sgraphWorkspace.events.off('llm-response-js', onJS));
 
-            // Listen for .js file selections from vault
             const onFileSelected = (data) => this._onFileSelected(data);
             window.sgraphWorkspace.events.on('file-selected', onFileSelected);
             this._unsubs.push(() => window.sgraphWorkspace.events.off('file-selected', onFileSelected));
@@ -72,7 +65,6 @@ articles.forEach(function(el) {
         loadScript(code, filename) {
             this._script   = code;
             this._filename = filename || 'transform.js';
-            this._error    = null;
             const textarea = this.querySelector('.se-code');
             if (textarea) {
                 textarea.value = code;
@@ -87,9 +79,7 @@ articles.forEach(function(el) {
             return textarea ? textarea.value : this._script;
         }
 
-        getFilename() {
-            return this._filename;
-        }
+        getFilename() { return this._filename; }
 
         // --- Run ---------------------------------------------------------------
 
@@ -98,20 +88,18 @@ articles.forEach(function(el) {
 
             const script = this.getScript();
             if (!script.trim()) {
-                this._showError('No script to execute');
+                this._addConsoleEntry('error', 'No script to execute');
                 return;
             }
 
-            // Get source HTML
             const sourceViewer = document.querySelector('document-viewer[data-role="source"]');
             const sourceHtml   = sourceViewer ? sourceViewer.getTextContent() : null;
             if (!sourceHtml) {
-                this._showError('No source HTML loaded. Load a file in the source panel first.');
+                this._addConsoleEntry('error', 'No source HTML loaded. Load a file in the source panel first.');
                 return;
             }
 
             this._running     = true;
-            this._error       = null;
             this._consoleLogs = [];
             this._updateButtons();
             this._renderConsole();
@@ -122,26 +110,26 @@ articles.forEach(function(el) {
                 const result = await window.sgraphWorkspace.executeJS(sourceHtml, script);
                 const elapsed = Date.now() - startTime;
 
-                // Capture console logs from result
+                // Add captured console logs
                 if (result.consoleLogs && result.consoleLogs.length > 0) {
-                    this._consoleLogs = result.consoleLogs;
-                    this._renderConsole();
+                    for (const log of result.consoleLogs) {
+                        this._consoleLogs.push(log);
+                    }
                 }
 
                 if (result.error) {
-                    this._showError(result.error);
+                    this._addConsoleEntry('error', result.error);
                     window.sgraphWorkspace.events.emit('script-executed', {
                         success: false, error: result.error, elapsedMs: elapsed
                     });
                 } else {
-                    // Display result in transform viewer
                     const transformViewer = document.querySelector('document-viewer[data-role="transform"]');
                     if (transformViewer) {
                         const ext = result.resultType === 'json' ? 'json' : 'html';
                         transformViewer.loadText(result.data, `result.${ext}`);
                     }
 
-                    this._clearError();
+                    this._addConsoleEntry('info', `Script executed in ${elapsed}ms — ${result.resultType} output (${(result.data || '').length} chars)`);
                     window.sgraphWorkspace.messages.success(`Script executed in ${elapsed}ms`);
                     window.sgraphWorkspace.events.emit('script-executed', {
                         success: true,
@@ -151,11 +139,12 @@ articles.forEach(function(el) {
                     });
                 }
             } catch (e) {
-                this._showError('Execution failed: ' + e.message);
+                this._addConsoleEntry('error', 'Execution failed: ' + e.message);
             }
 
             this._running = false;
             this._updateButtons();
+            this._renderConsole();
         }
 
         // --- Save to vault -----------------------------------------------------
@@ -206,18 +195,15 @@ articles.forEach(function(el) {
             });
         }
 
-        // --- Error display -----------------------------------------------------
+        // --- Console entries ---------------------------------------------------
 
-        _showError(msg) {
-            this._error = msg;
-            const el = this.querySelector('.se-error');
-            if (el) { el.textContent = msg; el.style.display = ''; }
+        _addConsoleEntry(level, text, data) {
+            this._consoleLogs.push({ level, args: text, data: data || null });
         }
 
-        _clearError() {
-            this._error = null;
-            const el = this.querySelector('.se-error');
-            if (el) el.style.display = 'none';
+        _clearConsole() {
+            this._consoleLogs = [];
+            this._renderConsole();
         }
 
         _updateButtons() {
@@ -233,19 +219,77 @@ articles.forEach(function(el) {
             if (el) el.textContent = this._filename;
         }
 
+        // --- Object browser (1-level expandable) --------------------------------
+
+        _renderObjectValue(val) {
+            if (val === null) return '<span class="se-val-null">null</span>';
+            if (val === undefined) return '<span class="se-val-null">undefined</span>';
+            if (typeof val === 'string') return `<span class="se-val-string">"${esc(val)}"</span>`;
+            if (typeof val === 'number') return `<span class="se-val-number">${val}</span>`;
+            if (typeof val === 'boolean') return `<span class="se-val-bool">${val}</span>`;
+            if (Array.isArray(val)) {
+                if (val.length === 0) return '<span class="se-val-null">[]</span>';
+                return `<span class="se-val-type">Array(${val.length})</span>`;
+            }
+            if (typeof val === 'object') {
+                const keys = Object.keys(val);
+                if (keys.length === 0) return '<span class="se-val-null">{}</span>';
+                return `<span class="se-val-type">Object {${keys.slice(0, 3).join(', ')}${keys.length > 3 ? ', ...' : ''}}</span>`;
+            }
+            return esc(String(val));
+        }
+
+        _renderExpandableObject(data) {
+            if (!data || typeof data !== 'object') return '';
+            const entries = Array.isArray(data)
+                ? data.map((v, i) => [String(i), v])
+                : Object.entries(data);
+            if (entries.length === 0) return '';
+
+            const rows = entries.slice(0, 50).map(([k, v]) => {
+                const valHtml = this._renderObjectValue(v);
+                // If value is an object/array, show its properties too (1 level)
+                let subRows = '';
+                if (v && typeof v === 'object') {
+                    const subEntries = Array.isArray(v)
+                        ? v.map((sv, si) => [String(si), sv])
+                        : Object.entries(v);
+                    subRows = subEntries.slice(0, 20).map(([sk, sv]) =>
+                        `<div class="se-obj-row se-obj-row--sub"><span class="se-obj-key">${esc(sk)}:</span> ${this._renderObjectValue(sv)}</div>`
+                    ).join('');
+                }
+                return `<div class="se-obj-row"><span class="se-obj-key">${esc(k)}:</span> ${valHtml}</div>${subRows}`;
+            }).join('');
+
+            return `<div class="se-obj-browser">${rows}</div>`;
+        }
+
         _renderConsole() {
             const consoleEl = this.querySelector('.se-console-body');
             if (!consoleEl) return;
             if (this._consoleLogs.length === 0) {
-                consoleEl.innerHTML = '<span class="se-console-empty">Console output will appear here after Run</span>';
+                consoleEl.innerHTML = '<span class="se-console-empty">Console output appears here after Run</span>';
                 return;
             }
             consoleEl.innerHTML = this._consoleLogs.map(log => {
                 const cls = log.level === 'error' ? 'se-log--error'
                           : log.level === 'warn'  ? 'se-log--warn'
-                          : 'se-log--info';
-                return `<div class="se-log ${cls}">${esc(log.args)}</div>`;
+                          : log.level === 'info'   ? 'se-log--system'
+                          : 'se-log--log';
+                const prefix = log.level === 'error' ? '<span class="se-log-prefix se-log-prefix--error">ERR</span> '
+                             : log.level === 'warn'  ? '<span class="se-log-prefix se-log-prefix--warn">WRN</span> '
+                             : '';
+
+                let objHtml = '';
+                if (log.data && typeof log.data === 'object') {
+                    objHtml = this._renderExpandableObject(log.data);
+                }
+
+                return `<div class="se-log ${cls}">${prefix}${esc(log.args)}${objHtml}</div>`;
             }).join('');
+
+            // Auto-scroll to bottom
+            consoleEl.scrollTop = consoleEl.scrollHeight;
         }
 
         // --- Render ------------------------------------------------------------
@@ -260,12 +304,19 @@ articles.forEach(function(el) {
                         <button class="se-save" title="Save to vault">Save</button>
                     </div>
                 </div>
-                <textarea class="se-code" spellcheck="false">${esc(this._script)}</textarea>
-                <div class="se-error" style="display:${this._error ? '' : 'none'}">${esc(this._error || '')}</div>
-                <div class="se-console">
-                    <div class="se-console-header">Console</div>
-                    <div class="se-console-body">
-                        <span class="se-console-empty">Console output will appear here after Run</span>
+                <div class="se-split">
+                    <div class="se-code-wrap" style="flex:${this._codeFraction}">
+                        <textarea class="se-code" spellcheck="false">${esc(this._script)}</textarea>
+                    </div>
+                    <div class="se-split-handle" title="Drag to resize"></div>
+                    <div class="se-console-wrap" style="flex:${1 - this._codeFraction}">
+                        <div class="se-console-header">
+                            <span>Console</span>
+                            <button class="se-console-clear" title="Clear console">Clear</button>
+                        </div>
+                        <div class="se-console-body">
+                            <span class="se-console-empty">Console output appears here after Run</span>
+                        </div>
                     </div>
                 </div>
             </div>`;
@@ -277,9 +328,11 @@ articles.forEach(function(el) {
             const runBtn  = this.querySelector('.se-run');
             const saveBtn = this.querySelector('.se-save');
             const code    = this.querySelector('.se-code');
+            const clearBtn = this.querySelector('.se-console-clear');
 
             if (runBtn)  runBtn.addEventListener('click', () => this._run());
             if (saveBtn) saveBtn.addEventListener('click', () => this._save());
+            if (clearBtn) clearBtn.addEventListener('click', () => this._clearConsole());
 
             if (code) {
                 code.addEventListener('keydown', (e) => {
@@ -297,6 +350,51 @@ articles.forEach(function(el) {
                 });
                 code.addEventListener('input', () => { this._script = code.value; });
             }
+
+            // Resizable split between code and console
+            this._setupSplitResize();
+        }
+
+        _setupSplitResize() {
+            const handle    = this.querySelector('.se-split-handle');
+            const split     = this.querySelector('.se-split');
+            const codeWrap  = this.querySelector('.se-code-wrap');
+            const consWrap  = this.querySelector('.se-console-wrap');
+            if (!handle || !split || !codeWrap || !consWrap) return;
+
+            let isResizing = false;
+            let startY, startCodeH, totalH;
+
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startY     = e.clientY;
+                startCodeH = codeWrap.offsetHeight;
+                totalH     = split.offsetHeight - 4; // minus handle height
+                handle.classList.add('se-split-handle--active');
+                document.body.style.cursor    = 'row-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            const onMouseMove = (e) => {
+                if (!isResizing) return;
+                const diff     = e.clientY - startY;
+                const newCodeH = Math.max(60, Math.min(startCodeH + diff, totalH - 40));
+                this._codeFraction = newCodeH / totalH;
+                codeWrap.style.flex = String(this._codeFraction);
+                consWrap.style.flex = String(1 - this._codeFraction);
+            };
+
+            const onMouseUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                handle.classList.remove('se-split-handle--active');
+                document.body.style.cursor     = '';
+                document.body.style.userSelect = '';
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         }
 
         // --- Styles ------------------------------------------------------------
@@ -319,9 +417,7 @@ articles.forEach(function(el) {
                     color: var(--ws-text-muted, #5a6478);
                     font-family: var(--ws-font-mono, monospace);
                 }
-                .se-actions {
-                    display: flex; gap: 0.375rem;
-                }
+                .se-actions { display: flex; gap: 0.375rem; }
                 .se-run, .se-save {
                     padding: 0.1875rem 0.625rem; border-radius: var(--ws-radius, 6px);
                     font-size: 0.6875rem; font-weight: 600;
@@ -341,31 +437,42 @@ articles.forEach(function(el) {
                     color: var(--ws-text-muted, #5a6478);
                 }
                 .se-save:hover { color: var(--ws-text-secondary, #8892A0); background: var(--ws-surface-hover, #253254); }
+
+                /* Split layout */
+                .se-split {
+                    flex: 1; min-height: 0;
+                    display: flex; flex-direction: column;
+                }
+                .se-code-wrap {
+                    display: flex; min-height: 0;
+                    overflow: hidden;
+                }
                 .se-code {
-                    flex: 1; min-height: 0; resize: none;
+                    flex: 1; width: 100%; min-height: 0; resize: none;
                     font-family: var(--ws-font-mono, monospace); font-size: 0.75rem;
                     padding: 0.5rem 0.75rem; line-height: 1.5;
                     background: var(--ws-bg, #1A1A2E);
                     color: var(--ws-text, #F0F0F5);
                     border: none; outline: none;
-                    tab-size: 4;
+                    tab-size: 4; box-sizing: border-box;
                 }
                 .se-code::placeholder { color: var(--ws-text-muted, #5a6478); }
-                .se-error {
-                    padding: 0.375rem 0.75rem; flex-shrink: 0;
-                    font-size: 0.6875rem; font-family: var(--ws-font-mono, monospace);
-                    color: var(--ws-error, #E94560);
-                    background: var(--ws-error-bg, rgba(233,69,96,0.08));
-                    border-top: 1px solid var(--ws-error, #E94560);
-                    white-space: pre-wrap; word-break: break-all;
+
+                .se-split-handle {
+                    height: 4px; flex-shrink: 0;
+                    cursor: row-resize;
+                    background: var(--ws-border-subtle, #222d4d);
+                    transition: background 0.15s;
                 }
-                .se-console {
-                    flex-shrink: 0;
-                    max-height: 30%;
+                .se-split-handle:hover,
+                .se-split-handle--active { background: var(--ws-primary, #4ECDC4); }
+
+                .se-console-wrap {
                     display: flex; flex-direction: column;
-                    border-top: 1px solid var(--ws-border-subtle, #222d4d);
+                    min-height: 0; overflow: hidden;
                 }
                 .se-console-header {
+                    display: flex; align-items: center; justify-content: space-between;
                     padding: 0.1875rem 0.75rem;
                     font-size: 0.625rem; font-weight: 600;
                     text-transform: uppercase; letter-spacing: 0.04em;
@@ -374,20 +481,66 @@ articles.forEach(function(el) {
                     border-bottom: 1px solid var(--ws-border-subtle, #222d4d);
                     flex-shrink: 0;
                 }
+                .se-console-clear {
+                    padding: 0 0.375rem; font-size: 0.5625rem; font-weight: 600;
+                    background: transparent; color: var(--ws-text-muted, #5a6478);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: 3px; cursor: pointer; font-family: inherit;
+                }
+                .se-console-clear:hover { color: var(--ws-text, #F0F0F5); }
                 .se-console-body {
-                    overflow-y: auto; padding: 0.25rem 0.75rem;
+                    flex: 1; overflow-y: auto; padding: 0.25rem 0;
                     font-family: var(--ws-font-mono, monospace);
-                    font-size: 0.6875rem; line-height: 1.4;
+                    font-size: 0.6875rem; line-height: 1.5;
                     background: var(--ws-bg, #1A1A2E);
-                    min-height: 2rem;
                 }
                 .se-console-empty {
                     color: var(--ws-text-muted, #5a6478); font-style: italic;
+                    padding: 0.25rem 0.75rem;
                 }
-                .se-log { padding: 0.0625rem 0; }
-                .se-log--info  { color: var(--ws-text-secondary, #8892A0); }
-                .se-log--warn  { color: #f0ad4e; }
-                .se-log--error { color: var(--ws-error, #E94560); }
+
+                /* Log entries (browser-style) */
+                .se-log {
+                    padding: 0.125rem 0.75rem;
+                    border-bottom: 1px solid rgba(255,255,255,0.03);
+                }
+                .se-log--log    { color: var(--ws-text, #F0F0F5); }
+                .se-log--system { color: var(--ws-text-muted, #5a6478); font-style: italic; }
+                .se-log--warn   { color: #f0ad4e; background: rgba(240,173,78,0.04); }
+                .se-log--error  {
+                    color: var(--ws-error, #E94560);
+                    background: var(--ws-error-bg, rgba(233,69,96,0.06));
+                }
+                .se-log-prefix {
+                    font-size: 0.5625rem; font-weight: 700;
+                    padding: 0 0.25rem; border-radius: 2px;
+                    vertical-align: middle;
+                }
+                .se-log-prefix--error { background: var(--ws-error, #E94560); color: #fff; }
+                .se-log-prefix--warn  { background: #f0ad4e; color: #000; }
+
+                /* Object browser */
+                .se-obj-browser {
+                    margin: 0.125rem 0 0 1rem;
+                    border-left: 2px solid var(--ws-border-subtle, #222d4d);
+                    padding-left: 0.5rem;
+                }
+                .se-obj-row {
+                    padding: 0.0625rem 0;
+                    color: var(--ws-text, #F0F0F5);
+                }
+                .se-obj-row--sub {
+                    margin-left: 1rem;
+                    color: var(--ws-text-secondary, #8892A0);
+                }
+                .se-obj-key {
+                    color: #c792ea; font-weight: 600;
+                }
+                .se-val-string { color: #c3e88d; }
+                .se-val-number { color: #f78c6c; }
+                .se-val-bool   { color: #89ddff; }
+                .se-val-null   { color: var(--ws-text-muted, #5a6478); font-style: italic; }
+                .se-val-type   { color: #82aaff; font-style: italic; }
             `;
         }
     }

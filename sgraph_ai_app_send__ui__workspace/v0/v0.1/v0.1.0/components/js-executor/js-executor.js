@@ -99,15 +99,41 @@
 ${sourceHtml}
 <script>
 (function() {
-    // Intercept console methods and send to parent
+    // Intercept console methods and send to parent with structured data
     var __logs = [];
+    function __safeClone(val, depth) {
+        if (depth > 2) return String(val);
+        if (val === null || val === undefined) return val;
+        if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return val;
+        if (Array.isArray(val)) {
+            return val.slice(0, 50).map(function(v) { return __safeClone(v, depth + 1); });
+        }
+        if (typeof val === 'object') {
+            var out = {};
+            var keys = Object.keys(val).slice(0, 50);
+            for (var i = 0; i < keys.length; i++) {
+                try { out[keys[i]] = __safeClone(val[keys[i]], depth + 1); } catch(_) { out[keys[i]] = '[Error]'; }
+            }
+            return out;
+        }
+        return String(val);
+    }
     function __capture(level, args) {
-        var msg = Array.prototype.slice.call(args).map(function(a) {
-            if (typeof a === 'object') try { return JSON.stringify(a); } catch(_) {}
+        var arr = Array.prototype.slice.call(args);
+        var msg = arr.map(function(a) {
+            if (typeof a === 'object' && a !== null) try { return JSON.stringify(a); } catch(_) {}
             return String(a);
         }).join(' ');
-        __logs.push({ level: level, args: msg });
-        parent.postMessage({ type: 'js-exec-console', level: level, args: msg }, '*');
+        // Send structured data for object browser (first object arg)
+        var data = null;
+        for (var i = 0; i < arr.length; i++) {
+            if (arr[i] && typeof arr[i] === 'object') {
+                try { data = __safeClone(arr[i], 0); } catch(_) {}
+                break;
+            }
+        }
+        __logs.push({ level: level, args: msg, data: data });
+        parent.postMessage({ type: 'js-exec-console', level: level, args: msg, data: data }, '*');
     }
     var _origLog   = console.log;
     var _origWarn  = console.warn;

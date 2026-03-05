@@ -276,7 +276,7 @@ html, body {
 .ws-transform-area {
     grid-area: main;
     display: grid;
-    grid-template-columns: 1fr 4px 1fr 4px 1fr;
+    grid-template-columns: 2fr 4px 1.5fr 4px 1.5fr;
     grid-template-rows: minmax(0, 1fr) 4px var(--ws-chat-height);
     grid-template-areas:
         "source   col-resize script  col-resize2  transform"
