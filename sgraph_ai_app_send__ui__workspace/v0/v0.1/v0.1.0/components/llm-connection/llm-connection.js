@@ -118,6 +118,11 @@
         getSelectedModel() { return this._selectedModel; }
         isConnected()      { return this._status === 'connected'; }
 
+        getModelPricing(modelId) {
+            const m = this._models.find(m => m.id === modelId);
+            return m?.pricing || null;
+        }
+
         setSelectedModel(modelId) {
             this._selectedModel = modelId;
             this._saveSettings();
@@ -180,7 +185,12 @@
             if (data.data && Array.isArray(data.data)) {
                 this._models = data.data
                     .filter(m => m.id && !m.id.includes('image'))
-                    .map(m => ({ id: m.id, name: m.name || m.id }))
+                    .map(m => ({
+                        id:             m.id,
+                        name:           m.name || m.id,
+                        pricing:        m.pricing || null,
+                        context_length: m.context_length || null,
+                    }))
                     .sort((a, b) => a.name.localeCompare(b.name));
             } else {
                 this._models = [...PROVIDERS.openrouter.defaultModels];
