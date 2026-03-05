@@ -68,6 +68,7 @@ articles.forEach(function(el) {
             const textarea = this.querySelector('.se-code');
             if (textarea) {
                 textarea.value = code;
+                this._syncHighlight();
             } else {
                 this._render();
             }
@@ -294,6 +295,31 @@ articles.forEach(function(el) {
             consoleEl.scrollTop = consoleEl.scrollHeight;
         }
 
+        // --- Syntax highlighting -----------------------------------------------
+
+        _highlightCode(code) {
+            if (typeof JsHighlighter !== 'undefined') {
+                return JsHighlighter.highlight(code);
+            }
+            return esc(code);
+        }
+
+        _syncHighlight() {
+            const pre  = this.querySelector('.se-highlight');
+            const code = this.querySelector('.se-code');
+            if (!pre || !code) return;
+            // Re-highlight and add trailing newline so pre height matches textarea
+            pre.innerHTML = this._highlightCode(code.value) + '\n';
+        }
+
+        _syncScroll() {
+            const pre  = this.querySelector('.se-highlight');
+            const code = this.querySelector('.se-code');
+            if (!pre || !code) return;
+            pre.scrollTop  = code.scrollTop;
+            pre.scrollLeft = code.scrollLeft;
+        }
+
         // --- Render ------------------------------------------------------------
 
         _render() {
@@ -308,6 +334,7 @@ articles.forEach(function(el) {
                 </div>
                 <div class="se-split">
                     <div class="se-code-wrap" style="flex:${this._codeFraction}">
+                        <pre class="se-highlight" aria-hidden="true">${this._highlightCode(this._script)}</pre>
                         <textarea class="se-code" spellcheck="false">${esc(this._script)}</textarea>
                     </div>
                     <div class="se-split-handle" title="Drag to resize"></div>
@@ -350,7 +377,11 @@ articles.forEach(function(el) {
                         code.selectionStart = code.selectionEnd = start + 4;
                     }
                 });
-                code.addEventListener('input', () => { this._script = code.value; });
+                code.addEventListener('input', () => {
+                    this._script = code.value;
+                    this._syncHighlight();
+                });
+                code.addEventListener('scroll', () => this._syncScroll());
             }
 
             // Resizable split between code and console
@@ -446,19 +477,37 @@ articles.forEach(function(el) {
                     display: flex; flex-direction: column;
                 }
                 .se-code-wrap {
+                    position: relative;
                     display: flex; min-height: 0;
                     overflow: hidden;
                 }
-                .se-code {
-                    flex: 1; width: 100%; min-height: 0; resize: none;
+                .se-highlight {
+                    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+                    margin: 0;
                     font-family: var(--ws-font-mono, monospace); font-size: 0.75rem;
                     padding: 0.5rem 0.75rem; line-height: 1.5;
                     background: var(--ws-bg, #1A1A2E);
                     color: var(--ws-text, #F0F0F5);
+                    border: none;
+                    tab-size: 4; box-sizing: border-box;
+                    white-space: pre-wrap; word-wrap: break-word;
+                    overflow: auto;
+                    pointer-events: none;
+                    z-index: 0;
+                }
+                .se-code {
+                    position: relative; z-index: 1;
+                    flex: 1; width: 100%; min-height: 0; resize: none;
+                    font-family: var(--ws-font-mono, monospace); font-size: 0.75rem;
+                    padding: 0.5rem 0.75rem; line-height: 1.5;
+                    background: transparent;
+                    color: transparent;
+                    caret-color: var(--ws-text, #F0F0F5);
                     border: none; outline: none;
                     tab-size: 4; box-sizing: border-box;
                 }
                 .se-code::placeholder { color: var(--ws-text-muted, #5a6478); }
+                .se-code::selection { background: rgba(78, 205, 196, 0.25); }
 
                 .se-split-handle {
                     height: 4px; flex-shrink: 0;
