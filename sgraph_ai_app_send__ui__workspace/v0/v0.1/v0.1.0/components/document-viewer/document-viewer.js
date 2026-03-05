@@ -311,6 +311,7 @@
             this._loading = true;
             this._filename = data.name;
             this._renderLoading(data.name);
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Loading ' + data.name + '...' });
 
             try {
                 // Get vault panel reference for file decryption via SGVault
@@ -334,6 +335,7 @@
             }
 
             this._loading = false;
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         // --- Blob URL management -----------------------------------------------

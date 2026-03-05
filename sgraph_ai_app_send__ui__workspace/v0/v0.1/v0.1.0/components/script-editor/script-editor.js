@@ -103,6 +103,7 @@ articles.forEach(function(el) {
             this._consoleLogs = [];
             this._updateButtons();
             this._renderConsole();
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Running script...' });
 
             const startTime = Date.now();
 
@@ -145,6 +146,7 @@ articles.forEach(function(el) {
             this._running = false;
             this._updateButtons();
             this._renderConsole();
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         // --- Save to vault -----------------------------------------------------

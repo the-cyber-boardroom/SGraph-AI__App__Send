@@ -110,6 +110,7 @@
         async _openVault(vaultKey) {
             this._state = 'loading';
             this._render();
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Opening vault...' });
 
             try {
                 const endpoint = window.sgraphWorkspace.config.sendEndpoint;
@@ -142,6 +143,7 @@
                 this._clearSaved();
                 this._render();
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         async _createVault() {
@@ -157,6 +159,7 @@
 
             this._state = 'loading';
             this._render();
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Creating vault...' });
 
             try {
                 const endpoint = window.sgraphWorkspace.config.sendEndpoint;
@@ -187,6 +190,7 @@
                 this._errorMsg = e.message;
                 this._render();
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         async _refreshVault() {
@@ -345,6 +349,7 @@
 
         async _loadDemoData() {
             if (!this._vault || this._state !== 'open') return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Loading demo data...' });
             const enc = (s) => new TextEncoder().encode(s);
 
             const demoHtml = `<!DOCTYPE html>
@@ -432,6 +437,7 @@ document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remo
                 console.error('[vault-panel] Load demo data failed:', e);
                 window.sgraphWorkspace.messages.error('Load demo data failed: ' + e.message);
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         // --- Navigation --------------------------------------------------------
