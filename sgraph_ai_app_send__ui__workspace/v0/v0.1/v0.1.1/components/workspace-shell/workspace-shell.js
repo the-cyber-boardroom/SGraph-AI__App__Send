@@ -69,6 +69,32 @@
             background: var(--ws-primary, #4ECDC4);
         }
 
+        /* Work panel collapse toggle */
+        .ws-panel-toggle {
+            font-size: 0.5rem;
+            color: var(--ws-text-muted, #5a6478);
+            transition: transform 150ms;
+            margin-right: 0.125rem;
+        }
+
+        /* Collapsed flex sub-panels (Source, Data within source zone) */
+        .ws-panel--collapsed .ws-panel-content { display: none !important; }
+        .ws-panel--collapsed { flex: 0 0 auto !important; }
+        .ws-panel--collapsed .ws-panel-toggle { transform: rotate(-90deg); }
+
+        /* Collapsed grid columns (Script, Result) */
+        .ws-zone--collapsed .ws-panel-content { display: none !important; }
+        .ws-zone--collapsed .ws-panel-header {
+            writing-mode: vertical-rl;
+            white-space: nowrap;
+            padding: 0.375rem 0.125rem;
+            border-bottom: none;
+            border-right: 1px solid var(--ws-border-subtle, #222d4d);
+            flex: 1;
+        }
+        .ws-zone--collapsed .ws-panel-clear { display: none !important; }
+        .ws-zone--collapsed .ws-panel-toggle { transform: rotate(-90deg); }
+
         /* Save button feedback */
         @keyframes ws-save-flash {
             0%   { background: rgba(78,205,196,0.3); }
@@ -179,6 +205,9 @@
 
         // 5. Wrap chat body children in collapsible sections
         wrapChatSections(shell);
+
+        // 6. Setup collapsible work panels (Source, Data, Script, Result)
+        setupPanelCollapse(shell);
     }
 
     // --- Wrap chat body components in collapsible section wrappers ---
@@ -231,6 +260,89 @@
                 section.after(handle);
 
                 setupSectionResize(handle, section);
+            }
+        }
+    }
+
+    // --- Collapsible work panels (Source, Data, Script, Result) ---
+
+    const PANEL_COLLAPSED_KEY = 'sgraph-workspace-panel-collapsed';
+
+    function getCollapsedPanels() {
+        try {
+            const raw = localStorage.getItem(PANEL_COLLAPSED_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch (_) { return {}; }
+    }
+
+    function saveCollapsedPanels(state) {
+        try { localStorage.setItem(PANEL_COLLAPSED_KEY, JSON.stringify(state)); } catch (_) {}
+    }
+
+    function setupPanelCollapse(shell) {
+        addPanelToggle(shell, 'source', '.ws-source-top',     'flex');
+        addPanelToggle(shell, 'data',   '.ws-source-bottom',  'flex');
+        addPanelToggle(shell, 'script', '.ws-script-zone',    'grid');
+        addPanelToggle(shell, 'result', '.ws-transform-zone', 'grid');
+        applyAllPanelState(shell);
+    }
+
+    function addPanelToggle(shell, id, selector, type) {
+        const panel  = shell.querySelector(selector);
+        if (!panel) return;
+        const header = panel.querySelector('.ws-panel-header');
+        if (!header || header.querySelector('.ws-panel-toggle')) return;
+
+        const toggle = document.createElement('span');
+        toggle.className = 'ws-panel-toggle';
+        toggle.innerHTML = '&#9660;';
+        header.insertBefore(toggle, header.firstChild);
+
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', (e) => {
+            if (e.target.closest('.ws-panel-clear')) return;
+            const state = getCollapsedPanels();
+            state[id] = !state[id];
+            saveCollapsedPanels(state);
+            applyAllPanelState(shell);
+        });
+    }
+
+    function applyAllPanelState(shell) {
+        const state = getCollapsedPanels();
+
+        // Source / Data (flex sub-panels)
+        const sourceTop    = shell.querySelector('.ws-source-top');
+        const sourceBottom = shell.querySelector('.ws-source-bottom');
+        if (sourceTop)    sourceTop.classList.toggle('ws-panel--collapsed', !!state['source']);
+        if (sourceBottom) sourceBottom.classList.toggle('ws-panel--collapsed', !!state['data']);
+
+        // Hide source split handle when either is collapsed
+        const splitHandle = shell.querySelector('.ws-source-split-handle');
+        if (splitHandle) splitHandle.style.display = (state['source'] || state['data']) ? 'none' : '';
+
+        // Script / Result (grid columns)
+        const scriptZone = shell.querySelector('.ws-script-zone');
+        const resultZone = shell.querySelector('.ws-transform-zone');
+        if (scriptZone) scriptZone.classList.toggle('ws-zone--collapsed', !!state['script']);
+        if (resultZone) resultZone.classList.toggle('ws-zone--collapsed', !!state['result']);
+
+        // Disable column resize handles next to collapsed columns
+        const colResize  = shell.querySelector('.ws-col-resize');
+        const colResize2 = shell.querySelector('.ws-col-resize2');
+        if (colResize)  colResize.style.pointerEvents  = state['script'] ? 'none' : '';
+        if (colResize2) colResize2.style.pointerEvents = (state['script'] || state['result']) ? 'none' : '';
+
+        // Update grid-template-columns
+        const area = shell.querySelector('.ws-transform-area');
+        if (area) {
+            if (state['script'] || state['result']) {
+                const sw  = '2fr';
+                const scw = state['script'] ? '28px' : '1.5fr';
+                const rw  = state['result'] ? '28px' : '1.5fr';
+                area.style.gridTemplateColumns = `${sw} 4px ${scw} 4px ${rw}`;
+            } else {
+                area.style.gridTemplateColumns = '';
             }
         }
     }

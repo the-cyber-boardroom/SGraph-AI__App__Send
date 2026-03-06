@@ -157,7 +157,7 @@
             const llmOutput = document.querySelector('llm-output');
             const responseText = llmOutput ? llmOutput.getText() : '';
 
-            // Collapsed sections state
+            // Collapsed sections state (chat sections)
             const collapsedSections = {};
             document.querySelectorAll('.ws-chat-section').forEach(section => {
                 const sectionId = section.dataset.sectionId;
@@ -166,6 +166,13 @@
                 }
             });
 
+            // Collapsed panels state (work area: Source, Data, Script, Result)
+            let collapsedPanels = {};
+            try {
+                const raw = localStorage.getItem('sgraph-workspace-panel-collapsed');
+                if (raw) collapsedPanels = JSON.parse(raw);
+            } catch (_) {}
+
             // Build bundle
             const bundle = {
                 id:        id,
@@ -173,6 +180,7 @@
                 parent_id: this._activeBundle || null,
 
                 collapsed_sections: collapsedSections,
+                collapsed_panels:  collapsedPanels,
 
                 config: {
                     model:     model,
@@ -399,7 +407,41 @@
                 if (lo && lo.clear) lo.clear();
             }
 
-            // Restore collapsed panel state
+            // Restore collapsed work panels (Source, Data, Script, Result)
+            if (bundle.collapsed_panels) {
+                try { localStorage.setItem('sgraph-workspace-panel-collapsed', JSON.stringify(bundle.collapsed_panels)); } catch (_) {}
+                // Trigger panel state update via the shell's applyAllPanelState
+                const sourceTop    = document.querySelector('.ws-source-top');
+                const sourceBottom = document.querySelector('.ws-source-bottom');
+                const scriptZone   = document.querySelector('.ws-script-zone');
+                const resultZone   = document.querySelector('.ws-transform-zone');
+                const state = bundle.collapsed_panels;
+                if (sourceTop)    sourceTop.classList.toggle('ws-panel--collapsed', !!state['source']);
+                if (sourceBottom) sourceBottom.classList.toggle('ws-panel--collapsed', !!state['data']);
+                if (scriptZone)   scriptZone.classList.toggle('ws-zone--collapsed', !!state['script']);
+                if (resultZone)   resultZone.classList.toggle('ws-zone--collapsed', !!state['result']);
+                // Update split handle
+                const splitHandle = document.querySelector('.ws-source-split-handle');
+                if (splitHandle) splitHandle.style.display = (state['source'] || state['data']) ? 'none' : '';
+                // Update grid columns
+                const area = document.querySelector('.ws-transform-area');
+                if (area) {
+                    if (state['script'] || state['result']) {
+                        const scw = state['script'] ? '28px' : '1.5fr';
+                        const rw  = state['result'] ? '28px' : '1.5fr';
+                        area.style.gridTemplateColumns = `2fr 4px ${scw} 4px ${rw}`;
+                    } else {
+                        area.style.gridTemplateColumns = '';
+                    }
+                }
+                // Disable resize handles next to collapsed columns
+                const colResize  = document.querySelector('.ws-col-resize');
+                const colResize2 = document.querySelector('.ws-col-resize2');
+                if (colResize)  colResize.style.pointerEvents  = state['script'] ? 'none' : '';
+                if (colResize2) colResize2.style.pointerEvents = (state['script'] || state['result']) ? 'none' : '';
+            }
+
+            // Restore collapsed chat section state
             if (bundle.collapsed_sections) {
                 const sections = document.querySelectorAll('.ws-chat-section');
                 sections.forEach(section => {
