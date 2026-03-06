@@ -5,7 +5,7 @@
      2. Bundles debug tab
      3. Collapsible/resizable chat sections
      4. Collapsible chat zone (entire bottom panel)
-     5. Fix: source zone shrinks when both Source+Data collapsed
+     5. Four-column layout: Source | Data | Script | Result
      6. <bundle-manager> and <bundle-list> components
 
    Loads AFTER v0.1.0/workspace-shell.js — overrides via prototype patching.
@@ -15,9 +15,42 @@
 (function() {
     'use strict';
 
-    // --- CSS for collapsible chat sections + save feedback ---
+    // --- CSS for collapsible chat sections + save feedback + 4-column layout ---
     const CHAT_STYLES = document.createElement('style');
     CHAT_STYLES.textContent = `
+        /* --- Four-column grid override --- */
+        .ws-transform-area--four-col {
+            grid-template-columns: 1fr 4px 1fr 4px 1fr 4px 1fr !important;
+            grid-template-areas:
+                "source   col-resize1 data    col-resize2 script  col-resize3 result"
+                "row-resize row-resize row-resize row-resize row-resize row-resize row-resize"
+                "chat     chat        chat    chat         chat   chat         chat" !important;
+        }
+
+        .ws-source-top    { grid-area: source; }
+        .ws-source-bottom { grid-area: data; }
+        .ws-script-zone   { grid-area: script; }
+        .ws-transform-zone { grid-area: result; }
+
+        .ws-col-resize1 { grid-area: col-resize1; cursor: col-resize; background: transparent; transition: background 0.15s; z-index: 5; }
+        .ws-col-resize2 { grid-area: col-resize2; cursor: col-resize; background: transparent; transition: background 0.15s; z-index: 5; }
+        .ws-col-resize3 { grid-area: col-resize3; cursor: col-resize; background: transparent; transition: background 0.15s; z-index: 5; }
+        .ws-col-resize1:hover, .ws-col-resize1--active { background: var(--ws-primary, #4ECDC4); }
+        .ws-col-resize2:hover, .ws-col-resize2--active { background: var(--ws-primary, #4ECDC4); }
+        .ws-col-resize3:hover, .ws-col-resize3--active { background: var(--ws-primary, #4ECDC4); }
+
+        /* All 4 work panels: flex column layout */
+        .ws-source-top,
+        .ws-source-bottom {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--ws-bg, #1A1A2E);
+            min-height: 0;
+            flex: unset;
+        }
+
+        /* --- Chat sections --- */
         .ws-chat-section {
             display: flex; flex-direction: column;
             min-height: 0; overflow: hidden;
@@ -79,17 +112,7 @@
             margin-right: 0.125rem;
         }
 
-        /* Collapsed flex sub-panels (Source, Data within source zone) */
-        .ws-panel--collapsed .ws-panel-content { display: none !important; }
-        .ws-panel--collapsed { flex: 0 0 auto !important; }
-        .ws-panel--collapsed .ws-panel-toggle { transform: rotate(-90deg); }
-
-        /* Source zone: shrink when both sub-panels collapsed */
-        .ws-source-zone--all-collapsed {
-            align-self: start;
-        }
-
-        /* Collapsed grid columns (Script, Result) */
+        /* Collapsed grid columns (all 4 panels use this) */
         .ws-zone--collapsed .ws-panel-content { display: none !important; }
         .ws-zone--collapsed .ws-panel-header {
             writing-mode: vertical-rl;
@@ -149,10 +172,145 @@
         try { localStorage.setItem('sgraph-workspace-chat-collapsed', JSON.stringify(state)); } catch (_) {}
     }
 
+    // --- Restructure DOM: extract source-top/bottom from source-zone into grid ---
+    function restructureToFourColumns(shell) {
+        const area = shell.querySelector('.ws-transform-area');
+        if (!area || area.classList.contains('ws-transform-area--four-col')) return;
+
+        const sourceZone  = area.querySelector('.ws-source-zone');
+        const sourceTop   = area.querySelector('.ws-source-top');
+        const sourceBot   = area.querySelector('.ws-source-bottom');
+        const splitHandle = area.querySelector('.ws-source-split-handle');
+        const oldResize1  = area.querySelector('.ws-col-resize');
+        const scriptZone  = area.querySelector('.ws-script-zone');
+        const oldResize2  = area.querySelector('.ws-col-resize2');
+        const resultZone  = area.querySelector('.ws-transform-zone');
+        const rowResize   = area.querySelector('.ws-row-resize');
+        const chatZone    = area.querySelector('.ws-chat-zone');
+
+        if (!sourceZone || !sourceTop || !sourceBot || !scriptZone || !resultZone) return;
+
+        // Remove old elements from DOM
+        if (splitHandle) splitHandle.remove();
+        if (oldResize1)  oldResize1.remove();
+        if (oldResize2)  oldResize2.remove();
+
+        // Pull source-top and source-bottom out of source-zone
+        sourceZone.before(sourceTop);
+        sourceZone.before(sourceBot);
+        sourceZone.remove();
+
+        // Create 3 new resize handles
+        const resize1 = document.createElement('div');
+        resize1.className = 'ws-col-resize1';
+        resize1.title = 'Drag to resize';
+
+        const resize2 = document.createElement('div');
+        resize2.className = 'ws-col-resize2';
+        resize2.title = 'Drag to resize';
+
+        const resize3 = document.createElement('div');
+        resize3.className = 'ws-col-resize3';
+        resize3.title = 'Drag to resize';
+
+        // Rebuild area children in order:
+        // source-top, resize1, source-bottom, resize2, script, resize3, result, row-resize, chat, ...rest
+        const otherChildren = [];
+        while (area.firstChild) {
+            const child = area.firstChild;
+            area.removeChild(child);
+            // Collect non-layout children (like bundle-manager, llm-orchestrator)
+            if (child !== sourceTop && child !== sourceBot && child !== scriptZone &&
+                child !== resultZone && child !== rowResize && child !== chatZone) {
+                otherChildren.push(child);
+            }
+        }
+
+        area.appendChild(sourceTop);
+        area.appendChild(resize1);
+        area.appendChild(sourceBot);
+        area.appendChild(resize2);
+        area.appendChild(scriptZone);
+        area.appendChild(resize3);
+        area.appendChild(resultZone);
+        if (rowResize) area.appendChild(rowResize);
+        if (chatZone)  area.appendChild(chatZone);
+        for (const child of otherChildren) area.appendChild(child);
+
+        // Apply the 4-column grid class
+        area.classList.add('ws-transform-area--four-col');
+
+        // Setup column resize drag handlers
+        setupFourColResize(shell, area, resize1, resize2, resize3);
+    }
+
+    // --- Four-column resize drag handlers ---
+    function setupFourColResize(shell, area, r1, r2, r3) {
+        const handles = [
+            { el: r1, activeClass: 'ws-col-resize1--active', leftSel: '.ws-source-top',    rightSel: '.ws-source-bottom' },
+            { el: r2, activeClass: 'ws-col-resize2--active', leftSel: '.ws-source-bottom',  rightSel: '.ws-script-zone' },
+            { el: r3, activeClass: 'ws-col-resize3--active', leftSel: '.ws-script-zone',    rightSel: '.ws-transform-zone' },
+        ];
+
+        for (const h of handles) {
+            let isResizing = false;
+            let startX, startLeftW, startRightW;
+
+            h.el.addEventListener('mousedown', (e) => {
+                const left  = area.querySelector(h.leftSel);
+                const right = area.querySelector(h.rightSel);
+                if (!left || !right) return;
+                isResizing  = true;
+                startX      = e.clientX;
+                startLeftW  = left.offsetWidth;
+                startRightW = right.offsetWidth;
+                h.el.classList.add(h.activeClass);
+                document.body.style.cursor     = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            const onMove = (e) => {
+                if (!isResizing) return;
+                const diff = e.clientX - startX;
+                const newLeft  = Math.max(80, startLeftW + diff);
+                const newRight = Math.max(80, startRightW - diff);
+                // Get all 4 zone widths
+                const zones = ['.ws-source-top', '.ws-source-bottom', '.ws-script-zone', '.ws-transform-zone'];
+                const widths = zones.map(sel => {
+                    const el = area.querySelector(sel);
+                    if (sel === h.leftSel)  return newLeft;
+                    if (sel === h.rightSel) return newRight;
+                    return el ? el.offsetWidth : 100;
+                });
+                const total = widths.reduce((a, b) => a + b, 0);
+                area.style.gridTemplateColumns = widths.map(w => `${w/total}fr`).join(' 4px ');
+            };
+
+            const onUp = () => {
+                if (!isResizing) return;
+                isResizing = false;
+                h.el.classList.remove(h.activeClass);
+                document.body.style.cursor     = '';
+                document.body.style.userSelect = '';
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+            _resizeCleanups.push(
+                () => document.removeEventListener('mousemove', onMove),
+                () => document.removeEventListener('mouseup', onUp),
+            );
+        }
+    }
+
     // --- Shared injection logic ---
     function injectBundleUI(shell) {
         // Guard: don't inject twice
         if (shell.querySelector('.ws-bundle-save')) return;
+
+        // 0. Restructure to 4-column layout
+        restructureToFourColumns(shell);
 
         // 1. Add "Save State" button and collapse toggle to the chat zone header
         const chatHeader = shell.querySelector('.ws-chat-header');
@@ -170,7 +328,6 @@
             try {
                 if (localStorage.getItem(chatCollapsedKey) === 'true' && chatZone) {
                     chatZone.classList.add('ws-chat-zone--collapsed');
-                    // Shrink the grid row for chat when collapsed
                     const area = shell.querySelector('.ws-transform-area');
                     if (area) area.style.gridTemplateRows = 'minmax(0, 1fr) 4px auto';
                 }
@@ -178,14 +335,12 @@
 
             chatHeader.style.cursor = 'pointer';
             chatHeader.addEventListener('click', (e) => {
-                // Don't toggle when clicking the Save button
                 if (e.target.closest('.ws-bundle-save')) return;
                 if (!chatZone) return;
                 chatZone.classList.toggle('ws-chat-zone--collapsed');
                 const isCollapsed = chatZone.classList.contains('ws-chat-zone--collapsed');
                 try { localStorage.setItem(chatCollapsedKey, isCollapsed); } catch (_) {}
 
-                // Adjust grid row: collapsed = auto height (just header), expanded = restore
                 const area = shell.querySelector('.ws-transform-area');
                 if (area) {
                     area.style.gridTemplateRows = isCollapsed
@@ -200,7 +355,6 @@
             saveBtn.textContent = 'Save State';
             saveBtn.title = 'Save current workspace state as an execution bundle';
             saveBtn.addEventListener('click', () => {
-                // Visual feedback
                 saveBtn.textContent = 'Saving...';
                 saveBtn.classList.add('ws-bundle-save--saving');
                 window.sgraphWorkspace.events.emit('bundle-save-requested', {});
@@ -223,7 +377,6 @@
             chatHeader.style.gap = '0.5rem';
             chatHeader.appendChild(saveBtn);
 
-            // Reset button after save completes
             const onSaved = () => {
                 saveBtn.textContent = 'Saved!';
                 setTimeout(() => {
@@ -233,7 +386,6 @@
             };
             window.sgraphWorkspace.events.on('bundle-saved', onSaved);
 
-            // Store cleanup so disconnectedCallback can remove it
             shell._bundleSavedUnsub = () => {
                 window.sgraphWorkspace.events.off('bundle-saved', onSaved);
             };
@@ -286,14 +438,12 @@
             const component = chatBody.querySelector(sec.tag);
             if (!component) continue;
 
-            // Create section wrapper
             const section = document.createElement('div');
             section.className = 'ws-chat-section';
             section.dataset.sectionId = sec.id;
             section.style.flex = '1';
             if (collapsed[sec.id]) section.classList.add('ws-chat-section--collapsed');
 
-            // Create header
             const header = document.createElement('div');
             header.className = 'ws-section-header';
             header.innerHTML = `<span class="ws-section-toggle">&#9660;</span><span class="ws-section-label">${sec.label}</span>`;
@@ -303,7 +453,6 @@
                 state[sec.id] = section.classList.contains('ws-chat-section--collapsed');
                 saveCollapsedSections(state);
 
-                // Reset non-collapsed siblings to flex:1 so they reclaim freed space
                 const siblings = section.parentElement.querySelectorAll('.ws-chat-section');
                 siblings.forEach(s => {
                     if (!s.classList.contains('ws-chat-section--collapsed')) {
@@ -312,24 +461,21 @@
                 });
             });
 
-            // Wrap: insert section before component, move component inside
             component.parentNode.insertBefore(section, component);
             section.appendChild(header);
             section.appendChild(component);
 
-            // Add resize handle between sections (except after last)
             if (sec.id !== 'llm-stats') {
                 const handle = document.createElement('div');
                 handle.className = 'ws-section-resize';
                 handle.title = 'Drag to resize';
                 section.after(handle);
-
                 setupSectionResize(handle, section);
             }
         }
     }
 
-    // --- Collapsible work panels (Source, Data, Script, Result) ---
+    // --- Collapsible work panels (all 4 use grid-column collapse) ---
 
     const PANEL_COLLAPSED_KEY = 'sgraph-workspace-panel-collapsed';
 
@@ -344,15 +490,21 @@
         try { localStorage.setItem(PANEL_COLLAPSED_KEY, JSON.stringify(state)); } catch (_) {}
     }
 
+    const PANEL_DEFS = [
+        { id: 'source', selector: '.ws-source-top' },
+        { id: 'data',   selector: '.ws-source-bottom' },
+        { id: 'script', selector: '.ws-script-zone' },
+        { id: 'result', selector: '.ws-transform-zone' },
+    ];
+
     function setupPanelCollapse(shell) {
-        addPanelToggle(shell, 'source', '.ws-source-top',     'flex');
-        addPanelToggle(shell, 'data',   '.ws-source-bottom',  'flex');
-        addPanelToggle(shell, 'script', '.ws-script-zone',    'grid');
-        addPanelToggle(shell, 'result', '.ws-transform-zone', 'grid');
+        for (const def of PANEL_DEFS) {
+            addPanelToggle(shell, def.id, def.selector);
+        }
         applyAllPanelState(shell);
     }
 
-    function addPanelToggle(shell, id, selector, type) {
+    function addPanelToggle(shell, id, selector) {
         const panel  = shell.querySelector(selector);
         if (!panel) return;
         const header = panel.querySelector('.ws-panel-header');
@@ -373,75 +525,32 @@
         });
     }
 
-    function applyFlexPanelCollapse(el, collapsed) {
-        if (!el) return;
-        el.classList.toggle('ws-panel--collapsed', collapsed);
-        const content = el.querySelector('.ws-panel-content');
-        if (collapsed) {
-            // Hide content first so header height is accurate
-            if (content) content.style.display = 'none';
-            // Measure header and lock element to that exact height
-            const header = el.querySelector('.ws-panel-header');
-            const h = header ? header.offsetHeight : 28;
-            el.style.flex      = `0 0 ${h}px`;
-            el.style.maxHeight = h + 'px';
-            el.style.overflow  = 'hidden';
-        } else {
-            el.style.flex      = '';
-            el.style.maxHeight = '';
-            el.style.overflow  = '';
-            if (content) content.style.display = '';
-        }
-    }
-
     function applyAllPanelState(shell) {
         const state = getCollapsedPanels();
+        const area  = shell.querySelector('.ws-transform-area');
 
-        // Source / Data (flex sub-panels) — explicit inline styles to beat resize overrides
-        applyFlexPanelCollapse(shell.querySelector('.ws-source-top'),    !!state['source']);
-        applyFlexPanelCollapse(shell.querySelector('.ws-source-bottom'), !!state['data']);
-
-        // Hide source split handle when either is collapsed
-        const splitHandle = shell.querySelector('.ws-source-split-handle');
-        if (splitHandle) splitHandle.style.display = (state['source'] || state['data']) ? 'none' : '';
-
-        // When BOTH Source and Data are collapsed, shrink the source zone's grid row
-        const sourceZone = shell.querySelector('.ws-source-zone');
-        const bothCollapsed = !!state['source'] && !!state['data'];
-        if (sourceZone) {
-            sourceZone.classList.toggle('ws-source-zone--all-collapsed', bothCollapsed);
+        // Apply ws-zone--collapsed to all 4 panels uniformly
+        for (const def of PANEL_DEFS) {
+            const el = shell.querySelector(def.selector);
+            if (el) el.classList.toggle('ws-zone--collapsed', !!state[def.id]);
         }
 
-        // Update grid-template-rows (only for chat zone collapse — source zone uses align-self)
-        const area = shell.querySelector('.ws-transform-area');
-        if (area && !bothCollapsed) {
-            const chatZone = shell.querySelector('.ws-chat-zone');
-            const chatCollapsed = chatZone && chatZone.classList.contains('ws-chat-zone--collapsed');
-            area.style.gridTemplateRows = chatCollapsed ? 'minmax(0, 1fr) 4px auto' : '';
-        }
-
-        // Script / Result (grid columns)
-        const scriptZone = shell.querySelector('.ws-script-zone');
-        const resultZone = shell.querySelector('.ws-transform-zone');
-        if (scriptZone) scriptZone.classList.toggle('ws-zone--collapsed', !!state['script']);
-        if (resultZone) resultZone.classList.toggle('ws-zone--collapsed', !!state['result']);
-
-        // Disable column resize handles next to collapsed columns
-        const colResize  = shell.querySelector('.ws-col-resize');
-        const colResize2 = shell.querySelector('.ws-col-resize2');
-        if (colResize)  colResize.style.pointerEvents  = state['script'] ? 'none' : '';
-        if (colResize2) colResize2.style.pointerEvents = (state['script'] || state['result']) ? 'none' : '';
-
-        // Update grid-template-columns
+        // Update grid-template-columns based on collapse state
         if (area) {
-            if (state['script'] || state['result']) {
-                const sw  = '2fr';
-                const scw = state['script'] ? '28px' : '1.5fr';
-                const rw  = state['result'] ? '28px' : '1.5fr';
-                area.style.gridTemplateColumns = `${sw} 4px ${scw} 4px ${rw}`;
+            const anyCollapsed = PANEL_DEFS.some(d => state[d.id]);
+            if (anyCollapsed) {
+                const widths = PANEL_DEFS.map(d => state[d.id] ? '28px' : '1fr');
+                area.style.gridTemplateColumns = widths.join(' 4px ');
             } else {
                 area.style.gridTemplateColumns = '';
             }
+        }
+
+        // Update grid-template-rows for chat zone collapse
+        if (area) {
+            const chatZone = shell.querySelector('.ws-chat-zone');
+            const chatCollapsed = chatZone && chatZone.classList.contains('ws-chat-zone--collapsed');
+            area.style.gridTemplateRows = chatCollapsed ? 'minmax(0, 1fr) 4px auto' : '';
         }
     }
 
