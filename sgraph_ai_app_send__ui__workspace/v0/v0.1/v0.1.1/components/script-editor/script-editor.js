@@ -30,9 +30,9 @@
         const origExecute = window.sgraphWorkspace.executeJS;
         const self = this;
 
-        window.sgraphWorkspace.executeJS = function(html, script, timeout) {
+        window.sgraphWorkspace.executeJS = function(html, script, timeout, dataContent) {
             // Call original but store the cleanup handle
-            const promise = origExecute(html, script, timeout);
+            const promise = origExecute(html, script, timeout, dataContent);
 
             // Find the hidden iframe (it's the last one appended)
             const iframes = document.querySelectorAll('iframe[sandbox]');
