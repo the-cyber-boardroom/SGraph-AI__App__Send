@@ -22,6 +22,9 @@
 
     const BUNDLE_FOLDER = '/.bundles';
 
+    // Data file extensions (mirrors DocumentViewer.DATA_EXTS for file-origin tracking)
+    const DocumentViewer_DATA_EXTS = ['json', 'csv', 'xml', 'yaml', 'yml', 'tsv'];
+
     function shortId() {
         return Math.random().toString(16).slice(2, 6);
     }
@@ -39,21 +42,29 @@
             this._activeBundle = null;   // currently loaded bundle ID (for parent_id tracking)
             this._unsubs       = [];
             this._autoSave     = false;  // auto-save after LLM responses (off by default)
+
+            // Track vault file origins for vault:// references
+            this._sourceRef = null;  // { folderPath, name } from last file-selected into source
+            this._dataRef   = null;  // { folderPath, name } from last file-selected into data
+            this._scriptRef = null;  // { folderPath, name } from last file-selected into script
         }
 
         connectedCallback() {
             const onSave   = (data) => this._handleSave(data);
             const onLoad   = (data) => this._handleLoad(data);
             const onLLMComplete = (data) => this._handleLLMComplete(data);
+            const onFileSelected = (data) => this._trackFileOrigin(data);
 
             window.sgraphWorkspace.events.on('bundle-save-requested', onSave);
             window.sgraphWorkspace.events.on('bundle-load-requested', onLoad);
             window.sgraphWorkspace.events.on('llm-request-complete', onLLMComplete);
+            window.sgraphWorkspace.events.on('file-selected', onFileSelected);
 
             this._unsubs.push(
                 () => window.sgraphWorkspace.events.off('bundle-save-requested', onSave),
                 () => window.sgraphWorkspace.events.off('bundle-load-requested', onLoad),
                 () => window.sgraphWorkspace.events.off('llm-request-complete', onLLMComplete),
+                () => window.sgraphWorkspace.events.off('file-selected', onFileSelected),
             );
         }
 
@@ -157,9 +168,9 @@
                 },
 
                 context: {
-                    source:      sourceText ? { inline: sourceText } : null,
-                    data:        dataText   ? { inline: dataText }   : null,
-                    script:      scriptText ? { inline: scriptText, filename: scriptFile } : null,
+                    source:      sourceText ? { ref: this._buildVaultRef(this._sourceRef), inline: sourceText } : null,
+                    data:        dataText   ? { ref: this._buildVaultRef(this._dataRef),   inline: dataText }   : null,
+                    script:      scriptText ? { ref: this._buildVaultRef(this._scriptRef), inline: scriptText, filename: scriptFile } : null,
                     result:      resultText ? { inline: resultText } : null,
                     console:     consoleText || null,
                     screenshots: screenshots,
@@ -202,11 +213,11 @@
 
             try {
                 // Ensure .bundles folder exists
-                try { vault.createFolder(BUNDLE_FOLDER); } catch (_) {}
+                try { await vault.createFolder(BUNDLE_FOLDER); } catch (_) { /* already exists */ }
 
                 const filename = `${bundle.id}.json`;
                 const data = new TextEncoder().encode(JSON.stringify(bundle, null, 2));
-                await vault.writeFile(BUNDLE_FOLDER, filename, data);
+                await vault.addFile(BUNDLE_FOLDER, filename, data);
 
                 // Update tree.json
                 await this._updateTreeIndex(vault, bundle);
@@ -334,6 +345,18 @@
                 this._setCheckbox('#lpi-gen-js', config.gen_js_mode);
             }
 
+            // Restore screenshots into prompt input's pasted images
+            if (ctx.screenshots && ctx.screenshots.length > 0) {
+                const pi = document.querySelector('llm-prompt-input');
+                if (pi) {
+                    pi._pastedImages = ctx.screenshots.map(s => ({
+                        dataUrl: s.data,
+                        type:    s.type || 'image/png',
+                    }));
+                    if (pi._renderImagePreviews) pi._renderImagePreviews();
+                }
+            }
+
             // Restore LLM response
             if (bundle.response && bundle.response.text) {
                 const lo = document.querySelector('llm-output');
@@ -367,7 +390,7 @@
             };
 
             const data = new TextEncoder().encode(JSON.stringify(tree, null, 2));
-            await vault.writeFile(BUNDLE_FOLDER, 'tree.json', data);
+            await vault.addFile(BUNDLE_FOLDER, 'tree.json', data);
         }
 
         // --- Event Handlers ----------------------------------------------------
@@ -387,6 +410,30 @@
             if (!this._autoSave) return;
             const bundle = this.captureState(data);
             await this.saveBundle(bundle);
+        }
+
+        // --- Track vault file origins for vault:// references ------------------
+
+        _trackFileOrigin(data) {
+            if (!data || !data.name || !data.folderPath) return;
+            const name = data.name;
+            const ref = { folderPath: data.folderPath, name: name };
+
+            if (name.endsWith('.js')) {
+                // JS files go to script editor
+                this._scriptRef = ref;
+            } else if (DocumentViewer_DATA_EXTS.includes(name.split('.').pop().toLowerCase())) {
+                // Data files go to data viewer
+                this._dataRef = ref;
+            } else {
+                // Everything else goes to source viewer
+                this._sourceRef = ref;
+            }
+        }
+
+        _buildVaultRef(ref) {
+            if (!ref) return null;
+            return `vault://${ref.folderPath}/${ref.name}`.replace(/\/+/g, '/').replace('vault:/', 'vault://');
         }
 
         // --- Helpers -----------------------------------------------------------

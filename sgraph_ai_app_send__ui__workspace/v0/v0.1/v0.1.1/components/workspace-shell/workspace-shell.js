@@ -8,21 +8,19 @@
    3. <bundle-manager> and <bundle-list> hidden components
 
    Loads AFTER v0.1.0/workspace-shell.js — overrides via prototype patching.
+   Also applies immediately to the already-rendered shell instance.
    ============================================================================= */
 
 (function() {
     'use strict';
 
-    // Get the class from the custom elements registry (not in global scope due to IIFE)
-    const ShellClass = customElements.get('workspace-shell');
-    const _originalRender = ShellClass.prototype.render;
-
-    ShellClass.prototype.render = function() {
-        // Call the original render (builds the full DOM)
-        _originalRender.call(this);
+    // Shared injection logic — adds v0.1.1 UI elements to a shell instance
+    function injectBundleUI(shell) {
+        // Guard: don't inject twice
+        if (shell.querySelector('.ws-bundle-save')) return;
 
         // 1. Add "Save State" button to the chat zone header
-        const chatHeader = this.querySelector('.ws-chat-header');
+        const chatHeader = shell.querySelector('.ws-chat-header');
         if (chatHeader) {
             const saveBtn = document.createElement('button');
             saveBtn.className = 'ws-bundle-save';
@@ -32,7 +30,6 @@
                 window.sgraphWorkspace.events.emit('bundle-save-requested', {});
             });
 
-            // Style inline (surgical — no separate CSS file needed)
             saveBtn.style.cssText = `
                 padding: 0.125rem 0.5rem;
                 font-size: 0.625rem; font-weight: 600;
@@ -51,8 +48,8 @@
         }
 
         // 2. Add "Bundles" tab to the debug sidebar
-        const debugTabs = this.querySelector('.ws-debug-tabs');
-        if (debugTabs) {
+        const debugTabs = shell.querySelector('.ws-debug-tabs');
+        if (debugTabs && !debugTabs.querySelector('[data-tab="bundles"]')) {
             const tab = document.createElement('button');
             tab.className = 'ws-debug-tab';
             tab.dataset.tab = 'bundles';
@@ -61,8 +58,8 @@
         }
 
         // 3. Add bundle-list panel to debug content
-        const debugContent = this.querySelector('.ws-debug-content');
-        if (debugContent) {
+        const debugContent = shell.querySelector('.ws-debug-content');
+        if (debugContent && !debugContent.querySelector('[data-panel="bundles"]')) {
             const panel = document.createElement('div');
             panel.className = 'ws-debug-panel';
             panel.dataset.panel = 'bundles';
@@ -72,12 +69,27 @@
         }
 
         // 4. Add hidden <bundle-manager> component
-        const existing = this.querySelector('bundle-manager');
-        if (!existing) {
+        if (!shell.querySelector('bundle-manager')) {
             const mgr = document.createElement('bundle-manager');
             mgr.style.display = 'none';
-            this.querySelector('.ws-transform-area')?.appendChild(mgr);
+            const target = shell.querySelector('.ws-transform-area') || shell;
+            target.appendChild(mgr);
         }
+    }
+
+    // Override render() for future re-renders
+    const ShellClass = customElements.get('workspace-shell');
+    const _originalRender = ShellClass.prototype.render;
+
+    ShellClass.prototype.render = function() {
+        _originalRender.call(this);
+        injectBundleUI(this);
     };
+
+    // Apply immediately to the already-rendered shell instance
+    const existingShell = document.querySelector('workspace-shell');
+    if (existingShell) {
+        injectBundleUI(existingShell);
+    }
 
 })();
