@@ -422,17 +422,18 @@
                 const applyFlex = (el, collapsed) => {
                     if (!el) return;
                     el.classList.toggle('ws-panel--collapsed', collapsed);
+                    const c = el.querySelector('.ws-panel-content');
                     if (collapsed) {
-                        el.style.flex = '0 0 auto';
-                        el.style.minHeight = '0';
-                        el.style.overflow = 'visible';
-                        const c = el.querySelector('.ws-panel-content');
                         if (c) c.style.display = 'none';
+                        const header = el.querySelector('.ws-panel-header');
+                        const h = header ? header.offsetHeight : 28;
+                        el.style.flex      = `0 0 ${h}px`;
+                        el.style.maxHeight = h + 'px';
+                        el.style.overflow  = 'hidden';
                     } else {
-                        el.style.flex = '';
-                        el.style.minHeight = '';
-                        el.style.overflow = '';
-                        const c = el.querySelector('.ws-panel-content');
+                        el.style.flex      = '';
+                        el.style.maxHeight = '';
+                        el.style.overflow  = '';
                         if (c) c.style.display = '';
                     }
                 };

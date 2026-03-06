@@ -311,18 +311,20 @@
     function applyFlexPanelCollapse(el, collapsed) {
         if (!el) return;
         el.classList.toggle('ws-panel--collapsed', collapsed);
-        // Explicitly set inline styles to override any leftover resize inline flex
+        const content = el.querySelector('.ws-panel-content');
         if (collapsed) {
-            el.style.flex      = '0 0 auto';
-            el.style.minHeight = '0';
-            el.style.overflow  = 'visible';
-            const content = el.querySelector('.ws-panel-content');
+            // Hide content first so header height is accurate
             if (content) content.style.display = 'none';
+            // Measure header and lock element to that exact height
+            const header = el.querySelector('.ws-panel-header');
+            const h = header ? header.offsetHeight : 28;
+            el.style.flex      = `0 0 ${h}px`;
+            el.style.maxHeight = h + 'px';
+            el.style.overflow  = 'hidden';
         } else {
             el.style.flex      = '';
-            el.style.minHeight = '';
+            el.style.maxHeight = '';
             el.style.overflow  = '';
-            const content = el.querySelector('.ws-panel-content');
             if (content) content.style.display = '';
         }
     }
