@@ -418,8 +418,10 @@
                 try { localStorage.setItem('sgraph-workspace-panel-collapsed', JSON.stringify(bundle.collapsed_panels)); } catch (_) {}
                 const state = bundle.collapsed_panels;
 
-                // Flex sub-panels: explicit inline styles to ensure collapse/expand
-                const applyFlex = (el, collapsed) => {
+                // Flex sub-panels with sibling fill
+                const srcTop = document.querySelector('.ws-source-top');
+                const srcBot = document.querySelector('.ws-source-bottom');
+                [[srcTop, !!state['source']], [srcBot, !!state['data']]].forEach(([el, collapsed]) => {
                     if (!el) return;
                     el.classList.toggle('ws-panel--collapsed', collapsed);
                     const c = el.querySelector('.ws-panel-content');
@@ -431,14 +433,12 @@
                         el.style.maxHeight = h + 'px';
                         el.style.overflow  = 'hidden';
                     } else {
-                        el.style.flex      = '';
+                        if (c) c.style.display = '';
                         el.style.maxHeight = '';
                         el.style.overflow  = '';
-                        if (c) c.style.display = '';
+                        el.style.flex = '1';
                     }
-                };
-                applyFlex(document.querySelector('.ws-source-top'),    !!state['source']);
-                applyFlex(document.querySelector('.ws-source-bottom'), !!state['data']);
+                });
 
                 // Grid columns
                 const scriptZone = document.querySelector('.ws-script-zone');

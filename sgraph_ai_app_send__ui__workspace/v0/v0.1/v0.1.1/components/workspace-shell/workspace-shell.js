@@ -308,33 +308,35 @@
         });
     }
 
-    function applyFlexPanelCollapse(el, collapsed) {
-        if (!el) return;
-        el.classList.toggle('ws-panel--collapsed', collapsed);
-        const content = el.querySelector('.ws-panel-content');
-        if (collapsed) {
-            // Hide content first so header height is accurate
-            if (content) content.style.display = 'none';
-            // Measure header and lock element to that exact height
-            const header = el.querySelector('.ws-panel-header');
-            const h = header ? header.offsetHeight : 28;
-            el.style.flex      = `0 0 ${h}px`;
-            el.style.maxHeight = h + 'px';
-            el.style.overflow  = 'hidden';
-        } else {
-            el.style.flex      = '';
-            el.style.maxHeight = '';
-            el.style.overflow  = '';
-            if (content) content.style.display = '';
-        }
-    }
-
     function applyAllPanelState(shell) {
         const state = getCollapsedPanels();
+        const srcCollapsed  = !!state['source'];
+        const dataCollapsed = !!state['data'];
 
-        // Source / Data (flex sub-panels) — explicit inline styles to beat resize overrides
-        applyFlexPanelCollapse(shell.querySelector('.ws-source-top'),    !!state['source']);
-        applyFlexPanelCollapse(shell.querySelector('.ws-source-bottom'), !!state['data']);
+        const sourceTop    = shell.querySelector('.ws-source-top');
+        const sourceBottom = shell.querySelector('.ws-source-bottom');
+
+        // Collapse or expand each sub-panel
+        [sourceTop, sourceBottom].forEach((el, i) => {
+            if (!el) return;
+            const collapsed = i === 0 ? srcCollapsed : dataCollapsed;
+            el.classList.toggle('ws-panel--collapsed', collapsed);
+            const content = el.querySelector('.ws-panel-content');
+            if (collapsed) {
+                if (content) content.style.display = 'none';
+                const header = el.querySelector('.ws-panel-header');
+                const h = header ? header.offsetHeight : 28;
+                el.style.flex      = `0 0 ${h}px`;
+                el.style.maxHeight = h + 'px';
+                el.style.overflow  = 'hidden';
+            } else {
+                if (content) content.style.display = '';
+                el.style.maxHeight = '';
+                el.style.overflow  = '';
+                // Force this panel to grow and fill the space freed by its collapsed sibling
+                el.style.flex = '1';
+            }
+        });
 
         // Hide source split handle when either is collapsed
         const splitHandle = shell.querySelector('.ws-source-split-handle');
