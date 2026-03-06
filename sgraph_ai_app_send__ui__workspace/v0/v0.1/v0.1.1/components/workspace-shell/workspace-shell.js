@@ -84,6 +84,11 @@
         .ws-panel--collapsed { flex: 0 0 auto !important; }
         .ws-panel--collapsed .ws-panel-toggle { transform: rotate(-90deg); }
 
+        /* Source zone: shrink when both sub-panels collapsed */
+        .ws-source-zone--all-collapsed {
+            align-self: start;
+        }
+
         /* Collapsed grid columns (Script, Result) */
         .ws-zone--collapsed .ws-panel-content { display: none !important; }
         .ws-zone--collapsed .ws-panel-header {
@@ -407,22 +412,12 @@
             sourceZone.classList.toggle('ws-source-zone--all-collapsed', bothCollapsed);
         }
 
-        // Update grid-template-rows when both source panels are collapsed
+        // Update grid-template-rows (only for chat zone collapse — source zone uses align-self)
         const area = shell.querySelector('.ws-transform-area');
-        if (area) {
-            if (bothCollapsed) {
-                // Shrink the top row to fit-content (just the collapsed headers)
-                area.style.gridTemplateRows = 'auto 4px var(--ws-chat-height)';
-            } else {
-                // Restore default (unless chat zone is also collapsed)
-                const chatZone = shell.querySelector('.ws-chat-zone');
-                const chatCollapsed = chatZone && chatZone.classList.contains('ws-chat-zone--collapsed');
-                if (chatCollapsed) {
-                    area.style.gridTemplateRows = 'minmax(0, 1fr) 4px auto';
-                } else {
-                    area.style.gridTemplateRows = '';
-                }
-            }
+        if (area && !bothCollapsed) {
+            const chatZone = shell.querySelector('.ws-chat-zone');
+            const chatCollapsed = chatZone && chatZone.classList.contains('ws-chat-zone--collapsed');
+            area.style.gridTemplateRows = chatCollapsed ? 'minmax(0, 1fr) 4px auto' : '';
         }
 
         // Script / Result (grid columns)
