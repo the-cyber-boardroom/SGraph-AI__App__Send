@@ -94,17 +94,20 @@
                 const ts = this._formatTimestamp(info.timestamp);
                 const model = info.model ? this._shortModel(info.model) : 'no model';
                 const preview = info.prompt_preview || '(no prompt)';
+                const displayName = info.display_name || '';
                 const sizeLabel = info.size_bytes ? this._formatSize(info.size_bytes) : '';
                 const parentLabel = info.parent_id
                     ? `<span class="bl-fork" title="Forked from ${esc(info.parent_id)}">fork</span>`
                     : '';
 
                 return `<div class="bl-item ${isActive ? 'bl-item--active' : ''}" data-bundle-id="${esc(id)}">
+                    ${displayName ? `<div class="bl-name">${esc(displayName)}</div>` : ''}
                     <div class="bl-item-top">
                         <span class="bl-time">${esc(ts)}</span>
                         <span class="bl-model">${esc(model)}</span>
                         ${sizeLabel ? `<span class="bl-size">${esc(sizeLabel)}</span>` : ''}
                         ${parentLabel}
+                        <button class="bl-rename" data-rename-id="${esc(id)}" data-current-name="${esc(displayName)}" title="Rename bundle">&#9998;</button>
                         <button class="bl-delete" data-delete-id="${esc(id)}" title="Delete bundle">&times;</button>
                     </div>
                     <div class="bl-preview">${esc(preview)}</div>
@@ -135,6 +138,16 @@
                 });
             });
 
+            // Rename buttons — show inline input
+            this.querySelectorAll('.bl-rename').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const bundleId = btn.dataset.renameId;
+                    const currentName = btn.dataset.currentName || '';
+                    this._showRenameInput(bundleId, currentName, btn.closest('.bl-item'));
+                });
+            });
+
             // Click to load bundle
             this.querySelectorAll('.bl-item').forEach(el => {
                 el.addEventListener('click', () => {
@@ -150,6 +163,34 @@
             if (refreshBtn) {
                 refreshBtn.addEventListener('click', () => this._refresh());
             }
+        }
+
+        _showRenameInput(bundleId, currentName, itemEl) {
+            // Replace the item content with an inline input
+            const existing = itemEl.querySelector('.bl-rename-input');
+            if (existing) return; // already showing
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'bl-rename-row';
+            wrapper.innerHTML = `<input class="bl-rename-input" type="text" value="${esc(currentName)}" placeholder="Enter bundle name..." />`;
+            itemEl.insertBefore(wrapper, itemEl.firstChild);
+
+            const input = wrapper.querySelector('.bl-rename-input');
+            input.focus();
+            input.select();
+
+            const commit = () => {
+                const name = input.value.trim();
+                wrapper.remove();
+                window.sgraphWorkspace.events.emit('bundle-rename-requested', { bundleId, name });
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commit(); }
+                if (e.key === 'Escape') { e.preventDefault(); wrapper.remove(); }
+            });
+            input.addEventListener('blur', () => commit());
+            input.addEventListener('click', (e) => e.stopPropagation());
         }
 
         // --- Helpers -----------------------------------------------------------
@@ -253,7 +294,7 @@
                     text-transform: uppercase; letter-spacing: 0.04em;
                 }
                 .bl-delete {
-                    margin-left: auto;
+                    margin-left: 0;
                     width: 16px; height: 16px;
                     font-size: 0.75rem; line-height: 1;
                     background: transparent; color: var(--ws-text-muted, #5a6478);
@@ -266,6 +307,36 @@
                 .bl-delete:hover {
                     color: var(--ws-error, #E94560);
                     background: var(--ws-error-bg, rgba(233,69,96,0.08));
+                }
+                .bl-rename {
+                    width: 16px; height: 16px;
+                    font-size: 0.625rem; line-height: 1;
+                    background: transparent; color: var(--ws-text-muted, #5a6478);
+                    border: none; border-radius: 2px;
+                    cursor: pointer; padding: 0;
+                    display: flex; align-items: center; justify-content: center;
+                    opacity: 0; transition: opacity 100ms;
+                    margin-left: auto;
+                }
+                .bl-item:hover .bl-rename { opacity: 1; }
+                .bl-rename:hover { color: var(--ws-primary, #4ECDC4); }
+                .bl-name {
+                    font-size: 0.6875rem; font-weight: 600;
+                    color: var(--ws-text, #F0F0F5);
+                    margin-bottom: 0.125rem;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                }
+                .bl-rename-row {
+                    margin-bottom: 0.25rem;
+                }
+                .bl-rename-input {
+                    width: 100%; box-sizing: border-box;
+                    padding: 0.1875rem 0.375rem;
+                    font-size: 0.6875rem; font-family: var(--ws-font, sans-serif);
+                    background: var(--ws-bg, #1A1A2E);
+                    color: var(--ws-text, #F0F0F5);
+                    border: 1px solid var(--ws-primary, #4ECDC4);
+                    border-radius: 3px; outline: none;
                 }
                 .bl-preview {
                     font-size: 0.625rem;

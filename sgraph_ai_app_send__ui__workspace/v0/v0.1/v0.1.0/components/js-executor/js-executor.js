@@ -1,6 +1,6 @@
 /* =============================================================================
    SGraph Workspace — JS Executor
-   v0.2.0 — Sandboxed JavaScript execution with console capture
+   v0.3.0 — Sandboxed JavaScript execution with console capture + data injection
 
    Executes user-provided JavaScript against source HTML in a sandboxed iframe.
    The iframe uses sandbox="allow-scripts" (no allow-same-origin) so the
@@ -9,8 +9,12 @@
    Console.log/warn/error calls inside the script are intercepted and sent
    back alongside the result via postMessage.
 
+   Scripts can access structured data from the DATA panel via __SG_SEND_DATA__:
+     __SG_SEND_DATA__.raw    — raw text content
+     __SG_SEND_DATA__.parsed — JSON-parsed version (null if not valid JSON)
+
    Usage:
-     const result = await window.sgraphWorkspace.executeJS(sourceHtml, userScript);
+     const result = await window.sgraphWorkspace.executeJS(sourceHtml, userScript, 10000, dataText);
      // result = { data, resultType, error, consoleLogs: [{level, args}] }
    ============================================================================= */
 
@@ -19,7 +23,7 @@
 
     const DEFAULT_TIMEOUT = 10000;
 
-    function executeJS(sourceHtml, userScript, timeoutMs) {
+    function executeJS(sourceHtml, userScript, timeoutMs, dataContent) {
         const timeout = timeoutMs || DEFAULT_TIMEOUT;
 
         return new Promise((resolve) => {
@@ -76,7 +80,7 @@
                 });
             }, timeout);
 
-            const iframeDoc = buildIframeDocument(sourceHtml, userScript);
+            const iframeDoc = buildIframeDocument(sourceHtml, userScript, dataContent);
             const blob = new Blob([iframeDoc], { type: 'text/html' });
             blobUrl = URL.createObjectURL(blob);
 
@@ -89,8 +93,9 @@
         });
     }
 
-    function buildIframeDocument(sourceHtml, userScript) {
+    function buildIframeDocument(sourceHtml, userScript, dataContent) {
         const safeScript = userScript.replace(/<\/script>/gi, '<\\/script>');
+        const safeData   = (dataContent || '').replace(/<\/script>/gi, '<\\/script>').replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
 
         return `<!DOCTYPE html>
 <html>
@@ -99,6 +104,12 @@
 ${sourceHtml}
 <script>
 (function() {
+    // Inject DATA panel content as __SG_SEND_DATA__
+    var __rawData = \`${safeData}\`;
+    var __parsedData = null;
+    try { if (__rawData) __parsedData = JSON.parse(__rawData); } catch(_) {}
+    window.__SG_SEND_DATA__ = { raw: __rawData || null, parsed: __parsedData };
+
     // Intercept console methods and send to parent with structured data
     var __logs = [];
     function __safeClone(val, depth) {

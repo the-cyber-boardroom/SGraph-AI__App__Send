@@ -60,12 +60,14 @@
             const onSave   = (data) => this._handleSave(data);
             const onLoad   = (data) => this._handleLoad(data);
             const onDelete = (data) => this._handleDelete(data);
+            const onRename = (data) => this._handleRename(data);
             const onLLMComplete = (data) => this._handleLLMComplete(data);
             const onFileSelected = (data) => this._trackFileOrigin(data);
 
             window.sgraphWorkspace.events.on('bundle-save-requested', onSave);
             window.sgraphWorkspace.events.on('bundle-load-requested', onLoad);
             window.sgraphWorkspace.events.on('bundle-delete-requested', onDelete);
+            window.sgraphWorkspace.events.on('bundle-rename-requested', onRename);
             window.sgraphWorkspace.events.on('llm-request-complete', onLLMComplete);
             window.sgraphWorkspace.events.on('file-selected', onFileSelected);
 
@@ -73,6 +75,7 @@
                 () => window.sgraphWorkspace.events.off('bundle-save-requested', onSave),
                 () => window.sgraphWorkspace.events.off('bundle-load-requested', onLoad),
                 () => window.sgraphWorkspace.events.off('bundle-delete-requested', onDelete),
+                () => window.sgraphWorkspace.events.off('bundle-rename-requested', onRename),
                 () => window.sgraphWorkspace.events.off('llm-request-complete', onLLMComplete),
                 () => window.sgraphWorkspace.events.off('file-selected', onFileSelected),
             );
@@ -481,10 +484,44 @@
             await this.deleteBundle(data.bundleId);
         }
 
+        async _handleRename(data) {
+            if (!data || !data.bundleId || !data.name) return;
+            await this.renameBundle(data.bundleId, data.name);
+        }
+
         async _handleLLMComplete(data) {
             if (!this._autoSave) return;
             const bundle = this.captureState(data);
             await this.saveBundle(bundle);
+        }
+
+        // --- Rename Bundle -----------------------------------------------------
+
+        async renameBundle(bundleId, name) {
+            const vault = this._getVault();
+            if (!vault) return false;
+
+            try {
+                let tree = { bundles: {} };
+                try {
+                    const raw = await vault.getFile(getBundleFolder(), 'tree.json');
+                    const text = new TextDecoder().decode(new Uint8Array(raw));
+                    tree = JSON.parse(text);
+                } catch (_) {}
+
+                if (!tree.bundles[bundleId]) return false;
+
+                tree.bundles[bundleId].display_name = name.trim() || null;
+
+                const data = new TextEncoder().encode(JSON.stringify(tree, null, 2));
+                await vault.addFile(getBundleFolder(), 'tree.json', data);
+
+                window.sgraphWorkspace.events.emit('bundle-list-changed');
+                return true;
+            } catch (e) {
+                console.error('[bundle-manager] Rename failed:', e);
+                return false;
+            }
         }
 
         // --- Delete Bundle -----------------------------------------------------
