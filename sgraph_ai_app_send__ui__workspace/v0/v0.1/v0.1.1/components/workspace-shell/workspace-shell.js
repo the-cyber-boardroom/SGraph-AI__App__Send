@@ -308,14 +308,31 @@
         });
     }
 
+    function applyFlexPanelCollapse(el, collapsed) {
+        if (!el) return;
+        el.classList.toggle('ws-panel--collapsed', collapsed);
+        // Explicitly set inline styles to override any leftover resize inline flex
+        if (collapsed) {
+            el.style.flex      = '0 0 auto';
+            el.style.minHeight = '0';
+            el.style.overflow  = 'visible';
+            const content = el.querySelector('.ws-panel-content');
+            if (content) content.style.display = 'none';
+        } else {
+            el.style.flex      = '';
+            el.style.minHeight = '';
+            el.style.overflow  = '';
+            const content = el.querySelector('.ws-panel-content');
+            if (content) content.style.display = '';
+        }
+    }
+
     function applyAllPanelState(shell) {
         const state = getCollapsedPanels();
 
-        // Source / Data (flex sub-panels)
-        const sourceTop    = shell.querySelector('.ws-source-top');
-        const sourceBottom = shell.querySelector('.ws-source-bottom');
-        if (sourceTop)    sourceTop.classList.toggle('ws-panel--collapsed', !!state['source']);
-        if (sourceBottom) sourceBottom.classList.toggle('ws-panel--collapsed', !!state['data']);
+        // Source / Data (flex sub-panels) — explicit inline styles to beat resize overrides
+        applyFlexPanelCollapse(shell.querySelector('.ws-source-top'),    !!state['source']);
+        applyFlexPanelCollapse(shell.querySelector('.ws-source-bottom'), !!state['data']);
 
         // Hide source split handle when either is collapsed
         const splitHandle = shell.querySelector('.ws-source-split-handle');

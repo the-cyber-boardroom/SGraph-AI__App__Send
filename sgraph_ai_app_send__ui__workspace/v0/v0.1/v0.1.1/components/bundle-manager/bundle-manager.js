@@ -410,19 +410,39 @@
             // Restore collapsed work panels (Source, Data, Script, Result)
             if (bundle.collapsed_panels) {
                 try { localStorage.setItem('sgraph-workspace-panel-collapsed', JSON.stringify(bundle.collapsed_panels)); } catch (_) {}
-                // Trigger panel state update via the shell's applyAllPanelState
-                const sourceTop    = document.querySelector('.ws-source-top');
-                const sourceBottom = document.querySelector('.ws-source-bottom');
-                const scriptZone   = document.querySelector('.ws-script-zone');
-                const resultZone   = document.querySelector('.ws-transform-zone');
                 const state = bundle.collapsed_panels;
-                if (sourceTop)    sourceTop.classList.toggle('ws-panel--collapsed', !!state['source']);
-                if (sourceBottom) sourceBottom.classList.toggle('ws-panel--collapsed', !!state['data']);
-                if (scriptZone)   scriptZone.classList.toggle('ws-zone--collapsed', !!state['script']);
-                if (resultZone)   resultZone.classList.toggle('ws-zone--collapsed', !!state['result']);
+
+                // Flex sub-panels: explicit inline styles to ensure collapse/expand
+                const applyFlex = (el, collapsed) => {
+                    if (!el) return;
+                    el.classList.toggle('ws-panel--collapsed', collapsed);
+                    if (collapsed) {
+                        el.style.flex = '0 0 auto';
+                        el.style.minHeight = '0';
+                        el.style.overflow = 'visible';
+                        const c = el.querySelector('.ws-panel-content');
+                        if (c) c.style.display = 'none';
+                    } else {
+                        el.style.flex = '';
+                        el.style.minHeight = '';
+                        el.style.overflow = '';
+                        const c = el.querySelector('.ws-panel-content');
+                        if (c) c.style.display = '';
+                    }
+                };
+                applyFlex(document.querySelector('.ws-source-top'),    !!state['source']);
+                applyFlex(document.querySelector('.ws-source-bottom'), !!state['data']);
+
+                // Grid columns
+                const scriptZone = document.querySelector('.ws-script-zone');
+                const resultZone = document.querySelector('.ws-transform-zone');
+                if (scriptZone) scriptZone.classList.toggle('ws-zone--collapsed', !!state['script']);
+                if (resultZone) resultZone.classList.toggle('ws-zone--collapsed', !!state['result']);
+
                 // Update split handle
                 const splitHandle = document.querySelector('.ws-source-split-handle');
                 if (splitHandle) splitHandle.style.display = (state['source'] || state['data']) ? 'none' : '';
+
                 // Update grid columns
                 const area = document.querySelector('.ws-transform-area');
                 if (area) {
@@ -434,6 +454,7 @@
                         area.style.gridTemplateColumns = '';
                     }
                 }
+
                 // Disable resize handles next to collapsed columns
                 const colResize  = document.querySelector('.ws-col-resize');
                 const colResize2 = document.querySelector('.ws-col-resize2');
