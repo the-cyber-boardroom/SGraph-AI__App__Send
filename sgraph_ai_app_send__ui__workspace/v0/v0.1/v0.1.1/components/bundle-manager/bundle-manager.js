@@ -30,7 +30,7 @@
     }
 
     // Data file extensions (mirrors DocumentViewer.DATA_EXTS for file-origin tracking)
-    const DocumentViewer_DATA_EXTS = ['json', 'csv', 'xml', 'yaml', 'yml', 'tsv'];
+    const DocumentViewer_DATA_EXTS = ['json', 'csv', 'xml', 'yaml', 'yml', 'tsv', 'ndjson', 'jsonl'];
 
     function shortId() {
         return Math.random().toString(16).slice(2, 6);

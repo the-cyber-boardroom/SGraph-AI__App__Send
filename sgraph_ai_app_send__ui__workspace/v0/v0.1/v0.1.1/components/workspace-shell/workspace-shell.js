@@ -4,7 +4,9 @@
      1. Save State button (with visual feedback)
      2. Bundles debug tab
      3. Collapsible/resizable chat sections
-     4. <bundle-manager> and <bundle-list> components
+     4. Collapsible chat zone (entire bottom panel)
+     5. Fix: source zone shrinks when both Source+Data collapsed
+     6. <bundle-manager> and <bundle-list> components
 
    Loads AFTER v0.1.0/workspace-shell.js — overrides via prototype patching.
    Also applies immediately to the already-rendered shell instance.
@@ -95,6 +97,21 @@
         .ws-zone--collapsed .ws-panel-clear { display: none !important; }
         .ws-zone--collapsed .ws-panel-toggle { transform: rotate(-90deg); }
 
+        /* Collapsed chat zone (entire bottom panel) */
+        .ws-chat-zone--collapsed .ws-chat-body { display: none !important; }
+        .ws-chat-zone--collapsed {
+            border-top: 1px solid var(--ws-border-subtle, #222d4d);
+        }
+        .ws-chat-zone--collapsed .ws-chat-toggle {
+            transform: rotate(-90deg);
+        }
+        .ws-chat-toggle {
+            font-size: 0.5rem;
+            color: var(--ws-text-muted, #5a6478);
+            transition: transform 150ms;
+            margin-right: 0.25rem;
+        }
+
         /* Save button feedback */
         @keyframes ws-save-flash {
             0%   { background: rgba(78,205,196,0.3); }
@@ -132,9 +149,47 @@
         // Guard: don't inject twice
         if (shell.querySelector('.ws-bundle-save')) return;
 
-        // 1. Add "Save State" button to the chat zone header
+        // 1. Add "Save State" button and collapse toggle to the chat zone header
         const chatHeader = shell.querySelector('.ws-chat-header');
         if (chatHeader) {
+            // Add collapse toggle for the entire chat zone
+            const chatToggle = document.createElement('span');
+            chatToggle.className = 'ws-chat-toggle';
+            chatToggle.innerHTML = '&#9660;';
+            chatHeader.insertBefore(chatToggle, chatHeader.firstChild);
+
+            const chatZone = shell.querySelector('.ws-chat-zone');
+            const chatCollapsedKey = 'sgraph-workspace-chat-zone-collapsed';
+
+            // Restore collapsed state
+            try {
+                if (localStorage.getItem(chatCollapsedKey) === 'true' && chatZone) {
+                    chatZone.classList.add('ws-chat-zone--collapsed');
+                    // Shrink the grid row for chat when collapsed
+                    const area = shell.querySelector('.ws-transform-area');
+                    if (area) area.style.gridTemplateRows = 'minmax(0, 1fr) 4px auto';
+                }
+            } catch (_) {}
+
+            chatHeader.style.cursor = 'pointer';
+            chatHeader.addEventListener('click', (e) => {
+                // Don't toggle when clicking the Save button
+                if (e.target.closest('.ws-bundle-save')) return;
+                if (!chatZone) return;
+                chatZone.classList.toggle('ws-chat-zone--collapsed');
+                const isCollapsed = chatZone.classList.contains('ws-chat-zone--collapsed');
+                try { localStorage.setItem(chatCollapsedKey, isCollapsed); } catch (_) {}
+
+                // Adjust grid row: collapsed = auto height (just header), expanded = restore
+                const area = shell.querySelector('.ws-transform-area');
+                if (area) {
+                    area.style.gridTemplateRows = isCollapsed
+                        ? 'minmax(0, 1fr) 4px auto'
+                        : '';
+                }
+            });
+
+            // Add Save State button
             const saveBtn = document.createElement('button');
             saveBtn.className = 'ws-bundle-save';
             saveBtn.textContent = 'Save State';
@@ -172,6 +227,11 @@
                 }, 1200);
             };
             window.sgraphWorkspace.events.on('bundle-saved', onSaved);
+
+            // Store cleanup so disconnectedCallback can remove it
+            shell._bundleSavedUnsub = () => {
+                window.sgraphWorkspace.events.off('bundle-saved', onSaved);
+            };
         }
 
         // 2. Add "Bundles" tab to the debug sidebar
@@ -340,6 +400,31 @@
         const splitHandle = shell.querySelector('.ws-source-split-handle');
         if (splitHandle) splitHandle.style.display = (state['source'] || state['data']) ? 'none' : '';
 
+        // When BOTH Source and Data are collapsed, shrink the source zone's grid row
+        const sourceZone = shell.querySelector('.ws-source-zone');
+        const bothCollapsed = !!state['source'] && !!state['data'];
+        if (sourceZone) {
+            sourceZone.classList.toggle('ws-source-zone--all-collapsed', bothCollapsed);
+        }
+
+        // Update grid-template-rows when both source panels are collapsed
+        const area = shell.querySelector('.ws-transform-area');
+        if (area) {
+            if (bothCollapsed) {
+                // Shrink the top row to fit-content (just the collapsed headers)
+                area.style.gridTemplateRows = 'auto 4px var(--ws-chat-height)';
+            } else {
+                // Restore default (unless chat zone is also collapsed)
+                const chatZone = shell.querySelector('.ws-chat-zone');
+                const chatCollapsed = chatZone && chatZone.classList.contains('ws-chat-zone--collapsed');
+                if (chatCollapsed) {
+                    area.style.gridTemplateRows = 'minmax(0, 1fr) 4px auto';
+                } else {
+                    area.style.gridTemplateRows = '';
+                }
+            }
+        }
+
         // Script / Result (grid columns)
         const scriptZone = shell.querySelector('.ws-script-zone');
         const resultZone = shell.querySelector('.ws-transform-zone');
@@ -353,7 +438,6 @@
         if (colResize2) colResize2.style.pointerEvents = (state['script'] || state['result']) ? 'none' : '';
 
         // Update grid-template-columns
-        const area = shell.querySelector('.ws-transform-area');
         if (area) {
             if (state['script'] || state['result']) {
                 const sw  = '2fr';
@@ -408,8 +492,21 @@
         );
     }
 
-    // --- Override render() for future re-renders ---
+    // --- Override disconnectedCallback to clean up section resize listeners ---
     const ShellClass = customElements.get('workspace-shell');
+    const _originalDisconnected = ShellClass.prototype.disconnectedCallback;
+
+    ShellClass.prototype.disconnectedCallback = function() {
+        _originalDisconnected.call(this);
+        for (const cleanup of _resizeCleanups) cleanup();
+        _resizeCleanups.length = 0;
+        if (this._bundleSavedUnsub) {
+            this._bundleSavedUnsub();
+            this._bundleSavedUnsub = null;
+        }
+    };
+
+    // --- Override render() for future re-renders ---
     const _originalRender = ShellClass.prototype.render;
 
     ShellClass.prototype.render = function() {

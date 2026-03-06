@@ -58,6 +58,10 @@ articles.forEach(function(el) {
 
         disconnectedCallback() {
             for (const unsub of this._unsubs) unsub();
+            if (this._splitResizeCleanup) {
+                this._splitResizeCleanup();
+                this._splitResizeCleanup = null;
+            }
         }
 
         // --- Public API --------------------------------------------------------
@@ -396,6 +400,13 @@ articles.forEach(function(el) {
         }
 
         _setupSplitResize() {
+            // Clean up previous split resize listeners before adding new ones
+            // (prevents duplicates when _render() is called multiple times)
+            if (this._splitResizeCleanup) {
+                this._splitResizeCleanup();
+                this._splitResizeCleanup = null;
+            }
+
             const handle    = this.querySelector('.se-split-handle');
             const split     = this.querySelector('.se-split');
             const codeWrap  = this.querySelector('.se-code-wrap');
@@ -436,10 +447,10 @@ articles.forEach(function(el) {
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
 
-            this._unsubs.push(
-                () => document.removeEventListener('mousemove', onMouseMove),
-                () => document.removeEventListener('mouseup', onMouseUp),
-            );
+            this._splitResizeCleanup = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
         }
 
         // --- Styles ------------------------------------------------------------
