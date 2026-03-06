@@ -52,17 +52,20 @@
         connectedCallback() {
             const onSave   = (data) => this._handleSave(data);
             const onLoad   = (data) => this._handleLoad(data);
+            const onDelete = (data) => this._handleDelete(data);
             const onLLMComplete = (data) => this._handleLLMComplete(data);
             const onFileSelected = (data) => this._trackFileOrigin(data);
 
             window.sgraphWorkspace.events.on('bundle-save-requested', onSave);
             window.sgraphWorkspace.events.on('bundle-load-requested', onLoad);
+            window.sgraphWorkspace.events.on('bundle-delete-requested', onDelete);
             window.sgraphWorkspace.events.on('llm-request-complete', onLLMComplete);
             window.sgraphWorkspace.events.on('file-selected', onFileSelected);
 
             this._unsubs.push(
                 () => window.sgraphWorkspace.events.off('bundle-save-requested', onSave),
                 () => window.sgraphWorkspace.events.off('bundle-load-requested', onLoad),
+                () => window.sgraphWorkspace.events.off('bundle-delete-requested', onDelete),
                 () => window.sgraphWorkspace.events.off('llm-request-complete', onLLMComplete),
                 () => window.sgraphWorkspace.events.off('file-selected', onFileSelected),
             );
@@ -219,13 +222,16 @@
                 const data = new TextEncoder().encode(JSON.stringify(bundle, null, 2));
                 await vault.addFile(BUNDLE_FOLDER, filename, data);
 
+                // Track bundle size (bytes)
+                bundle._sizeBytes = data.byteLength;
+
                 // Update tree.json
                 await this._updateTreeIndex(vault, bundle);
 
                 // Track as active bundle
                 this._activeBundle = bundle.id;
 
-                window.sgraphWorkspace.messages.success(`Bundle saved: ${bundle.id}`);
+                window.sgraphWorkspace.messages.success(`Bundle saved (${this._formatSize(data.byteLength)})`);
                 window.sgraphWorkspace.events.emit('bundle-saved', { bundle });
                 window.sgraphWorkspace.events.emit('bundle-list-changed');
 
@@ -345,16 +351,18 @@
                 this._setCheckbox('#lpi-gen-js', config.gen_js_mode);
             }
 
-            // Restore screenshots into prompt input's pasted images
-            if (ctx.screenshots && ctx.screenshots.length > 0) {
-                const pi = document.querySelector('llm-prompt-input');
-                if (pi) {
+            // Restore or clear screenshots in prompt input
+            const pi = document.querySelector('llm-prompt-input');
+            if (pi) {
+                if (ctx.screenshots && ctx.screenshots.length > 0) {
                     pi._pastedImages = ctx.screenshots.map(s => ({
                         dataUrl: s.data,
                         type:    s.type || 'image/png',
                     }));
-                    if (pi._renderImagePreviews) pi._renderImagePreviews();
+                } else {
+                    pi._pastedImages = [];
                 }
+                if (pi._renderImagePreviews) pi._renderImagePreviews();
             }
 
             // Restore LLM response
@@ -387,6 +395,7 @@
                 timestamp:      bundle.timestamp,
                 model:          bundle.config?.model || null,
                 prompt_preview: (bundle.prompts?.user || '').slice(0, 60),
+                size_bytes:     bundle._sizeBytes || null,
             };
 
             const data = new TextEncoder().encode(JSON.stringify(tree, null, 2));
@@ -406,10 +415,60 @@
             await this.loadBundle(data.bundleId);
         }
 
+        async _handleDelete(data) {
+            if (!data || !data.bundleId) return;
+            await this.deleteBundle(data.bundleId);
+        }
+
         async _handleLLMComplete(data) {
             if (!this._autoSave) return;
             const bundle = this.captureState(data);
             await this.saveBundle(bundle);
+        }
+
+        // --- Delete Bundle -----------------------------------------------------
+
+        async deleteBundle(bundleId) {
+            const vault = this._getVault();
+            if (!vault) {
+                window.sgraphWorkspace.messages.error('No vault open — cannot delete bundle');
+                return false;
+            }
+
+            try {
+                // Remove bundle file from vault
+                try { await vault.removeFile(BUNDLE_FOLDER, `${bundleId}.json`); } catch (_) {}
+
+                // Update tree.json — remove entry
+                let tree = { bundles: {} };
+                try {
+                    const raw = await vault.getFile(BUNDLE_FOLDER, 'tree.json');
+                    const text = new TextDecoder().decode(new Uint8Array(raw));
+                    tree = JSON.parse(text);
+                } catch (_) {}
+
+                delete tree.bundles[bundleId];
+
+                const data = new TextEncoder().encode(JSON.stringify(tree, null, 2));
+                await vault.addFile(BUNDLE_FOLDER, 'tree.json', data);
+
+                // Clear active if deleted
+                if (this._activeBundle === bundleId) this._activeBundle = null;
+
+                window.sgraphWorkspace.messages.success(`Bundle deleted: ${bundleId}`);
+                window.sgraphWorkspace.events.emit('bundle-list-changed');
+                return true;
+            } catch (e) {
+                console.error('[bundle-manager] Delete failed:', e);
+                window.sgraphWorkspace.messages.error('Bundle delete failed: ' + e.message);
+                return false;
+            }
+        }
+
+        _formatSize(bytes) {
+            if (!bytes || bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
         // --- Track vault file origins for vault:// references ------------------
