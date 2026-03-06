@@ -76,33 +76,43 @@ html, body {
 .ws-shell {
     display: grid;
     grid-template-areas:
-        "header  header    header    header    header    header"
-        "nav     vault     main      main      resize    debug"
-        "nav     vault     main      main      resize    debug"
-        "status  status    status    status    status    status";
-    grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 1fr 1fr 4px var(--ws-debug-width);
+        "header  header    header      header    header    header    header"
+        "nav     vault     vault-resize main      main      resize    debug"
+        "nav     vault     vault-resize main      main      resize    debug"
+        "status  status    status      status    status    status    status";
+    grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 4px 1fr 1fr 4px var(--ws-debug-width);
     grid-template-rows: var(--ws-header-height) 1fr var(--ws-chat-height) var(--ws-status-height);
     height: 100vh;
     overflow: hidden;
 }
 
 .ws-shell--no-debug {
-    grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 1fr 1fr 0 0;
+    grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 4px 1fr 1fr 0 0;
 }
 
 .ws-shell--no-debug .ws-debug-sidebar,
 .ws-shell--no-debug .ws-debug-resize { display: none; }
 
 .ws-shell--vault-collapsed {
-    grid-template-columns: var(--ws-nav-width) 0px 1fr 1fr 4px var(--ws-debug-width);
+    grid-template-columns: var(--ws-nav-width) 28px 0 1fr 1fr 4px var(--ws-debug-width);
 }
 
 .ws-shell--vault-collapsed .ws-vault-content,
-.ws-shell--vault-collapsed .ws-vault-title { display: none; }
+.ws-shell--vault-collapsed .ws-vault-title,
+.ws-shell--vault-collapsed .ws-vault-icon { display: none; }
+
+.ws-shell--vault-collapsed .ws-vault-header {
+    padding: 0.5rem 0.25rem;
+    justify-content: center;
+}
+
+.ws-shell--vault-collapsed .ws-vault-toggle { margin-left: 0; }
 
 .ws-shell--vault-collapsed.ws-shell--no-debug {
-    grid-template-columns: var(--ws-nav-width) 0px 1fr 1fr 0 0;
+    grid-template-columns: var(--ws-nav-width) 28px 0 1fr 1fr 0 0;
 }
+
+.ws-shell--vault-collapsed .ws-vault-resize { display: none; }
 
 /* --- Header --------------------------------------------------------------- */
 
@@ -247,24 +257,64 @@ html, body {
     overflow-y: auto;
 }
 
+/* --- Vault Resize Handle ------------------------------------------------- */
+
+.ws-vault-resize {
+    grid-area: vault-resize;
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 5;
+}
+
+.ws-vault-resize:hover,
+.ws-vault-resize.ws-vault-resize--active { background: var(--ws-primary); }
+
 /* --- Source & Transform Panels -------------------------------------------- */
 
 .ws-transform-area {
     grid-area: main;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: minmax(0, 1fr) var(--ws-chat-height);
+    grid-template-columns: 2fr 4px 1.5fr 4px 1.5fr;
+    grid-template-rows: minmax(0, 1fr) 4px var(--ws-chat-height);
     grid-template-areas:
-        "source transform"
-        "chat   chat";
+        "source   col-resize script  col-resize2  transform"
+        "row-resize row-resize row-resize row-resize row-resize"
+        "chat     chat       chat    chat          chat";
     overflow: hidden;
 }
 
-.ws-source-zone    { grid-area: source; }
-.ws-transform-zone { grid-area: transform; }
-.ws-chat-zone      { grid-area: chat; }
+.ws-source-zone     { grid-area: source; }
+.ws-col-resize      { grid-area: col-resize; }
+.ws-script-zone     { grid-area: script; }
+.ws-col-resize2     { grid-area: col-resize2; }
+.ws-transform-zone  { grid-area: transform; }
+.ws-row-resize      { grid-area: row-resize; }
+.ws-chat-zone       { grid-area: chat; }
+
+/* Column resize handle (between source and transform) */
+.ws-col-resize {
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 5;
+}
+.ws-col-resize:hover,
+.ws-col-resize.ws-col-resize--active { background: var(--ws-primary); }
+
+/* Row resize handle (between panels and chat) */
+.ws-row-resize {
+    cursor: row-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 5;
+}
+.ws-row-resize:hover,
+.ws-row-resize.ws-row-resize--active { background: var(--ws-primary); }
 
 .ws-source-zone,
+.ws-script-zone,
 .ws-transform-zone {
     display: flex;
     flex-direction: column;
@@ -272,7 +322,34 @@ html, body {
     background: var(--ws-bg);
 }
 
-.ws-source-zone    { border-right: 1px solid var(--ws-border-subtle); }
+/* Source split (HTML top + Data bottom) */
+.ws-source-top,
+.ws-source-bottom {
+    flex: 0.5;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.ws-source-split-handle {
+    height: 4px; flex-shrink: 0;
+    cursor: row-resize;
+    background: var(--ws-border-subtle, #222d4d);
+    transition: background 0.15s;
+}
+.ws-source-split-handle:hover,
+.ws-source-split-handle--active { background: var(--ws-primary); }
+
+/* Second column resize handle */
+.ws-col-resize2 {
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    z-index: 5;
+}
+.ws-col-resize2:hover,
+.ws-col-resize2.ws-col-resize2--active { background: var(--ws-primary); }
 
 .ws-panel-header {
     display: flex;
@@ -291,6 +368,23 @@ html, body {
     color: var(--ws-text-muted);
 }
 
+.ws-panel-clear {
+    margin-left: auto;
+    padding: 0.0625rem 0.375rem;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    background: transparent;
+    color: var(--ws-text-muted);
+    border: 1px solid var(--ws-border-subtle);
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.ws-panel-clear:hover {
+    color: var(--ws-text-secondary);
+    background: var(--ws-surface-hover);
+}
+
 .ws-panel-content {
     flex: 1;
     overflow: hidden;
@@ -306,12 +400,26 @@ document-viewer {
     overflow: hidden;
 }
 
-llm-chat {
+script-editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+llm-system-prompt,
+llm-prompt-input,
+llm-output {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
     overflow: hidden;
+}
+
+llm-orchestrator {
+    display: none;
 }
 
 vault-panel {
@@ -344,6 +452,27 @@ vault-panel {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--ws-text-muted);
+}
+
+.ws-chat-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+llm-stats {
+    width: 200px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--ws-border-subtle);
+    overflow-y: auto;
+    background: var(--ws-surface);
+}
+
+/* When llm-stats is inside a collapsed chat section, allow it to shrink */
+.ws-chat-section--collapsed llm-stats {
+    width: auto;
+    flex-shrink: 1;
 }
 
 /* --- Settings Area -------------------------------------------------------- */
@@ -445,11 +574,45 @@ vault-panel {
 
 .ws-msg-badge--error { background: var(--ws-error); color: #fff; }
 
+/* Activity indicator */
+.ws-activity {
+    display: none;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--ws-font-size-xs);
+    color: var(--ws-primary);
+}
+.ws-activity--active { display: flex; }
+.ws-activity-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ws-primary);
+    animation: ws-pulse 1s ease-in-out infinite;
+}
+.ws-activity-text {
+    color: var(--ws-text-secondary);
+    font-family: var(--ws-font-mono);
+}
+@keyframes ws-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.75); }
+}
+
+/* --- JS Syntax Highlighting ----------------------------------------------- */
+
+.jsh-keyword     { color: #c678dd; }
+.jsh-string      { color: #98c379; }
+.jsh-number      { color: #d19a66; }
+.jsh-comment     { color: #5c6370; font-style: italic; }
+.jsh-builtin     { color: #e5c07b; }
+.jsh-operator    { color: #56b6c2; }
+.jsh-punctuation { color: #abb2bf; }
+
 /* --- Responsive ----------------------------------------------------------- */
 
 @media (max-width: 1024px) {
     .ws-shell {
-        grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 1fr 1fr 0 0;
+        grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 4px 1fr 1fr 0 0;
     }
     .ws-debug-sidebar, .ws-debug-resize { display: none; }
 }
@@ -478,7 +641,10 @@ vault-panel {
     }
 
     .ws-vault-zone { display: none; }
+    .ws-vault-resize { display: none; }
+    .ws-col-resize, .ws-col-resize2, .ws-row-resize { display: none; }
     .ws-debug-sidebar, .ws-debug-resize { display: none; }
+    llm-stats { display: none; }
     .ws-menu-btn { display: block; }
     .ws-source-zone { border-right: none; border-bottom: 1px solid var(--ws-border-subtle); }
 }

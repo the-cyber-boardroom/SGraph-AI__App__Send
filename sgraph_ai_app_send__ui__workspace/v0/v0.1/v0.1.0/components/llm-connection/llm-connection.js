@@ -1,6 +1,6 @@
 /* =============================================================================
    SGraph Workspace — LLM Connection Manager
-   v0.1.0 — API key management, provider selection, model listing
+   v0.1.0 — API key management, provider selection, model listing, favorites
 
    Supports two providers for Phase 1:
      - OpenRouter (api key → openrouter.ai, access to many models)
@@ -22,7 +22,8 @@
         return d.innerHTML;
     }
 
-    const STORAGE_KEY = 'sgraph-workspace-llm';
+    const STORAGE_KEY    = 'sgraph-workspace-llm';
+    const FAVORITES_KEY  = 'sgraph-workspace-llm-favorites';
 
     // --- Provider definitions ------------------------------------------------
 
@@ -59,11 +60,15 @@
             this._provider      = null;       // 'openrouter' | 'ollama'
             this._apiKey        = '';
             this._ollamaUrl     = 'http://localhost:11434';
-            this._models        = [];         // [{ id, name }]
+            this._models        = [];         // [{ id, name, pricing, context_length }]
             this._selectedModel = null;
             this._status        = 'disconnected'; // disconnected | connecting | connected | error
             this._errorMsg      = null;
+            this._modelSearch   = '';
+            this._favorites     = [];         // [modelId, ...]
+            this._defaults      = { text: null, code: null, multimodal: null };
             this._loadSettings();
+            this._loadFavorites();
         }
 
         connectedCallback() {
@@ -105,7 +110,29 @@
             } catch (_) { /* ignore */ }
         }
 
-        // --- Public API (used by llm-chat) ------------------------------------
+        // --- Favorites persistence -----------------------------------------------
+
+        _loadFavorites() {
+            try {
+                const raw = localStorage.getItem(FAVORITES_KEY);
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    this._favorites = data.favorites || [];
+                    this._defaults  = data.defaults  || { text: null, code: null, multimodal: null };
+                }
+            } catch (_) { /* ignore */ }
+        }
+
+        _saveFavorites() {
+            try {
+                localStorage.setItem(FAVORITES_KEY, JSON.stringify({
+                    favorites: this._favorites,
+                    defaults:  this._defaults,
+                }));
+            } catch (_) { /* ignore */ }
+        }
+
+        // --- Public API ----------------------------------------------------------
 
         getProvider()      { return this._provider; }
         getApiKey()        { return this._apiKey; }
@@ -117,6 +144,50 @@
         getModels()        { return [...this._models]; }
         getSelectedModel() { return this._selectedModel; }
         isConnected()      { return this._status === 'connected'; }
+
+        getModelPricing(modelId) {
+            const m = this._models.find(m => m.id === modelId);
+            return m?.pricing || null;
+        }
+
+        getFavorites() {
+            return this._favorites
+                .map(id => this._models.find(m => m.id === id))
+                .filter(Boolean);
+        }
+
+        getFavoriteIds() { return [...this._favorites]; }
+
+        isFavorite(modelId) { return this._favorites.includes(modelId); }
+
+        toggleFavorite(modelId) {
+            const idx = this._favorites.indexOf(modelId);
+            if (idx >= 0) {
+                this._favorites.splice(idx, 1);
+                // Clear defaults pointing to this model
+                for (const role of ['text', 'code', 'multimodal']) {
+                    if (this._defaults[role] === modelId) this._defaults[role] = null;
+                }
+            } else {
+                this._favorites.push(modelId);
+            }
+            this._saveFavorites();
+            window.sgraphWorkspace.events.emit('llm-favorites-changed', { favorites: this._favorites });
+        }
+
+        getDefault(role)          { return this._defaults[role] || null; }
+        setDefault(role, modelId) {
+            this._defaults[role] = modelId;
+            this._saveFavorites();
+            window.sgraphWorkspace.events.emit('llm-favorites-changed', { favorites: this._favorites });
+        }
+
+        setSelectedModel(modelId) {
+            this._selectedModel = modelId;
+            this._saveSettings();
+            this._updateStatusBar();
+            window.sgraphWorkspace.events.emit('llm-model-changed', { model: modelId });
+        }
 
         // --- Connection --------------------------------------------------------
 
@@ -173,8 +244,12 @@
             if (data.data && Array.isArray(data.data)) {
                 this._models = data.data
                     .filter(m => m.id && !m.id.includes('image'))
-                    .slice(0, 50)
-                    .map(m => ({ id: m.id, name: m.name || m.id }))
+                    .map(m => ({
+                        id:             m.id,
+                        name:           m.name || m.id,
+                        pricing:        m.pricing || null,
+                        context_length: m.context_length || null,
+                    }))
                     .sort((a, b) => a.name.localeCompare(b.name));
             } else {
                 this._models = [...PROVIDERS.openrouter.defaultModels];
@@ -279,10 +354,134 @@
                             `<option value="${esc(m.id)}" ${m.id === this._selectedModel ? 'selected' : ''}>${esc(m.name)}</option>`
                         ).join('')}
                     </select>
-                </div>` : ''}
+                </div>
+
+                ${this._renderFavoritesSection()}
+                ` : ''}
+
+                <hr class="lc-divider">
+                <h2 class="lc-title">Workspace Storage</h2>
+                <div class="lc-hint" style="margin-bottom: 0.75rem">Data stored in your browser's localStorage. Never sent to the server.</div>
+                ${this._renderStorageSection()}
             </div>`;
 
             this._bind();
+        }
+
+        // --- Favorites section ---------------------------------------------------
+
+        _renderFavoritesSection() {
+            const favModels = this.getFavorites();
+
+            // Role defaults
+            const roles = ['text', 'code', 'multimodal'];
+            const roleOptions = (role) => {
+                let html = '<option value="">(none)</option>';
+                for (const m of favModels) {
+                    const sel = this._defaults[role] === m.id ? 'selected' : '';
+                    html += `<option value="${esc(m.id)}" ${sel}>${esc(m.name)}</option>`;
+                }
+                return html;
+            };
+
+            // Filtered model list for adding favorites
+            const search = this._modelSearch.toLowerCase();
+            const filtered = search
+                ? this._models.filter(m => m.id.toLowerCase().includes(search) || m.name.toLowerCase().includes(search)).slice(0, 30)
+                : [];
+
+            return `
+                <hr class="lc-divider">
+                <h2 class="lc-title">Model Favorites</h2>
+                <div class="lc-hint" style="margin-bottom: 0.75rem">
+                    Star models to add them to your quick-select list.
+                    Assign role defaults so the right model is auto-selected.
+                </div>
+
+                ${favModels.length > 0 ? `
+                <div class="lc-section">
+                    <label class="lc-label">Favorites (${favModels.length})</label>
+                    <div class="lc-fav-list">
+                        ${favModels.map(m => {
+                            const pricing = m.pricing;
+                            const cost = pricing ? `$${(parseFloat(pricing.prompt || 0) * 1e6).toFixed(2)}/$${(parseFloat(pricing.completion || 0) * 1e6).toFixed(2)} /M` : '';
+                            const ctx = m.context_length ? `${Math.round(m.context_length / 1024)}K` : '';
+                            return `<div class="lc-fav-row">
+                                <button class="lc-fav-star lc-fav-star--active" data-fav-id="${esc(m.id)}" title="Remove from favorites">&#9733;</button>
+                                <span class="lc-fav-name">${esc(m.name)}</span>
+                                ${ctx ? `<span class="lc-fav-ctx">${ctx}</span>` : ''}
+                                ${cost ? `<span class="lc-fav-cost">${cost}</span>` : ''}
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+
+                <div class="lc-section">
+                    <label class="lc-label">Role Defaults</label>
+                    ${roles.map(role => `
+                        <div class="lc-role-row">
+                            <span class="lc-role-label">${role.charAt(0).toUpperCase() + role.slice(1)}:</span>
+                            <select class="lc-role-select" data-role="${role}">${roleOptions(role)}</select>
+                        </div>
+                    `).join('')}
+                </div>
+                ` : '<div class="lc-hint" style="margin-bottom: 0.75rem">No favorites yet. Search below to add models.</div>'}
+
+                <div class="lc-section">
+                    <label class="lc-label">Search Models</label>
+                    <input type="text" class="lc-input" id="lc-model-search"
+                           placeholder="Type to search ${this._models.length} models..." value="${esc(this._modelSearch)}">
+                    ${filtered.length > 0 ? `
+                    <div class="lc-search-results">
+                        ${filtered.map(m => {
+                            const isFav = this.isFavorite(m.id);
+                            return `<div class="lc-search-row">
+                                <button class="lc-fav-star ${isFav ? 'lc-fav-star--active' : ''}" data-fav-id="${esc(m.id)}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '&#9733;' : '&#9734;'}</button>
+                                <span class="lc-search-name">${esc(m.name)}</span>
+                                <span class="lc-search-id">${esc(m.id)}</span>
+                            </div>`;
+                        }).join('')}
+                    </div>` : (search ? '<div class="lc-hint">No models match</div>' : '')}
+                </div>`;
+        }
+
+        // --- Storage display ----------------------------------------------------
+
+        _renderStorageSection() {
+            const KEYS = [
+                { key: 'sgraph-workspace-vault', label: 'Vault Settings' },
+                { key: 'sgraph-workspace-llm',   label: 'LLM Settings' },
+            ];
+
+            let html = '';
+            for (const { key, label } of KEYS) {
+                try {
+                    const raw = localStorage.getItem(key);
+                    if (!raw) {
+                        html += `<div class="lc-section"><label class="lc-label">${esc(label)}</label><div class="lc-hint">Not set</div></div>`;
+                        continue;
+                    }
+                    const data = JSON.parse(raw);
+                    const rows = Object.entries(data).map(([k, v]) => {
+                        let display = v;
+                        // Mask sensitive values (show first/last chars)
+                        if (k === 'apiKey' && typeof v === 'string' && v.length > 8) {
+                            display = v.slice(0, 6) + '...' + v.slice(-4);
+                        }
+                        if (typeof display === 'object') display = JSON.stringify(display);
+                        return `<div class="lc-storage-row">
+                            <span class="lc-storage-key">${esc(k)}</span>
+                            <input type="text" class="lc-storage-value" value="${esc(String(display || ''))}" readonly
+                                   data-storage-key="${esc(key)}" data-field="${esc(k)}" data-full="${esc(String(v || ''))}">
+                            <button class="lc-storage-copy" data-copy="${esc(String(v || ''))}" title="Copy to clipboard">Copy</button>
+                        </div>`;
+                    }).join('');
+                    html += `<div class="lc-section"><label class="lc-label">${esc(label)}</label>${rows}</div>`;
+                } catch (_) {
+                    html += `<div class="lc-section"><label class="lc-label">${esc(label)}</label><div class="lc-hint">Error reading</div></div>`;
+                }
+            }
+            return html;
         }
 
         // --- Event binding -----------------------------------------------------
@@ -316,6 +515,28 @@
             const disconnectBtn = this.querySelector('#lc-disconnect');
             if (disconnectBtn) disconnectBtn.addEventListener('click', () => this._disconnect());
 
+            // Copy buttons for storage values
+            this.querySelectorAll('.lc-storage-copy').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const val = btn.dataset.copy;
+                    navigator.clipboard.writeText(val).then(() => {
+                        btn.textContent = 'Copied';
+                        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+                    }).catch(() => {
+                        const input = btn.previousElementSibling;
+                        if (input) { input.value = btn.dataset.copy; input.select(); }
+                    });
+                });
+            });
+
+            // Clicking on storage value input reveals full value
+            this.querySelectorAll('.lc-storage-value').forEach(input => {
+                input.addEventListener('click', () => {
+                    input.value = input.dataset.full;
+                    input.select();
+                });
+            });
+
             const modelSelect = this.querySelector('#lc-model-select');
             if (modelSelect) {
                 modelSelect.addEventListener('change', () => {
@@ -325,6 +546,42 @@
                     window.sgraphWorkspace.events.emit('llm-model-changed', { model: this._selectedModel });
                 });
             }
+
+            // Model search
+            const modelSearchInput = this.querySelector('#lc-model-search');
+            if (modelSearchInput) {
+                modelSearchInput.addEventListener('input', () => {
+                    this._modelSearch = modelSearchInput.value;
+                    this._render();
+                    // Restore focus and cursor position
+                    const newInput = this.querySelector('#lc-model-search');
+                    if (newInput) {
+                        newInput.focus();
+                        newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+                    }
+                });
+            }
+
+            // Favorite star buttons (both in favorites list and search results)
+            this.querySelectorAll('.lc-fav-star').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    this.toggleFavorite(btn.dataset.favId);
+                    this._render();
+                    // Restore search focus
+                    const newInput = this.querySelector('#lc-model-search');
+                    if (newInput && this._modelSearch) {
+                        newInput.focus();
+                        newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+                    }
+                });
+            });
+
+            // Role default selects
+            this.querySelectorAll('.lc-role-select').forEach(sel => {
+                sel.addEventListener('change', () => {
+                    this.setDefault(sel.dataset.role, sel.value || null);
+                });
+            });
         }
 
         // --- Styles ------------------------------------------------------------
@@ -404,6 +661,101 @@
                     color: var(--ws-primary, #4ECDC4); border-color: var(--ws-primary, #4ECDC4);
                 }
                 .lc-btn--primary:hover { background: rgba(78,205,196,0.2); }
+                .lc-divider {
+                    border: none; border-top: 1px solid var(--ws-border, #2C3E6B);
+                    margin: 1.5rem 0;
+                }
+
+                /* Favorites */
+                .lc-fav-list { display: flex; flex-direction: column; gap: 0.25rem; }
+                .lc-fav-row, .lc-search-row {
+                    display: flex; align-items: center; gap: 0.5rem;
+                    padding: 0.375rem 0.5rem;
+                    border-radius: var(--ws-radius, 6px);
+                    font-size: 0.8125rem;
+                }
+                .lc-fav-row:hover, .lc-search-row:hover { background: var(--ws-surface-hover, #253254); }
+                .lc-fav-star {
+                    background: none; border: none; cursor: pointer;
+                    font-size: 1.125rem; color: var(--ws-text-muted, #5a6478);
+                    padding: 0; line-height: 1; flex-shrink: 0;
+                }
+                .lc-fav-star--active { color: var(--ws-warning, #fbbf24); }
+                .lc-fav-star:hover { color: var(--ws-warning, #fbbf24); }
+                .lc-fav-name { color: var(--ws-text, #F0F0F5); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .lc-fav-ctx {
+                    font-size: 0.6875rem; color: var(--ws-text-muted, #5a6478);
+                    flex-shrink: 0;
+                }
+                .lc-fav-cost {
+                    font-size: 0.625rem; color: var(--ws-text-muted, #5a6478);
+                    font-family: var(--ws-font-mono, monospace); flex-shrink: 0;
+                }
+
+                /* Role defaults */
+                .lc-role-row {
+                    display: flex; align-items: center; gap: 0.5rem;
+                    margin-bottom: 0.375rem;
+                }
+                .lc-role-label {
+                    font-size: 0.8125rem; font-weight: 600;
+                    color: var(--ws-text-secondary, #8892A0);
+                    min-width: 80px; flex-shrink: 0;
+                }
+                .lc-role-select {
+                    flex: 1; padding: 0.375rem 0.5rem;
+                    background: var(--ws-bg, #1A1A2E); color: var(--ws-text, #F0F0F5);
+                    border: 1px solid var(--ws-border, #2C3E6B);
+                    border-radius: var(--ws-radius, 6px); font-size: 0.8125rem;
+                    outline: none; box-sizing: border-box;
+                }
+
+                /* Search results */
+                .lc-search-results {
+                    max-height: 250px; overflow-y: auto;
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px);
+                    margin-top: 0.375rem;
+                }
+                .lc-search-name {
+                    color: var(--ws-text, #F0F0F5);
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                }
+                .lc-search-id {
+                    font-size: 0.6875rem; color: var(--ws-text-muted, #5a6478);
+                    margin-left: auto; flex-shrink: 0;
+                    font-family: var(--ws-font-mono, monospace);
+                }
+
+                /* Storage */
+                .lc-storage-row {
+                    display: flex; align-items: center; gap: 0.5rem;
+                    margin-bottom: 0.375rem;
+                }
+                .lc-storage-key {
+                    font-size: 0.75rem; font-weight: 600;
+                    color: var(--ws-text-muted, #5a6478);
+                    font-family: var(--ws-font-mono, monospace);
+                    min-width: 100px; flex-shrink: 0;
+                }
+                .lc-storage-value {
+                    flex: 1; padding: 0.25rem 0.5rem;
+                    font-size: 0.75rem; font-family: var(--ws-font-mono, monospace);
+                    background: var(--ws-bg, #1A1A2E); color: var(--ws-text, #F0F0F5);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px);
+                    outline: none; box-sizing: border-box; cursor: pointer;
+                }
+                .lc-storage-value:focus { border-color: var(--ws-primary, #4ECDC4); }
+                .lc-storage-copy {
+                    padding: 0.1875rem 0.5rem; font-size: 0.625rem; font-weight: 600;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-secondary, #8892A0);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px);
+                    cursor: pointer; font-family: inherit; flex-shrink: 0;
+                }
+                .lc-storage-copy:hover { color: var(--ws-text, #F0F0F5); background: var(--ws-surface-hover, #253254); }
             `;
         }
     }

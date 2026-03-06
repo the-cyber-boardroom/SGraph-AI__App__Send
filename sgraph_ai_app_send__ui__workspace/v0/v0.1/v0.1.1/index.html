@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGraph Workspace v0.1.1 — Execution Bundles</title>
+
+    <!-- Workspace CSS (from v0.1.0) -->
+    <link rel="stylesheet" href="../v0.1.0/css/workspace.css">
+</head>
+<body>
+    <workspace-shell></workspace-shell>
+
+    <!-- === Layer 0: Build info (from v0.1.0) === -->
+    <script src="../v0.1.0/js/build-info.js"></script>
+
+    <!-- === Layer 1: Workspace initialisation (from v0.1.0) === -->
+    <script src="../v0.1.0/js/workspace-init.js"></script>
+
+    <!-- === Layer 2: Shared infrastructure from static.sgraph.ai === -->
+    <script src="https://static.sgraph.ai/websites/sgraph-vault/dev/releases/v0/v0.1/v0.1.1/_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-vault/dev/releases/v0/v0.1/v0.1.1/_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-vault/dev/releases/v0/v0.1/v0.1.1/_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-vault/dev/releases/v0/v0.1/v0.1.1/_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-send/dev/releases/v0/v0.2/v0.2.0/_common/js/file-type-detect.js"></script>
+    <script src="https://static.sgraph.ai/websites/sgraph-send/dev/releases/v0/v0.2/v0.2.0/_common/js/markdown-parser.js"></script>
+
+    <!-- === Layer 3: Debug panels (from v0.1.0) === -->
+    <script src="../v0.1.0/components/debug/messages-panel.js"></script>
+    <script src="../v0.1.0/components/debug/events-viewer.js"></script>
+    <script src="../v0.1.0/components/debug/api-logger.js"></script>
+    <script src="../v0.1.0/components/debug/llm-debug.js"></script>
+
+    <!-- === Layer 4: Workspace components (from v0.1.0) === -->
+    <script src="../v0.1.0/components/vault-panel/vault-panel.js"></script>
+    <script src="../v0.1.0/components/document-viewer/document-viewer.js"></script>
+    <script src="../v0.1.0/components/prompt-library/prompt-library.js"></script>
+    <script src="../v0.1.0/components/llm-connection/llm-connection.js"></script>
+    <script src="../v0.1.0/components/js-highlighter/js-highlighter.js"></script>
+    <script src="../v0.1.0/components/llm-system-prompt/llm-system-prompt.js"></script>
+    <script src="../v0.1.0/components/llm-output/llm-output.js"></script>
+    <script src="../v0.1.0/components/llm-prompt-input/llm-prompt-input.js"></script>
+    <script src="../v0.1.0/components/llm-orchestrator/llm-orchestrator.js"></script>
+    <script src="../v0.1.0/components/llm-stats/llm-stats.js"></script>
+    <script src="../v0.1.0/components/js-executor/js-executor.js"></script>
+    <script src="../v0.1.0/components/execution-history/execution-history.js"></script>
+    <script src="../v0.1.0/components/script-editor/script-editor.js"></script>
+
+    <!-- === Layer 5: Shell (from v0.1.0 — must load before override) === -->
+    <script src="../v0.1.0/components/workspace-shell/workspace-shell.js"></script>
+
+    <!-- === Layer 6: v0.1.1 bug fixes === -->
+    <!-- Fix: execution-history vault.writeFile -> vault.addFile + await createFolder -->
+    <script src="components/execution-history/execution-history.js"></script>
+
+    <!-- === Layer 7: v0.1.1 overrides — behaviour patches === -->
+    <!-- Keep screenshots after send -->
+    <script src="components/llm-prompt-input/llm-prompt-input.js"></script>
+    <!-- Code block detection + extract on copy to Script -->
+    <script src="components/llm-output/llm-output.js"></script>
+    <!-- Stop/cancel button for running scripts -->
+    <script src="components/script-editor/script-editor.js"></script>
+
+    <!-- === Layer 8: v0.1.1 additions — Execution Bundles === -->
+    <!-- New components (must load before shell override) -->
+    <script src="components/bundle-manager/bundle-manager.js"></script>
+    <script src="components/bundle-list/bundle-list.js"></script>
+
+    <!-- Surgical override: Save State, Bundles tab, collapsible chat sections -->
+    <script src="components/workspace-shell/workspace-shell.js"></script>
+</body>
+</html>

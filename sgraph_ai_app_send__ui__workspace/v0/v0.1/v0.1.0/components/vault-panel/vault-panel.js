@@ -110,6 +110,7 @@
         async _openVault(vaultKey) {
             this._state = 'loading';
             this._render();
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Opening vault...' });
 
             try {
                 const endpoint = window.sgraphWorkspace.config.sendEndpoint;
@@ -142,6 +143,7 @@
                 this._clearSaved();
                 this._render();
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         async _createVault() {
@@ -157,6 +159,7 @@
 
             this._state = 'loading';
             this._render();
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Creating vault...' });
 
             try {
                 const endpoint = window.sgraphWorkspace.config.sendEndpoint;
@@ -187,6 +190,25 @@
                 this._errorMsg = e.message;
                 this._render();
             }
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
+        async _refreshVault() {
+            if (!this._vaultKey) return;
+            window.sgraphWorkspace.messages.info('Refreshing vault...');
+            try {
+                const endpoint = window.sgraphWorkspace.config.sendEndpoint;
+                this._sgSend   = new SGSend({ endpoint, token: this._accessToken });
+                this._vault    = await SGVault.open(this._sgSend, this._vaultKey);
+                this._render();
+                const stats = this._vault.getStats();
+                window.sgraphWorkspace.messages.success(
+                    `Vault refreshed — ${stats.files} files`
+                );
+            } catch (e) {
+                console.error('[vault-panel] Refresh failed:', e);
+                window.sgraphWorkspace.messages.error('Refresh failed: ' + e.message);
+            }
         }
 
         _lockVault() {
@@ -203,6 +225,315 @@
             window.sgraphWorkspace.messages.info('Vault locked');
         }
 
+        // --- Inline action mode (replaces context menu) --------------------------
+
+        _startInlineInput(mode, defaultValue) {
+            // mode: 'new-folder' | 'new-file' | 'rename'
+            this._inlineMode  = mode;
+            this._inlineValue = defaultValue || '';
+            this._render();
+            const input = this.querySelector('.vp-inline-input');
+            if (input) { input.focus(); input.select(); }
+        }
+
+        _cancelInlineInput() {
+            this._inlineMode  = null;
+            this._inlineValue = '';
+            this._render();
+        }
+
+        async _confirmInlineInput() {
+            const input = this.querySelector('.vp-inline-input');
+            const value = input ? input.value.trim() : '';
+            if (!value) { this._cancelInlineInput(); return; }
+
+            const mode = this._inlineMode;
+            const targetName = this._inlineTarget;
+            this._inlineMode = null;
+            this._inlineValue = '';
+
+            if (mode === 'new-folder') await this._doCreateFolder(value);
+            else if (mode === 'new-file') await this._doCreateFile(value);
+            else if (mode === 'rename') await this._doRename(targetName, value);
+        }
+
+        async _doCreateFolder(name) {
+            if (!this._vault || this._state !== 'open') return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Creating folder "${name}"...` });
+            try {
+                // Build full path for subfolder
+                const fullPath = this._currentPath === '/'
+                    ? '/' + name
+                    : this._currentPath + '/' + name;
+                // Check if already exists
+                const items = this._vault.listFolder(this._currentPath) || [];
+                if (items.some(i => i.type === 'folder' && i.name === name)) {
+                    window.sgraphWorkspace.messages.warning(`Folder "${name}" already exists`);
+                    return;
+                }
+                this._vault.createFolder(fullPath);
+                this._render();
+                window.sgraphWorkspace.messages.success(`Folder "${name}" created`);
+                window.sgraphWorkspace.events.emit('folder-created', { name, path: this._currentPath });
+            } catch (e) {
+                console.error('[vault-panel] Create folder failed:', e);
+                window.sgraphWorkspace.messages.error('Create folder failed: ' + e.message);
+            }
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
+        async _doCreateFile(filename) {
+            if (!this._vault || this._state !== 'open') return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Creating "${filename}"...` });
+            try {
+                const content = new TextEncoder().encode('');
+                await this._vault.addFile(this._currentPath, filename, content);
+                this._render();
+                window.sgraphWorkspace.messages.success(`"${filename}" created`);
+                window.sgraphWorkspace.events.emit('file-created', { name: filename, path: this._currentPath });
+            } catch (e) {
+                console.error('[vault-panel] Create file failed:', e);
+                window.sgraphWorkspace.messages.error('Create failed: ' + e.message);
+            }
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
+        async _doRename(oldName, newName) {
+            if (!this._vault || !oldName || newName === oldName) return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Renaming "${oldName}"...` });
+            try {
+                await this._vault.renameFile(this._currentPath, oldName, newName);
+                this._render();
+                window.sgraphWorkspace.messages.success(`Renamed to "${newName}"`);
+            } catch (e) {
+                console.error('[vault-panel] Rename failed:', e);
+                window.sgraphWorkspace.messages.error('Rename failed: ' + e.message);
+            }
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
+        async _duplicateFile(name) {
+            if (!this._vault || !name) return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Duplicating "${name}"...` });
+            try {
+                const content = await this._vault.getFile(this._currentPath, name);
+                const dot = name.lastIndexOf('.');
+                const base = dot > 0 ? name.slice(0, dot) : name;
+                const ext  = dot > 0 ? name.slice(dot) : '';
+                let copyName = `${base}-copy${ext}`;
+                const items = this._vault.listFolder(this._currentPath) || [];
+                const names = new Set(items.map(i => i.name));
+                let n = 2;
+                while (names.has(copyName)) { copyName = `${base}-copy-${n}${ext}`; n++; }
+                await this._vault.addFile(this._currentPath, copyName, new Uint8Array(content));
+                this._render();
+                window.sgraphWorkspace.messages.success(`Duplicated as "${copyName}"`);
+            } catch (e) {
+                console.error('[vault-panel] Duplicate failed:', e);
+                window.sgraphWorkspace.messages.error('Duplicate failed: ' + e.message);
+            }
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
+        async _deleteItem(name, kind) {
+            if (!this._vault || !name) return;
+            if (!confirm(`Delete "${name}"?`)) return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Deleting "${name}"...` });
+            try {
+                if (kind === 'folder') {
+                    await this._vault.deleteFolder(this._currentPath, name);
+                } else {
+                    await this._vault.deleteFile(this._currentPath, name);
+                }
+                this._selectedFile = null;
+                this._render();
+                window.sgraphWorkspace.messages.success(`"${name}" deleted`);
+            } catch (e) {
+                console.error('[vault-panel] Delete failed:', e);
+                window.sgraphWorkspace.messages.error('Delete failed: ' + e.message);
+            }
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
+        // --- Demo data -----------------------------------------------------------
+
+        async _loadDemoData() {
+            if (!this._vault || this._state !== 'open') return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Loading demo data...' });
+            const enc = (s) => new TextEncoder().encode(s);
+
+            const demoHtml = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Demo Page</title>
+<style>
+  body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 0.5rem; }
+  .article { margin: 1.5rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+  .article h2 { color: #2980b9; margin-top: 0; }
+  .article .meta { color: #7f8c8d; font-size: 0.85rem; }
+  .ad-banner { background: #fff3cd; padding: 0.75rem; text-align: center; border: 1px dashed #ffc107; margin: 1rem 0; }
+  .tracking { display: none; }
+  footer { color: #95a5a6; font-size: 0.8rem; margin-top: 2rem; border-top: 1px solid #eee; padding-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="tracking" data-analytics="page-view"></div>
+<div class="ad-banner">Advertisement: Buy Our Product!</div>
+<h1>Tech News Daily</h1>
+<div class="article" data-category="ai">
+  <h2>New AI Framework Released</h2>
+  <div class="meta">March 5, 2026 | AI & Machine Learning</div>
+  <p>A groundbreaking new framework for building AI applications was released today, promising 10x faster training times and simplified deployment workflows.</p>
+</div>
+<div class="ad-banner">Special Offer: 50% Off Premium!</div>
+<div class="article" data-category="security">
+  <h2>Major Security Vulnerability Patched</h2>
+  <div class="meta">March 4, 2026 | Security</div>
+  <p>A critical vulnerability affecting millions of web servers was patched yesterday. Administrators are urged to update immediately.</p>
+</div>
+<div class="article" data-category="web">
+  <h2>WebAssembly 3.0 Specification Approved</h2>
+  <div class="meta">March 3, 2026 | Web Standards</div>
+  <p>The W3C has approved the WebAssembly 3.0 specification, bringing garbage collection and improved threading support to the web platform.</p>
+</div>
+<div class="tracking" data-pixel="exit"></div>
+<script>console.log('tracking-script');</script>
+<footer>Tech News Daily &copy; 2026. All rights reserved.</footer>
+</body>
+</html>`;
+
+            const demoScript1 = `// Remove ads and tracking elements
+document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remove());`;
+
+            const demoScript2 = `// Extract articles as JSON
+var articles = [];
+document.querySelectorAll('.article').forEach(function(el) {
+    articles.push({
+        title:    el.querySelector('h2')?.textContent || '',
+        meta:     el.querySelector('.meta')?.textContent || '',
+        body:     el.querySelector('p')?.textContent || '',
+        category: el.dataset.category || 'unknown'
+    });
+});
+return articles;`;
+
+            const demoScript3 = `// Filter: only show AI articles, remove others
+document.querySelectorAll('.article').forEach(function(el) {
+    if (el.dataset.category !== 'ai') {
+        el.remove();
+    }
+});
+// Also clean up ads
+document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remove());`;
+
+            // articles.json — pre-extracted data (output of extract-articles.js)
+            // This is what you get when you run extract-articles.js and save the result
+            const demoArticlesJson = JSON.stringify([
+                {
+                    title:    "New AI Framework Released",
+                    meta:     "March 5, 2026 | AI & Machine Learning",
+                    body:     "A groundbreaking new framework for building AI applications was released today, promising 10x faster training times and simplified deployment workflows.",
+                    category: "ai"
+                },
+                {
+                    title:    "Major Security Vulnerability Patched",
+                    meta:     "March 4, 2026 | Security",
+                    body:     "A critical vulnerability affecting millions of web servers was patched yesterday. Administrators are urged to update immediately.",
+                    category: "security"
+                },
+                {
+                    title:    "WebAssembly 3.0 Specification Approved",
+                    meta:     "March 3, 2026 | Web Standards",
+                    body:     "The W3C has approved the WebAssembly 3.0 specification, bringing garbage collection and improved threading support to the web platform.",
+                    category: "web"
+                }
+            ], null, 2);
+
+            // Scripts that use __SG_SEND_DATA__ to transform content using extracted data
+            const demoScript4 = `// Rewrite titles: add category prefix using DATA
+// Load articles.json into DATA panel, then run this against source.html
+var data = __SG_SEND_DATA__.parsed;
+if (!data) return 'Error: Load articles.json into the DATA panel first';
+
+var lookup = {};
+data.forEach(function(a) { lookup[a.title] = a; });
+
+document.querySelectorAll('.article').forEach(function(el) {
+    var h2 = el.querySelector('h2');
+    if (!h2) return;
+    var info = lookup[h2.textContent];
+    if (info) {
+        var prefix = '[' + info.category.toUpperCase() + '] ';
+        h2.textContent = prefix + h2.textContent;
+    }
+});
+document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remove());`;
+
+            const demoScript5 = `// Translate titles to Spanish using DATA
+// Load articles.json into DATA panel, then run this against source.html
+var data = __SG_SEND_DATA__.parsed;
+if (!data) return 'Error: Load articles.json into the DATA panel first';
+
+// Simple translation map (in real usage, LLM would generate this)
+var translations = {
+    'New AI Framework Released':               'Nuevo Framework de IA Lanzado',
+    'Major Security Vulnerability Patched':    'Vulnerabilidad de Seguridad Importante Parcheada',
+    'WebAssembly 3.0 Specification Approved':  'Especificacion WebAssembly 3.0 Aprobada'
+};
+
+document.querySelectorAll('.article h2').forEach(function(h2) {
+    var tr = translations[h2.textContent];
+    if (tr) h2.textContent = tr;
+});
+document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remove());`;
+
+            const demoScript6 = `// Build summary card from DATA (no source HTML needed)
+// Load articles.json into DATA panel, run against any source
+var data = __SG_SEND_DATA__.parsed;
+if (!data) return 'Error: Load articles.json into the DATA panel first';
+
+var html = '<div style="font-family:sans-serif;max-width:600px;margin:1rem auto">';
+html += '<h2 style="color:#2c3e50">Article Summary (' + data.length + ' articles)</h2>';
+html += '<table style="width:100%;border-collapse:collapse">';
+html += '<tr style="background:#3498db;color:#fff"><th style="padding:8px;text-align:left">Title</th><th style="padding:8px">Category</th></tr>';
+data.forEach(function(a, i) {
+    var bg = i % 2 === 0 ? '#f8f9fa' : '#fff';
+    html += '<tr style="background:' + bg + '">';
+    html += '<td style="padding:8px">' + a.title + '</td>';
+    html += '<td style="padding:8px;text-align:center"><span style="background:#e8f4f8;padding:2px 8px;border-radius:4px;font-size:0.85em">' + a.category + '</span></td>';
+    html += '</tr>';
+});
+html += '</table></div>';
+return html;`;
+
+            try {
+                // Create demo folder
+                const demoPath = this._currentPath === '/'
+                    ? '/demo-transforms'
+                    : this._currentPath + '/demo-transforms';
+                const items = this._vault.listFolder(this._currentPath) || [];
+                if (!items.some(i => i.type === 'folder' && i.name === 'demo-transforms')) {
+                    this._vault.createFolder(demoPath);
+                }
+
+                await this._vault.addFile(demoPath, 'source.html', enc(demoHtml));
+                await this._vault.addFile(demoPath, 'articles.json', enc(demoArticlesJson));
+                await this._vault.addFile(demoPath, 'clean-ads.js', enc(demoScript1));
+                await this._vault.addFile(demoPath, 'extract-articles.js', enc(demoScript2));
+                await this._vault.addFile(demoPath, 'filter-ai-only.js', enc(demoScript3));
+                await this._vault.addFile(demoPath, 'rewrite-titles.js', enc(demoScript4));
+                await this._vault.addFile(demoPath, 'translate-titles.js', enc(demoScript5));
+                await this._vault.addFile(demoPath, 'build-summary.js', enc(demoScript6));
+
+                this._render();
+                window.sgraphWorkspace.messages.success('Demo data loaded into "demo-transforms" folder');
+            } catch (e) {
+                console.error('[vault-panel] Load demo data failed:', e);
+                window.sgraphWorkspace.messages.error('Load demo data failed: ' + e.message);
+            }
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
         // --- Navigation --------------------------------------------------------
 
         _navigateToFolder(path, name) {
@@ -210,6 +541,17 @@
             this._breadcrumb.push({ path, name });
             this._selectedFile = null;
             this._render();
+
+            window.sgraphWorkspace.events.emit('folder-navigated', { path });
+
+            // Auto-load source.html if present in the folder
+            if (this._vault) {
+                const items = this._vault.listFolder(path) || [];
+                const sourceFile = items.find(i => i.type !== 'folder' && i.name === 'source.html');
+                if (sourceFile) {
+                    this._selectFile('source.html', sourceFile);
+                }
+            }
         }
 
         _navigateBreadcrumb(idx) {
@@ -217,6 +559,8 @@
             this._currentPath   = this._breadcrumb[idx].path;
             this._selectedFile  = null;
             this._render();
+
+            window.sgraphWorkspace.events.emit('folder-navigated', { path: this._currentPath });
         }
 
         // --- File selection (emits event for document-viewer) ------------------
@@ -237,9 +581,10 @@
 
         // --- Public API (for document-viewer to load/save files) ---------------
 
-        getVault()    { return this._vault; }
-        getSgSend()   { return this._sgSend; }
-        getState()    { return this._state; }
+        getVault()       { return this._vault; }
+        getSgSend()      { return this._sgSend; }
+        getState()       { return this._state; }
+        getCurrentPath() { return this._currentPath; }
 
         /**
          * Save a new file into the vault (encrypt + upload via Transfer API).
@@ -349,12 +694,25 @@
                 itemsHtml = items.map(item => {
                     const isSelected = item.name === this._selectedFile;
                     const isFolder   = item.type === 'folder';
-                    return `<div class="vp-item ${isSelected ? 'vp-item--selected' : ''}"
+                    const isSource   = !isFolder && item.name === 'source.html';
+                    const isView     = !isFolder && /^view-/.test(item.name);
+                    const extraClass = isSource ? ' vp-item--source' : isView ? ' vp-item--view' : '';
+                    const badge      = isSource ? '<span class="vp-item-badge vp-item-badge--source">SRC</span>'
+                                     : isView   ? '<span class="vp-item-badge vp-item-badge--view">VIEW</span>'
+                                     : '';
+                    const folderActions = isFolder ? `
+                        <span class="vp-folder-actions">
+                            <button class="vp-folder-btn" data-folder-action="rename" data-folder-name="${esc(item.name)}" title="Rename folder">Rename</button>
+                            <button class="vp-folder-btn vp-folder-btn--danger" data-folder-action="delete" data-folder-name="${esc(item.name)}" title="Delete folder">Del</button>
+                        </span>` : '';
+                    return `<div class="vp-item ${isSelected ? 'vp-item--selected' : ''}${extraClass}"
                                 data-name="${esc(item.name)}"
                                 data-kind="${item.type}">
                         <span class="vp-item-icon">${isFolder ? ICON_FOLDER : ICON_FILE}</span>
                         <span class="vp-item-name">${esc(item.name)}</span>
+                        ${badge}
                         ${!isFolder && item.size ? `<span class="vp-item-size">${formatSize(item.size)}</span>` : ''}
+                        ${folderActions}
                     </div>`;
                 }).join('');
             }
@@ -362,13 +720,38 @@
             // Stats
             const stats = this._vault.getStats();
 
+            // Inline input row (for new folder / new file / rename)
+            const inlineLabel = this._inlineMode === 'new-folder' ? 'Create'
+                               : this._inlineMode === 'new-file'   ? 'Create'
+                               : 'Rename';
+            const inlineHtml = this._inlineMode ? `
+                <div class="vp-inline-row">
+                    <input type="text" class="vp-inline-input" value="${esc(this._inlineValue || '')}"
+                           placeholder="${this._inlineMode === 'new-folder' ? 'Folder name' : this._inlineMode === 'new-file' ? 'File name' : 'New name'}">
+                    <button class="vp-inline-ok" title="Confirm">${inlineLabel}</button>
+                    <button class="vp-inline-cancel" title="Cancel">&times;</button>
+                </div>` : '';
+
             return `<style>${VaultPanel.styles}</style>
                 <div class="vp-browser">
                     <div class="vp-browser-header">
                         <div class="vp-breadcrumb">${bc}</div>
-                        <button class="vp-lock-btn" id="vp-lock" title="Lock vault">&#128274;</button>
+                        <button class="vp-header-btn" id="vp-refresh" title="Refresh vault">&#x21bb;</button>
+                        <button class="vp-header-btn" id="vp-lock" title="Lock vault">&#128274;</button>
                     </div>
                     <div class="vp-items">${itemsHtml}</div>
+                    ${inlineHtml}
+                    <div class="vp-toolbar">
+                        <button class="vp-tb-btn" data-action="new-file" title="New File">+ File</button>
+                        <button class="vp-tb-btn" data-action="new-folder" title="New Folder">+ Folder</button>
+                        <button class="vp-tb-btn" data-action="demo-data" title="Load demo transformation files">+ Demo</button>
+                        ${this._selectedFile ? `
+                            <span class="vp-tb-sep"></span>
+                            <button class="vp-tb-btn" data-action="rename" title="Rename selected">Rename</button>
+                            <button class="vp-tb-btn" data-action="duplicate" title="Duplicate selected">Dup</button>
+                            <button class="vp-tb-btn vp-tb-btn--danger" data-action="delete" title="Delete selected">Del</button>
+                        ` : ''}
+                    </div>
                     <div class="vp-stats">
                         ${stats.folders} folder${stats.folders !== 1 ? 's' : ''} &middot;
                         ${stats.files} file${stats.files !== 1 ? 's' : ''}
@@ -430,6 +813,10 @@
                 this._render();
             });
 
+            // Refresh vault
+            const refreshBtn = this.querySelector('#vp-refresh');
+            if (refreshBtn) refreshBtn.addEventListener('click', () => this._refreshVault());
+
             // Lock vault
             const lockBtn = this.querySelector('#vp-lock');
             if (lockBtn) lockBtn.addEventListener('click', () => this._lockVault());
@@ -459,6 +846,55 @@
                     }
                 });
             });
+
+            // Folder action buttons (Rename / Del on folder rows)
+            this.querySelectorAll('.vp-folder-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = btn.dataset.folderAction;
+                    const name   = btn.dataset.folderName;
+                    if (action === 'rename') {
+                        this._inlineTarget = name;
+                        this._startInlineInput('rename', name);
+                    }
+                    if (action === 'delete') {
+                        this._deleteItem(name, 'folder');
+                    }
+                });
+            });
+
+            // Toolbar buttons
+            this.querySelectorAll('.vp-tb-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const action = btn.dataset.action;
+                    if (action === 'new-file')   this._startInlineInput('new-file', 'new-file.txt');
+                    if (action === 'new-folder') this._startInlineInput('new-folder', 'new-folder');
+                    if (action === 'demo-data')  this._loadDemoData();
+                    if (action === 'rename' && this._selectedFile) {
+                        this._inlineTarget = this._selectedFile;
+                        this._startInlineInput('rename', this._selectedFile);
+                    }
+                    if (action === 'duplicate' && this._selectedFile) this._duplicateFile(this._selectedFile);
+                    if (action === 'delete' && this._selectedFile) {
+                        const items = this._vault.listFolder(this._currentPath) || [];
+                        const entry = items.find(i => i.name === this._selectedFile);
+                        this._deleteItem(this._selectedFile, entry?.type || 'file');
+                    }
+                });
+            });
+
+            // Inline input confirm/cancel
+            const inlineOk = this.querySelector('.vp-inline-ok');
+            const inlineCancel = this.querySelector('.vp-inline-cancel');
+            const inlineInput = this.querySelector('.vp-inline-input');
+            if (inlineOk) inlineOk.addEventListener('click', () => this._confirmInlineInput());
+            if (inlineCancel) inlineCancel.addEventListener('click', () => this._cancelInlineInput());
+            if (inlineInput) {
+                inlineInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') this._confirmInlineInput();
+                    if (e.key === 'Escape') this._cancelInlineInput();
+                });
+            }
         }
 
         // --- Styles ------------------------------------------------------------
@@ -512,7 +948,7 @@
                 }
                 .vp-btn--primary:hover { background: rgba(78,205,196,0.2); }
 
-                .vp-browser { display: flex; flex-direction: column; height: 100%; }
+                .vp-browser { display: flex; flex-direction: column; height: 100%; position: relative; }
                 .vp-browser-header {
                     display: flex; align-items: center;
                     border-bottom: 1px solid var(--ws-border-subtle, #222d4d);
@@ -522,13 +958,13 @@
                     flex: 1; padding: 0.5rem 0.75rem; font-size: 0.75rem;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
-                .vp-lock-btn {
+                .vp-header-btn {
                     background: none; border: none; cursor: pointer;
                     font-size: 0.75rem; padding: 0.375rem 0.5rem;
                     color: var(--ws-text-muted, #5a6478);
                     border-radius: var(--ws-radius, 6px);
                 }
-                .vp-lock-btn:hover { background: var(--ws-surface-hover, #253254); color: var(--ws-text, #F0F0F5); }
+                .vp-header-btn:hover { background: var(--ws-surface-hover, #253254); color: var(--ws-text, #F0F0F5); }
                 .vp-bc-link { color: var(--ws-primary, #4ECDC4); text-decoration: none; }
                 .vp-bc-link:hover { text-decoration: underline; }
                 .vp-bc-sep { color: var(--ws-text-muted, #5a6478); margin: 0 0.25rem; }
@@ -552,6 +988,83 @@
                     flex: 1; font-size: 0.8125rem; color: var(--ws-text, #F0F0F5);
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
+                .vp-item-badge {
+                    font-size: 0.5625rem; font-weight: 700; letter-spacing: 0.04em;
+                    padding: 0.0625rem 0.25rem; border-radius: 3px;
+                    flex-shrink: 0;
+                }
+                .vp-item-badge--source {
+                    background: rgba(78,205,196,0.15); color: var(--ws-primary, #4ECDC4);
+                }
+                .vp-item-badge--view {
+                    background: rgba(139,92,246,0.15); color: #a78bfa;
+                }
+                .vp-item--source .vp-item-name { color: var(--ws-primary, #4ECDC4); font-weight: 600; }
+
+                .vp-folder-actions {
+                    display: none; flex-shrink: 0; gap: 0.25rem; align-items: center;
+                }
+                .vp-item:hover .vp-folder-actions { display: flex; }
+                .vp-folder-btn {
+                    padding: 0.0625rem 0.375rem; border-radius: 3px;
+                    font-size: 0.5625rem; font-weight: 600;
+                    cursor: pointer; font-family: inherit;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-secondary, #8892A0);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    transition: background 80ms;
+                }
+                .vp-folder-btn:hover { background: var(--ws-surface-hover, #253254); color: var(--ws-text, #F0F0F5); }
+                .vp-folder-btn--danger:hover { background: rgba(255,107,107,0.15); color: #FF6B6B; }
+
+                .vp-toolbar {
+                    display: flex; align-items: center; gap: 0.25rem;
+                    padding: 0.25rem 0.5rem; flex-shrink: 0;
+                    border-top: 1px solid var(--ws-border-subtle, #222d4d);
+                    flex-wrap: wrap;
+                }
+                .vp-tb-btn {
+                    padding: 0.1875rem 0.5rem; border-radius: var(--ws-radius, 6px);
+                    font-size: 0.625rem; font-weight: 600;
+                    cursor: pointer; font-family: inherit;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-secondary, #8892A0);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    transition: background 80ms;
+                }
+                .vp-tb-btn:hover { background: var(--ws-surface-hover, #253254); color: var(--ws-text, #F0F0F5); }
+                .vp-tb-btn--danger { color: var(--ws-error, #E94560); }
+                .vp-tb-btn--danger:hover { background: var(--ws-error-bg, rgba(233,69,96,0.08)); }
+                .vp-tb-sep { width: 1px; height: 14px; background: var(--ws-border-subtle, #222d4d); }
+                .vp-inline-row {
+                    display: flex; align-items: center; gap: 0.25rem;
+                    padding: 0.375rem 0.5rem;
+                    border-top: 1px solid var(--ws-border-subtle, #222d4d);
+                    background: var(--ws-surface-raised, #1c2a4a);
+                }
+                .vp-inline-input {
+                    flex: 1; padding: 0.25rem 0.5rem;
+                    font-size: 0.75rem; font-family: var(--ws-font-mono, monospace);
+                    background: var(--ws-bg, #1A1A2E); color: var(--ws-text, #F0F0F5);
+                    border: 1px solid var(--ws-primary, #4ECDC4);
+                    border-radius: var(--ws-radius, 6px);
+                    outline: none; box-sizing: border-box;
+                }
+                .vp-inline-ok {
+                    padding: 0.1875rem 0.5rem; font-size: 0.625rem; font-weight: 600;
+                    background: var(--ws-primary-bg, rgba(78,205,196,0.1));
+                    color: var(--ws-primary, #4ECDC4);
+                    border: 1px solid var(--ws-primary, #4ECDC4);
+                    border-radius: var(--ws-radius, 6px); cursor: pointer; font-family: inherit;
+                }
+                .vp-inline-ok:hover { background: rgba(78,205,196,0.2); }
+                .vp-inline-cancel {
+                    padding: 0.1875rem 0.375rem; font-size: 0.75rem;
+                    background: transparent; color: var(--ws-text-muted, #5a6478);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px); cursor: pointer; font-family: inherit;
+                }
+                .vp-inline-cancel:hover { color: var(--ws-text, #F0F0F5); }
                 .vp-item-size {
                     font-size: 0.6875rem; color: var(--ws-text-muted, #5a6478);
                     font-family: var(--ws-font-mono, monospace); flex-shrink: 0;

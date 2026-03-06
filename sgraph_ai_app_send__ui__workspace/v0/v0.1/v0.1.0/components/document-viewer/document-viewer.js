@@ -50,20 +50,28 @@
             this._filename   = null;
             this._fileType   = null;    // from FileTypeDetect
             this._renderType = null;    // 'markdown' | 'code' | 'text' | 'html' | 'image' | 'pdf' | null
-            this._mode       = 'rendered';  // 'rendered' | 'source'
+            this._mode       = 'rendered';  // 'rendered' | 'source' | 'edit'
             this._blobUrl    = null;
             this._version    = 0;
             this._loading    = false;
             this._unsub      = null;
+            this._dirty      = false;       // true when user has edited content
         }
 
         connectedCallback() {
             this._role = this.dataset.role || 'viewer';
             this._renderEmpty();
 
-            // Only the 'source' viewer auto-loads files from the vault
+            // Source viewer: auto-loads non-.js, non-data files from vault
             if (this._role === 'source') {
                 const handler = (data) => this._onFileSelected(data);
+                window.sgraphWorkspace.events.on('file-selected', handler);
+                this._unsub = () => window.sgraphWorkspace.events.off('file-selected', handler);
+            }
+
+            // Data viewer: auto-loads data files (.json, .csv, .xml, .yaml) from vault
+            if (this._role === 'data') {
+                const handler = (data) => this._onDataFileSelected(data);
                 window.sgraphWorkspace.events.on('file-selected', handler);
                 this._unsub = () => window.sgraphWorkspace.events.off('file-selected', handler);
             }
@@ -83,6 +91,7 @@
             this._textContent = text;
             this._content     = new TextEncoder().encode(text);
             this._filename    = filename || 'output.md';
+            this._streaming   = false;
             this._detectType();
             this._version++;
             this._renderContent();
@@ -90,6 +99,62 @@
             window.sgraphWorkspace.events.emit('document-loaded', {
                 role: this._role, filename: this._filename, type: this._renderType
             });
+        }
+
+        /** Start streaming mode — sets up the viewer for incremental text updates */
+        startStreaming(filename) {
+            this._textContent = '';
+            this._content     = new Uint8Array(0);
+            this._filename    = filename || 'output.md';
+            this._streaming   = true;
+            this._detectType();
+            this._version++;
+            this._renderContent();
+        }
+
+        /** Append a chunk during streaming — updates text without full DOM rebuild */
+        appendStreamChunk(chunk) {
+            if (!this._streaming) return;
+            this._textContent = (this._textContent || '') + chunk;
+            this._content     = new TextEncoder().encode(this._textContent);
+
+            // Update the visible content incrementally based on render type
+            const body = this.querySelector('.dv-body');
+            if (!body) return;
+
+            if (this._mode === 'source' || this._mode === 'edit') {
+                // In source/edit mode, update the pre/textarea content
+                const pre = body.querySelector('.dv-pre code, .dv-pre');
+                if (pre) pre.textContent = this._textContent;
+                const editor = body.querySelector('.dv-editor');
+                if (editor) editor.value = this._textContent;
+            } else if (this._renderType === 'markdown') {
+                const md = body.querySelector('.dv-markdown');
+                if (md) {
+                    md.innerHTML = typeof MarkdownParser !== 'undefined'
+                        ? MarkdownParser.parse(this._textContent)
+                        : `<pre>${esc(this._textContent)}</pre>`;
+                }
+            } else if (this._renderType === 'html') {
+                // For HTML, show as code during streaming (iframe per-chunk is too expensive)
+                const pre = body.querySelector('.dv-pre code');
+                if (pre) pre.textContent = this._textContent;
+            } else {
+                // text, code — update pre content
+                const pre = body.querySelector('.dv-pre');
+                if (pre) pre.textContent = this._textContent;
+            }
+
+            // Update file size in toolbar
+            const sizeEl = this.querySelector('.dv-filesize');
+            if (sizeEl) sizeEl.textContent = formatSize(this._content.byteLength);
+        }
+
+        /** End streaming mode — do a final full render to ensure correct display */
+        endStreaming() {
+            this._streaming = false;
+            this._version++;
+            this._renderContent();
         }
 
         /** Load raw bytes (used by vault decryption pipeline) */
@@ -121,6 +186,7 @@
             this._filename    = null;
             this._renderType  = null;
             this._mode        = 'rendered';
+            this._dirty       = false;
             this._revokeBlobUrl();
             this._renderEmpty();
         }
@@ -131,7 +197,7 @@
         getRenderType()  { return this._renderType; }
         getVersion()     { return this._version; }
 
-        /** Save current content to vault as a new encrypted file */
+        /** Save current content to vault as a view file (view-N.html) */
         async saveToVault() {
             if (!this._content || !this._filename) {
                 window.sgraphWorkspace.messages.warning('Nothing to save');
@@ -144,14 +210,38 @@
                 return;
             }
 
-            // Derive a filename for the transformed version
-            const baseName  = this._filename.replace(/\.[^.]+$/, '');
-            const ext       = this._filename.includes('.') ? '.' + this._filename.split('.').pop() : '.md';
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            const saveName  = `${baseName}__transformed__${timestamp}${ext}`;
+            // Use custom name from input if provided, else auto-number
+            const nameInput = this.querySelector('.dv-view-name');
+            const customName = nameInput ? nameInput.value.trim() : '';
+
+            let saveName;
+            if (customName) {
+                // Ensure it has the right extension
+                const ext = this._filename.includes('.') ? '.' + this._filename.split('.').pop() : '.html';
+                saveName = customName.endsWith(ext) ? customName
+                         : customName.startsWith('view-') ? customName + ext
+                         : 'view-' + customName + ext;
+            } else {
+                // Auto-number: find next available view-N
+                const ext = this._filename.includes('.') ? '.' + this._filename.split('.').pop() : '.html';
+                const vault = vaultPanel.getVault();
+                const currentPath = vaultPanel.getCurrentPath ? vaultPanel.getCurrentPath() : '/';
+                let nextNum = 1;
+                if (vault) {
+                    try {
+                        const items = vault.listFolder(currentPath) || [];
+                        const viewNums = items
+                            .map(i => i.name.match(/^view-(\d+)\./))
+                            .filter(Boolean)
+                            .map(m => parseInt(m[1]));
+                        if (viewNums.length > 0) nextNum = Math.max(...viewNums) + 1;
+                    } catch (_) { /* ignore */ }
+                }
+                saveName = `view-${nextNum}${ext}`;
+            }
 
             this._setSaveState('saving');
-            window.sgraphWorkspace.messages.info('Encrypting and saving to vault...');
+            window.sgraphWorkspace.messages.info(`Saving as "${saveName}"...`);
 
             try {
                 const result = await vaultPanel.saveFile(this._content, saveName);
@@ -160,6 +250,9 @@
                 window.sgraphWorkspace.events.emit('file-saved', {
                     role: this._role, fileId: result.fileId, name: saveName
                 });
+
+                // Clear custom name input
+                if (nameInput) nameInput.value = '';
 
                 // Reset save button after 2s
                 setTimeout(() => this._setSaveState('idle'), 2000);
@@ -183,7 +276,7 @@
                 btn.classList.add('dv-save-btn--saved');
             } else {
                 btn.disabled = false;
-                btn.textContent = 'Save to Vault';
+                btn.textContent = 'Save';
                 btn.classList.remove('dv-save-btn--saved');
             }
         }
@@ -194,11 +287,19 @@
             if (typeof FileTypeDetect !== 'undefined') {
                 this._renderType = FileTypeDetect.detect(this._filename, null);
             }
+
+            // Override: HTML files must render as 'html' (iframe), not 'code'
+            // FileTypeDetect may classify .html as 'code' — force correct type
+            const ext = (this._filename || '').split('.').pop().toLowerCase();
+            if (['html', 'htm'].includes(ext)) {
+                this._renderType = 'html';
+                return;
+            }
+
             // Fallback for types FileTypeDetect doesn't cover (e.g. .txt) or if it's not loaded
             if (!this._renderType && this._filename) {
-                const ext = (this._filename || '').split('.').pop().toLowerCase();
                 const textExts = ['md', 'markdown', 'txt', 'json', 'yaml', 'yml', 'xml', 'csv', 'log', 'cfg', 'conf'];
-                const codeExts = ['js', 'ts', 'py', 'html', 'css', 'sh', 'sql', 'go', 'rs', 'java', 'c', 'cpp', 'rb', 'php'];
+                const codeExts = ['js', 'ts', 'py', 'css', 'sh', 'sql', 'go', 'rs', 'java', 'c', 'cpp', 'rb', 'php'];
                 if (['md', 'markdown'].includes(ext)) this._renderType = 'markdown';
                 else if (codeExts.includes(ext))       this._renderType = 'code';
                 else if (textExts.includes(ext))       this._renderType = 'text';
@@ -207,13 +308,59 @@
             }
         }
 
-        // --- Event handler: file-selected from vault-panel ---------------------
+        // --- Data file extensions (loaded in data viewer, not source) -----------
 
-        async _onFileSelected(data) {
+        static get DATA_EXTS() {
+            return ['json', 'csv', 'xml', 'yaml', 'yml', 'tsv', 'ndjson', 'jsonl'];
+        }
+
+        _isDataFile(name) {
+            if (!name) return false;
+            const ext = name.split('.').pop().toLowerCase();
+            return DocumentViewer.DATA_EXTS.includes(ext);
+        }
+
+        // --- Event handler: file-selected for data viewer ----------------------
+
+        async _onDataFileSelected(data) {
+            if (!data.name || !this._isDataFile(data.name)) return;
             if (this._loading) return;
             this._loading = true;
             this._filename = data.name;
             this._renderLoading(data.name);
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Loading ' + data.name + '...' });
+
+            try {
+                const vaultPanel = document.querySelector('vault-panel');
+                if (!vaultPanel) throw new Error('Vault panel not found');
+                const vault = vaultPanel.getVault();
+                if (!vault) throw new Error('Vault is not open');
+                const plaintext = await vault.getFile(data.folderPath, data.name);
+                this.loadBytes(new Uint8Array(plaintext), data.name, data.type);
+                window.sgraphWorkspace.messages.success('"' + data.name + '" loaded in Data panel');
+            } catch (e) {
+                console.error('[document-viewer] Failed to load data file:', e);
+                this._renderError(data.name, e.message);
+                window.sgraphWorkspace.messages.error('Failed to load "' + data.name + '": ' + e.message);
+            }
+
+            this._loading = false;
+            window.sgraphWorkspace.events.emit('activity-end');
+        }
+
+        // --- Event handler: file-selected from vault-panel ---------------------
+
+        async _onFileSelected(data) {
+            // Skip .js files — those go to the script editor, not source viewer
+            if (data.name && data.name.endsWith('.js')) return;
+            // Skip data files — those go to the data viewer
+            if (this._isDataFile(data.name)) return;
+
+            if (this._loading) return;
+            this._loading = true;
+            this._filename = data.name;
+            this._renderLoading(data.name);
+            window.sgraphWorkspace.events.emit('activity-start', { label: 'Loading ' + data.name + '...' });
 
             try {
                 // Get vault panel reference for file decryption via SGVault
@@ -237,6 +384,7 @@
             }
 
             this._loading = false;
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         // --- Blob URL management -----------------------------------------------
@@ -258,14 +406,16 @@
         // --- Render: States ----------------------------------------------------
 
         _renderEmpty() {
+            const icon = this._role === 'source' ? '&#128196;'
+                       : this._role === 'data'   ? '&#128202;'
+                       : '&#10024;';
+            const msg  = this._role === 'source' ? 'Select a file from the vault<br>to load it here.'
+                       : this._role === 'data'   ? 'Data files (.json, .csv, .xml)<br>will appear here.'
+                       : 'Transformation output<br>will appear here.';
             this.innerHTML = `
                 <div class="dv-empty">
-                    <div class="dv-empty-icon">
-                        ${this._role === 'source' ? '&#128196;' : '&#10024;'}
-                    </div>
-                    ${this._role === 'source'
-                        ? 'Select a file from the vault<br>to load it here.'
-                        : 'Transformation output<br>will appear here.'}
+                    <div class="dv-empty-icon">${icon}</div>
+                    ${msg}
                 </div>
                 <style>${DocumentViewer.styles}</style>`;
         }
@@ -296,29 +446,43 @@
             const lang = typeof FileTypeDetect !== 'undefined'
                 ? FileTypeDetect.getLanguage(this._filename) : 'text';
 
-            // Toolbar: filename + source/rendered toggle + save button (transform only)
-            const canSave = this._role === 'transform' && this._content;
+            // Toolbar: filename + toggle + save button
+            // HTML files get custom labels: "Browser" (iframe) and "HTML Code" (source)
+            const isHtml  = this._renderType === 'html';
+            const renderedLabel = isHtml ? 'Browser'   : 'Rendered';
+            const sourceLabel   = isHtml ? 'HTML Code'  : 'Source';
+            const canSave = this._content;
             const toolbar = `
                 <div class="dv-toolbar">
                     <span class="dv-filename">${esc(this._filename || 'untitled')}</span>
                     <span class="dv-filetype">${esc(this._renderType || 'binary')}</span>
+                    ${this._dirty ? '<span class="dv-dirty-badge">modified</span>' : ''}
                     ${isTextBased ? `
                         <div class="dv-toggle">
                             <button class="dv-toggle-btn ${this._mode === 'rendered' ? 'dv-toggle-btn--active' : ''}"
-                                    data-mode="rendered">Rendered</button>
+                                    data-mode="rendered">${renderedLabel}</button>
                             <button class="dv-toggle-btn ${this._mode === 'source' ? 'dv-toggle-btn--active' : ''}"
-                                    data-mode="source">Source</button>
+                                    data-mode="source">${sourceLabel}</button>
+                            <button class="dv-toggle-btn ${this._mode === 'edit' ? 'dv-toggle-btn--active' : ''}"
+                                    data-mode="edit">Edit</button>
                         </div>
                     ` : ''}
                     ${this._content ? `<span class="dv-filesize">${formatSize(this._content.byteLength)}</span>` : ''}
-                    ${canSave ? `<button class="dv-save-btn">Save to Vault</button>` : ''}
+                    ${canSave ? `
+                        <input class="dv-view-name" type="text" placeholder="view name..." title="Custom view name (e.g. dark-mode). Leave empty for auto-numbering.">
+                        <button class="dv-save-btn">Save</button>
+                    ` : ''}
                 </div>`;
 
             let body = '';
 
-            if (this._mode === 'source' && isTextBased && this._textContent) {
-                // Source mode: raw text
-                body = `<div class="dv-source"><pre class="dv-pre"><code>${esc(this._textContent)}</code></pre></div>`;
+            if (this._mode === 'edit' && isTextBased) {
+                // Edit mode: editable textarea
+                body = `<div class="dv-edit"><textarea class="dv-editor" spellcheck="false">${esc(this._textContent || '')}</textarea></div>`;
+            } else if (this._mode === 'source' && isTextBased && this._textContent) {
+                // Source mode: show as code block with language label
+                const srcLang = isHtml ? 'html' : (lang || 'text');
+                body = this._renderCode(srcLang);
             } else {
                 // Rendered mode: type-specific
                 switch (this._renderType) {
@@ -332,7 +496,7 @@
                         body = `<div class="dv-text"><pre class="dv-pre">${esc(this._textContent || '')}</pre></div>`;
                         break;
                     case 'html':
-                        body = this._renderHtml();
+                        body = this._streaming ? this._renderCode('html') : this._renderHtml();
                         break;
                     case 'image':
                         body = this._renderImage();
@@ -376,7 +540,7 @@
             if (!this._textContent) return '<div class="dv-text">No HTML content</div>';
             // Render in sandboxed iframe for security
             const blobUrl = this._createBlobUrl(this._content, 'text/html');
-            return `<iframe class="dv-iframe" src="${blobUrl}" sandbox="allow-same-origin" title="HTML preview"></iframe>`;
+            return `<iframe class="dv-iframe" src="${blobUrl}" sandbox="allow-scripts" title="HTML preview"></iframe>`;
         }
 
         _renderImage() {
@@ -409,13 +573,56 @@
         _bindToggle() {
             this.querySelectorAll('.dv-toggle-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
+                    // Before leaving edit mode, capture textarea content
+                    if (this._mode === 'edit') this._captureEditorContent();
                     this._mode = btn.dataset.mode;
                     this._renderContent();
                 });
             });
 
             const saveBtn = this.querySelector('.dv-save-btn');
-            if (saveBtn) saveBtn.addEventListener('click', () => this.saveToVault());
+            if (saveBtn) saveBtn.addEventListener('click', () => {
+                // Capture editor content if in edit mode before saving
+                if (this._mode === 'edit') this._captureEditorContent();
+                this.saveToVault();
+            });
+
+            // Bind editor textarea events
+            const editor = this.querySelector('.dv-editor');
+            if (editor) {
+                editor.addEventListener('input', () => {
+                    this._dirty = true;
+                    // Update dirty badge without full re-render
+                    const badge = this.querySelector('.dv-dirty-badge');
+                    if (!badge) {
+                        const filetype = this.querySelector('.dv-filetype');
+                        if (filetype) {
+                            const span = document.createElement('span');
+                            span.className = 'dv-dirty-badge';
+                            span.textContent = 'modified';
+                            filetype.after(span);
+                        }
+                    }
+                });
+                // Focus the editor
+                editor.focus();
+            }
+        }
+
+        /** Capture content from the editor textarea back into internal state */
+        _captureEditorContent() {
+            const editor = this.querySelector('.dv-editor');
+            if (!editor) return;
+            const text = editor.value;
+            if (text !== this._textContent) {
+                this._textContent = text;
+                this._content     = new TextEncoder().encode(text);
+                this._dirty       = true;
+                this._version++;
+                window.sgraphWorkspace.events.emit('document-edited', {
+                    role: this._role, filename: this._filename, type: this._renderType
+                });
+            }
         }
 
         // --- Styles ------------------------------------------------------------
@@ -475,6 +682,18 @@
                 }
                 .dv-toggle + .dv-filesize { margin-left: 0; }
 
+                .dv-view-name {
+                    width: 7rem; padding: 0.1875rem 0.5rem; font-size: 0.6875rem;
+                    font-family: var(--ws-font-mono, monospace);
+                    background: var(--ws-bg, #1A1A2E);
+                    color: var(--ws-text, #F0F0F5);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    border-radius: var(--ws-radius, 6px);
+                    outline: none; flex-shrink: 0;
+                }
+                .dv-view-name:focus { border-color: var(--ws-primary, #4ECDC4); }
+                .dv-view-name::placeholder { color: var(--ws-text-muted, #5a6478); }
+
                 .dv-save-btn {
                     padding: 0.1875rem 0.625rem; font-size: 0.6875rem; font-weight: 600;
                     border: 1px solid var(--ws-primary, #4ECDC4);
@@ -492,7 +711,25 @@
                     color: var(--ws-success, #4ECDC4);
                 }
 
+                .dv-dirty-badge {
+                    font-size: 0.6875rem; font-weight: 600; padding: 0.0625rem 0.375rem;
+                    border-radius: 9999px; background: var(--ws-warning-bg, rgba(251,191,36,0.08));
+                    color: var(--ws-warning, #fbbf24); flex-shrink: 0;
+                }
+
                 .dv-body { flex: 1; overflow-y: auto; }
+
+                /* Edit mode */
+                .dv-edit { height: 100%; display: flex; flex-direction: column; }
+                .dv-editor {
+                    flex: 1; width: 100%; resize: none; border: none; outline: none;
+                    padding: 0.75rem;
+                    font-family: var(--ws-font-mono, monospace); font-size: 0.8125rem;
+                    line-height: 1.6; color: var(--ws-text, #F0F0F5);
+                    background: var(--ws-bg, #1A1A2E);
+                    white-space: pre-wrap; word-wrap: break-word;
+                    tab-size: 2;
+                }
 
                 /* Markdown rendered output */
                 .dv-markdown {

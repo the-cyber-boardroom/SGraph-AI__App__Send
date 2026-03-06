@@ -11,9 +11,17 @@ name: Deploy Workspace UI to S3
 #   websites/sgraph-workspace/main/   — main branch (automatic)
 #   websites/sgraph-workspace/prod/   — production (manual dispatch)
 #
+# Deployment model (v0.1.1+):
+#   v0.1.1 index.html references v0.1.0 components via relative paths (../v0.1.0/).
+#   These work locally and in releases/ (sibling directories), but break in latest/
+#   (no sibling v0.1.0 folder). So before deploying to latest/, the CI rewrites
+#   relative ../v0.1.0/ refs to absolute static.sgraph.ai CDN URLs.
+#
 # Steps:
-#   1. Sync workspace static files to S3 under the environment prefix
-#   2. Invalidate CloudFront cache
+#   1. Deploy v0.1.0 base components to releases/v0/v0.1/v0.1.0/
+#   2. Rewrite ../v0.1.0/ refs in v0.1.1 to absolute CDN paths
+#   3. Deploy v0.1.1 (with rewritten paths) to releases/v0/v0.1/v0.1.1/ + latest/
+#   4. Invalidate CloudFront cache
 #
 # Environments:
 #   - dev:        dev.workspace.sgraph.ai  (default — push to dev branch)
@@ -49,9 +57,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION  : eu-west-2
-  UI_VERSION  : v0.1.0
-  SOURCE_DIR  : sgraph_ai_app_send__ui__workspace/v0/v0.1/v0.1.0
+  AWS_REGION     : eu-west-2
+  UI_VERSION     : v0.1.1
+  UI_BASE_VERSION: v0.1.0
+  SOURCE_DIR     : sgraph_ai_app_send__ui__workspace/v0/v0.1/v0.1.1
+  BASE_SOURCE_DIR: sgraph_ai_app_send__ui__workspace/v0/v0.1/v0.1.0
+  STATIC_CDN     : https://static.sgraph.ai/websites/sgraph-workspace
 
 jobs:
   deploy:
@@ -105,14 +116,40 @@ jobs:
             echo "Deploying to DEV (dev.workspace.sgraph.ai) → S3: websites/sgraph-workspace/dev/"
           fi
 
-      - name: Inject build version
+      - name: Inject build version into v0.1.0 base (where build-info.js is loaded from)
         run: |
           python scripts/inject_build_version.py \
             --ui-base sgraph_ai_app_send__ui__workspace \
-            --version ${{ env.UI_VERSION }} \
+            --version ${{ env.UI_BASE_VERSION }} \
             --output-subdir js
 
-      - name: Deploy Workspace UI to S3
+      - name: Rewrite v0.1.0 relative paths to absolute CDN URLs
+        run: |
+          DEPLOY_ENV="${{ steps.env.outputs.deploy_env }}"
+          CDN_BASE="${{ env.STATIC_CDN }}/${DEPLOY_ENV}/releases/v0/v0.1/v0.1.0"
+
+          echo "Rewriting ../v0.1.0/ → ${CDN_BASE}/ in ${{ env.SOURCE_DIR }}/index.html"
+
+          # Replace relative ../v0.1.0/ references with absolute CDN paths
+          sed -i "s|\"\\.\\.\/v0\\.1\\.0\/|\"${CDN_BASE}/|g" "${{ env.SOURCE_DIR }}/index.html"
+          sed -i "s|'\\.\\.\/v0\\.1\\.0\/|'${CDN_BASE}/|g" "${{ env.SOURCE_DIR }}/index.html"
+
+          echo "--- Rewritten index.html references ---"
+          grep -n 'static.sgraph.ai' "${{ env.SOURCE_DIR }}/index.html" || echo "  (no matches — check source)"
+
+      - name: Deploy v0.1.0 base components to releases
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        run: |
+          python scripts/deploy_static_site.py \
+            --site sgraph-workspace \
+            --version ${{ env.UI_BASE_VERSION }} \
+            --source-dir ${{ env.BASE_SOURCE_DIR }} \
+            --bucket ${{ secrets.SGRAPH_WORKSPACE__UI_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --deploy-env ${{ steps.env.outputs.deploy_env }} \
+            --skip-validation
+
+      - name: Deploy Workspace UI v0.1.1 to S3
         if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
           python scripts/deploy_static_site.py \
