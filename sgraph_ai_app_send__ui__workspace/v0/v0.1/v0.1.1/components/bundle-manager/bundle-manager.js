@@ -416,57 +416,7 @@
             // Restore collapsed work panels (Source, Data, Script, Result)
             if (bundle.collapsed_panels) {
                 try { localStorage.setItem('sgraph-workspace-panel-collapsed', JSON.stringify(bundle.collapsed_panels)); } catch (_) {}
-                const state = bundle.collapsed_panels;
-
-                // Flex sub-panels with sibling fill
-                const srcTop = document.querySelector('.ws-source-top');
-                const srcBot = document.querySelector('.ws-source-bottom');
-                [[srcTop, !!state['source']], [srcBot, !!state['data']]].forEach(([el, collapsed]) => {
-                    if (!el) return;
-                    el.classList.toggle('ws-panel--collapsed', collapsed);
-                    const c = el.querySelector('.ws-panel-content');
-                    if (collapsed) {
-                        if (c) c.style.display = 'none';
-                        const header = el.querySelector('.ws-panel-header');
-                        const h = header ? header.offsetHeight : 28;
-                        el.style.flex      = `0 0 ${h}px`;
-                        el.style.maxHeight = h + 'px';
-                        el.style.overflow  = 'hidden';
-                    } else {
-                        if (c) c.style.display = '';
-                        el.style.maxHeight = '';
-                        el.style.overflow  = '';
-                        el.style.flex = '1';
-                    }
-                });
-
-                // Grid columns
-                const scriptZone = document.querySelector('.ws-script-zone');
-                const resultZone = document.querySelector('.ws-transform-zone');
-                if (scriptZone) scriptZone.classList.toggle('ws-zone--collapsed', !!state['script']);
-                if (resultZone) resultZone.classList.toggle('ws-zone--collapsed', !!state['result']);
-
-                // Update split handle
-                const splitHandle = document.querySelector('.ws-source-split-handle');
-                if (splitHandle) splitHandle.style.display = (state['source'] || state['data']) ? 'none' : '';
-
-                // Update grid columns
-                const area = document.querySelector('.ws-transform-area');
-                if (area) {
-                    if (state['script'] || state['result']) {
-                        const scw = state['script'] ? '28px' : '1.5fr';
-                        const rw  = state['result'] ? '28px' : '1.5fr';
-                        area.style.gridTemplateColumns = `2fr 4px ${scw} 4px ${rw}`;
-                    } else {
-                        area.style.gridTemplateColumns = '';
-                    }
-                }
-
-                // Disable resize handles next to collapsed columns
-                const colResize  = document.querySelector('.ws-col-resize');
-                const colResize2 = document.querySelector('.ws-col-resize2');
-                if (colResize)  colResize.style.pointerEvents  = state['script'] ? 'none' : '';
-                if (colResize2) colResize2.style.pointerEvents = (state['script'] || state['result']) ? 'none' : '';
+                document.dispatchEvent(new CustomEvent('workspace-panels-changed'));
             }
 
             // Restore collapsed chat section state
