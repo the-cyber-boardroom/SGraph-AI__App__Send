@@ -38,17 +38,20 @@
                 this._render();
             };
             const onVaultOpened = () => this._refresh();
+            const onFolderChanged = () => this._refresh();
 
             window.sgraphWorkspace.events.on('bundle-list-changed', onChanged);
             window.sgraphWorkspace.events.on('bundle-saved', onSaved);
             window.sgraphWorkspace.events.on('bundle-loaded', onLoaded);
             window.sgraphWorkspace.events.on('vault-opened', onVaultOpened);
+            window.sgraphWorkspace.events.on('folder-navigated', onFolderChanged);
 
             this._unsubs.push(
                 () => window.sgraphWorkspace.events.off('bundle-list-changed', onChanged),
                 () => window.sgraphWorkspace.events.off('bundle-saved', onSaved),
                 () => window.sgraphWorkspace.events.off('bundle-loaded', onLoaded),
                 () => window.sgraphWorkspace.events.off('vault-opened', onVaultOpened),
+                () => window.sgraphWorkspace.events.off('folder-navigated', onFolderChanged),
             );
         }
 

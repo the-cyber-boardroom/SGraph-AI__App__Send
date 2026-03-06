@@ -82,6 +82,13 @@ articles.forEach(function(el) {
 
         getFilename() { return this._filename; }
 
+        clear() {
+            this._script      = '';
+            this._filename    = 'transform.js';
+            this._consoleLogs = [];
+            this._render();
+        }
+
         // --- Run ---------------------------------------------------------------
 
         async _run() {

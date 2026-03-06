@@ -20,7 +20,14 @@
 (function() {
     'use strict';
 
-    const BUNDLE_FOLDER = '/.bundles';
+    function getBundleFolder() {
+        const vaultPanel = document.querySelector('vault-panel');
+        const currentPath = (vaultPanel && vaultPanel.getCurrentPath) ? vaultPanel.getCurrentPath() : '/';
+        // Store bundles in a .bundles subfolder within the current vault folder
+        return currentPath === '/'
+            ? '/.bundles'
+            : currentPath + '/.bundles';
+    }
 
     // Data file extensions (mirrors DocumentViewer.DATA_EXTS for file-origin tracking)
     const DocumentViewer_DATA_EXTS = ['json', 'csv', 'xml', 'yaml', 'yml', 'tsv'];
@@ -150,11 +157,22 @@
             const llmOutput = document.querySelector('llm-output');
             const responseText = llmOutput ? llmOutput.getText() : '';
 
+            // Collapsed sections state
+            const collapsedSections = {};
+            document.querySelectorAll('.ws-chat-section').forEach(section => {
+                const sectionId = section.dataset.sectionId;
+                if (sectionId) {
+                    collapsedSections[sectionId] = section.classList.contains('ws-chat-section--collapsed');
+                }
+            });
+
             // Build bundle
             const bundle = {
                 id:        id,
                 timestamp: new Date().toISOString(),
                 parent_id: this._activeBundle || null,
+
+                collapsed_sections: collapsedSections,
 
                 config: {
                     model:     model,
@@ -216,11 +234,11 @@
 
             try {
                 // Ensure .bundles folder exists
-                try { await vault.createFolder(BUNDLE_FOLDER); } catch (_) { /* already exists */ }
+                try { await vault.createFolder(getBundleFolder()); } catch (_) { /* already exists */ }
 
                 const filename = `${bundle.id}.json`;
                 const data = new TextEncoder().encode(JSON.stringify(bundle, null, 2));
-                await vault.addFile(BUNDLE_FOLDER, filename, data);
+                await vault.addFile(getBundleFolder(), filename, data);
 
                 // Track bundle size (bytes)
                 bundle._sizeBytes = data.byteLength;
@@ -256,7 +274,7 @@
                 window.sgraphWorkspace.events.emit('activity-start', { label: 'Loading bundle...' });
 
                 const filename = `${bundleId}.json`;
-                const raw = await vault.getFile(BUNDLE_FOLDER, filename);
+                const raw = await vault.getFile(getBundleFolder(), filename);
                 const text = new TextDecoder().decode(new Uint8Array(raw));
                 const bundle = JSON.parse(text);
 
@@ -286,7 +304,7 @@
             if (!vault) return {};
 
             try {
-                const raw = await vault.getFile(BUNDLE_FOLDER, 'tree.json');
+                const raw = await vault.getFile(getBundleFolder(), 'tree.json');
                 const text = new TextDecoder().decode(new Uint8Array(raw));
                 return JSON.parse(text);
             } catch (_) {
@@ -301,28 +319,36 @@
             const prompts = bundle.prompts || {};
             const config  = bundle.config  || {};
 
-            // Restore source panel
+            // Restore source panel (or clear if no data)
+            const sv = document.querySelector('document-viewer[data-role="source"]');
             if (ctx.source && ctx.source.inline) {
-                const sv = document.querySelector('document-viewer[data-role="source"]');
                 if (sv) sv.loadText(ctx.source.inline, 'source.html');
+            } else {
+                if (sv && sv.clear) sv.clear();
             }
 
-            // Restore data panel
+            // Restore data panel (or clear if no data)
+            const dv = document.querySelector('document-viewer[data-role="data"]');
             if (ctx.data && ctx.data.inline) {
-                const dv = document.querySelector('document-viewer[data-role="data"]');
                 if (dv) dv.loadText(ctx.data.inline, 'data.json');
+            } else {
+                if (dv && dv.clear) dv.clear();
             }
 
-            // Restore script
+            // Restore script (or clear if no data)
+            const se = document.querySelector('script-editor');
             if (ctx.script && ctx.script.inline) {
-                const se = document.querySelector('script-editor');
                 if (se) se.loadScript(ctx.script.inline, ctx.script.filename || 'transform.js');
+            } else {
+                if (se && se.clear) se.clear();
             }
 
-            // Restore result panel
+            // Restore result panel (or clear if no data)
+            const rv = document.querySelector('document-viewer[data-role="transform"]');
             if (ctx.result && ctx.result.inline) {
-                const rv = document.querySelector('document-viewer[data-role="transform"]');
                 if (rv) rv.loadText(ctx.result.inline, 'result.html');
+            } else {
+                if (rv && rv.clear) rv.clear();
             }
 
             // Restore system prompt
@@ -365,10 +391,25 @@
                 if (pi._renderImagePreviews) pi._renderImagePreviews();
             }
 
-            // Restore LLM response
+            // Restore LLM response (or clear if no data)
+            const lo = document.querySelector('llm-output');
             if (bundle.response && bundle.response.text) {
-                const lo = document.querySelector('llm-output');
                 if (lo) lo.loadText(bundle.response.text);
+            } else {
+                if (lo && lo.clear) lo.clear();
+            }
+
+            // Restore collapsed panel state
+            if (bundle.collapsed_sections) {
+                const sections = document.querySelectorAll('.ws-chat-section');
+                sections.forEach(section => {
+                    const sectionId = section.dataset.sectionId;
+                    if (sectionId && bundle.collapsed_sections[sectionId] !== undefined) {
+                        section.classList.toggle('ws-chat-section--collapsed', !!bundle.collapsed_sections[sectionId]);
+                    }
+                });
+                // Also persist to localStorage so it stays in sync
+                try { localStorage.setItem('sgraph-workspace-chat-collapsed', JSON.stringify(bundle.collapsed_sections)); } catch (_) {}
             }
         }
 
@@ -383,7 +424,7 @@
             let tree = { bundles: {} };
 
             try {
-                const raw = await vault.getFile(BUNDLE_FOLDER, 'tree.json');
+                const raw = await vault.getFile(getBundleFolder(), 'tree.json');
                 const text = new TextDecoder().decode(new Uint8Array(raw));
                 tree = JSON.parse(text);
             } catch (_) {
@@ -399,7 +440,7 @@
             };
 
             const data = new TextEncoder().encode(JSON.stringify(tree, null, 2));
-            await vault.addFile(BUNDLE_FOLDER, 'tree.json', data);
+            await vault.addFile(getBundleFolder(), 'tree.json', data);
         }
 
         // --- Event Handlers ----------------------------------------------------
@@ -437,12 +478,12 @@
 
             try {
                 // Remove bundle file from vault
-                try { await vault.removeFile(BUNDLE_FOLDER, `${bundleId}.json`); } catch (_) {}
+                try { await vault.removeFile(getBundleFolder(), `${bundleId}.json`); } catch (_) {}
 
                 // Update tree.json — remove entry
                 let tree = { bundles: {} };
                 try {
-                    const raw = await vault.getFile(BUNDLE_FOLDER, 'tree.json');
+                    const raw = await vault.getFile(getBundleFolder(), 'tree.json');
                     const text = new TextDecoder().decode(new Uint8Array(raw));
                     tree = JSON.parse(text);
                 } catch (_) {}
@@ -450,7 +491,7 @@
                 delete tree.bundles[bundleId];
 
                 const data = new TextEncoder().encode(JSON.stringify(tree, null, 2));
-                await vault.addFile(BUNDLE_FOLDER, 'tree.json', data);
+                await vault.addFile(getBundleFolder(), 'tree.json', data);
 
                 // Clear active if deleted
                 if (this._activeBundle === bundleId) this._activeBundle = null;

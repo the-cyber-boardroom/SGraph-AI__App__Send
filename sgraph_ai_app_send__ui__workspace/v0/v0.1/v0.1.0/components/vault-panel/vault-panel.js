@@ -448,6 +448,8 @@ document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remo
             this._selectedFile = null;
             this._render();
 
+            window.sgraphWorkspace.events.emit('folder-navigated', { path });
+
             // Auto-load source.html if present in the folder
             if (this._vault) {
                 const items = this._vault.listFolder(path) || [];
@@ -463,6 +465,8 @@ document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remo
             this._currentPath   = this._breadcrumb[idx].path;
             this._selectedFile  = null;
             this._render();
+
+            window.sgraphWorkspace.events.emit('folder-navigated', { path: this._currentPath });
         }
 
         // --- File selection (emits event for document-viewer) ------------------

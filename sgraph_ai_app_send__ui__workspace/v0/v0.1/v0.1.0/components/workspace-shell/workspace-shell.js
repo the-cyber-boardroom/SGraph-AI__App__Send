@@ -273,6 +273,15 @@
                     return;
                 }
 
+                // Panel clear button
+                const clearBtn = e.target.closest('.ws-panel-clear[data-clear-role]');
+                if (clearBtn) {
+                    const role = clearBtn.dataset.clearRole;
+                    const viewer = this.querySelector(`document-viewer[data-role="${role}"]`);
+                    if (viewer && viewer.clear) viewer.clear();
+                    return;
+                }
+
                 // Mobile menu
                 if (e.target.closest('.ws-menu-btn')) {
                     this._mobileMenuOpen = !this._mobileMenuOpen;
@@ -635,6 +644,7 @@
                             <div class="ws-source-bottom">
                                 <div class="ws-panel-header">
                                     <span class="ws-panel-label">Data</span>
+                                    <button class="ws-panel-clear" data-clear-role="data" title="Clear data pane">Clear</button>
                                 </div>
                                 <div class="ws-panel-content">
                                     <document-viewer data-role="data"></document-viewer>

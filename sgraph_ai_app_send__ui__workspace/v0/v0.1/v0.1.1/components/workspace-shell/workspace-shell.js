@@ -23,9 +23,18 @@
         }
         .ws-chat-section--collapsed {
             flex: 0 0 auto !important;
+            min-width: 0 !important;
+            max-width: fit-content !important;
         }
         .ws-chat-section--collapsed > :not(.ws-section-header) {
             display: none !important;
+        }
+        .ws-chat-section--collapsed .ws-section-header {
+            writing-mode: vertical-rl;
+            white-space: nowrap;
+            padding: 0.375rem 0.125rem;
+            border-bottom: none;
+            border-right: 1px solid var(--ws-border-subtle, #222d4d);
         }
         .ws-section-header {
             display: flex; align-items: center; gap: 0.375rem;
@@ -199,6 +208,14 @@
                 const state = getCollapsedSections();
                 state[sec.id] = section.classList.contains('ws-chat-section--collapsed');
                 saveCollapsedSections(state);
+
+                // Reset non-collapsed siblings to flex:1 so they reclaim freed space
+                const siblings = section.parentElement.querySelectorAll('.ws-chat-section');
+                siblings.forEach(s => {
+                    if (!s.classList.contains('ws-chat-section--collapsed')) {
+                        s.style.flex = '1';
+                    }
+                });
             });
 
             // Wrap: insert section before component, move component inside
