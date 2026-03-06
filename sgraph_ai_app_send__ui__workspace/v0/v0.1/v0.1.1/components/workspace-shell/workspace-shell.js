@@ -502,6 +502,9 @@
             addPanelToggle(shell, def.id, def.selector);
         }
         applyAllPanelState(shell);
+
+        // Allow external components (e.g. bundle-manager) to trigger re-apply
+        document.addEventListener('workspace-panels-changed', () => applyAllPanelState(shell));
     }
 
     function addPanelToggle(shell, id, selector) {
