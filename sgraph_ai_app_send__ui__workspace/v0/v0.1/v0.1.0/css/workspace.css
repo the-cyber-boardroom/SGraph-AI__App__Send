@@ -612,7 +612,7 @@ llm-stats {
 
 @media (max-width: 1024px) {
     .ws-shell {
-        grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 1fr 1fr 0 0;
+        grid-template-columns: var(--ws-nav-width) var(--ws-vault-width) 4px 1fr 1fr 0 0;
     }
     .ws-debug-sidebar, .ws-debug-resize { display: none; }
 }

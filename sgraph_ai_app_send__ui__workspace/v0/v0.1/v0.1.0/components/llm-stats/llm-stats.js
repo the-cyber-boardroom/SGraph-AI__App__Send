@@ -101,11 +101,12 @@
                 return;
             }
 
-            const chat = document.querySelector('llm-chat');
-            if (!chat) return;
+            const sysPromptEl = document.querySelector('llm-system-prompt');
+            const promptEl    = document.querySelector('llm-prompt-input');
+            if (!sysPromptEl && !promptEl) return;
 
-            const systemPrompt = chat._systemPrompt || '';
-            const userPrompt   = chat.querySelector('#lc-prompt')?.value || '';
+            const systemPrompt = (sysPromptEl && sysPromptEl.getSystemPrompt) ? sysPromptEl.getSystemPrompt() : '';
+            const userPrompt   = (promptEl && promptEl.getPromptText) ? promptEl.getPromptText() : '';
 
             if (!systemPrompt && !userPrompt) {
                 window.sgraphWorkspace.messages.warning('No prompt to save');

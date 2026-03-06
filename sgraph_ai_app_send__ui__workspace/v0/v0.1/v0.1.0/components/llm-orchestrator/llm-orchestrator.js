@@ -257,6 +257,7 @@
                     finishReason:     result?.finishReason      || null,
                     cost,
                     speed,
+                    latencyMs,
                 });
 
             } catch (e) {

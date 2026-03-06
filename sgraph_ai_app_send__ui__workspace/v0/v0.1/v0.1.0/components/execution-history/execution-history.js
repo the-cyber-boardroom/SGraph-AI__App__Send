@@ -74,10 +74,10 @@
 
         try {
             // Ensure /executions folder exists
-            try { vault.createFolder(FOLDER); } catch (_) { /* may already exist */ }
+            try { await vault.createFolder(FOLDER); } catch (_) { /* may already exist */ }
 
             const data = new TextEncoder().encode(JSON.stringify(record, null, 2));
-            await vault.writeFile(FOLDER, filename, data);
+            await vault.addFile(FOLDER, filename, data);
             return record;
         } catch (e) {
             console.error('[exec-history] Failed to save:', e);

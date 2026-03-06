@@ -121,7 +121,7 @@
         _matchesFilter(entry) {
             if (this._statusFilter) {
                 if (this._statusFilter === 'err') {
-                    if (entry.status !== 0 && !entry.error) return false;
+                    if (entry.status !== 0 && !(entry.status >= 400) && !entry.error) return false;
                 } else {
                     // '2xx' → 200, '4xx' → 400
                     const range = parseInt(this._statusFilter) * 100;

@@ -435,6 +435,11 @@ articles.forEach(function(el) {
 
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
+
+            this._unsubs.push(
+                () => document.removeEventListener('mousemove', onMouseMove),
+                () => document.removeEventListener('mouseup', onMouseUp),
+            );
         }
 
         // --- Styles ------------------------------------------------------------

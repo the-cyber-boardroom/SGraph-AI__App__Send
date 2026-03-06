@@ -235,6 +235,9 @@
         }
     }
 
+    // Track resize listeners for cleanup
+    const _resizeCleanups = [];
+
     // --- Section resize (drag to adjust flex proportions) ---
     function setupSectionResize(handle, sectionAbove) {
         let isResizing = false;
@@ -250,20 +253,28 @@
             e.preventDefault();
         });
 
-        document.addEventListener('mousemove', (e) => {
+        const onMouseMove = (e) => {
             if (!isResizing) return;
             const diff = e.clientY - startY;
             const newH = Math.max(24, startH + diff);
             sectionAbove.style.flex = `0 0 ${newH}px`;
-        });
+        };
 
-        document.addEventListener('mouseup', () => {
+        const onMouseUp = () => {
             if (!isResizing) return;
             isResizing = false;
             handle.classList.remove('ws-section-resize--active');
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-        });
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+        _resizeCleanups.push(
+            () => document.removeEventListener('mousemove', onMouseMove),
+            () => document.removeEventListener('mouseup', onMouseUp),
+        );
     }
 
     // --- Override render() for future re-renders ---
