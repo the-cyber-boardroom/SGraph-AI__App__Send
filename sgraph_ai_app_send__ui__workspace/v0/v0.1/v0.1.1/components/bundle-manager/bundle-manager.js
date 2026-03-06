@@ -327,6 +327,12 @@
             const prompts = bundle.prompts || {};
             const config  = bundle.config  || {};
 
+            // Restore model selection
+            if (config.model) {
+                const conn = document.querySelector('llm-connection');
+                if (conn && conn.setSelectedModel) conn.setSelectedModel(config.model);
+            }
+
             // Restore source panel (or clear if no data)
             const sv = document.querySelector('document-viewer[data-role="source"]');
             if (ctx.source && ctx.source.inline) {
