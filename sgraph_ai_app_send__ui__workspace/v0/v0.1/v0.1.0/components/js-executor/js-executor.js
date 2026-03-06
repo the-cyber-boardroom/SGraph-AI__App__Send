@@ -95,7 +95,7 @@
 
     function buildIframeDocument(sourceHtml, userScript, dataContent) {
         const safeScript = userScript.replace(/<\/script>/gi, '<\\/script>');
-        const safeData   = (dataContent || '').replace(/<\/script>/gi, '<\\/script>').replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+        const safeData   = (dataContent || '').replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/<\/script>/gi, '<\\/script>');
 
         return `<!DOCTYPE html>
 <html>
