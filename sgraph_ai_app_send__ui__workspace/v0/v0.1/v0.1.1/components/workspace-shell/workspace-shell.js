@@ -13,10 +13,11 @@
 (function() {
     'use strict';
 
-    // Store original render
-    const _originalRender = WorkspaceShell.prototype.render;
+    // Get the class from the custom elements registry (not in global scope due to IIFE)
+    const ShellClass = customElements.get('workspace-shell');
+    const _originalRender = ShellClass.prototype.render;
 
-    WorkspaceShell.prototype.render = function() {
+    ShellClass.prototype.render = function() {
         // Call the original render (builds the full DOM)
         _originalRender.call(this);
 

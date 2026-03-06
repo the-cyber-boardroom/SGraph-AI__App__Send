@@ -134,7 +134,7 @@
 
             // LLM output
             const llmOutput = document.querySelector('llm-output');
-            const responseText = llmOutput ? llmOutput.getTextContent() : '';
+            const responseText = llmOutput ? llmOutput.getText() : '';
 
             // Build bundle
             const bundle = {
