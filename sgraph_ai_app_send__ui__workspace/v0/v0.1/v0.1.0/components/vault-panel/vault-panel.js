@@ -416,6 +416,86 @@ document.querySelectorAll('.article').forEach(function(el) {
 // Also clean up ads
 document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remove());`;
 
+            // articles.json — pre-extracted data (output of extract-articles.js)
+            // This is what you get when you run extract-articles.js and save the result
+            const demoArticlesJson = JSON.stringify([
+                {
+                    title:    "New AI Framework Released",
+                    meta:     "March 5, 2026 | AI & Machine Learning",
+                    body:     "A groundbreaking new framework for building AI applications was released today, promising 10x faster training times and simplified deployment workflows.",
+                    category: "ai"
+                },
+                {
+                    title:    "Major Security Vulnerability Patched",
+                    meta:     "March 4, 2026 | Security",
+                    body:     "A critical vulnerability affecting millions of web servers was patched yesterday. Administrators are urged to update immediately.",
+                    category: "security"
+                },
+                {
+                    title:    "WebAssembly 3.0 Specification Approved",
+                    meta:     "March 3, 2026 | Web Standards",
+                    body:     "The W3C has approved the WebAssembly 3.0 specification, bringing garbage collection and improved threading support to the web platform.",
+                    category: "web"
+                }
+            ], null, 2);
+
+            // Scripts that use __SG_SEND_DATA__ to transform content using extracted data
+            const demoScript4 = `// Rewrite titles: add category prefix using DATA
+// Load articles.json into DATA panel, then run this against source.html
+var data = __SG_SEND_DATA__.parsed;
+if (!data) return 'Error: Load articles.json into the DATA panel first';
+
+var lookup = {};
+data.forEach(function(a) { lookup[a.title] = a; });
+
+document.querySelectorAll('.article').forEach(function(el) {
+    var h2 = el.querySelector('h2');
+    if (!h2) return;
+    var info = lookup[h2.textContent];
+    if (info) {
+        var prefix = '[' + info.category.toUpperCase() + '] ';
+        h2.textContent = prefix + h2.textContent;
+    }
+});
+document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remove());`;
+
+            const demoScript5 = `// Translate titles to Spanish using DATA
+// Load articles.json into DATA panel, then run this against source.html
+var data = __SG_SEND_DATA__.parsed;
+if (!data) return 'Error: Load articles.json into the DATA panel first';
+
+// Simple translation map (in real usage, LLM would generate this)
+var translations = {
+    'New AI Framework Released':               'Nuevo Framework de IA Lanzado',
+    'Major Security Vulnerability Patched':    'Vulnerabilidad de Seguridad Importante Parcheada',
+    'WebAssembly 3.0 Specification Approved':  'Especificacion WebAssembly 3.0 Aprobada'
+};
+
+document.querySelectorAll('.article h2').forEach(function(h2) {
+    var tr = translations[h2.textContent];
+    if (tr) h2.textContent = tr;
+});
+document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remove());`;
+
+            const demoScript6 = `// Build summary card from DATA (no source HTML needed)
+// Load articles.json into DATA panel, run against any source
+var data = __SG_SEND_DATA__.parsed;
+if (!data) return 'Error: Load articles.json into the DATA panel first';
+
+var html = '<div style="font-family:sans-serif;max-width:600px;margin:1rem auto">';
+html += '<h2 style="color:#2c3e50">Article Summary (' + data.length + ' articles)</h2>';
+html += '<table style="width:100%;border-collapse:collapse">';
+html += '<tr style="background:#3498db;color:#fff"><th style="padding:8px;text-align:left">Title</th><th style="padding:8px">Category</th></tr>';
+data.forEach(function(a, i) {
+    var bg = i % 2 === 0 ? '#f8f9fa' : '#fff';
+    html += '<tr style="background:' + bg + '">';
+    html += '<td style="padding:8px">' + a.title + '</td>';
+    html += '<td style="padding:8px;text-align:center"><span style="background:#e8f4f8;padding:2px 8px;border-radius:4px;font-size:0.85em">' + a.category + '</span></td>';
+    html += '</tr>';
+});
+html += '</table></div>';
+return html;`;
+
             try {
                 // Create demo folder
                 const demoPath = this._currentPath === '/'
@@ -427,9 +507,13 @@ document.querySelectorAll('.ad-banner, .tracking, script').forEach(el => el.remo
                 }
 
                 await this._vault.addFile(demoPath, 'source.html', enc(demoHtml));
+                await this._vault.addFile(demoPath, 'articles.json', enc(demoArticlesJson));
                 await this._vault.addFile(demoPath, 'clean-ads.js', enc(demoScript1));
                 await this._vault.addFile(demoPath, 'extract-articles.js', enc(demoScript2));
                 await this._vault.addFile(demoPath, 'filter-ai-only.js', enc(demoScript3));
+                await this._vault.addFile(demoPath, 'rewrite-titles.js', enc(demoScript4));
+                await this._vault.addFile(demoPath, 'translate-titles.js', enc(demoScript5));
+                await this._vault.addFile(demoPath, 'build-summary.js', enc(demoScript6));
 
                 this._render();
                 window.sgraphWorkspace.messages.success('Demo data loaded into "demo-transforms" folder');
