@@ -690,6 +690,11 @@ return html;`;
                     const badge      = isSource ? '<span class="vp-item-badge vp-item-badge--source">SRC</span>'
                                      : isView   ? '<span class="vp-item-badge vp-item-badge--view">VIEW</span>'
                                      : '';
+                    const folderActions = isFolder ? `
+                        <span class="vp-folder-actions">
+                            <button class="vp-folder-btn" data-folder-action="rename" data-folder-name="${esc(item.name)}" title="Rename folder">Rename</button>
+                            <button class="vp-folder-btn vp-folder-btn--danger" data-folder-action="delete" data-folder-name="${esc(item.name)}" title="Delete folder">Del</button>
+                        </span>` : '';
                     return `<div class="vp-item ${isSelected ? 'vp-item--selected' : ''}${extraClass}"
                                 data-name="${esc(item.name)}"
                                 data-kind="${item.type}">
@@ -697,6 +702,7 @@ return html;`;
                         <span class="vp-item-name">${esc(item.name)}</span>
                         ${badge}
                         ${!isFolder && item.size ? `<span class="vp-item-size">${formatSize(item.size)}</span>` : ''}
+                        ${folderActions}
                     </div>`;
                 }).join('');
             }
@@ -824,6 +830,22 @@ return html;`;
                         const items = this._vault.listFolder(this._currentPath) || [];
                         const entry = items.find(i => i.name === name);
                         if (entry) this._selectFile(name, entry);
+                    }
+                });
+            });
+
+            // Folder action buttons (Rename / Del on folder rows)
+            this.querySelectorAll('.vp-folder-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = btn.dataset.folderAction;
+                    const name   = btn.dataset.folderName;
+                    if (action === 'rename') {
+                        this._inlineTarget = name;
+                        this._startInlineInput('rename', name);
+                    }
+                    if (action === 'delete') {
+                        this._deleteItem(name, 'folder');
                     }
                 });
             });
@@ -965,6 +987,22 @@ return html;`;
                     background: rgba(139,92,246,0.15); color: #a78bfa;
                 }
                 .vp-item--source .vp-item-name { color: var(--ws-primary, #4ECDC4); font-weight: 600; }
+
+                .vp-folder-actions {
+                    display: none; flex-shrink: 0; gap: 0.25rem; align-items: center;
+                }
+                .vp-item:hover .vp-folder-actions { display: flex; }
+                .vp-folder-btn {
+                    padding: 0.0625rem 0.375rem; border-radius: 3px;
+                    font-size: 0.5625rem; font-weight: 600;
+                    cursor: pointer; font-family: inherit;
+                    background: var(--ws-surface-raised, #1c2a4a);
+                    color: var(--ws-text-secondary, #8892A0);
+                    border: 1px solid var(--ws-border-subtle, #222d4d);
+                    transition: background 80ms;
+                }
+                .vp-folder-btn:hover { background: var(--ws-surface-hover, #253254); color: var(--ws-text, #F0F0F5); }
+                .vp-folder-btn--danger:hover { background: rgba(255,107,107,0.15); color: #FF6B6B; }
 
                 .vp-toolbar {
                     display: flex; align-items: center; gap: 0.25rem;
