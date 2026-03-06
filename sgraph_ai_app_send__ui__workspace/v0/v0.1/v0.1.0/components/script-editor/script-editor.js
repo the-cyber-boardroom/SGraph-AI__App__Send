@@ -111,6 +111,10 @@ articles.forEach(function(el) {
                 return;
             }
 
+            // Read DATA panel content for __SG_SEND_DATA__ injection
+            const dataViewer = document.querySelector('document-viewer[data-role="data"]');
+            const dataText   = dataViewer ? dataViewer.getTextContent() : null;
+
             this._running     = true;
             this._consoleLogs = [];
             this._updateButtons();
@@ -120,7 +124,7 @@ articles.forEach(function(el) {
             const startTime = Date.now();
 
             try {
-                const result = await window.sgraphWorkspace.executeJS(sourceHtml, script);
+                const result = await window.sgraphWorkspace.executeJS(sourceHtml, script, 10000, dataText);
                 const elapsed = Date.now() - startTime;
 
                 // Add captured console logs
