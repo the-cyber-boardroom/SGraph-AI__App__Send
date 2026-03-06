@@ -1,11 +1,10 @@
 /* =============================================================================
    SGraph Workspace — Shell Override
-   v0.1.1 — Surgical override: adds Save State button + Bundles debug tab
-
-   Overrides WorkspaceShell.prototype.render to inject:
-   1. "Save State" button in the chat zone header
-   2. "Bundles" tab in the debug sidebar
-   3. <bundle-manager> and <bundle-list> hidden components
+   v0.1.1 — Surgical override:
+     1. Save State button (with visual feedback)
+     2. Bundles debug tab
+     3. Collapsible/resizable chat sections
+     4. <bundle-manager> and <bundle-list> components
 
    Loads AFTER v0.1.0/workspace-shell.js — overrides via prototype patching.
    Also applies immediately to the already-rendered shell instance.
@@ -14,7 +13,86 @@
 (function() {
     'use strict';
 
-    // Shared injection logic — adds v0.1.1 UI elements to a shell instance
+    // --- CSS for collapsible chat sections + save feedback ---
+    const CHAT_STYLES = document.createElement('style');
+    CHAT_STYLES.textContent = `
+        .ws-chat-section {
+            display: flex; flex-direction: column;
+            min-height: 0; overflow: hidden;
+            transition: flex 150ms ease;
+        }
+        .ws-chat-section--collapsed {
+            flex: 0 0 auto !important;
+        }
+        .ws-chat-section--collapsed > :not(.ws-section-header) {
+            display: none !important;
+        }
+        .ws-section-header {
+            display: flex; align-items: center; gap: 0.375rem;
+            padding: 0.125rem 0.375rem;
+            background: var(--ws-surface, #162040);
+            border-bottom: 1px solid var(--ws-border-subtle, #222d4d);
+            flex-shrink: 0; cursor: pointer; user-select: none;
+        }
+        .ws-section-header:hover {
+            background: var(--ws-surface-hover, #253254);
+        }
+        .ws-section-label {
+            font-size: 0.5625rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            color: var(--ws-text-muted, #5a6478);
+        }
+        .ws-section-toggle {
+            font-size: 0.5rem; color: var(--ws-text-muted, #5a6478);
+            transition: transform 150ms;
+        }
+        .ws-chat-section--collapsed .ws-section-toggle {
+            transform: rotate(-90deg);
+        }
+        .ws-section-resize {
+            height: 3px; flex-shrink: 0;
+            cursor: row-resize;
+            background: transparent;
+            transition: background 0.15s;
+        }
+        .ws-section-resize:hover,
+        .ws-section-resize--active {
+            background: var(--ws-primary, #4ECDC4);
+        }
+
+        /* Save button feedback */
+        @keyframes ws-save-flash {
+            0%   { background: rgba(78,205,196,0.3); }
+            100% { background: var(--ws-primary-bg, rgba(78,205,196,0.1)); }
+        }
+        .ws-bundle-save--saving {
+            pointer-events: none;
+            animation: ws-save-flash 0.6s ease;
+        }
+    `;
+    document.head.appendChild(CHAT_STYLES);
+
+    // --- Chat section definitions ---
+    const CHAT_SECTIONS = [
+        { id: 'system-prompt', label: 'System Prompt', tag: 'llm-system-prompt' },
+        { id: 'prompt-input',  label: 'Prompt',        tag: 'llm-prompt-input' },
+        { id: 'llm-output',    label: 'LLM Output',    tag: 'llm-output' },
+        { id: 'llm-stats',     label: 'Request Mode',  tag: 'llm-stats' },
+    ];
+
+    // Load collapsed state from localStorage
+    function getCollapsedSections() {
+        try {
+            const raw = localStorage.getItem('sgraph-workspace-chat-collapsed');
+            return raw ? JSON.parse(raw) : {};
+        } catch (_) { return {}; }
+    }
+
+    function saveCollapsedSections(state) {
+        try { localStorage.setItem('sgraph-workspace-chat-collapsed', JSON.stringify(state)); } catch (_) {}
+    }
+
+    // --- Shared injection logic ---
     function injectBundleUI(shell) {
         // Guard: don't inject twice
         if (shell.querySelector('.ws-bundle-save')) return;
@@ -27,6 +105,9 @@
             saveBtn.textContent = 'Save State';
             saveBtn.title = 'Save current workspace state as an execution bundle';
             saveBtn.addEventListener('click', () => {
+                // Visual feedback
+                saveBtn.textContent = 'Saving...';
+                saveBtn.classList.add('ws-bundle-save--saving');
                 window.sgraphWorkspace.events.emit('bundle-save-requested', {});
             });
 
@@ -39,12 +120,23 @@
                 border-radius: var(--ws-radius, 6px);
                 cursor: pointer; font-family: inherit;
                 margin-left: auto;
+                transition: background 150ms;
             `;
 
             chatHeader.style.display = 'flex';
             chatHeader.style.alignItems = 'center';
             chatHeader.style.gap = '0.5rem';
             chatHeader.appendChild(saveBtn);
+
+            // Reset button after save completes
+            const onSaved = () => {
+                saveBtn.textContent = 'Saved!';
+                setTimeout(() => {
+                    saveBtn.textContent = 'Save State';
+                    saveBtn.classList.remove('ws-bundle-save--saving');
+                }, 1200);
+            };
+            window.sgraphWorkspace.events.on('bundle-saved', onSaved);
         }
 
         // 2. Add "Bundles" tab to the debug sidebar
@@ -75,9 +167,89 @@
             const target = shell.querySelector('.ws-transform-area') || shell;
             target.appendChild(mgr);
         }
+
+        // 5. Wrap chat body children in collapsible sections
+        wrapChatSections(shell);
     }
 
-    // Override render() for future re-renders
+    // --- Wrap chat body components in collapsible section wrappers ---
+    function wrapChatSections(shell) {
+        const chatBody = shell.querySelector('.ws-chat-body');
+        if (!chatBody || chatBody.querySelector('.ws-chat-section')) return;
+
+        const collapsed = getCollapsedSections();
+
+        for (const sec of CHAT_SECTIONS) {
+            const component = chatBody.querySelector(sec.tag);
+            if (!component) continue;
+
+            // Create section wrapper
+            const section = document.createElement('div');
+            section.className = 'ws-chat-section';
+            section.dataset.sectionId = sec.id;
+            section.style.flex = '1';
+            if (collapsed[sec.id]) section.classList.add('ws-chat-section--collapsed');
+
+            // Create header
+            const header = document.createElement('div');
+            header.className = 'ws-section-header';
+            header.innerHTML = `<span class="ws-section-toggle">&#9660;</span><span class="ws-section-label">${sec.label}</span>`;
+            header.addEventListener('click', () => {
+                section.classList.toggle('ws-chat-section--collapsed');
+                const state = getCollapsedSections();
+                state[sec.id] = section.classList.contains('ws-chat-section--collapsed');
+                saveCollapsedSections(state);
+            });
+
+            // Wrap: insert section before component, move component inside
+            component.parentNode.insertBefore(section, component);
+            section.appendChild(header);
+            section.appendChild(component);
+
+            // Add resize handle between sections (except after last)
+            if (sec.id !== 'llm-stats') {
+                const handle = document.createElement('div');
+                handle.className = 'ws-section-resize';
+                handle.title = 'Drag to resize';
+                section.after(handle);
+
+                setupSectionResize(handle, section);
+            }
+        }
+    }
+
+    // --- Section resize (drag to adjust flex proportions) ---
+    function setupSectionResize(handle, sectionAbove) {
+        let isResizing = false;
+        let startY, startH;
+
+        handle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startY = e.clientY;
+            startH = sectionAbove.offsetHeight;
+            handle.classList.add('ws-section-resize--active');
+            document.body.style.cursor = 'row-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const diff = e.clientY - startY;
+            const newH = Math.max(24, startH + diff);
+            sectionAbove.style.flex = `0 0 ${newH}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!isResizing) return;
+            isResizing = false;
+            handle.classList.remove('ws-section-resize--active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        });
+    }
+
+    // --- Override render() for future re-renders ---
     const ShellClass = customElements.get('workspace-shell');
     const _originalRender = ShellClass.prototype.render;
 
@@ -86,7 +258,7 @@
         injectBundleUI(this);
     };
 
-    // Apply immediately to the already-rendered shell instance
+    // --- Apply immediately to the already-rendered shell instance ---
     const existingShell = document.querySelector('workspace-shell');
     if (existingShell) {
         injectBundleUI(existingShell);

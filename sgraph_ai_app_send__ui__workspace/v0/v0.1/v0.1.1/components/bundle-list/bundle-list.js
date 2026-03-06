@@ -91,6 +91,7 @@
                 const ts = this._formatTimestamp(info.timestamp);
                 const model = info.model ? this._shortModel(info.model) : 'no model';
                 const preview = info.prompt_preview || '(no prompt)';
+                const sizeLabel = info.size_bytes ? this._formatSize(info.size_bytes) : '';
                 const parentLabel = info.parent_id
                     ? `<span class="bl-fork" title="Forked from ${esc(info.parent_id)}">fork</span>`
                     : '';
@@ -99,7 +100,9 @@
                     <div class="bl-item-top">
                         <span class="bl-time">${esc(ts)}</span>
                         <span class="bl-model">${esc(model)}</span>
+                        ${sizeLabel ? `<span class="bl-size">${esc(sizeLabel)}</span>` : ''}
                         ${parentLabel}
+                        <button class="bl-delete" data-delete-id="${esc(id)}" title="Delete bundle">&times;</button>
                     </div>
                     <div class="bl-preview">${esc(preview)}</div>
                 </div>`;
@@ -118,6 +121,17 @@
         }
 
         _bind() {
+            // Delete buttons (must bind before item click to stop propagation)
+            this.querySelectorAll('.bl-delete').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const deleteId = btn.dataset.deleteId;
+                    if (deleteId) {
+                        window.sgraphWorkspace.events.emit('bundle-delete-requested', { bundleId: deleteId });
+                    }
+                });
+            });
+
             // Click to load bundle
             this.querySelectorAll('.bl-item').forEach(el => {
                 el.addEventListener('click', () => {
@@ -152,6 +166,12 @@
             // "anthropic/claude-3.7-sonnet" -> "claude-3.7-sonnet"
             const slash = model.lastIndexOf('/');
             return slash >= 0 ? model.slice(slash + 1) : model;
+        }
+
+        _formatSize(bytes) {
+            if (!bytes || bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
         // --- Styles ------------------------------------------------------------
@@ -217,12 +237,32 @@
                     color: var(--ws-text-muted, #5a6478);
                     max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                 }
+                .bl-size {
+                    font-size: 0.5rem;
+                    color: var(--ws-text-muted, #5a6478);
+                    font-family: var(--ws-font-mono, monospace);
+                }
                 .bl-fork {
                     font-size: 0.5rem; font-weight: 700;
                     padding: 0 0.25rem; border-radius: 2px;
                     background: rgba(78,205,196,0.15);
                     color: var(--ws-primary, #4ECDC4);
                     text-transform: uppercase; letter-spacing: 0.04em;
+                }
+                .bl-delete {
+                    margin-left: auto;
+                    width: 16px; height: 16px;
+                    font-size: 0.75rem; line-height: 1;
+                    background: transparent; color: var(--ws-text-muted, #5a6478);
+                    border: none; border-radius: 2px;
+                    cursor: pointer; padding: 0;
+                    display: flex; align-items: center; justify-content: center;
+                    opacity: 0; transition: opacity 100ms;
+                }
+                .bl-item:hover .bl-delete { opacity: 1; }
+                .bl-delete:hover {
+                    color: var(--ws-error, #E94560);
+                    background: var(--ws-error-bg, rgba(233,69,96,0.08));
                 }
                 .bl-preview {
                     font-size: 0.625rem;

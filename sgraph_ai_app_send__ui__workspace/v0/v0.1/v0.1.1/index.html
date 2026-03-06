@@ -53,12 +53,20 @@
     <!-- Fix: execution-history vault.writeFile -> vault.addFile + await createFolder -->
     <script src="components/execution-history/execution-history.js"></script>
 
-    <!-- === Layer 7: v0.1.1 additions — Execution Bundles === -->
+    <!-- === Layer 7: v0.1.1 overrides — behaviour patches === -->
+    <!-- Keep screenshots after send -->
+    <script src="components/llm-prompt-input/llm-prompt-input.js"></script>
+    <!-- Code block detection + extract on copy to Script -->
+    <script src="components/llm-output/llm-output.js"></script>
+    <!-- Stop/cancel button for running scripts -->
+    <script src="components/script-editor/script-editor.js"></script>
+
+    <!-- === Layer 8: v0.1.1 additions — Execution Bundles === -->
     <!-- New components (must load before shell override) -->
     <script src="components/bundle-manager/bundle-manager.js"></script>
     <script src="components/bundle-list/bundle-list.js"></script>
 
-    <!-- Surgical override: adds Save State button + Bundles tab to shell -->
+    <!-- Surgical override: Save State, Bundles tab, collapsible chat sections -->
     <script src="components/workspace-shell/workspace-shell.js"></script>
 </body>
 </html>
