@@ -49,7 +49,11 @@
     <!-- === Layer 5: Shell (from v0.1.0 — must load before override) === -->
     <script src="../v0.1.0/components/workspace-shell/workspace-shell.js"></script>
 
-    <!-- === Layer 6: v0.1.1 additions — Execution Bundles === -->
+    <!-- === Layer 6: v0.1.1 bug fixes === -->
+    <!-- Fix: execution-history vault.writeFile -> vault.addFile + await createFolder -->
+    <script src="components/execution-history/execution-history.js"></script>
+
+    <!-- === Layer 7: v0.1.1 additions — Execution Bundles === -->
     <!-- New components (must load before shell override) -->
     <script src="components/bundle-manager/bundle-manager.js"></script>
     <script src="components/bundle-list/bundle-list.js"></script>
