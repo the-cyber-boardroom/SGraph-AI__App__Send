@@ -20,11 +20,11 @@
     CHAT_STYLES.textContent = `
         /* --- Four-column grid override --- */
         .ws-transform-area--four-col {
-            grid-template-columns: 1fr 4px 1fr 4px 1fr 4px 1fr !important;
+            grid-template-columns: 1fr 4px 1fr 4px 1fr 4px 1fr;
             grid-template-areas:
                 "source   col-resize1 data    col-resize2 script  col-resize3 result"
                 "row-resize row-resize row-resize row-resize row-resize row-resize row-resize"
-                "chat     chat        chat    chat         chat   chat         chat" !important;
+                "chat     chat        chat    chat         chat   chat         chat";
         }
 
         .ws-source-top    { grid-area: source; }
