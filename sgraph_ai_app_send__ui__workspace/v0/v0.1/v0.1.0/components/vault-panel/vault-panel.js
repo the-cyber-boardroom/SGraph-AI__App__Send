@@ -259,6 +259,7 @@
 
         async _doCreateFolder(name) {
             if (!this._vault || this._state !== 'open') return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Creating folder "${name}"...` });
             try {
                 // Build full path for subfolder
                 const fullPath = this._currentPath === '/'
@@ -278,10 +279,12 @@
                 console.error('[vault-panel] Create folder failed:', e);
                 window.sgraphWorkspace.messages.error('Create folder failed: ' + e.message);
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         async _doCreateFile(filename) {
             if (!this._vault || this._state !== 'open') return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Creating "${filename}"...` });
             try {
                 const content = new TextEncoder().encode('');
                 await this._vault.addFile(this._currentPath, filename, content);
@@ -292,10 +295,12 @@
                 console.error('[vault-panel] Create file failed:', e);
                 window.sgraphWorkspace.messages.error('Create failed: ' + e.message);
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         async _doRename(oldName, newName) {
             if (!this._vault || !oldName || newName === oldName) return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Renaming "${oldName}"...` });
             try {
                 await this._vault.renameFile(this._currentPath, oldName, newName);
                 this._render();
@@ -304,10 +309,12 @@
                 console.error('[vault-panel] Rename failed:', e);
                 window.sgraphWorkspace.messages.error('Rename failed: ' + e.message);
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         async _duplicateFile(name) {
             if (!this._vault || !name) return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Duplicating "${name}"...` });
             try {
                 const content = await this._vault.getFile(this._currentPath, name);
                 const dot = name.lastIndexOf('.');
@@ -325,11 +332,13 @@
                 console.error('[vault-panel] Duplicate failed:', e);
                 window.sgraphWorkspace.messages.error('Duplicate failed: ' + e.message);
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         async _deleteItem(name, kind) {
             if (!this._vault || !name) return;
             if (!confirm(`Delete "${name}"?`)) return;
+            window.sgraphWorkspace.events.emit('activity-start', { label: `Deleting "${name}"...` });
             try {
                 if (kind === 'folder') {
                     await this._vault.deleteFolder(this._currentPath, name);
@@ -343,6 +352,7 @@
                 console.error('[vault-panel] Delete failed:', e);
                 window.sgraphWorkspace.messages.error('Delete failed: ' + e.message);
             }
+            window.sgraphWorkspace.events.emit('activity-end');
         }
 
         // --- Demo data -----------------------------------------------------------
@@ -711,11 +721,14 @@ return html;`;
             const stats = this._vault.getStats();
 
             // Inline input row (for new folder / new file / rename)
+            const inlineLabel = this._inlineMode === 'new-folder' ? 'Create'
+                               : this._inlineMode === 'new-file'   ? 'Create'
+                               : 'Rename';
             const inlineHtml = this._inlineMode ? `
                 <div class="vp-inline-row">
                     <input type="text" class="vp-inline-input" value="${esc(this._inlineValue || '')}"
                            placeholder="${this._inlineMode === 'new-folder' ? 'Folder name' : this._inlineMode === 'new-file' ? 'File name' : 'New name'}">
-                    <button class="vp-inline-ok" title="Confirm">OK</button>
+                    <button class="vp-inline-ok" title="Confirm">${inlineLabel}</button>
                     <button class="vp-inline-cancel" title="Cancel">&times;</button>
                 </div>` : '';
 
