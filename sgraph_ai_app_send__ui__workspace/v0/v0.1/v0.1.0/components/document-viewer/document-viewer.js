@@ -540,7 +540,7 @@
             if (!this._textContent) return '<div class="dv-text">No HTML content</div>';
             // Render in sandboxed iframe for security
             const blobUrl = this._createBlobUrl(this._content, 'text/html');
-            return `<iframe class="dv-iframe" src="${blobUrl}" sandbox="allow-same-origin" title="HTML preview"></iframe>`;
+            return `<iframe class="dv-iframe" src="${blobUrl}" sandbox="allow-scripts" title="HTML preview"></iframe>`;
         }
 
         _renderImage() {
