@@ -145,5 +145,18 @@
   "download.zip.save_all": "Tout enregistrer (zip)",
   "download.zip.save_file": "Enregistrer ce fichier",
   "download.zip.no_preview": "Aperçu non disponible. Cliquez sur \"Enregistrer ce fichier\".",
-  "download.zip.select_file": "Cliquez sur un fichier dans l'arborescence pour l'apercevoir."
+  "download.zip.select_file": "Cliquez sur un fichier dans l'arborescence pour l'apercevoir.",
+  "welcome.title": "Activation de votre accès...",
+  "welcome.fetching": "Récupération du jeton chiffré...",
+  "welcome.decrypting": "Déchiffrement dans votre navigateur...",
+  "welcome.success": "Tout est prêt !",
+  "welcome.personal_token_note": "Votre jeton d'accès personnel a été activé sur cet appareil.",
+  "welcome.token_active": "{remaining} utilisations restantes sur votre jeton.",
+  "welcome.start_sending": "Commencer à envoyer des fichiers",
+  "welcome.error_title": "Échec de l'activation",
+  "welcome.try_again": "Réessayer",
+  "welcome.error.invalid_url": "Lien de bienvenue non valide. Veuillez vérifier l'URL que vous avez reçue.",
+  "welcome.error.fetch_failed": "Impossible de récupérer votre jeton. Le lien a peut-être expiré.",
+  "welcome.error.decrypt_failed": "Impossible de déchiffrer votre jeton. Le lien est peut-être invalide.",
+  "welcome.error.token_invalid": "Le jeton de ce lien n'est plus valide."
 }

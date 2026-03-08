@@ -145,5 +145,18 @@
   "download.zip.save_all": "Zapisz wszystko (zip)",
   "download.zip.save_file": "Zapisz ten plik",
   "download.zip.no_preview": "Podgląd niedostępny. Kliknij \"Zapisz ten plik\".",
-  "download.zip.select_file": "Kliknij plik w drzewie, aby wyświetlić podgląd."
+  "download.zip.select_file": "Kliknij plik w drzewie, aby wyświetlić podgląd.",
+  "welcome.title": "Aktywacja dostępu...",
+  "welcome.fetching": "Pobieranie zaszyfrowanego tokena...",
+  "welcome.decrypting": "Odszyfrowywanie w przeglądarce...",
+  "welcome.success": "Wszystko gotowe!",
+  "welcome.personal_token_note": "Twój osobisty token dostępu został aktywowany na tym urządzeniu.",
+  "welcome.token_active": "{remaining} pozostałych użyć Twojego tokena.",
+  "welcome.start_sending": "Zacznij wysyłać pliki",
+  "welcome.error_title": "Aktywacja nie powiodła się",
+  "welcome.try_again": "Spróbuj ponownie",
+  "welcome.error.invalid_url": "Nieprawidłowy link powitalny. Sprawdź otrzymany adres URL.",
+  "welcome.error.fetch_failed": "Nie udało się pobrać tokena. Link mógł wygasnąć.",
+  "welcome.error.decrypt_failed": "Nie udało się odszyfrować tokena. Link może być nieprawidłowy.",
+  "welcome.error.token_invalid": "Token w tym linku nie jest już ważny."
 }

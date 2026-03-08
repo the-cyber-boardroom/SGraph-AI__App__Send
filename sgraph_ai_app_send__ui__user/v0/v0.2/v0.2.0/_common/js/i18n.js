@@ -199,6 +199,21 @@ const I18n = {
             'crypto.error.unavailable':         'Web Crypto API is not available. It requires a secure context (HTTPS or localhost). If running locally, use "localhost" instead of "127.0.0.1".',
             'crypto.error.read_failed':         'Failed to read file',
 
+            // ─── Welcome (Token Activation) ─────────────────────────────
+            'welcome.title':                    'Activating your access...',
+            'welcome.fetching':                 'Fetching encrypted token...',
+            'welcome.decrypting':               'Decrypting in your browser...',
+            'welcome.success':                  'You\'re all set!',
+            'welcome.personal_token_note':      'Your personal access token has been activated on this device.',
+            'welcome.token_active':             '{remaining} uses remaining on your token.',
+            'welcome.start_sending':            'Start sending files',
+            'welcome.error_title':              'Activation failed',
+            'welcome.try_again':                'Try again',
+            'welcome.error.invalid_url':        'Invalid welcome link. Please check the URL you received.',
+            'welcome.error.fetch_failed':       'Could not fetch your token. The link may have expired.',
+            'welcome.error.decrypt_failed':     'Could not decrypt your token. The link may be invalid.',
+            'welcome.error.token_invalid':      'The token in this link is no longer valid.',
+
             // ─── Common ───────────────────────────────────────────────────
             'common.copied':                    'Copied!',
             'common.copy':                      'Copy',
