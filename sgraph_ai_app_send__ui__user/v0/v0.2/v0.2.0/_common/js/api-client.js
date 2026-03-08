@@ -32,7 +32,7 @@ const ApiClient = {
     },
 
     setAccessToken(token) {
-        localStorage.setItem('sgraph-send-token', this._sanitiseToken(token));
+        localStorage.setItem('sgraph-send-token', token);
     },
 
     clearAccessToken() {
@@ -43,16 +43,16 @@ const ApiClient = {
         return !!localStorage.getItem('sgraph-send-token');
     },
 
-    _sanitiseToken(token) {                                             // Strip non-ASCII chars that break HTTP headers (ISO-8859-1 limit)
-        if (!token) return token;
-        return token.replace(/[^\x20-\x7E]/g, '');                    // Keep only printable ASCII
-    },
-
     _authHeaders() {
         const token = this.getAccessToken();
         if (!token) return {};
-        const safe = this._sanitiseToken(token);                      // Defence in depth — sanitise even if setAccessToken already did
-        return safe ? { 'x-sgraph-access-token': safe } : {};
+        // Defence in depth — reject any token that would cause a fetch header violation
+        if (!/^[a-z0-9_-]+$/i.test(token)) {
+            this.clearAccessToken();
+            document.dispatchEvent(new CustomEvent('access-token-invalid'));
+            return {};
+        }
+        return { 'x-sgraph-access-token': token };
     },
 
     // ─── Transfer Lifecycle ──────────────────────────────────────────────

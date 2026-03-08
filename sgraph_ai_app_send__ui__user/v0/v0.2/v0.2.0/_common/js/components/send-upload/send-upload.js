@@ -681,6 +681,12 @@ class SendUpload extends HTMLElement {
         } catch (err) {
             this._setBeforeUnload(false);
             if (err.message === 'ACCESS_TOKEN_INVALID') { document.dispatchEvent(new CustomEvent('access-token-invalid')); return; }
+            // Corrupted token in localStorage causing header rejection — clear and re-show gate
+            if (err.message && err.message.includes('ISO-8859-1')) {
+                ApiClient.clearAccessToken();
+                document.dispatchEvent(new CustomEvent('access-token-invalid'));
+                return;
+            }
             this.errorMessage = err.message || this.t('upload.error.upload_failed');
             this.state = 'error'; this.render(); this.setupEventListeners();
         }
