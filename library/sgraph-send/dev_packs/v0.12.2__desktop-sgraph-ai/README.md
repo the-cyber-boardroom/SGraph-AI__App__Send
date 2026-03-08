@@ -73,7 +73,7 @@ cargo tauri build
 
 This dev pack bootstraps a new Claude Code session to build `SGraph-AI__Desktop` — a lightweight Tauri-based macOS desktop app that provides native access to the SGraph ecosystem websites. It synthesises the desktop app exploration from the 7 March brief (v0.12.2) covering:
 
-- **Tauri over Electron:** ~10MB binary vs ~150MB+, native macOS integration, Rust backend
+- **Tauri v2:** ~10MB binary, native macOS WebKit webview, Rust backend
 - **Multi-site launcher:** Single app providing tabbed/windowed access to send.sgraph.ai, vault.sgraph.ai, workspace.sgraph.ai, tools.sgraph.ai
 - **Native integration:** macOS keychain for token storage, file type associations, menu bar quick access
 - **Web Components reuse:** Same sg-layout framework and components from the web, rendered in Tauri's webview

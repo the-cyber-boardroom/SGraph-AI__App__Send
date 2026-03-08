@@ -53,7 +53,7 @@ The app wraps `send.sgraph.ai`, `vault.sgraph.ai`, `workspace.sgraph.ai`, and `t
 
 | Layer | Technology | Rule |
 |-------|-----------|------|
-| Desktop framework | Tauri v2 | Not Electron. Not v1. |
+| Desktop framework | Tauri v2 | Not v1 — API is significantly different |
 | Backend language | Rust | All native OS operations via Tauri commands |
 | Frontend language | Vanilla JavaScript (ES modules) | No frameworks, no build step |
 | Webview engine | WebKit (macOS system) | Remote webviews load *.sgraph.ai URLs |

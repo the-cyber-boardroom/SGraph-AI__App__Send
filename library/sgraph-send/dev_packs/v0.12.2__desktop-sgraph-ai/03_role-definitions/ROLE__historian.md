@@ -15,7 +15,7 @@
 
 | Decision | Rationale | Source |
 |----------|-----------|--------|
-| Tauri v2, not Electron | ~10MB binary, native WebKit, Rust backend, better security model | v0.12.2 web components brief (Part 4) |
+| Tauri v2 | ~10MB binary, native WebKit, Rust backend, scoped API access | v0.12.2 web components brief (Part 4) |
 | macOS first, Windows/Linux later | Human's immediate need is macOS; 80% of use case | v0.12.2 web components brief (Part 4) |
 | Remote webviews, not bundled apps | Web apps already exist and are actively developed | v0.12.2 web components brief (Part 4) |
 | macOS Keychain for secrets | More secure than localStorage, survives browser clears | v0.12.2 web components brief + chrome extension brief |

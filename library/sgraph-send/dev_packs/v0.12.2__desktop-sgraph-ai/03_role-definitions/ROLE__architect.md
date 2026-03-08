@@ -18,7 +18,7 @@
 
 | Decision | Rationale |
 |----------|-----------|
-| Tauri v2, not Electron | ~10MB vs ~150MB, native WebKit, Rust backend |
+| Tauri v2 | ~10MB binary, native WebKit, Rust backend, scoped API access |
 | macOS first, others later | Immediate need is macOS/arm64 |
 | Remote webviews, not bundled apps | Web apps already exist; desktop wraps them |
 | macOS Keychain for secrets | More secure than localStorage, persists across browser clears |

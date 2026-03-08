@@ -10,7 +10,7 @@
 
 | ID | Decision | Rationale |
 |----|----------|-----------|
-| AD-D1 | Tauri v2, not Electron | 15x smaller binary, native WebKit, Rust backend, better security |
+| AD-D1 | Tauri v2 | ~10MB binary, native WebKit, Rust backend, scoped API access |
 | AD-D2 | macOS first (arm64) | Human's primary platform, 80% of immediate use case |
 | AD-D3 | Remote webviews, not bundled apps | Web apps are actively developed; bundling creates sync problems |
 | AD-D4 | Single window, multiple webviews | Simpler UX than multi-window; background webviews preserve state |

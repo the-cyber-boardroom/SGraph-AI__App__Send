@@ -39,7 +39,7 @@ The desktop app solves:
 
 | Constraint | Detail |
 |-----------|--------|
-| **Tauri (not Electron)** | ~10MB binary, native macOS webview (WebKit), Rust backend |
+| **Tauri v2** | ~10MB binary, native macOS webview (WebKit), Rust backend |
 | **macOS first** | Primary target is macOS/arm64. Windows/Linux later. |
 | **Web-first content** | The app loads `*.sgraph.ai` URLs in webviews — it does NOT bundle the web apps |
 | **Vanilla JS for local UI** | App chrome (sidebar, tabs, settings) uses vanilla JS — same pattern as tools.sgraph.ai |
@@ -83,17 +83,6 @@ Tokens in macOS keychain (persistent, secure).
 ---
 
 ## Tauri Architecture
-
-### Why Tauri (Not Electron)
-
-| Factor | Electron | Tauri |
-|--------|----------|-------|
-| Binary size | ~150MB+ (bundles Chromium) | ~10MB (uses system WebKit) |
-| Memory usage | High (full Chromium process) | Low (native webview) |
-| macOS integration | Via Node.js bindings | Native Rust, direct API access |
-| Security | Full Node.js access | Rust backend, scoped API access |
-| Startup time | 2-5 seconds | <1 second |
-| Webview | Chromium (bundled) | WebKit (macOS system, always up to date) |
 
 ### Tauri v2 Features We Use
 
@@ -257,7 +246,7 @@ Sites are configured in `src-tauri/sgraph-sites.json` — easy to add new `*.sgr
 
 | Question | Answer |
 |----------|--------|
-| Framework? | **Tauri v2.** Not Electron. Not PWA (that's separate). |
+| Framework? | **Tauri v2.** |
 | Target OS? | **macOS first.** arm64 (Apple Silicon). Intel via universal binary. Windows/Linux later. |
 | Local UI? | **Vanilla JS.** Same pattern as tools.sgraph.ai. No frameworks. |
 | Content source? | **Remote webviews.** Load *.sgraph.ai URLs. Don't bundle web apps. |

@@ -9,7 +9,7 @@
 
 | Date | Version | Brief | Summary |
 |------|---------|-------|---------|
-| 7 Mar 2026 | v0.12.2 | `v0.12.2__dev-brief__web-components-architecture.md` | Part 4: Desktop App Exploration — Electron vs Tauri vs PWA comparison, recommendation for Tauri, what the desktop app would do |
+| 7 Mar 2026 | v0.12.2 | `v0.12.2__dev-brief__web-components-architecture.md` | Part 4: Desktop App Exploration — Tauri v2 desktop app design, what it would do |
 
 ## Related Briefs (Architecture Context)
 
