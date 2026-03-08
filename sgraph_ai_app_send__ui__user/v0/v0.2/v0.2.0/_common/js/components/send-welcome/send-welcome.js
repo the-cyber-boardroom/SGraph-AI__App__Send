@@ -26,6 +26,10 @@ class SendWelcome extends HTMLElement {
     }
 
     connectedCallback() {
+        // Re-render when translations are loaded (for non-English locales)
+        this._onLocaleChanged = () => { if (this.state) this.render(); };
+        document.addEventListener('locale-changed', this._onLocaleChanged);
+
         this.parseHash();
         if (!this.transferId || !this.hashKey) {
             this.state = 'error';
@@ -34,6 +38,12 @@ class SendWelcome extends HTMLElement {
             return;
         }
         this.activate();
+    }
+
+    disconnectedCallback() {
+        if (this._onLocaleChanged) {
+            document.removeEventListener('locale-changed', this._onLocaleChanged);
+        }
     }
 
     // ─── Shorthand ─────────────────────────────────────────────────────

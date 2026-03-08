@@ -145,5 +145,18 @@
   "download.zip.save_all": "Alle speichern (zip)",
   "download.zip.save_file": "Diese Datei speichern",
   "download.zip.no_preview": "Keine Vorschau verfügbar. Klicken Sie auf \"Diese Datei speichern\".",
-  "download.zip.select_file": "Klicken Sie auf eine Datei im Baum, um sie anzuzeigen."
+  "download.zip.select_file": "Klicken Sie auf eine Datei im Baum, um sie anzuzeigen.",
+  "welcome.title": "Zugang wird aktiviert...",
+  "welcome.fetching": "Verschlüsseltes Token wird abgerufen...",
+  "welcome.decrypting": "Entschlüsselung in Ihrem Browser...",
+  "welcome.success": "Alles bereit!",
+  "welcome.personal_token_note": "Ihr persönliches Zugangs-Token wurde auf diesem Gerät aktiviert.",
+  "welcome.token_active": "{remaining} Nutzungen für Ihr Token verbleibend.",
+  "welcome.start_sending": "Dateien senden",
+  "welcome.error_title": "Aktivierung fehlgeschlagen",
+  "welcome.try_again": "Erneut versuchen",
+  "welcome.error.invalid_url": "Ungültiger Willkommens-Link. Bitte überprüfen Sie die erhaltene URL.",
+  "welcome.error.fetch_failed": "Token konnte nicht abgerufen werden. Der Link ist möglicherweise abgelaufen.",
+  "welcome.error.decrypt_failed": "Token konnte nicht entschlüsselt werden. Der Link ist möglicherweise ungültig.",
+  "welcome.error.token_invalid": "Das Token in diesem Link ist nicht mehr gültig."
 }
