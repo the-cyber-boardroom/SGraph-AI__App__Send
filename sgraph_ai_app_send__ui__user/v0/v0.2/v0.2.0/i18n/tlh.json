@@ -145,5 +145,18 @@
   "download.zip.save_all": "Hoch choq (zip)",
   "download.zip.save_file": "De' choq",
   "download.zip.no_preview": "leghlaHbe'. \"De' choq\" yIchel.",
-  "download.zip.select_file": "Sor De' yIwIv 'ej yIlegh."
+  "download.zip.select_file": "Sor De' yIwIv 'ej yIlegh.",
+  "welcome.title": "nIHmeH DuSaQ So'...",
+  "welcome.fetching": "peghmey token Sam...",
+  "welcome.decrypting": "DeSoQmoH lIw...",
+  "welcome.success": "bIlugh!",
+  "welcome.personal_token_note": "lIw token chu' DaghItlh.",
+  "welcome.token_active": "{remaining} lo'laHghach token.",
+  "welcome.start_sending": "ngeH teywI'",
+  "welcome.error_title": "lujpu' chavmoH",
+  "welcome.try_again": "nIH",
+  "welcome.error.invalid_url": "QapHa' URL. yIqel.",
+  "welcome.error.fetch_failed": "token Sam lujpu'. Qel pagh.",
+  "welcome.error.decrypt_failed": "DeSoQmoH lujpu'. QapHa' URL.",
+  "welcome.error.token_invalid": "token Qapbe'."
 }

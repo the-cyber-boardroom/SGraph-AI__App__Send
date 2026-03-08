@@ -145,5 +145,18 @@
   "download.zip.save_all": "Guardar tudo (zip)",
   "download.zip.save_file": "Guardar este ficheiro",
   "download.zip.no_preview": "Pré-visualização indisponível. Clique em \"Guardar este ficheiro\".",
-  "download.zip.select_file": "Clique num ficheiro na árvore para pré-visualizar."
+  "download.zip.select_file": "Clique num ficheiro na árvore para pré-visualizar.",
+  "welcome.title": "A activar o seu acesso...",
+  "welcome.fetching": "A obter o token encriptado...",
+  "welcome.decrypting": "A desencriptar no seu navegador...",
+  "welcome.success": "Tudo pronto!",
+  "welcome.personal_token_note": "O seu token de acesso pessoal foi activado neste dispositivo.",
+  "welcome.token_active": "{remaining} utilizações restantes no seu token.",
+  "welcome.start_sending": "Começar a enviar ficheiros",
+  "welcome.error_title": "Falha na activação",
+  "welcome.try_again": "Tentar novamente",
+  "welcome.error.invalid_url": "Ligação de boas-vindas inválida. Verifique o URL que recebeu.",
+  "welcome.error.fetch_failed": "Não foi possível obter o seu token. A ligação pode ter expirado.",
+  "welcome.error.decrypt_failed": "Não foi possível desencriptar o seu token. A ligação pode ser inválida.",
+  "welcome.error.token_invalid": "O token nesta ligação já não é válido."
 }

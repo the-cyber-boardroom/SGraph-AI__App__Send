@@ -145,5 +145,18 @@
   "download.zip.save_all": "Spremi sve (zip)",
   "download.zip.save_file": "Spremi ovu datoteku",
   "download.zip.no_preview": "Pretpregled nije dostupan. Kliknite \"Spremi ovu datoteku\".",
-  "download.zip.select_file": "Kliknite na datoteku u stablu za pretpregled."
+  "download.zip.select_file": "Kliknite na datoteku u stablu za pretpregled.",
+  "welcome.title": "Aktivacija pristupa...",
+  "welcome.fetching": "Dohvaćanje šifriranog tokena...",
+  "welcome.decrypting": "Dešifriranje u vašem pregledniku...",
+  "welcome.success": "Sve je spremno!",
+  "welcome.personal_token_note": "Vaš osobni pristupni token aktiviran je na ovom uređaju.",
+  "welcome.token_active": "{remaining} preostalih korištenja vašeg tokena.",
+  "welcome.start_sending": "Počni slati datoteke",
+  "welcome.error_title": "Aktivacija nije uspjela",
+  "welcome.try_again": "Pokušaj ponovo",
+  "welcome.error.invalid_url": "Nevažeća poveznica dobrodošlice. Provjerite URL koji ste primili.",
+  "welcome.error.fetch_failed": "Nije moguće dohvatiti vaš token. Poveznica je možda istekla.",
+  "welcome.error.decrypt_failed": "Nije moguće dešifrirati vaš token. Poveznica je možda nevažeća.",
+  "welcome.error.token_invalid": "Token u ovoj poveznici više nije valjan."
 }

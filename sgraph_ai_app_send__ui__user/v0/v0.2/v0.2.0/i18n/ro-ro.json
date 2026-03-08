@@ -145,5 +145,18 @@
   "download.zip.save_all": "Salvați tot (zip)",
   "download.zip.save_file": "Salvați acest fișier",
   "download.zip.no_preview": "Previzualizare indisponibilă. Faceți clic pe \"Salvați acest fișier\".",
-  "download.zip.select_file": "Faceți clic pe un fișier din arbore pentru previzualizare."
+  "download.zip.select_file": "Faceți clic pe un fișier din arbore pentru previzualizare.",
+  "welcome.title": "Se activează accesul...",
+  "welcome.fetching": "Se preia tokenul criptat...",
+  "welcome.decrypting": "Se decriptează în browserul dvs....",
+  "welcome.success": "Totul este pregătit!",
+  "welcome.personal_token_note": "Tokenul dvs. personal de acces a fost activat pe acest dispozitiv.",
+  "welcome.token_active": "{remaining} utilizări rămase pe tokenul dvs.",
+  "welcome.start_sending": "Începeți să trimiteți fișiere",
+  "welcome.error_title": "Activarea a eșuat",
+  "welcome.try_again": "Încercați din nou",
+  "welcome.error.invalid_url": "Link de bun venit invalid. Verificați URL-ul primit.",
+  "welcome.error.fetch_failed": "Nu s-a putut prelua tokenul. Linkul poate fi expirat.",
+  "welcome.error.decrypt_failed": "Nu s-a putut decripta tokenul. Linkul poate fi invalid.",
+  "welcome.error.token_invalid": "Tokenul din acest link nu mai este valid."
 }

@@ -145,5 +145,18 @@
   "download.zip.save_all": "Alles opslaan (zip)",
   "download.zip.save_file": "Dit bestand opslaan",
   "download.zip.no_preview": "Geen voorbeeld beschikbaar. Klik op \"Dit bestand opslaan\".",
-  "download.zip.select_file": "Klik op een bestand in de boom om het te bekijken."
+  "download.zip.select_file": "Klik op een bestand in de boom om het te bekijken.",
+  "welcome.title": "Toegang activeren...",
+  "welcome.fetching": "Versleuteld token ophalen...",
+  "welcome.decrypting": "Ontsleutelen in uw browser...",
+  "welcome.success": "Alles is klaar!",
+  "welcome.personal_token_note": "Uw persoonlijke toegangstoken is geactiveerd op dit apparaat.",
+  "welcome.token_active": "{remaining} gebruiken resterend op uw token.",
+  "welcome.start_sending": "Begin met het verzenden van bestanden",
+  "welcome.error_title": "Activering mislukt",
+  "welcome.try_again": "Opnieuw proberen",
+  "welcome.error.invalid_url": "Ongeldige welkomstlink. Controleer de URL die u heeft ontvangen.",
+  "welcome.error.fetch_failed": "Kon uw token niet ophalen. De link is mogelijk verlopen.",
+  "welcome.error.decrypt_failed": "Kon uw token niet ontsleutelen. De link is mogelijk ongeldig.",
+  "welcome.error.token_invalid": "Het token in deze link is niet meer geldig."
 }
