@@ -237,6 +237,29 @@ def s3_sync_by_type(source_dir, s3_prefix, file_type, extensions, cache_control,
     run_cmd(cmd, description=description)
 
 
+def upload_version_file(version_file, bucket, site, deploy_env=None):
+    """Upload a version file to the site root so it's accessible at /version.
+
+    This makes the app version available at e.g. https://sgraph.ai/version,
+    https://send.sgraph.ai/version, etc. — a plain text file with no extension.
+    """
+    version_path = Path(version_file)
+    if not version_path.is_file():
+        print(f"\n  WARNING: version file not found: {version_file} — skipping version upload")
+        return
+
+    env_segment = f"{deploy_env}/" if deploy_env else ""
+    s3_key = f"s3://{bucket}/websites/{site}/{env_segment}latest/version"
+
+    print(f"\n--- Uploading version file to site root ---")
+    run_cmd(
+        ["aws", "s3", "cp", str(version_path), s3_key,
+         "--content-type", "text/plain",
+         "--cache-control", CACHE_CONTROL["html"]],      # short cache (5 min) — same as HTML
+        description=f"Uploading {version_file} → {s3_key}"
+    )
+
+
 def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None):
     """Deploy the static site to S3 using the versioned deployment model.
 
@@ -407,6 +430,13 @@ def parse_args():
              "Without this, deploys to websites/{site}/ directly (legacy behaviour).",
     )
     parser.add_argument(
+        "--version-file",
+        default=None,
+        help="Path to a version file to upload to the site root as /version. "
+             "Makes the app version accessible at e.g. https://sgraph.ai/version. "
+             "Typically: sgraph_ai_app_send/version",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print what would be done without executing S3 commands.",
@@ -457,6 +487,8 @@ def main():
         env_segment = f"{args.deploy_env}/" if args.deploy_env else ""
         print(f"\n[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/{env_segment}releases/{ifd_path}/")
         print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/{env_segment}latest/")
+        if args.version_file:
+            print(f"[dry-run] Would upload {args.version_file} to s3://{bucket}/websites/{args.site}/{env_segment}latest/version")
         for dist_id in args.cloudfront_distribution_id:
             print(f"[dry-run] Would invalidate CloudFront {dist_id}")
         print("\nDry run complete.")
@@ -464,6 +496,10 @@ def main():
 
     # --- Deploy ---
     deploy_to_s3(source_dir, bucket, args.site, args.version, deploy_env=args.deploy_env)
+
+    # --- Version file ---
+    if args.version_file:
+        upload_version_file(args.version_file, bucket, args.site, deploy_env=args.deploy_env)
 
     # --- CloudFront ---
     for dist_id in args.cloudfront_distribution_id:
