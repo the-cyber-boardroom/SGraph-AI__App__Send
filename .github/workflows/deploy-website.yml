@@ -93,7 +93,8 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --deploy-env ${{ steps.env.outputs.deploy_env }} \
             --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }} \
-            --smoke-test-url "https://sgraph.ai"
+            --smoke-test-url "https://sgraph.ai" \
+            --version-file sgraph_ai_app_send/version
 
       - name: Store CI artifacts
         run: |
