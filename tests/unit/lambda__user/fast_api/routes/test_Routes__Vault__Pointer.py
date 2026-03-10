@@ -27,6 +27,9 @@ class test_Routes__Vault__Pointer(TestCase):
     def _read(self, vault_id=VAULT_ID, file_id=FILE_ID):
         return self.client.get(f'/api/vault/read/{vault_id}/{file_id}')
 
+    def _read_base64(self, vault_id=VAULT_ID, file_id=FILE_ID):
+        return self.client.get(f'/api/vault/read-base64/{vault_id}/{file_id}')
+
     def _delete(self, vault_id=VAULT_ID, file_id=FILE_ID, write_key=WRITE_KEY):
         return self.client.delete(f'/api/vault/delete/{vault_id}/{file_id}',
                                   headers = {'x-sgraph-vault-write-key': write_key})
@@ -83,6 +86,32 @@ class test_Routes__Vault__Pointer(TestCase):
     def test__read__not_found(self):
         response = self._read(file_id='nonexistent')
         assert response.status_code == 404
+
+    # --- Read-base64 endpoint (MCP-compatible) ---
+
+    def test__read_base64__existing(self):
+        import base64
+        payload = b'\x89PNG\x00\x01\x02\x03'
+        self._write(file_id='read-b64-1', payload=payload)
+        response = self._read_base64(file_id='read-b64-1')
+        assert response.status_code == 200
+        data = response.json()
+        assert data['vault_id']        == VAULT_ID
+        assert data['file_id']         == 'read-b64-1'
+        assert data['size'] == len(payload)
+        assert base64.b64decode(data['data']) == payload
+
+    def test__read_base64__not_found(self):
+        response = self._read_base64(file_id='nonexistent-b64')
+        assert response.status_code == 404
+
+    def test__read_base64__no_auth_required(self):
+        self._write(file_id='read-b64-noauth')
+        from starlette.testclient import TestClient
+        unauthenticated = TestClient(self.client.app)
+        response = unauthenticated.get(f'/api/vault/read-base64/{VAULT_ID}/read-b64-noauth')
+        assert response.status_code == 200
+        assert response.json()['size'] > 0
 
     def test__read__no_auth_required(self):
         """Read endpoint requires no access token (zero-knowledge model)."""

@@ -3,6 +3,7 @@
 # Mutable vault file endpoints: write, read, delete
 # ===============================================================================
 
+import base64
 from fastapi                                                                     import HTTPException, Request, Response
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
@@ -11,10 +12,13 @@ from sgraph_ai_app_send.lambda__user.user__config                               
 
 TAG__ROUTES_VAULT = 'api/vault'
 
-ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id}}'  ,
-                       f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}/{{file_id}}'   ,
-                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id}}' ]
+ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id}}'        ,
+                       f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}/{{file_id}}'         ,
+                       f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}/{{file_id}}'  ,
+                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id}}'       ]
 
+
+LAMBDA_BASE64_LIMIT = 3750000                                                    # ~3.75MB (base64 adds ~33%, must stay under Lambda 5MB response limit)
 
 class Routes__Vault__Pointer(Fast_API__Routes):                                  # Vault file endpoints (write, read, delete)
     tag                  : str = TAG__ROUTES_VAULT
@@ -88,6 +92,22 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         return Response(content    = payload                    ,
                         media_type = 'application/octet-stream')
 
+    def read_base64__vault_id__file_id(self, vault_id : Safe_Str__Id,           # GET /vault/{vault_id}/read-base64/{file_id} — JSON-safe base64 read
+                                             file_id  : Safe_Str__Id
+                                       ) -> dict:
+        payload = self.vault_service.read(vault_id = str(vault_id),
+                                          file_id  = str(file_id) )
+        if payload is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Vault file not found')
+        if len(payload) > LAMBDA_BASE64_LIMIT:
+            raise HTTPException(status_code = 413,
+                                detail      = 'File too large for base64 download. Use /api/vault/read/{vault_id}/{file_id} instead.')
+        return dict(vault_id = str(vault_id)                          ,
+                    file_id  = str(file_id)                           ,
+                    data     = base64.b64encode(payload).decode('ascii'),
+                    size     = len(payload)                           )
+
     async def delete__vault_id__file_id(self, vault_id : Safe_Str__Id,           # DELETE /vault/{vault_id}/file/{file_id}
                                               file_id  : Safe_Str__Id,
                                               request  : Request
@@ -106,7 +126,8 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         return result
 
     def setup_routes(self):                                                      # Register all endpoints
-        self.add_route_put   (self.write__vault_id__file_id  )
-        self.add_route_get   (self.read__vault_id__file_id   )
-        self.add_route_delete(self.delete__vault_id__file_id )
+        self.add_route_put   (self.write__vault_id__file_id       )
+        self.add_route_get   (self.read__vault_id__file_id        )
+        self.add_route_get   (self.read_base64__vault_id__file_id )
+        self.add_route_delete(self.delete__vault_id__file_id      )
         return self
