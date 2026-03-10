@@ -103,13 +103,17 @@ class MCP__Setup(Type_Safe):
             method = sorted(route.methods)[0].lower()
 
             # Extract action from path: strip tag prefix, remove {params}
-            path_parts = [p for p in route.path.split('/')
-                          if p and not p.startswith('{')]
-            if path_parts and path_parts[0] == tag:
-                path_parts = path_parts[1:]
+            tag_segments  = [p for p in tag.split('/') if p]
+            path_parts    = [p for p in route.path.split('/')
+                             if p and not p.startswith('{')]
+            # Strip leading path segments that match the tag (e.g. api/transfers)
+            for seg in tag_segments:
+                if path_parts and path_parts[0] == seg:
+                    path_parts = path_parts[1:]
             action = '_'.join(path_parts) or 'root'
 
-            name = f"{tag}_{action}"
+            safe_tag = tag.replace('/', '_')
+            name = f"{safe_tag}_{action}"
             candidates.append((route, name, method))
 
         # Find duplicate names (e.g. vault_folder for both POST and GET)
