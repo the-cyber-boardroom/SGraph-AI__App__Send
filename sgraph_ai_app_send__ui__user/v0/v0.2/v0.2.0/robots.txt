@@ -26,7 +26,4 @@ Allow: /ro-ro/
 Disallow: /_common/
 Disallow: /i18n/
 
-# API endpoints — not indexable
-Disallow: /api/
-
 Sitemap: https://send.sgraph.ai/sitemap.xml
