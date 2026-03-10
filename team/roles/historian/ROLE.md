@@ -138,7 +138,7 @@ The Journalist may reference the decision log when explaining "why we built it t
 - **Write access:** `team/roles/historian/`.
 - **Key inputs:** Conductor briefs (`team/humans/dinis_cruz/briefs/`), all role reviews (`team/roles/*/reviews/`), original specs (`library/docs/_to_process/`).
 - **Version file:** `sgraph_ai_app_send/version` (read-only, for version prefix).
-- **Decision log:** Maintained in Historian review files, starting from `team/roles/historian/reviews/26-02-10/v0.2.1__response-to-infrastructure-brief.md`.
+- **Decision log:** Maintained in Historian review files, starting from `team/roles/historian/reviews/02/10/v0.2.1__response-to-infrastructure-brief.md`.
 
 ---
 
@@ -188,7 +188,7 @@ After every incident, ask: "Did we make the same decision we made last time? If 
 |----------|----------|
 | Original project brief | `library/docs/_to_process/01-project-brief.md` |
 | All original specs | `library/docs/_to_process/` |
-| Decision log (current) | `team/roles/historian/reviews/26-02-10/v0.2.1__response-to-infrastructure-brief.md` |
+| Decision log (current) | `team/roles/historian/reviews/02/10/v0.2.1__response-to-infrastructure-brief.md` |
 | Conductor briefs | `team/humans/dinis_cruz/briefs/` |
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
 | CLAUDE.md | `.claude/CLAUDE.md` |

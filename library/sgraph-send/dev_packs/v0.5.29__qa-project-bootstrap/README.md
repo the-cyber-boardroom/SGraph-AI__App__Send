@@ -32,5 +32,5 @@ Bootstrap pack for the SG/Send QA Automation project — a standalone project th
 ## Related Documents
 
 - **Architect tool evaluation:** [`team/roles/architect/reviews/02/22/v0.5.29__research__browser-automation-tool-evaluation.md`](../../../../team/roles/architect/reviews/02/22/v0.5.29__research__browser-automation-tool-evaluation.md)
-- **Dev feasibility review:** [`team/roles/dev/reviews/26-02-22/v0.5.29__review__qa-project-bootstrap-pack.md`](../../../../team/roles/dev/reviews/26-02-22/v0.5.29__review__qa-project-bootstrap-pack.md)
+- **Dev feasibility review:** [`team/roles/dev/reviews/02/22/v0.5.29__review__qa-project-bootstrap-pack.md`](../../../../team/roles/dev/reviews/02/22/v0.5.29__review__qa-project-bootstrap-pack.md)
 - **Human briefs (source):** [`team/humans/dinis_cruz/briefs/02/22/new-qa-project/`](../../../../team/humans/dinis_cruz/briefs/02/22/new-qa-project/)

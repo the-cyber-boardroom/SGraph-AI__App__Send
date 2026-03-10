@@ -42,7 +42,7 @@ Also read the role definitions:
 
 And the research that informed tool decisions:
 11. `/tmp/sgraph-send-ref/team/roles/architect/reviews/02/22/v0.5.29__research__browser-automation-tool-evaluation.md` — Playwright vs agent-browser evaluation
-12. `/tmp/sgraph-send-ref/team/roles/dev/reviews/26-02-22/v0.5.29__review__qa-project-bootstrap-pack.md` — feasibility and technical decisions
+12. `/tmp/sgraph-send-ref/team/roles/dev/reviews/02/22/v0.5.29__review__qa-project-bootstrap-pack.md` — feasibility and technical decisions
 
 Also read the CLAUDE.md files to understand the conventions this project inherits:
 13. `/tmp/sgraph-send-ref/.claude/CLAUDE.md` — global project conventions

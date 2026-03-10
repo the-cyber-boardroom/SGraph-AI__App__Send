@@ -11,7 +11,7 @@
 
 ## Reclassification
 
-The joint GRC + AppSec + Architect risk analysis (`team/roles/grc/reviews/26-02-17/v0.4.9__risk-analysis__finding-1-token-race-condition.md`) recommends reclassification from P3 to P5:
+The joint GRC + AppSec + Architect risk analysis (`team/roles/grc/reviews/02/17/v0.4.9__risk-analysis__finding-1-token-race-condition.md`) recommends reclassification from P3 to P5:
 
 - **Impact is quota bypass, not data breach** — server stores only encrypted bytes
 - **All fix options introduce more architectural risk than they remove** — DynamoDB, S3 conditional writes, and CAS all add new failure modes, dependencies, and complexity
@@ -38,4 +38,4 @@ Fix as part of the production storage architecture redesign, where atomic operat
 
 ## Full Risk Analysis
 
-See: `team/roles/grc/reviews/26-02-17/v0.4.9__risk-analysis__finding-1-token-race-condition.md`
+See: `team/roles/grc/reviews/02/17/v0.4.9__risk-analysis__finding-1-token-race-condition.md`

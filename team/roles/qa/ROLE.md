@@ -174,7 +174,7 @@ After every incident, ask: "How come our test matrix had this gap?" If the answe
 
 | Document | Location |
 |----------|----------|
-| QA infrastructure brief response | `team/roles/qa/reviews/26-02-10/v0.2.1__response-to-infrastructure-brief.md` |
+| QA infrastructure brief response | `team/roles/qa/reviews/02/10/v0.2.1__response-to-infrastructure-brief.md` |
 | Agent guidance (testing rules) | `.claude/CLAUDE.md` |
 | System landscape map | `team/roles/cartographer/v0.1.2/v0.1.2__system-landscape-map-revised.md` |
 | Architect deployment matrix | `team/roles/architect/reviews/02/10/v0.2.1__response-to-infrastructure-brief.md` |

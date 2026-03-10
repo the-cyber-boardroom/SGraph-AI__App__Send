@@ -57,6 +57,6 @@ The reviewer used their own P0-P3 scale. We reclassified using our business-impa
 
 ## Coordination
 
-- **Incident declaration:** `team/roles/conductor/reviews/26-02-17/v0.4.9__incident-declaration__INC-002__first-external-security-disclosure.md`
+- **Incident declaration:** `team/roles/conductor/reviews/02/17/v0.4.9__incident-declaration__INC-002__first-external-security-disclosure.md`
 - **Triggering brief:** `team/humans/dinis_cruz/briefs/02/17/v0.4.7__daily-brief__all-teams-17-feb-2026.md`
-- **User A interview brief:** `team/roles/journalist/reviews/26-02-17/v0.4.9__interview-brief__user-a-security-reviewer.md`
+- **User A interview brief:** `team/roles/journalist/reviews/02/17/v0.4.9__interview-brief__user-a-security-reviewer.md`

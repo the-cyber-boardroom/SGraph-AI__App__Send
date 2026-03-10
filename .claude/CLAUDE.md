@@ -276,6 +276,6 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 | Current brief (v0.3.0) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.3.0__daily-brief__sgraph-send-14-feb-2026.md` |
 | Decisions (14 Feb) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.2.41__brief__decisions-14-feb-2026.md` |
 | Latest debrief | `team/humans/dinis_cruz/debriefs/02/14/v0.3.0__debrief__daily-brief-responses-and-admin-ui.md` |
-| Master index (latest) | `team/roles/librarian/reviews/26-02-14/v0.3.0__master-index__daily-brief-responses-14-feb.md` |
+| Master index (latest) | `team/roles/librarian/reviews/02/14/v0.3.0__master-index__daily-brief-responses-14-feb.md` |
 | Issues FS | `.issues/` |
 | IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |

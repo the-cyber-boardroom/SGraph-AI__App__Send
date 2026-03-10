@@ -83,8 +83,8 @@ QR code generation for lookup codes. Navigation polish.
 Before starting, read these files to understand the patterns:
 
 ### Architecture & Plan
-1. **The full implementation plan:** `team/roles/dev/reviews/26-02-21/v0.5.0__implementation-plan__key-discovery-and-registry-revised.md` — has component inventory, event catalogue, shell layout, phased plan
-2. **AppSec read-now:** `team/roles/appsec/reviews/26-02-21/v0.5.0__appsec__read-now.md` — 3 security items to address in the build
+1. **The full implementation plan:** `team/roles/dev/reviews/02/21/v0.5.0__implementation-plan__key-discovery-and-registry-revised.md` — has component inventory, event catalogue, shell layout, phased plan
+2. **AppSec read-now:** `team/roles/appsec/reviews/02/21/v0.5.0__appsec__read-now.md` — 3 security items to address in the build
 
 ### Backend Patterns (follow these exactly)
 3. **Service__Tokens:** `sgraph_ai_app_send/lambda__admin/service/Service__Tokens.py` — pattern for `Service__Keys`

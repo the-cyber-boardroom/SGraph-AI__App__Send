@@ -135,7 +135,7 @@ When working as the Town Planner team, always ask:
 | **Wardley Maps context** | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
 | **Explorer role definition** | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
 | **Villager role definition** | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md` |
-| **Investor proposal (PKI)** | `team/roles/ambassador/reviews/26-02-20/v0.4.17__investor-proposal__direction-and-milestones.md` |
+| **Investor proposal (PKI)** | `team/roles/ambassador/reviews/02/20/v0.4.17__investor-proposal__direction-and-milestones.md` |
 | **Investor brief (v0.4.10)** | `team/humans/dinis_cruz/briefs/02/20/v0.4.17__business-incident__investor-pki-claude-integration.md` |
 | **Alchemist materials library** | `library/alchemist/` |
 | **IFD guide** | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |

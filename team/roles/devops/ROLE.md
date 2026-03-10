@@ -184,7 +184,7 @@ After every incident, ask: "How come our pipeline did not detect this?" If the a
 
 | Document | Location |
 |----------|----------|
-| DevOps infrastructure brief response | `team/roles/devops/reviews/26-02-10/v0.2.1__response-to-infrastructure-brief.md` |
+| DevOps infrastructure brief response | `team/roles/devops/reviews/02/10/v0.2.1__response-to-infrastructure-brief.md` |
 | CI pipeline (dev) | `.github/workflows/ci-pipeline__dev.yml` |
 | CI pipeline (main) | `.github/workflows/ci-pipeline__main.yml` |
 | Agent guidance (deployment rules) | `.claude/CLAUDE.md` |
