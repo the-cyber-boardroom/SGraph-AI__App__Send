@@ -33,7 +33,7 @@ Bootstrap pack for the **SG_Send__CLI** project — a standalone Python CLI tool
 
 | Document | Path in main repo |
 |---|---|
-| Architect assessment v2 | `team/roles/architect/reviews/26-03-03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md` |
+| Architect assessment v2 | `team/roles/architect/reviews/03/03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md` |
 | Vault key stability brief | `team/roles/dev/reviews/26-03-03/v0.10.36__implementation-brief__vault-key-stability.md` |
 | Type_Safe guidance | `library/dependencies/osbot-utils/type_safe/v3.63.4__for_llms__type_safe.md` |
 | Type_Safe testing | `library/dependencies/osbot-utils/type_safe/v3.1.1__for_llms__type_safe__testing_guidance.md` |

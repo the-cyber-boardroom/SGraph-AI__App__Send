@@ -174,7 +174,7 @@ After every incident, ask: "How come our architecture allowed this?" If the answ
 | FastAPI service plan | `team/roles/architect/v0.1.1/` |
 | Agent guidance (stack rules) | `.claude/CLAUDE.md` |
 | Current sprint brief | `team/humans/dinis_cruz/briefs/2026-02-10/v0.1.4__briefs__focus-on-mvp-release-infrastructure.md` |
-| Infrastructure brief response | `team/roles/architect/reviews/26-02-10/v0.2.1__response-to-infrastructure-brief.md` |
+| Infrastructure brief response | `team/roles/architect/reviews/02/10/v0.2.1__response-to-infrastructure-brief.md` |
 | Specs index | `library/docs/specs/README.md` |
 
 ## For AI Agents

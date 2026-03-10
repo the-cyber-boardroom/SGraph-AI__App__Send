@@ -179,7 +179,7 @@ team/                            # Team structure
 
 ### File Naming
 
-14. **Review files:** `team/roles/{role}/reviews/YY-MM-DD/{version}__{description}.md`
+14. **Review files:** `team/roles/{role}/reviews/MM/DD/{version}__{description}.md`
 15. **Debrief files:** `team/humans/dinis_cruz/debriefs/MM/DD/{version}__debrief__{description}.md`
 16. **Version** comes from `sgraph_ai_app_send/version`
 17. **UI assets** use versioned paths: `v0/v0.1/v0.1.0/index.html`
@@ -189,7 +189,7 @@ team/                            # Team structure
 18. **`team/humans/dinis_cruz/briefs/` is HUMAN-ONLY.** Agents must NEVER create, modify, or move files into this folder. It is reserved exclusively for files that the human creates and uploads. This rule has no exceptions.
 19. **Agent session outputs** go to `team/humans/dinis_cruz/claude-code-web/MM/DD/` — this is the folder for decisions, observations, and documents produced during Claude Code sessions.
 20. **Debriefs** go to `team/humans/dinis_cruz/debriefs/MM/DD/` — summaries of session deliverables for human review.
-21. **Role reviews** go to `team/roles/{role}/reviews/YY-MM-DD/` — the standard output location for all role work.
+21. **Role reviews** go to `team/roles/{role}/reviews/MM/DD/` — the standard output location for all role work.
 
 ### Testing
 
@@ -235,12 +235,12 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
   | Another debrief (`debriefs/MM/DD/`) | 2 | `../../` | `../../02/14/v0.3.0__debrief__topic.md` |
   | Briefs (`briefs/MM/DD/`) | 3 + down | `../../../briefs/` | `../../../briefs/02/14/v0.3.2__brief.md` |
   | Claude-code-web (`claude-code-web/MM/DD/`) | 3 + down | `../../../claude-code-web/` | `../../../claude-code-web/02/14/file.md` |
-  | Role reviews (`team/roles/{role}/reviews/`) | **5** + down | `../../../../../roles/` | `../../../../../roles/architect/reviews/26-03-01/file.md` |
+  | Role reviews (`team/roles/{role}/reviews/`) | **5** + down | `../../../../../roles/` | `../../../../../roles/architect/reviews/03/01/file.md` |
   | Library (`library/`) | **6** + down | `../../../../../../library/` | `../../../../../../library/docs/specs/README.md` |
 
   **The most common mistake** is linking to `team/roles/` with only 3 levels (`../../../roles/...`). This resolves to `team/humans/dinis_cruz/roles/...` which does not exist. You need **5 levels** (`../../../../../roles/...`) to reach `team/` and then down into `roles/`.
 
-  **Always verify** relative links resolve correctly before committing — run: `cd team/humans/dinis_cruz/debriefs/MM/DD && ls -la ../../../../../roles/{role}/reviews/YY-MM-DD/filename.md`
+  **Always verify** relative links resolve correctly before committing — run: `cd team/humans/dinis_cruz/debriefs/MM/DD && ls -la ../../../../../roles/{role}/reviews/MM/DD/filename.md`
 - **When:** Create a debrief whenever a session produces multiple deliverables
 - **Content:** Executive summary, recommended reading order, key decisions, what's next
 
