@@ -1,7 +1,7 @@
 /* ============================================================
    SGraph AI — Contact Form & Modal
    Handles the contact modal and both modal + page contact forms.
-   MVP: constructs a mailto: link to sherpa@sgraph.ai.
+   MVP: constructs a mailto: link to sherpa.explorer@sgraph.ai.
    ============================================================ */
 
 (function () {
@@ -10,7 +10,7 @@
   // ----------------------------------------------------------
   // Constants
   // ----------------------------------------------------------
-  var SHERPA_EMAIL     = 'sherpa@sgraph.ai';
+  var SHERPA_EMAIL     = 'sherpa.explorer@sgraph.ai';
   var MIN_MESSAGE_LEN  = 10;
   var MAX_MESSAGE_LEN  = 5000;
   var EMAIL_REGEX      = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
