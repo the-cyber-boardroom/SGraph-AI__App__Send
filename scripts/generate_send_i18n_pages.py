@@ -186,6 +186,16 @@ def main():
     i18n_dir    = version_dir / 'i18n'
     en_dir      = version_dir / SOURCE_DIR
 
+    # IFD fallback: if i18n/ doesn't exist in this patch version, walk down
+    # from the current patch to v*.*.0 to find the base version's i18n/ folder.
+    if not i18n_dir.is_dir() and len(parts) == 3:
+        major, minor, patch_num = parts
+        for p in range(int(patch_num) - 1, -1, -1):
+            candidate = UI_BASE / f'v{major}/v{major}.{minor}/v{major}.{minor}.{p}' / 'i18n'
+            if candidate.is_dir():
+                i18n_dir = candidate
+                break
+
     print(f"SGraph Send — i18n Page Generator")
     print(f"  Version:    {args.version}")
     print(f"  Source:     {en_dir}")
