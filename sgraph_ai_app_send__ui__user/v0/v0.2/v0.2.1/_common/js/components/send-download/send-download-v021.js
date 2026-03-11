@@ -15,6 +15,13 @@
      - Breadcrumb trail for subfolder navigation
      - Fullscreen API support
 
+   v0.2.1b — Additional overrides:
+     - Prominent loading state with spinner (replaces tiny status bar)
+     - Page-level actions hidden during loading, shown after complete
+     - Decryption link display with copy button (URL saved before hash clear)
+     - Access key display with copy button for easy sharing
+     - CTA replaced with subtle "Send a file or folder" button
+
    Loads AFTER v0.2.0 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -22,6 +29,102 @@
 // ─── Store original methods for super-calling if needed ────────────────────
 const _v020_setupEventListeners = SendDownload.prototype.setupEventListeners;
 const _v020_cleanup             = SendDownload.prototype.cleanup;
+const _v020_render              = SendDownload.prototype.render;
+const _v020_renderLoading       = SendDownload.prototype.renderLoading;
+const _v020_renderComplete      = SendDownload.prototype.renderComplete;
+const _v020_startDownload       = SendDownload.prototype.startDownload;
+
+// ─── Eagerly capture the original URL (before any hash clearing) ────────────
+const _v020_connectedCallback = SendDownload.prototype.connectedCallback;
+SendDownload.prototype.connectedCallback = function() {
+    this._originalDownloadUrl = window.location.href;
+    _v020_connectedCallback.call(this);
+};
+
+// ─── Override: render — show/hide page-level elements based on state ────────
+
+SendDownload.prototype.render = function() {
+    _v020_render.call(this);
+
+    // Show/hide page-level actions and disclaimer
+    const actions    = document.getElementById('download-actions');
+    const disclaimer = document.getElementById('download-disclaimer');
+    const showExtras = (this.state === 'complete' || this.state === 'ready' || this.state === 'error');
+    if (actions)    actions.style.display    = showExtras ? '' : 'none';
+    if (disclaimer) disclaimer.style.display = showExtras ? '' : 'none';
+
+    // Fix "Send a file" link to use correct locale path
+    const sendBtn = document.getElementById('send-new-btn');
+    if (sendBtn) sendBtn.href = `${window.location.origin}/${typeof I18n !== 'undefined' ? I18n.locale : 'en-gb'}/`;
+};
+
+// ─── Override: renderLoading — prominent spinner during cold boot ────────────
+
+SendDownload.prototype.renderLoading = function() {
+    if (this.state !== 'loading') return '';
+    return `
+        <div style="text-align: center; padding: var(--space-8) var(--space-4);">
+            <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid var(--color-border); border-top-color: var(--accent); border-radius: 50%; animation: sg-spin 0.8s linear infinite; margin-bottom: var(--space-4);"></div>
+            <div style="font-size: var(--text-body); color: var(--color-text); font-weight: var(--weight-semibold); margin-bottom: var(--space-2);">
+                ${this.escapeHtml(this.t('download.loading'))}
+            </div>
+            <div style="font-size: var(--text-sm); color: var(--color-text-secondary);">
+                Preparing your encrypted file for decryption...
+            </div>
+            <style>@keyframes sg-spin { to { transform: rotate(360deg); } }</style>
+        </div>
+    `;
+};
+
+// ─── Override: startDownload — save original URL before hash gets cleared ────
+
+SendDownload.prototype.startDownload = async function(keyOverride) {
+    // Capture the full download URL before v0.2.0 clears the hash fragment
+    this._originalDownloadUrl = window.location.href;
+    return _v020_startDownload.call(this, keyOverride);
+};
+
+// ─── New: _renderSharePanel — decryption link + access key ──────────────────
+
+SendDownload.prototype._renderSharePanel = function() {
+    const parts = [];
+
+    // Decryption link (the URL the user arrived with)
+    const downloadUrl = this._originalDownloadUrl;
+    if (downloadUrl) {
+        parts.push(`
+            <div class="share-panel__item">
+                <div class="share-panel__label">Download link</div>
+                <div class="share-panel__row">
+                    <input type="text" class="input share-panel__input" id="share-download-url" value="${this.escapeHtml(downloadUrl)}" readonly>
+                    <button class="btn btn-sm btn-secondary" id="copy-download-url" title="Copy link">Copy</button>
+                </div>
+            </div>
+        `);
+    }
+
+    // Access key (token name from URL)
+    if (this.tokenName) {
+        parts.push(`
+            <div class="share-panel__item">
+                <div class="share-panel__label">Access key</div>
+                <div class="share-panel__row">
+                    <code class="share-panel__code" id="share-token-name">${this.escapeHtml(this.tokenName)}</code>
+                    <button class="btn btn-sm btn-secondary" id="copy-token-name" title="Copy access key">Copy</button>
+                </div>
+            </div>
+        `);
+    }
+
+    if (parts.length === 0) return '';
+
+    return `
+        <div class="share-panel" id="share-panel">
+            <div class="share-panel__header">Share</div>
+            ${parts.join('')}
+        </div>
+    `;
+};
 
 // ─── Override: _renderZipLayout — two-column split ─────────────────────────
 
@@ -321,6 +424,43 @@ SendDownload.prototype._previewZipEntry = async function(path) {
 SendDownload.prototype.setupEventListeners = function() {
     // Call v0.2.0's original listeners first
     _v020_setupEventListeners.call(this);
+
+    // Inject share panel after complete render (into the card, before send-another)
+    if (this.state === 'complete' && this._originalDownloadUrl) {
+        const sharePanelHtml = this._renderSharePanel();
+        if (sharePanelHtml) {
+            // For zip layout: inject before the info panel
+            const zipInfoPanel = this.querySelector('#zip-info-panel');
+            if (zipInfoPanel) {
+                zipInfoPanel.insertAdjacentHTML('beforebegin', sharePanelHtml);
+            } else {
+                // For two-column and text layouts: inject before the transparency panel or send-another link
+                const transparency = this.querySelector('#transparency-panel');
+                const card = this.querySelector('.card');
+                if (transparency) {
+                    transparency.insertAdjacentHTML('beforebegin', sharePanelHtml);
+                } else if (card) {
+                    card.insertAdjacentHTML('beforeend', sharePanelHtml);
+                }
+            }
+        }
+    }
+
+    // Share panel copy buttons
+    const copyUrlBtn = this.querySelector('#copy-download-url');
+    if (copyUrlBtn) {
+        copyUrlBtn.addEventListener('click', () => {
+            const input = this.querySelector('#share-download-url');
+            if (input) this.copyToClipboard(input.value, copyUrlBtn);
+        });
+    }
+    const copyTokenBtn = this.querySelector('#copy-token-name');
+    if (copyTokenBtn) {
+        copyTokenBtn.addEventListener('click', () => {
+            const code = this.querySelector('#share-token-name');
+            if (code) this.copyToClipboard(code.textContent, copyTokenBtn);
+        });
+    }
 
     // Info panel toggle (transparency + timing)
     const infoBtn   = this.querySelector('#zip-info-btn');
