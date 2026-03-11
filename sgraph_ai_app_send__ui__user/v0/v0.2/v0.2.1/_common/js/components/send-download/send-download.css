@@ -1,0 +1,195 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Download Component Styles
+   v0.2.1 — Surgical CSS overrides on v0.2.0
+   Loads AFTER v0.2.0 CSS — later selectors win via cascade.
+
+   Changes:
+     - Zip header sticky variant
+     - Zip left rail (replaces zip-browser for two-column layout)
+     - Zip preview split variant (fills viewport)
+     - Maximise button
+     - Progress indicator
+     - Info panel (hidden by default)
+     - SVG file type icons with colours
+     - First-load hint
+     - Breadcrumb trail
+     - Mobile responsive overrides for new layout
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Zip Header — Sticky variant ─────────────────────────────────── */
+
+.zip-header--sticky {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.zip-header__folder-icon {
+    font-size: 1.2em;
+    flex-shrink: 0;
+}
+
+/* ─── Zip Left Rail (replaces zip-browser for two-column layout) ──── */
+
+.zip-left-rail {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-right: var(--space-3, 0.75rem);
+    font-size: var(--text-small, 0.8rem);
+    font-family: var(--font-mono, monospace);
+    line-height: 1.5;
+}
+
+.zip-left-rail__folders {
+    flex-shrink: 0;
+    max-height: 40%;
+    overflow-y: auto;
+    padding: var(--space-2, 0.5rem) 0;
+}
+
+.zip-left-rail__divider {
+    height: 1px;
+    background: var(--color-border, rgba(78,205,196,0.15));
+    margin: var(--space-2, 0.5rem) 0;
+    flex-shrink: 0;
+}
+
+.zip-left-rail__files {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-2, 0.5rem) 0;
+    min-height: 0;
+}
+
+/* ─── Zip Preview — Split variant (fills viewport) ────────────────── */
+
+.zip-preview--split {
+    position: relative;
+    min-height: calc(100vh - 180px);
+    overflow: auto;
+    border: 2px solid var(--accent, #4ECDC4);
+    border-radius: var(--radius-md, 8px);
+    background: var(--bg-secondary, #16213E);
+}
+
+/* ─── Maximise button ──────────────────────────────────────────────── */
+
+.zip-maximise-btn {
+    position: absolute;
+    top: var(--space-2, 0.5rem);
+    right: var(--space-2, 0.5rem);
+    z-index: 15;
+    background: var(--bg-secondary, #16213E);
+    border: 1px solid var(--color-border, rgba(78,205,196,0.15));
+    color: var(--color-text-secondary, #8892A0);
+    border-radius: var(--radius-sm, 4px);
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    transition: color 0.15s, border-color 0.15s;
+}
+.zip-maximise-btn:hover {
+    color: var(--accent, #4ECDC4);
+    border-color: var(--accent, #4ECDC4);
+}
+
+/* ─── Progress indicator ───────────────────────────────────────────── */
+
+.zip-progress {
+    padding: var(--space-2, 0.5rem) 0;
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* ─── Info panel (transparency + timing, hidden by default) ────────── */
+
+.zip-info-panel {
+    margin-top: var(--space-4, 1rem);
+    padding-top: var(--space-4, 1rem);
+    border-top: 1px solid var(--color-border, rgba(78,205,196,0.15));
+}
+
+.btn--active {
+    background: var(--accent-subtle, rgba(78,205,196,0.1));
+    color: var(--accent, #4ECDC4);
+    border-color: var(--accent, #4ECDC4);
+}
+
+/* ─── SVG file type icons ──────────────────────────────────────────── */
+
+.zip-icon {
+    width: 1em;
+    height: 1em;
+    vertical-align: middle;
+    fill: currentColor;
+}
+.zip-icon--audio    { color: #9b59b6; }
+.zip-icon--video    { color: #e74c3c; }
+.zip-icon--image    { color: #2ecc71; }
+.zip-icon--pdf      { color: #e74c3c; }
+.zip-icon--markdown { color: #3498db; }
+.zip-icon--code     { color: #f39c12; }
+
+/* ─── First-load hint ──────────────────────────────────────────────── */
+
+.zip-hint {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    background: var(--accent-subtle, rgba(78,205,196,0.1));
+    border: 1px solid rgba(78, 205, 196, 0.2);
+    border-radius: var(--radius-sm, 4px);
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+    margin-bottom: var(--space-2, 0.5rem);
+}
+.zip-hint__dismiss {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    font-size: 1.1em;
+    padding: 0 4px;
+}
+
+/* ─── Breadcrumb trail ─────────────────────────────────────────────── */
+
+.zip-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 0 var(--space-2, 0.5rem) 0;
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--color-border, rgba(78,205,196,0.15));
+    margin-bottom: var(--space-2, 0.5rem);
+}
+.zip-breadcrumb__item {
+    cursor: pointer;
+    color: var(--accent, #4ECDC4);
+}
+.zip-breadcrumb__item:hover {
+    text-decoration: underline;
+}
+.zip-breadcrumb__sep {
+    color: var(--color-text-secondary, #8892A0);
+}
+
+/* ─── Mobile: zip left rail stacking ───────────────────────────────── */
+
+@media (max-width: 768px) {
+    .zip-left-rail {
+        max-height: 200px;
+        padding-right: 0;
+    }
+    .zip-left-rail__folders {
+        max-height: 80px;
+    }
+}
