@@ -4,11 +4,15 @@
 Follows the v0.7.6 architecture brief: CI pipeline logic lives in Python,
 GitHub Actions is just the trigger and executor.
 
-Deployment model:
+Deployment model (IFD overlay):
   1. Validate required files exist
-  2. Sync to S3: websites/{site}/{env}/releases/{version}/
-  3. Copy release to: websites/{site}/{env}/latest/
+  2. Sync to S3: websites/{site}/{env}/releases/{version}/  (archive)
+  3. Overlay release onto: websites/{site}/{env}/latest/     (no --delete)
   4. Invalidate CloudFront cache
+
+IFD overlay means latest/ accumulates files across patch versions.
+v0.2.0 (full base) + v0.2.1 (overrides) = latest/ has the union of both.
+Rollback = re-sync a previous release folder. Cleanup = deliberate manual step.
 
 When --deploy-env is provided (e.g. dev, main, prod), content is isolated
 under that environment prefix. Each branch deploys to its own S3 folder:
@@ -303,15 +307,37 @@ def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None):
     s3_sync_by_type(source_dir, release_prefix, "font",
                     FONT_EXTENSIONS, CACHE_CONTROL["image"])  # fonts get long cache like images
 
-    # ----- Copy release to latest/ -----
+    # ----- Overlay release onto latest/ -----
+    # IFD overlay model: sync source directly to latest/ WITHOUT --delete.
+    # Each patch version adds/overwrites files on top of what's already in latest/.
+    # This preserves files from previous versions (e.g. v0.2.0 base files remain
+    # when v0.2.1 overrides are deployed). Rollback = re-sync a previous release.
+    # Cleanup of stale files is a deliberate, manual step (e.g. major version bump).
     print(f"\n{'='*60}")
-    print(f"Copying release to latest/")
+    print(f"Overlaying release onto latest/ (IFD — preserving previous files)")
     print(f"{'='*60}")
 
-    run_cmd(
-        ["aws", "s3", "sync", release_prefix, latest_prefix, "--delete"],
-        description="Syncing release to latest/"
-    )
+    s3_sync_by_type(str(source_dir), latest_prefix, "html",
+                    HTML_EXTENSIONS, CACHE_CONTROL["html"],
+                    content_type="text/html", delete=False)
+
+    s3_sync_by_type(str(source_dir), latest_prefix, "css",
+                    {".css"}, CACHE_CONTROL["css_js"],
+                    content_type="text/css")
+
+    s3_sync_by_type(str(source_dir), latest_prefix, "js",
+                    {".js"}, CACHE_CONTROL["css_js"],
+                    content_type="application/javascript")
+
+    s3_sync_by_type(str(source_dir), latest_prefix, "json",
+                    {".json"}, CACHE_CONTROL["css_js"],
+                    content_type="application/json")
+
+    s3_sync_by_type(str(source_dir), latest_prefix, "image",
+                    IMAGE_EXTENSIONS, CACHE_CONTROL["image"])
+
+    s3_sync_by_type(str(source_dir), latest_prefix, "font",
+                    FONT_EXTENSIONS, CACHE_CONTROL["image"])
 
 
 # ---------------------------------------------------------------------------

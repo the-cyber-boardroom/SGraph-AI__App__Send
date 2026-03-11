@@ -1,6 +1,6 @@
 name: Deploy User UI to S3
 
-# Publishes v0.2.0 static UI files to S3 for CloudFront distribution.
+# Publishes v0.2.1 static UI files to S3 for CloudFront distribution.
 # CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
 #
 # Deploy is manifest-driven — manifest.json lists exactly what gets deployed:
