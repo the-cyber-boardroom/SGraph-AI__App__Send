@@ -26,6 +26,14 @@
    NO customElements.define() — reuses v0.2.0's registration.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+(function() {
+
+// ─── Guard: v0.2.0 base must be loaded first ────────────────────────────────
+if (typeof SendDownload === 'undefined') {
+    console.warn('[send-download-v021] SendDownload base class not found — skipping overrides');
+    return;
+}
+
 // ─── Store original methods for super-calling if needed ────────────────────
 const _v020_setupEventListeners = SendDownload.prototype.setupEventListeners;
 const _v020_cleanup             = SendDownload.prototype.cleanup;
@@ -103,14 +111,33 @@ SendDownload.prototype._renderSharePanel = function() {
         `);
     }
 
-    // Access key (token name from URL)
-    if (this.tokenName) {
+    // Access key — from URL param or localStorage fallback
+    const tokenName = this.tokenName || (() => {
+        try { return localStorage.getItem('sgraph-send-token'); } catch(_) { return null; }
+    })();
+    if (tokenName) {
         parts.push(`
             <div class="share-panel__item">
                 <div class="share-panel__label">Access key</div>
                 <div class="share-panel__row">
-                    <code class="share-panel__code" id="share-token-name">${this.escapeHtml(this.tokenName)}</code>
+                    <code class="share-panel__code" id="share-token-name">${this.escapeHtml(tokenName)}</code>
                     <button class="btn btn-sm btn-secondary" id="copy-token-name" title="Copy access key">Copy</button>
+                </div>
+            </div>
+        `);
+    }
+
+    // Access token value — from localStorage
+    const accessToken = (() => {
+        try { return localStorage.getItem('sgraph-send-access-token'); } catch(_) { return null; }
+    })();
+    if (accessToken) {
+        parts.push(`
+            <div class="share-panel__item">
+                <div class="share-panel__label">Access token</div>
+                <div class="share-panel__row">
+                    <code class="share-panel__code" id="share-access-token">${this.escapeHtml(accessToken)}</code>
+                    <button class="btn btn-sm btn-secondary" id="copy-access-token" title="Copy access token">Copy</button>
                 </div>
             </div>
         `);
@@ -461,6 +488,13 @@ SendDownload.prototype.setupEventListeners = function() {
             if (code) this.copyToClipboard(code.textContent, copyTokenBtn);
         });
     }
+    const copyAccessBtn = this.querySelector('#copy-access-token');
+    if (copyAccessBtn) {
+        copyAccessBtn.addEventListener('click', () => {
+            const code = this.querySelector('#share-access-token');
+            if (code) this.copyToClipboard(code.textContent, copyAccessBtn);
+        });
+    }
 
     // Info panel toggle (transparency + timing)
     const infoBtn   = this.querySelector('#zip-info-btn');
@@ -543,3 +577,5 @@ SendDownload.prototype.cleanup = function() {
     // Call v0.2.0's original cleanup
     _v020_cleanup.call(this);
 };
+
+})();
