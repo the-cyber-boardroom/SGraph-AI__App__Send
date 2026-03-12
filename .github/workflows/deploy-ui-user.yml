@@ -49,6 +49,11 @@ on:
         options:
           - dev
           - production
+      rebuild_latest:
+        description: 'Rebuild latest/ from all releases (clean IFD overlay, removes stale files)'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: "ui-user-deploy-${{ inputs.environment || github.ref_name || 'dev' }}"
@@ -118,8 +123,23 @@ jobs:
             echo "Deploying to DEV (dev.send.sgraph.ai) → S3: websites/sgraph-send/dev/"
           fi
 
+      - name: Rebuild latest/ from releases (if requested)
+        if: steps.check-creds.outputs.has-credentials == 'true' && inputs.rebuild_latest == true
+        run: |
+          python scripts/deploy_static_site.py \
+            --site sgraph-send \
+            --version ${{ env.UI_VERSION }} \
+            --source-dir ${{ env.SOURCE_DIR }} \
+            --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --deploy-env ${{ steps.env.outputs.deploy_env }} \
+            --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} \
+            --skip-validation \
+            --rebuild-latest \
+            --version-file sgraph_ai_app_send/version
+
       - name: Deploy User UI to S3
-        if: steps.check-creds.outputs.has-credentials == 'true'
+        if: steps.check-creds.outputs.has-credentials == 'true' && inputs.rebuild_latest != true
         run: |
           python scripts/deploy_static_site.py \
             --site sgraph-send \
