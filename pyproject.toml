@@ -8,6 +8,12 @@ readme      = "README.md"
 homepage    = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
 repository  = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
 
+packages    = [ { include = "sgraph_ai_app_send"                 },
+                { include = "sgraph_ai_app_send__ui__admin"      },
+                { include = "sgraph_ai_app_send__ui__user"       },
+                { include = "sgraph_ai_app_send__ui__vault"      },
+                { include = "sgraph_ai_app_send__ui__workspace"  }]
+
 [tool.poetry.dependencies]
 python                         = "^3.12"
 osbot-utils                    = "*"
