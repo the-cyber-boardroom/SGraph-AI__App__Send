@@ -32,5 +32,5 @@ INC-{NNN}__{YYYY-MM-DD}__{short-description}/
 
 ## Cross-References
 
-- **Incident attribution leaderboard:** `team/roles/historian/reviews/26-02-19/v0.4.16__leaderboard__incident-attribution.md`
-- **Full-arc narrative (INC-003 + INC-004):** `team/roles/journalist/reviews/26-02-19/v0.4.16__article__from-leak-to-feature-full-arc.md`
+- **Incident attribution leaderboard:** `team/roles/historian/reviews/02/19/v0.4.16__leaderboard__incident-attribution.md`
+- **Full-arc narrative (INC-003 + INC-004):** `team/roles/journalist/reviews/02/19/v0.4.16__article__from-leak-to-feature-full-arc.md`

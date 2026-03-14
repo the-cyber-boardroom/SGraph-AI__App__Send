@@ -175,6 +175,8 @@ const I18n = {
             'access_gate.signup_subtitle':      'Sign up to get notified when SGraph Send is available.',
             'access_gate.show_token':           'Show access token',
             'access_gate.hide_token':           'Hide access token',
+            'access_gate.invalid_format':       "That doesn't look like a valid token. Tokens contain only letters, numbers, hyphens and underscores.",
+            'access_gate.browser_scope_hint':   'Your token is saved in this browser only. If you switch browsers or devices, you\u2019ll need to enter it again.',
 
             // ─── Transparency Panel ───────────────────────────────────────
             'transparency.title':               'What we stored about this transfer',

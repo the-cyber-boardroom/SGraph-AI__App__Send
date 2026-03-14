@@ -74,6 +74,7 @@ class SendAccessGate extends HTMLElement {
                     </div>
                     <button class="btn btn-primary" id="access-token-submit">${this.t('access_gate.button')}</button>
                 </div>
+                <p style="font-size: var(--text-small, 0.75rem); color: var(--color-text-secondary); margin-top: 0.5rem;">${this.t('access_gate.browser_scope_hint')}</p>
                 <div id="access-token-error" class="status status--error hidden" style="margin-top: 0.75rem;">
                     ${this.t('access_gate.invalid')}
                 </div>
@@ -119,6 +120,13 @@ class SendAccessGate extends HTMLElement {
 
         if (!token) { error.classList.remove('hidden'); return; }
 
+        // Reject tokens with non-ASCII or non-alphanumeric characters (prevents ISO-8859-1 header errors)
+        if (!/^[a-z0-9_-]+$/.test(token)) {
+            error.textContent = this.t('access_gate.invalid_format');
+            error.classList.remove('hidden');
+            return;
+        }
+
         if (submit) submit.disabled = true;
         try {
             const result = await ApiClient.checkToken(token);
@@ -133,7 +141,9 @@ class SendAccessGate extends HTMLElement {
                 return;
             }
         } catch (e) {
-            // Token check endpoint unavailable — fall through
+            // checkToken unavailable (network error or service down) — accept token optimistically.
+            // Format validation above already ensured it is structurally valid.
+            // If the token is actually invalid, the next upload attempt will return 401.
         }
         if (submit) submit.disabled = false;
 

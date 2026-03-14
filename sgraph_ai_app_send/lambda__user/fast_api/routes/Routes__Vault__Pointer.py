@@ -1,8 +1,9 @@
 # ===============================================================================
 # SGraph Send - Vault Pointer Routes
-# Mutable vault file endpoints: write, read, delete
+# Opaque blob endpoints: write, read, read-base64, delete, batch, list
 # ===============================================================================
 
+import base64
 from fastapi                                                                     import HTTPException, Request, Response
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
@@ -11,12 +12,18 @@ from sgraph_ai_app_send.lambda__user.user__config                               
 
 TAG__ROUTES_VAULT = 'api/vault'
 
-ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id}}'  ,
-                       f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}/{{file_id}}'   ,
-                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id}}' ]
+ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id}}'        ,
+                       f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}/{{file_id}}'         ,
+                       f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}/{{file_id}}'  ,
+                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id}}'       ,
+                       f'/{TAG__ROUTES_VAULT}/batch/{{vault_id}}'                    ,
+                       f'/{TAG__ROUTES_VAULT}/list/{{vault_id}}'                     ]
 
 
-class Routes__Vault__Pointer(Fast_API__Routes):                                  # Vault file endpoints (write, read, delete)
+LAMBDA_BASE64_LIMIT = 3750000                                                    # ~3.75MB (base64 adds ~33%, must stay under Lambda 5MB response limit)
+BATCH_MAX_OPERATIONS = 100                                                       # Max operations per batch request
+
+class Routes__Vault__Pointer(Fast_API__Routes):                                  # Vault file endpoints (write, read, delete, batch, list)
     tag                  : str = TAG__ROUTES_VAULT
     vault_service        : Service__Vault__Pointer                               # Auto-initialized by Type_Safe
     admin_service_client : object = None                                         # Optional Admin__Service__Client
@@ -68,10 +75,10 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if not payload:
             raise HTTPException(status_code = 400,
                                 detail      = 'Empty payload')
-        result = self.vault_service.write(vault_id    = str(vault_id)  ,
-                                          file_id     = str(file_id)   ,
-                                          write_key_hex = write_key    ,
-                                          payload_bytes = payload      )
+        result = self.vault_service.write(vault_id      = str(vault_id)  ,
+                                          file_id       = str(file_id)   ,
+                                          write_key_hex = write_key      ,
+                                          payload_bytes = payload        )
         if result is None:
             raise HTTPException(status_code = 403,
                                 detail      = 'Write key mismatch')
@@ -87,6 +94,22 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                                 detail      = 'Vault file not found')
         return Response(content    = payload                    ,
                         media_type = 'application/octet-stream')
+
+    def read_base64__vault_id__file_id(self, vault_id : Safe_Str__Id,           # GET /vault/{vault_id}/read-base64/{file_id} — JSON-safe base64 read
+                                             file_id  : Safe_Str__Id
+                                       ) -> dict:
+        payload = self.vault_service.read(vault_id = str(vault_id),
+                                          file_id  = str(file_id) )
+        if payload is None:
+            raise HTTPException(status_code = 404,
+                                detail      = 'Vault file not found')
+        if len(payload) > LAMBDA_BASE64_LIMIT:
+            raise HTTPException(status_code = 413,
+                                detail      = 'File too large for base64 download. Use /api/vault/read/{vault_id}/{file_id} instead.')
+        return dict(vault_id = str(vault_id)                          ,
+                    file_id  = str(file_id)                           ,
+                    data     = base64.b64encode(payload).decode('ascii'),
+                    size     = len(payload)                           )
 
     async def delete__vault_id__file_id(self, vault_id : Safe_Str__Id,           # DELETE /vault/{vault_id}/file/{file_id}
                                               file_id  : Safe_Str__Id,
@@ -105,8 +128,41 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                                 detail      = 'Write key mismatch or file not found')
         return result
 
+    async def batch__vault_id(self, vault_id : Safe_Str__Id,                     # POST /vault/batch/{vault_id}
+                                    request  : Request
+                              ) -> dict:
+        self.check_access_token(request)
+        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
+        if not write_key:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Missing write key')
+        body = await request.json()
+        operations = body.get('operations', [])
+        if not operations:
+            raise HTTPException(status_code = 400,
+                                detail      = 'No operations provided')
+        if len(operations) > BATCH_MAX_OPERATIONS:
+            raise HTTPException(status_code = 400,
+                                detail      = f'Too many operations (max {BATCH_MAX_OPERATIONS})')
+        result = self.vault_service.batch(vault_id      = str(vault_id)  ,
+                                          operations    = operations      ,
+                                          write_key_hex = write_key      )
+        if result is None:
+            raise HTTPException(status_code = 403,
+                                detail      = 'Write key mismatch')
+        return result
+
+    def list__vault_id(self, vault_id : Safe_Str__Id,                            # GET /vault/list/{vault_id}?prefix=bare/data/
+                             prefix   : str = ''                                 # Query param: filter by file_id prefix
+                       ) -> dict:
+        return self.vault_service.list_files(vault_id = str(vault_id) ,
+                                             prefix   = prefix        )
+
     def setup_routes(self):                                                      # Register all endpoints
-        self.add_route_put   (self.write__vault_id__file_id  )
-        self.add_route_get   (self.read__vault_id__file_id   )
-        self.add_route_delete(self.delete__vault_id__file_id )
+        self.add_route_put   (self.write__vault_id__file_id       )
+        self.add_route_get   (self.read__vault_id__file_id        )
+        self.add_route_get   (self.read_base64__vault_id__file_id )
+        self.add_route_delete(self.delete__vault_id__file_id      )
+        self.add_route_post  (self.batch__vault_id                )
+        self.add_route_get   (self.list__vault_id                 )
         return self

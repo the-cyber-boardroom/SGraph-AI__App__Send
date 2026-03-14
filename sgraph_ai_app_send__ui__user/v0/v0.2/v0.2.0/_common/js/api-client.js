@@ -45,7 +45,14 @@ const ApiClient = {
 
     _authHeaders() {
         const token = this.getAccessToken();
-        return token ? { 'x-sgraph-access-token': token } : {};
+        if (!token) return {};
+        // Defence in depth — reject any token that would cause a fetch header violation
+        if (!/^[a-z0-9_-]+$/i.test(token)) {
+            this.clearAccessToken();
+            document.dispatchEvent(new CustomEvent('access-token-invalid'));
+            return {};
+        }
+        return { 'x-sgraph-access-token': token };
     },
 
     // ─── Transfer Lifecycle ──────────────────────────────────────────────

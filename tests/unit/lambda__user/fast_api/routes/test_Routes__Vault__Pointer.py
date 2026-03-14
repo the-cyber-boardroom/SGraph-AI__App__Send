@@ -1,8 +1,11 @@
 # ===============================================================================
 # SGraph Send - Routes__Vault__Pointer Tests
 # Full vault file API lifecycle via the shared FastAPI test client
+# Including batch and list endpoint tests
 # ===============================================================================
 
+import base64
+import json
 from unittest                                                                    import TestCase
 from tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User        import setup__fast_api__user__test_objs
 
@@ -27,9 +30,22 @@ class test_Routes__Vault__Pointer(TestCase):
     def _read(self, vault_id=VAULT_ID, file_id=FILE_ID):
         return self.client.get(f'/api/vault/read/{vault_id}/{file_id}')
 
+    def _read_base64(self, vault_id=VAULT_ID, file_id=FILE_ID):
+        return self.client.get(f'/api/vault/read-base64/{vault_id}/{file_id}')
+
     def _delete(self, vault_id=VAULT_ID, file_id=FILE_ID, write_key=WRITE_KEY):
         return self.client.delete(f'/api/vault/delete/{vault_id}/{file_id}',
                                   headers = {'x-sgraph-vault-write-key': write_key})
+
+    def _batch(self, vault_id=VAULT_ID, operations=None, write_key=WRITE_KEY):
+        return self.client.post(f'/api/vault/batch/{vault_id}',
+                                content = json.dumps({'operations': operations or []}),
+                                headers = {'content-type'             : 'application/json'     ,
+                                           'x-sgraph-vault-write-key' : write_key              })
+
+    def _list(self, vault_id=VAULT_ID, prefix=''):
+        params = {'prefix': prefix} if prefix else {}
+        return self.client.get(f'/api/vault/list/{vault_id}', params=params)
 
     # --- Write endpoint ---
 
@@ -40,13 +56,12 @@ class test_Routes__Vault__Pointer(TestCase):
         assert data['file_id']     == 'write-test-1'
         assert data['vault_id']    == VAULT_ID
         assert data['status']      == 'completed'
-        assert data['write_count'] == 1
 
     def test__write__overwrite(self):
         self._write(file_id='write-test-2', payload=b'v1')
         response = self._write(file_id='write-test-2', payload=b'v2')
         assert response.status_code == 200
-        assert response.json()['write_count'] == 2
+        assert response.json()['status'] == 'completed'
 
         # Verify content was updated
         read = self._read(file_id='write-test-2')
@@ -83,6 +98,31 @@ class test_Routes__Vault__Pointer(TestCase):
     def test__read__not_found(self):
         response = self._read(file_id='nonexistent')
         assert response.status_code == 404
+
+    # --- Read-base64 endpoint (MCP-compatible) ---
+
+    def test__read_base64__existing(self):
+        payload = b'\x89PNG\x00\x01\x02\x03'
+        self._write(file_id='read-b64-1', payload=payload)
+        response = self._read_base64(file_id='read-b64-1')
+        assert response.status_code == 200
+        data = response.json()
+        assert data['vault_id']        == VAULT_ID
+        assert data['file_id']         == 'read-b64-1'
+        assert data['size'] == len(payload)
+        assert base64.b64decode(data['data']) == payload
+
+    def test__read_base64__not_found(self):
+        response = self._read_base64(file_id='nonexistent-b64')
+        assert response.status_code == 404
+
+    def test__read_base64__no_auth_required(self):
+        self._write(file_id='read-b64-noauth')
+        from starlette.testclient import TestClient
+        unauthenticated = TestClient(self.client.app)
+        response = unauthenticated.get(f'/api/vault/read-base64/{VAULT_ID}/read-b64-noauth')
+        assert response.status_code == 200
+        assert response.json()['size'] > 0
 
     def test__read__no_auth_required(self):
         """Read endpoint requires no access token (zero-knowledge model)."""
@@ -132,7 +172,7 @@ class test_Routes__Vault__Pointer(TestCase):
         # Write v1
         write1 = self._write(file_id=fid, payload=payload_v1)
         assert write1.status_code == 200
-        assert write1.json()['write_count'] == 1
+        assert write1.json()['status'] == 'completed'
 
         # Read v1
         read1 = self._read(file_id=fid)
@@ -140,7 +180,7 @@ class test_Routes__Vault__Pointer(TestCase):
 
         # Overwrite with v2
         write2 = self._write(file_id=fid, payload=payload_v2)
-        assert write2.json()['write_count'] == 2
+        assert write2.json()['status'] == 'completed'
 
         # Read v2
         read2 = self._read(file_id=fid)
@@ -205,3 +245,143 @@ class test_Routes__Vault__Pointer(TestCase):
         self._write(file_id='binary-test', payload=payload)
         read = self._read(file_id='binary-test')
         assert read.content == payload
+
+    # === Batch endpoint ===
+
+    def test__batch__write_objects(self):
+        ops = [
+            dict(op='write', file_id='bare/data/obj-r1', data=base64.b64encode(b'blob-1').decode()),
+            dict(op='write', file_id='bare/data/obj-r2', data=base64.b64encode(b'blob-2').decode()),
+        ]
+        response = self._batch(vault_id='batch-vault-1', operations=ops)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data['results']) == 2
+        assert all(r['status'] == 'ok' for r in data['results'])
+
+    def test__batch__write_if_match_success(self):
+        # Set up initial ref via batch (slashed file_ids require batch, not individual PUT)
+        vault = 'batch-vault-2'
+        setup_ops = [dict(op='write', file_id='bare/refs/ref-001',
+                          data=base64.b64encode(b'commit-aaa').decode())]
+        self._batch(vault_id=vault, operations=setup_ops)
+
+        ops = [
+            dict(op='write-if-match', file_id='bare/refs/ref-001',
+                 match=base64.b64encode(b'commit-aaa').decode(),
+                 data=base64.b64encode(b'commit-bbb').decode()),
+        ]
+        response = self._batch(vault_id=vault, operations=ops)
+        assert response.status_code == 200
+        assert response.json()['results'][0]['status'] == 'ok'
+
+    def test__batch__write_if_match_conflict(self):
+        vault = 'batch-vault-3'
+        setup_ops = [dict(op='write', file_id='bare/refs/ref-001',
+                          data=base64.b64encode(b'commit-aaa').decode())]
+        self._batch(vault_id=vault, operations=setup_ops)
+
+        ops = [
+            dict(op='write-if-match', file_id='bare/refs/ref-001',
+                 match=base64.b64encode(b'stale').decode(),
+                 data=base64.b64encode(b'new').decode()),
+        ]
+        response = self._batch(vault_id=vault, operations=ops)
+        assert response.status_code == 200
+        data = response.json()
+        assert data['results'][0]['status']  == 'conflict'
+        assert data['results'][0]['current'] == base64.b64encode(b'commit-aaa').decode()
+
+    def test__batch__missing_write_key(self):
+        response = self.client.post(f'/api/vault/batch/{VAULT_ID}',
+                                    content = json.dumps({'operations': []}),
+                                    headers = {'content-type': 'application/json'})
+        assert response.status_code == 400
+
+    def test__batch__no_operations(self):
+        response = self._batch(operations=[])
+        assert response.status_code == 400
+
+    def test__batch__wrong_key(self):
+        # First create the vault with correct key
+        self._write(vault_id='batch-vault-4', file_id='setup', payload=b'setup')
+        ops = [dict(op='write', file_id='file-1', data=base64.b64encode(b'data').decode())]
+        response = self._batch(vault_id='batch-vault-4', operations=ops, write_key='wrong-key')
+        assert response.status_code == 403
+
+    def test__batch__push_simulation(self):
+        """Simulate a full push: write blobs + tree + commit, CAS the ref."""
+        vault = 'push-sim-vault'
+        ops = [
+            dict(op='write', file_id='bare/data/obj-blob1',   data=base64.b64encode(b'file-content').decode()),
+            dict(op='write', file_id='bare/data/obj-tree1',   data=base64.b64encode(b'tree-json').decode()),
+            dict(op='write', file_id='bare/data/obj-commit1', data=base64.b64encode(b'commit-json').decode()),
+            dict(op='write-if-match', file_id='bare/refs/ref-current',
+                 match=None,
+                 data=base64.b64encode(b'obj-commit1').decode()),
+        ]
+        response = self._batch(vault_id=vault, operations=ops)
+        assert response.status_code == 200
+        results = response.json()['results']
+        assert len(results) == 4
+        assert all(r['status'] == 'ok' for r in results)
+
+        # Verify via list endpoint (slashed file_ids can't be read via individual GET)
+        list_response = self._list(vault_id=vault, prefix='bare/data/')
+        files = sorted(list_response.json()['files'])
+        assert 'bare/data/obj-blob1'   in files
+        assert 'bare/data/obj-tree1'   in files
+        assert 'bare/data/obj-commit1' in files
+
+        ref_response = self._list(vault_id=vault, prefix='bare/refs/')
+        assert 'bare/refs/ref-current' in ref_response.json()['files']
+
+    # === List endpoint ===
+
+    def test__list__empty_vault(self):
+        response = self._list(vault_id='list-empty-vault')
+        assert response.status_code == 200
+        data = response.json()
+        assert data['vault_id'] == 'list-empty-vault'
+        assert data['files']    == []
+
+    def test__list__returns_files(self):
+        vault = 'list-vault-1'
+        # Write files via batch (slashed file_ids require batch)
+        ops = [
+            dict(op='write', file_id='bare/data/obj-aaa', data=base64.b64encode(b'a').decode()),
+            dict(op='write', file_id='bare/data/obj-bbb', data=base64.b64encode(b'b').decode()),
+            dict(op='write', file_id='bare/refs/ref-001', data=base64.b64encode(b'r').decode()),
+        ]
+        self._batch(vault_id=vault, operations=ops)
+
+        response = self._list(vault_id=vault)
+        assert response.status_code == 200
+        files = sorted(response.json()['files'])
+        assert len(files) == 3
+        assert 'bare/data/obj-aaa' in files
+        assert 'bare/refs/ref-001' in files
+
+    def test__list__with_prefix(self):
+        vault = 'list-vault-2'
+        ops = [
+            dict(op='write', file_id='bare/data/obj-aaa', data=base64.b64encode(b'a').decode()),
+            dict(op='write', file_id='bare/refs/ref-001', data=base64.b64encode(b'r').decode()),
+        ]
+        self._batch(vault_id=vault, operations=ops)
+
+        response = self._list(vault_id=vault, prefix='bare/data/')
+        assert response.status_code == 200
+        assert response.json()['files'] == ['bare/data/obj-aaa']
+
+    def test__list__no_auth_required(self):
+        """List endpoint is unauthenticated (consistent with read)."""
+        vault = 'list-vault-3'
+        ops = [dict(op='write', file_id='bare/data/obj-xxx', data=base64.b64encode(b'x').decode())]
+        self._batch(vault_id=vault, operations=ops)
+
+        from starlette.testclient import TestClient
+        unauthenticated = TestClient(self.client.app)
+        response = unauthenticated.get(f'/api/vault/list/{vault}')
+        assert response.status_code == 200
+        assert 'bare/data/obj-xxx' in response.json()['files']

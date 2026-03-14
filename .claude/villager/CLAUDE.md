@@ -136,7 +136,7 @@ Explorer experimentation must **never** affect production. Production must **nev
 
 ## Resolved Decisions (16 Feb 2026)
 
-These decisions are binding for all Villager agents. Full record: `team/villager/roles/historian/reviews/26-02-16/v0.4.4__decisions__villager-brief-clarifications-16-feb.md`
+These decisions are binding for all Villager agents. Full record: `team/villager/roles/historian/reviews/02/16/v0.4.4__decisions__villager-brief-clarifications-16-feb.md`
 
 | ID | Decision | Detail |
 |----|----------|--------|
@@ -173,7 +173,7 @@ All dev packs live at `library/sgraph-send/dev_packs/{version}__{pack-name}/`. T
 | **Reality document** | `team/roles/librarian/reality/v0.6.36__what-exists-today.md` |
 | **Current Villager daily brief** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__daily-brief__villager-team-16-feb-2026.md` |
 | **Briefing packs process** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__briefs__briefing-packs-for-agents.md` |
-| **Decision record (16 Feb)** | `team/villager/roles/historian/reviews/26-02-16/v0.4.4__decisions__villager-brief-clarifications-16-feb.md` |
+| **Decision record (16 Feb)** | `team/villager/roles/historian/reviews/02/16/v0.4.4__decisions__villager-brief-clarifications-16-feb.md` |
 | **CloudFront LETS briefing pack** | `library/sgraph-send/dev_packs/v0.4.5__cloudfront-log-pipeline/BRIEF.md` |
 | **DPO/AppSec/GRC evidence pack** | `team/humans/dinis_cruz/briefs/02/16/v0.4.4__briefs__dpo-appsec-grc-evidence-pack.md` |
 | **Translator role definition** | `team/humans/dinis_cruz/briefs/02/16/v0.4.3__role-definition__translator.md` |
@@ -181,7 +181,7 @@ All dev packs live at `library/sgraph-send/dev_packs/{version}__{pack-name}/`. T
 | Wardley Maps context | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
 | IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |
 | Issues FS guide | `library/dependencies/issues-fs/v0.6.1__guide__agent-workflow-issues-format.md` |
-| Villager master index (latest) | `team/villager/roles/librarian/reviews/26-02-16/` |
+| Villager master index (latest) | `team/villager/roles/librarian/reviews/02/16/` |
 | CI pipeline (dev) | `.github/workflows/ci-pipeline__dev.yml` |
 | CI pipeline (main) | `.github/workflows/ci-pipeline__main.yml` |
 

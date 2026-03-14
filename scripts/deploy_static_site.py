@@ -4,11 +4,15 @@
 Follows the v0.7.6 architecture brief: CI pipeline logic lives in Python,
 GitHub Actions is just the trigger and executor.
 
-Deployment model:
+Deployment model (IFD overlay):
   1. Validate required files exist
-  2. Sync to S3: websites/{site}/{env}/releases/{version}/
-  3. Copy release to: websites/{site}/{env}/latest/
+  2. Sync to S3: websites/{site}/{env}/releases/{version}/  (archive)
+  3. Overlay release onto: websites/{site}/{env}/latest/     (no --delete)
   4. Invalidate CloudFront cache
+
+IFD overlay means latest/ accumulates files across patch versions.
+v0.2.0 (full base) + v0.2.1 (overrides) = latest/ has the union of both.
+Rollback = re-sync a previous release folder. Cleanup = deliberate manual step.
 
 When --deploy-env is provided (e.g. dev, main, prod), content is isolated
 under that environment prefix. Each branch deploys to its own S3 folder:
@@ -237,11 +241,166 @@ def s3_sync_by_type(source_dir, s3_prefix, file_type, extensions, cache_control,
     run_cmd(cmd, description=description)
 
 
-def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None):
+def upload_version_file(version_file, bucket, site, deploy_env=None):
+    """Upload a version file to the site root so it's accessible at /version.
+
+    This makes the app version available at e.g. https://sgraph.ai/version,
+    https://send.sgraph.ai/version, etc. — a plain text file with no extension.
+    """
+    version_path = Path(version_file)
+    if not version_path.is_file():
+        print(f"\n  WARNING: version file not found: {version_file} — skipping version upload")
+        return
+
+    env_segment = f"{deploy_env}/" if deploy_env else ""
+    s3_key = f"s3://{bucket}/websites/{site}/{env_segment}latest/version"
+
+    print(f"\n--- Uploading version file to site root ---")
+    run_cmd(
+        ["aws", "s3", "cp", str(version_path), s3_key,
+         "--content-type", "text/plain",
+         "--cache-control", CACHE_CONTROL["html"]],      # short cache (5 min) — same as HTML
+        description=f"Uploading {version_file} → {s3_key}"
+    )
+
+
+def clean_latest(bucket, site, deploy_env=None):
+    """Delete all files in latest/ to prepare for a clean rebuild.
+
+    Use this when stale files from previous deployments contaminate latest/
+    (e.g. renamed files leaving ghost copies, or major IFD version bumps).
+    After cleaning, deploy all versions in order to rebuild the overlay.
+    """
+    env_segment = f"{deploy_env}/" if deploy_env else ""
+    latest_prefix = f"s3://{bucket}/websites/{site}/{env_segment}latest/"
+
+    print(f"\n{'='*60}")
+    print(f"CLEAN: Deleting all files in {latest_prefix}")
+    print(f"{'='*60}")
+
+    run_cmd(
+        ["aws", "s3", "rm", "--recursive", latest_prefix],
+        description=f"Removing all objects under {latest_prefix}"
+    )
+
+
+def list_releases(bucket, site, deploy_env=None):
+    """List all release versions deployed to S3, sorted by version number.
+
+    Returns a list of version strings (e.g. ['v0.2.0', 'v0.2.1']).
+    """
+    env_segment = f"{deploy_env}/" if deploy_env else ""
+    releases_prefix = f"s3://{bucket}/websites/{site}/{env_segment}releases/"
+
+    result = run_cmd(
+        ["aws", "s3", "ls", releases_prefix, "--recursive"],
+        description="Listing release versions",
+        check=False
+    )
+
+    # Parse S3 listing to extract unique version paths
+    versions = set()
+    for line in (result.stdout or '').strip().split('\n'):
+        if not line.strip():
+            continue
+        # Extract the path after releases/ — format: releases/v0/v0.2/v0.2.0/...
+        parts = line.strip().split()
+        if len(parts) < 4:
+            continue
+        key = parts[3]  # the S3 key
+        # Find the releases/ segment and extract the version path
+        rel_idx = key.find('releases/')
+        if rel_idx < 0:
+            continue
+        after_releases = key[rel_idx + len('releases/'):]
+        # IFD path is v0/v0.2/v0.2.0/... — extract the third segment as the version
+        segments = after_releases.split('/')
+        if len(segments) >= 3:
+            versions.add(segments[2])   # e.g. 'v0.2.0'
+
+    # Sort versions numerically
+    def version_key(v):
+        try:
+            return tuple(int(x) for x in v.lstrip('v').split('.'))
+        except ValueError:
+            return (0, 0, 0)
+
+    sorted_versions = sorted(versions, key=version_key)
+    print(f"  Found {len(sorted_versions)} release(s): {', '.join(sorted_versions)}")
+    return sorted_versions
+
+
+def rebuild_latest_from_releases(bucket, site, deploy_env=None):
+    """Rebuild latest/ by replaying all releases in version order.
+
+    1. Delete everything in latest/
+    2. List all releases in releases/
+    3. Sync each release to latest/ in version order (oldest first)
+
+    This produces a clean IFD overlay with no ghost files.
+    """
+    env_segment = f"{deploy_env}/" if deploy_env else ""
+    latest_prefix = f"s3://{bucket}/websites/{site}/{env_segment}latest/"
+
+    # Step 1: Clean latest/
+    clean_latest(bucket, site, deploy_env)
+
+    # Step 2: List releases
+    versions = list_releases(bucket, site, deploy_env)
+    if not versions:
+        print("\n  WARNING: No releases found — latest/ is now empty")
+        return
+
+    # Step 3: Replay each release onto latest/ in order
+    for version in versions:
+        ifd_path = version_to_ifd_path(version)
+        release_prefix = f"s3://{bucket}/websites/{site}/{env_segment}releases/{ifd_path}/"
+
+        print(f"\n{'='*60}")
+        print(f"Rebuilding latest/ — overlaying {version}")
+        print(f"{'='*60}")
+
+        # Sync from S3 release → S3 latest (server-side copy, no download)
+        run_cmd(
+            ["aws", "s3", "sync", release_prefix, latest_prefix,
+             "--no-progress"],
+            description=f"Overlaying {version} onto latest/"
+        )
+
+    print(f"\n  Rebuild complete — latest/ now contains {len(versions)} version(s) overlaid in order")
+
+
+def sync_all_types_to_s3(source_dir, s3_prefix, delete=False):
+    """Sync all file types from source_dir to an S3 prefix."""
+    s3_sync_by_type(source_dir, s3_prefix, "html",
+                    HTML_EXTENSIONS, CACHE_CONTROL["html"],
+                    content_type="text/html", delete=delete)
+
+    s3_sync_by_type(source_dir, s3_prefix, "css",
+                    {".css"}, CACHE_CONTROL["css_js"],
+                    content_type="text/css")
+
+    s3_sync_by_type(source_dir, s3_prefix, "js",
+                    {".js"}, CACHE_CONTROL["css_js"],
+                    content_type="application/javascript")
+
+    s3_sync_by_type(source_dir, s3_prefix, "json",
+                    {".json"}, CACHE_CONTROL["css_js"],
+                    content_type="application/json")
+
+    s3_sync_by_type(source_dir, s3_prefix, "image",
+                    IMAGE_EXTENSIONS, CACHE_CONTROL["image"])
+
+    s3_sync_by_type(source_dir, s3_prefix, "font",
+                    FONT_EXTENSIONS, CACHE_CONTROL["image"])
+
+
+def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None, do_clean_latest=False):
     """Deploy the static site to S3 using the versioned deployment model.
 
     Step 1: Sync to websites/{site}/{env}/releases/{ifd_path}/  (IFD versioning)
-    Step 2: Copy the release to websites/{site}/{env}/latest/
+    Step 2: Optionally clean latest/ (--clean-latest)
+    Step 3: Copy the release to websites/{site}/{env}/latest/
 
     When deploy_env is provided (e.g. 'dev', 'main', 'prod'), files are isolated
     under that environment prefix. Without it, files go to the site root (legacy).
@@ -258,37 +417,23 @@ def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None):
     print(f"Deploying to releases/{ifd_path}/")
     print(f"{'='*60}")
 
-    s3_sync_by_type(source_dir, release_prefix, "html",
-                    HTML_EXTENSIONS, CACHE_CONTROL["html"],
-                    content_type="text/html", delete=True)
+    sync_all_types_to_s3(source_dir, release_prefix, delete=True)
 
-    s3_sync_by_type(source_dir, release_prefix, "css",
-                    {".css"}, CACHE_CONTROL["css_js"],
-                    content_type="text/css")
+    # ----- Optionally clean latest/ before overlay -----
+    if do_clean_latest:
+        clean_latest(bucket, site, deploy_env)
 
-    s3_sync_by_type(source_dir, release_prefix, "js",
-                    {".js"}, CACHE_CONTROL["css_js"],
-                    content_type="application/javascript")
-
-    s3_sync_by_type(source_dir, release_prefix, "json",
-                    {".json"}, CACHE_CONTROL["css_js"],
-                    content_type="application/json")
-
-    s3_sync_by_type(source_dir, release_prefix, "image",
-                    IMAGE_EXTENSIONS, CACHE_CONTROL["image"])
-
-    s3_sync_by_type(source_dir, release_prefix, "font",
-                    FONT_EXTENSIONS, CACHE_CONTROL["image"])  # fonts get long cache like images
-
-    # ----- Copy release to latest/ -----
+    # ----- Overlay release onto latest/ -----
+    # IFD overlay model: sync source directly to latest/ WITHOUT --delete.
+    # Each patch version adds/overwrites files on top of what's already in latest/.
+    # This preserves files from previous versions (e.g. v0.2.0 base files remain
+    # when v0.2.1 overrides are deployed). Rollback = re-sync a previous release.
+    # Cleanup of stale files is a deliberate, manual step (e.g. major version bump).
     print(f"\n{'='*60}")
-    print(f"Copying release to latest/")
+    print(f"Overlaying release onto latest/ (IFD — preserving previous files)")
     print(f"{'='*60}")
 
-    run_cmd(
-        ["aws", "s3", "sync", release_prefix, latest_prefix, "--delete"],
-        description="Syncing release to latest/"
-    )
+    sync_all_types_to_s3(str(source_dir), latest_prefix, delete=False)
 
 
 # ---------------------------------------------------------------------------
@@ -407,6 +552,29 @@ def parse_args():
              "Without this, deploys to websites/{site}/ directly (legacy behaviour).",
     )
     parser.add_argument(
+        "--version-file",
+        default=None,
+        help="Path to a version file to upload to the site root as /version. "
+             "Makes the app version accessible at e.g. https://sgraph.ai/version. "
+             "Typically: sgraph_ai_app_send/version",
+    )
+    parser.add_argument(
+        "--clean-latest",
+        action="store_true",
+        help="Delete all files in latest/ before overlaying. Use when stale files "
+             "contaminate latest/ (e.g. renamed files leaving ghost copies). "
+             "WARNING: After cleaning, only the current version's files will be in "
+             "latest/ — use --rebuild-latest instead to replay all versions.",
+    )
+    parser.add_argument(
+        "--rebuild-latest",
+        action="store_true",
+        help="Rebuild latest/ from scratch by replaying all releases in version order. "
+             "Deletes latest/, lists all versions in releases/, and overlays them "
+             "oldest-first. Produces a clean IFD overlay with no ghost files. "
+             "Skips the normal deploy — only rebuilds latest/ from existing releases.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print what would be done without executing S3 commands.",
@@ -455,15 +623,30 @@ def main():
     if args.dry_run:
         ifd_path = version_to_ifd_path(args.version)
         env_segment = f"{args.deploy_env}/" if args.deploy_env else ""
-        print(f"\n[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/{env_segment}releases/{ifd_path}/")
-        print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/{env_segment}latest/")
+        if args.rebuild_latest:
+            print(f"\n[dry-run] Would rebuild latest/ from all releases in s3://{bucket}/websites/{args.site}/{env_segment}releases/")
+        else:
+            if args.clean_latest:
+                print(f"\n[dry-run] Would delete all files in s3://{bucket}/websites/{args.site}/{env_segment}latest/")
+            print(f"[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/{env_segment}releases/{ifd_path}/")
+            print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/{env_segment}latest/")
+        if args.version_file:
+            print(f"[dry-run] Would upload {args.version_file} to s3://{bucket}/websites/{args.site}/{env_segment}latest/version")
         for dist_id in args.cloudfront_distribution_id:
             print(f"[dry-run] Would invalidate CloudFront {dist_id}")
         print("\nDry run complete.")
         sys.exit(0)
 
     # --- Deploy ---
-    deploy_to_s3(source_dir, bucket, args.site, args.version, deploy_env=args.deploy_env)
+    if args.rebuild_latest:
+        rebuild_latest_from_releases(bucket, args.site, deploy_env=args.deploy_env)
+    else:
+        deploy_to_s3(source_dir, bucket, args.site, args.version,
+                     deploy_env=args.deploy_env, do_clean_latest=args.clean_latest)
+
+    # --- Version file ---
+    if args.version_file:
+        upload_version_file(args.version_file, bucket, args.site, deploy_env=args.deploy_env)
 
     # --- CloudFront ---
     for dist_id in args.cloudfront_distribution_id:

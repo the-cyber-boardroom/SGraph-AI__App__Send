@@ -176,7 +176,7 @@ Move each incident type rightward: **Unprepared → Practised → Operationalise
 |----------|----------|
 | Project brief | `library/docs/_to_process/01-project-brief.md` |
 | Current sprint brief | `team/humans/dinis_cruz/briefs/2026-02-10/v0.1.4__briefs__focus-on-mvp-release-infrastructure.md` |
-| Master index | `team/roles/librarian/reviews/26-02-10/v0.2.1__master-index__infrastructure-brief-responses.md` |
+| Master index | `team/roles/librarian/reviews/02/10/v0.2.1__master-index__infrastructure-brief-responses.md` |
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
 | Issues FS | `.issues/` |
 | Agent guidance | `.claude/CLAUDE.md` |

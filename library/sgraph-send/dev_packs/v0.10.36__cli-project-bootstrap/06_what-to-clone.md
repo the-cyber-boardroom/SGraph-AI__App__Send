@@ -25,8 +25,8 @@ These files define the contracts the CLI must implement against:
 | **Transfer routes** | `sgraph_ai_app_send/lambda__user/fast_api/routes/Routes__Transfers.py` | API contract, auth pattern |
 | **Presigned routes** | `sgraph_ai_app_send/lambda__user/fast_api/routes/Routes__Presigned.py` | Multipart upload API |
 | **Transfer service** | `sgraph_ai_app_send/lambda__user/service/Transfer__Service.py` | Backend behaviour, status machine |
-| **Assessment v2** | `team/roles/architect/reviews/26-03-03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md` | Full architecture document |
-| **Vault stability brief** | `team/roles/dev/reviews/26-03-03/v0.10.36__implementation-brief__vault-key-stability.md` | Backend update endpoint spec |
+| **Assessment v2** | `team/roles/architect/reviews/03/03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md` | Full architecture document |
+| **Vault stability brief** | `team/roles/dev/reviews/03/03/v0.10.36__implementation-brief__vault-key-stability.md` | Backend update endpoint spec |
 
 ## What to COPY (Into CLI Repo)
 

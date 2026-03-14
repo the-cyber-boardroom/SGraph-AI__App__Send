@@ -14,7 +14,7 @@
 
 **Before describing, assessing, or assuming what SGraph Send can do, READ:**
 
-`team/roles/librarian/reality/v0.10.13__what-exists-today.md`
+`team/roles/librarian/reality/v0.13.34__what-exists-today.md`
 
 This is the **code-verified** record of every endpoint, UI page, test, and feature that actually exists. It was built by auditing source code, not briefs or reviews.
 
@@ -179,7 +179,7 @@ team/                            # Team structure
 
 ### File Naming
 
-14. **Review files:** `team/roles/{role}/reviews/YY-MM-DD/{version}__{description}.md`
+14. **Review files:** `team/roles/{role}/reviews/MM/DD/{version}__{description}.md`
 15. **Debrief files:** `team/humans/dinis_cruz/debriefs/MM/DD/{version}__debrief__{description}.md`
 16. **Version** comes from `sgraph_ai_app_send/version`
 17. **UI assets** use versioned paths: `v0/v0.1/v0.1.0/index.html`
@@ -189,7 +189,7 @@ team/                            # Team structure
 18. **`team/humans/dinis_cruz/briefs/` is HUMAN-ONLY.** Agents must NEVER create, modify, or move files into this folder. It is reserved exclusively for files that the human creates and uploads. This rule has no exceptions.
 19. **Agent session outputs** go to `team/humans/dinis_cruz/claude-code-web/MM/DD/` — this is the folder for decisions, observations, and documents produced during Claude Code sessions.
 20. **Debriefs** go to `team/humans/dinis_cruz/debriefs/MM/DD/` — summaries of session deliverables for human review.
-21. **Role reviews** go to `team/roles/{role}/reviews/YY-MM-DD/` — the standard output location for all role work.
+21. **Role reviews** go to `team/roles/{role}/reviews/MM/DD/` — the standard output location for all role work.
 
 ### Testing
 
@@ -216,7 +216,7 @@ Each agent operates as a specific role. Roles produce review documents in their 
 **Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs, Villager briefs, and Town Planner briefs. **IMPORTANT: The `briefs/` folder is read-only for agents.** Only the human creates files there. Agent outputs go to `team/humans/dinis_cruz/claude-code-web/` or `team/roles/{role}/reviews/`.
 
 Before starting work, check:
-1. **Reality document** at `team/roles/librarian/reality/v0.10.13__what-exists-today.md` — what actually exists in code
+1. **Reality document** at `team/roles/librarian/reality/v0.13.34__what-exists-today.md` — what actually exists in code
 2. Latest human brief in `team/humans/dinis_cruz/briefs/`
 3. Latest debrief in `team/humans/dinis_cruz/debriefs/`
 4. Latest Librarian master index in `team/roles/librarian/reviews/`
@@ -235,12 +235,12 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
   | Another debrief (`debriefs/MM/DD/`) | 2 | `../../` | `../../02/14/v0.3.0__debrief__topic.md` |
   | Briefs (`briefs/MM/DD/`) | 3 + down | `../../../briefs/` | `../../../briefs/02/14/v0.3.2__brief.md` |
   | Claude-code-web (`claude-code-web/MM/DD/`) | 3 + down | `../../../claude-code-web/` | `../../../claude-code-web/02/14/file.md` |
-  | Role reviews (`team/roles/{role}/reviews/`) | **5** + down | `../../../../../roles/` | `../../../../../roles/architect/reviews/26-03-01/file.md` |
+  | Role reviews (`team/roles/{role}/reviews/`) | **5** + down | `../../../../../roles/` | `../../../../../roles/architect/reviews/03/01/file.md` |
   | Library (`library/`) | **6** + down | `../../../../../../library/` | `../../../../../../library/docs/specs/README.md` |
 
   **The most common mistake** is linking to `team/roles/` with only 3 levels (`../../../roles/...`). This resolves to `team/humans/dinis_cruz/roles/...` which does not exist. You need **5 levels** (`../../../../../roles/...`) to reach `team/` and then down into `roles/`.
 
-  **Always verify** relative links resolve correctly before committing — run: `cd team/humans/dinis_cruz/debriefs/MM/DD && ls -la ../../../../../roles/{role}/reviews/YY-MM-DD/filename.md`
+  **Always verify** relative links resolve correctly before committing — run: `cd team/humans/dinis_cruz/debriefs/MM/DD && ls -la ../../../../../roles/{role}/reviews/MM/DD/filename.md`
 - **When:** Create a debrief whenever a session produces multiple deliverables
 - **Content:** Executive summary, recommended reading order, key decisions, what's next
 
@@ -248,7 +248,7 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 ## Current State (v0.6.36)
 
-**See `team/roles/librarian/reality/v0.10.13__what-exists-today.md` for the full code-verified picture.**
+**See `team/roles/librarian/reality/v0.13.34__what-exists-today.md` for the full code-verified picture.**
 
 **Summary:** 73 HTTP endpoints (18 User + 55 Admin), 6 User UI pages, 17 Admin components, 393 passing tests, MCP on both Lambdas, full encryption pipeline, data rooms, personal vaults, PKI, audit trails, token management, analytics.
 
@@ -263,7 +263,7 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 | Document | Location |
 |---|---|
-| **Reality document** | `team/roles/librarian/reality/v0.10.13__what-exists-today.md` |
+| **Reality document** | `team/roles/librarian/reality/v0.13.34__what-exists-today.md` |
 | Project brief | `library/docs/_to_process/01-project-brief.md` |
 | Specs index | `library/docs/specs/README.md` |
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
@@ -276,6 +276,6 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 | Current brief (v0.3.0) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.3.0__daily-brief__sgraph-send-14-feb-2026.md` |
 | Decisions (14 Feb) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.2.41__brief__decisions-14-feb-2026.md` |
 | Latest debrief | `team/humans/dinis_cruz/debriefs/02/14/v0.3.0__debrief__daily-brief-responses-and-admin-ui.md` |
-| Master index (latest) | `team/roles/librarian/reviews/26-02-14/v0.3.0__master-index__daily-brief-responses-14-feb.md` |
+| Master index (latest) | `team/roles/librarian/reviews/02/14/v0.3.0__master-index__daily-brief-responses-14-feb.md` |
 | Issues FS | `.issues/` |
 | IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |

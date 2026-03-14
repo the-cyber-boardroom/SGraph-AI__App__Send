@@ -1,6 +1,6 @@
 # Architect Summary for Key Discovery Build
 
-**Source:** `team/roles/architect/reviews/26-02-21/v0.5.0__review__chain-of-trust-architecture.md`
+**Source:** `team/roles/architect/reviews/02/21/v0.5.0__review__chain-of-trust-architecture.md`
 
 ---
 

@@ -108,6 +108,6 @@ Transfer API (remote — send.sgraph.ai)
 |---|---|
 | **Reality document** | `team/explorer/librarian/reality/` |
 | Type_Safe guide | `library/dependencies/osbot-utils/type_safe/v3.63.4__for_llms__type_safe.md` |
-| Architecture (main repo) | `/tmp/sgraph-send-ref/team/roles/architect/reviews/26-03-03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md` |
+| Architecture (main repo) | `/tmp/sgraph-send-ref/team/roles/architect/reviews/03/03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md` |
 | Encryption source | `/tmp/sgraph-send-ref/sgraph_ai_app_send__ui__vault/v0/v0.1/v0.1.1/_common/js/lib/sg-send/sg-send-crypto.js` |
 | Vault source | `/tmp/sgraph-send-ref/sgraph_ai_app_send__ui__vault/v0/v0.1/v0.1.1/_common/js/lib/sg-vault/sg-vault.js` |

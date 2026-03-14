@@ -1,6 +1,6 @@
 # AppSec Summary for Key Discovery Build
 
-**Source:** `team/roles/appsec/reviews/26-02-21/v0.5.0__appsec__read-now.md`
+**Source:** `team/roles/appsec/reviews/02/21/v0.5.0__appsec__read-now.md`
 
 ---
 
@@ -39,4 +39,4 @@
 
 ## GRC Risk
 
-When the auth model widens (self-service users, public endpoints, OAuth), many findings escalate to Critical. Track this transition. Full details: `team/roles/appsec/reviews/26-02-21/v0.5.0__grc-risk__auth-model-transition.md`
+When the auth model widens (self-service users, public endpoints, OAuth), many findings escalate to Critical. Track this transition. Full details: `team/roles/appsec/reviews/02/21/v0.5.0__grc-risk__auth-model-transition.md`

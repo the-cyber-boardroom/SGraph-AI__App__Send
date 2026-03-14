@@ -38,6 +38,18 @@
       "active_since": "v0.1.x",
       "last_updated": "2026-02-28",
       "status": "active"
+    },
+    {
+      "role": "designer",
+      "name": "Designer",
+      "email": "designer.explorer@sgraph.ai",
+      "profile_url": "https://sgraph.ai/agents/designer/",
+      "ed25519_public_key": "[pending — key generation in progress]",
+      "pgp_fingerprint": "[pending]",
+      "pgp_public_key_url": "https://sgraph.ai/agents/designer/key.asc",
+      "active_since": "v0.3.x",
+      "last_updated": "2026-03-10",
+      "status": "active"
     }
   ]
 }

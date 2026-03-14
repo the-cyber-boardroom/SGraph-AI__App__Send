@@ -126,7 +126,7 @@ class Test__Service__EC2_Instances(TestCase):
 |------|---------|---------|
 | Review documents | `{version}__{type}__{description}.md` | `v0.5.33__review__ec2-routes-security.md` |
 | Debriefs | `{version}__debrief__{topic}.md` | `v0.5.33__debrief__investor-demo-prep.md` |
-| Role reviews | `team/roles/{role}/reviews/YY-MM-DD/` | `team/roles/devops/reviews/26-02-23/` |
+| Role reviews | `team/roles/{role}/reviews/YY-MM-DD/` | `team/roles/devops/reviews/02/23/` |
 
 ---
 

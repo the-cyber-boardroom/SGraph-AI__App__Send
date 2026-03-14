@@ -121,4 +121,5 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --deploy-env ${{ steps.env.outputs.deploy_env }} \
             --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} \
-            --skip-validation
+            --skip-validation \
+            --version-file sgraph_ai_app_send/version

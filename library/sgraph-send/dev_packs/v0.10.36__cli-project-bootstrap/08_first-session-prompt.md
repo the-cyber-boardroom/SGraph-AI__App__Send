@@ -42,8 +42,8 @@ Also read the role definitions:
 11. `/tmp/sgraph-send-ref/library/sgraph-send/dev_packs/v0.10.36__cli-project-bootstrap/03_role-definitions/ROLE__devops.md`
 
 And the architecture + guidance from the main repo:
-12. `/tmp/sgraph-send-ref/team/roles/architect/reviews/26-03-03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md` — full architecture
-13. `/tmp/sgraph-send-ref/team/roles/dev/reviews/26-03-03/v0.10.36__implementation-brief__vault-key-stability.md` — vault key stability
+12. `/tmp/sgraph-send-ref/team/roles/architect/reviews/03/03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md` — full architecture
+13. `/tmp/sgraph-send-ref/team/roles/dev/reviews/03/03/v0.10.36__implementation-brief__vault-key-stability.md` — vault key stability
 14. `/tmp/sgraph-send-ref/library/dependencies/osbot-utils/type_safe/v3.63.4__for_llms__type_safe.md` — Type_Safe guide (MUST READ)
 15. `/tmp/sgraph-send-ref/library/dependencies/osbot-utils/type_safe/v3.1.1__for_llms__type_safe__testing_guidance.md` — testing guide
 

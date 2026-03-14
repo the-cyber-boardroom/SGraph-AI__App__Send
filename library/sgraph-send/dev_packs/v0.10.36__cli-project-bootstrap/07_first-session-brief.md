@@ -18,7 +18,7 @@ A Python CLI tool (`sg-send-cli`) that syncs encrypted vaults between a local fi
 
 The architecture has already been designed. Read the assessment v2 in the main repo:
 ```
-/tmp/sgraph-send-ref/team/roles/architect/reviews/26-03-03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md
+/tmp/sgraph-send-ref/team/roles/architect/reviews/03/03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md
 ```
 
 Key decisions are already made (see `03_role-definitions/ROLE__historian.md` for the full list).
@@ -52,7 +52,7 @@ Then read the Type_Safe guides from the main repo:
 8. `/tmp/sgraph-send-ref/library/dependencies/osbot-utils/type_safe/v3.1.1__for_llms__type_safe__testing_guidance.md`
 
 And the architecture:
-9. `/tmp/sgraph-send-ref/team/roles/architect/reviews/26-03-03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md`
+9. `/tmp/sgraph-send-ref/team/roles/architect/reviews/03/03/v0.10.36__architect-dev-assessment-v2__vault-cli-local-sync.md`
 
 ## Critical Reminders
 

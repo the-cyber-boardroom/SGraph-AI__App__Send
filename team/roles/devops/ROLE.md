@@ -184,11 +184,11 @@ After every incident, ask: "How come our pipeline did not detect this?" If the a
 
 | Document | Location |
 |----------|----------|
-| DevOps infrastructure brief response | `team/roles/devops/reviews/26-02-10/v0.2.1__response-to-infrastructure-brief.md` |
+| DevOps infrastructure brief response | `team/roles/devops/reviews/02/10/v0.2.1__response-to-infrastructure-brief.md` |
 | CI pipeline (dev) | `.github/workflows/ci-pipeline__dev.yml` |
 | CI pipeline (main) | `.github/workflows/ci-pipeline__main.yml` |
 | Agent guidance (deployment rules) | `.claude/CLAUDE.md` |
-| Architect entry point architecture | `team/roles/architect/reviews/26-02-10/v0.2.1__response-to-infrastructure-brief.md` |
+| Architect entry point architecture | `team/roles/architect/reviews/02/10/v0.2.1__response-to-infrastructure-brief.md` |
 | System landscape map | `team/roles/cartographer/v0.1.2/v0.1.2__system-landscape-map-revised.md` |
 | Current sprint brief | `team/humans/dinis_cruz/briefs/2026-02-10/v0.1.4__briefs__focus-on-mvp-release-infrastructure.md` |
 
