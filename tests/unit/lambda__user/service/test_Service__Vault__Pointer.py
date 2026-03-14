@@ -1,9 +1,10 @@
 # ===============================================================================
 # SGraph Send - Service__Vault__Pointer Tests
 # Vault file lifecycle: write, read, overwrite, delete with write-key auth
-# Including vault manifest protection tests
+# Including vault manifest protection, write-if-match, batch, and list tests
 # ===============================================================================
 
+import base64
 from unittest                                                                    import TestCase
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer
 
@@ -28,7 +29,6 @@ class test_Service__Vault__Pointer(TestCase):
         assert result['file_id']     == self.file_id
         assert result['vault_id']    == self.vault_id
         assert result['status']      == 'completed'
-        assert result['write_count'] == 1
 
     def test__write__creates_payload(self):
         self.service.write(vault_id      = self.vault_id  ,
@@ -49,7 +49,7 @@ class test_Service__Vault__Pointer(TestCase):
                                     file_id       = self.file_id      ,
                                     write_key_hex = self.write_key    ,
                                     payload_bytes = b'version-2'      )
-        assert result['write_count'] == 2
+        assert result['status'] == 'completed'
         assert self.service.read(self.vault_id, self.file_id) == b'version-2'
 
     def test__write__overwrite_wrong_key(self):
@@ -65,21 +65,14 @@ class test_Service__Vault__Pointer(TestCase):
         assert result is None                                                    # Auth failure
         assert self.service.read(self.vault_id, self.file_id) == b'original'     # Payload unchanged
 
-    def test__write__stores_metadata(self):
+    def test__write__no_meta_json_created(self):
+        """Verify meta.json is NOT created — removed in branch model architecture."""
         self.service.write(vault_id      = self.vault_id  ,
                            file_id       = self.file_id   ,
                            write_key_hex = self.write_key ,
                            payload_bytes = self.payload   )
-        meta = self.service.storage_fs.file__json(
-            self.service.vault_meta_path(self.vault_id, self.file_id))
-        assert meta['file_id']        == self.file_id
-        assert meta['vault_id']       == self.vault_id
-        assert meta['mutable']        is True
-        assert meta['status']         == 'completed'
-        assert meta['write_count']    == 1
-        assert 'write_key_hash'       in meta
-        assert 'created_at'           in meta
-        assert 'updated_at'           in meta
+        meta_path = f'transfers/vault/{self.vault_id}/{self.file_id}/meta.json'
+        assert not self.service.storage_fs.file__exists(meta_path)
 
     # --- Read ---
 
@@ -113,7 +106,6 @@ class test_Service__Vault__Pointer(TestCase):
         assert result['vault_id'] == self.vault_id
         assert result['status']   == 'deleted'
 
-        # Confirm both meta and payload are gone
         assert self.service.read(self.vault_id, self.file_id) is None
 
     def test__delete__wrong_key(self):
@@ -160,7 +152,6 @@ class test_Service__Vault__Pointer(TestCase):
     # --- Storage paths ---
 
     def test__storage_paths(self):
-        assert self.service.vault_meta_path('v1', 'f1')     == 'transfers/vault/v1/f1/meta.json'
         assert self.service.vault_payload_path('v1', 'f1')   == 'transfers/vault/v1/f1/payload'
         assert self.service.vault_manifest_path('v1')        == 'transfers/vault/v1/manifest.json'
 
@@ -169,19 +160,19 @@ class test_Service__Vault__Pointer(TestCase):
     def test__full_lifecycle(self):
         # Create
         result = self.service.write(self.vault_id, self.file_id, self.write_key, b'v1')
-        assert result['write_count'] == 1
+        assert result['status'] == 'completed'
 
         # Read
         assert self.service.read(self.vault_id, self.file_id) == b'v1'
 
         # Overwrite
         result = self.service.write(self.vault_id, self.file_id, self.write_key, b'v2')
-        assert result['write_count'] == 2
+        assert result['status'] == 'completed'
         assert self.service.read(self.vault_id, self.file_id) == b'v2'
 
         # Overwrite again
         result = self.service.write(self.vault_id, self.file_id, self.write_key, b'v3')
-        assert result['write_count'] == 3
+        assert result['status'] == 'completed'
         assert self.service.read(self.vault_id, self.file_id) == b'v3'
 
         # Reject wrong key
@@ -200,10 +191,10 @@ class test_Service__Vault__Pointer(TestCase):
                            file_id       = self.file_id   ,
                            write_key_hex = self.write_key ,
                            payload_bytes = self.payload   )
-        meta = self.service.storage_fs.file__json(
-            self.service.vault_meta_path(self.vault_id, self.file_id))
-        assert self.write_key not in str(meta)                                   # Raw key not in metadata
-        assert len(meta['write_key_hash']) == 64                                 # SHA-256 hex digest
+        manifest = self.service.storage_fs.file__json(
+            self.service.vault_manifest_path(self.vault_id))
+        assert self.write_key not in str(manifest)                               # Raw key not in manifest
+        assert len(manifest['write_key_hash']) == 64                             # SHA-256 hex digest
 
     # === Vault Manifest Protection ===
 
@@ -260,17 +251,203 @@ class test_Service__Vault__Pointer(TestCase):
         assert self.service.write('vault-aaa', 'file-3', 'key-bob',   b'intruder') is None
         assert self.service.write('vault-bbb', 'file-3', 'key-alice', b'intruder') is None
 
-    def test__manifest__write_key_hash_matches_file_meta(self):
-        """Manifest and file meta store the same write_key_hash."""
-        self.service.write(self.vault_id, self.file_id, self.write_key, self.payload)
-        manifest = self.service.storage_fs.file__json(
-            self.service.vault_manifest_path(self.vault_id))
-        file_meta = self.service.storage_fs.file__json(
-            self.service.vault_meta_path(self.vault_id, self.file_id))
-        assert manifest['write_key_hash'] == file_meta['write_key_hash']
-
     def test__manifest__raw_write_key_not_in_manifest(self):
         self.service.write(self.vault_id, self.file_id, self.write_key, self.payload)
         manifest = self.service.storage_fs.file__json(
             self.service.vault_manifest_path(self.vault_id))
         assert self.write_key not in str(manifest)                               # Only hash stored
+
+    # === write-if-match (compare-and-swap) ===
+
+    def test__write_if_match__succeeds_when_matching(self):
+        """CAS write succeeds when current value matches expected."""
+        self.service.write(self.vault_id, 'ref-001', self.write_key, b'commit-aaa')
+
+        current_b64 = base64.b64encode(b'commit-aaa').decode()
+        new_b64     = base64.b64encode(b'commit-bbb').decode()
+
+        result = self.service.write_if_match(self.vault_id, 'ref-001',
+                                             current_b64, new_b64, self.write_key)
+        assert result['status']  == 'ok'
+        assert result['file_id'] == 'ref-001'
+        assert self.service.read(self.vault_id, 'ref-001') == b'commit-bbb'
+
+    def test__write_if_match__conflict_when_mismatched(self):
+        """CAS write returns conflict with current value when mismatch."""
+        self.service.write(self.vault_id, 'ref-001', self.write_key, b'commit-aaa')
+
+        stale_b64 = base64.b64encode(b'commit-old').decode()
+        new_b64   = base64.b64encode(b'commit-bbb').decode()
+
+        result = self.service.write_if_match(self.vault_id, 'ref-001',
+                                             stale_b64, new_b64, self.write_key)
+        assert result['status']  == 'conflict'
+        assert result['current'] == base64.b64encode(b'commit-aaa').decode()
+        assert self.service.read(self.vault_id, 'ref-001') == b'commit-aaa'      # Unchanged
+
+    def test__write_if_match__first_write_with_no_existing(self):
+        """CAS write to nonexistent file with match=None succeeds."""
+        new_b64 = base64.b64encode(b'first-commit').decode()
+
+        result = self.service.write_if_match(self.vault_id, 'ref-new',
+                                             None, new_b64, self.write_key)
+        assert result['status'] == 'ok'
+        assert self.service.read(self.vault_id, 'ref-new') == b'first-commit'
+
+    def test__write_if_match__conflict_when_file_exists_but_match_is_none(self):
+        """CAS write fails when file exists but match=None (expects no file)."""
+        self.service.write(self.vault_id, 'ref-001', self.write_key, b'existing')
+
+        new_b64 = base64.b64encode(b'overwrite').decode()
+        result  = self.service.write_if_match(self.vault_id, 'ref-001',
+                                              None, new_b64, self.write_key)
+        assert result['status'] == 'conflict'
+
+    def test__write_if_match__wrong_key_rejected(self):
+        """CAS write rejected when write key doesn't match vault."""
+        self.service.write(self.vault_id, 'ref-001', self.write_key, b'data')
+
+        result = self.service.write_if_match(self.vault_id, 'ref-001',
+                                             base64.b64encode(b'data').decode(),
+                                             base64.b64encode(b'new').decode(),
+                                             'wrong-key')
+        assert result is None
+
+    # === list_files ===
+
+    def test__list_files__empty_vault(self):
+        result = self.service.list_files(self.vault_id)
+        assert result['vault_id'] == self.vault_id
+        assert result['prefix']   == ''
+        assert result['files']    == []
+
+    def test__list_files__returns_file_ids(self):
+        self.service.write(self.vault_id, 'bare/data/obj-aaa', self.write_key, b'blob-a')
+        self.service.write(self.vault_id, 'bare/data/obj-bbb', self.write_key, b'blob-b')
+        self.service.write(self.vault_id, 'bare/refs/ref-001', self.write_key, b'ref-data')
+
+        result = self.service.list_files(self.vault_id)
+        files  = sorted(result['files'])
+        assert 'bare/data/obj-aaa' in files
+        assert 'bare/data/obj-bbb' in files
+        assert 'bare/refs/ref-001' in files
+        assert len(files) == 3
+
+    def test__list_files__with_prefix(self):
+        self.service.write(self.vault_id, 'bare/data/obj-aaa', self.write_key, b'blob')
+        self.service.write(self.vault_id, 'bare/refs/ref-001', self.write_key, b'ref')
+        self.service.write(self.vault_id, 'bare/keys/key-001', self.write_key, b'key')
+
+        result = self.service.list_files(self.vault_id, prefix='bare/data/')
+        assert result['files'] == ['bare/data/obj-aaa']
+
+        result = self.service.list_files(self.vault_id, prefix='bare/refs/')
+        assert result['files'] == ['bare/refs/ref-001']
+
+    def test__list_files__no_matches(self):
+        self.service.write(self.vault_id, 'bare/data/obj-aaa', self.write_key, b'blob')
+        result = self.service.list_files(self.vault_id, prefix='bare/pending/')
+        assert result['files'] == []
+
+    def test__list_files__excludes_manifest(self):
+        self.service.write(self.vault_id, 'some-file', self.write_key, b'data')
+        result = self.service.list_files(self.vault_id)
+        assert 'manifest.json' not in result['files']
+
+    def test__list_files__vault_isolation(self):
+        self.service.write('vault-a', 'file-1', self.write_key, b'a')
+        self.service.write('vault-b', 'file-1', self.write_key, b'b')
+        result = self.service.list_files('vault-a')
+        assert result['files'] == ['file-1']
+
+    # === batch ===
+
+    def test__batch__write_multiple(self):
+        operations = [
+            dict(op='write', file_id='bare/data/obj-aaa', data=base64.b64encode(b'blob-a').decode()),
+            dict(op='write', file_id='bare/data/obj-bbb', data=base64.b64encode(b'blob-b').decode()),
+            dict(op='write', file_id='bare/refs/ref-001', data=base64.b64encode(b'ref-data').decode()),
+        ]
+        result = self.service.batch(self.vault_id, operations, self.write_key)
+        assert result is not None
+        assert result['vault_id'] == self.vault_id
+        assert len(result['results']) == 3
+        assert all(r['status'] == 'ok' for r in result['results'])
+
+        # Verify data was written
+        assert self.service.read(self.vault_id, 'bare/data/obj-aaa') == b'blob-a'
+        assert self.service.read(self.vault_id, 'bare/data/obj-bbb') == b'blob-b'
+        assert self.service.read(self.vault_id, 'bare/refs/ref-001') == b'ref-data'
+
+    def test__batch__write_if_match_success(self):
+        """Batch with write-if-match succeeds when ref matches."""
+        self.service.write(self.vault_id, 'bare/refs/ref-001', self.write_key, b'commit-aaa')
+
+        operations = [
+            dict(op='write', file_id='bare/data/obj-new', data=base64.b64encode(b'new-blob').decode()),
+            dict(op='write-if-match', file_id='bare/refs/ref-001',
+                 match=base64.b64encode(b'commit-aaa').decode(),
+                 data=base64.b64encode(b'commit-bbb').decode()),
+        ]
+        result = self.service.batch(self.vault_id, operations, self.write_key)
+        assert len(result['results']) == 2
+        assert result['results'][0]['status'] == 'ok'
+        assert result['results'][1]['status'] == 'ok'
+        assert self.service.read(self.vault_id, 'bare/refs/ref-001') == b'commit-bbb'
+
+    def test__batch__write_if_match_conflict_stops(self):
+        """Batch stops on write-if-match conflict — subsequent ops not executed."""
+        self.service.write(self.vault_id, 'bare/refs/ref-001', self.write_key, b'commit-aaa')
+
+        operations = [
+            dict(op='write', file_id='bare/data/obj-1', data=base64.b64encode(b'blob-1').decode()),
+            dict(op='write-if-match', file_id='bare/refs/ref-001',
+                 match=base64.b64encode(b'wrong-commit').decode(),
+                 data=base64.b64encode(b'commit-bbb').decode()),
+            dict(op='write', file_id='bare/data/obj-2', data=base64.b64encode(b'blob-2').decode()),
+        ]
+        result = self.service.batch(self.vault_id, operations, self.write_key)
+        assert len(result['results']) == 2                                       # Third op not executed
+        assert result['results'][0]['status'] == 'ok'                            # First write succeeded
+        assert result['results'][1]['status'] == 'conflict'                      # CAS failed
+        assert self.service.read(self.vault_id, 'bare/data/obj-1') == b'blob-1' # First op committed
+        assert self.service.read(self.vault_id, 'bare/data/obj-2') is None      # Third op skipped
+        assert self.service.read(self.vault_id, 'bare/refs/ref-001') == b'commit-aaa'  # Ref unchanged
+
+    def test__batch__delete(self):
+        self.service.write(self.vault_id, 'bare/data/obj-old', self.write_key, b'old-blob')
+        operations = [
+            dict(op='delete', file_id='bare/data/obj-old'),
+        ]
+        result = self.service.batch(self.vault_id, operations, self.write_key)
+        assert result['results'][0]['status'] == 'ok'
+        assert self.service.read(self.vault_id, 'bare/data/obj-old') is None
+
+    def test__batch__wrong_key_rejected(self):
+        """Batch rejected when vault manifest exists with different write key."""
+        self.service.write(self.vault_id, 'setup', self.write_key, b'setup')     # Create manifest with correct key
+        operations = [dict(op='write', file_id='file-1', data=base64.b64encode(b'data').decode())]
+        result = self.service.batch(self.vault_id, operations, 'wrong-key')
+        assert result is None
+
+    def test__batch__mixed_operations(self):
+        """Full push simulation: write blobs + trees + commit, then CAS the ref."""
+        operations = [
+            dict(op='write', file_id='bare/data/obj-blob1', data=base64.b64encode(b'file-content').decode()),
+            dict(op='write', file_id='bare/data/obj-tree1', data=base64.b64encode(b'tree-data').decode()),
+            dict(op='write', file_id='bare/data/obj-commit1', data=base64.b64encode(b'commit-data').decode()),
+            dict(op='write-if-match', file_id='bare/refs/ref-current',
+                 match=None,                                                     # No existing ref (first push)
+                 data=base64.b64encode(b'obj-commit1').decode()),
+        ]
+        result = self.service.batch(self.vault_id, operations, self.write_key)
+        assert len(result['results']) == 4
+        assert all(r['status'] == 'ok' for r in result['results'])
+        assert self.service.read(self.vault_id, 'bare/refs/ref-current') == b'obj-commit1'
+
+    def test__batch__delete_not_found(self):
+        """Deleting a nonexistent file in batch returns not_found (not an error)."""
+        self.service.write(self.vault_id, 'setup', self.write_key, b'setup')     # Create manifest
+        operations = [dict(op='delete', file_id='bare/data/ghost')]
+        result = self.service.batch(self.vault_id, operations, self.write_key)
+        assert result['results'][0]['status'] == 'not_found'
