@@ -1,7 +1,12 @@
 name: Deploy User UI to S3
 
-# Publishes v0.2.1 static UI files to S3 for CloudFront distribution.
+# Publishes v0.2.0 (base) + v0.2.1 (IFD overlay) static UI files to S3.
 # CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
+#
+# IFD deployment model:
+#   1. Deploy v0.2.0 base → releases/v0/v0.2/v0.2.0/ + overlay onto latest/
+#   2. Deploy v0.2.1 overlay → releases/v0/v0.2/v0.2.1/ + overlay onto latest/
+#   latest/ = union of v0.2.0 + v0.2.1 (overlay files win)
 #
 # Deploy is manifest-driven — manifest.json lists exactly what gets deployed:
 #   - source_folders: _common/, en-gb/, i18n/ (in git)
@@ -14,9 +19,10 @@ name: Deploy User UI to S3
 #   websites/sgraph-send/prod/   — production (manual dispatch)
 #
 # Steps:
-#   1. Generate i18n locale pages from en-gb/ templates + i18n/*.json
-#   2. Sync content (source + generated) to S3 under the environment prefix
-#   3. Invalidate CloudFront cache
+#   1. Generate i18n locale pages for v0.2.0 and v0.2.1
+#   2. Deploy v0.2.0 base to S3 (releases + latest overlay)
+#   3. Deploy v0.2.1 overlay to S3 (releases + latest overlay)
+#   4. Invalidate CloudFront cache
 #
 # Environments:
 #   - dev:        dev.send.sgraph.ai   (default — push to dev branch)
@@ -50,7 +56,7 @@ on:
           - dev
           - production
       rebuild_latest:
-        description: 'Rebuild latest/ from all releases (clean IFD overlay, removes stale files)'
+        description: 'Clean latest/ first, then deploy v0.2.0 + v0.2.1 from scratch (removes stale files)'
         required: false
         default: false
         type: boolean
@@ -60,10 +66,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION  : eu-west-2
-  UI_VERSION  : v0.2.1
-  # Source: only the v0.2.1 folder (excludes v0.1, assets, tools)
-  SOURCE_DIR  : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.1
+  AWS_REGION      : eu-west-2
+  UI_VERSION_BASE : v0.2.0
+  UI_VERSION      : v0.2.1
+  # IFD: base + overlay. Both get deployed in order.
+  SOURCE_DIR_BASE : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.0
+  SOURCE_DIR      : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.1
 
 jobs:
   deploy:
@@ -81,11 +89,15 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Inject build version into UI
-        run: python scripts/inject_build_version.py --version ${{ env.UI_VERSION }}
+      - name: Inject build version into UI (v0.2.0 base + v0.2.1 overlay)
+        run: |
+          python scripts/inject_build_version.py --version ${{ env.UI_VERSION_BASE }}
+          python scripts/inject_build_version.py --version ${{ env.UI_VERSION }}
 
-      - name: Generate i18n locale pages
-        run: python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION }}
+      - name: Generate i18n locale pages (v0.2.0 base + v0.2.1 overlay)
+        run: |
+          python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION_BASE }}
+          python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION }}
 
       - name: Check AWS credentials
         id: check-creds
@@ -123,23 +135,26 @@ jobs:
             echo "Deploying to DEV (dev.send.sgraph.ai) → S3: websites/sgraph-send/dev/"
           fi
 
-      - name: Rebuild latest/ from releases (if requested)
-        if: steps.check-creds.outputs.has-credentials == 'true' && inputs.rebuild_latest == true
+      - name: Deploy v0.2.0 base to S3
+        if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
+          # Deploy v0.2.0 base first. On rebuild, clean latest/ before overlaying.
+          CLEAN_FLAG=""
+          if [ "${{ inputs.rebuild_latest }}" == "true" ]; then
+            CLEAN_FLAG="--clean-latest"
+          fi
           python scripts/deploy_static_site.py \
             --site sgraph-send \
-            --version ${{ env.UI_VERSION }} \
-            --source-dir ${{ env.SOURCE_DIR }} \
+            --version ${{ env.UI_VERSION_BASE }} \
+            --source-dir ${{ env.SOURCE_DIR_BASE }} \
             --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
             --region ${{ env.AWS_REGION }} \
             --deploy-env ${{ steps.env.outputs.deploy_env }} \
-            --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} \
             --skip-validation \
-            --rebuild-latest \
-            --version-file sgraph_ai_app_send/version
+            $CLEAN_FLAG
 
-      - name: Deploy User UI to S3
-        if: steps.check-creds.outputs.has-credentials == 'true' && inputs.rebuild_latest != true
+      - name: Deploy v0.2.1 overlay to S3
+        if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
           python scripts/deploy_static_site.py \
             --site sgraph-send \
