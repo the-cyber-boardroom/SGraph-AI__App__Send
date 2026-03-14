@@ -14,7 +14,7 @@
 
 **Before describing, assessing, or assuming what SGraph Send can do, READ:**
 
-`team/roles/librarian/reality/v0.10.13__what-exists-today.md`
+`team/roles/librarian/reality/v0.13.34__what-exists-today.md`
 
 This is the **code-verified** record of every endpoint, UI page, test, and feature that actually exists. It was built by auditing source code, not briefs or reviews.
 
@@ -216,7 +216,7 @@ Each agent operates as a specific role. Roles produce review documents in their 
 **Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs, Villager briefs, and Town Planner briefs. **IMPORTANT: The `briefs/` folder is read-only for agents.** Only the human creates files there. Agent outputs go to `team/humans/dinis_cruz/claude-code-web/` or `team/roles/{role}/reviews/`.
 
 Before starting work, check:
-1. **Reality document** at `team/roles/librarian/reality/v0.10.13__what-exists-today.md` — what actually exists in code
+1. **Reality document** at `team/roles/librarian/reality/v0.13.34__what-exists-today.md` — what actually exists in code
 2. Latest human brief in `team/humans/dinis_cruz/briefs/`
 3. Latest debrief in `team/humans/dinis_cruz/debriefs/`
 4. Latest Librarian master index in `team/roles/librarian/reviews/`
@@ -248,7 +248,7 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 ## Current State (v0.6.36)
 
-**See `team/roles/librarian/reality/v0.10.13__what-exists-today.md` for the full code-verified picture.**
+**See `team/roles/librarian/reality/v0.13.34__what-exists-today.md` for the full code-verified picture.**
 
 **Summary:** 73 HTTP endpoints (18 User + 55 Admin), 6 User UI pages, 17 Admin components, 393 passing tests, MCP on both Lambdas, full encryption pipeline, data rooms, personal vaults, PKI, audit trails, token management, analytics.
 
@@ -263,7 +263,7 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 | Document | Location |
 |---|---|
-| **Reality document** | `team/roles/librarian/reality/v0.10.13__what-exists-today.md` |
+| **Reality document** | `team/roles/librarian/reality/v0.13.34__what-exists-today.md` |
 | Project brief | `library/docs/_to_process/01-project-brief.md` |
 | Specs index | `library/docs/specs/README.md` |
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
