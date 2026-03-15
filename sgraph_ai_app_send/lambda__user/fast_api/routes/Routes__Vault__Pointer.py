@@ -5,6 +5,7 @@
 
 import base64
 from fastapi                                                                     import HTTPException, Request, Response
+from osbot_fast_api.api.decorators.route_path                                    import route_path
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer
@@ -12,12 +13,12 @@ from sgraph_ai_app_send.lambda__user.user__config                               
 
 TAG__ROUTES_VAULT = 'api/vault'
 
-ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id}}'        ,
-                       f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}/{{file_id}}'         ,
-                       f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}/{{file_id}}'  ,
-                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id}}'       ,
-                       f'/{TAG__ROUTES_VAULT}/batch/{{vault_id}}'                    ,
-                       f'/{TAG__ROUTES_VAULT}/list/{{vault_id}}'                     ]
+ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id:path}}'        ,
+                       f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}/{{file_id:path}}'         ,
+                       f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}/{{file_id:path}}'  ,
+                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id:path}}'       ,
+                       f'/{TAG__ROUTES_VAULT}/batch/{{vault_id}}'                         ,
+                       f'/{TAG__ROUTES_VAULT}/list/{{vault_id}}'                          ]
 
 
 LAMBDA_BASE64_LIMIT = 3750000                                                    # ~3.75MB (base64 adds ~33%, must stay under Lambda 5MB response limit)
@@ -62,8 +63,9 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                                 detail      = 'Access token required')
         return provided_token
 
-    async def write__vault_id__file_id(self, vault_id : Safe_Str__Id,            # PUT /vault/{vault_id}/write/{file_id}
-                                             file_id  : Safe_Str__Id,
+    @route_path('/write/{vault_id}/{file_id:path}')
+    async def write__vault_id__file_id(self, vault_id : Safe_Str__Id,            # PUT /vault/{vault_id}/write/{file_id:path}
+                                             file_id  : str,
                                              request  : Request
                                        ) -> dict:
         self.check_access_token(request)
@@ -84,8 +86,9 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                                 detail      = 'Write key mismatch')
         return result
 
-    def read__vault_id__file_id(self, vault_id : Safe_Str__Id,                   # GET /vault/{vault_id}/read/{file_id}
-                                      file_id  : Safe_Str__Id
+    @route_path('/read/{vault_id}/{file_id:path}')
+    def read__vault_id__file_id(self, vault_id : Safe_Str__Id,                   # GET /vault/{vault_id}/read/{file_id:path}
+                                      file_id  : str
                                ) -> Response:
         payload = self.vault_service.read(vault_id = str(vault_id),
                                           file_id  = str(file_id) )
@@ -95,8 +98,9 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         return Response(content    = payload                    ,
                         media_type = 'application/octet-stream')
 
-    def read_base64__vault_id__file_id(self, vault_id : Safe_Str__Id,           # GET /vault/{vault_id}/read-base64/{file_id} — JSON-safe base64 read
-                                             file_id  : Safe_Str__Id
+    @route_path('/read-base64/{vault_id}/{file_id:path}')
+    def read_base64__vault_id__file_id(self, vault_id : Safe_Str__Id,           # GET /vault/{vault_id}/read-base64/{file_id:path} — JSON-safe base64 read
+                                             file_id  : str
                                        ) -> dict:
         payload = self.vault_service.read(vault_id = str(vault_id),
                                           file_id  = str(file_id) )
@@ -111,8 +115,9 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                     data     = base64.b64encode(payload).decode('ascii'),
                     size     = len(payload)                           )
 
-    async def delete__vault_id__file_id(self, vault_id : Safe_Str__Id,           # DELETE /vault/{vault_id}/file/{file_id}
-                                              file_id  : Safe_Str__Id,
+    @route_path('/delete/{vault_id}/{file_id:path}')
+    async def delete__vault_id__file_id(self, vault_id : Safe_Str__Id,           # DELETE /vault/{vault_id}/delete/{file_id:path}
+                                              file_id  : str,
                                               request  : Request
                                         ) -> dict:
         self.check_access_token(request)
