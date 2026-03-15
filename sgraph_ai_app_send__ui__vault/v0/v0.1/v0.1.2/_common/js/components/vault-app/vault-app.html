@@ -1,0 +1,39 @@
+<div class="vault-app">
+
+    <!-- Header -->
+    <header class="vault-app__header">
+        <div class="vault-app__brand">
+            <span class="sg-brand-logo">
+                <span class="sg-brand-logo__sg">SG</span><span class="sg-brand-logo__slash">/</span><span class="sg-brand-logo__product">Vault</span>
+            </span>
+            <span class="vault-app__vault-name" id="vault-name"></span>
+        </div>
+        <div class="vault-app__header-actions">
+            <button class="btn btn-secondary btn-sm" id="share-toggle" hidden>Key</button>
+            <button class="btn btn-secondary btn-sm" id="lock-btn" hidden>Lock</button>
+        </div>
+    </header>
+
+    <!-- Views -->
+    <div class="vault-app__view" id="view-entry">
+        <vault-entry id="entry"></vault-entry>
+    </div>
+
+    <div class="vault-app__view" id="view-browser" hidden>
+        <div class="card vault-app__browser-card">
+            <vault-browser id="browser"></vault-browser>
+            <vault-share id="share"></vault-share>
+        </div>
+
+        <!-- Upload panel (shown on demand) -->
+        <div class="card vault-app__upload-card" id="upload-panel" hidden>
+            <vault-upload id="uploader"></vault-upload>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="vault-app__footer">
+        <span>Powered by <a href="https://sgraph.ai" target="_blank" rel="noopener">SGraph</a></span>
+    </footer>
+
+</div>

@@ -1,0 +1,110 @@
+:host {
+    display: block;
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.vault-entry {
+    text-align: center;
+    padding: var(--space-8, 32px) var(--space-6, 24px);
+}
+
+.vault-entry__logo {
+    margin-bottom: var(--space-8, 32px);
+}
+
+.sg-brand-logo {
+    font-family: var(--font-display, system-ui);
+    font-size: var(--text-display, 2.5rem);
+    font-weight: var(--weight-bold, 700);
+    letter-spacing: -0.02em;
+}
+
+.sg-brand-logo__sg    { color: var(--accent, #4ECDC4); }
+.sg-brand-logo__slash { color: var(--color-text-secondary, #8892A0); margin: 0 2px; }
+.sg-brand-logo__product { color: var(--color-text, #E0E0E0); }
+
+.vault-entry__tagline {
+    color: var(--color-text-secondary, #8892A0);
+    font-size: var(--text-sm, 0.875rem);
+    margin-top: var(--space-2, 8px);
+}
+
+.vault-entry__section {
+    text-align: left;
+}
+
+.vault-entry__label {
+    display: block;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text-secondary, #8892A0);
+    margin-bottom: var(--space-2, 8px);
+}
+
+.vault-entry__input {
+    margin-bottom: var(--space-3, 12px);
+}
+
+.vault-entry__btn {
+    width: 100%;
+    margin-top: var(--space-2, 8px);
+}
+
+.vault-entry__divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 12px);
+    margin: var(--space-6, 24px) 0;
+    color: var(--color-text-secondary, #8892A0);
+    font-size: var(--text-sm, 0.875rem);
+}
+
+.vault-entry__divider::before,
+.vault-entry__divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--color-border, rgba(78, 205, 196, 0.15));
+}
+
+.vault-entry__create-form {
+    text-align: left;
+    margin-top: var(--space-4, 16px);
+}
+
+.vault-entry__create-form .input {
+    margin-bottom: var(--space-3, 12px);
+}
+
+.vault-entry__status {
+    margin-top: var(--space-4, 16px);
+    padding: var(--space-3, 12px);
+    border-radius: var(--radius-sm, 6px);
+    background: rgba(78, 205, 196, 0.08);
+    color: var(--accent, #4ECDC4);
+    font-size: var(--text-sm, 0.875rem);
+}
+
+.vault-entry__error {
+    margin-top: var(--space-4, 16px);
+}
+
+.vault-entry__access {
+    margin-bottom: var(--space-6, 24px);
+    padding-bottom: var(--space-6, 24px);
+    border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+}
+
+.vault-entry__hint {
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    margin-top: var(--space-1, 4px);
+}
+
+.vault-entry__optional {
+    font-weight: 400;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.8;
+}

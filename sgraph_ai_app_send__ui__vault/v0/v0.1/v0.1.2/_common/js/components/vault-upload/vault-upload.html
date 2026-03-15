@@ -1,0 +1,21 @@
+<div class="vault-upload">
+
+    <div class="vault-upload__header">
+        <h3 class="vault-upload__title" data-i18n="vault.upload.select">Select files or drag & drop</h3>
+    </div>
+
+    <div class="vault-upload__drop-zone" id="drop-area">
+        <input type="file" id="file-input" multiple hidden>
+        <p>Drop files here or <a id="browse-link">browse</a></p>
+    </div>
+
+    <div class="vault-upload__queue" id="upload-queue"></div>
+
+    <div class="vault-upload__progress" id="progress-area" hidden>
+        <div class="progress-bar">
+            <div class="progress-bar__fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+        <span class="vault-upload__stage" id="progress-label"></span>
+    </div>
+
+</div>
