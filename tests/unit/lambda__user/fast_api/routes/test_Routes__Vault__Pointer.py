@@ -385,3 +385,47 @@ class test_Routes__Vault__Pointer(TestCase):
         response = unauthenticated.get(f'/api/vault/list/{vault}')
         assert response.status_code == 200
         assert 'bare/data/obj-xxx' in response.json()['files']
+
+    # === Slashed file_id via individual endpoints (path converter) ===
+
+    def test__write_read_delete__slashed_file_id(self):
+        """Individual PUT/GET/DELETE endpoints support slashed file_ids via :path converter."""
+        vault   = 'slash-vault-1'
+        file_id = 'bare/data/obj-abc123'
+        payload = b'content-addressed-blob'
+
+        # Write via individual PUT
+        response = self._write(vault_id=vault, file_id=file_id, payload=payload)
+        assert response.status_code == 200
+        assert response.json()['file_id'] == file_id
+
+        # Read via individual GET
+        response = self._read(vault_id=vault, file_id=file_id)
+        assert response.status_code == 200
+        assert response.content     == payload
+
+        # Read base64 via individual GET
+        response = self._read_base64(vault_id=vault, file_id=file_id)
+        assert response.status_code == 200
+        assert response.json()['file_id'] == file_id
+
+        # Delete via individual DELETE
+        response = self._delete(vault_id=vault, file_id=file_id)
+        assert response.status_code == 200
+
+        # Confirm deleted
+        response = self._read(vault_id=vault, file_id=file_id)
+        assert response.status_code == 404
+
+    def test__write_read__deeply_nested_file_id(self):
+        """File IDs with multiple slashes (e.g. bare/refs/heads/main) work."""
+        vault   = 'slash-vault-2'
+        file_id = 'bare/refs/heads/main'
+        payload = b'commit-hash-ref'
+
+        response = self._write(vault_id=vault, file_id=file_id, payload=payload)
+        assert response.status_code == 200
+
+        response = self._read(vault_id=vault, file_id=file_id)
+        assert response.status_code == 200
+        assert response.content == payload
