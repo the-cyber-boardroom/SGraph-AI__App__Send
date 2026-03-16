@@ -27,6 +27,13 @@ body.v022-viewport-lock > main {
     flex-direction: column;
 }
 
+body.v022-viewport-lock > main > send-download {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 body.v022-viewport-lock > send-footer {
     flex-shrink: 0;
 }
@@ -126,25 +133,23 @@ body.v022-viewport-lock .card {
     font-weight: 500;
 }
 
-/* ─── Main content area — fills remaining space via absolute positioning ── */
+/* ─── Main content area — fills remaining space ──────────────────────── */
 
 .v022-main-content {
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
-/* ─── Two-column split — fills parent absolutely ─────────────────────── */
+/* ─── Two-column split ───────────────────────────────────────────────── */
 
 .v022-split {
     display: grid;
     gap: 0;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    flex: 1;
+    min-height: 0;
 }
 
 /* ─── Right column: command strip + tabs + preview stacked vertically ── */
