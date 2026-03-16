@@ -130,7 +130,7 @@ class VaultEntry extends VaultComponent {
     }
 
     _getSGSend() {
-        const endpoint = this.getAttribute('data-endpoint') || 'https://send.sgraph.ai'
+        const endpoint = this.getAttribute('data-endpoint') || 'https://dev.send.sgraph.ai'
         const token    = this._accessKeyInput.value.trim()
                       || this.getAttribute('data-token')
                       || ''
