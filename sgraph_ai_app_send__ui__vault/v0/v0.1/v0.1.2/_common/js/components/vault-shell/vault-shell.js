@@ -112,9 +112,9 @@
             if (!el) return;
             const build = window.SGRAPH_BUILD;
             if (build) {
-                el.textContent = `${build.appVersion}  ·  UI ${build.uiVersion}`;
+                el.textContent = `${build.appVersion}  ·  UI ${build.uiVersion} (IFD)`;
             } else {
-                const uiVersion = 'v0.1.2';
+                const uiVersion = 'v0.1.2 (IFD)';
                 el.textContent = this._appVersion
                     ? `${uiVersion} / ${this._appVersion}`
                     : uiVersion;

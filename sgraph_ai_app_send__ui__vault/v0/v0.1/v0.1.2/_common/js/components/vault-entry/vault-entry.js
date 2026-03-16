@@ -45,10 +45,10 @@ class VaultEntry extends VaultComponent {
     _renderVersion() {
         const el = this.$('#vault-entry-version')
         if (!el) return
-        const uiVersion = 'v0.1.2'
+        const uiVersion = 'v0.1.2 (IFD)'
         const build     = window.SGRAPH_BUILD
         el.textContent  = build
-            ? `${build.appVersion}  ·  UI ${build.uiVersion}`
+            ? `${build.appVersion}  ·  UI ${build.uiVersion} (IFD)`
             : `UI ${uiVersion}`
     }
 
