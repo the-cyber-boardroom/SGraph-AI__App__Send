@@ -126,25 +126,25 @@ body.v022-viewport-lock .card {
     font-weight: 500;
 }
 
-/* ─── Main content area — fills remaining space ──────────────────────── */
+/* ─── Main content area — fills remaining space via absolute positioning ── */
 
 .v022-main-content {
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    position: relative;
 }
 
-/* ─── Two-column split ───────────────────────────────────────────────── */
+/* ─── Two-column split — fills parent absolutely ─────────────────────── */
 
 .v022-split {
     display: grid;
     gap: 0;
-    height: 100%;
-}
-
-.v022-main-content .v022-split {
-    height: 100% !important;
-    min-height: 0 !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 /* ─── Right column: command strip + tabs + preview stacked vertically ── */
