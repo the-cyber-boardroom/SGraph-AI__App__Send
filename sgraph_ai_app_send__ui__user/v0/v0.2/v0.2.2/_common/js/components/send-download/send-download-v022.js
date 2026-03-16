@@ -509,7 +509,7 @@ SendDownload.prototype._downloadEncryptedPayload = async function() {
 
     // 2. Try direct download (may fail with 413 for large files on Lambda)
     try {
-        const res = await fetch(`/api/transfers/download/${this.transferId}`, {
+        const res = await ApiClient._fetch(`/api/transfers/download/${this.transferId}`, {
             headers: ApiClient._authHeaders()
         });
         if (res.ok) return res.arrayBuffer();
@@ -537,5 +537,18 @@ SendDownload.prototype.cleanup = function() {
     document.body.classList.remove('v022-viewport-lock');
     _v021_cleanup.call(this);
 };
+
+// ─── Re-render already-upgraded elements ─────────────────────────────────────
+// When scripts load after the DOM, customElements.define() upgrades <send-download>
+// synchronously with v0.2.0's prototype. By the time v0.2.2 patches the prototype,
+// the element has already rendered. If it rendered an error (e.g. no transfer ID),
+// re-render now so the v0.2.2 manual entry form appears instead of the plain error.
+
+document.querySelectorAll('send-download').forEach(el => {
+    if (el.state === 'error' && !el.transferId) {
+        el.render();
+        el.setupEventListeners();
+    }
+});
 
 })();
