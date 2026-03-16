@@ -115,7 +115,7 @@ class VaultEntry extends VaultComponent {
         try {
             const sgSend = this._getSGSend()
             const vault  = await SGVault.create(sgSend, passphrase, { name })
-            const vaultKey = vault.getVaultKey(passphrase)
+            const vaultKey = vault.getVaultKey()
 
             // Update URL hash
             window.history.replaceState(null, '', '#' + encodeURIComponent(vaultKey))
