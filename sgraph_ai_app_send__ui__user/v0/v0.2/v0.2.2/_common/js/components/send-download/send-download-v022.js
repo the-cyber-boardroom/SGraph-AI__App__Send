@@ -6,7 +6,7 @@
      - Viewport-locked layout (no page scroll on download page)
      - Manual transfer ID + key entry form when no ID in URL
      - Compact header: single-line status + file info merged
-     - Command strip + tabs ABOVE the document view area
+     - Two-column layout: tree view (left) | actions + tabs + preview (right)
      - Tab system for multiple open documents (like terminal tabs)
      - Share tab auto-opens on load
      - Deduplicated Save Zip (command strip only, no header button)
@@ -69,14 +69,12 @@ SendDownload.prototype._v022_closeTab = function(tabId) {
     this._tabs.splice(idx, 1);
 
     if (this._activeTabId === tabId) {
-        // Activate the previous tab, or the first, or none
         if (this._tabs.length > 0) {
             const newIdx = Math.min(idx, this._tabs.length - 1);
             this._activeTabId = this._tabs[newIdx].id;
             this._v022_showActiveTabContent();
         } else {
             this._activeTabId = null;
-            // Show default preview
             const preview = this.querySelector('#preview-panel');
             if (preview) {
                 const maxBtn = '<button id="maximise-btn" class="zip-maximise-btn" title="Toggle maximise">&#x26F6;</button>';
@@ -98,7 +96,6 @@ SendDownload.prototype._v022_showActiveTabContent = function() {
     if (!tab) return;
 
     if (tab.type === 'file') {
-        // Re-preview this file
         this._v022_previewingViaTab = true;
         _v021_previewZipEntry.call(this, tab.path);
         this._v022_previewingViaTab = false;
@@ -107,7 +104,7 @@ SendDownload.prototype._v022_showActiveTabContent = function() {
         if (preview) {
             const maxBtn = '<button id="maximise-btn" class="zip-maximise-btn" title="Toggle maximise">&#x26F6;</button>';
             const shareHtml = this._renderSharePanel ? this._renderSharePanel() : '';
-            preview.innerHTML = maxBtn + `<div style="padding: var(--space-6); overflow: auto; height: 100%;">${shareHtml}</div>`;
+            preview.innerHTML = maxBtn + `<div style="padding: var(--space-4); overflow: auto; height: 100%;">${shareHtml}</div>`;
             const newMaxBtn = preview.querySelector('#maximise-btn');
             if (newMaxBtn) newMaxBtn.addEventListener('click', () => this._toggleMaximise());
             this._v022_wireShareCopyButtons();
@@ -116,10 +113,9 @@ SendDownload.prototype._v022_showActiveTabContent = function() {
         const preview = this.querySelector('#preview-panel');
         if (preview) {
             const maxBtn = '<button id="maximise-btn" class="zip-maximise-btn" title="Toggle maximise">&#x26F6;</button>';
-            preview.innerHTML = maxBtn + `<div style="padding: var(--space-6); overflow: auto; height: 100%;"><send-transparency id="transparency-panel"></send-transparency></div>`;
+            preview.innerHTML = maxBtn + `<div style="padding: var(--space-4); overflow: auto; height: 100%;"><send-transparency id="transparency-panel"></send-transparency></div>`;
             const newMaxBtn = preview.querySelector('#maximise-btn');
             if (newMaxBtn) newMaxBtn.addEventListener('click', () => this._toggleMaximise());
-            // Populate transparency data
             const tp = preview.querySelector('#transparency-panel');
             if (tp && tp.setTransferInfo && this.transferInfo) {
                 tp.setTransferInfo(this.transferInfo);
@@ -145,7 +141,6 @@ SendDownload.prototype._v022_renderTabs = function() {
 
     tabBar.innerHTML = html;
 
-    // Wire tab click handlers
     tabBar.querySelectorAll('.v022-tab').forEach(el => {
         const tabId = el.dataset.tabId;
         el.querySelector('.v022-tab__label').addEventListener('click', () => this._v022_activateTab(tabId));
@@ -201,7 +196,6 @@ SendDownload.prototype._v022_updateCommandStrip = function() {
 SendDownload.prototype.renderError = function() {
     if (this.state !== 'error' || !this.errorMessage) return '';
 
-    // Check if this is the "no transfer ID" error — offer manual entry
     const isNoId = !this.transferId;
     if (isNoId) {
         return `
@@ -237,7 +231,6 @@ SendDownload.prototype.renderError = function() {
         `;
     }
 
-    // For other errors, use the original
     return _v021_renderError.call(this);
 };
 
@@ -246,10 +239,8 @@ SendDownload.prototype.renderError = function() {
 SendDownload.prototype.render = function() {
     _v021_render.call(this);
 
-    // Only apply viewport lock when showing zip layout
     if (this.state === 'complete' && this._zipTree) {
         document.body.classList.add('v022-viewport-lock');
-        // Hide page-level actions/disclaimer — they're replaced by command strip
         const actions    = document.getElementById('download-actions');
         const disclaimer = document.getElementById('download-disclaimer');
         if (actions)    actions.style.display    = 'none';
@@ -259,7 +250,7 @@ SendDownload.prototype.render = function() {
     }
 };
 
-// ─── Override: _renderZipLayout — viewport-locked with tabs + command strip ──
+// ─── Override: _renderZipLayout — two-column: tree | actions+tabs+preview ────
 
 SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) {
     this._v022_initTabs();
@@ -277,16 +268,38 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
     const previewHtml     = this._renderZipPreview();
     const savedWidth      = this._loadSplitWidth();
 
-    // Breadcrumb trail
     const breadcrumbHtml = this._renderBreadcrumb(currentFolder);
 
-    // Progress indicator
     const selectedIndex = this._selectedZipPath
         ? allFiles.findIndex(f => f.path === this._selectedZipPath) + 1
         : 0;
     const progressHtml = selectedIndex > 0
         ? `<div class="zip-progress">${selectedIndex} of ${allFiles.length} files</div>`
         : '';
+
+    // Command strip HTML (rendered inside the right column)
+    const commandStripHtml = `
+        <div class="v022-command-strip">
+            <div class="v022-command-strip__left">
+                <button class="btn btn-sm btn-primary" id="v022-cmd-save-zip" title="Download the full zip file">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12v2h12v-2M8 2v8M5 7l3 3 3-3"/></svg>
+                    Save Zip
+                </button>
+                <button class="btn btn-sm btn-secondary" id="v022-cmd-save-file" disabled title="Select a file to save">
+                    Save File
+                </button>
+                <span class="v022-command-strip__divider"></span>
+                <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">Edit</button>
+                <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">Rename</button>
+                <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">Delete</button>
+            </div>
+            <div class="v022-command-strip__right">
+                <button class="btn btn-sm btn-secondary" id="v022-cmd-share" title="Show share link">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 9l4 2M6 7l4-2"/></svg>
+                    Share
+                </button>
+            </div>
+        </div>`;
 
     return `
         <div class="v022-layout">
@@ -303,42 +316,8 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
                 </div>
             </div>
 
-            <div class="v022-command-strip">
-                <div class="v022-command-strip__left">
-                    <button class="btn btn-sm btn-primary" id="v022-cmd-save-zip" title="Download the full zip file">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12v2h12v-2M8 2v8M5 7l3 3 3-3"/></svg>
-                        Save Zip
-                    </button>
-                    <button class="btn btn-sm btn-secondary" id="v022-cmd-save-file" disabled title="Select a file to save">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1h6l4 4v10H4V1z"/><path d="M10 1v4h4"/></svg>
-                        Save File
-                    </button>
-                    <span class="v022-command-strip__divider"></span>
-                    <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13l9-9M12 4l-1.5-1.5"/></svg>
-                        Edit
-                    </button>
-                    <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h8M4 8h5M4 12h8"/></svg>
-                        Rename
-                    </button>
-                    <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h10M5 5V3h6v2M6 8v4M10 8v4"/></svg>
-                        Delete
-                    </button>
-                </div>
-                <div class="v022-command-strip__right">
-                    <button class="btn btn-sm btn-secondary" id="v022-cmd-share" title="Show share link">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 9l4 2M6 7l4-2"/></svg>
-                        Share
-                    </button>
-                </div>
-            </div>
-
-            <div class="v022-tab-bar" id="v022-tab-bar"></div>
-
             <div class="v022-main-content">
-                <div id="preview-split" style="display: grid; grid-template-columns: ${savedWidth}px 4px 1fr; gap: 0; height: 100%;">
+                <div id="preview-split" class="v022-split" style="grid-template-columns: ${savedWidth}px 4px 1fr;">
                     <div id="details-panel" class="zip-left-rail">
                         <div class="zip-left-rail__folders" id="zip-folder-tree">
                             ${folderTreeHtml}
@@ -351,9 +330,13 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
                         ${progressHtml}
                     </div>
                     <div id="split-resize" style="cursor: col-resize; background: transparent; transition: background 0.15s; z-index: 10; border-radius: 2px;"></div>
-                    <div id="preview-panel" class="zip-preview zip-preview--split" style="min-height: 0;">
-                        <button id="maximise-btn" class="zip-maximise-btn" title="Toggle maximise">&#x26F6;</button>
-                        ${previewHtml}
+                    <div class="v022-right-column">
+                        ${commandStripHtml}
+                        <div class="v022-tab-bar" id="v022-tab-bar"></div>
+                        <div id="preview-panel" class="zip-preview zip-preview--split" style="min-height: 0;">
+                            <button id="maximise-btn" class="zip-maximise-btn" title="Toggle maximise">&#x26F6;</button>
+                            ${previewHtml}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -373,7 +356,6 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
 SendDownload.prototype._previewZipEntry = async function(path) {
     this._v022_initTabs();
 
-    // Create/activate a tab for this file (unless we're being called from tab switch)
     if (!this._v022_previewingViaTab) {
         const entry = this._zipTree.find(e => e.path === path && !e.dir);
         if (entry) {
@@ -381,10 +363,7 @@ SendDownload.prototype._previewZipEntry = async function(path) {
         }
     }
 
-    // Call v0.2.1's preview logic
     await _v021_previewZipEntry.call(this, path);
-
-    // Update command strip state
     this._v022_updateCommandStrip();
 };
 
@@ -408,10 +387,8 @@ SendDownload.prototype.setupEventListeners = function() {
                 return;
             }
 
-            // Parse: could be a full URL or just "fileId/key"
             let fileId = null, key = null;
             try {
-                // Try parsing as URL first
                 if (raw.startsWith('http')) {
                     const url = new URL(raw);
                     const hash = url.hash.substring(1);
@@ -423,9 +400,7 @@ SendDownload.prototype.setupEventListeners = function() {
                 }
             } catch(_) {}
 
-            // If not a URL, try "fileId/key" format
             if (!fileId) {
-                // Strip any leading # or /
                 raw = raw.replace(/^[#/]+/, '');
                 const slashIdx = raw.indexOf('/');
                 if (slashIdx > 0) {
@@ -441,7 +416,6 @@ SendDownload.prototype.setupEventListeners = function() {
                 return;
             }
 
-            // Build the download URL and navigate
             const token = tokenInput ? tokenInput.value.trim() : '';
             let newUrl = `${window.location.origin}${window.location.pathname}`;
             if (token) newUrl += `?token=${encodeURIComponent(token)}`;
@@ -451,16 +425,12 @@ SendDownload.prototype.setupEventListeners = function() {
         };
 
         manualGoBtn.addEventListener('click', handleManualGo);
-
-        // Also handle Enter key in inputs
         const linkInput = this.querySelector('#v022-manual-link');
         const tokenInput = this.querySelector('#v022-manual-token');
         if (linkInput)  linkInput.addEventListener('keydown',  (e) => { if (e.key === 'Enter') handleManualGo(); });
         if (tokenInput) tokenInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleManualGo(); });
-
-        // Focus the link input
         if (linkInput) linkInput.focus();
-        return; // Don't wire zip-specific listeners
+        return;
     }
 
     if (this.state !== 'complete' || !this._zipTree) return;
@@ -469,7 +439,6 @@ SendDownload.prototype.setupEventListeners = function() {
     const saveZipBtn = this.querySelector('#v022-cmd-save-zip');
     if (saveZipBtn) {
         saveZipBtn.addEventListener('click', () => {
-            // Trigger the hidden save-file-btn's logic directly
             if (this._zipOrigBytes) {
                 const blob = new Blob([this._zipOrigBytes], { type: 'application/zip' });
                 const url  = URL.createObjectURL(blob);
@@ -501,7 +470,6 @@ SendDownload.prototype.setupEventListeners = function() {
     }
 
     // ─── Remove injected share panel from below the viewer ─────────────
-    // (v0.2.1 injects it — we move it into a tab instead)
     const injectedShare = this.querySelector('.share-panel');
     if (injectedShare) injectedShare.remove();
 
@@ -511,14 +479,12 @@ SendDownload.prototype.setupEventListeners = function() {
 
     // ─── Auto-open Share tab + first file tab on load ───────────────────
     if (this._tabs.length === 0) {
-        // Open first file in a tab
         if (this._selectedZipPath) {
             const entry = this._zipTree.find(e => e.path === this._selectedZipPath && !e.dir);
             if (entry) {
                 this._v022_createTab(entry.name, this._selectedZipPath, 'file');
             }
         }
-        // Auto-open Share tab
         this._v022_createTab('Share', '__share__', 'share');
     }
 };
