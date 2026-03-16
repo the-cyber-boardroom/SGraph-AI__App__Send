@@ -417,6 +417,25 @@ class test_Routes__Vault__Pointer(TestCase):
         response = self._read(vault_id=vault, file_id=file_id)
         assert response.status_code == 404
 
+    def test__read__missing_file_id__returns_400(self):
+        """GET /api/vault/read/{vault_id} (no file_id) returns 400, not a redirect loop."""
+        response = self.client.get('/api/vault/read/98a3heec')
+        assert response.status_code == 400
+        assert 'file_id' in response.json()['detail'].lower()
+
+    def test__write__missing_file_id__returns_400(self):
+        """PUT /api/vault/write/{vault_id} (no file_id) returns 400."""
+        response = self.client.put('/api/vault/write/98a3heec',
+                                   content = b'data',
+                                   headers = {'x-sgraph-vault-write-key': 'key'})
+        assert response.status_code == 400
+
+    def test__delete__missing_file_id__returns_400(self):
+        """DELETE /api/vault/delete/{vault_id} (no file_id) returns 400."""
+        response = self.client.delete('/api/vault/delete/98a3heec',
+                                      headers = {'x-sgraph-vault-write-key': 'key'})
+        assert response.status_code == 400
+
     def test__write_read__deeply_nested_file_id(self):
         """File IDs with multiple slashes (e.g. bare/refs/heads/main) work."""
         vault   = 'slash-vault-2'
