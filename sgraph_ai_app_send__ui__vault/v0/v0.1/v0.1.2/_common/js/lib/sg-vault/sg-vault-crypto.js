@@ -35,8 +35,8 @@ class SGVaultCrypto {
         if (!passphrase) {
             throw new Error('Passphrase cannot be empty')
         }
-        if (!/^[0-9a-f]{8}$/.test(vaultId)) {
-            throw new Error('vault_id must be 8 hex characters')
+        if (!/^[a-z0-9]{8}$/.test(vaultId)) {
+            throw new Error('vault_id must be 8 lowercase alphanumeric characters')
         }
         return { passphrase, vaultId }
     }
