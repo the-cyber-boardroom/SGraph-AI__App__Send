@@ -3,13 +3,7 @@
    v0.2.2 — Surgical CSS overrides on v0.2.1 + v0.2.0
    Loads AFTER v0.2.1 CSS — later selectors win via cascade.
 
-   Changes:
-     - Viewport-locked body (no scroll on download page)
-     - Compact single-line header (file info + status merged)
-     - Command strip + tabs above the content area
-     - Manual entry form for missing transfer ID
-     - Footer compacted to thin one-liner
-     - Maximized content area
+   Layout: Two columns — tree view (left) | command strip + tabs + preview (right)
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 /* ─── Viewport lock — entire page fits in one screen ────────────────── */
@@ -37,20 +31,22 @@ body.v022-viewport-lock > send-footer {
     flex-shrink: 0;
 }
 
-/* ─── Compact footer to thin one-liner ──────────────────────────────── */
+/* ─── Compact footer — thin one-liner ───────────────────────────────── */
 
-body.v022-viewport-lock send-footer .footer {
-    padding: 0.2rem 1rem;
+body.v022-viewport-lock send-footer .sg-footer {
+    padding: 0.15rem 1rem;
     font-size: 0.65rem;
-    min-height: 0;
-    gap: 0.5rem;
+    opacity: 0.5;
 }
 
-body.v022-viewport-lock send-footer .footer__version {
+body.v022-viewport-lock send-footer .sg-footer__version {
+    display: inline;
     font-size: 0.6rem;
+    margin-top: 0;
+    margin-left: 0.5rem;
 }
 
-/* ─── Card fills main ────────────────────────────────────────────────── */
+/* ─── Card fills main — minimal padding ─────────────────────────────── */
 
 body.v022-viewport-lock .card {
     flex: 1;
@@ -59,7 +55,7 @@ body.v022-viewport-lock .card {
     flex-direction: column;
     overflow: hidden;
     margin-bottom: 0;
-    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
 }
 
 /* ─── v0.2.2 layout wrapper — fills the card ─────────────────────────── */
@@ -78,10 +74,9 @@ body.v022-viewport-lock .card {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.3rem 0;
+    padding: 0.2rem 0;
     flex-shrink: 0;
     border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
-    margin-bottom: 0;
     gap: var(--space-2, 0.5rem);
 }
 
@@ -101,12 +96,12 @@ body.v022-viewport-lock .card {
 }
 
 .v022-compact-header__icon {
-    font-size: 1rem;
+    font-size: 0.9rem;
     flex-shrink: 0;
 }
 
 .v022-compact-header__name {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--color-text, #E0E0E0);
     white-space: nowrap;
@@ -116,54 +111,88 @@ body.v022-viewport-lock .card {
 }
 
 .v022-compact-header__meta {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     color: var(--color-text-secondary, #8892A0);
     white-space: nowrap;
 }
 
 .v022-compact-header__status {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--color-success, #4ECDC4);
     background: rgba(78, 205, 196, 0.1);
-    padding: 1px 6px;
+    padding: 1px 5px;
     border-radius: 3px;
     white-space: nowrap;
     font-weight: 500;
 }
 
-/* ─── Command strip ───────────────────────────────────────────────────── */
+/* ─── Main content area — fills remaining space ──────────────────────── */
+
+.v022-main-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ─── Two-column split ───────────────────────────────────────────────── */
+
+.v022-split {
+    display: grid;
+    gap: 0;
+    height: 100%;
+}
+
+.v022-main-content .v022-split {
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+/* ─── Right column: command strip + tabs + preview stacked vertically ── */
+
+.v022-right-column {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.v022-right-column #preview-panel {
+    flex: 1;
+    min-height: 0;
+}
+
+/* ─── Command strip (inside right column) ─────────────────────────────── */
 
 .v022-command-strip {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-1, 0.25rem) 0;
-    gap: var(--space-2, 0.5rem);
+    padding: 2px 4px;
+    gap: var(--space-1, 0.25rem);
     flex-shrink: 0;
     border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
-    margin-bottom: 0;
 }
 
 .v022-command-strip__left,
 .v022-command-strip__right {
     display: flex;
     align-items: center;
-    gap: var(--space-1, 0.25rem);
+    gap: 3px;
 }
 
 .v022-command-strip__divider {
     width: 1px;
-    height: 20px;
+    height: 18px;
     background: var(--color-border, rgba(78, 205, 196, 0.15));
-    margin: 0 var(--space-1, 0.25rem);
+    margin: 0 2px;
 }
 
 .v022-command-strip .btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 0.72rem;
-    padding: 3px 8px;
+    gap: 3px;
+    font-size: 0.68rem;
+    padding: 2px 6px;
     white-space: nowrap;
 }
 
@@ -176,18 +205,18 @@ body.v022-viewport-lock .card {
 .v022-cmd--disabled::after {
     content: 'soon';
     position: absolute;
-    top: -6px;
-    right: -4px;
-    font-size: 0.5rem;
+    top: -5px;
+    right: -3px;
+    font-size: 0.45rem;
     background: var(--accent, #4ECDC4);
     color: var(--bg-primary, #0D1B2A);
-    padding: 0 3px;
+    padding: 0 2px;
     border-radius: 2px;
     line-height: 1.3;
     font-weight: 600;
 }
 
-/* ─── Tab bar ─────────────────────────────────────────────────────────── */
+/* ─── Tab bar (inside right column, below command strip) ──────────────── */
 
 .v022-tab-bar {
     display: flex;
@@ -197,7 +226,7 @@ body.v022-viewport-lock .card {
     overflow-x: auto;
     overflow-y: hidden;
     background: rgba(0, 0, 0, 0.15);
-    min-height: 28px;
+    min-height: 26px;
     scrollbar-width: thin;
 }
 
@@ -208,9 +237,9 @@ body.v022-viewport-lock .card {
 .v022-tab {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 3px 8px 3px 10px;
-    font-size: 0.7rem;
+    gap: 5px;
+    padding: 2px 7px 2px 9px;
+    font-size: 0.68rem;
     font-family: var(--font-mono, monospace);
     color: var(--color-text-secondary, #8892A0);
     background: transparent;
@@ -244,7 +273,7 @@ body.v022-viewport-lock .card {
     border: none;
     color: var(--color-text-secondary, #8892A0);
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     padding: 0 2px;
     line-height: 1;
     border-radius: 2px;
@@ -256,20 +285,7 @@ body.v022-viewport-lock .card {
     background: rgba(231, 76, 60, 0.15);
 }
 
-/* ─── Main content area — fills remaining space ──────────────────────── */
-
-.v022-main-content {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.v022-main-content #preview-split {
-    height: 100% !important;
-    min-height: 0 !important;
-}
-
-/* ─── Override zip preview to fill flex container instead of calc ─────── */
+/* ─── Override zip preview to fill flex container ─────────────────────── */
 
 body.v022-viewport-lock .zip-preview--split {
     min-height: 0;
@@ -386,12 +402,12 @@ body.v022-viewport-lock #save-entry-btn {
         display: none;
     }
     .v022-tab-bar {
-        min-height: 24px;
+        min-height: 22px;
     }
     .v022-tab {
-        font-size: 0.62rem;
-        padding: 2px 6px 2px 8px;
-        max-width: 140px;
+        font-size: 0.6rem;
+        padding: 2px 5px 2px 7px;
+        max-width: 130px;
     }
     .v022-compact-header {
         flex-wrap: wrap;
