@@ -489,6 +489,48 @@ SendDownload.prototype.setupEventListeners = function() {
     }
 };
 
+// ─── Override: _downloadEncryptedPayload — better 413 handling ───────────────
+
+const _v020_downloadEncryptedPayload = SendDownload.prototype._downloadEncryptedPayload;
+
+SendDownload.prototype._downloadEncryptedPayload = async function() {
+    // 1. Try presigned URL first (works for any file size)
+    let presignedError = null;
+    try {
+        const result = await ApiClient.getPresignedDownloadUrl(this.transferId);
+        if (result && result.download_url) {
+            const response = await fetch(result.download_url);
+            if (response.ok) return response.arrayBuffer();
+            presignedError = `S3 download failed: ${response.status}`;
+        }
+    } catch (e) {
+        presignedError = e.message || 'Presigned URL unavailable';
+    }
+
+    // 2. Try direct download (may fail with 413 for large files on Lambda)
+    try {
+        const res = await fetch(`/api/transfers/download/${this.transferId}`, {
+            headers: ApiClient._authHeaders()
+        });
+        if (res.ok) return res.arrayBuffer();
+
+        if (res.status === 413) {
+            // File too large for direct download and presigned also failed
+            const detail = presignedError
+                ? `File is too large for direct download (${this.transferInfo ? ApiClient.formatBytes ? '' : '' : ''}5MB Lambda limit). Presigned download also failed: ${presignedError}. Try from the deployed environment instead.`
+                : 'File too large for direct download. Presigned URL fallback also failed.';
+            throw new Error(detail);
+        }
+        if (res.status === 401) throw new Error('ACCESS_TOKEN_INVALID');
+        throw new Error(`Download failed: ${res.status}`);
+    } catch (e) {
+        if (e.message.includes('too large') || e.message.includes('413') || e.message.includes('ACCESS_TOKEN_INVALID')) {
+            throw e;
+        }
+        throw new Error(`Download failed: ${e.message}`);
+    }
+};
+
 // ─── Override: cleanup — no extra state to clean ────────────────────────────
 
 SendDownload.prototype.cleanup = function() {
