@@ -73,7 +73,7 @@
             const treeEl = this.querySelector('.vt-tree');
             if (!treeEl) return;
 
-            const root = this._vault._tree?.tree?.['/'];
+            const root = this._vault._tree?.['/'];
             if (!root) {
                 treeEl.innerHTML = '<div class="vt-empty">Empty vault</div>';
                 return;

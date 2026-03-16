@@ -100,7 +100,7 @@ class VaultBrowser extends VaultComponent {
             const icon     = isFolder ? '\uD83D\uDCC1' : '\uD83D\uDCC4'
             const typeLabel = isFolder ? this.t('vault.browser.folder') : this.t('vault.browser.file')
             const size     = isFolder ? '--' : VaultHelpers.formatBytes(item.size)
-            const date     = item.uploaded ? VaultHelpers.formatTimestamp(item.uploaded) : '--'
+            const date     = '--'
             const rowClass = isFolder ? 'vault-browser__row vault-browser__row--folder' : 'vault-browser__row'
 
             return `
@@ -379,9 +379,7 @@ class VaultBrowser extends VaultComponent {
     // --- Vault Key Update ------------------------------------------------------
 
     _updateVaultKey() {
-        this.emit('vault-key-changed', {
-            settingsTransferId: this._vault._settingsTransferId
-        })
+        this.emit('vault-key-changed', {})
     }
 
     // --- Public API ------------------------------------------------------------

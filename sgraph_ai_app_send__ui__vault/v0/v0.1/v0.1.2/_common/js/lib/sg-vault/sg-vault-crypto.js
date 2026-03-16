@@ -1,18 +1,15 @@
 /* =================================================================================
    SGraph Vault — Deterministic Key Derivation
-   v0.1.2 — Parallel PBKDF2 read/write key derivation + HMAC file ID generation
+   v0.2.0 — Parallel PBKDF2 read/write key derivation + HMAC file ID generation
 
    From a vault key ({passphrase}:{vault_id}), derives:
-     - read_key:          AES-256-GCM key for encrypting/decrypting all content
-     - write_key:         hex string submitted to server for write authorization
-     - tree_file_id:      deterministic 12-char hex ID for the vault tree
-     - settings_file_id:  deterministic 12-char hex ID for the vault settings
-     - ref_file_id:       deterministic 12-char hex ID for the vault HEAD ref
+     - read_key:              AES-256-GCM key for encrypting/decrypting all content
+     - write_key:             hex string submitted to server for write authorization
+     - ref_file_id:           deterministic 12-char hex ID for the vault HEAD ref
+     - branch_index_file_id:  deterministic 12-char hex ID for the branch index
 
    Read and write keys are derived in PARALLEL via PBKDF2 with different salts.
    Knowing read_key does NOT reveal write_key (and vice versa).
-
-   Compatible with sg-send-cli v0.5.x key derivation (same salts, iterations, HMAC domains).
 
    Depends on: Web Crypto API (secure context required)
    ================================================================================= */
@@ -84,13 +81,12 @@ class SGVaultCrypto {
             'raw', readBits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
         )
 
-        const [treeFileId, settingsFileId, refFileId] = await Promise.all([
-            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:tree:${vaultId}`),
-            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:settings:${vaultId}`),
-            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:ref:${vaultId}`)
+        const [refFileId, branchIndexFileId] = await Promise.all([
+            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:ref:${vaultId}`),
+            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:branch-index:${vaultId}`)
         ])
 
-        return { readKey, writeKey, treeFileId, settingsFileId, refFileId }
+        return { readKey, writeKey, refFileId, branchIndexFileId }
     }
 
     // --- Internal Helpers -------------------------------------------------------

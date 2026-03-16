@@ -93,7 +93,7 @@
             this.querySelector('.vfp-rename-input').style.display = 'none';
             this.querySelector('.vfp-size').textContent = VaultHelpers.formatBytes(entry.size || 0);
             this.querySelector('.vfp-type-label').textContent = type ? type.charAt(0).toUpperCase() + type.slice(1) : '--';
-            this.querySelector('.vfp-date').textContent = entry.uploaded ? VaultHelpers.formatTimestamp(entry.uploaded) : '';
+            this.querySelector('.vfp-date').textContent = '';
             this.querySelector('.vfp-folder').textContent = this._folderPath;
         }
 
