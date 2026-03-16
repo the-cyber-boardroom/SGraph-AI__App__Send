@@ -1,6 +1,6 @@
 /* =============================================================================
    SGraph Vault — Shell Component
-   v0.1.2 — Light DOM, EventBus, 5-column layout with left navigation
+   v0.1.3 — Light DOM, EventBus, 5-column layout with left navigation
 
    Pattern adapted from Admin Console v0.1.3 admin-shell.js.
    Five-column layout:
@@ -110,10 +110,15 @@
         _updateVersionDisplay() {
             const el = this.querySelector('.vs-header-version');
             if (!el) return;
-            const vaultVersion = 'v0.1.2';
-            el.textContent = this._appVersion
-                ? `${vaultVersion} / ${this._appVersion}`
-                : vaultVersion;
+            const build = window.SGRAPH_BUILD;
+            if (build) {
+                el.textContent = `${build.appVersion}  ·  UI ${build.uiVersion} (IFD)`;
+            } else {
+                const uiVersion = 'v0.1.3 (IFD)';
+                el.textContent = this._appVersion
+                    ? `${uiVersion} / ${this._appVersion}`
+                    : uiVersion;
+            }
         }
 
         // --- View Switching (nav) -----------------------------------------------
@@ -845,7 +850,7 @@
                             <button class="vs-upload-btn">Upload</button>
                             <button class="vs-debug-toggle">Debug</button>
                             <button class="vs-lock-btn" style="display:none">Lock</button>
-                            <span class="vs-header-version">v0.1.2</span>
+                            <span class="vs-header-version">v0.1.3</span>
                         </div>
                         <!-- Loading bar (shown during API requests) -->
                         <div class="vs-loading-bar" style="display:none"><div class="vs-loading-bar-inner"></div></div>

@@ -1,6 +1,6 @@
 /* =================================================================================
    SGraph Vault — Deterministic Key Derivation
-   v0.1.2 — Parallel PBKDF2 read/write key derivation + HMAC file ID generation
+   v0.1.3 — Parallel PBKDF2 read/write key derivation + HMAC file ID generation
 
    From a vault key ({passphrase}:{vault_id}), derives:
      - read_key:          AES-256-GCM key for encrypting/decrypting all content
@@ -35,8 +35,8 @@ class SGVaultCrypto {
         if (!passphrase) {
             throw new Error('Passphrase cannot be empty')
         }
-        if (!/^[0-9a-f]{8}$/.test(vaultId)) {
-            throw new Error('vault_id must be 8 hex characters')
+        if (!/^[a-z0-9]{8}$/.test(vaultId)) {
+            throw new Error('vault_id must be 8 lowercase alphanumeric characters')
         }
         return { passphrase, vaultId }
     }

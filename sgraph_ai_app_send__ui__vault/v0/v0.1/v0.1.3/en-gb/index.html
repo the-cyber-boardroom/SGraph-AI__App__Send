@@ -20,7 +20,7 @@
     <vault-shell></vault-shell>
 
     <!-- ===================================================================
-         Script Loading Order — v0.1.2
+         Script Loading Order — v0.1.3
          1. Services (EventBus, ConfigManager, MessagesService)
             → initialises window.sgraphVault namespace
          2. i18n
@@ -33,6 +33,9 @@
          9. Shell (vault-shell — depends on everything above)
         10. Init
          =================================================================== -->
+
+    <!-- 0. Build info (CI-generated, absent in local dev) -->
+    <script src="../_common/js/build-info.js"></script>
 
     <!-- 1. Services (establish window.sgraphVault first) -->
     <script src="../_common/js/services/event-bus.js"></script>
@@ -81,7 +84,7 @@
     <script>
         VaultComponentPaths.init('../_common');
         VaultI18n.init();
-        window.sgraphVault.events.emit('app-init', { version: 'v0.1.2' });
+        window.sgraphVault.events.emit('app-init', { version: 'v0.1.3' });
     </script>
 
 </body>
