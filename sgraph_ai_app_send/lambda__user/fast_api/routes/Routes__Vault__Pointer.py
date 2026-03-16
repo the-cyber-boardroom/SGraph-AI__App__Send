@@ -18,7 +18,11 @@ ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id:path}
                        f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}/{{file_id:path}}'  ,
                        f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id:path}}'       ,
                        f'/{TAG__ROUTES_VAULT}/batch/{{vault_id}}'                         ,
-                       f'/{TAG__ROUTES_VAULT}/list/{{vault_id}}'                          ]
+                       f'/{TAG__ROUTES_VAULT}/list/{{vault_id}}'                          ,
+                       f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}'                         ,
+                       f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}'                          ,
+                       f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}'                   ,
+                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}'                        ]
 
 
 LAMBDA_BASE64_LIMIT = 3750000                                                    # ~3.75MB (base64 adds ~33%, must stay under Lambda 5MB response limit)
@@ -163,6 +167,24 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         return self.vault_service.list_files(vault_id = str(vault_id) ,
                                              prefix   = prefix        )
 
+    # --- Catch routes: prevent redirect loops when file_id is missing ----------
+
+    @route_path('/write/{vault_id}')
+    async def write__vault_id(self, vault_id: str):                              # PUT /vault/write/{vault_id} — missing file_id
+        raise HTTPException(status_code=400, detail='Missing file_id in path')
+
+    @route_path('/read/{vault_id}')
+    def read__vault_id(self, vault_id: str):                                     # GET /vault/read/{vault_id} — missing file_id
+        raise HTTPException(status_code=400, detail='Missing file_id in path')
+
+    @route_path('/read-base64/{vault_id}')
+    def read_base64__vault_id(self, vault_id: str):                              # GET /vault/read-base64/{vault_id} — missing file_id
+        raise HTTPException(status_code=400, detail='Missing file_id in path')
+
+    @route_path('/delete/{vault_id}')
+    async def delete__vault_id(self, vault_id: str):                             # DELETE /vault/delete/{vault_id} — missing file_id
+        raise HTTPException(status_code=400, detail='Missing file_id in path')
+
     def setup_routes(self):                                                      # Register all endpoints
         self.add_route_put   (self.write__vault_id__file_id       )
         self.add_route_get   (self.read__vault_id__file_id        )
@@ -170,4 +192,8 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         self.add_route_delete(self.delete__vault_id__file_id      )
         self.add_route_post  (self.batch__vault_id                )
         self.add_route_get   (self.list__vault_id                 )
+        self.add_route_put   (self.write__vault_id                )              # Catch: missing file_id
+        self.add_route_get   (self.read__vault_id                 )              # Catch: missing file_id
+        self.add_route_get   (self.read_base64__vault_id          )              # Catch: missing file_id
+        self.add_route_delete(self.delete__vault_id               )              # Catch: missing file_id
         return self
