@@ -204,6 +204,7 @@ team/                            # Team structure
 23. **Feature branches** branch from `dev`
 24. **Branch naming:** `claude/{description}-{session-id}`
 25. **Always push with:** `git push -u origin {branch-name}`
+26. **Pull from dev before starting work** — always run `git fetch origin dev && git merge origin/dev` at the start of every session before making any changes
 
 ---
 

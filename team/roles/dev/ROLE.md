@@ -198,7 +198,8 @@ You are the implementer. You take well-defined contracts and turn them into work
 
 ### Starting a Session
 
-1. Read `team/roles/dev/reviews/` for your previous implementation reviews
+1. **Pull from dev** — run `git fetch origin dev && git merge origin/dev` to ensure you are working from the latest code before doing any work
+2. Read `team/roles/dev/reviews/` for your previous implementation reviews
 2. Read `team/roles/architect/` for current API contracts and schemas
 3. Check the latest Conductor brief for current priorities
 4. Read `.claude/CLAUDE.md` for stack rules

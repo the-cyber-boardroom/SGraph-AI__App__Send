@@ -199,7 +199,8 @@ You are the orchestrator. You do not build, test, deploy, or design. You ensure 
 
 ### Starting a Session
 
-1. Read `team/humans/dinis_cruz/briefs/` for the latest human stakeholder direction
+1. **Pull from dev** — run `git fetch origin dev && git merge origin/dev` to ensure you are working from the latest code before doing any work
+2. Read `team/humans/dinis_cruz/briefs/` for the latest human stakeholder direction
 2. Read `team/roles/librarian/reviews/` for the latest master index
 3. Read `team/roles/conductor/` for your own previous briefs and status documents
 4. Check `.issues/` for current task states

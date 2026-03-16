@@ -1,0 +1,260 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Download Component Styles
+   v0.2.2 — Surgical CSS overrides on v0.2.1 + v0.2.0
+   Loads AFTER v0.2.1 CSS — later selectors win via cascade.
+
+   Changes:
+     - Viewport-locked body (no scroll on download page)
+     - Sticky footer pinned to bottom
+     - Info banner explaining folder view
+     - Command strip with action buttons
+     - Tab bar for multiple open documents
+     - Layout fills available viewport height
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Viewport lock — entire page fits in one screen ────────────────── */
+
+body.v022-viewport-lock {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+body.v022-viewport-lock > send-header {
+    flex-shrink: 0;
+}
+
+body.v022-viewport-lock > main {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+body.v022-viewport-lock > send-footer {
+    flex-shrink: 0;
+}
+
+/* ─── Card fills main ────────────────────────────────────────────────── */
+
+body.v022-viewport-lock .card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-bottom: 0;
+    padding-bottom: var(--space-2, 0.5rem);
+}
+
+/* ─── v0.2.2 layout wrapper — fills the card ─────────────────────────── */
+
+.v022-layout {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ─── Info banner ─────────────────────────────────────────────────────── */
+
+.v022-info-banner {
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    background: var(--accent-subtle, rgba(78, 205, 196, 0.06));
+    border: 1px solid rgba(78, 205, 196, 0.15);
+    border-radius: var(--radius-sm, 4px);
+    margin-bottom: var(--space-2, 0.5rem);
+    flex-shrink: 0;
+}
+
+.v022-info-banner__text {
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+    line-height: 1.5;
+}
+
+.v022-info-banner__text strong {
+    color: var(--accent, #4ECDC4);
+}
+
+/* ─── Command strip ───────────────────────────────────────────────────── */
+
+.v022-command-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-1, 0.25rem) 0;
+    gap: var(--space-2, 0.5rem);
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    margin-bottom: 0;
+}
+
+.v022-command-strip__left,
+.v022-command-strip__right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+}
+
+.v022-command-strip__divider {
+    width: 1px;
+    height: 20px;
+    background: var(--color-border, rgba(78, 205, 196, 0.15));
+    margin: 0 var(--space-1, 0.25rem);
+}
+
+.v022-command-strip .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    white-space: nowrap;
+}
+
+.v022-cmd--disabled {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    position: relative;
+}
+
+.v022-cmd--disabled::after {
+    content: 'soon';
+    position: absolute;
+    top: -6px;
+    right: -4px;
+    font-size: 0.5rem;
+    background: var(--accent, #4ECDC4);
+    color: var(--bg-primary, #0D1B2A);
+    padding: 0 3px;
+    border-radius: 2px;
+    line-height: 1.3;
+    font-weight: 600;
+}
+
+/* ─── Tab bar ─────────────────────────────────────────────────────────── */
+
+.v022-tab-bar {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-shrink: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: rgba(0, 0, 0, 0.15);
+    min-height: 30px;
+    scrollbar-width: thin;
+}
+
+.v022-tab-bar:empty {
+    display: none;
+}
+
+.v022-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px 4px 12px;
+    font-size: 0.72rem;
+    font-family: var(--font-mono, monospace);
+    color: var(--color-text-secondary, #8892A0);
+    background: transparent;
+    border-right: 1px solid var(--color-border, rgba(78, 205, 196, 0.1));
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+    max-width: 200px;
+}
+
+.v022-tab:hover {
+    background: rgba(78, 205, 196, 0.06);
+    color: var(--color-text, #E0E0E0);
+}
+
+.v022-tab--active {
+    background: var(--bg-secondary, #16213E);
+    color: var(--accent, #4ECDC4);
+    border-bottom: 2px solid var(--accent, #4ECDC4);
+}
+
+.v022-tab__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.v022-tab__close {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0 2px;
+    line-height: 1;
+    border-radius: 2px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.v022-tab__close:hover {
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.15);
+}
+
+/* ─── Main content area — fills remaining space ──────────────────────── */
+
+.v022-main-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.v022-main-content #preview-split {
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+/* ─── Override zip preview to fill flex container instead of calc ─────── */
+
+body.v022-viewport-lock .zip-preview--split {
+    min-height: 0;
+    height: 100%;
+    overflow: auto;
+}
+
+body.v022-viewport-lock .zip-left-rail {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* ─── Hide the zip-info-panel (moved to tab) ─────────────────────────── */
+
+body.v022-viewport-lock .zip-info-panel {
+    display: none !important;
+}
+
+/* ─── Mobile responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .v022-command-strip {
+        flex-wrap: wrap;
+    }
+    .v022-command-strip .v022-cmd--disabled {
+        display: none;
+    }
+    .v022-tab-bar {
+        min-height: 26px;
+    }
+    .v022-tab {
+        font-size: 0.65rem;
+        padding: 3px 6px 3px 8px;
+        max-width: 140px;
+    }
+    .v022-info-banner {
+        padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+    }
+}
