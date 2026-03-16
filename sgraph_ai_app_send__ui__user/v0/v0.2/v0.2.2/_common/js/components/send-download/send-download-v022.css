@@ -5,11 +5,11 @@
 
    Changes:
      - Viewport-locked body (no scroll on download page)
-     - Sticky footer pinned to bottom
-     - Info banner explaining folder view
-     - Command strip with action buttons
-     - Tab bar for multiple open documents
-     - Layout fills available viewport height
+     - Compact single-line header (file info + status merged)
+     - Command strip + tabs above the content area
+     - Manual entry form for missing transfer ID
+     - Footer compacted to thin one-liner
+     - Maximized content area
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 /* ─── Viewport lock — entire page fits in one screen ────────────────── */
@@ -37,6 +37,19 @@ body.v022-viewport-lock > send-footer {
     flex-shrink: 0;
 }
 
+/* ─── Compact footer to thin one-liner ──────────────────────────────── */
+
+body.v022-viewport-lock send-footer .footer {
+    padding: 0.2rem 1rem;
+    font-size: 0.65rem;
+    min-height: 0;
+    gap: 0.5rem;
+}
+
+body.v022-viewport-lock send-footer .footer__version {
+    font-size: 0.6rem;
+}
+
 /* ─── Card fills main ────────────────────────────────────────────────── */
 
 body.v022-viewport-lock .card {
@@ -46,7 +59,7 @@ body.v022-viewport-lock .card {
     flex-direction: column;
     overflow: hidden;
     margin-bottom: 0;
-    padding-bottom: var(--space-2, 0.5rem);
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
 }
 
 /* ─── v0.2.2 layout wrapper — fills the card ─────────────────────────── */
@@ -59,25 +72,63 @@ body.v022-viewport-lock .card {
     overflow: hidden;
 }
 
-/* ─── Info banner ─────────────────────────────────────────────────────── */
+/* ─── Compact header — single line with file info + status ────────────── */
 
-.v022-info-banner {
-    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
-    background: var(--accent-subtle, rgba(78, 205, 196, 0.06));
-    border: 1px solid rgba(78, 205, 196, 0.15);
-    border-radius: var(--radius-sm, 4px);
-    margin-bottom: var(--space-2, 0.5rem);
+.v022-compact-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    margin-bottom: 0;
+    gap: var(--space-2, 0.5rem);
+}
+
+.v022-compact-header__left {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.v022-compact-header__right {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
     flex-shrink: 0;
 }
 
-.v022-info-banner__text {
-    font-size: var(--text-small, 0.8rem);
-    color: var(--color-text-secondary, #8892A0);
-    line-height: 1.5;
+.v022-compact-header__icon {
+    font-size: 1rem;
+    flex-shrink: 0;
 }
 
-.v022-info-banner__text strong {
-    color: var(--accent, #4ECDC4);
+.v022-compact-header__name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text, #E0E0E0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+}
+
+.v022-compact-header__meta {
+    font-size: 0.72rem;
+    color: var(--color-text-secondary, #8892A0);
+    white-space: nowrap;
+}
+
+.v022-compact-header__status {
+    font-size: 0.65rem;
+    color: var(--color-success, #4ECDC4);
+    background: rgba(78, 205, 196, 0.1);
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    font-weight: 500;
 }
 
 /* ─── Command strip ───────────────────────────────────────────────────── */
@@ -146,7 +197,7 @@ body.v022-viewport-lock .card {
     overflow-x: auto;
     overflow-y: hidden;
     background: rgba(0, 0, 0, 0.15);
-    min-height: 30px;
+    min-height: 28px;
     scrollbar-width: thin;
 }
 
@@ -158,8 +209,8 @@ body.v022-viewport-lock .card {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 8px 4px 12px;
-    font-size: 0.72rem;
+    padding: 3px 8px 3px 10px;
+    font-size: 0.7rem;
     font-family: var(--font-mono, monospace);
     color: var(--color-text-secondary, #8892A0);
     background: transparent;
@@ -193,7 +244,7 @@ body.v022-viewport-lock .card {
     border: none;
     color: var(--color-text-secondary, #8892A0);
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     padding: 0 2px;
     line-height: 1;
     border-radius: 2px;
@@ -237,6 +288,94 @@ body.v022-viewport-lock .zip-info-panel {
     display: none !important;
 }
 
+/* ─── Hide the old zip-header (replaced by compact header) ────────────── */
+
+body.v022-viewport-lock .zip-header--sticky {
+    display: none !important;
+}
+
+/* ─── Hide v0.2.1's save-entry button (use command strip instead) ─────── */
+
+body.v022-viewport-lock #save-entry-btn {
+    display: none !important;
+}
+
+/* ─── Manual entry form ───────────────────────────────────────────────── */
+
+.v022-manual-entry {
+    max-width: 520px;
+    margin: var(--space-8, 2rem) auto;
+    padding: var(--space-6, 1.5rem);
+}
+
+.v022-manual-entry__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.v022-manual-entry__header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--color-text, #E0E0E0);
+    font-weight: 600;
+}
+
+.v022-manual-entry__desc {
+    color: var(--color-text-secondary, #8892A0);
+    font-size: var(--text-sm, 0.875rem);
+    line-height: 1.5;
+    margin: 0 0 var(--space-5, 1.25rem) 0;
+}
+
+.v022-manual-entry__field {
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.v022-manual-entry__field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-text, #E0E0E0);
+    margin-bottom: var(--space-1, 0.25rem);
+}
+
+.v022-manual-entry__optional {
+    font-weight: 400;
+    color: var(--color-text-secondary, #8892A0);
+    font-size: 0.75rem;
+}
+
+.v022-manual-entry__field .input {
+    width: 100%;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85rem;
+}
+
+.v022-manual-entry__hint {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary, #8892A0);
+    margin-top: 0.3rem;
+}
+
+.v022-manual-entry__hint code {
+    background: rgba(78, 205, 196, 0.1);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    color: var(--accent, #4ECDC4);
+}
+
+.v022-manual-entry__error {
+    margin-top: var(--space-3, 0.75rem);
+    color: var(--color-error, #e74c3c);
+    font-size: var(--text-sm, 0.875rem);
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    background: rgba(231, 76, 60, 0.1);
+    border-radius: var(--radius-sm, 4px);
+}
+
 /* ─── Mobile responsive ───────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -247,14 +386,21 @@ body.v022-viewport-lock .zip-info-panel {
         display: none;
     }
     .v022-tab-bar {
-        min-height: 26px;
+        min-height: 24px;
     }
     .v022-tab {
-        font-size: 0.65rem;
-        padding: 3px 6px 3px 8px;
+        font-size: 0.62rem;
+        padding: 2px 6px 2px 8px;
         max-width: 140px;
     }
-    .v022-info-banner {
-        padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+    .v022-compact-header {
+        flex-wrap: wrap;
+    }
+    .v022-compact-header__meta {
+        display: none;
+    }
+    .v022-manual-entry {
+        padding: var(--space-4, 1rem);
+        margin: var(--space-4, 1rem) auto;
     }
 }

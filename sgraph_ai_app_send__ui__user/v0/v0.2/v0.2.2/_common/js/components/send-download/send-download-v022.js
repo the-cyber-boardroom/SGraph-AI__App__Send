@@ -4,11 +4,12 @@
 
    Changes:
      - Viewport-locked layout (no page scroll on download page)
-     - Sticky footer pinned to bottom
-     - Info banner explaining folder view and next steps
-     - Command strip with save zip, save file, and greyed-out future actions
+     - Manual transfer ID + key entry form when no ID in URL
+     - Compact header: single-line status + file info merged
+     - Command strip + tabs ABOVE the document view area
      - Tab system for multiple open documents (like terminal tabs)
-     - Share panel and info panel moved into tabs instead of below viewer
+     - Share tab auto-opens on load
+     - Deduplicated Save Zip (command strip only, no header button)
 
    Loads AFTER v0.2.1 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -28,6 +29,7 @@ const _v021_renderZipLayout     = SendDownload.prototype._renderZipLayout;
 const _v021_setupEventListeners = SendDownload.prototype.setupEventListeners;
 const _v021_previewZipEntry     = SendDownload.prototype._previewZipEntry;
 const _v021_cleanup             = SendDownload.prototype.cleanup;
+const _v021_renderError         = SendDownload.prototype.renderError;
 
 // ─── Tab state ───────────────────────────────────────────────────────────────
 // Each tab: { id, label, path, type:'file'|'share'|'info', content:null }
@@ -194,6 +196,51 @@ SendDownload.prototype._v022_updateCommandStrip = function() {
     }
 };
 
+// ─── Override: renderError — manual entry form when no transfer ID ───────────
+
+SendDownload.prototype.renderError = function() {
+    if (this.state !== 'error' || !this.errorMessage) return '';
+
+    // Check if this is the "no transfer ID" error — offer manual entry
+    const isNoId = !this.transferId;
+    if (isNoId) {
+        return `
+            <div class="v022-manual-entry">
+                <div class="v022-manual-entry__header">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent, #4ECDC4)" stroke-width="1.5" stroke-linecap="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <h2>Download & Decrypt</h2>
+                </div>
+                <p class="v022-manual-entry__desc">Enter the file ID and decryption key from your share link to download and decrypt a file.</p>
+
+                <div class="v022-manual-entry__field">
+                    <label for="v022-manual-link">Share link or file ID</label>
+                    <input type="text" id="v022-manual-link" class="input" placeholder="d6a1c7da620d/F5w9JGdaqA1vh1fgZ77W0GMKWZu3GuUaIimuNInrbJE  or full URL" autocomplete="off" spellcheck="false">
+                    <div class="v022-manual-entry__hint">Paste the full download link, or just the <code>fileId/key</code> part</div>
+                </div>
+
+                <div class="v022-manual-entry__field">
+                    <label for="v022-manual-token">Access key <span class="v022-manual-entry__optional">(optional)</span></label>
+                    <input type="text" id="v022-manual-token" class="input" placeholder="e.g. owasp" autocomplete="off" spellcheck="false">
+                </div>
+
+                <button class="btn btn-primary" id="v022-manual-go" style="width: 100%;">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12v2h12v-2M8 2v8M5 7l3 3 3-3"/></svg>
+                    Download & Decrypt
+                </button>
+
+                <div id="v022-manual-error" class="v022-manual-entry__error" style="display: none;"></div>
+            </div>
+        `;
+    }
+
+    // For other errors, use the original
+    return _v021_renderError.call(this);
+};
+
 // ─── Override: render — lock viewport on download page ──────────────────────
 
 SendDownload.prototype.render = function() {
@@ -241,36 +288,18 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
         ? `<div class="zip-progress">${selectedIndex} of ${allFiles.length} files</div>`
         : '';
 
-    // First-load hint
-    const hintShown = (() => { try { return localStorage.getItem('sgraph-zip-hint-shown'); } catch(_) { return null; } })();
-    const hintHtml = !hintShown
-        ? `<div class="zip-hint" id="zip-hint">Click any file to preview it. Use the folder tree to navigate. <button class="zip-hint__dismiss" id="zip-hint-dismiss">&times;</button></div>`
-        : '';
-
     return `
         <div class="v022-layout">
-            <div class="status status--success" style="font-size: var(--text-sm); padding: 0.5rem 0.75rem;">
-                ${this.escapeHtml(this.t('download.result.file_success'))}
-            </div>
-
-            <div class="v022-info-banner">
-                <div class="v022-info-banner__text">
-                    <strong>Folder view</strong> — This zip file has been fully downloaded and decrypted in your browser.
-                    Browse files below or save the entire zip. Preview may not work for all file types.
-                </div>
-            </div>
-
-            <div class="zip-header zip-header--sticky" style="margin-bottom: 0;">
-                <div class="zip-header__info">
-                    <span class="zip-header__folder-icon">&#128193;</span>
-                    <h3 class="zip-header__name">${this.escapeHtml(zipName)}</h3>
+            <div class="v022-compact-header">
+                <div class="v022-compact-header__left">
+                    <span class="v022-compact-header__icon">&#128193;</span>
+                    <span class="v022-compact-header__name">${this.escapeHtml(zipName)}</span>
                     <span class="zip-header__badge">zip</span>
-                    <span class="zip-header__size">${this.escapeHtml(sizeStr)}</span>
-                    <span class="zip-header__summary">${this.escapeHtml(summary)}</span>
+                    <span class="v022-compact-header__meta">${this.escapeHtml(sizeStr)} &middot; ${this.escapeHtml(summary)}</span>
+                    <span class="v022-compact-header__status">&check; Decrypted</span>
                 </div>
-                <div class="zip-header__actions">
+                <div class="v022-compact-header__right">
                     <button class="btn btn-sm btn-secondary" id="zip-info-btn" title="Transfer details">&#9432;</button>
-                    <button class="btn btn-primary btn-sm" id="save-file-btn">${this.escapeHtml(this.t('download.zip.save_all'))}</button>
                 </div>
             </div>
 
@@ -308,8 +337,6 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
 
             <div class="v022-tab-bar" id="v022-tab-bar"></div>
 
-            ${hintHtml}
-
             <div class="v022-main-content">
                 <div id="preview-split" style="display: grid; grid-template-columns: ${savedWidth}px 4px 1fr; gap: 0; height: 100%;">
                     <div id="details-panel" class="zip-left-rail">
@@ -336,6 +363,8 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
             <send-transparency id="transparency-panel"></send-transparency>
             ${timingHtml}
         </div>
+
+        <div id="save-file-btn" style="display:none;"></div>
     `;
 };
 
@@ -359,10 +388,80 @@ SendDownload.prototype._previewZipEntry = async function(path) {
     this._v022_updateCommandStrip();
 };
 
-// ─── Override: setupEventListeners — wire command strip + tabs ───────────────
+// ─── Override: setupEventListeners — wire command strip + tabs + manual entry ─
 
 SendDownload.prototype.setupEventListeners = function() {
     _v021_setupEventListeners.call(this);
+
+    // ─── Manual entry form (error state with no transfer ID) ────────────
+    const manualGoBtn = this.querySelector('#v022-manual-go');
+    if (manualGoBtn) {
+        const handleManualGo = () => {
+            const linkInput  = this.querySelector('#v022-manual-link');
+            const tokenInput = this.querySelector('#v022-manual-token');
+            const errorDiv   = this.querySelector('#v022-manual-error');
+            if (!linkInput) return;
+
+            let raw = linkInput.value.trim();
+            if (!raw) {
+                if (errorDiv) { errorDiv.textContent = 'Please enter a file ID or share link.'; errorDiv.style.display = ''; }
+                return;
+            }
+
+            // Parse: could be a full URL or just "fileId/key"
+            let fileId = null, key = null;
+            try {
+                // Try parsing as URL first
+                if (raw.startsWith('http')) {
+                    const url = new URL(raw);
+                    const hash = url.hash.substring(1);
+                    if (hash) {
+                        const slashIdx = hash.indexOf('/');
+                        if (slashIdx > 0) { fileId = hash.substring(0, slashIdx); key = hash.substring(slashIdx + 1); }
+                        else { fileId = hash; }
+                    }
+                }
+            } catch(_) {}
+
+            // If not a URL, try "fileId/key" format
+            if (!fileId) {
+                // Strip any leading # or /
+                raw = raw.replace(/^[#/]+/, '');
+                const slashIdx = raw.indexOf('/');
+                if (slashIdx > 0) {
+                    fileId = raw.substring(0, slashIdx);
+                    key    = raw.substring(slashIdx + 1);
+                } else {
+                    fileId = raw;
+                }
+            }
+
+            if (!fileId) {
+                if (errorDiv) { errorDiv.textContent = 'Could not parse a file ID. Check the format.'; errorDiv.style.display = ''; }
+                return;
+            }
+
+            // Build the download URL and navigate
+            const token = tokenInput ? tokenInput.value.trim() : '';
+            let newUrl = `${window.location.origin}${window.location.pathname}`;
+            if (token) newUrl += `?token=${encodeURIComponent(token)}`;
+            newUrl += `#${fileId}`;
+            if (key) newUrl += `/${key}`;
+            window.location.href = newUrl;
+        };
+
+        manualGoBtn.addEventListener('click', handleManualGo);
+
+        // Also handle Enter key in inputs
+        const linkInput = this.querySelector('#v022-manual-link');
+        const tokenInput = this.querySelector('#v022-manual-token');
+        if (linkInput)  linkInput.addEventListener('keydown',  (e) => { if (e.key === 'Enter') handleManualGo(); });
+        if (tokenInput) tokenInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleManualGo(); });
+
+        // Focus the link input
+        if (linkInput) linkInput.focus();
+        return; // Don't wire zip-specific listeners
+    }
 
     if (this.state !== 'complete' || !this._zipTree) return;
 
@@ -370,8 +469,18 @@ SendDownload.prototype.setupEventListeners = function() {
     const saveZipBtn = this.querySelector('#v022-cmd-save-zip');
     if (saveZipBtn) {
         saveZipBtn.addEventListener('click', () => {
-            const saveAllBtn = this.querySelector('#save-file-btn');
-            if (saveAllBtn) saveAllBtn.click();
+            // Trigger the hidden save-file-btn's logic directly
+            if (this._zipOrigBytes) {
+                const blob = new Blob([this._zipOrigBytes], { type: 'application/zip' });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href     = url;
+                a.download = this._zipOrigName || 'archive.zip';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
         });
     }
 
@@ -396,12 +505,21 @@ SendDownload.prototype.setupEventListeners = function() {
     const injectedShare = this.querySelector('.share-panel');
     if (injectedShare) injectedShare.remove();
 
-    // ─── Auto-open first file in a tab if none selected ────────────────
-    if (this._tabs.length === 0 && this._selectedZipPath) {
-        const entry = this._zipTree.find(e => e.path === this._selectedZipPath && !e.dir);
-        if (entry) {
-            this._v022_createTab(entry.name, this._selectedZipPath, 'file');
+    // ─── Remove v0.2.1's save-entry button (we have command strip) ─────
+    const saveEntryBtn = this.querySelector('#save-entry-btn');
+    if (saveEntryBtn) saveEntryBtn.remove();
+
+    // ─── Auto-open Share tab + first file tab on load ───────────────────
+    if (this._tabs.length === 0) {
+        // Open first file in a tab
+        if (this._selectedZipPath) {
+            const entry = this._zipTree.find(e => e.path === this._selectedZipPath && !e.dir);
+            if (entry) {
+                this._v022_createTab(entry.name, this._selectedZipPath, 'file');
+            }
         }
+        // Auto-open Share tab
+        this._v022_createTab('Share', '__share__', 'share');
     }
 };
 
