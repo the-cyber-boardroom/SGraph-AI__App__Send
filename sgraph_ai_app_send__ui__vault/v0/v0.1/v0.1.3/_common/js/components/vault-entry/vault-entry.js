@@ -31,12 +31,25 @@ class VaultEntry extends VaultComponent {
         const saved = sessionStorage.getItem('sg-vault-access-key')
         if (saved) this._accessKeyInput.value = saved
 
+        // Show version info
+        this._renderVersion()
+
         // Check URL hash for vault key
         const hash = window.location.hash.slice(1)
         if (hash) {
             this._keyInput.value = decodeURIComponent(hash)
             this._onOpen()
         }
+    }
+
+    _renderVersion() {
+        const el = this.$('#vault-entry-version')
+        if (!el) return
+        const uiVersion = 'v0.1.3 (IFD)'
+        const build     = window.SGRAPH_BUILD
+        el.textContent  = build
+            ? `${build.appVersion}  ·  UI ${build.uiVersion} (IFD)`
+            : `UI ${uiVersion}`
     }
 
     _onAccessKeyChange() {

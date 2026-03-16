@@ -1,6 +1,6 @@
 /* =================================================================================
    SGraph Vault — Client-Side Encrypted Vault Logic
-   v0.1.2 — Deterministic vault pointers with read/write key separation
+   v0.1.3 — Deterministic vault pointers with read/write key separation
 
    A vault is a collection of encrypted files stored via the vault pointer API.
    The server sees only encrypted blobs — it has no concept of folders or file names.
@@ -39,9 +39,10 @@ class SGVault {
         const vault = new SGVault(sgSend)
         vault._passphrase = passphrase
 
-        // 1. Generate vault ID (8 hex chars)
-        vault._vaultId = Array.from(crypto.getRandomValues(new Uint8Array(4)))
-            .map(b => b.toString(16).padStart(2, '0')).join('')
+        // 1. Generate vault ID (8 lowercase alphanumeric chars — matches sg-send-cli format)
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+        const bytes    = crypto.getRandomValues(new Uint8Array(8))
+        vault._vaultId = Array.from(bytes).map(b => alphabet[b % alphabet.length]).join('')
 
         // 2. Derive all keys and deterministic file IDs
         const keys = await SGVaultCrypto.deriveKeys(passphrase, vault._vaultId)

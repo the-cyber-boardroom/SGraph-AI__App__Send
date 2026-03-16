@@ -1,0 +1,56 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Font Declarations
+   v0.2.0 — Vendored fonts (zero external dependencies)
+
+   Fonts are loaded from the same origin via CloudFront/S3.
+   No Google Fonts or external CDN dependencies.
+
+   Font files should be placed alongside this CSS:
+     _common/fonts/DMSans-Regular.woff2
+     _common/fonts/DMSans-Medium.woff2
+     _common/fonts/DMSans-SemiBold.woff2
+     _common/fonts/DMSans-Bold.woff2
+     _common/fonts/JetBrainsMono-Regular.woff2
+
+   Until font files are vendored, fall back to system fonts.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('DMSans-Regular.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('DMSans-Medium.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('DMSans-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('DMSans-Bold.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('JetBrainsMono-Regular.woff2') format('woff2');
+}
