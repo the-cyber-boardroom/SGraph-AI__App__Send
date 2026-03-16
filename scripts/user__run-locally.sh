@@ -96,6 +96,12 @@ window.SGRAPH_BUILD = {
 };
 JSEOF
 
+# ─── Test files ──────────────────────────────────────────────────────────────
+# The send-test-files component resolves ../test-files from en-gb/ → /test-files/
+if [ -d "$UPLOAD_DIR/test-files" ]; then
+    ln -sf "$UPLOAD_DIR/test-files" "$SERVE_DIR/test-files"
+fi
+
 # ─── Root redirect ───────────────────────────────────────────────────────────
 cat > "$SERVE_DIR/index.html" <<'HTMLEOF'
 <!DOCTYPE html>
