@@ -19,7 +19,7 @@ PORT=10063
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
-UI_VERSION="v0.1.2"
+UI_VERSION="v0.1.3"
 IFD_PATH="v0/v0.1/$UI_VERSION"
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
 
