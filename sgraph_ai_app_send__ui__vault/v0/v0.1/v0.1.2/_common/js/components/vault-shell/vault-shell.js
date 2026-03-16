@@ -110,10 +110,15 @@
         _updateVersionDisplay() {
             const el = this.querySelector('.vs-header-version');
             if (!el) return;
-            const vaultVersion = 'v0.1.2';
-            el.textContent = this._appVersion
-                ? `${vaultVersion} / ${this._appVersion}`
-                : vaultVersion;
+            const build = window.SGRAPH_BUILD;
+            if (build) {
+                el.textContent = `${build.appVersion}  ·  UI ${build.uiVersion}`;
+            } else {
+                const uiVersion = 'v0.1.2';
+                el.textContent = this._appVersion
+                    ? `${uiVersion} / ${this._appVersion}`
+                    : uiVersion;
+            }
         }
 
         // --- View Switching (nav) -----------------------------------------------
