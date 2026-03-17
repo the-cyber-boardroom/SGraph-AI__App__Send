@@ -159,6 +159,32 @@ SendUpload.prototype.render = function() {
         });
     }
 
+    // ── Step 6: Email Link button handler (must be in render, not setupEventListeners,
+    //    because complete state calls setupDynamicListeners not setupEventListeners) ──
+    if (this.state === 'complete') {
+        var self = this;
+        var emailBtn = this.querySelector('#v028-email-link-btn');
+        if (emailBtn && this.result) {
+            emailBtn.addEventListener('click', function() {
+                var friendlyKey = self.result.friendlyKey || '';
+                var tokenLink = self._v028_buildTokenLink(friendlyKey);
+                var subject = 'Secure file shared via SGraph Send';
+                var body = '';
+                if (self._v026_shareMode === 'token' && friendlyKey) {
+                    body = 'I\'ve shared a file with you via SGraph Send.\n\n' +
+                           'Simple token: ' + friendlyKey + '\n\n' +
+                           'Or use this direct link:\n' + tokenLink;
+                } else {
+                    var link = self.result.combinedUrl || self.result.linkOnlyUrl || '';
+                    body = 'I\'ve shared a file with you via SGraph Send.\n\n' +
+                           'Link: ' + link;
+                }
+                window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) +
+                                       '&body=' + encodeURIComponent(body);
+            });
+        }
+    }
+
     // Start/stop carousel for processing states
     if (isProcessing) {
         this._v027_startCarousel();
@@ -207,32 +233,22 @@ SendUpload.prototype.setupEventListeners = function() {
         });
     }
 
-    // ── Step 6: Email Link button — opens mailto with link ──
-    var emailBtn = this.querySelector('#v028-email-link-btn');
-    if (emailBtn && this.result) {
-        emailBtn.addEventListener('click', function() {
-            var link = self.result.combinedUrl || self.result.linkOnlyUrl || '';
-            var subject = 'Secure file shared via SGraph Send';
-            var body = '';
-            if (self._v026_shareMode === 'token' && self.result.friendlyKey) {
-                body = 'I\'ve shared a file with you via SGraph Send.\n\n' +
-                       'Simple token: ' + self.result.friendlyKey + '\n\n' +
-                       'Enter the token at: ' + window.location.origin + '\n\n' +
-                       'Or use this direct link:\n' + link;
-            } else {
-                body = 'I\'ve shared a file with you via SGraph Send.\n\n' +
-                       'Link: ' + link;
-            }
-            window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) +
-                                   '&body=' + encodeURIComponent(body);
-        });
-    }
+    // Note: Email Link button handler is in render() because complete state
+    // calls setupDynamicListeners, not setupEventListeners
+};
+
+// ─── Helper: build token-based link (origin/locale/route/#friendlyKey) ───────
+SendUpload.prototype._v028_buildTokenLink = function(friendlyKey) {
+    var locale   = this._detectLocalePrefix();
+    var delivery = this.result && this.result.delivery || 'download';
+    var route    = delivery === 'download' ? 'download' : delivery;
+    return window.location.origin + '/' + locale + '/' + route + '/#' + friendlyKey;
 };
 
 // ─── Override: _v026_renderToken — show simple token + full link ─────────────
 SendUpload.prototype._v026_renderToken = function(result) {
     var friendlyKey = result.friendlyKey || '';
-    var fullLink    = result.combinedUrl || result.linkOnlyUrl || '';
+    var tokenLink   = this._v028_buildTokenLink(friendlyKey);
 
     return '<div class="v026-share-value">' +
         '<label class="v026-share-label">Simple token</label>' +
@@ -245,7 +261,7 @@ SendUpload.prototype._v026_renderToken = function(result) {
     '<div class="v026-share-value" style="margin-top: var(--space-4, 1rem);">' +
         '<label class="v026-share-label">Full link</label>' +
         '<div class="v026-share-row">' +
-            '<div class="v026-share-box" id="full-link">' + this.escapeHtml(fullLink) + '</div>' +
+            '<div class="v026-share-box" id="full-link">' + this.escapeHtml(tokenLink) + '</div>' +
             '<button class="btn btn-sm" data-copy="full-link">Copy</button>' +
         '</div>' +
         '<div class="v026-share-guidance">Direct link &mdash; anyone with this can decrypt the file</div>' +
