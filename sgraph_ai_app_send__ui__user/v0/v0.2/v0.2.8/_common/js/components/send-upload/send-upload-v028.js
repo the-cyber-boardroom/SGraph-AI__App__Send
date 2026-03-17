@@ -8,7 +8,7 @@
        2. Delivery — download/view/browse
        3. Share mode — token/combined/separate
        4. Confirm — review choices
-       5. Encrypt & Send — processing (encrypt + upload)
+       5. Encrypt & Upload — processing (encrypt + upload)
        6. Done — result in chosen mode
      - Next button moved INLINE with step indicator (same row, vertically centred)
        Eliminates the empty space below the step bar.
@@ -41,7 +41,7 @@ var _v026_renderToken     = SendUpload.prototype._v026_renderToken;
 
 // ─── Update step indicator to 6 steps ───────────────────────────────────────
 if (typeof SendStepIndicator !== 'undefined') {
-    SendStepIndicator.STEP_LABELS = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Encrypt & Send', 'Done'];
+    SendStepIndicator.STEP_LABELS = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Encrypt & Upload', 'Done'];
 }
 
 // ─── New state-to-step mapping (6 steps) ────────────────────────────────────
@@ -100,7 +100,7 @@ SendUpload.prototype.render = function() {
     if (this.state === 'choosing-delivery' || this.state === 'choosing-share') {
         nextBtnHtml = '<button class="v028-inline-next" id="v028-next-btn">Next \u2192</button>';
     } else if (this.state === 'confirming') {
-        nextBtnHtml = '<button class="v028-inline-next v028-inline-next--send" id="v028-next-btn">Encrypt &amp; Send \u2192</button>';
+        nextBtnHtml = '<button class="v028-inline-next v028-inline-next--send" id="v028-next-btn">Encrypt &amp; Upload \u2192</button>';
     } else if (isProcessing) {
         nextBtnHtml = '<button class="v028-inline-next v028-inline-next--disabled" disabled>Encrypting\u2026</button>';
     } else if (this.state === 'complete') {
@@ -179,8 +179,8 @@ SendUpload.prototype.render = function() {
                     body = 'I\'ve shared a file with you via SGraph Send.\n\n' +
                            'Link: ' + link;
                 }
-                window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) +
-                                       '&body=' + encodeURIComponent(body);
+                window.open('mailto:?subject=' + encodeURIComponent(subject) +
+                            '&body=' + encodeURIComponent(body), '_blank');
             });
         }
     }
@@ -254,7 +254,7 @@ SendUpload.prototype._v026_renderToken = function(result) {
         '<label class="v026-share-label">Simple token</label>' +
         '<div class="v026-share-row">' +
             '<div class="v026-share-box v026-share-box--friendly" id="simple-token">' + this.escapeHtml(friendlyKey) + '</div>' +
-            '<button class="btn btn-sm" data-copy="simple-token">Copy</button>' +
+            '<button class="btn btn-sm v028-copy-btn" data-copy="simple-token">Copy</button>' +
         '</div>' +
         '<div class="v026-share-guidance">This token derives both the transfer ID and decryption key</div>' +
     '</div>' +
@@ -262,7 +262,7 @@ SendUpload.prototype._v026_renderToken = function(result) {
         '<label class="v026-share-label">Full link</label>' +
         '<div class="v026-share-row">' +
             '<div class="v026-share-box" id="full-link">' + this.escapeHtml(tokenLink) + '</div>' +
-            '<button class="btn btn-sm" data-copy="full-link">Copy</button>' +
+            '<button class="btn btn-sm v028-copy-btn" data-copy="full-link">Copy</button>' +
         '</div>' +
         '<div class="v026-share-guidance">Direct link &mdash; anyone with this can decrypt the file</div>' +
     '</div>';
@@ -273,7 +273,7 @@ SendUpload.prototype._v026_renderConfirm = function() {
     var html = _v026_renderConfirm.call(this);
     html = html.replace(
         'Review your choices, then hit the button below.',
-        'Review your choices, then hit Encrypt &amp; Send.'
+        'Review your choices, then hit Encrypt &amp; Upload.'
     );
     return html;
 };
@@ -353,6 +353,44 @@ SendUpload.prototype._v026_renderConfirm = function() {
         .v028-hover-highlight {\
             border-color: var(--color-primary, #4ECDC4) !important;\
             background: var(--accent-subtle, rgba(78, 205, 196, 0.12)) !important;\
+        }\
+        \
+        /* Copy buttons — outlined, compact */\
+        .v028-copy-btn {\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.3)) !important;\
+            background: transparent !important;\
+            color: var(--color-text, #E0E0E0) !important;\
+            padding: 0.4rem 1rem !important;\
+            font-size: var(--text-sm, 0.875rem) !important;\
+            font-weight: var(--weight-medium, 500) !important;\
+            border-radius: var(--radius-sm, 6px) !important;\
+            cursor: pointer;\
+            transition: border-color 0.2s, background 0.2s, color 0.2s;\
+            white-space: nowrap;\
+            min-width: 60px;\
+        }\
+        .v028-copy-btn:hover {\
+            border-color: var(--color-primary, #4ECDC4) !important;\
+            color: var(--color-primary, #4ECDC4) !important;\
+            background: rgba(78, 205, 196, 0.08) !important;\
+        }\
+        \
+        /* Send another — larger ghost button, not primary color */\
+        #send-another-btn {\
+            font-size: var(--text-base, 1rem) !important;\
+            padding: 0.625rem 2rem !important;\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.25)) !important;\
+            border-radius: var(--radius-sm, 6px) !important;\
+            background: transparent !important;\
+            color: var(--color-text-secondary, #8892A0) !important;\
+            cursor: pointer;\
+            transition: border-color 0.2s, color 0.2s, background 0.2s;\
+            margin-top: var(--space-6, 1.5rem);\
+        }\
+        #send-another-btn:hover {\
+            border-color: var(--color-text-secondary, #8892A0) !important;\
+            color: var(--color-text, #E0E0E0) !important;\
+            background: rgba(136, 146, 160, 0.08) !important;\
         }\
         \
         /* Mobile */\
