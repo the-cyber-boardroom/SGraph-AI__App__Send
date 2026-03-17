@@ -245,12 +245,38 @@ SendUpload.prototype._v028_buildTokenLink = function(friendlyKey) {
     return window.location.origin + '/' + locale + '/' + route + '/#' + friendlyKey;
 };
 
-// ─── Override: _v026_renderToken — show simple token + full link ─────────────
+// ─── Override: _v026_renderToken — file info + simple token + full link + QR ──
 SendUpload.prototype._v026_renderToken = function(result) {
     var friendlyKey = result.friendlyKey || '';
     var tokenLink   = this._v028_buildTokenLink(friendlyKey);
 
-    return '<div class="v026-share-value">' +
+    // File info
+    var fileInfoHtml = '';
+    var file = this.selectedFile;
+    var isFolder = !!this._folderScan;
+    if (file || isFolder) {
+        var icon = isFolder ? '&#128193;' : '&#128196;';
+        var name = isFolder ? (this._folderName || 'folder') + '/' : file.name;
+        var size = isFolder ? this.formatBytes(this._folderScan.totalSize) : this.formatBytes(file.size);
+        fileInfoHtml = '<div class="v028-file-info">' +
+            '<span class="v028-file-info__icon">' + icon + '</span>' +
+            '<span class="v028-file-info__name">' + this.escapeHtml(name) + '</span>' +
+            '<span class="v028-file-info__size">' + size + '</span>' +
+        '</div>';
+    }
+
+    // QR code for full link
+    var qrHtml = '';
+    if (window.sgraphSend && window.sgraphSend.qr && tokenLink) {
+        var svg = window.sgraphSend.qr.toSvg(tokenLink, { ecl: 'medium', border: 2, lightColor: '#ffffff', darkColor: '#1A1A2E' });
+        qrHtml = '<div class="v028-qr-section">' +
+            '<div class="v028-qr-code">' + svg + '</div>' +
+            '<div class="v028-qr-label">Scan to open link</div>' +
+        '</div>';
+    }
+
+    return fileInfoHtml +
+    '<div class="v026-share-value">' +
         '<label class="v026-share-label">Simple token</label>' +
         '<div class="v026-share-row">' +
             '<div class="v026-share-box v026-share-box--friendly" id="simple-token">' + this.escapeHtml(friendlyKey) + '</div>' +
@@ -265,6 +291,44 @@ SendUpload.prototype._v026_renderToken = function(result) {
             '<button class="btn btn-sm v028-copy-btn" data-copy="full-link">Copy</button>' +
         '</div>' +
         '<div class="v026-share-guidance">Direct link &mdash; anyone with this can decrypt the file</div>' +
+    '</div>' +
+    qrHtml;
+};
+
+// ─── Override: _v023_renderProcessing — live timing bars as stages complete ──
+SendUpload.prototype._v023_renderProcessing = function() {
+    var stage = SendUpload.PROGRESS_STAGES[this.state];
+    var pct   = stage ? stage.pct : 5;
+    var label = stage ? this.t(stage.label) : 'Processing...';
+
+    // Build completed stage rows from timestamps
+    var allStages = ['zipping', 'reading', 'encrypting', 'creating', 'uploading', 'completing'];
+    var ts = this._stageTimestamps || {};
+    var completedRows = '';
+    var currentIndex = allStages.indexOf(this.state);
+
+    for (var i = 0; i < allStages.length; i++) {
+        var s = allStages[i];
+        var next = allStages[i + 1] || this.state;
+        if (ts[s] && ts[next] && i < currentIndex) {
+            var ms = ts[next] - ts[s];
+            var stageLabel = this.t(SendUpload.PROGRESS_STAGES[s]?.label || s).replace('...', '');
+            completedRows +=
+                '<div class="v028-live-timing__row">' +
+                    '<span class="v028-live-timing__label">' + this.escapeHtml(stageLabel) + '</span>' +
+                    '<span class="v028-live-timing__check">&#10003;</span>' +
+                    '<span class="v028-live-timing__ms">' + ms + 'ms</span>' +
+                '</div>';
+        }
+    }
+
+    return '<div class="v023-processing">' +
+        '<div class="v023-processing__label">' + this.escapeHtml(label) + '</div>' +
+        '<div class="progress-bar" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100">' +
+            '<div class="progress-bar__fill" style="width: ' + pct + '%;"></div>' +
+        '</div>' +
+        (completedRows ? '<div class="v028-live-timing">' + completedRows + '</div>' : '') +
+        '<div class="v023-processing__hint">Your file is being encrypted in your browser. Keep this tab open.</div>' +
     '</div>';
 };
 
@@ -353,6 +417,85 @@ SendUpload.prototype._v026_renderConfirm = function() {
         .v028-hover-highlight {\
             border-color: var(--color-primary, #4ECDC4) !important;\
             background: var(--accent-subtle, rgba(78, 205, 196, 0.12)) !important;\
+        }\
+        \
+        /* File info bar on Done screen */\
+        .v028-file-info {\
+            display: flex;\
+            align-items: center;\
+            gap: var(--space-2, 0.5rem);\
+            padding: 0.5rem 0.75rem;\
+            margin-bottom: var(--space-4, 1rem);\
+            background: var(--bg-secondary, #16213E);\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));\
+            border-radius: var(--radius-sm, 6px);\
+            font-size: var(--text-sm, 0.875rem);\
+        }\
+        .v028-file-info__icon {\
+            font-size: 1.1rem;\
+        }\
+        .v028-file-info__name {\
+            color: var(--color-text, #E0E0E0);\
+            font-weight: var(--weight-medium, 500);\
+            overflow: hidden;\
+            text-overflow: ellipsis;\
+            white-space: nowrap;\
+            flex: 1;\
+            min-width: 0;\
+        }\
+        .v028-file-info__size {\
+            color: var(--color-text-secondary, #8892A0);\
+            white-space: nowrap;\
+        }\
+        \
+        /* QR code section */\
+        .v028-qr-section {\
+            display: flex;\
+            flex-direction: column;\
+            align-items: center;\
+            margin-top: var(--space-4, 1rem);\
+        }\
+        .v028-qr-code {\
+            width: 160px;\
+            height: 160px;\
+            padding: 8px;\
+            background: #ffffff;\
+            border-radius: var(--radius-sm, 6px);\
+        }\
+        .v028-qr-code svg {\
+            width: 100%;\
+            height: 100%;\
+        }\
+        .v028-qr-label {\
+            font-size: var(--text-small, 0.75rem);\
+            color: var(--color-text-secondary, #8892A0);\
+            margin-top: var(--space-2, 0.5rem);\
+            opacity: 0.7;\
+        }\
+        \
+        /* Live timing rows during processing */\
+        .v028-live-timing {\
+            margin-top: var(--space-3, 0.75rem);\
+            display: flex;\
+            flex-direction: column;\
+            gap: var(--space-1, 0.25rem);\
+        }\
+        .v028-live-timing__row {\
+            display: flex;\
+            align-items: center;\
+            gap: var(--space-2, 0.5rem);\
+            font-size: var(--text-sm, 0.875rem);\
+            color: var(--color-text-secondary, #8892A0);\
+        }\
+        .v028-live-timing__label {\
+            min-width: 110px;\
+        }\
+        .v028-live-timing__check {\
+            color: var(--color-primary, #4ECDC4);\
+        }\
+        .v028-live-timing__ms {\
+            margin-left: auto;\
+            font-family: var(--font-mono, monospace);\
         }\
         \
         /* Copy buttons — outlined, compact */\
