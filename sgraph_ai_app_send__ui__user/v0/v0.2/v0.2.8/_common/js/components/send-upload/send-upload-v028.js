@@ -17,8 +17,8 @@
      - Step 2: Default delivery pre-selected; deselects on hover, reselects
        on mouseout if nothing clicked. Badge: "RECOMMENDED" → "DEFAULT".
      - Step 4: Remove duplicate bottom Encrypt & Send button
-     - Step 6: "Copy Link" button. In simple token mode, show ONLY token + key
-       (no success banner, file summary, delivery label, security note, etc.)
+     - Step 6: "Email Link" button. In simple token mode, show simple token
+       prominently + full link below (no transfer ID, no success banner, etc.)
 
    Loads AFTER v0.2.7 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -104,7 +104,7 @@ SendUpload.prototype.render = function() {
     } else if (isProcessing) {
         nextBtnHtml = '<button class="v028-inline-next v028-inline-next--disabled" disabled>Encrypting\u2026</button>';
     } else if (this.state === 'complete') {
-        nextBtnHtml = '<button class="v028-inline-next" id="v028-copy-link-btn">Copy Link</button>';
+        nextBtnHtml = '<button class="v028-inline-next" id="v028-email-link-btn">Email Link</button>';
     }
 
     // Wrap step indicator + button in a flex row
@@ -207,26 +207,49 @@ SendUpload.prototype.setupEventListeners = function() {
         });
     }
 
-    // ── Step 6: Copy Link button — copies token + key together ──
-    var copyLinkBtn = this.querySelector('#v028-copy-link-btn');
-    if (copyLinkBtn && this.result) {
-        copyLinkBtn.addEventListener('click', function() {
-            var text = '';
+    // ── Step 6: Email Link button — opens mailto with link ──
+    var emailBtn = this.querySelector('#v028-email-link-btn');
+    if (emailBtn && this.result) {
+        emailBtn.addEventListener('click', function() {
+            var link = self.result.combinedUrl || self.result.linkOnlyUrl || '';
+            var subject = 'Secure file shared via SGraph Send';
+            var body = '';
             if (self._v026_shareMode === 'token' && self.result.friendlyKey) {
-                text = 'Token: ' + (self.result.transferId || '') + '\nKey: ' + self.result.friendlyKey;
-            } else if (self.result.combinedUrl) {
-                text = self.result.combinedUrl;
-            } else if (self.result.linkOnlyUrl) {
-                text = self.result.linkOnlyUrl;
+                body = 'I\'ve shared a file with you via SGraph Send.\n\n' +
+                       'Simple token: ' + self.result.friendlyKey + '\n\n' +
+                       'Enter the token at: ' + window.location.origin + '\n\n' +
+                       'Or use this direct link:\n' + link;
+            } else {
+                body = 'I\'ve shared a file with you via SGraph Send.\n\n' +
+                       'Link: ' + link;
             }
-            if (text) {
-                navigator.clipboard.writeText(text).then(function() {
-                    copyLinkBtn.textContent = 'Copied!';
-                    setTimeout(function() { copyLinkBtn.textContent = 'Copy Link'; }, 2000);
-                });
-            }
+            window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) +
+                                   '&body=' + encodeURIComponent(body);
         });
     }
+};
+
+// ─── Override: _v026_renderToken — show simple token + full link ─────────────
+SendUpload.prototype._v026_renderToken = function(result) {
+    var friendlyKey = result.friendlyKey || '';
+    var fullLink    = result.combinedUrl || result.linkOnlyUrl || '';
+
+    return '<div class="v026-share-value">' +
+        '<label class="v026-share-label">Simple token</label>' +
+        '<div class="v026-share-row">' +
+            '<div class="v026-share-box v026-share-box--friendly" id="simple-token">' + this.escapeHtml(friendlyKey) + '</div>' +
+            '<button class="btn btn-sm" data-copy="simple-token">Copy</button>' +
+        '</div>' +
+        '<div class="v026-share-guidance">This token derives both the transfer ID and decryption key</div>' +
+    '</div>' +
+    '<div class="v026-share-value" style="margin-top: var(--space-4, 1rem);">' +
+        '<label class="v026-share-label">Full link</label>' +
+        '<div class="v026-share-row">' +
+            '<div class="v026-share-box" id="full-link">' + this.escapeHtml(fullLink) + '</div>' +
+            '<button class="btn btn-sm" data-copy="full-link">Copy</button>' +
+        '</div>' +
+        '<div class="v026-share-guidance">Direct link &mdash; anyone with this can decrypt the file</div>' +
+    '</div>';
 };
 
 // ─── Override: _v026_renderConfirm — update hint text ───────────────────────
