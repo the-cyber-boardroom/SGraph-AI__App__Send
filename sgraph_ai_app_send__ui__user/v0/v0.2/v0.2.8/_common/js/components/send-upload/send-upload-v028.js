@@ -245,10 +245,10 @@ SendUpload.prototype._v026_renderConfirm = function() {
     var style = document.createElement('style');
     style.id = 'v028-styles';
     style.textContent = '\
-        /* Header row: step indicator + Next button inline, vertically centred */\
+        /* Header row: step indicator + Next button inline, aligned to top */\
         .v028-header-row {\
             display: flex;\
-            align-items: center;\
+            align-items: flex-start;\
             gap: var(--space-4, 1rem);\
         }\
         .v028-header-row__steps {\
@@ -259,13 +259,14 @@ SendUpload.prototype._v026_renderConfirm = function() {
             flex-shrink: 0;\
         }\
         \
-        /* Inline Next button — fixed width so step indicator does not shift */\
+        /* Inline Next button — fixed size so step indicator does not shift */\
         .v028-inline-next {\
             display: inline-flex;\
             align-items: center;\
             justify-content: center;\
             min-width: 160px;\
-            padding: var(--space-2, 0.5rem) var(--space-5, 1.25rem);\
+            height: 50px;\
+            padding: 0 var(--space-5, 1.25rem);\
             background: var(--color-primary, #4ECDC4);\
             color: var(--color-bg, #1A1A2E);\
             border: none;\
