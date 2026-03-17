@@ -348,9 +348,11 @@ SendUpload.prototype._v023_startProcessing = async function() {
         } finally {
             SendCrypto.generateKey = origGenKey;
         }
-        // Store friendly key in result for display
+        // Store friendly key in result and re-render (original already rendered without it)
         if (this.result) {
             this.result.friendlyKey = this._v026_friendlyKey;
+            this.render();
+            this.setupDynamicListeners();
         }
     } else {
         await _v025_startProcessing.call(this);
@@ -511,11 +513,15 @@ SendUpload.prototype.renderResult = function() {
         }
     }
 
+    // When encrypted with a friendly key, mode is locked (key is PBKDF2-derived, can't switch)
+    var modeLocked = selectedMode === 'token' && result.friendlyKey;
+    var changeBtn = modeLocked ? '' : '<button class="v026-mode-change" id="v026-change-mode">Change</button>';
+
     return successHtml + summaryHtml + deliveryLabel +
         '<div class="v026-mode-header">' +
             '<span class="v026-mode-header__icon">' + modeConfig.icon + '</span>' +
             '<span class="v026-mode-header__title">' + this.escapeHtml(modeConfig.title) + '</span>' +
-            '<button class="v026-mode-change" id="v026-change-mode">Change</button>' +
+            changeBtn +
         '</div>' +
         detailHtml +
         '<div class="v026-security-note">' +
