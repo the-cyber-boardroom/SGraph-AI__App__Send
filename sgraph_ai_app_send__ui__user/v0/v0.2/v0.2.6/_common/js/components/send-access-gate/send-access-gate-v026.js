@@ -22,6 +22,30 @@ if (typeof SendAccessGate === 'undefined') {
 
 // Store original methods
 var _v020_updateTokenBar = SendAccessGate.prototype.updateTokenBar;
+var _v020_showContent    = SendAccessGate.prototype.showContent;
+
+// ─── Processing states where Change Token is dangerous ──────────────────────
+var BUSY_STATES = ['zipping', 'reading', 'encrypting', 'creating', 'uploading', 'completing'];
+
+// ─── Override: showContent — watch upload state to hide bar during processing ─
+SendAccessGate.prototype.showContent = function() {
+    _v020_showContent.call(this);
+    var self = this;
+
+    // Watch for upload state changes via MutationObserver on the upload component
+    var upload = this.querySelector('send-upload');
+    if (upload) {
+        var observer = new MutationObserver(function() {
+            var bar = self.querySelector('#token-status-bar');
+            if (!bar) return;
+            var state = upload.state || 'idle';
+            var isBusy = BUSY_STATES.indexOf(state) !== -1;
+            bar.style.display = isBusy ? 'none' : '';
+        });
+        observer.observe(upload, { childList: true, subtree: true });
+        this._v026_observer = observer;
+    }
+};
 
 // ─── Override: updateTokenBar — redesigned with title, show/hide, share note ─
 SendAccessGate.prototype.updateTokenBar = function(bar, remaining) {
