@@ -315,6 +315,36 @@ class test_Routes__Transfers(TestCase):
         b64_data     = b64_download.json()
         assert base64.b64decode(b64_data['data']) == raw_payload
 
+    # --- Client-provided transfer ID (PBKDF2 simple-token mode) ---
+
+    def test__create_with_client_transfer_id(self):
+        client_id = 'deadbeefcafe'                                               # Valid 12-char lowercase hex
+        response  = self.client.post('/api/transfers/create',
+                                      json=dict(file_size_bytes   = 1024,
+                                                content_type_hint = 'text/plain',
+                                                transfer_id       = client_id))
+        assert response.status_code == 200
+        data = response.json()
+        assert data['transfer_id'] == client_id
+
+    def test__create_with_duplicate_transfer_id__409(self):
+        client_id = 'aabbccddeeff'
+        self.client.post('/api/transfers/create',
+                         json=dict(file_size_bytes = 1024, transfer_id = client_id))
+        response = self.client.post('/api/transfers/create',
+                                     json=dict(file_size_bytes = 1024, transfer_id = client_id))
+        assert response.status_code == 409
+
+    def test__create_with_invalid_transfer_id_format__400(self):
+        response = self.client.post('/api/transfers/create',
+                                     json=dict(file_size_bytes = 1024, transfer_id = 'not-hex-value'))
+        assert response.status_code == 400
+
+    def test__create_without_transfer_id__uses_random(self):
+        response = self.client.post('/api/transfers/create',
+                                     json=dict(file_size_bytes = 1024)).json()
+        assert len(response['transfer_id']) == 12                                # Server-generated random hex
+
     # --- Security: complete response must not leak sensitive data ---
 
     def test__complete__does_not_leak_token(self):
