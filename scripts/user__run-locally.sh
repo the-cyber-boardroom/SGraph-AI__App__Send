@@ -20,7 +20,7 @@ API_ENDPOINT="${SGRAPH_API_ENDPOINT:-https://dev.send.sgraph.ai}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
-UI_VERSION_UPLOAD="v0.2.0"
+UI_VERSION_UPLOAD="v0.2.3"
 UI_VERSION_DOWNLOAD="v0.2.2"
 SERVE_DIR="$REPO_ROOT/.local-server-user"
 
@@ -37,6 +37,7 @@ echo "Building local server directory (mirroring production URL structure)..."
 rm -rf "$SERVE_DIR"
 mkdir -p "$SERVE_DIR"
 
+UPLOAD_BASE_DIR="$STATIC_DIR/v0/v0.2/v0.2.0"
 UPLOAD_DIR="$STATIC_DIR/v0/v0.2/$UI_VERSION_UPLOAD"
 DOWNLOAD_DIR="$STATIC_DIR/v0/v0.2/$UI_VERSION_DOWNLOAD"
 
@@ -50,13 +51,24 @@ if [ ! -d "$DOWNLOAD_DIR" ]; then
 fi
 
 # ─── Build merged _common ────────────────────────────────────────────────────
-# Start with v0.2.0's _common (has all components: upload, welcome, etc.)
-# Then overlay v0.2.2's real files (api-client.js, send-download-v022.*, etc.)
+# Start with v0.2.0's _common (has all base components: upload, welcome, etc.)
+# Then overlay upload version's real files (e.g. v0.2.3 step indicator, overlay)
+# Then overlay download version's real files (e.g. v0.2.2 send-download-v022.*)
 
 # Copy v0.2.0's _common as base (resolving symlinks)
-cp -rL "$UPLOAD_DIR/_common" "$SERVE_DIR/_common"
+cp -rL "$UPLOAD_BASE_DIR/_common" "$SERVE_DIR/_common"
 
-# Overlay v0.2.2's real (non-symlink) files on top
+# Overlay upload version's real (non-symlink) files on top
+if [ "$UI_VERSION_UPLOAD" != "v0.2.0" ]; then
+    find "$UPLOAD_DIR/_common" -type f | while read -r src; do
+        rel="${src#$UPLOAD_DIR/_common/}"
+        dest="$SERVE_DIR/_common/$rel"
+        mkdir -p "$(dirname "$dest")"
+        cp "$src" "$dest"
+    done
+fi
+
+# Overlay download version's real (non-symlink) files on top
 # This picks up: api-client.js, send-download-v022.js, send-download-v022.css
 find "$DOWNLOAD_DIR/_common" -type f | while read -r src; do
     rel="${src#$DOWNLOAD_DIR/_common/}"
@@ -66,7 +78,7 @@ find "$DOWNLOAD_DIR/_common" -type f | while read -r src; do
 done
 
 # ─── Symlink locale pages ────────────────────────────────────────────────────
-# en-gb/index.html        → upload page (v0.2.0)
+# en-gb/index.html        → upload page (v0.2.3)
 # en-gb/download/          → download page (v0.2.2)
 # en-gb/welcome/           → welcome page (v0.2.0)
 
@@ -79,9 +91,11 @@ ln -sf "$UPLOAD_DIR/en-gb/index.html" "$SERVE_DIR/en-gb/index.html"
 mkdir -p "$SERVE_DIR/en-gb/download"
 ln -sf "$DOWNLOAD_DIR/en-gb/download/index.html" "$SERVE_DIR/en-gb/download/index.html"
 
-# Welcome page
+# Welcome page (may be in upload version or base)
 if [ -d "$UPLOAD_DIR/en-gb/welcome" ]; then
     ln -sf "$UPLOAD_DIR/en-gb/welcome" "$SERVE_DIR/en-gb/welcome"
+elif [ -d "$UPLOAD_BASE_DIR/en-gb/welcome" ]; then
+    ln -sf "$UPLOAD_BASE_DIR/en-gb/welcome" "$SERVE_DIR/en-gb/welcome"
 fi
 
 # ─── Inject build-info.js ────────────────────────────────────────────────────
@@ -100,6 +114,8 @@ JSEOF
 # The send-test-files component resolves ../test-files from en-gb/ → /test-files/
 if [ -d "$UPLOAD_DIR/test-files" ]; then
     ln -sf "$UPLOAD_DIR/test-files" "$SERVE_DIR/test-files"
+elif [ -d "$UPLOAD_BASE_DIR/test-files" ]; then
+    ln -sf "$UPLOAD_BASE_DIR/test-files" "$SERVE_DIR/test-files"
 fi
 
 # ─── Root redirect ───────────────────────────────────────────────────────────
