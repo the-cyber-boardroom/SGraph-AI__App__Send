@@ -434,6 +434,30 @@ class test_Routes__Vault__Pointer(TestCase):
                                          headers = {'content-type': 'application/json'})
         assert response.status_code in (400, 401)                                # Missing write-key or access token
 
+    # === Health check endpoint ===
+
+    def test__health__existing_vault(self):
+        """Health check returns ok for a vault that has been written to."""
+        vault = 'health-vault-1'
+        self._write(vault_id=vault, file_id='setup-file', payload=b'data')       # Creates manifest
+        response = self.client.get(f'/api/vault/health/{vault}')
+        assert response.status_code == 200
+        assert response.json()     == dict(status='ok', vault_id=vault)
+
+    def test__health__nonexistent_vault(self):
+        """Health check returns 404 for a vault that doesn't exist."""
+        response = self.client.get('/api/vault/health/no-such-vault')
+        assert response.status_code == 404
+
+    def test__health__no_auth_required(self):
+        """Health check is unauthenticated — serves as Lambda warm-up."""
+        vault = 'health-vault-2'
+        self._write(vault_id=vault, file_id='setup-file', payload=b'data')
+        from starlette.testclient import TestClient
+        unauthenticated = TestClient(self.client.app)
+        response = unauthenticated.get(f'/api/vault/health/{vault}')
+        assert response.status_code == 200
+
     # === Slashed file_id via individual endpoints (path converter) ===
 
     def test__write_read_delete__slashed_file_id(self):
