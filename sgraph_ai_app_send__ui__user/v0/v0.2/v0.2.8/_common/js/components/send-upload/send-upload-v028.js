@@ -10,13 +10,15 @@
        4. Confirm — review choices
        5. Encrypt & Send — processing (encrypt + upload)
        6. Done — result in chosen mode
-     - Next button moved INLINE with step indicator (same row, right side)
+     - Next button moved INLINE with step indicator (same row, vertically centred)
        Eliminates the empty space below the step bar.
+       Fixed width so the step indicator doesn't shift between states.
      - Next button visible but DISABLED during step 5 (processing)
      - Step 2: Default delivery pre-selected; deselects on hover, reselects
        on mouseout if nothing clicked. Badge: "RECOMMENDED" → "DEFAULT".
      - Step 4: Remove duplicate bottom Encrypt & Send button
-     - Step 6: In simple token mode, hide share mode header + add Copy All
+     - Step 6: "Copy Link" button. In simple token mode, show ONLY token + key
+       (no success banner, file summary, delivery label, security note, etc.)
 
    Loads AFTER v0.2.7 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -35,6 +37,7 @@ var _v027_render          = SendUpload.prototype.render;
 var _v027_setupEvents     = SendUpload.prototype.setupEventListeners;
 var _v027_handleNext      = SendUpload.prototype._v027_handleNext;
 var _v026_renderConfirm   = SendUpload.prototype._v026_renderConfirm;
+var _v026_renderToken     = SendUpload.prototype._v026_renderToken;
 
 // ─── Update step indicator to 6 steps ───────────────────────────────────────
 if (typeof SendStepIndicator !== 'undefined') {
@@ -100,8 +103,8 @@ SendUpload.prototype.render = function() {
         nextBtnHtml = '<button class="v028-inline-next v028-inline-next--send" id="v028-next-btn">Encrypt &amp; Send \u2192</button>';
     } else if (isProcessing) {
         nextBtnHtml = '<button class="v028-inline-next v028-inline-next--disabled" disabled>Encrypting\u2026</button>';
-    } else if (this.state === 'complete' && this._v026_shareMode === 'token') {
-        nextBtnHtml = '<button class="v028-inline-next" id="v028-copy-all-btn">Copy All</button>';
+    } else if (this.state === 'complete') {
+        nextBtnHtml = '<button class="v028-inline-next" id="v028-copy-link-btn">Copy Link</button>';
     }
 
     // Wrap step indicator + button in a flex row
@@ -136,10 +139,24 @@ SendUpload.prototype.render = function() {
         if (sendAction) sendAction.remove();
     }
 
-    // ── Step 6: In simple token mode, simplify the display ──
+    // ── Step 6: In simple token mode, strip everything except token + key ──
     if (this.state === 'complete' && this._v026_shareMode === 'token' && !this._v026_showPicker) {
-        var modeHeader = this.querySelector('.v026-mode-header');
-        if (modeHeader) modeHeader.remove();
+        // Remove success banner, file summary, delivery label, mode header,
+        // security note, timings, transparency — keep only the share values + send another
+        var toRemove = [
+            '.v026-success-banner',
+            '.v023-file-summary',
+            '.v023-delivery-choice',
+            '.v026-mode-header',
+            '.v026-security-note',
+            '.v023-timings',
+            '#transparency-panel'
+        ];
+        var self = this;
+        toRemove.forEach(function(sel) {
+            var el = self.querySelector(sel);
+            if (el) el.remove();
+        });
     }
 
     // Start/stop carousel for processing states
@@ -150,7 +167,7 @@ SendUpload.prototype.render = function() {
     }
 };
 
-// ─── Override: setupEventListeners — inline Next + hover + Copy All ─────────
+// ─── Override: setupEventListeners — inline Next + hover + Copy Link ────────
 SendUpload.prototype.setupEventListeners = function() {
     var self = this;
 
@@ -190,17 +207,24 @@ SendUpload.prototype.setupEventListeners = function() {
         });
     }
 
-    // ── Step 6: Copy All button ──
-    var copyAllBtn = this.querySelector('#v028-copy-all-btn');
-    if (copyAllBtn && this.result) {
-        copyAllBtn.addEventListener('click', function() {
-            var transferId  = self.result.transferId  || '';
-            var friendlyKey = self.result.friendlyKey || '';
-            var text = 'Token: ' + transferId + '\nKey: ' + friendlyKey;
-            navigator.clipboard.writeText(text).then(function() {
-                copyAllBtn.textContent = 'Copied!';
-                setTimeout(function() { copyAllBtn.textContent = 'Copy All'; }, 2000);
-            });
+    // ── Step 6: Copy Link button — copies token + key together ──
+    var copyLinkBtn = this.querySelector('#v028-copy-link-btn');
+    if (copyLinkBtn && this.result) {
+        copyLinkBtn.addEventListener('click', function() {
+            var text = '';
+            if (self._v026_shareMode === 'token' && self.result.friendlyKey) {
+                text = 'Token: ' + (self.result.transferId || '') + '\nKey: ' + self.result.friendlyKey;
+            } else if (self.result.combinedUrl) {
+                text = self.result.combinedUrl;
+            } else if (self.result.linkOnlyUrl) {
+                text = self.result.linkOnlyUrl;
+            }
+            if (text) {
+                navigator.clipboard.writeText(text).then(function() {
+                    copyLinkBtn.textContent = 'Copied!';
+                    setTimeout(function() { copyLinkBtn.textContent = 'Copy Link'; }, 2000);
+                });
+            }
         });
     }
 };
@@ -221,10 +245,10 @@ SendUpload.prototype._v026_renderConfirm = function() {
     var style = document.createElement('style');
     style.id = 'v028-styles';
     style.textContent = '\
-        /* Header row: step indicator + Next button inline */\
+        /* Header row: step indicator + Next button inline, vertically centred */\
         .v028-header-row {\
             display: flex;\
-            align-items: flex-start;\
+            align-items: center;\
             gap: var(--space-4, 1rem);\
         }\
         .v028-header-row__steps {\
@@ -233,14 +257,14 @@ SendUpload.prototype._v026_renderConfirm = function() {
         }\
         .v028-header-row__action {\
             flex-shrink: 0;\
-            padding-top: var(--space-1, 0.25rem);\
         }\
         \
-        /* Inline Next button */\
+        /* Inline Next button — fixed width so step indicator does not shift */\
         .v028-inline-next {\
             display: inline-flex;\
             align-items: center;\
-            gap: var(--space-2, 0.5rem);\
+            justify-content: center;\
+            min-width: 160px;\
             padding: var(--space-2, 0.5rem) var(--space-5, 1.25rem);\
             background: var(--color-primary, #4ECDC4);\
             color: var(--color-bg, #1A1A2E);\
@@ -251,6 +275,7 @@ SendUpload.prototype._v026_renderConfirm = function() {
             cursor: pointer;\
             transition: transform 0.15s, box-shadow 0.2s, background 0.2s;\
             white-space: nowrap;\
+            box-sizing: border-box;\
         }\
         .v028-inline-next:hover:not(:disabled) {\
             transform: translateY(-1px);\
@@ -261,7 +286,6 @@ SendUpload.prototype._v026_renderConfirm = function() {
             transform: translateY(0);\
         }\
         .v028-inline-next--send {\
-            padding: var(--space-2, 0.5rem) var(--space-6, 1.5rem);\
             box-shadow: 0 2px 8px rgba(78, 205, 196, 0.25);\
         }\
         .v028-inline-next--disabled {\
@@ -298,9 +322,9 @@ SendUpload.prototype._v026_renderConfirm = function() {
             }\
             .v028-header-row__action {\
                 align-self: flex-end;\
-                padding-top: 0;\
             }\
             .v028-inline-next {\
+                min-width: 120px;\
                 padding: var(--space-2, 0.5rem) var(--space-4, 1rem);\
                 font-size: var(--text-small, 0.75rem);\
             }\
@@ -309,6 +333,6 @@ SendUpload.prototype._v026_renderConfirm = function() {
     document.head.appendChild(style);
 })();
 
-console.log('[send-upload-v028] 6-step wizard, inline Next button, default selection, Copy All');
+console.log('[send-upload-v028] 6-step wizard, inline Next button, default selection, Copy Link');
 
 })();
