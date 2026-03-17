@@ -33,6 +33,7 @@ const _v025_resetForNew        = SendUpload.prototype.resetForNew;
 const _v025_advanceToDelivery  = SendUpload.prototype._v023_advanceToDelivery;
 const _v025_renderStep3        = SendUpload.prototype._v023_renderStep3;
 const _v025_render             = SendUpload.prototype.render;
+const _v025_startProcessing    = SendUpload.prototype._v023_startProcessing;
 
 // ─── Update step indicator to 5 steps ───────────────────────────────────────
 if (typeof SendStepIndicator !== 'undefined') {
@@ -95,10 +96,21 @@ SendUpload.prototype.render = function() {
     this._v023_goingBack = false;
 };
 
-// ─── Override: skip file-ready for ALL files ────────────────────────────────
+// ─── Override: skip file-ready for ALL files + reorder delivery (view first) ─
 SendUpload.prototype._v023_advanceToDelivery = function() {
     this._v024_userConfirmed = true;
     _v025_advanceToDelivery.call(this);
+    // Reorder: viewable options (view/browse/gallery) before download
+    var opts = this._v023_deliveryOptions;
+    if (opts && opts.length > 1) {
+        var viewFirst = [], downloadLast = [];
+        opts.forEach(function(o) {
+            (o.id === 'download' ? downloadLast : viewFirst).push(o);
+        });
+        this._v023_deliveryOptions = viewFirst.concat(downloadLast);
+        this.render();
+        this.setupEventListeners();
+    }
 };
 
 // ─── Share mode definitions ────────────────────────────────────────────────
@@ -128,6 +140,71 @@ var SHARE_MODES = [
         security: 'Neither piece works alone'
     }
 ];
+
+// ─── Word list for friendly keys (~256 common words) ─────────────────────────
+var V026_WORDS = [
+    'amber','anchor','apple','arrow','atlas','badge','baker','beach','berry','birch',
+    'blade','blank','blaze','bloom','board','bold','bonus','brave','bread','brick',
+    'brook','brush','cabin','camel','candy','cargo','cedar','chain','chalk','charm',
+    'chess','chief','chill','civic','claim','clay','cliff','climb','clock','cloud',
+    'coach','coast','cocoa','coral','crane','crash','creek','crisp','cross','crown',
+    'cubic','curve','dance','delta','diary','dodge','dove','draft','dream','drift',
+    'drum','dune','eagle','earth','echo','elder','elite','ember','epoch','equal',
+    'fable','faith','feast','field','flame','flash','flint','float','flora','focus',
+    'forge','found','frost','fruit','fudge','gaze','giant','glade','glass','gleam',
+    'globe','glow','gold','grace','grain','grand','grape','green','grove','guard',
+    'guide','guild','halo','haven','hawk','heart','hedge','herb','honey','hound',
+    'humor','ivory','jewel','jolly','judge','karma','lake','latch','lemon','level',
+    'light','lily','linen','lion','logic','lotus','lucky','lunar','magic','manor',
+    'maple','marsh','match','mayor','medal','melon','mercy','mirth','model','moose',
+    'mount','music','myth','noble','north','novel','oasis','ocean','olive','onset',
+    'onyx','orbit','otter','oxide','palm','panel','patch','peace','pearl','petal',
+    'pilot','pixel','plant','plaza','plume','plush','polar','pouch','prism','proud',
+    'pulse','quail','queen','quest','quick','radar','rain','rapid','raven','reach',
+    'realm','relay','ridge','river','robin','robot','royal','ruby','rumor','sage',
+    'sandy','satin','scale','scene','scout','shade','shark','shell','shift','shine',
+    'silk','slate','smile','solar','solid','sonic','spark','spell','spice','spine',
+    'spoke','staff','stamp','star','steam','steel','stone','storm','sugar','sunny',
+    'surge','sweep','swift','table','tango','terra','thorn','tiger','toast','token',
+    'topaz','tower','trace','trail','trend','tulip','twist','ultra','union','unity',
+    'urban','valid','valve','vault','verse','vigor','vine','vinyl','vivid','voice',
+    'water','wave','wheat','whole','willow','wind','wolf','wonder','world','yacht',
+    'yarn','yield','zenith','zinc','zone'
+];
+
+function v026_randomWord() {
+    var arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return V026_WORDS[arr[0] % V026_WORDS.length];
+}
+
+function v026_randomSuffix() {
+    var arr = new Uint8Array(1);
+    crypto.getRandomValues(arr);
+    return String(arr[0] % 100).padStart(2, '0');
+}
+
+function v026_newFriendlyKey() {
+    return { words: [v026_randomWord(), v026_randomWord()], suffix: v026_randomSuffix() };
+}
+
+function v026_formatFriendly(parts) {
+    return parts.words[0] + '-' + parts.words[1] + '-' + parts.suffix;
+}
+
+async function v026_deriveKeyFromFriendly(passphrase) {
+    var enc = new TextEncoder();
+    var material = await crypto.subtle.importKey(
+        'raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: enc.encode('sgraph-send-v1'), iterations: 600000, hash: 'SHA-256' },
+        material,
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
+    );
+}
 
 // ─── Step 3: Share mode selection (auto-advances on click) ──────────────────
 SendUpload.prototype._v026_renderShareChoice = function() {
@@ -166,9 +243,46 @@ SendUpload.prototype._v026_renderConfirm = function() {
     var shareMode = this._v026_shareMode || 'token';
     var shareModeConfig = SHARE_MODES.find(function(m) { return m.id === shareMode; });
 
+    // Generate friendly key if not already set and share mode is token
+    if (shareMode === 'token' && !this._v026_friendlyParts) {
+        this._v026_friendlyParts = v026_newFriendlyKey();
+        this._v026_friendlyKey = v026_formatFriendly(this._v026_friendlyParts);
+    }
+
     var largeWarning = file && file.size > 2 * 1024 * 1024 * 1024
         ? '<div class="v023-large-warning" style="margin-top: var(--space-4, 1rem);">Large files may take several minutes to encrypt. Keep this tab open.</div>'
         : '';
+
+    // Word picker (only for token mode)
+    var wordPickerHtml = '';
+    if (shareMode === 'token' && this._v026_friendlyParts) {
+        var fp = this._v026_friendlyParts;
+        wordPickerHtml =
+            '<div class="v026-word-picker">' +
+                '<label class="v026-word-picker__label">Your friendly key</label>' +
+                '<div class="v026-word-picker__slots">' +
+                    '<div class="v026-word-picker__slot">' +
+                        '<span class="v026-word-picker__word">' + this.escapeHtml(fp.words[0]) + '</span>' +
+                        '<button class="v026-word-picker__shuffle-btn" data-shuffle-word="0" title="Shuffle this word">&#128256;</button>' +
+                    '</div>' +
+                    '<span class="v026-word-picker__sep">&mdash;</span>' +
+                    '<div class="v026-word-picker__slot">' +
+                        '<span class="v026-word-picker__word">' + this.escapeHtml(fp.words[1]) + '</span>' +
+                        '<button class="v026-word-picker__shuffle-btn" data-shuffle-word="1" title="Shuffle this word">&#128256;</button>' +
+                    '</div>' +
+                    '<span class="v026-word-picker__sep">&mdash;</span>' +
+                    '<div class="v026-word-picker__slot">' +
+                        '<span class="v026-word-picker__suffix">' + this.escapeHtml(fp.suffix) + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="v026-word-picker__preview">' +
+                    '<span class="v026-word-picker__key" id="v026-friendly-display">' + this.escapeHtml(this._v026_friendlyKey) + '</span>' +
+                    '<button class="v026-word-picker__action" data-copy="v026-friendly-display" title="Copy">&#128203;</button>' +
+                    '<button class="v026-word-picker__action" id="v026-shuffle-all" title="Generate new key">&#128256; New</button>' +
+                '</div>' +
+                '<div class="v026-word-picker__hint">Share this verbally or in a message &mdash; easy to remember and type</div>' +
+            '</div>';
+    }
 
     return '<h3 class="v023-step-title">Ready to encrypt and send</h3>' +
         '<p class="v023-step-desc" style="margin-bottom: var(--space-5, 1.25rem);">Review your choices, then hit the button below.</p>' +
@@ -199,9 +313,12 @@ SendUpload.prototype._v026_renderConfirm = function() {
             '</div>' : '') +
         '</div>' +
 
+        wordPickerHtml +
+
         // Security note
         '<div class="v026-security-note" style="margin-top: var(--space-4, 1rem);">' +
-            '<span>&#128274;</span> Your file will be encrypted in your browser before upload. The server never sees your data.' +
+            '<span>&#128274;</span> Your file will be encrypted in your browser' +
+            (shareMode === 'token' ? ' using this key. The server never sees your data or key.' : ' before upload. The server never sees your data.') +
         '</div>' +
 
         largeWarning +
@@ -215,6 +332,29 @@ SendUpload.prototype._v026_renderConfirm = function() {
         '</div>' +
 
         '<button class="v023-back-link" id="v026-back-to-share">&larr; Back</button>';
+};
+
+// ─── Override: startProcessing — use PBKDF2-derived key for friendly keys ────
+SendUpload.prototype._v023_startProcessing = async function() {
+    var self = this;
+    if (this._v026_shareMode === 'token' && this._v026_friendlyKey) {
+        // Temporarily swap key generation to use PBKDF2 from friendly key
+        var origGenKey = SendCrypto.generateKey;
+        SendCrypto.generateKey = function() {
+            return v026_deriveKeyFromFriendly(self._v026_friendlyKey);
+        };
+        try {
+            await _v025_startProcessing.call(this);
+        } finally {
+            SendCrypto.generateKey = origGenKey;
+        }
+        // Store friendly key in result for display
+        if (this.result) {
+            this.result.friendlyKey = this._v026_friendlyKey;
+        }
+    } else {
+        await _v025_startProcessing.call(this);
+    }
 };
 
 // ─── Override: setupEventListeners ──────────────────────────────────────────
@@ -258,6 +398,30 @@ SendUpload.prototype.setupEventListeners = function() {
         changeShare.addEventListener('click', function() {
             self._v023_goingBack = true;
             self.state = 'choosing-share';
+            self.render();
+            self.setupEventListeners();
+        });
+    }
+
+    // Word picker: shuffle individual words
+    this.querySelectorAll('[data-shuffle-word]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var idx = parseInt(btn.getAttribute('data-shuffle-word'), 10);
+            if (self._v026_friendlyParts && self._v026_friendlyParts.words[idx] !== undefined) {
+                self._v026_friendlyParts.words[idx] = v026_randomWord();
+                self._v026_friendlyKey = v026_formatFriendly(self._v026_friendlyParts);
+                self.render();
+                self.setupEventListeners();
+            }
+        });
+    });
+
+    // Word picker: shuffle all
+    var shuffleAll = this.querySelector('#v026-shuffle-all');
+    if (shuffleAll) {
+        shuffleAll.addEventListener('click', function() {
+            self._v026_friendlyParts = v026_newFriendlyKey();
+            self._v026_friendlyKey = v026_formatFriendly(self._v026_friendlyParts);
             self.render();
             self.setupEventListeners();
         });
@@ -400,6 +564,28 @@ SendUpload.prototype._v026_renderSeparate = function(result) {
 // ─── Token + key rendering ──────────────────────────────────────────────────
 SendUpload.prototype._v026_renderToken = function(result) {
     var transferId = result.transferId || '';
+    var friendlyKey = result.friendlyKey || null;
+
+    if (friendlyKey) {
+        return '<div class="v026-share-value">' +
+            '<label class="v026-share-label">1. Share this token</label>' +
+            '<div class="v026-share-row">' +
+                '<div class="v026-share-box v026-share-box--token" id="transfer-token">' + this.escapeHtml(transferId) + '</div>' +
+                '<button class="btn btn-sm" data-copy="transfer-token">' + this.escapeHtml(this.t('upload.result.copy')) + '</button>' +
+            '</div>' +
+            '<div class="v026-share-guidance">Recipient enters this at ' + this.escapeHtml(window.location.origin) + '</div>' +
+        '</div>' +
+        '<div class="v026-share-value" style="margin-top: var(--space-4, 1rem);">' +
+            '<label class="v026-share-label">2. Share this key</label>' +
+            '<div class="v026-share-row">' +
+                '<div class="v026-share-box v026-share-box--friendly" id="friendly-key">' + this.escapeHtml(friendlyKey) + '</div>' +
+                '<button class="btn btn-sm" data-copy="friendly-key">' + this.escapeHtml(this.t('upload.result.copy')) + '</button>' +
+            '</div>' +
+            '<div class="v026-share-guidance">Tell them this key &mdash; easy to say and type</div>' +
+        '</div>';
+    }
+
+    // Fallback: no friendly key, show raw key
     return '<div class="v026-share-value">' +
         '<label class="v026-share-label">1. Share this token</label>' +
         '<div class="v026-share-row">' +
@@ -465,8 +651,10 @@ SendUpload.prototype.setupDynamicListeners = function() {
 
 // ─── Override: resetForNew — clear share mode ───────────────────────────────
 SendUpload.prototype.resetForNew = function() {
-    this._v026_shareMode  = null;
-    this._v026_showPicker = false;
+    this._v026_shareMode      = null;
+    this._v026_showPicker     = false;
+    this._v026_friendlyParts  = null;
+    this._v026_friendlyKey    = null;
     _v025_resetForNew.call(this);
 };
 
@@ -737,12 +925,116 @@ SendUpload.prototype.resetForNew = function() {
             border-radius: var(--radius-sm, 6px);\
         }\
         \
+        /* Word picker */\
+        .v026-word-picker {\
+            margin-top: var(--space-4, 1rem);\
+            padding: var(--space-4, 1rem);\
+            background: var(--color-surface, #1E2A4A);\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));\
+            border-radius: var(--radius-md, 12px);\
+        }\
+        .v026-word-picker__label {\
+            display: block;\
+            font-size: var(--text-sm, 0.875rem);\
+            font-weight: var(--weight-semibold, 600);\
+            color: var(--color-text, #E0E0E0);\
+            margin-bottom: var(--space-3, 0.75rem);\
+        }\
+        .v026-word-picker__slots {\
+            display: flex;\
+            align-items: center;\
+            gap: var(--space-2, 0.5rem);\
+            justify-content: center;\
+            flex-wrap: wrap;\
+        }\
+        .v026-word-picker__slot {\
+            display: flex;\
+            align-items: center;\
+            gap: var(--space-1, 0.25rem);\
+            background: var(--bg-secondary, #16213E);\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));\
+            border-radius: var(--radius-sm, 6px);\
+            padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);\
+        }\
+        .v026-word-picker__word,\
+        .v026-word-picker__suffix {\
+            font-family: var(--font-mono, monospace);\
+            font-size: var(--text-body, 1rem);\
+            font-weight: var(--weight-semibold, 600);\
+            color: var(--color-primary, #4ECDC4);\
+        }\
+        .v026-word-picker__shuffle-btn {\
+            background: none;\
+            border: none;\
+            cursor: pointer;\
+            padding: 2px;\
+            font-size: 0.875rem;\
+            color: var(--color-text-secondary, #8892A0);\
+            border-radius: var(--radius-xs, 4px);\
+            transition: color 0.2s, background 0.2s;\
+            line-height: 1;\
+        }\
+        .v026-word-picker__shuffle-btn:hover {\
+            color: var(--color-primary, #4ECDC4);\
+            background: rgba(78, 205, 196, 0.08);\
+        }\
+        .v026-word-picker__sep {\
+            color: var(--color-text-secondary, #8892A0);\
+            font-size: var(--text-sm, 0.875rem);\
+        }\
+        .v026-word-picker__preview {\
+            display: flex;\
+            align-items: center;\
+            gap: var(--space-2, 0.5rem);\
+            margin-top: var(--space-3, 0.75rem);\
+            justify-content: center;\
+        }\
+        .v026-word-picker__key {\
+            font-family: var(--font-mono, monospace);\
+            font-size: var(--text-lg, 1.25rem);\
+            font-weight: var(--weight-bold, 700);\
+            color: var(--color-primary, #4ECDC4);\
+            letter-spacing: 0.05em;\
+        }\
+        .v026-word-picker__action {\
+            background: none;\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));\
+            cursor: pointer;\
+            padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);\
+            font-size: var(--text-small, 0.75rem);\
+            color: var(--color-text-secondary, #8892A0);\
+            border-radius: var(--radius-xs, 4px);\
+            transition: color 0.2s, border-color 0.2s;\
+        }\
+        .v026-word-picker__action:hover {\
+            color: var(--color-primary, #4ECDC4);\
+            border-color: var(--color-primary, #4ECDC4);\
+        }\
+        .v026-word-picker__hint {\
+            text-align: center;\
+            margin-top: var(--space-2, 0.5rem);\
+            font-size: var(--text-micro, 0.625rem);\
+            color: var(--color-text-secondary, #8892A0);\
+            opacity: 0.7;\
+        }\
+        \
+        /* Friendly key box in result */\
+        .v026-share-box--friendly {\
+            font-size: var(--text-lg, 1.25rem);\
+            letter-spacing: 0.05em;\
+            font-weight: var(--weight-semibold, 600);\
+            text-align: center;\
+            color: var(--color-primary, #4ECDC4);\
+        }\
+        \
         /* Mobile */\
         @media (max-width: 480px) {\
             .v026-share-row { flex-direction: column; align-items: stretch; }\
             .v026-share-row .btn { width: 100%; }\
             .v026-summary__label { min-width: 60px; }\
             .v026-send-btn { width: 100%; justify-content: center; }\
+            .v026-word-picker__slots { flex-direction: column; }\
+            .v026-word-picker__sep { display: none; }\
         }\
     ';
     document.head.appendChild(style);
