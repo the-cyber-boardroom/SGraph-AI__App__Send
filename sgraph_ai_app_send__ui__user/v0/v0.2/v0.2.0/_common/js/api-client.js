@@ -57,19 +57,17 @@ const ApiClient = {
 
     // ─── Transfer Lifecycle ──────────────────────────────────────────────
 
-    async createTransfer(fileSize, contentType, transferId) {
-        const payload = {
-            file_size_bytes:    fileSize,
-            content_type_hint:  contentType || 'application/octet-stream'
-        };
-        if (transferId) payload.transfer_id = transferId;
+    async createTransfer(fileSize, contentType) {
         const res = await fetch('/api/transfers/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...this._authHeaders()
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                file_size_bytes:    fileSize,
+                content_type_hint:  contentType || 'application/octet-stream'
+            })
         });
         if (!res.ok) {
             if (res.status === 401) throw new Error('ACCESS_TOKEN_INVALID');

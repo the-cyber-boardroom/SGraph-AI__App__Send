@@ -8,7 +8,8 @@
        2. AES-256 key (PBKDF2) — used for encryption
      - Uses shared FriendlyCrypto module (friendly-crypto.js)
      - Replaces v0.2.6's inline PBKDF2 derivation with FriendlyCrypto.deriveKey
-     - Adds FriendlyCrypto.deriveTransferId call during transfer creation
+     - Monkey-patches ApiClient.createTransfer to include derived transfer_id
+       in the request body (no base file modification needed)
 
    Loads AFTER v0.2.8 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -43,12 +44,26 @@ SendUpload.prototype._v023_startProcessing = async function() {
             return FriendlyCrypto.deriveKey(self._v026_friendlyKey);
         };
 
-        // Swap createTransfer to pass derived transfer ID
-        var origCreateTransfer = ApiClient.createTransfer.bind(ApiClient);
-        var boundCreateTransfer = function(fileSize, contentType) {
-            return origCreateTransfer(fileSize, contentType, derivedTransferId);
+        // Swap createTransfer to include the derived transfer_id in the body
+        // (v0.2.0 base doesn't accept transfer_id, so we replace the function)
+        var origCreateTransfer = ApiClient.createTransfer;
+        ApiClient.createTransfer = async function(fileSize, contentType) {
+            var payload = {
+                file_size_bytes:   fileSize,
+                content_type_hint: contentType || 'application/octet-stream',
+                transfer_id:       derivedTransferId
+            };
+            var res = await fetch('/api/transfers/create', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, ApiClient._authHeaders()),
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                if (res.status === 401) throw new Error('ACCESS_TOKEN_INVALID');
+                throw new Error('Create transfer failed: ' + res.status);
+            }
+            return res.json();
         };
-        ApiClient.createTransfer = boundCreateTransfer;
 
         try {
             await _v028_startProcessing.call(this);
