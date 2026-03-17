@@ -222,6 +222,19 @@ async function v026_deriveKeyFromFriendly(passphrase) {
     );
 }
 
+/** Derive a deterministic 12-char hex transfer ID from a friendly token.
+ *  SHA-256(token) → first 12 hex chars. Must match FriendlyCrypto.deriveTransferId. */
+async function v026_deriveTransferId(friendlyToken) {
+    var enc = new TextEncoder();
+    var hash = await crypto.subtle.digest('SHA-256', enc.encode(friendlyToken));
+    var bytes = new Uint8Array(hash);
+    var hex = '';
+    for (var i = 0; i < 6; i++) {
+        hex += bytes[i].toString(16).padStart(2, '0');
+    }
+    return hex;
+}
+
 // ─── Step 3: Share mode selection (auto-advances on click) ──────────────────
 SendUpload.prototype._v026_renderShareChoice = function() {
     var self = this;
@@ -351,19 +364,47 @@ SendUpload.prototype._v026_renderConfirm = function() {
         '<button class="v023-back-link" id="v026-back-to-share">&larr; Back</button>';
 };
 
-// ─── Override: startProcessing — use PBKDF2-derived key for friendly keys ────
+// ─── Override: startProcessing — derive key + transfer ID from friendly token ──
 SendUpload.prototype._v023_startProcessing = async function() {
     var self = this;
     if (this._v026_shareMode === 'token' && this._v026_friendlyKey) {
+        // Derive deterministic transfer ID from friendly token (SHA-256 → 12 hex)
+        var derivedTransferId = await v026_deriveTransferId(this._v026_friendlyKey);
+
         // Temporarily swap key generation to use PBKDF2 from friendly key
         var origGenKey = SendCrypto.generateKey;
         SendCrypto.generateKey = function() {
             return v026_deriveKeyFromFriendly(self._v026_friendlyKey);
         };
+
+        // Temporarily swap createTransfer to include derived transfer_id
+        var origCreateTransfer = ApiClient.createTransfer;
+        ApiClient.createTransfer = async function(fileSize, contentType) {
+            var fetchFn = typeof ApiClient._fetch === 'function'
+                        ? ApiClient._fetch.bind(ApiClient)
+                        : function(path, opts) { return fetch(path, opts); };
+            var res = await fetchFn('/api/transfers/create', {
+                method:  'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, ApiClient._authHeaders()),
+                body:    JSON.stringify({
+                    file_size_bytes:   fileSize,
+                    content_type_hint: contentType || 'application/octet-stream',
+                    transfer_id:       derivedTransferId
+                })
+            });
+            if (!res.ok) {
+                if (res.status === 401) throw new Error('ACCESS_TOKEN_INVALID');
+                if (res.status === 409) throw new Error('Transfer ID collision — please retry');
+                throw new Error('Create transfer failed: ' + res.status);
+            }
+            return res.json();
+        };
+
         try {
             await _v025_startProcessing.call(this);
         } finally {
-            SendCrypto.generateKey = origGenKey;
+            SendCrypto.generateKey    = origGenKey;
+            ApiClient.createTransfer  = origCreateTransfer;
         }
         // Store friendly key in result and re-render (original already rendered without it)
         if (this.result) {
