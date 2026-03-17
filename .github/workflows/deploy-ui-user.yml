@@ -1,30 +1,22 @@
 name: Deploy User UI to S3
 
-# Publishes v0.2.0 (base) + v0.2.1 + v0.2.2 (IFD overlays) static UI files to S3.
+# Publishes v0.2.0 (base) + all v0.2.x IFD overlays to S3.
 # CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
 #
-# IFD deployment model:
-#   1. Deploy v0.2.0 base → releases/v0/v0.2/v0.2.0/ + overlay onto latest/
-#   2. Deploy v0.2.1 overlay → releases/v0/v0.2/v0.2.1/ + overlay onto latest/
-#   3. Deploy v0.2.2 overlay → releases/v0/v0.2/v0.2.2/ + overlay onto latest/
-#   latest/ = union of v0.2.0 + v0.2.1 + v0.2.2 (later overlays win)
+# IFD deployment model (auto-discovery):
+#   1. v0.2.0 is always the base — deployed first
+#   2. All v0.2.x directories (x > 0) are discovered automatically and deployed
+#      in version order as overlays onto latest/
+#   latest/ = union of v0.2.0 + all overlays (later versions win)
 #
-# Deploy is manifest-driven — manifest.json lists exactly what gets deployed:
-#   - source_folders: _common/, en-gb/, i18n/ (in git)
-#   - ci_generated_folders: locale HTML pages (generated here, never in git)
-#   - root_files: manifest.json
+# Adding a new IFD version:
+#   Just create sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.N/ with your overlay
+#   files. The CI will auto-discover and deploy it. No workflow changes needed.
 #
 # S3 path isolation by branch/environment:
 #   websites/sgraph-send/dev/    — dev branch (automatic)
 #   websites/sgraph-send/main/   — main branch (automatic)
 #   websites/sgraph-send/prod/   — production (manual dispatch)
-#
-# Steps:
-#   1. Generate i18n locale pages for v0.2.0, v0.2.1, and v0.2.2
-#   2. Deploy v0.2.0 base to S3 (releases + latest overlay)
-#   3. Deploy v0.2.1 overlay to S3 (releases + latest overlay)
-#   4. Deploy v0.2.2 overlay to S3 (releases + latest overlay)
-#   5. Invalidate CloudFront cache
 #
 # Environments:
 #   - dev:        dev.send.sgraph.ai   (default — push to dev branch)
@@ -58,7 +50,7 @@ on:
           - dev
           - production
       rebuild_latest:
-        description: 'Clean latest/ first, then deploy v0.2.0 + v0.2.1 + v0.2.2 from scratch (removes stale files)'
+        description: 'Clean latest/ first, then deploy all versions from scratch (removes stale files)'
         required: false
         default: false
         type: boolean
@@ -68,14 +60,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION      : eu-west-2
-  UI_VERSION_BASE : v0.2.0
-  UI_VERSION_V021 : v0.2.1
-  UI_VERSION      : v0.2.2
-  # IFD: base + overlays. All three get deployed in order.
-  SOURCE_DIR_BASE : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.0
-  SOURCE_DIR_V021 : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.1
-  SOURCE_DIR      : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.2
+  AWS_REGION       : eu-west-2
+  UI_BASE_DIR      : sgraph_ai_app_send__ui__user/v0/v0.2
+  UI_VERSION_BASE  : v0.2.0
 
 jobs:
   deploy:
@@ -93,17 +80,29 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Inject build version into UI (v0.2.0 base + v0.2.1 + v0.2.2 overlays)
+      - name: Discover IFD versions
+        id: discover
         run: |
-          python scripts/inject_build_version.py --version ${{ env.UI_VERSION_BASE }}
-          python scripts/inject_build_version.py --version ${{ env.UI_VERSION_V021 }}
-          python scripts/inject_build_version.py --version ${{ env.UI_VERSION }}
+          # Find all v0.2.x directories, sort by version number
+          VERSIONS=$(ls -d ${{ env.UI_BASE_DIR }}/v0.2.* | xargs -n1 basename | sort -t. -k3 -n)
+          echo "Found IFD versions:"
+          echo "$VERSIONS"
+          # Store as space-separated list
+          echo "versions=$(echo $VERSIONS | tr '\n' ' ')" >> $GITHUB_OUTPUT
 
-      - name: Generate i18n locale pages (v0.2.0 base + v0.2.1 + v0.2.2 overlays)
+      - name: Inject build version into all IFD versions
         run: |
-          python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION_BASE }}
-          python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION_V021 }}
-          python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION }}
+          for VERSION in ${{ steps.discover.outputs.versions }}; do
+            echo "Injecting build version into $VERSION"
+            python scripts/inject_build_version.py --version "$VERSION"
+          done
+
+      - name: Generate i18n locale pages for all IFD versions
+        run: |
+          for VERSION in ${{ steps.discover.outputs.versions }}; do
+            echo "Generating i18n pages for $VERSION"
+            python scripts/generate_send_i18n_pages.py --version "$VERSION"
+          done
 
       - name: Check AWS credentials
         id: check-creds
@@ -141,46 +140,40 @@ jobs:
             echo "Deploying to DEV (dev.send.sgraph.ai) → S3: websites/sgraph-send/dev/"
           fi
 
-      - name: Deploy v0.2.0 base to S3
+      - name: Deploy all IFD versions to S3 (base + overlays in order)
         if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
-          # Deploy v0.2.0 base first. On rebuild, clean latest/ before overlaying.
-          CLEAN_FLAG=""
-          if [ "${{ inputs.rebuild_latest }}" == "true" ]; then
-            CLEAN_FLAG="--clean-latest"
-          fi
-          python scripts/deploy_static_site.py \
-            --site sgraph-send \
-            --version ${{ env.UI_VERSION_BASE }} \
-            --source-dir ${{ env.SOURCE_DIR_BASE }} \
-            --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
-            --region ${{ env.AWS_REGION }} \
-            --deploy-env ${{ steps.env.outputs.deploy_env }} \
-            --skip-validation \
-            $CLEAN_FLAG
+          VERSIONS=(${{ steps.discover.outputs.versions }})
+          LAST_INDEX=$(( ${#VERSIONS[@]} - 1 ))
 
-      - name: Deploy v0.2.1 overlay to S3
-        if: steps.check-creds.outputs.has-credentials == 'true'
-        run: |
-          python scripts/deploy_static_site.py \
-            --site sgraph-send \
-            --version ${{ env.UI_VERSION_V021 }} \
-            --source-dir ${{ env.SOURCE_DIR_V021 }} \
-            --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
-            --region ${{ env.AWS_REGION }} \
-            --deploy-env ${{ steps.env.outputs.deploy_env }} \
-            --skip-validation
+          for i in "${!VERSIONS[@]}"; do
+            VERSION="${VERSIONS[$i]}"
+            SOURCE_DIR="${{ env.UI_BASE_DIR }}/$VERSION"
+            echo ""
+            echo "=== Deploying $VERSION ($SOURCE_DIR) ==="
 
-      - name: Deploy v0.2.2 overlay to S3
-        if: steps.check-creds.outputs.has-credentials == 'true'
-        run: |
-          python scripts/deploy_static_site.py \
-            --site sgraph-send \
-            --version ${{ env.UI_VERSION }} \
-            --source-dir ${{ env.SOURCE_DIR }} \
-            --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
-            --region ${{ env.AWS_REGION }} \
-            --deploy-env ${{ steps.env.outputs.deploy_env }} \
-            --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} \
-            --skip-validation \
-            --version-file sgraph_ai_app_send/version
+            EXTRA_FLAGS=""
+
+            # First version (base): apply clean flag if rebuild requested
+            if [ "$i" -eq 0 ] && [ "${{ inputs.rebuild_latest }}" == "true" ]; then
+              EXTRA_FLAGS="--clean-latest"
+            fi
+
+            # Last version: include CloudFront invalidation and version file
+            if [ "$i" -eq "$LAST_INDEX" ]; then
+              EXTRA_FLAGS="$EXTRA_FLAGS --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} --version-file sgraph_ai_app_send/version"
+            fi
+
+            python scripts/deploy_static_site.py \
+              --site sgraph-send \
+              --version "$VERSION" \
+              --source-dir "$SOURCE_DIR" \
+              --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
+              --region ${{ env.AWS_REGION }} \
+              --deploy-env ${{ steps.env.outputs.deploy_env }} \
+              --skip-validation \
+              $EXTRA_FLAGS
+          done
+
+          echo ""
+          echo "=== Deployed ${#VERSIONS[@]} IFD versions: ${VERSIONS[*]} ==="
