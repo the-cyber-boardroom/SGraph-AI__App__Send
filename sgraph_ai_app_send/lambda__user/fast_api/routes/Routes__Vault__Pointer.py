@@ -140,11 +140,6 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     async def batch__vault_id(self, vault_id : Safe_Str__Id,                     # POST /vault/batch/{vault_id}
                                     request  : Request
                               ) -> dict:
-        self.check_access_token(request)
-        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
-        if not write_key:
-            raise HTTPException(status_code = 400,
-                                detail      = 'Missing write key')
         body = await request.json()
         operations = body.get('operations', [])
         if not operations:
@@ -153,6 +148,18 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if len(operations) > BATCH_MAX_OPERATIONS:
             raise HTTPException(status_code = 400,
                                 detail      = f'Too many operations (max {BATCH_MAX_OPERATIONS})')
+
+        read_only = all(op.get('op') == 'read' for op in operations)
+
+        if read_only:                                                            # Read-only batch — no auth required (data is encrypted)
+            return self.vault_service.batch_read(vault_id   = str(vault_id) ,
+                                                  operations = operations    )
+
+        self.check_access_token(request)                                         # Mixed/write batch — require auth
+        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
+        if not write_key:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Missing write key')
         result = self.vault_service.batch(vault_id      = str(vault_id)  ,
                                           operations    = operations      ,
                                           write_key_hex = write_key      )
