@@ -179,9 +179,9 @@ function v026_randomWord() {
 }
 
 function v026_randomSuffix() {
-    var arr = new Uint8Array(1);
+    var arr = new Uint16Array(1);
     crypto.getRandomValues(arr);
-    return String(arr[0] % 100).padStart(2, '0');
+    return String(arr[0] % 10000).padStart(4, '0');
 }
 
 function v026_newFriendlyKey() {
@@ -281,6 +281,7 @@ SendUpload.prototype._v026_renderConfirm = function() {
                     '<button class="v026-word-picker__action" id="v026-shuffle-all" title="Generate new key">&#128256; New</button>' +
                 '</div>' +
                 '<div class="v026-word-picker__hint">Share this verbally or in a message &mdash; easy to remember and type</div>' +
+                '<div class="v026-word-picker__hint" style="opacity: 0.5; margin-top: 0.25rem;">' + (V026_WORDS.length + ' words &times; ' + V026_WORDS.length + ' words &times; 10,000 = ' + (V026_WORDS.length * V026_WORDS.length * 10000).toLocaleString() + ' combinations') + '</div>' +
             '</div>';
     }
 
