@@ -20,8 +20,8 @@ API_ENDPOINT="${SGRAPH_API_ENDPOINT:-https://dev.send.sgraph.ai}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
-UI_VERSION_UPLOAD="v0.2.8"
-UI_VERSION_DOWNLOAD="v0.2.2"
+UI_VERSION_UPLOAD="v0.2.9"
+UI_VERSION_DOWNLOAD="v0.2.3"
 SERVE_DIR="$REPO_ROOT/.local-server-user"
 
 # Clean up on exit
@@ -86,7 +86,8 @@ done
 
 # ─── Symlink locale pages ────────────────────────────────────────────────────
 # en-gb/index.html        → upload page (latest upload version)
-# en-gb/download/          → download page (v0.2.2)
+# en-gb/download/          → download page (v0.2.3 — friendly token support)
+# en-gb/browse|gallery|v|view/ → viewer routes (same as download, different titles)
 # en-gb/welcome/           → welcome page (v0.2.0)
 
 mkdir -p "$SERVE_DIR/en-gb"
@@ -94,9 +95,17 @@ mkdir -p "$SERVE_DIR/en-gb"
 # Upload page
 ln -sf "$UPLOAD_DIR/en-gb/index.html" "$SERVE_DIR/en-gb/index.html"
 
-# Download page (v0.2.2)
+# Download page
 mkdir -p "$SERVE_DIR/en-gb/download"
 ln -sf "$DOWNLOAD_DIR/en-gb/download/index.html" "$SERVE_DIR/en-gb/download/index.html"
+
+# Viewer route pages (browse, gallery, v, view — same download component, different titles)
+for route in browse gallery v view; do
+    if [ -d "$DOWNLOAD_DIR/en-gb/$route" ]; then
+        mkdir -p "$SERVE_DIR/en-gb/$route"
+        ln -sf "$DOWNLOAD_DIR/en-gb/$route/index.html" "$SERVE_DIR/en-gb/$route/index.html"
+    fi
+done
 
 # Welcome page (may be in upload version or base)
 if [ -d "$UPLOAD_DIR/en-gb/welcome" ]; then
@@ -145,6 +154,8 @@ echo "  URLs:"
 echo "    Home:           http://localhost:$PORT/"
 echo "    Upload:         http://localhost:$PORT/en-gb/"
 echo "    Download:       http://localhost:$PORT/en-gb/download/"
+echo "    Browse:         http://localhost:$PORT/en-gb/browse/"
+echo "    View:           http://localhost:$PORT/en-gb/v/"
 echo ""
 echo "  Backend API:    $API_ENDPOINT"
 echo "    Override:     SGRAPH_API_ENDPOINT=https://send.sgraph.ai ./scripts/user__run-locally.sh"
