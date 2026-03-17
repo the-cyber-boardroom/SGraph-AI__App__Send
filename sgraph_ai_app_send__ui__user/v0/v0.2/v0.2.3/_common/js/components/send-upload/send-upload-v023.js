@@ -3,12 +3,13 @@
    v0.2.3 — Surgical overlay on v0.2.0
 
    Changes:
-     - Three-step wizard state machine (file-ready -> choosing-delivery -> choosing-share)
+     - Four-step wizard: Upload → Choose delivery → Encrypt & Send → Share
      - Step indicator (<send-step-indicator>) rendered at top of card
      - MAX_FILE_SIZE_PRESIGNED raised to 10GB
      - Encryption happens LAST — after all user choices
-     - New states: file-ready, choosing-delivery, choosing-share
-     - Processing phase: zipping -> reading -> encrypting -> creating -> uploading -> completing
+     - Folder compression deferred to processing phase (step 3)
+     - File/folder selection goes straight to delivery choice (step 2)
+     - Processing phase: zipping → reading → encrypting → creating → uploading → completing
 
    Loads AFTER v0.2.0 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -35,19 +36,21 @@ const _v020_handleFileSelect    = SendUpload.prototype.handleFileSelect;
 
 // ─── Step mapping ───────────────────────────────────────────────────────────
 // Maps state to which step the user is on (for the step indicator)
+// Steps: 1=Upload, 2=Choose delivery, 3=Encrypt & Send, 4=Share
+const TOTAL_STEPS = 4;
 const STATE_TO_STEP = {
     'idle':              1,
     'folder-options':    1,
     'file-ready':        1,
     'choosing-delivery': 2,
     'choosing-share':    3,
-    'zipping':           1,
+    'zipping':           3,
     'reading':           3,
     'encrypting':        3,
     'creating':          3,
     'uploading':         3,
     'completing':        3,
-    'complete':          3,
+    'complete':          4,
     'error':             1
 };
 
@@ -105,10 +108,8 @@ SendUpload.prototype.render = function() {
     const step = STATE_TO_STEP[this.state] || 1;
     const isProcessing = !!SendUpload.PROGRESS_STAGES[this.state] || this.state === 'zipping';
 
-    // Step indicator (always visible except on complete)
-    const stepIndicator = this.state !== 'complete'
-        ? `<send-step-indicator step="${step}" total="3"></send-step-indicator>`
-        : '';
+    // Step indicator (always visible — step 4 is Share/complete)
+    const stepIndicator = `<send-step-indicator step="${step}" total="${TOTAL_STEPS}"></send-step-indicator>`;
 
     // Render step content based on current state
     let content = '';
@@ -245,10 +246,8 @@ SendUpload.prototype._v023_renderStep2 = function() {
         : (file ? this.formatBytes(file.size) : '');
 
     const cardsHtml = options.map(opt => {
-        const isSelected    = selected === opt.id;
         const isRecommended = opt.id === recommended;
         let classes = 'v023-delivery-card';
-        if (isSelected)    classes += ' v023-delivery-card--selected';
         if (isRecommended) classes += ' v023-delivery-card--recommended';
         return `
             <div class="${classes}" data-delivery="${opt.id}">
@@ -260,12 +259,6 @@ SendUpload.prototype._v023_renderStep2 = function() {
         `;
     }).join('');
 
-    const continueBtn = selected
-        ? `<div style="text-align: center; margin-top: var(--space-4, 1rem);">
-               <button class="btn btn-primary" id="v023-continue-to-share">Continue &rarr;</button>
-           </div>`
-        : '';
-
     return `
         <div class="v023-file-summary v023-file-summary--compact">
             <span class="v023-file-summary__icon">${icon}</span>
@@ -276,7 +269,6 @@ SendUpload.prototype._v023_renderStep2 = function() {
         </div>
         <h3 class="v023-step-title">How should the recipient get this?</h3>
         <div class="v023-delivery-cards">${cardsHtml}</div>
-        ${continueBtn}
         <button class="v023-back-link" id="v023-back-to-idle">&larr; Back</button>
     `;
 };
@@ -284,6 +276,8 @@ SendUpload.prototype._v023_renderStep2 = function() {
 // ─── Step 3: Choose Share Mode ──────────────────────────────────────────────
 SendUpload.prototype._v023_renderStep3 = function() {
     const delivery = this._v023_selectedDelivery || 'download';
+    const deliveryOpt = (this._v023_deliveryOptions || []).find(o => o.id === delivery);
+    const deliveryLabel = deliveryOpt ? deliveryOpt.title : delivery;
 
     // File summary at top
     const file = this.selectedFile;
@@ -299,8 +293,12 @@ SendUpload.prototype._v023_renderStep3 = function() {
             <span class="v023-file-summary__icon">${icon}</span>
             <div>
                 <div class="v023-file-summary__name">${this.escapeHtml(name)}</div>
-                <div class="v023-file-summary__meta">${meta} &middot; ${this.escapeHtml(delivery)}</div>
+                <div class="v023-file-summary__meta">${meta}</div>
             </div>
+        </div>
+        <div class="v023-delivery-choice">
+            <span class="v023-delivery-choice__label">Delivery:</span>
+            <span class="v023-delivery-choice__value">${deliveryOpt ? deliveryOpt.icon + ' ' : ''}${this.escapeHtml(deliveryLabel)}</span>
         </div>
         <h3 class="v023-step-title">Ready to encrypt and send</h3>
         <p class="v023-step-desc">
@@ -338,23 +336,15 @@ SendUpload.prototype.setupEventListeners = function() {
     // Call base for shared listeners (drag/drop, file input, folder input, mode tabs, etc.)
     _v020_setupEventListeners.call(this);
 
-    // Delivery card selection
+    // Delivery card click → go straight to step 3
     this.querySelectorAll('[data-delivery]').forEach(card => {
         card.addEventListener('click', () => {
             this._v023_selectedDelivery = card.getAttribute('data-delivery');
-            this.render();
-            this.setupEventListeners();
-        });
-    });
-
-    const continueToShare = this.querySelector('#v023-continue-to-share');
-    if (continueToShare) {
-        continueToShare.addEventListener('click', () => {
             this.state = 'choosing-share';
             this.render();
             this.setupEventListeners();
         });
-    }
+    });
 
     // Send button (Step 3 → processing)
     const sendBtn = this.querySelector('#v023-send-btn');
@@ -445,68 +435,54 @@ SendUpload.prototype.handleFileSelect = function(e) {
     }
 };
 
-// ─── Override: _handleFolderEntry — skip folder-options, auto-compress ───────
+// ─── Override: _handleFolderEntry — scan only, skip compression ─────────────
 const _v020_handleFolderEntry = SendUpload.prototype._handleFolderEntry;
 SendUpload.prototype._handleFolderEntry = function(entry) {
-    // Call base to scan the folder (populates _folderScan, _folderName)
-    // but intercept the state change to folder-options
-    const origRender = this.render.bind(this);
-    const origSetup  = this.setupEventListeners.bind(this);
     const self = this;
 
+    // Call base to scan the folder (populates _folderScan, _folderName)
     _v020_handleFolderEntry.call(this, entry);
 
-    // The base method is async (scans folder tree), so we watch for
-    // the state to become 'folder-options' and then auto-compress
+    // The base method is async (scans folder tree) and transitions to
+    // 'folder-options'. We intercept that and go straight to delivery.
+    // Compression is deferred to the processing phase (step 3).
     const checkInterval = setInterval(() => {
         if (self.state === 'folder-options') {
             clearInterval(checkInterval);
-            // Auto-compress with defaults: max compression, no empty folders, no dotfiles
             self._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
-            self._v023_autoCompressFolder();
+            self._v023_advanceToDelivery();
         }
     }, 50);
-    // Safety timeout
     setTimeout(() => clearInterval(checkInterval), 10000);
 };
 
-// ─── Auto-compress folder and advance to delivery ───────────────────────────
-const _v020_startFolderZip = SendUpload.prototype._startFolderZip;
-SendUpload.prototype._v023_autoCompressFolder = async function() {
-    try {
-        await this._loadJSZip();
-
-        this.state = 'zipping';
-        this.render();
-        this.setupEventListeners();
-
-        const zip = new JSZip();
-        const entries = this._folderScan.entries.filter(e => !e.isDir);
-        const opts = this._folderOptions;
-
-        for (const entry of entries) {
-            if (!opts.includeHidden && entry.name.startsWith('.')) continue;
-            if (entry.file) {
-                zip.file(entry.path, entry.file, { compression: opts.level > 0 ? 'DEFLATE' : 'STORE', compressionOptions: { level: opts.level } });
-            }
-        }
-
-        const blob = await zip.generateAsync({ type: 'blob' });
-        const zipName = (this._folderName || 'folder') + '.zip';
-        this.selectedFile = new File([blob], zipName, { type: 'application/zip' });
-
-        // Go straight to delivery step (skip file-ready)
-        this._v023_advanceToDelivery();
-    } catch (err) {
-        this.errorMessage = err.message || 'Failed to create zip';
-        this.state = 'error';
-        this.render();
-        this.setupEventListeners();
-    }
+// Override _startFolderZip to prevent base code from zipping early
+SendUpload.prototype._startFolderZip = function() {
+    // No-op: compression is deferred to _v023_startProcessing
 };
 
-// Keep _startFolderZip override in case base code calls it directly
-SendUpload.prototype._startFolderZip = SendUpload.prototype._v023_autoCompressFolder;
+// ─── Compress folder to zip (called during processing phase) ────────────────
+SendUpload.prototype._v023_compressFolder = async function() {
+    await this._loadJSZip();
+
+    const zip = new JSZip();
+    const entries = this._folderScan.entries.filter(e => !e.isDir);
+    const opts = this._folderOptions;
+
+    for (const entry of entries) {
+        if (!opts.includeHidden && entry.name.startsWith('.')) continue;
+        if (entry.file) {
+            zip.file(entry.path, entry.file, {
+                compression: opts.level > 0 ? 'DEFLATE' : 'STORE',
+                compressionOptions: { level: opts.level }
+            });
+        }
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const zipName = (this._folderName || 'folder') + '.zip';
+    this.selectedFile = new File([blob], zipName, { type: 'application/zip' });
+};
 
 // ─── Processing: encrypt + upload (called from Step 3) ──────────────────────
 SendUpload.prototype._v023_startProcessing = async function() {
@@ -515,9 +491,11 @@ SendUpload.prototype._v023_startProcessing = async function() {
         this.state = 'error'; this.render(); this.setupEventListeners(); return;
     }
 
-    const file = this.selectedFile;
-    if (!file) return;
-    if (file.size > SendUpload.MAX_FILE_SIZE) {
+    if (!this.selectedFile && !this._folderScan) return;
+
+    // Size check — use folder totalSize for folders, file.size for files
+    const checkSize = this._folderScan ? this._folderScan.totalSize : (this.selectedFile ? this.selectedFile.size : 0);
+    if (checkSize > SendUpload.MAX_FILE_SIZE) {
         this.errorMessage = this.t('upload.error.file_too_large', { limit: this.formatBytes(SendUpload.MAX_FILE_SIZE) });
         this.state = 'error'; this.render(); this.setupEventListeners(); return;
     }
@@ -526,7 +504,14 @@ SendUpload.prototype._v023_startProcessing = async function() {
         this._setBeforeUnload(true);
         this._stageTimestamps = {};
 
+        // Compress folder to zip if needed (deferred from drop)
+        if (this._folderScan) {
+            this.state = 'zipping'; this.render(); this.setupEventListeners();
+            await this._v023_compressFolder();
+        }
+
         // Reading
+        const file = this.selectedFile;
         this.state = 'reading'; this.render(); this.setupEventListeners();
         const rawContent = await this.readFileAsArrayBuffer(file);
         const contentType = file.type || 'application/octet-stream';
@@ -720,6 +705,26 @@ SendUpload.prototype.resetForNew = function() {
             line-height: 1.5;
         }
 
+        /* Delivery choice summary (step 3) */
+        .v023-delivery-choice {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2, 0.5rem);
+            padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+            margin-bottom: var(--space-4, 1rem);
+            border-radius: var(--radius-sm, 6px);
+            background: rgba(78, 205, 196, 0.06);
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+            font-size: var(--text-sm, 0.875rem);
+        }
+        .v023-delivery-choice__label {
+            color: var(--color-text-secondary, #8892A0);
+        }
+        .v023-delivery-choice__value {
+            color: var(--color-primary, #4ECDC4);
+            font-weight: var(--weight-semibold, 600);
+        }
+
         /* Delivery cards */
         .v023-delivery-cards {
             display: grid;
@@ -821,6 +826,6 @@ SendUpload.prototype.resetForNew = function() {
     document.head.appendChild(style);
 })();
 
-console.log('[send-upload-v023] Three-step wizard overlay loaded (10GB limit, encryption-last)');
+console.log('[send-upload-v023] Four-step wizard overlay loaded (10GB limit, compression+encryption deferred)');
 
 })();
