@@ -192,6 +192,17 @@ function v026_formatFriendly(parts) {
     return parts.words[0] + '-' + parts.words[1] + '-' + parts.suffix;
 }
 
+function v026_combinationsLabel() {
+    var total = V026_WORDS.length * V026_WORDS.length * 10000;
+    var label;
+    if (total >= 1e9) {
+        label = (total / 1e9).toFixed(1).replace(/\.0$/, '') + ' billion';
+    } else {
+        label = Math.round(total / 1e6) + ' million';
+    }
+    return V026_WORDS.length + ' words &times; ' + V026_WORDS.length + ' words &times; 10,000 = ~' + label + ' combinations';
+}
+
 async function v026_deriveKeyFromFriendly(passphrase) {
     var enc = new TextEncoder();
     var material = await crypto.subtle.importKey(
@@ -281,7 +292,7 @@ SendUpload.prototype._v026_renderConfirm = function() {
                     '<button class="v026-word-picker__action" id="v026-shuffle-all" title="Generate new key">&#128256; New</button>' +
                 '</div>' +
                 '<div class="v026-word-picker__hint">Share this verbally or in a message &mdash; easy to remember and type</div>' +
-                '<div class="v026-word-picker__hint" style="opacity: 0.5; margin-top: 0.25rem;">' + (V026_WORDS.length + ' words &times; ' + V026_WORDS.length + ' words &times; 10,000 = ' + (V026_WORDS.length * V026_WORDS.length * 10000).toLocaleString() + ' combinations') + '</div>' +
+                '<div class="v026-word-picker__hint" style="opacity: 0.5; margin-top: 0.25rem;">' + v026_combinationsLabel() + '</div>' +
             '</div>';
     }
 
