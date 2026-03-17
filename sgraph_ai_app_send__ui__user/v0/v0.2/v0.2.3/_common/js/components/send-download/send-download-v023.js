@@ -354,9 +354,24 @@ SendDownload.prototype.setupEventListeners = function() {
     document.head.appendChild(style);
 })();
 
-// ─── Re-render already-upgraded elements (same pattern as v0.2.2) ────────────
+// ─── Re-render already-upgraded elements ─────────────────────────────────────
+// When v0.2.0's customElements.define() runs, connectedCallback fires immediately
+// with v0.2.0's logic (before this overlay loads). If the hash contains a friendly
+// token, v0.2.0 would have treated it as a raw transfer ID and fired a doomed API
+// call. We detect this and re-trigger with the correct async resolution flow.
 document.querySelectorAll('send-download').forEach(function(el) {
-    if (el.state === 'error' && !el.transferId) {
+    var hash = window.location.hash.substring(1);
+    if (hash && FriendlyCrypto.isFriendlyToken(hash)) {
+        // Friendly token in URL — re-trigger the full flow with v0.2.3's logic
+        el._friendlyToken = hash;
+        el._friendlyResolved = false;
+        el.transferId = null;
+        el.hashKey = null;
+        el.state = 'loading';
+        el.render();
+        el._resolveFriendlyToken(hash);
+    } else if (el.state === 'error' && !el.transferId) {
+        // No transfer ID — show the entry form
         el.render();
         el.setupEventListeners();
     }
