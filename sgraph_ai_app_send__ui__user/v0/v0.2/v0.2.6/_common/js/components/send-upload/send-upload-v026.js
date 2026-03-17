@@ -3,14 +3,14 @@
    v0.2.6 — Surgical overlay on v0.2.5
 
    Changes:
-     - Step 4 (Share) redesigned with three sharing mode cards:
-       1. Combined link — URL with embedded key (simplest, one click)
+     - Step 4 (Share) defaults to "Combined link" mode (no card picker)
+       User can click "Change" to switch to separate key or token mode
+     - Skip file-ready pause for ALL files (single files too) — delivery
+       step already shows file info, so the intermediate screen is redundant
+     - Three sharing modes available via Change button:
+       1. Combined link — URL with embedded key (default, simplest)
        2. Link + key separate — send via different channels (more secure)
        3. Simple token — short memorable code (easiest to share verbally)
-     - Each mode shows its value(s) with copy buttons
-     - Mode selection persists within the session
-     - File summary shown at top of share step for context
-     - "Send another" resets to idle
 
    Loads AFTER v0.2.5 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -28,6 +28,15 @@ if (typeof SendUpload === 'undefined' || !SendUpload.prototype._v025_multiFile =
 const _v025_renderResult       = SendUpload.prototype.renderResult;
 const _v025_setupDynamic       = SendUpload.prototype.setupDynamicListeners;
 const _v025_resetForNew        = SendUpload.prototype.resetForNew;
+const _v025_advanceToDelivery  = SendUpload.prototype._v023_advanceToDelivery;
+
+// ─── Override: skip file-ready for ALL files ────────────────────────────────
+// The delivery step (Step 2) already shows file info at the top, so the
+// intermediate file-ready pause is redundant for single files too.
+SendUpload.prototype._v023_advanceToDelivery = function() {
+    this._v024_userConfirmed = true;
+    _v025_advanceToDelivery.call(this);
+};
 
 // ─── Share mode definitions ────────────────────────────────────────────────
 var SHARE_MODES = [
@@ -90,11 +99,12 @@ SendUpload.prototype.renderResult = function() {
             '</div>' +
         '</div>';
 
-    // Mode cards (if no mode selected yet)
-    if (!this._v026_shareMode) {
+    // Card picker mode (user clicked "Change")
+    if (this._v026_showPicker) {
         var self = this;
         var cardsHtml = SHARE_MODES.map(function(mode) {
-            return '<div class="v026-share-card" data-share-mode="' + mode.id + '">' +
+            var activeClass = mode.id === selectedMode ? ' v026-share-card--active' : '';
+            return '<div class="v026-share-card' + activeClass + '" data-share-mode="' + mode.id + '">' +
                 '<div class="v026-share-card__icon">' + mode.icon + '</div>' +
                 '<div class="v026-share-card__body">' +
                     '<div class="v026-share-card__title">' + self.escapeHtml(mode.title) + '</div>' +
@@ -114,7 +124,7 @@ SendUpload.prototype.renderResult = function() {
             '</div>';
     }
 
-    // Mode selected — show the relevant sharing details
+    // Default: show the selected mode's sharing details directly
     var detailHtml = '';
     var modeConfig = SHARE_MODES.find(function(m) { return m.id === selectedMode; });
 
@@ -222,20 +232,21 @@ SendUpload.prototype.setupDynamicListeners = function() {
         });
     });
 
-    // Share mode card selection
+    // Share mode card selection (in picker view)
     this.querySelectorAll('[data-share-mode]').forEach(function(card) {
         card.addEventListener('click', function() {
             self._v026_shareMode = card.getAttribute('data-share-mode');
+            self._v026_showPicker = false;
             self.render();
             self.setupDynamicListeners();
         });
     });
 
-    // Change mode button
+    // Change mode button — show the card picker
     var changeBtn = this.querySelector('#v026-change-mode');
     if (changeBtn) {
         changeBtn.addEventListener('click', function() {
-            self._v026_shareMode = null;
+            self._v026_showPicker = true;
             self.render();
             self.setupDynamicListeners();
         });
@@ -256,7 +267,8 @@ SendUpload.prototype.setupDynamicListeners = function() {
 
 // ─── Override: resetForNew — clear share mode ───────────────────────────────
 SendUpload.prototype.resetForNew = function() {
-    this._v026_shareMode = null;
+    this._v026_shareMode  = null;
+    this._v026_showPicker = false;
     _v025_resetForNew.call(this);
 };
 
@@ -307,6 +319,10 @@ SendUpload.prototype.resetForNew = function() {
             border-color: var(--color-primary, #4ECDC4);\
             background: var(--accent-subtle, rgba(78, 205, 196, 0.12));\
             transform: translateY(-1px);\
+        }\
+        .v026-share-card--active {\
+            border-color: var(--color-primary, #4ECDC4);\
+            background: var(--accent-subtle, rgba(78, 205, 196, 0.08));\
         }\
         .v026-share-card__icon {\
             font-size: 1.5rem;\
@@ -443,6 +459,6 @@ SendUpload.prototype.resetForNew = function() {
     document.head.appendChild(style);
 })();
 
-console.log('[send-upload-v026] Step 4: three sharing modes (combined link, separate key, simple token)');
+console.log('[send-upload-v026] Combined link default, skip file-ready for all files, Change button for other share modes');
 
 })();
