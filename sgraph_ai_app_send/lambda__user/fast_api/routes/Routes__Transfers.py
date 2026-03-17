@@ -33,10 +33,11 @@ class Routes__Transfers(Fast_API__Routes):                                      
     admin_service_client : object = None                                         # Optional Admin__Service__Client (typed as object to avoid circular import)
 
     def check_access_token(self, request: Request, access_token: str = ''):      # Validate access token — header, query param, or env-var fallback
-        provided_token = (access_token                                                 # MCP tool parameter (Claude.ai web)
+        raw_token      = (access_token                                                 # MCP tool parameter (Claude.ai web)
                           or request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '') # HTTP header (browser UI, Claude Code CLI)
                           or request.query_params.get('access_token', '')               # Query param fallback
                           )
+        provided_token = str(Safe_Str__Id(raw_token))                                  # Sanitise: strip path-traversal and injection chars
 
         if self.admin_service_client is not None:                                # Admin service available — validate via token_lookup
             if not provided_token:
@@ -196,7 +197,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                     data            = base64.b64encode(payload).decode('ascii'),
                     file_size_bytes = info.get('file_size_bytes', 0)         )
 
-    def check_token__token_name(self, token_name: str) -> dict:                  # GET /transfers/check_token/{token_name} — lookup only (no usage consumed)
+    def check_token__token_name(self, token_name: Safe_Str__Id) -> dict:          # GET /transfers/check_token/{token_name} — lookup only (no usage consumed)
         if self.admin_service_client is None:
             return dict(valid = True, status = 'active')                         # No admin service → always valid (dev mode)
         try:
@@ -212,7 +213,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
             raise HTTPException(status_code = 503,
                                 detail      = 'Token validation service unavailable')
 
-    def validate_token__token_name(self, token_name : str   ,                    # POST /transfers/validate_token/{token_name} — consume a use (for download page)
+    def validate_token__token_name(self, token_name : Safe_Str__Id,              # POST /transfers/validate_token/{token_name} — consume a use (for download page)
                                          request    : Request
                                   ) -> dict:
         if self.admin_service_client is None:
