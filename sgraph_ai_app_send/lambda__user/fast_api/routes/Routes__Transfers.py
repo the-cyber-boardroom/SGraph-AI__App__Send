@@ -90,7 +90,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
         result = self.transfer_service.create_transfer(file_size_bytes   = request.file_size_bytes  ,
                                                        content_type_hint = request.content_type_hint,
                                                        sender_ip        = ''                        ,
-                                                       transfer_id      = str(request.transfer_id)  )
+                                                       transfer_id      = request.transfer_id       )
         if 'error' in result:
             if result['error'] == 'transfer_id_exists':
                 raise HTTPException(status_code = 409, detail = 'Transfer ID already exists')
