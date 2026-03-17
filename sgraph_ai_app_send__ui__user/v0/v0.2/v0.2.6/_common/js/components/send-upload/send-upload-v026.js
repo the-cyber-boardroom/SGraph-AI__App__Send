@@ -3,14 +3,14 @@
    v0.2.6 — Surgical overlay on v0.2.5
 
    Changes:
-     - Step 4 (Share) defaults to "Combined link" mode (no card picker)
-       User can click "Change" to switch to separate key or token mode
-     - Skip file-ready pause for ALL files (single files too) — delivery
-       step already shows file info, so the intermediate screen is redundant
-     - Three sharing modes available via Change button:
-       1. Combined link — URL with embedded key (default, simplest)
-       2. Link + key separate — send via different channels (more secure)
-       3. Simple token — short memorable code (easiest to share verbally)
+     - Share mode selection moved to Step 3 (BEFORE encryption)
+       User picks combined/separate/token, then clicks Encrypt & Send
+     - Combined link is pre-selected as default (simplest option)
+     - Skip file-ready pause for ALL files (single files too)
+     - Step 4 (Share) shows result in chosen mode with Change button
+     - Step indicator label updated: "Encrypt & Send" → "Choose & Send"
+
+   Flow: Upload → Choose delivery → Choose share mode → Encrypt & Send → Result
 
    Loads AFTER v0.2.5 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -27,8 +27,15 @@ if (typeof SendUpload === 'undefined' || !SendUpload.prototype._v025_multiFile =
 // ─── Store methods we override ──────────────────────────────────────────────
 const _v025_renderResult       = SendUpload.prototype.renderResult;
 const _v025_setupDynamic       = SendUpload.prototype.setupDynamicListeners;
+const _v025_setupEvents        = SendUpload.prototype.setupEventListeners;
 const _v025_resetForNew        = SendUpload.prototype.resetForNew;
 const _v025_advanceToDelivery  = SendUpload.prototype._v023_advanceToDelivery;
+const _v025_renderStep3        = SendUpload.prototype._v023_renderStep3;
+
+// ─── Update step indicator label ────────────────────────────────────────────
+if (typeof SendStepIndicator !== 'undefined') {
+    SendStepIndicator.STEP_LABELS[2] = 'Choose & Send';
+}
 
 // ─── Override: skip file-ready for ALL files ────────────────────────────────
 // The delivery step (Step 2) already shows file info at the top, so the
@@ -66,7 +73,71 @@ var SHARE_MODES = [
     }
 ];
 
-// ─── Override: renderResult — three sharing mode cards ──────────────────────
+// ─── Override: Step 3 — share mode selection before encryption ──────────────
+SendUpload.prototype._v023_renderStep3 = function() {
+    var delivery = this._v023_selectedDelivery || 'download';
+    var deliveryOpt = (this._v023_deliveryOptions || []).find(function(o) { return o.id === delivery; });
+
+    // File summary at top
+    var file = this.selectedFile;
+    var isFolder = !!this._folderScan;
+    var icon = isFolder ? '&#128193;' : '&#128196;';
+    var name = isFolder ? (this._folderName || 'folder') + '/' : (file ? file.name : '');
+    var meta = isFolder
+        ? this._folderScan.fileCount + ' files &middot; ' + this.formatBytes(this._folderScan.totalSize)
+        : (file ? this.formatBytes(file.size) : '');
+
+    var selectedMode = this._v026_shareMode || 'combined';
+    var self = this;
+
+    var cardsHtml = SHARE_MODES.map(function(mode) {
+        var activeClass = mode.id === selectedMode ? ' v026-share-card--active' : '';
+        return '<div class="v026-share-card' + activeClass + '" data-share-mode="' + mode.id + '">' +
+            '<div class="v026-share-card__icon">' + mode.icon + '</div>' +
+            '<div class="v026-share-card__body">' +
+                '<div class="v026-share-card__title">' + self.escapeHtml(mode.title) + '</div>' +
+                '<div class="v026-share-card__desc">' + self.escapeHtml(mode.desc) + '</div>' +
+                '<div class="v026-share-card__hint">' + self.escapeHtml(mode.hint) + '</div>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+
+    return '<div class="v023-file-summary v023-file-summary--compact">' +
+            '<span class="v023-file-summary__icon">' + icon + '</span>' +
+            '<div>' +
+                '<div class="v023-file-summary__name">' + this.escapeHtml(name) + '</div>' +
+                '<div class="v023-file-summary__meta">' + meta + '</div>' +
+            '</div>' +
+        '</div>' +
+        (deliveryOpt ? '<div class="v023-delivery-choice">' +
+            '<span class="v023-delivery-choice__label">Delivery:</span>' +
+            '<span class="v023-delivery-choice__value">' + deliveryOpt.icon + ' ' + this.escapeHtml(deliveryOpt.title) + '</span>' +
+        '</div>' : '') +
+        '<h3 class="v023-step-title">How do you want to share it?</h3>' +
+        '<div class="v026-share-cards">' + cardsHtml + '</div>' +
+        '<div style="text-align: center; margin-top: var(--space-6, 1.5rem);">' +
+            '<button class="btn btn-primary btn-lg" id="v023-send-btn">Encrypt &amp; Send</button>' +
+        '</div>' +
+        '<button class="v023-back-link" id="v023-back-to-delivery">&larr; Back</button>';
+};
+
+// ─── Override: setupEventListeners — add share card clicks in Step 3 ────────
+SendUpload.prototype.setupEventListeners = function() {
+    var self = this;
+    _v025_setupEvents.call(this);
+
+    // Share mode card selection in Step 3 (choosing-share state)
+    this.querySelectorAll('.v026-share-card[data-share-mode]').forEach(function(card) {
+        card.addEventListener('click', function() {
+            self._v026_shareMode = card.getAttribute('data-share-mode');
+            // Re-render to update active card highlight
+            self.render();
+            self.setupEventListeners();
+        });
+    });
+};
+
+// ─── Override: renderResult — show result in chosen mode ────────────────────
 SendUpload.prototype.renderResult = function() {
     if (this.state !== 'complete' || !this.result) return '';
 
@@ -459,6 +530,6 @@ SendUpload.prototype.resetForNew = function() {
     document.head.appendChild(style);
 })();
 
-console.log('[send-upload-v026] Combined link default, skip file-ready for all files, Change button for other share modes');
+console.log('[send-upload-v026] Share mode selection in Step 3 (before encryption), combined link default, skip file-ready');
 
 })();
