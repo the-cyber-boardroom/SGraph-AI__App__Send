@@ -41,7 +41,7 @@ const STATE_TO_STEP = {
     'file-ready':        1,
     'choosing-delivery': 2,
     'choosing-share':    3,
-    'zipping':           3,
+    'zipping':           1,
     'reading':           3,
     'encrypting':        3,
     'creating':          3,
@@ -63,7 +63,10 @@ const IMAGE_EXTENSIONS = new Set([
 
 function detectDeliveryOptions(file, folderScan) {
     const ext = (file?.name || '').split('.').pop().toLowerCase();
-    const options = [{ id: 'download', icon: '\uD83D\uDCE5', title: 'Send as download', desc: 'Recipient gets a file to save to their device', hint: 'Best for: large archives, backups' }];
+    const isFolder = !!folderScan;
+    const downloadTitle = isFolder ? 'Send as a zip' : 'Send as download';
+    const downloadDesc  = isFolder ? 'Recipient downloads a single zip file'  : 'Recipient gets a file to save to their device';
+    const options = [{ id: 'download', icon: '\uD83D\uDCE5', title: downloadTitle, desc: downloadDesc, hint: 'Best for: large archives, backups' }];
 
     if (folderScan) {
         options.push({ id: 'browse', icon: '\uD83D\uDCC2', title: 'Let them browse the folder', desc: 'Recipient sees files in a browsable view with inline preview', hint: 'Best for: sharing documents, reports' });
@@ -274,7 +277,7 @@ SendUpload.prototype._v023_renderStep2 = function() {
         <h3 class="v023-step-title">How should the recipient get this?</h3>
         <div class="v023-delivery-cards">${cardsHtml}</div>
         ${continueBtn}
-        <button class="v023-back-link" id="v023-back-to-file-ready">&larr; Back</button>
+        <button class="v023-back-link" id="v023-back-to-idle">&larr; Back</button>
     `;
 };
 
@@ -335,26 +338,6 @@ SendUpload.prototype.setupEventListeners = function() {
     // Call base for shared listeners (drag/drop, file input, folder input, mode tabs, etc.)
     _v020_setupEventListeners.call(this);
 
-    // v0.2.3 step navigation buttons
-    const continueToDelivery = this.querySelector('#v023-continue-to-delivery');
-    if (continueToDelivery) {
-        continueToDelivery.addEventListener('click', () => {
-            this._v023_deliveryOptions = detectDeliveryOptions(this.selectedFile, this._folderScan);
-            this._v023_recommendedDelivery = getRecommendedDelivery(this._v023_deliveryOptions, this._folderScan);
-            this._v023_selectedDelivery = null;
-
-            // Auto-advance if only one option
-            if (this._v023_deliveryOptions.length === 1) {
-                this._v023_selectedDelivery = this._v023_deliveryOptions[0].id;
-                this.state = 'choosing-share';
-            } else {
-                this.state = 'choosing-delivery';
-            }
-            this.render();
-            this.setupEventListeners();
-        });
-    }
-
     // Delivery card selection
     this.querySelectorAll('[data-delivery]').forEach(card => {
         card.addEventListener('click', () => {
@@ -390,16 +373,6 @@ SendUpload.prototype.setupEventListeners = function() {
         });
     }
 
-    const backToFileReady = this.querySelector('#v023-back-to-file-ready');
-    if (backToFileReady) {
-        backToFileReady.addEventListener('click', () => {
-            this._v023_goingBack = true;
-            this.state = 'file-ready';
-            this.render();
-            this.setupEventListeners();
-        });
-    }
-
     const backToDelivery = this.querySelector('#v023-back-to-delivery');
     if (backToDelivery) {
         backToDelivery.addEventListener('click', () => {
@@ -411,7 +384,23 @@ SendUpload.prototype.setupEventListeners = function() {
     }
 };
 
-// ─── Override: handleDrop — go to file-ready instead of idle ────────────────
+// ─── Helper: advance to delivery step ───────────────────────────────────────
+SendUpload.prototype._v023_advanceToDelivery = function() {
+    this._v023_deliveryOptions = detectDeliveryOptions(this.selectedFile, this._folderScan);
+    this._v023_recommendedDelivery = getRecommendedDelivery(this._v023_deliveryOptions, this._folderScan);
+    this._v023_selectedDelivery = null;
+
+    if (this._v023_deliveryOptions.length === 1) {
+        this._v023_selectedDelivery = this._v023_deliveryOptions[0].id;
+        this.state = 'choosing-share';
+    } else {
+        this.state = 'choosing-delivery';
+    }
+    this.render();
+    this.setupEventListeners();
+};
+
+// ─── Override: handleDrop — go straight to delivery step ────────────────────
 SendUpload.prototype.handleDrop = function(e) {
     e.preventDefault(); e.stopPropagation();
     const dz = this.querySelector('#drop-zone'); if (dz) dz.classList.remove('dragover');
@@ -426,13 +415,11 @@ SendUpload.prototype.handleDrop = function(e) {
         }
     }
 
-    // Single file — go to file-ready state
+    // Single file — go straight to delivery step
     const files = e.dataTransfer && e.dataTransfer.files;
     if (files && files.length > 0) {
         this.selectedFile = files[0];
-        this.state = 'file-ready';
-        this.render();
-        this.setupEventListeners();
+        this._v023_advanceToDelivery();
         return;
     }
 
@@ -443,32 +430,49 @@ SendUpload.prototype.handleDrop = function(e) {
             const { url, name, mime } = JSON.parse(testFileData);
             fetch(url).then(r => r.arrayBuffer()).then(buf => {
                 this.selectedFile = new File([buf], name, { type: mime });
-                this.state = 'file-ready';
-                this.render();
-                this.setupEventListeners();
+                this._v023_advanceToDelivery();
             });
         } catch (err) { /* ignore malformed data */ }
     }
 };
 
-// ─── Override: handleFileSelect — go to file-ready ──────────────────────────
+// ─── Override: handleFileSelect — go straight to delivery step ──────────────
 SendUpload.prototype.handleFileSelect = function(e) {
     const files = e.target.files;
     if (files && files.length > 0) {
         this.selectedFile = files[0];
-        this.state = 'file-ready';
-        this.render();
-        this.setupEventListeners();
+        this._v023_advanceToDelivery();
     }
 };
 
-// ─── Override: handleFolderSelect — after folder-options, go to file-ready ──
+// ─── Override: _handleFolderEntry — skip folder-options, auto-compress ───────
+const _v020_handleFolderEntry = SendUpload.prototype._handleFolderEntry;
+SendUpload.prototype._handleFolderEntry = function(entry) {
+    // Call base to scan the folder (populates _folderScan, _folderName)
+    // but intercept the state change to folder-options
+    const origRender = this.render.bind(this);
+    const origSetup  = this.setupEventListeners.bind(this);
+    const self = this;
+
+    _v020_handleFolderEntry.call(this, entry);
+
+    // The base method is async (scans folder tree), so we watch for
+    // the state to become 'folder-options' and then auto-compress
+    const checkInterval = setInterval(() => {
+        if (self.state === 'folder-options') {
+            clearInterval(checkInterval);
+            // Auto-compress with defaults: max compression, no empty folders, no dotfiles
+            self._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
+            self._v023_autoCompressFolder();
+        }
+    }, 50);
+    // Safety timeout
+    setTimeout(() => clearInterval(checkInterval), 10000);
+};
+
+// ─── Auto-compress folder and advance to delivery ───────────────────────────
 const _v020_startFolderZip = SendUpload.prototype._startFolderZip;
-SendUpload.prototype._startFolderZip = async function() {
-    // Folder options confirmed — transition to file-ready (v0.2.3)
-    // The actual zipping happens during the processing phase
-    // For now, create a synthetic zip file to represent the folder
-    // and move to file-ready
+SendUpload.prototype._v023_autoCompressFolder = async function() {
     try {
         await this._loadJSZip();
 
@@ -491,9 +495,8 @@ SendUpload.prototype._startFolderZip = async function() {
         const zipName = (this._folderName || 'folder') + '.zip';
         this.selectedFile = new File([blob], zipName, { type: 'application/zip' });
 
-        this.state = 'file-ready';
-        this.render();
-        this.setupEventListeners();
+        // Go straight to delivery step (skip file-ready)
+        this._v023_advanceToDelivery();
     } catch (err) {
         this.errorMessage = err.message || 'Failed to create zip';
         this.state = 'error';
@@ -501,6 +504,9 @@ SendUpload.prototype._startFolderZip = async function() {
         this.setupEventListeners();
     }
 };
+
+// Keep _startFolderZip override in case base code calls it directly
+SendUpload.prototype._startFolderZip = SendUpload.prototype._v023_autoCompressFolder;
 
 // ─── Processing: encrypt + upload (called from Step 3) ──────────────────────
 SendUpload.prototype._v023_startProcessing = async function() {
@@ -610,20 +616,16 @@ SendUpload.prototype.resetForNew = function() {
     const style = document.createElement('style');
     style.id = 'v023-styles';
     style.textContent = `
-        /* Step content transitions */
+        /* Step content transitions (fade only, no horizontal shift) */
         .step-content {
-            animation: v023-step-enter 300ms ease;
+            animation: v023-step-fade 200ms ease;
         }
-        @keyframes v023-step-enter {
-            from { opacity: 0; transform: translateX(20px); }
-            to   { opacity: 1; transform: translateX(0); }
+        @keyframes v023-step-fade {
+            from { opacity: 0; }
+            to   { opacity: 1; }
         }
         .step-content--reverse {
-            animation: v023-step-enter-reverse 300ms ease;
-        }
-        @keyframes v023-step-enter-reverse {
-            from { opacity: 0; transform: translateX(-20px); }
-            to   { opacity: 1; transform: translateX(0); }
+            animation: v023-step-fade 200ms ease;
         }
 
         /* Browse buttons (ghost style) */
