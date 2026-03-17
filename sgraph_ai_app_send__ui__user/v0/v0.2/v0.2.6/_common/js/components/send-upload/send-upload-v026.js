@@ -3,14 +3,15 @@
    v0.2.6 — Surgical overlay on v0.2.5
 
    Changes:
-     - Share mode selection moved to Step 3 (BEFORE encryption)
-       User picks combined/separate/token, then clicks Encrypt & Send
-     - Combined link is pre-selected as default (simplest option)
-     - Skip file-ready pause for ALL files (single files too)
-     - Step 4 (Share) shows result in chosen mode with Change button
-     - Step indicator label updated: "Encrypt & Send" → "Choose & Send"
-
-   Flow: Upload → Choose delivery → Choose share mode → Encrypt & Send → Result
+     - Five-step wizard (was four):
+       1. Upload — drop/browse file
+       2. Choose delivery — download/view/browse
+       3. Choose share — token/combined/separate cards (auto-advances on click)
+       4. Confirm & Send — summary of all choices + prominent Encrypt & Send button
+       5. Share — result in chosen mode
+     - Simple token is default share mode (first card, pre-selected)
+     - Skip file-ready pause for ALL files
+     - Step indicator updated to 5 steps
 
    Loads AFTER v0.2.5 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -31,15 +32,70 @@ const _v025_setupEvents        = SendUpload.prototype.setupEventListeners;
 const _v025_resetForNew        = SendUpload.prototype.resetForNew;
 const _v025_advanceToDelivery  = SendUpload.prototype._v023_advanceToDelivery;
 const _v025_renderStep3        = SendUpload.prototype._v023_renderStep3;
+const _v025_render             = SendUpload.prototype.render;
 
-// ─── Update step indicator label ────────────────────────────────────────────
+// ─── Update step indicator to 5 steps ───────────────────────────────────────
 if (typeof SendStepIndicator !== 'undefined') {
-    SendStepIndicator.STEP_LABELS[2] = 'Choose & Send';
+    SendStepIndicator.STEP_LABELS = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Done'];
 }
 
+// ─── New state-to-step mapping (5 steps) ────────────────────────────────────
+var V026_TOTAL_STEPS = 5;
+var V026_STATE_TO_STEP = {
+    'idle':              1,
+    'folder-options':    1,
+    'file-ready':        1,
+    'choosing-delivery': 2,
+    'choosing-share':    3,
+    'confirming':        4,
+    'zipping':           4,
+    'reading':           4,
+    'encrypting':        4,
+    'creating':          4,
+    'uploading':         4,
+    'completing':        4,
+    'complete':          5,
+    'error':             1
+};
+
+// ─── Override: render — use 5-step mapping ──────────────────────────────────
+SendUpload.prototype.render = function() {
+    this._stageTimestamps = this._stageTimestamps || {};
+    this._stageTimestamps[this.state] = Date.now();
+
+    var step = V026_STATE_TO_STEP[this.state] || 1;
+    var stepIndicator = '<send-step-indicator step="' + step + '" total="' + V026_TOTAL_STEPS + '"></send-step-indicator>';
+
+    var content = '';
+    switch (this.state) {
+        case 'idle':              content = this._v023_renderStep1Idle(); break;
+        case 'folder-options':    content = this.renderFolderOptions(); break;
+        case 'file-ready':        content = this._v023_renderFileReady(); break;
+        case 'choosing-delivery': content = this._v023_renderStep2(); break;
+        case 'choosing-share':    content = this._v026_renderShareChoice(); break;
+        case 'confirming':        content = this._v026_renderConfirm(); break;
+        case 'zipping':
+        case 'reading':
+        case 'encrypting':
+        case 'creating':
+        case 'uploading':
+        case 'completing':        content = this._v023_renderProcessing(); break;
+        case 'complete':          content = this.renderResult(); break;
+        case 'error':             content = this.renderError(); break;
+        default:                  _v025_render.call(this); return;
+    }
+
+    this.innerHTML =
+        '<div class="card">' +
+            stepIndicator +
+            '<div class="step-content' + (this._v023_goingBack ? ' step-content--reverse' : '') + '">' +
+                content +
+            '</div>' +
+        '</div>';
+    this._v023_goingBack = false;
+};
+
 // ─── Override: skip file-ready for ALL files ────────────────────────────────
-// The delivery step (Step 2) already shows file info at the top, so the
-// intermediate file-ready pause is redundant for single files too.
 SendUpload.prototype._v023_advanceToDelivery = function() {
     this._v024_userConfirmed = true;
     _v025_advanceToDelivery.call(this);
@@ -47,6 +103,14 @@ SendUpload.prototype._v023_advanceToDelivery = function() {
 
 // ─── Share mode definitions ────────────────────────────────────────────────
 var SHARE_MODES = [
+    {
+        id:    'token',
+        icon:  '\uD83C\uDFAB',       // 🎫
+        title: 'Simple token',
+        desc:  'A short transfer ID they can enter on the site. Key sent separately.',
+        hint:  'Easiest — share verbally or in a message',
+        security: 'Recipient needs both the token and the key'
+    },
     {
         id:    'combined',
         icon:  '\uD83D\uDD17',       // 🔗
@@ -62,33 +126,13 @@ var SHARE_MODES = [
         desc:  'Send the link and decryption key through different channels.',
         hint:  'More secure — requires both pieces',
         security: 'Neither piece works alone'
-    },
-    {
-        id:    'token',
-        icon:  '\uD83C\uDFAB',       // 🎫
-        title: 'Simple token',
-        desc:  'A short transfer ID they can enter on the site. Key sent separately.',
-        hint:  'Easy to share verbally or in a message',
-        security: 'Recipient needs both the token and the key'
     }
 ];
 
-// ─── Override: Step 3 — share mode selection before encryption ──────────────
-SendUpload.prototype._v023_renderStep3 = function() {
-    var delivery = this._v023_selectedDelivery || 'download';
-    var deliveryOpt = (this._v023_deliveryOptions || []).find(function(o) { return o.id === delivery; });
-
-    // File summary at top
-    var file = this.selectedFile;
-    var isFolder = !!this._folderScan;
-    var icon = isFolder ? '&#128193;' : '&#128196;';
-    var name = isFolder ? (this._folderName || 'folder') + '/' : (file ? file.name : '');
-    var meta = isFolder
-        ? this._folderScan.fileCount + ' files &middot; ' + this.formatBytes(this._folderScan.totalSize)
-        : (file ? this.formatBytes(file.size) : '');
-
-    var selectedMode = this._v026_shareMode || 'combined';
+// ─── Step 3: Share mode selection (auto-advances on click) ──────────────────
+SendUpload.prototype._v026_renderShareChoice = function() {
     var self = this;
+    var selectedMode = this._v026_shareMode || 'token';
 
     var cardsHtml = SHARE_MODES.map(function(mode) {
         var activeClass = mode.id === selectedMode ? ' v026-share-card--active' : '';
@@ -102,39 +146,122 @@ SendUpload.prototype._v023_renderStep3 = function() {
         '</div>';
     }).join('');
 
-    return '<div class="v023-file-summary v023-file-summary--compact">' +
-            '<span class="v023-file-summary__icon">' + icon + '</span>' +
-            '<div>' +
-                '<div class="v023-file-summary__name">' + this.escapeHtml(name) + '</div>' +
-                '<div class="v023-file-summary__meta">' + meta + '</div>' +
-            '</div>' +
-        '</div>' +
-        (deliveryOpt ? '<div class="v023-delivery-choice">' +
-            '<span class="v023-delivery-choice__label">Delivery:</span>' +
-            '<span class="v023-delivery-choice__value">' + deliveryOpt.icon + ' ' + this.escapeHtml(deliveryOpt.title) + '</span>' +
-        '</div>' : '') +
-        '<h3 class="v023-step-title">How do you want to share it?</h3>' +
+    return '<h3 class="v023-step-title">How do you want to share it?</h3>' +
         '<div class="v026-share-cards">' + cardsHtml + '</div>' +
-        '<div style="text-align: center; margin-top: var(--space-6, 1.5rem);">' +
-            '<button class="btn btn-primary btn-lg" id="v023-send-btn">Encrypt &amp; Send</button>' +
-        '</div>' +
         '<button class="v023-back-link" id="v023-back-to-delivery">&larr; Back</button>';
 };
 
-// ─── Override: setupEventListeners — add share card clicks in Step 3 ────────
+// ─── Step 4: Confirmation summary ──────────────────────────────────────────
+SendUpload.prototype._v026_renderConfirm = function() {
+    var file = this.selectedFile;
+    var isFolder = !!this._folderScan;
+    var icon = isFolder ? '&#128193;' : '&#128196;';
+    var name = isFolder ? (this._folderName || 'folder') + '/' : (file ? file.name : '');
+    var meta = isFolder
+        ? this._folderScan.fileCount + ' files &middot; ' + this.formatBytes(this._folderScan.totalSize)
+        : (file ? this.formatBytes(file.size) : '');
+
+    var delivery = this._v023_selectedDelivery || 'download';
+    var deliveryOpt = (this._v023_deliveryOptions || []).find(function(o) { return o.id === delivery; });
+    var shareMode = this._v026_shareMode || 'token';
+    var shareModeConfig = SHARE_MODES.find(function(m) { return m.id === shareMode; });
+
+    var largeWarning = file && file.size > 2 * 1024 * 1024 * 1024
+        ? '<div class="v023-large-warning" style="margin-top: var(--space-4, 1rem);">Large files may take several minutes to encrypt. Keep this tab open.</div>'
+        : '';
+
+    return '<h3 class="v023-step-title">Ready to encrypt and send</h3>' +
+        '<p class="v023-step-desc" style="margin-bottom: var(--space-5, 1.25rem);">Review your choices, then hit the button below.</p>' +
+
+        // Summary rows
+        '<div class="v026-summary">' +
+            '<div class="v026-summary__row">' +
+                '<span class="v026-summary__label">File</span>' +
+                '<span class="v026-summary__value">' +
+                    '<span class="v026-summary__icon">' + icon + '</span> ' +
+                    this.escapeHtml(name) +
+                    '<span class="v026-summary__meta"> &middot; ' + meta + '</span>' +
+                '</span>' +
+            '</div>' +
+            (deliveryOpt ? '<div class="v026-summary__row">' +
+                '<span class="v026-summary__label">Delivery</span>' +
+                '<span class="v026-summary__value">' +
+                    deliveryOpt.icon + ' ' + this.escapeHtml(deliveryOpt.title) +
+                '</span>' +
+                '<button class="v026-summary__change" data-change="delivery">change</button>' +
+            '</div>' : '') +
+            (shareModeConfig ? '<div class="v026-summary__row">' +
+                '<span class="v026-summary__label">Share mode</span>' +
+                '<span class="v026-summary__value">' +
+                    shareModeConfig.icon + ' ' + this.escapeHtml(shareModeConfig.title) +
+                '</span>' +
+                '<button class="v026-summary__change" data-change="share">change</button>' +
+            '</div>' : '') +
+        '</div>' +
+
+        // Security note
+        '<div class="v026-security-note" style="margin-top: var(--space-4, 1rem);">' +
+            '<span>&#128274;</span> Your file will be encrypted in your browser before upload. The server never sees your data.' +
+        '</div>' +
+
+        largeWarning +
+
+        // Big Encrypt & Send button
+        '<div class="v026-send-action">' +
+            '<button class="v026-send-btn" id="v023-send-btn">' +
+                '<span class="v026-send-btn__icon">&#128274;</span>' +
+                '<span class="v026-send-btn__text">Encrypt &amp; Send</span>' +
+            '</button>' +
+        '</div>' +
+
+        '<button class="v023-back-link" id="v026-back-to-share">&larr; Back</button>';
+};
+
+// ─── Override: setupEventListeners ──────────────────────────────────────────
 SendUpload.prototype.setupEventListeners = function() {
     var self = this;
     _v025_setupEvents.call(this);
 
-    // Share mode card selection in Step 3 (choosing-share state)
+    // Share mode card click → save selection and auto-advance to confirmation
     this.querySelectorAll('.v026-share-card[data-share-mode]').forEach(function(card) {
         card.addEventListener('click', function() {
             self._v026_shareMode = card.getAttribute('data-share-mode');
-            // Re-render to update active card highlight
+            self.state = 'confirming';
             self.render();
             self.setupEventListeners();
         });
     });
+
+    // Back from confirmation → share choice
+    var backToShare = this.querySelector('#v026-back-to-share');
+    if (backToShare) {
+        backToShare.addEventListener('click', function() {
+            self._v023_goingBack = true;
+            self.state = 'choosing-share';
+            self.render();
+            self.setupEventListeners();
+        });
+    }
+
+    // Change buttons in confirmation summary
+    var changeDelivery = this.querySelector('[data-change="delivery"]');
+    if (changeDelivery) {
+        changeDelivery.addEventListener('click', function() {
+            self._v023_goingBack = true;
+            self.state = 'choosing-delivery';
+            self.render();
+            self.setupEventListeners();
+        });
+    }
+    var changeShare = this.querySelector('[data-change="share"]');
+    if (changeShare) {
+        changeShare.addEventListener('click', function() {
+            self._v023_goingBack = true;
+            self.state = 'choosing-share';
+            self.render();
+            self.setupEventListeners();
+        });
+    }
 };
 
 // ─── Override: renderResult — show result in chosen mode ────────────────────
@@ -142,7 +269,7 @@ SendUpload.prototype.renderResult = function() {
     if (this.state !== 'complete' || !this.result) return '';
 
     var result = this.result;
-    var selectedMode = this._v026_shareMode || 'combined';
+    var selectedMode = this._v026_shareMode || 'token';
 
     // File summary at top
     var file = this.selectedFile;
@@ -303,7 +430,7 @@ SendUpload.prototype.setupDynamicListeners = function() {
         });
     });
 
-    // Share mode card selection (in picker view)
+    // Share mode card selection (in picker view on result screen)
     this.querySelectorAll('[data-share-mode]').forEach(function(card) {
         card.addEventListener('click', function() {
             self._v026_shareMode = card.getAttribute('data-share-mode');
@@ -419,6 +546,95 @@ SendUpload.prototype.resetForNew = function() {
             opacity: 0.8;\
         }\
         \
+        /* Confirmation summary */\
+        .v026-summary {\
+            display: flex;\
+            flex-direction: column;\
+            gap: 0;\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));\
+            border-radius: var(--radius-md, 12px);\
+            overflow: hidden;\
+        }\
+        .v026-summary__row {\
+            display: flex;\
+            align-items: center;\
+            gap: var(--space-3, 0.75rem);\
+            padding: var(--space-3, 0.75rem) var(--space-4, 1rem);\
+            background: var(--color-surface, #1E2A4A);\
+            border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.1));\
+        }\
+        .v026-summary__row:last-child { border-bottom: none; }\
+        .v026-summary__label {\
+            font-size: var(--text-small, 0.75rem);\
+            color: var(--color-text-secondary, #8892A0);\
+            min-width: 80px;\
+            flex-shrink: 0;\
+            text-transform: uppercase;\
+            letter-spacing: 0.05em;\
+            font-weight: var(--weight-semibold, 600);\
+        }\
+        .v026-summary__value {\
+            flex: 1;\
+            font-size: var(--text-sm, 0.875rem);\
+            color: var(--color-text, #E0E0E0);\
+            min-width: 0;\
+            overflow: hidden;\
+            text-overflow: ellipsis;\
+            white-space: nowrap;\
+        }\
+        .v026-summary__icon { font-size: 1rem; }\
+        .v026-summary__meta {\
+            font-size: var(--text-small, 0.75rem);\
+            color: var(--color-text-secondary, #8892A0);\
+        }\
+        .v026-summary__change {\
+            background: none;\
+            border: none;\
+            color: var(--color-text-secondary, #8892A0);\
+            font-size: var(--text-micro, 0.625rem);\
+            cursor: pointer;\
+            padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);\
+            border-radius: var(--radius-xs, 4px);\
+            text-decoration: underline;\
+            text-underline-offset: 2px;\
+            flex-shrink: 0;\
+        }\
+        .v026-summary__change:hover {\
+            color: var(--color-primary, #4ECDC4);\
+        }\
+        \
+        /* Big send button */\
+        .v026-send-action {\
+            text-align: center;\
+            margin-top: var(--space-6, 1.5rem);\
+        }\
+        .v026-send-btn {\
+            display: inline-flex;\
+            align-items: center;\
+            gap: var(--space-3, 0.75rem);\
+            padding: var(--space-4, 1rem) var(--space-8, 2rem);\
+            background: var(--color-primary, #4ECDC4);\
+            color: var(--color-bg, #1A1A2E);\
+            border: none;\
+            border-radius: var(--radius-md, 12px);\
+            font-size: var(--text-lg, 1.25rem);\
+            font-weight: var(--weight-bold, 700);\
+            cursor: pointer;\
+            transition: transform 0.15s, box-shadow 0.2s, background 0.2s;\
+            box-shadow: 0 4px 16px rgba(78, 205, 196, 0.3);\
+        }\
+        .v026-send-btn:hover {\
+            transform: translateY(-2px);\
+            box-shadow: 0 6px 24px rgba(78, 205, 196, 0.45);\
+            background: #5DE0D6;\
+        }\
+        .v026-send-btn:active {\
+            transform: translateY(0);\
+            box-shadow: 0 2px 8px rgba(78, 205, 196, 0.25);\
+        }\
+        .v026-send-btn__icon { font-size: 1.5rem; }\
+        .v026-send-btn__text { white-space: nowrap; }\
+        \
         /* Mode header (after selection) */\
         .v026-mode-header {\
             display: flex;\
@@ -525,11 +741,13 @@ SendUpload.prototype.resetForNew = function() {
         @media (max-width: 480px) {\
             .v026-share-row { flex-direction: column; align-items: stretch; }\
             .v026-share-row .btn { width: 100%; }\
+            .v026-summary__label { min-width: 60px; }\
+            .v026-send-btn { width: 100%; justify-content: center; }\
         }\
     ';
     document.head.appendChild(style);
 })();
 
-console.log('[send-upload-v026] Share mode selection in Step 3 (before encryption), combined link default, skip file-ready');
+console.log('[send-upload-v026] Five-step wizard: Upload > Delivery > Share mode > Confirm & Send > Done');
 
 })();
