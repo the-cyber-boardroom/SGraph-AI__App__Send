@@ -245,10 +245,8 @@ SendUpload.prototype._v023_renderStep2 = function() {
         : (file ? this.formatBytes(file.size) : '');
 
     const cardsHtml = options.map(opt => {
-        const isSelected    = selected === opt.id;
         const isRecommended = opt.id === recommended;
         let classes = 'v023-delivery-card';
-        if (isSelected)    classes += ' v023-delivery-card--selected';
         if (isRecommended) classes += ' v023-delivery-card--recommended';
         return `
             <div class="${classes}" data-delivery="${opt.id}">
@@ -260,12 +258,6 @@ SendUpload.prototype._v023_renderStep2 = function() {
         `;
     }).join('');
 
-    const continueBtn = selected
-        ? `<div style="text-align: center; margin-top: var(--space-4, 1rem);">
-               <button class="btn btn-primary" id="v023-continue-to-share">Continue &rarr;</button>
-           </div>`
-        : '';
-
     return `
         <div class="v023-file-summary v023-file-summary--compact">
             <span class="v023-file-summary__icon">${icon}</span>
@@ -276,7 +268,6 @@ SendUpload.prototype._v023_renderStep2 = function() {
         </div>
         <h3 class="v023-step-title">How should the recipient get this?</h3>
         <div class="v023-delivery-cards">${cardsHtml}</div>
-        ${continueBtn}
         <button class="v023-back-link" id="v023-back-to-idle">&larr; Back</button>
     `;
 };
@@ -284,6 +275,8 @@ SendUpload.prototype._v023_renderStep2 = function() {
 // ─── Step 3: Choose Share Mode ──────────────────────────────────────────────
 SendUpload.prototype._v023_renderStep3 = function() {
     const delivery = this._v023_selectedDelivery || 'download';
+    const deliveryOpt = (this._v023_deliveryOptions || []).find(o => o.id === delivery);
+    const deliveryLabel = deliveryOpt ? deliveryOpt.title : delivery;
 
     // File summary at top
     const file = this.selectedFile;
@@ -299,8 +292,12 @@ SendUpload.prototype._v023_renderStep3 = function() {
             <span class="v023-file-summary__icon">${icon}</span>
             <div>
                 <div class="v023-file-summary__name">${this.escapeHtml(name)}</div>
-                <div class="v023-file-summary__meta">${meta} &middot; ${this.escapeHtml(delivery)}</div>
+                <div class="v023-file-summary__meta">${meta}</div>
             </div>
+        </div>
+        <div class="v023-delivery-choice">
+            <span class="v023-delivery-choice__label">Delivery:</span>
+            <span class="v023-delivery-choice__value">${deliveryOpt ? deliveryOpt.icon + ' ' : ''}${this.escapeHtml(deliveryLabel)}</span>
         </div>
         <h3 class="v023-step-title">Ready to encrypt and send</h3>
         <p class="v023-step-desc">
@@ -338,23 +335,15 @@ SendUpload.prototype.setupEventListeners = function() {
     // Call base for shared listeners (drag/drop, file input, folder input, mode tabs, etc.)
     _v020_setupEventListeners.call(this);
 
-    // Delivery card selection
+    // Delivery card click → go straight to step 3
     this.querySelectorAll('[data-delivery]').forEach(card => {
         card.addEventListener('click', () => {
             this._v023_selectedDelivery = card.getAttribute('data-delivery');
-            this.render();
-            this.setupEventListeners();
-        });
-    });
-
-    const continueToShare = this.querySelector('#v023-continue-to-share');
-    if (continueToShare) {
-        continueToShare.addEventListener('click', () => {
             this.state = 'choosing-share';
             this.render();
             this.setupEventListeners();
         });
-    }
+    });
 
     // Send button (Step 3 → processing)
     const sendBtn = this.querySelector('#v023-send-btn');
@@ -718,6 +707,26 @@ SendUpload.prototype.resetForNew = function() {
             color: var(--color-text-secondary, #8892A0);
             margin: 0 0 var(--space-4, 1rem) 0;
             line-height: 1.5;
+        }
+
+        /* Delivery choice summary (step 3) */
+        .v023-delivery-choice {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2, 0.5rem);
+            padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+            margin-bottom: var(--space-4, 1rem);
+            border-radius: var(--radius-sm, 6px);
+            background: rgba(78, 205, 196, 0.06);
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+            font-size: var(--text-sm, 0.875rem);
+        }
+        .v023-delivery-choice__label {
+            color: var(--color-text-secondary, #8892A0);
+        }
+        .v023-delivery-choice__value {
+            color: var(--color-primary, #4ECDC4);
+            font-weight: var(--weight-semibold, 600);
         }
 
         /* Delivery cards */
