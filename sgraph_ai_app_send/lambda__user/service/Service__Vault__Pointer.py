@@ -140,7 +140,10 @@ class Service__Vault__Pointer(Type_Safe):                                       
             op_type = op.get('op')
             file_id = op.get('file_id', '')
 
-            if op_type == 'write':
+            if op_type == 'read':
+                results.append(self._batch_read(vault_id, file_id))
+
+            elif op_type == 'write':
                 data         = base64.b64decode(op['data'])
                 payload_path = self.vault_payload_path(vault_id, file_id)
                 self.storage_fs.file__save(payload_path, data)
@@ -168,6 +171,23 @@ class Service__Vault__Pointer(Type_Safe):                                       
 
         return dict(vault_id = vault_id ,
                     results  = results  )
+
+    def batch_read(self, vault_id, operations):                                  # Read-only batch (no auth required — data is encrypted)
+        results = []
+        for op in operations:
+            file_id = op.get('file_id', '')
+            results.append(self._batch_read(vault_id, file_id))
+        return dict(vault_id = vault_id ,
+                    results  = results  )
+
+    def _batch_read(self, vault_id, file_id):                                    # Internal: read single file for batch response
+        payload_path = self.vault_payload_path(vault_id, file_id)
+        if not self.storage_fs.file__exists(payload_path):
+            return dict(file_id = file_id, status = 'not_found')
+        payload = self.storage_fs.file__bytes(payload_path)
+        return dict(file_id = file_id                                ,
+                    status  = 'ok'                                   ,
+                    data    = base64.b64encode(payload).decode('ascii'))
 
     def _cas_write(self, vault_id, file_id, match_b64, data_b64):               # Internal CAS for batch use (no auth check — already validated)
         payload_path = self.vault_payload_path(vault_id, file_id)
