@@ -20,7 +20,7 @@ API_ENDPOINT="${SGRAPH_API_ENDPOINT:-https://dev.send.sgraph.ai}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
-UI_VERSION_UPLOAD="v0.2.3"
+UI_VERSION_UPLOAD="v0.2.4"
 UI_VERSION_DOWNLOAD="v0.2.2"
 SERVE_DIR="$REPO_ROOT/.local-server-user"
 
@@ -52,19 +52,26 @@ fi
 
 # ─── Build merged _common ────────────────────────────────────────────────────
 # Start with v0.2.0's _common (has all base components: upload, welcome, etc.)
-# Then overlay upload version's real files (e.g. v0.2.3 step indicator, overlay)
+# Then overlay each IFD version in order (v0.2.1 → v0.2.2 → ... → upload version)
 # Then overlay download version's real files (e.g. v0.2.2 send-download-v022.*)
 
 # Copy v0.2.0's _common as base (resolving symlinks)
 cp -rL "$UPLOAD_BASE_DIR/_common" "$SERVE_DIR/_common"
 
-# Overlay upload version's real (non-symlink) files on top
+# Overlay all intermediate IFD versions up to and including the upload version
+# This ensures dependency chains work (e.g. v0.2.4 depends on v0.2.3's files)
 if [ "$UI_VERSION_UPLOAD" != "v0.2.0" ]; then
-    find "$UPLOAD_DIR/_common" -type f | while read -r src; do
-        rel="${src#$UPLOAD_DIR/_common/}"
-        dest="$SERVE_DIR/_common/$rel"
-        mkdir -p "$(dirname "$dest")"
-        cp "$src" "$dest"
+    upload_patch=$(echo "$UI_VERSION_UPLOAD" | sed 's/v0\.2\.//')
+    for patch in $(seq 1 "$upload_patch"); do
+        overlay_dir="$STATIC_DIR/v0/v0.2/v0.2.$patch"
+        if [ -d "$overlay_dir/_common" ]; then
+            find "$overlay_dir/_common" -type f | while read -r src; do
+                rel="${src#$overlay_dir/_common/}"
+                dest="$SERVE_DIR/_common/$rel"
+                mkdir -p "$(dirname "$dest")"
+                cp "$src" "$dest"
+            done
+        fi
     done
 fi
 
@@ -78,7 +85,7 @@ find "$DOWNLOAD_DIR/_common" -type f | while read -r src; do
 done
 
 # ─── Symlink locale pages ────────────────────────────────────────────────────
-# en-gb/index.html        → upload page (v0.2.3)
+# en-gb/index.html        → upload page (latest upload version)
 # en-gb/download/          → download page (v0.2.2)
 # en-gb/welcome/           → welcome page (v0.2.0)
 
