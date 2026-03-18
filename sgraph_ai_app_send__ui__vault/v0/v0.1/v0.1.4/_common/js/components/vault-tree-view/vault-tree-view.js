@@ -30,6 +30,7 @@
                 <div class="vt-container">
                     <div class="vt-header">
                         <span class="vt-title">Files</span>
+                        <a class="vt-header-raw-link" title="Raw vault tree" href="#">raw</a>
                         <button class="vt-refresh-btn" title="Refresh from server">&#x21bb;</button>
                         <button class="vt-new-folder-btn" title="New Folder">+</button>
                     </div>
@@ -39,6 +40,13 @@
 
             this.querySelector('.vt-new-folder-btn').addEventListener('click', () => {
                 this._onNewFolder();
+            });
+            this.querySelector('.vt-header-raw-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                this.dispatchEvent(new CustomEvent('tree-raw-requested', {
+                    detail: { path: '/', type: 'vault', name: 'vault-tree' },
+                    bubbles: true, composed: true
+                }));
             });
             this.querySelector('.vt-refresh-btn').addEventListener('click', () => {
                 this.dispatchEvent(new CustomEvent('tree-refresh-requested', { bubbles: true }));
@@ -136,8 +144,9 @@
 
                 if (isFolder) {
                     const hasChildren = Object.keys(entry.children || {}).length > 0;
-                    const chevron = hasChildren ? (isExpanded ? '\u25BE' : '\u25B8') : '\u00A0\u00A0';
-                    row.innerHTML = `<span class="vt-chevron">${chevron}</span><span class="vt-icon">\uD83D\uDCC1</span><span class="vt-name">${this._escapeHtml(name)}</span>`;
+                    const chevron = hasChildren ? (isExpanded ? '\u25BC' : '\u25B6') : '\u00B7';
+                    const folderIcon = isExpanded ? '\uD83D\uDCC2' : '\uD83D\uDCC1';
+                    row.innerHTML = `<span class="vt-chevron">${chevron}</span><span class="vt-icon">${folderIcon}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw folder data" href="#">raw</a>`;
 
                     // --- Drop target (folders only) ---
                     row.addEventListener('dragover', (e) => {
@@ -158,8 +167,22 @@
                         this._handleDrop(fullPath);
                     });
 
+                    // Raw link click — open raw folder data
+                    const folderRawLink = row.querySelector('.vt-raw-link');
+                    if (folderRawLink) {
+                        folderRawLink.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            this.dispatchEvent(new CustomEvent('tree-raw-requested', {
+                                detail: { path: fullPath, type: 'folder', name, entry },
+                                bubbles: true, composed: true
+                            }));
+                        });
+                    }
+
                     // Single click: toggle expand + select folder
-                    row.addEventListener('click', () => {
+                    row.addEventListener('click', (e) => {
+                        if (e.target.closest('.vt-raw-link')) return;
                         if (isExpanded) {
                             this._expandedPaths.delete(fullPath);
                         } else {
@@ -182,9 +205,23 @@
                 } else {
                     const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
                     const icon = this._getFileIcon(ext);
-                    row.innerHTML = `<span class="vt-chevron">\u00A0\u00A0</span><span class="vt-icon">${icon}</span><span class="vt-name">${this._escapeHtml(name)}</span>`;
+                    row.innerHTML = `<span class="vt-chevron">\u00A0\u00A0</span><span class="vt-icon">${icon}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw file data" href="#">raw</a>`;
 
-                    row.addEventListener('click', () => {
+                    // Raw link click — open raw file data
+                    const fileRawLink = row.querySelector('.vt-raw-link');
+                    if (fileRawLink) {
+                        fileRawLink.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            this.dispatchEvent(new CustomEvent('tree-raw-requested', {
+                                detail: { path: fullPath, type: 'file', name, entry, folderPath: path },
+                                bubbles: true, composed: true
+                            }));
+                        });
+                    }
+
+                    row.addEventListener('click', (e) => {
+                        if (e.target.closest('.vt-raw-link')) return;
                         this._selectedPath = fullPath;
                         this.refresh();
                         this.dispatchEvent(new CustomEvent('tree-file-selected', {
@@ -459,7 +496,9 @@
                 .vt-container { height: 100%; display: flex; flex-direction: column; }
                 .vt-header { display: flex; align-items: center; justify-content: space-between; padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
                 .vt-title { font-size: var(--text-sm); font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
-                .vt-refresh-btn, .vt-new-folder-btn { font-size: var(--text-body); padding: 0 0.375rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; line-height: 1.4; margin-left: auto; }
+                .vt-header-raw-link { font-size: 0.625rem; color: var(--color-text-secondary); text-decoration: none; padding: 0 0.25rem; margin-left: auto; opacity: 0.6; }
+                .vt-header-raw-link:hover { color: var(--color-primary); opacity: 1; }
+                .vt-refresh-btn, .vt-new-folder-btn { font-size: var(--text-body); padding: 0 0.375rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; line-height: 1.4; }
                 .vt-refresh-btn:hover, .vt-new-folder-btn:hover { background: var(--bg-secondary); color: var(--color-primary); }
                 .vt-new-folder-btn { margin-left: 0.25rem; }
                 .vt-tree { flex: 1; overflow-y: auto; padding: 0.375rem 0; }
@@ -470,6 +509,9 @@
                 .vt-chevron { font-size: 0.6rem; flex-shrink: 0; width: 0.75rem; text-align: center; color: var(--color-text-secondary); }
                 .vt-icon { flex-shrink: 0; font-size: 0.875rem; }
                 .vt-name { overflow: hidden; text-overflow: ellipsis; }
+                .vt-raw-link { display: none; margin-left: auto; font-size: 0.625rem; color: var(--color-text-secondary); text-decoration: none; padding: 0 0.25rem; border-radius: 2px; opacity: 0.6; flex-shrink: 0; }
+                .vt-raw-link:hover { color: var(--color-primary); opacity: 1; background: rgba(78, 205, 196, 0.08); }
+                .vt-row:hover .vt-raw-link { display: inline; }
                 .vt-row[draggable="true"] { cursor: grab; }
                 .vt-row[draggable="true"]:active { cursor: grabbing; }
                 .vt-row--dragging { opacity: 0.4; }
