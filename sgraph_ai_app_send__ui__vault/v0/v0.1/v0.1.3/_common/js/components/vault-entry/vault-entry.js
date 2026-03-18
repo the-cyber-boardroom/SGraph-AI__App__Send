@@ -40,11 +40,17 @@ class VaultEntry extends VaultComponent {
         // Show version info
         this._renderVersion()
 
-        // Check URL hash for vault key
+        // Check URL hash for vault key, then fall back to localStorage
         const hash = window.location.hash.slice(1)
         if (hash) {
             this._keyInput.value = decodeURIComponent(hash)
             this._onOpen()
+        } else {
+            const savedKey = localStorage.getItem('sg-vault-key')
+            if (savedKey) {
+                this._keyInput.value = savedKey
+                this._onOpen()
+            }
         }
     }
 
@@ -98,6 +104,9 @@ class VaultEntry extends VaultComponent {
 
             // Update URL hash (vault key may have changed due to save)
             window.history.replaceState(null, '', '#' + encodeURIComponent(vaultKey))
+
+            // Persist vault key in localStorage for auto-open on next visit
+            try { localStorage.setItem('sg-vault-key', vaultKey) } catch (_) { /* ignore */ }
 
             // Pass access key availability so shell knows if uploads are possible
             const accessKey = this._accessKeyInput.value.trim()
