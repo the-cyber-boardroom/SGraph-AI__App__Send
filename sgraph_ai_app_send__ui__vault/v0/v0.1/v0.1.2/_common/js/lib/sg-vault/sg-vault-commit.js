@@ -1,16 +1,18 @@
 /* =================================================================================
    SGraph Vault — Commit & Tree Object Management
-   v0.2.0 — Git-like commit chain with encrypted tree objects
+   v0.3.0 — Encrypted-only metadata, encrypted commit messages
 
-   Commit schema (commit_v1):
-     { schema, parents[], tree_id, timestamp_ms, message, branch_id, signature }
+   Commit schema (commit_v2):
+     { schema, parents[], tree_id, timestamp_ms, message_enc, branch_id, signature }
+     - message_enc: AES-GCM encrypted commit message (base64)
+     - No plaintext message field
 
    Tree schema (tree_v1):
      { schema, entries[] }
      Each entry: { name_enc, size_enc, content_hash_enc, blob_id, tree_id }
-       - name_enc/size_enc/content_hash_enc are AES-GCM encrypted with readKey
+       - All metadata fields are encrypted (no plaintext name/size/content_hash)
        - blob_id points to a content-addressed object (for files)
-       - tree_id points to a sub-tree object (for directories, future use)
+       - tree_id points to a sub-tree object (for directories)
 
    All objects are stored via SGVaultObjectStore (content-addressed).
 
@@ -27,12 +29,17 @@ class SGVaultCommit {
     // --- Create a commit object, store it, return its object ID ------------------
 
     async createCommit({ parentIds = [], treeId, message = '', branchId = 'main' }) {
+        // Encrypt commit message
+        const msgPlain  = new TextEncoder().encode(message)
+        const msgCipher = await SGSendCrypto.encrypt(msgPlain, this._readKey)
+        const msgEnc    = SGVaultCommit._arrayBufferToBase64(msgCipher)
+
         const commit = {
-            schema:       'commit_v1',
+            schema:       'commit_v2',
             parents:      parentIds,
             tree_id:      treeId,
             timestamp_ms: Date.now(),
-            message:      message,
+            message_enc:  msgEnc,
             branch_id:    branchId,
             signature:    null
         }
@@ -47,7 +54,16 @@ class SGVaultCommit {
     async loadCommit(commitId) {
         const ciphertext = await this._objectStore.load(commitId)
         const plaintext  = await SGSendCrypto.decrypt(ciphertext, this._readKey)
-        return JSON.parse(new TextDecoder().decode(plaintext))
+        const commit     = JSON.parse(new TextDecoder().decode(plaintext))
+
+        // Decrypt message_enc if present (commit_v2), fall back to plaintext message (commit_v1)
+        if (commit.message_enc) {
+            const msgCipher = SGVaultCommit._base64ToArrayBuffer(commit.message_enc)
+            const msgPlain  = await SGSendCrypto.decrypt(msgCipher, this._readKey)
+            commit.message  = new TextDecoder().decode(msgPlain)
+        }
+
+        return commit
     }
 
     // --- Create a tree object from flat entries, store it, return object ID ------
@@ -82,6 +98,7 @@ class SGVaultCommit {
     }
 
     // --- Encrypt individual tree entry fields ------------------------------------
+    //     Only encrypted fields are stored — no plaintext name/size/content_hash
 
     async _encryptTreeEntry(entry) {
         const enc = async (value) => {
@@ -91,13 +108,19 @@ class SGVaultCommit {
             return SGVaultCommit._arrayBufferToBase64(cipher)
         }
 
-        return {
+        const result = {
             name_enc:         await enc(entry.name),
-            size_enc:         await enc(entry.size),
-            content_hash_enc: await enc(entry.content_hash),
             blob_id:          entry.blob_id  || null,
             tree_id:          entry.tree_id  || null
         }
+
+        // Only include size/hash for blobs (files), not for sub-trees (directories)
+        if (entry.blob_id) {
+            result.size_enc         = await enc(entry.size)
+            result.content_hash_enc = await enc(entry.content_hash)
+        }
+
+        return result
     }
 
     // --- Decrypt individual tree entry fields ------------------------------------

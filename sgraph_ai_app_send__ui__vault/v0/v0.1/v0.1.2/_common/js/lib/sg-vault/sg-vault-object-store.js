@@ -1,11 +1,12 @@
 /* =================================================================================
    SGraph Vault — Content-Addressed Object Store
-   v0.2.0 — Encrypted blob storage with SHA-256 content addressing
+   v0.3.0 — Encrypted blob storage with self-describing content-addressed IDs
 
-   Objects are stored as encrypted ciphertext. The object ID is derived from the
-   SHA-256 hash of the ciphertext: "obj-" + hex(SHA256(ciphertext))[:12].
-   This means the server only ever sees encrypted data, and identical ciphertext
-   (which is practically impossible due to random IVs) would deduplicate.
+   Objects are stored as encrypted ciphertext. The object ID follows the
+   four-segment format: "obj-cas-imm-" + hex(SHA256(ciphertext))[:12].
+     - obj: data object (blob, tree, or commit)
+     - cas: content-addressed (SHA256 of ciphertext)
+     - imm: immutable (written once, never changes)
 
    Depends on: SGSend (sg-send.js), Web Crypto API
    ================================================================================= */
@@ -19,17 +20,21 @@ class SGVaultObjectStore {
     }
 
     // --- Store an encrypted blob, return its content-addressed ID ----------------
+    //     Stored at bare/data/{objectId} on server
 
     async store(ciphertext) {
         const objectId = await this.computeObjectId(ciphertext)
-        await this._sgSend.vaultWrite(this._vaultId, objectId, this._writeKey, new Uint8Array(ciphertext))
+        const filePath = `bare/data/${objectId}`
+        await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, new Uint8Array(ciphertext))
         return objectId
     }
 
     // --- Load encrypted blob by object ID ----------------------------------------
+    //     Reads from bare/data/{objectId}
 
     async load(objectId) {
-        const data = await this._sgSend.vaultRead(this._vaultId, objectId)
+        const filePath = `bare/data/${objectId}`
+        const data = await this._sgSend.vaultRead(this._vaultId, filePath)
         if (!data) throw new Error(`Object not found: ${objectId}`)
         return data
     }
@@ -42,12 +47,13 @@ class SGVaultObjectStore {
         const hex   = Array.from(new Uint8Array(hash))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('')
-        return 'obj-' + hex.slice(0, 12)
+        return 'obj-cas-imm-' + hex.slice(0, 12)
     }
 
     // --- Delete an object by ID --------------------------------------------------
 
     async delete(objectId) {
-        return this._sgSend.vaultDelete(this._vaultId, objectId, this._writeKey)
+        const filePath = `bare/data/${objectId}`
+        return this._sgSend.vaultDelete(this._vaultId, filePath, this._writeKey)
     }
 }
