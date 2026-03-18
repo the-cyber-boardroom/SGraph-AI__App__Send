@@ -20,7 +20,7 @@ API_ENDPOINT="${SGRAPH_API_ENDPOINT:-https://dev.send.sgraph.ai}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
-UI_VERSION_UPLOAD="v0.2.10"
+UI_VERSION_UPLOAD="v0.2.12"
 UI_VERSION_DOWNLOAD="v0.2.3"
 SERVE_DIR="$REPO_ROOT/.local-server-user"
 
