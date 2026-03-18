@@ -9,7 +9,6 @@
      - Arrow key / swipe navigation between images in lightbox
      - "Save All" button to download the full zip
      - "Save Image" button in lightbox to save individual image
-     - View modes: grid (default), large, compact — toggle in header
      - Falls through to v0.2.2 zip browser for non-gallery pages or
        zips with non-image files
 
@@ -56,9 +55,6 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
     var files    = this._zipTree.filter(function(e) { return !e.dir; });
     var self     = this;
 
-    // Auto-select best view mode based on image count
-    var autoMode = files.length <= 2 ? 'large' : files.length <= 8 ? 'grid' : 'compact';
-
     // Generate thumbnail HTML
     var thumbsHtml = files.map(function(entry, idx) {
         return '<div class="v025-thumb" data-index="' + idx + '" data-path="' + self.escapeHtml(entry.path) + '">' +
@@ -85,17 +81,6 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
                     <span class="v022-compact-header__status">&check; Decrypted</span>\
                 </div>\
                 <div class="v025-gallery__header-right">\
-                    <div class="v025-view-modes" id="v025-view-modes">\
-                        <button class="v025-view-btn' + (autoMode === 'compact' ? ' v025-view-btn--active' : '') + '" data-mode="compact" title="Compact view">\
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1" y="1" width="4" height="4" rx="0.5"/><rect x="6" y="1" width="4" height="4" rx="0.5"/><rect x="11" y="1" width="4" height="4" rx="0.5"/><rect x="1" y="6" width="4" height="4" rx="0.5"/><rect x="6" y="6" width="4" height="4" rx="0.5"/><rect x="11" y="6" width="4" height="4" rx="0.5"/><rect x="1" y="11" width="4" height="4" rx="0.5"/><rect x="6" y="11" width="4" height="4" rx="0.5"/><rect x="11" y="11" width="4" height="4" rx="0.5"/></svg>\
-                        </button>\
-                        <button class="v025-view-btn' + (autoMode === 'grid' ? ' v025-view-btn--active' : '') + '" data-mode="grid" title="Grid view">\
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>\
-                        </button>\
-                        <button class="v025-view-btn' + (autoMode === 'large' ? ' v025-view-btn--active' : '') + '" data-mode="large" title="Large view">\
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1" y="1" width="14" height="6" rx="1"/><rect x="1" y="9" width="14" height="6" rx="1"/></svg>\
-                        </button>\
-                    </div>\
                     <button class="btn btn-sm btn-primary" id="v025-save-zip">\
                         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12v2h12v-2M8 2v8M5 7l3 3 3-3"/></svg>\
                         Save All\
@@ -103,7 +88,7 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
                     <button class="btn btn-sm btn-secondary" id="zip-info-btn" title="Transfer details">&#9432;</button>\
                 </div>\
             </div>\
-            <div class="v025-grid v025-grid--' + autoMode + '" id="v025-grid">' + thumbsHtml + '</div>\
+            <div class="v025-grid" id="v025-grid">' + thumbsHtml + '</div>\
         </div>\
         <div id="zip-info-panel" class="zip-info-panel" style="display: none;">\
             <send-transparency id="transparency-panel"></send-transparency>\
@@ -154,26 +139,6 @@ SendDownload.prototype.setupEventListeners = function() {
     if (saveZip) {
         saveZip.addEventListener('click', function() {
             self.saveFile(self._zipOrigBytes, self._zipOrigName || 'archive.zip');
-        });
-    }
-
-    // View mode toggle
-    var viewModes = this.querySelector('#v025-view-modes');
-    if (viewModes) {
-        viewModes.addEventListener('click', function(e) {
-            var btn = e.target.closest('.v025-view-btn');
-            if (!btn) return;
-            var mode = btn.dataset.mode;
-            var grid = self.querySelector('#v025-grid');
-            if (!grid) return;
-
-            // Update active button
-            viewModes.querySelectorAll('.v025-view-btn').forEach(function(b) {
-                b.classList.toggle('v025-view-btn--active', b === btn);
-            });
-
-            // Apply mode class
-            grid.className = 'v025-grid v025-grid--' + mode;
         });
     }
 
@@ -371,34 +336,6 @@ SendDownload.prototype.cleanup = function() {
             font-size: var(--text-small, 0.8rem);\
             color: var(--color-text-secondary, #8892A0);\
         }\
-        /* ── View mode toggle ── */\
-        .v025-view-modes {\
-            display: flex;\
-            gap: 2px;\
-            background: rgba(255,255,255,0.04);\
-            border-radius: var(--radius-sm, 6px);\
-            padding: 2px;\
-        }\
-        .v025-view-btn {\
-            background: none;\
-            border: none;\
-            color: rgba(255,255,255,0.35);\
-            padding: 5px 7px;\
-            border-radius: 4px;\
-            cursor: pointer;\
-            display: flex;\
-            align-items: center;\
-            transition: color 0.15s, background 0.15s;\
-        }\
-        .v025-view-btn:hover {\
-            color: rgba(255,255,255,0.6);\
-        }\
-        .v025-view-btn--active {\
-            background: rgba(255,255,255,0.1);\
-            color: var(--accent, #4ECDC4);\
-        }\
-        \
-        /* ── Grid base ── */\
         .v025-grid {\
             display: grid;\
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));\
@@ -406,29 +343,7 @@ SendDownload.prototype.cleanup = function() {
             padding: var(--space-4, 1rem);\
             overflow-y: auto;\
             flex: 1;\
-            align-content: start;\
         }\
-        /* ── Grid: compact mode ── */\
-        .v025-grid--compact {\
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));\
-            gap: var(--space-2, 0.5rem);\
-        }\
-        .v025-grid--compact .v025-thumb__img {\
-            aspect-ratio: 1/1;\
-        }\
-        .v025-grid--compact .v025-thumb__label {\
-            padding: 3px 6px;\
-            font-size: 0.7rem;\
-        }\
-        /* ── Grid: large mode ── */\
-        .v025-grid--large {\
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));\
-            gap: var(--space-4, 1rem);\
-        }\
-        .v025-grid--large .v025-thumb__img {\
-            aspect-ratio: 16/10;\
-        }\
-        \
         .v025-thumb {\
             cursor: pointer;\
             border-radius: var(--radius-md, 8px);\
