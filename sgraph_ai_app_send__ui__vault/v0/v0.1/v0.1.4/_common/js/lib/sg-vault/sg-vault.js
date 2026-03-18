@@ -123,6 +123,9 @@ class SGVault {
                 const settingsBlob = await vault._objectStore.load(entry.blob_id)
                 const decrypted    = await SGSendCrypto.decrypt(settingsBlob, vault._readKey)
                 vault._settings    = JSON.parse(new TextDecoder().decode(decrypted))
+            } else if (entry.tree_id) {
+                // Sub-tree: load recursively (CLI creates separate tree objects per folder)
+                await vault._loadSubTree(entry.name, entry.tree_id)
             } else {
                 vault._insertEntry(entry)
             }
@@ -347,10 +350,10 @@ class SGVault {
     // --- Commit: serialize tree → create tree object → create commit → update ref
 
     async _commit(message) {
-        // 1. Flatten nested tree to entry list
-        const entries = this._flattenTree()
+        // 1. Build tree entries with sub-tree objects for folders (matches CLI format)
+        const entries = await this._buildTreeEntries(this._tree['/'])
 
-        // 2. Add settings as a special entry
+        // 2. Add settings as a special entry in the root tree
         const settingsPlain     = new TextEncoder().encode(JSON.stringify(this._settings))
         const settingsEncrypted = await this._sgSend.encrypt(settingsPlain, this._readKey)
         const settingsBlobId    = await this._objectStore.store(settingsEncrypted)
@@ -364,7 +367,7 @@ class SGVault {
             tree_id:      null
         })
 
-        // 3. Create tree object
+        // 3. Create root tree object
         const treeId = await this._commitManager.createTree(entries)
 
         // 4. Create commit
@@ -380,7 +383,36 @@ class SGVault {
         this._headCommitId = commitId
     }
 
-    // --- Flatten nested tree into flat entry list --------------------------------
+    // --- Build tree entries with sub-tree objects for folders (matches CLI format)
+
+    async _buildTreeEntries(node) {
+        const entries = []
+        for (const [name, entry] of Object.entries(node.children || {})) {
+            if (entry.type === 'folder') {
+                // Recursively create sub-tree object for this folder
+                const childEntries = await this._buildTreeEntries(entry)
+                const childTreeId  = await this._commitManager.createTree(childEntries)
+                entries.push({
+                    name,
+                    size:         0,
+                    content_hash: null,
+                    blob_id:      null,
+                    tree_id:      childTreeId
+                })
+            } else {
+                entries.push({
+                    name,
+                    size:         entry.size || 0,
+                    content_hash: entry.content_hash || null,
+                    blob_id:      entry.blob_id || null,
+                    tree_id:      null
+                })
+            }
+        }
+        return entries
+    }
+
+    // --- Flatten nested tree into flat entry list (for UI display) ----------------
 
     _flattenTree() {
         const entries = []
@@ -453,6 +485,37 @@ class SGVault {
             blob_id:      entry.blob_id,
             size:         entry.size | 0,
             content_hash: entry.content_hash || null
+        }
+    }
+
+    // --- Load a sub-tree object and insert its entries into the in-memory tree ----
+
+    async _loadSubTree(folderName, treeId, parentPath = '') {
+        const subTree  = await this._commitManager.loadTree(treeId)
+        const fullPath = parentPath ? `${parentPath}/${folderName}` : folderName
+
+        // Ensure the folder exists in the in-memory tree
+        const parts = fullPath.split('/').filter(Boolean)
+        let node = this._tree['/']
+        for (const part of parts) {
+            if (!node.children[part]) {
+                node.children[part] = { type: 'folder', children: {} }
+            }
+            node = node.children[part]
+        }
+
+        // Process entries in the sub-tree
+        for (const entry of subTree.entries) {
+            if (entry.tree_id) {
+                // Nested sub-tree (e.g. folder-b/folder-b-1)
+                await this._loadSubTree(entry.name, entry.tree_id, fullPath)
+            } else {
+                // File entry — insert with full path prefix
+                this._insertEntry({
+                    ...entry,
+                    name: `${fullPath}/${entry.name}`
+                })
+            }
         }
     }
 }
