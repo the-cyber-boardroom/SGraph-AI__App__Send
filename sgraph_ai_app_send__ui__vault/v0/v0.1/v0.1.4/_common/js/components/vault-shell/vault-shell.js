@@ -349,7 +349,9 @@
 
         _onFileSelected(folderPath, fileName, fileEntry) {
             // Guard: if this is actually a folder, handle as folder selection instead
-            if (fileEntry && fileEntry.type === 'folder') {
+            // Detect folders by type OR by absence of blob_id (v2 compat)
+            const isFolder = fileEntry && (fileEntry.type === 'folder' || (!fileEntry.blob_id && fileEntry.children));
+            if (isFolder) {
                 const path = folderPath === '/' ? '/' + fileName : folderPath + '/' + fileName;
                 this._onFolderSelected(path);
                 return;
