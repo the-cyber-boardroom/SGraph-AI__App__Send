@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault (v0.1.4) — Zero-knowledge encrypted vault</title>
+    <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
+
+    <!-- Fonts (vendored — no external CDN) -->
+    <link rel="stylesheet" href="../_common/fonts/fonts.css">
+
+    <!-- Design tokens (defines CSS custom properties on :root) -->
+    <link rel="stylesheet" href="../_common/css/design-tokens.css">
+
+    <!-- Shared component styles (buttons, inputs, cards — used by Shadow DOM components) -->
+    <link rel="stylesheet" href="../_common/css/shared-components.css">
+</head>
+<body>
+
+    <vault-shell></vault-shell>
+
+    <!-- ===================================================================
+         Script Loading Order — v0.1.4
+         0. sg-layout (ES module — fractal window management)
+         1. Services (EventBus, ConfigManager, MessagesService)
+            → initialises window.sgraphVault namespace
+         2. i18n
+         3. Shared modules (file-type-detect, markdown-parser)
+         4. Libraries (sg-send-crypto, sg-send, sg-vault-crypto, sg-vault)
+         5. Base system (VaultHelpers, VaultComponentPaths, VaultComponent)
+         6. Debug panels (messages, events, API logger)
+         7. Light DOM components (tree, properties, preview, dropzone)
+         8. Shadow DOM components (entry, upload, share)
+         9. Shell (vault-shell — depends on everything above)
+        10. Init
+         =================================================================== -->
+
+    <!-- 0. sg-layout — fractal window management Web Component (ES module from CDN) -->
+    <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
+
+    <!-- 0b. Build info (CI-generated, absent in local dev) -->
+    <script src="../_common/js/build-info.js"></script>
+
+    <!-- 1. Services (establish window.sgraphVault first) -->
+    <script src="../_common/js/services/event-bus.js"></script>
+    <script src="../_common/js/services/config-manager.js"></script>
+    <script src="../_common/js/services/messages-service.js"></script>
+
+    <!-- 2. i18n -->
+    <script src="../_common/js/vault-i18n.js"></script>
+
+    <!-- 3. Shared modules -->
+    <script src="../_common/js/shared/file-type-detect.js"></script>
+    <script src="../_common/js/shared/markdown-parser.js"></script>
+
+    <!-- 4. Libraries -->
+    <script src="../_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="../_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault.js"></script>
+
+    <!-- 5. Base system -->
+    <script src="../_common/js/base/vault-helpers.js"></script>
+    <script src="../_common/js/base/vault-component-paths.js"></script>
+    <script src="../_common/js/base/vault-component.js"></script>
+
+    <!-- 6. Debug panels -->
+    <script src="../_common/js/components/messages-panel/messages-panel.js"></script>
+    <script src="../_common/js/components/events-viewer/events-viewer.js"></script>
+    <script src="../_common/js/components/api-logger/api-logger.js"></script>
+    <script src="../_common/js/components/storage-viewer/storage-viewer.js"></script>
+
+    <!-- 7. Light DOM components -->
+    <script src="../_common/js/components/vault-tree-view/vault-tree-view.js"></script>
+    <script src="../_common/js/components/vault-file-properties/vault-file-properties.js"></script>
+    <script src="../_common/js/components/vault-file-preview/vault-file-preview.js"></script>
+    <script src="../_common/js/components/vault-upload-dropzone/vault-upload-dropzone.js"></script>
+
+    <!-- 8. Shadow DOM components (kept from v0.1.0) -->
+    <script src="../_common/js/components/vault-entry/vault-entry.js"></script>
+    <script src="../_common/js/components/vault-upload/vault-upload.js"></script>
+    <script src="../_common/js/components/vault-share/vault-share.js"></script>
+
+    <!-- 9. Shell (vault-shell — depends on everything above) -->
+    <script src="../_common/js/components/vault-shell/vault-shell.js"></script>
+
+    <!-- 10. Init -->
+    <script>
+        VaultComponentPaths.init('../_common');
+        VaultI18n.init();
+        window.sgraphVault.events.emit('app-init', { version: 'v0.1.4' });
+    </script>
+
+</body>
+</html>
