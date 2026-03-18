@@ -158,8 +158,8 @@ def _escape_html(text):
 
 def main():
     parser = argparse.ArgumentParser(description='Generate i18n locale pages for SGraph Vault UI')
-    parser.add_argument('--version', type=str, default='v0.1.0',
-                        help='UI version to process (default: v0.1.0)')
+    parser.add_argument('--version', type=str, default='v0.1.4',
+                        help='UI version to process (default: v0.1.4)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Show what would be generated without writing files')
     args = parser.parse_args()
