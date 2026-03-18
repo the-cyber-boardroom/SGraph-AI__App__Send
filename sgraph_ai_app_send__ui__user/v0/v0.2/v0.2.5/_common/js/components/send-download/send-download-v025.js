@@ -28,6 +28,14 @@ var IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'];
 var _v022_renderZipLayout = SendDownload.prototype._renderZipLayout;
 var _v022_setupEvents     = SendDownload.prototype.setupEventListeners;
 var _v022_cleanup         = SendDownload.prototype.cleanup;
+var _v024_startDownload   = SendDownload.prototype.startDownload;
+
+// ─── Override: startDownload — add error logging for gallery debugging ───────
+SendDownload.prototype.startDownload = async function(keyOverride) {
+    console.log('[v025] startDownload called, keyOverride:', keyOverride ? keyOverride.substring(0, 8) + '...' : 'none');
+    await _v024_startDownload.call(this, keyOverride);
+    console.log('[v025] startDownload done — state:', this.state, 'errorMessage:', this.errorMessage, '_renderType:', this._renderType, '_zipTree:', this._zipTree ? this._zipTree.length + ' entries' : 'null');
+};
 
 // ─── Detect gallery page ────────────────────────────────────────────────────
 function isGalleryPage() {
