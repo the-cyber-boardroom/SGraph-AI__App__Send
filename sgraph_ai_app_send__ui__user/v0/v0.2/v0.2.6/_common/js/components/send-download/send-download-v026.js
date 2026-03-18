@@ -75,8 +75,8 @@ function metaLabel(counts) {
 
 // ─── SVG fragments ──────────────────────────────────────────────────────────
 var ICON = {
-    pdf:      '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h2a1 1 0 001-1v-1a1 1 0 00-1-1H9v4" stroke-width="1.3"/></svg>',
-    markdown: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h1l1 2 1-2h1" stroke-width="1.3"/></svg>',
+    pdf:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h2a1 1 0 001-1v-1a1 1 0 00-1-1H9v4" stroke-width="1.3"/></svg>',
+    markdown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h1l1 2 1-2h1" stroke-width="1.3"/></svg>',
     copy:     '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11V3a1 1 0 011-1h8"/></svg>',
     email:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="1"/><path d="M1 3l7 5 7-5"/></svg>',
     print:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6V1h8v5"/><rect x="1" y="6" width="14" height="6" rx="1"/><path d="M4 10h8v5H4z"/></svg>',
@@ -462,7 +462,7 @@ SendDownload.prototype._v026_saveFile = function() {
         .v025-grid--grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important; }\
         .v025-grid--large { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important; gap: var(--space-4, 1rem) !important; }\
         .v025-grid--large .v025-thumb__img { aspect-ratio: 16/10; }\
-        .v025-grid { align-content: start; }\
+        .v025-grid { align-content: start; align-items: start; }\
         \
         /* ── Share buttons ── */\
         .v026-share-group { display: flex; gap: 2px; }\
@@ -475,8 +475,9 @@ SendDownload.prototype._v026_saveFile = function() {
         /* ── Document-type thumbnails ── */\
         .v026-thumb__img--doc {\
             display: flex; flex-direction: column; align-items: center; justify-content: center;\
-            gap: 6px; color: rgba(255,255,255,0.3); position: relative;\
+            gap: 6px; color: rgba(255,255,255,0.3); position: relative; overflow: hidden;\
         }\
+        .v026-thumb__img--doc > svg { width: 25%; height: auto; min-width: 40px; opacity: 0.5; }\
         .v026-thumb__type-badge {\
             position: absolute; top: 8px; right: 8px;\
             font-size: 0.6rem; font-weight: 700; letter-spacing: 0.05em;\
@@ -484,9 +485,9 @@ SendDownload.prototype._v026_saveFile = function() {
             background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5);\
         }\
         .v026-thumb__md-preview {\
-            width: 100%; height: 100%; padding: 10px; font-size: 0.55rem;\
-            line-height: 1.4; color: rgba(255,255,255,0.35); overflow: hidden;\
-            text-overflow: ellipsis; white-space: pre-wrap; word-break: break-word;\
+            position: absolute; inset: 0; padding: 10px; padding-right: 40px;\
+            font-size: 0.65rem; line-height: 1.4; color: rgba(255,255,255,0.4);\
+            overflow: hidden; white-space: pre-wrap; word-break: break-word;\
         }\
         \
         /* ── Lightbox: PDF viewer ── */\
