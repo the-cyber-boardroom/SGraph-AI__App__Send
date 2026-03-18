@@ -1,13 +1,17 @@
 /* =================================================================================
    SGraph Vault — Deterministic Key Derivation
-   v0.1.3 — Parallel PBKDF2 read/write key derivation + HMAC file ID generation
+   v0.1.3 — Self-describing four-segment IDs + HMAC file ID generation
 
    From a vault key ({passphrase}:{vault_id}), derives:
-     - read_key:          AES-256-GCM key for encrypting/decrypting all content
-     - write_key:         hex string submitted to server for write authorization
-     - tree_file_id:      deterministic 12-char hex ID for the vault tree
-     - settings_file_id:  deterministic 12-char hex ID for the vault settings
-     - ref_file_id:       deterministic 12-char hex ID for the vault HEAD ref
+     - read_key:              AES-256-GCM key for encrypting/decrypting all content
+     - write_key:             hex string submitted to server for write authorization
+     - refFileId:             ref-pid-muw-{HMAC[:12]} for the vault HEAD ref
+     - branchIndexFileId:     idx-pid-muw-{HMAC[:12]} for the branch index
+
+   ID format: {type}-{derivation}-{mutability}-{hex_id}
+     type:       obj | ref | idx | key | pkg
+     derivation: pid (HMAC) | cas (SHA256) | rnd (random)
+     mutability: imm | snw | muw
 
    Read and write keys are derived in PARALLEL via PBKDF2 with different salts.
    Knowing read_key does NOT reveal write_key (and vice versa).
@@ -84,13 +88,25 @@ class SGVaultCrypto {
             'raw', readBits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
         )
 
-        const [treeFileId, settingsFileId, refFileId] = await Promise.all([
-            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:tree:${vaultId}`),
-            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:settings:${vaultId}`),
-            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:ref:${vaultId}`)
+        const [refHex, branchIndexHex] = await Promise.all([
+            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:ref:${vaultId}`),
+            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:branch-index:${vaultId}`)
         ])
 
-        return { readKey, writeKey, treeFileId, settingsFileId, refFileId }
+        return {
+            readKey,
+            writeKey,
+            hmacKey,                                                             // Exposed for per-branch ref derivation
+            refFileId:         'ref-pid-muw-' + refHex,                          // Named HEAD: deterministic, multi-writer
+            branchIndexFileId: 'idx-pid-muw-' + branchIndexHex                   // Branch index: deterministic, multi-writer
+        }
+    }
+
+    // --- Per-Branch Ref Derivation -----------------------------------------------
+
+    static async deriveBranchRefFileId(hmacKey, vaultId, branchName) {
+        const hex = await this._deriveFileId(hmacKey, `sg-vault-v1:file-id:branch-ref:${vaultId}:${branchName}`)
+        return 'ref-pid-snw-' + hex                                              // Clone branch: deterministic, single-writer
     }
 
     // --- Internal Helpers -------------------------------------------------------
