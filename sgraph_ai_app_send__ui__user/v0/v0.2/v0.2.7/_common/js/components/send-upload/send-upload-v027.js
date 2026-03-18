@@ -73,6 +73,9 @@ var CAROUSEL_MESSAGES = [
 
 var CAROUSEL_INTERVAL_MS = 4000;
 
+// Expose carousel messages for later overlays (v0.2.8+)
+SendUpload.CAROUSEL_MESSAGES = CAROUSEL_MESSAGES;
+
 // ─── Override: render — inject Next button bar after step indicator ──────────
 SendUpload.prototype.render = function() {
     // Let v0.2.6 render normally first

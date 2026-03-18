@@ -265,13 +265,25 @@ SendUpload.prototype._v026_renderToken = function(result) {
         '</div>';
     }
 
-    // QR code for full link
+    // QR code + Open in new tab — side by side
     var qrHtml = '';
-    if (window.sgraphSend && window.sgraphSend.qr && tokenLink) {
-        var svg = window.sgraphSend.qr.toSvg(tokenLink, { ecl: 'medium', border: 2, lightColor: '#ffffff', darkColor: '#1A1A2E' });
-        qrHtml = '<div class="v028-qr-section">' +
-            '<div class="v028-qr-code">' + svg + '</div>' +
-            '<div class="v028-qr-label">Scan to open link</div>' +
+    var qrSvg = (window.sgraphSend && window.sgraphSend.qr && tokenLink)
+              ? window.sgraphSend.qr.toSvg(tokenLink, { ecl: 'medium', border: 2, lightColor: '#ffffff', darkColor: '#1A1A2E' })
+              : '';
+    var openLinkHtml = tokenLink
+        ? '<a class="v028-open-link" href="' + this.escapeHtml(tokenLink) + '" target="_blank" rel="noopener">' +
+              '<span class="v028-open-link__icon">&#8599;</span>' +
+              '<span class="v028-open-link__text">Open in new tab</span>' +
+              '<span class="v028-open-link__hint">Test the recipient experience</span>' +
+          '</a>'
+        : '';
+    if (qrSvg || openLinkHtml) {
+        qrHtml = '<div class="v028-qr-open-row">' +
+            (qrSvg ? '<div class="v028-qr-section">' +
+                '<div class="v028-qr-code">' + qrSvg + '</div>' +
+                '<div class="v028-qr-label">Scan to open link</div>' +
+            '</div>' : '') +
+            (openLinkHtml ? openLinkHtml : '') +
         '</div>';
     }
 
@@ -295,7 +307,7 @@ SendUpload.prototype._v026_renderToken = function(result) {
     qrHtml;
 };
 
-// ─── Override: _v023_renderProcessing — live timing bars as stages complete ──
+// ─── Override: _v023_renderProcessing — trust messages + stats side by side ──
 SendUpload.prototype._v023_renderProcessing = function() {
     var stage = SendUpload.PROGRESS_STAGES[this.state];
     var pct   = stage ? stage.pct : 5;
@@ -322,13 +334,41 @@ SendUpload.prototype._v023_renderProcessing = function() {
         }
     }
 
+    // Carousel message (left column)
+    if (this._v027_carouselIndex === undefined) {
+        this._v027_carouselIndex = 0;
+    }
+    var CAROUSEL = SendUpload.CAROUSEL_MESSAGES || [];
+    var msg = CAROUSEL.length > 0 ? CAROUSEL[this._v027_carouselIndex % CAROUSEL.length] : null;
+    var carouselHtml = msg
+        ? '<div class="v028-process-col v028-process-col--messages">' +
+              '<div class="v027-carousel" id="v027-carousel">' +
+                  '<div class="v027-carousel__message v027-carousel__message--visible">' +
+                      '<span class="v027-carousel__icon">' + msg.icon + '</span>' +
+                      '<span class="v027-carousel__text">' + this.escapeHtml(msg.text) + '</span>' +
+                  '</div>' +
+              '</div>' +
+          '</div>'
+        : '<div class="v028-process-col v028-process-col--messages">' +
+              '<div class="v023-processing__hint">Your file is being encrypted in your browser. Keep this tab open.</div>' +
+          '</div>';
+
+    // Stats column (right column)
+    var statsHtml = completedRows
+        ? '<div class="v028-process-col v028-process-col--stats">' +
+              '<div class="v028-live-timing">' + completedRows + '</div>' +
+          '</div>'
+        : '';
+
     return '<div class="v023-processing">' +
         '<div class="v023-processing__label">' + this.escapeHtml(label) + '</div>' +
         '<div class="progress-bar" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100">' +
             '<div class="progress-bar__fill" style="width: ' + pct + '%;"></div>' +
         '</div>' +
-        (completedRows ? '<div class="v028-live-timing">' + completedRows + '</div>' : '') +
-        '<div class="v023-processing__hint">Your file is being encrypted in your browser. Keep this tab open.</div>' +
+        '<div class="v028-process-columns">' +
+            carouselHtml +
+            statsHtml +
+        '</div>' +
     '</div>';
 };
 
@@ -353,6 +393,7 @@ SendUpload.prototype._v026_renderConfirm = function() {
             display: flex;\
             align-items: flex-start;\
             gap: var(--space-4, 1rem);\
+            margin-bottom: var(--space-4, 1rem);\
         }\
         .v028-header-row__steps {\
             flex: 1;\
@@ -448,17 +489,28 @@ SendUpload.prototype._v026_renderConfirm = function() {
             white-space: nowrap;\
         }\
         \
-        /* QR code section */\
+        /* QR + Open link row — side by side */\
+        .v028-qr-open-row {\
+            display: flex;\
+            align-items: center;\
+            justify-content: center;\
+            gap: var(--space-6, 1.5rem);\
+            margin-top: var(--space-5, 1.25rem);\
+            padding: var(--space-4, 1rem);\
+            background: var(--bg-secondary, #16213E);\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));\
+            border-radius: var(--radius-md, 12px);\
+        }\
         .v028-qr-section {\
             display: flex;\
             flex-direction: column;\
             align-items: center;\
-            margin-top: var(--space-4, 1rem);\
+            flex-shrink: 0;\
         }\
         .v028-qr-code {\
-            width: 160px;\
-            height: 160px;\
-            padding: 8px;\
+            width: 120px;\
+            height: 120px;\
+            padding: 6px;\
             background: #ffffff;\
             border-radius: var(--radius-sm, 6px);\
         }\
@@ -472,13 +524,72 @@ SendUpload.prototype._v026_renderConfirm = function() {
             margin-top: var(--space-2, 0.5rem);\
             opacity: 0.7;\
         }\
+        .v028-open-link {\
+            display: flex;\
+            flex-direction: column;\
+            align-items: center;\
+            justify-content: center;\
+            text-decoration: none;\
+            padding: var(--space-4, 1rem) var(--space-5, 1.25rem);\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.2));\
+            border-radius: var(--radius-sm, 6px);\
+            background: rgba(78, 205, 196, 0.04);\
+            transition: border-color 0.2s, background 0.2s, transform 0.15s;\
+            cursor: pointer;\
+            min-width: 140px;\
+        }\
+        .v028-open-link:hover {\
+            border-color: var(--color-primary, #4ECDC4);\
+            background: rgba(78, 205, 196, 0.1);\
+            transform: translateY(-1px);\
+        }\
+        .v028-open-link__icon {\
+            font-size: 1.5rem;\
+            color: var(--color-primary, #4ECDC4);\
+            margin-bottom: var(--space-2, 0.5rem);\
+        }\
+        .v028-open-link__text {\
+            font-size: var(--text-sm, 0.875rem);\
+            font-weight: var(--weight-semibold, 600);\
+            color: var(--color-primary, #4ECDC4);\
+        }\
+        .v028-open-link__hint {\
+            font-size: var(--text-micro, 0.625rem);\
+            color: var(--color-text-secondary, #8892A0);\
+            margin-top: var(--space-1, 0.25rem);\
+            opacity: 0.7;\
+        }\
+        \
+        /* Two-column processing layout: messages left, stats right */\
+        .v028-process-columns {\
+            display: flex;\
+            gap: var(--space-4, 1rem);\
+            margin-top: var(--space-3, 0.75rem);\
+            min-height: 100px;\
+        }\
+        .v028-process-col {\
+            flex: 1;\
+            min-width: 0;\
+        }\
+        .v028-process-col--messages {\
+            display: flex;\
+            align-items: center;\
+        }\
+        .v028-process-col--messages .v027-carousel {\
+            width: 100%;\
+        }\
+        .v028-process-col--stats {\
+            display: flex;\
+            align-items: flex-start;\
+            justify-content: flex-end;\
+        }\
         \
         /* Live timing rows during processing */\
         .v028-live-timing {\
-            margin-top: var(--space-3, 0.75rem);\
             display: flex;\
             flex-direction: column;\
             gap: var(--space-1, 0.25rem);\
+            width: 100%;\
         }\
         .v028-live-timing__row {\
             display: flex;\
@@ -548,6 +659,13 @@ SendUpload.prototype._v026_renderConfirm = function() {
                 min-width: 120px;\
                 padding: var(--space-2, 0.5rem) var(--space-4, 1rem);\
                 font-size: var(--text-small, 0.75rem);\
+            }\
+            .v028-process-columns {\
+                flex-direction: column;\
+            }\
+            .v028-qr-open-row {\
+                flex-direction: column;\
+                gap: var(--space-3, 0.75rem);\
             }\
         }\
     ';
