@@ -93,8 +93,8 @@ function buildGalleryHtml(entries) {
 SendUpload.prototype._v023_renderStep2 = function() {
     var baseHtml = _v0210_renderStep2.call(this);
 
-    // Only add gallery for folder/multi-file uploads
-    if (!this._folderScan || !this._folderScan.entries) return baseHtml;
+    // Only add gallery for folder/multi-file uploads (skip if v0.2.12 suppresses it)
+    if (!this._folderScan || !this._folderScan.entries || this._v0212_suppressPreview) return baseHtml;
 
     var galleryHtml = buildGalleryHtml(this._folderScan.entries);
     if (!galleryHtml) return baseHtml;
