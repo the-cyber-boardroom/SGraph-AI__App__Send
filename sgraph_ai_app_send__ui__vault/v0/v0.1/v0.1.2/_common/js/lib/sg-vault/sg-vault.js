@@ -1,23 +1,24 @@
 /* =================================================================================
    SGraph Vault — Client-Side Encrypted Vault Logic
-   v0.2.0 — Git-like object model with content-addressed storage
+   v0.3.0 — Self-describing IDs, bare/ paths, on-demand sub-tree loading
 
    A vault is a collection of encrypted files stored via the vault pointer API.
    The server sees only encrypted blobs — it has no concept of folders or file names.
 
-   v2 data model:
-     - Objects (blobs, trees, commits) are content-addressed via SHA-256
-     - A HEAD ref points to the latest commit
-     - Each commit points to a tree object containing encrypted file entries
-     - Every mutation creates a new commit (no in-place overwrites)
+   v3 data model:
+     - Objects use self-describing IDs: obj-cas-imm-{hash}
+     - Refs use deterministic HMAC IDs: ref-pid-muw-{hmac} (HEAD), ref-pid-snw-{hmac} (clone)
+     - All file paths include bare/ prefix: bare/refs/ref-pid-muw-xxx, bare/data/obj-cas-imm-xxx
+     - Sub-tree model: one tree object per directory level
+     - Encrypted-only metadata: no plaintext name/size/content_hash in tree entries
 
    In-memory tree:
      The nested folder structure { '/': { type: 'folder', children: {} } } is
-     maintained in memory for UI convenience. It is derived from the flat tree
-     entries stored in commits, and serialized back to flat entries on save.
+     maintained in memory for UI convenience. It is derived from the tree
+     entries stored in commits, and serialized back to entries on save.
 
    Vault key format: {passphrase}:{vault_id}
-   Key derivation: SGVaultCrypto.deriveKeys() → readKey, writeKey, refFileId
+   Key derivation: SGVaultCrypto.deriveKeys() → readKey, writeKey, refFileId, branchIndexFileId
 
    Depends on: SGSend, SGSendCrypto, SGVaultCrypto, SGVaultObjectStore,
                SGVaultRefManager, SGVaultCommit
@@ -30,9 +31,10 @@ class SGVault {
         this._passphrase        = null
         this._readKey           = null                                         // AES-256-GCM CryptoKey
         this._writeKey          = null                                         // Hex string for server auth
+        this._hmacKey           = null                                         // For per-branch ref derivation
         this._vaultId           = null
-        this._refFileId         = null                                         // Deterministic (from HMAC)
-        this._branchIndexFileId = null                                         // Deterministic (from HMAC)
+        this._refFileId         = null                                         // ref-pid-muw-{HMAC[:12]}
+        this._branchIndexFileId = null                                         // idx-pid-muw-{HMAC[:12]}
         this._settings          = null                                         // Vault metadata
         this._tree              = null                                         // Nested in-memory tree
         this._headCommitId      = null                                         // Current HEAD commit
@@ -47,14 +49,16 @@ class SGVault {
         const vault = new SGVault(sgSend)
         vault._passphrase = passphrase
 
-        // 1. Generate vault ID (8 hex chars)
-        vault._vaultId = Array.from(crypto.getRandomValues(new Uint8Array(4)))
-            .map(b => b.toString(16).padStart(2, '0')).join('')
+        // 1. Generate vault ID (8 lowercase alphanumeric chars — matches sg-send-cli)
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+        const bytes    = crypto.getRandomValues(new Uint8Array(8))
+        vault._vaultId = Array.from(bytes).map(b => alphabet[b % alphabet.length]).join('')
 
         // 2. Derive all keys and deterministic file IDs
         const keys = await SGVaultCrypto.deriveKeys(passphrase, vault._vaultId)
         vault._readKey           = keys.readKey
         vault._writeKey          = keys.writeKey
+        vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
 
@@ -66,7 +70,7 @@ class SGVault {
             vault_name:  options.name || 'Untitled Vault',
             vault_id:    vault._vaultId,
             created:     new Date().toISOString(),
-            version:     2,
+            version:     3,
             description: options.description || ''
         }
 
@@ -90,6 +94,7 @@ class SGVault {
         const keys = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
         vault._readKey           = keys.readKey
         vault._writeKey          = keys.writeKey
+        vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
 

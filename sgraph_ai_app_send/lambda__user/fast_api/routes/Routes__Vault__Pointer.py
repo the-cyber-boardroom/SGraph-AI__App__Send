@@ -19,6 +19,7 @@ ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id:path}
                        f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}/{{file_id:path}}'       ,
                        f'/{TAG__ROUTES_VAULT}/batch/{{vault_id}}'                         ,
                        f'/{TAG__ROUTES_VAULT}/list/{{vault_id}}'                          ,
+                       f'/{TAG__ROUTES_VAULT}/health/{{vault_id}}'                        ,
                        f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}'                         ,
                        f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}'                          ,
                        f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}'                   ,
@@ -140,11 +141,6 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     async def batch__vault_id(self, vault_id : Safe_Str__Id,                     # POST /vault/batch/{vault_id}
                                     request  : Request
                               ) -> dict:
-        self.check_access_token(request)
-        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
-        if not write_key:
-            raise HTTPException(status_code = 400,
-                                detail      = 'Missing write key')
         body = await request.json()
         operations = body.get('operations', [])
         if not operations:
@@ -153,6 +149,18 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if len(operations) > BATCH_MAX_OPERATIONS:
             raise HTTPException(status_code = 400,
                                 detail      = f'Too many operations (max {BATCH_MAX_OPERATIONS})')
+
+        read_only = all(op.get('op') == 'read' for op in operations)
+
+        if read_only:                                                            # Read-only batch — no auth required (data is encrypted)
+            return self.vault_service.batch_read(vault_id   = str(vault_id) ,
+                                                  operations = operations    )
+
+        self.check_access_token(request)                                         # Mixed/write batch — require auth
+        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
+        if not write_key:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Missing write key')
         result = self.vault_service.batch(vault_id      = str(vault_id)  ,
                                           operations    = operations      ,
                                           write_key_hex = write_key      )
@@ -166,6 +174,15 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                        ) -> dict:
         return self.vault_service.list_files(vault_id = str(vault_id) ,
                                              prefix   = prefix        )
+
+    @route_path('/health/{vault_id}')
+    def health__vault_id(self, vault_id : Safe_Str__Id) -> dict:                # GET /vault/health/{vault_id} — unauthenticated existence check + Lambda warm-up
+        manifest_path = self.vault_service.vault_manifest_path(str(vault_id))
+        exists        = self.vault_service.storage_fs.file__exists(manifest_path)
+        if exists:
+            return dict(status = 'ok', vault_id = str(vault_id))
+        raise HTTPException(status_code = 404,
+                            detail      = 'Vault not found')
 
     # --- Catch routes: prevent redirect loops when file_id is missing ----------
 
@@ -192,6 +209,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         self.add_route_delete(self.delete__vault_id__file_id      )
         self.add_route_post  (self.batch__vault_id                )
         self.add_route_get   (self.list__vault_id                 )
+        self.add_route_get   (self.health__vault_id               )
         self.add_route_put   (self.write__vault_id                )              # Catch: missing file_id
         self.add_route_get   (self.read__vault_id                 )              # Catch: missing file_id
         self.add_route_get   (self.read_base64__vault_id          )              # Catch: missing file_id

@@ -30,6 +30,7 @@
                 <div class="vt-container">
                     <div class="vt-header">
                         <span class="vt-title">Files</span>
+                        <button class="vt-refresh-btn" title="Refresh from server">&#x21bb;</button>
                         <button class="vt-new-folder-btn" title="New Folder">+</button>
                     </div>
                     <div class="vt-tree"></div>
@@ -38,6 +39,9 @@
 
             this.querySelector('.vt-new-folder-btn').addEventListener('click', () => {
                 this._onNewFolder();
+            });
+            this.querySelector('.vt-refresh-btn').addEventListener('click', () => {
+                this.dispatchEvent(new CustomEvent('tree-refresh-requested', { bubbles: true }));
             });
 
             // Inject context menu styles into document head (once)
@@ -73,7 +77,7 @@
             const treeEl = this.querySelector('.vt-tree');
             if (!treeEl) return;
 
-            const root = this._vault._tree?.tree?.['/'];
+            const root = this._vault._tree?.['/'];
             if (!root) {
                 treeEl.innerHTML = '<div class="vt-empty">Empty vault</div>';
                 return;
@@ -455,8 +459,9 @@
                 .vt-container { height: 100%; display: flex; flex-direction: column; }
                 .vt-header { display: flex; align-items: center; justify-content: space-between; padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
                 .vt-title { font-size: var(--text-sm); font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
-                .vt-new-folder-btn { font-size: var(--text-body); padding: 0 0.375rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; line-height: 1.4; }
-                .vt-new-folder-btn:hover { background: var(--bg-secondary); color: var(--color-primary); }
+                .vt-refresh-btn, .vt-new-folder-btn { font-size: var(--text-body); padding: 0 0.375rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; line-height: 1.4; margin-left: auto; }
+                .vt-refresh-btn:hover, .vt-new-folder-btn:hover { background: var(--bg-secondary); color: var(--color-primary); }
+                .vt-new-folder-btn { margin-left: 0.25rem; }
                 .vt-tree { flex: 1; overflow-y: auto; padding: 0.375rem 0; }
                 .vt-empty { padding: 1rem; text-align: center; color: var(--color-text-secondary); font-size: var(--text-small); }
                 .vt-row { display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; cursor: pointer; font-size: var(--text-sm); color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 2px solid transparent; }

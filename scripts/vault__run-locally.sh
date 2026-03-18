@@ -15,7 +15,7 @@
 #   - http://localhost (local dev — this script)
 # Using 127.0.0.1 will NOT work for Web Crypto.
 # ---------------------------------------------------------------------------
-PORT=10063
+PORT=10067
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
@@ -95,7 +95,7 @@ echo "  IMPORTANT: Use 'localhost' not '127.0.0.1' (Web Crypto requires secure c
 echo ""
 echo "  Backend:"
 echo "    Default:        https://send.sgraph.ai (production)"
-echo "    Local backend:  Run ./scripts/user__run-locally.sh in another terminal (port 10062)"
-echo "                    Then set data-endpoint=\"http://localhost:10062\" on <vault-entry>"
+echo "    Local backend:  Run ./scripts/user__run-locally.sh in another terminal (port $PORT)"
+echo "                    Then set data-endpoint=\"http://localhost:$PORT\" on <vault-entry>"
 echo ""
 python3 -m http.server $PORT --directory "$SERVE_DIR" --bind localhost

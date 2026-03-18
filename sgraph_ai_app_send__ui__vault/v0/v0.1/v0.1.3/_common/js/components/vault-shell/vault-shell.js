@@ -266,7 +266,37 @@
             if (uploadPanel) uploadPanel.style.display = 'none';
 
             window.history.replaceState(null, '', window.location.pathname);
+            try { localStorage.removeItem('sg-vault-key') } catch (_) { /* ignore */ }
             window.sgraphVault.events.emit('vault-locked', {});
+        }
+
+        // --- Refresh Vault from Server ------------------------------------------
+
+        async _onRefreshVault() {
+            if (!this._vaultKey) return;
+            this._showLoading();
+            try {
+                const entry   = this.querySelector('vault-entry');
+                const sgSend  = entry._getSGSend();
+                const vault   = await SGVault.open(sgSend, this._vaultKey);
+                this._vault   = vault;
+
+                // Re-wire tree
+                const tree = this.querySelector('vault-tree-view');
+                if (tree) { tree.vault = vault; tree.refresh(); }
+
+                // Re-wire other components
+                const uploader = this.querySelector('vault-upload');
+                if (uploader) uploader.vault = vault;
+
+                this._updateStatusBar();
+                this._updateSettingsView();
+                window.sgraphVault.messages.success('Vault refreshed');
+            } catch (err) {
+                window.sgraphVault.messages.error(`Refresh failed: ${err.message}`);
+            } finally {
+                this._hideLoading();
+            }
         }
 
         // --- File Selection -----------------------------------------------------
@@ -585,6 +615,9 @@
             });
             this.addEventListener('tree-folder-selected', (e) => {
                 this._onFolderSelected(e.detail.path);
+            });
+            this.addEventListener('tree-refresh-requested', () => {
+                this._onRefreshVault();
             });
 
             // Upload events

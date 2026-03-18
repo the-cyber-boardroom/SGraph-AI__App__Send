@@ -386,6 +386,78 @@ class test_Routes__Vault__Pointer(TestCase):
         assert response.status_code == 200
         assert 'bare/data/obj-xxx' in response.json()['files']
 
+    # === Batch read (no auth required) ===
+
+    def test__batch_read__no_auth_required(self):
+        """Read-only batch does not require write-key or access token."""
+        vault = 'batch-read-vault-1'
+        # Write some files first (with auth)
+        ops = [dict(op='write', file_id='bare/refs/ref-main',  data=base64.b64encode(b'commit1').decode()),
+               dict(op='write', file_id='bare/data/obj-aaa',   data=base64.b64encode(b'blob-a').decode()),
+               dict(op='write', file_id='bare/data/obj-bbb',   data=base64.b64encode(b'blob-b').decode())]
+        self._batch(vault_id=vault, operations=ops)
+
+        # Read-only batch — no write-key, no access token
+        from starlette.testclient import TestClient
+        unauthenticated = TestClient(self.client.app)
+        read_ops = [dict(op='read', file_id='bare/refs/ref-main'),
+                    dict(op='read', file_id='bare/data/obj-aaa'),
+                    dict(op='read', file_id='bare/data/obj-bbb')]
+        response = unauthenticated.post(f'/api/vault/batch/{vault}',
+                                         content = json.dumps({'operations': read_ops}),
+                                         headers = {'content-type': 'application/json'})
+        assert response.status_code == 200
+        results = response.json()['results']
+        assert len(results) == 3
+        assert all(r['status'] == 'ok' for r in results)
+        assert base64.b64decode(results[0]['data']) == b'commit1'
+        assert base64.b64decode(results[1]['data']) == b'blob-a'
+        assert base64.b64decode(results[2]['data']) == b'blob-b'
+
+    def test__batch_read__not_found(self):
+        """Batch read of nonexistent file returns not_found status."""
+        read_ops = [dict(op='read', file_id='bare/data/ghost')]
+        response = self.client.post('/api/vault/batch/batch-read-vault-2',
+                                     content = json.dumps({'operations': read_ops}),
+                                     headers = {'content-type': 'application/json'})
+        assert response.status_code          == 200
+        assert response.json()['results'][0]['status'] == 'not_found'
+
+    def test__batch_mixed_read_write__requires_auth(self):
+        """Mixed batch with reads and writes still requires write-key."""
+        from starlette.testclient import TestClient
+        unauthenticated = TestClient(self.client.app)
+        ops = [dict(op='read',  file_id='bare/data/obj-aaa'),
+               dict(op='write', file_id='bare/data/obj-bbb', data=base64.b64encode(b'x').decode())]
+        response = unauthenticated.post('/api/vault/batch/batch-read-vault-3',
+                                         content = json.dumps({'operations': ops}),
+                                         headers = {'content-type': 'application/json'})
+        assert response.status_code in (400, 401)                                # Missing write-key or access token
+
+    # === Health check endpoint ===
+
+    def test__health__existing_vault(self):
+        """Health check returns ok for a vault that has been written to."""
+        vault = 'health-vault-1'
+        self._write(vault_id=vault, file_id='setup-file', payload=b'data')       # Creates manifest
+        response = self.client.get(f'/api/vault/health/{vault}')
+        assert response.status_code == 200
+        assert response.json()     == dict(status='ok', vault_id=vault)
+
+    def test__health__nonexistent_vault(self):
+        """Health check returns 404 for a vault that doesn't exist."""
+        response = self.client.get('/api/vault/health/no-such-vault')
+        assert response.status_code == 404
+
+    def test__health__no_auth_required(self):
+        """Health check is unauthenticated — serves as Lambda warm-up."""
+        vault = 'health-vault-2'
+        self._write(vault_id=vault, file_id='setup-file', payload=b'data')
+        from starlette.testclient import TestClient
+        unauthenticated = TestClient(self.client.app)
+        response = unauthenticated.get(f'/api/vault/health/{vault}')
+        assert response.status_code == 200
+
     # === Slashed file_id via individual endpoints (path converter) ===
 
     def test__write_read_delete__slashed_file_id(self):

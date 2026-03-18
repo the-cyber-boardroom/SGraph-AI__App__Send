@@ -451,3 +451,45 @@ class test_Service__Vault__Pointer(TestCase):
         operations = [dict(op='delete', file_id='bare/data/ghost')]
         result = self.service.batch(self.vault_id, operations, self.write_key)
         assert result['results'][0]['status'] == 'not_found'
+
+    # --- Batch read (no auth) ---
+
+    def test__batch_read__single_file(self):
+        """Read a single file via batch_read — returns base64 data."""
+        self.service.write(self.vault_id, 'bare/data/obj-abc', self.write_key, b'\xde\xad')
+        operations = [dict(op='read', file_id='bare/data/obj-abc')]
+        result = self.service.batch_read(self.vault_id, operations)
+        assert result['vault_id']             == self.vault_id
+        assert len(result['results'])         == 1
+        assert result['results'][0]['status'] == 'ok'
+        assert result['results'][0]['data']   == base64.b64encode(b'\xde\xad').decode('ascii')
+
+    def test__batch_read__multiple_files(self):
+        """Read multiple files in one batch_read call."""
+        files = {'bare/refs/ref-main': b'commit1', 'bare/data/obj-a': b'blob-a', 'bare/data/obj-b': b'blob-b'}
+        for fid, data in files.items():
+            self.service.write(self.vault_id, fid, self.write_key, data)
+        operations = [dict(op='read', file_id=fid) for fid in files]
+        result = self.service.batch_read(self.vault_id, operations)
+        assert len(result['results']) == 3
+        for i, (fid, data) in enumerate(files.items()):
+            assert result['results'][i]['file_id'] == fid
+            assert result['results'][i]['status']  == 'ok'
+            assert result['results'][i]['data']    == base64.b64encode(data).decode('ascii')
+
+    def test__batch_read__not_found(self):
+        """Reading a nonexistent file in batch_read returns not_found."""
+        operations = [dict(op='read', file_id='bare/data/ghost')]
+        result = self.service.batch_read(self.vault_id, operations)
+        assert result['results'][0]['status'] == 'not_found'
+        assert 'data' not in result['results'][0]
+
+    def test__batch__read_op_in_mixed_batch(self):
+        """Read ops work inside authenticated mixed batch alongside writes."""
+        self.service.write(self.vault_id, 'bare/data/existing', self.write_key, b'hello')
+        operations = [dict(op='read', file_id='bare/data/existing'),
+                      dict(op='write', file_id='bare/data/new-obj', data=base64.b64encode(b'world').decode())]
+        result = self.service.batch(self.vault_id, operations, self.write_key)
+        assert result['results'][0]['status'] == 'ok'
+        assert result['results'][0]['data']   == base64.b64encode(b'hello').decode('ascii')
+        assert result['results'][1]['status'] == 'ok'
