@@ -1,0 +1,55 @@
+<div class="vault-browser">
+
+    <!-- Toolbar -->
+    <div class="vault-browser__toolbar">
+        <div class="vault-browser__breadcrumb" id="breadcrumb"></div>
+        <div class="vault-browser__actions">
+            <button class="btn btn-secondary btn-sm" id="new-folder-btn" title="New Folder">+ Folder</button>
+            <button class="btn btn-primary btn-sm" id="upload-btn" title="Upload">Upload</button>
+        </div>
+    </div>
+
+    <!-- New Folder Inline Form -->
+    <div class="vault-browser__new-folder" id="new-folder-form" hidden>
+        <input class="input" type="text" id="new-folder-name" placeholder="Folder name" autocomplete="off">
+        <button class="btn btn-primary btn-sm" id="new-folder-ok">Create</button>
+        <button class="btn btn-secondary btn-sm" id="new-folder-cancel">Cancel</button>
+    </div>
+
+    <!-- File Table -->
+    <div class="vault-browser__table-wrap">
+        <table class="vault-browser__table">
+            <thead>
+                <tr>
+                    <th class="vault-browser__th vault-browser__th--name" id="sort-name" data-i18n="vault.browser.name">Name</th>
+                    <th class="vault-browser__th vault-browser__th--type" data-i18n="vault.browser.type">Type</th>
+                    <th class="vault-browser__th vault-browser__th--size" id="sort-size" data-i18n="vault.browser.size">Size</th>
+                    <th class="vault-browser__th vault-browser__th--date" data-i18n="vault.browser.uploaded">Uploaded</th>
+                    <th class="vault-browser__th vault-browser__th--actions"></th>
+                </tr>
+            </thead>
+            <tbody id="file-list"></tbody>
+        </table>
+    </div>
+
+    <!-- Empty State -->
+    <div class="vault-browser__empty" id="empty-state" hidden>
+        <p data-i18n="vault.browser.empty">This folder is empty</p>
+    </div>
+
+    <!-- Drop Zone Overlay -->
+    <div class="vault-browser__drop-zone" id="drop-zone" hidden>
+        <span data-i18n="vault.browser.drop_hint">Drop files here to encrypt & upload</span>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="vault-browser__status" id="status-bar"></div>
+
+    <!-- Delete Confirmation -->
+    <div class="vault-browser__confirm" id="delete-confirm" hidden>
+        <span id="delete-confirm-msg"></span>
+        <button class="btn btn-sm" style="background:var(--danger);color:#fff" id="delete-yes">Delete</button>
+        <button class="btn btn-secondary btn-sm" id="delete-no">Cancel</button>
+    </div>
+
+</div>
