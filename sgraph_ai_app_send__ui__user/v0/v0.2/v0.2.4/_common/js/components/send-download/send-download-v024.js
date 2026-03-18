@@ -4,14 +4,14 @@
 
    Changes:
      - Fix error flash: when a friendly token is in the URL, v0.2.0's
-       connectedCallback fires before this overlay loads and makes a doomed
+       connectedCallback fires before overlays load and makes a doomed
        API call with the raw token as transfer ID. The 404 error briefly
-       flashes before v0.2.3's re-trigger code kicks in. Fix: suppress
-       error rendering during the first 600ms of page load, giving the
-       overlay chain time to load and re-trigger with proper token resolution.
-     - Also: add a generation counter to loadTransferInfo so stale API
-       responses from v0.2.0's initial call don't overwrite the correct state
-       set by v0.2.3's re-trigger.
+       flashes before v0.2.3's re-trigger code kicks in.
+     - Fix: inline <style id="v024-head-suppress"> in <head> hides
+       .status--error from the very start. This JS removes that style
+       once the overlay chain is loaded and state is correct.
+     - Generation counter on loadTransferInfo so stale API responses
+       from v0.2.0's initial call don't overwrite the correct state.
 
    Loads AFTER v0.2.3 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -24,10 +24,6 @@ if (typeof SendDownload === 'undefined') {
     console.warn('[send-download-v024] SendDownload not found — skipping');
     return;
 }
-
-// ─── Store methods we override ──────────────────────────────────────────────
-var _v023_loadTransferInfo = SendDownload.prototype.loadTransferInfo;
-var _v023_render           = SendDownload.prototype.render;
 
 // ─── Generation counter — prevents stale API responses from v0.2.0 ──────────
 // Each call to loadTransferInfo increments the generation. When the async
@@ -69,30 +65,16 @@ SendDownload.prototype.loadTransferInfo = async function() {
         this.state = 'error';
         this.errorMessage = this.t('download.error.not_found');
     }
+
+    // Remove the head suppression now — we have the real state
+    var headSuppress = document.getElementById('v024-head-suppress');
+    if (headSuppress) headSuppress.remove();
+
     this.render();
     this.setupEventListeners();
 
     if (this.state === 'ready' && this.hashKey) this.startDownload(this.hashKey);
 };
-
-// ─── Suppress error flash during initial load ───────────────────────────────
-// The error state rendered by v0.2.0's initial doomed API call would flash
-// for ~100-300ms before v0.2.3's re-trigger. We inject CSS that hides error
-// states with an animation delay, then remove it once the overlay chain is
-// fully loaded.
-
-(function suppressFlash() {
-    var style = document.createElement('style');
-    style.id = 'v024-error-suppress';
-    style.textContent = '.status--error { opacity: 0 !important; transition: none !important; }';
-    document.head.appendChild(style);
-
-    // Remove the suppression after a short delay (overlay chain is loaded)
-    setTimeout(function() {
-        var el = document.getElementById('v024-error-suppress');
-        if (el) el.remove();
-    }, 100);
-})();
 
 // ─── Re-process already-upgraded elements with generation counter ───────────
 // If v0.2.0/v0.2.3 already started a loadTransferInfo call, bump the generation
@@ -112,9 +94,19 @@ document.querySelectorAll('send-download').forEach(function(el) {
             el.render();
             el._resolveFriendlyToken(hash);
         }
+    } else {
+        // Not a friendly token — remove suppression immediately so real errors show
+        var headSuppress = document.getElementById('v024-head-suppress');
+        if (headSuppress) headSuppress.remove();
     }
 });
 
-console.log('[send-download-v024] Error flash fix (generation counter + CSS suppression)');
+// Safety: if suppression is still present after 2s, remove it (e.g. no <send-download> on page)
+setTimeout(function() {
+    var headSuppress = document.getElementById('v024-head-suppress');
+    if (headSuppress) headSuppress.remove();
+}, 2000);
+
+console.log('[send-download-v024] Error flash fix (head suppression + generation counter)');
 
 })();
