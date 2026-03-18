@@ -388,12 +388,23 @@ SendUpload.prototype._v026_renderConfirm = function() {
     var style = document.createElement('style');
     style.id = 'v028-styles';
     style.textContent = '\
+        /* Widen the main content area to match header width */\
+        main {\
+            max-width: 1100px !important;\
+        }\
+        \
+        /* Kill the step-content fade animation — causes flicker on re-renders */\
+        .step-content,\
+        .step-content--reverse {\
+            animation: none !important;\
+        }\
+        \
         /* Header row: step indicator + Next button inline, aligned to top */\
         .v028-header-row {\
             display: flex;\
             align-items: flex-start;\
-            gap: var(--space-4, 1rem);\
-            margin-bottom: var(--space-4, 1rem);\
+            gap: var(--space-5, 1.25rem);\
+            margin-bottom: var(--space-5, 1.25rem);\
         }\
         .v028-header-row__steps {\
             flex: 1;\
@@ -408,14 +419,14 @@ SendUpload.prototype._v026_renderConfirm = function() {
             display: inline-flex;\
             align-items: center;\
             justify-content: center;\
-            min-width: 160px;\
-            height: 50px;\
-            padding: 0 var(--space-5, 1.25rem);\
+            min-width: 180px;\
+            height: 54px;\
+            padding: 0 var(--space-6, 1.5rem);\
             background: var(--color-primary, #4ECDC4);\
             color: var(--color-bg, #1A1A2E);\
             border: none;\
             border-radius: var(--radius-sm, 6px);\
-            font-size: var(--text-sm, 0.875rem);\
+            font-size: var(--text-base, 1rem);\
             font-weight: var(--weight-semibold, 600);\
             cursor: pointer;\
             transition: transform 0.15s, box-shadow 0.2s, background 0.2s;\
@@ -489,14 +500,14 @@ SendUpload.prototype._v026_renderConfirm = function() {
             white-space: nowrap;\
         }\
         \
-        /* QR + Open link row — side by side */\
+        /* QR + Open link row — side by side, equal height */\
         .v028-qr-open-row {\
             display: flex;\
-            align-items: center;\
+            align-items: stretch;\
             justify-content: center;\
-            gap: var(--space-6, 1.5rem);\
+            gap: var(--space-5, 1.25rem);\
             margin-top: var(--space-5, 1.25rem);\
-            padding: var(--space-4, 1rem);\
+            padding: var(--space-5, 1.25rem);\
             background: var(--bg-secondary, #16213E);\
             border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));\
             border-radius: var(--radius-md, 12px);\
@@ -505,7 +516,8 @@ SendUpload.prototype._v026_renderConfirm = function() {
             display: flex;\
             flex-direction: column;\
             align-items: center;\
-            flex-shrink: 0;\
+            justify-content: center;\
+            flex: 1;\
         }\
         .v028-qr-code {\
             width: 120px;\
@@ -530,13 +542,13 @@ SendUpload.prototype._v026_renderConfirm = function() {
             align-items: center;\
             justify-content: center;\
             text-decoration: none;\
+            flex: 1;\
             padding: var(--space-4, 1rem) var(--space-5, 1.25rem);\
             border: 1px solid var(--color-border, rgba(78, 205, 196, 0.2));\
             border-radius: var(--radius-sm, 6px);\
             background: rgba(78, 205, 196, 0.04);\
             transition: border-color 0.2s, background 0.2s, transform 0.15s;\
             cursor: pointer;\
-            min-width: 140px;\
         }\
         .v028-open-link:hover {\
             border-color: var(--color-primary, #4ECDC4);\
@@ -544,44 +556,49 @@ SendUpload.prototype._v026_renderConfirm = function() {
             transform: translateY(-1px);\
         }\
         .v028-open-link__icon {\
-            font-size: 1.5rem;\
+            font-size: 2rem;\
             color: var(--color-primary, #4ECDC4);\
             margin-bottom: var(--space-2, 0.5rem);\
         }\
         .v028-open-link__text {\
-            font-size: var(--text-sm, 0.875rem);\
+            font-size: var(--text-base, 1rem);\
             font-weight: var(--weight-semibold, 600);\
             color: var(--color-primary, #4ECDC4);\
         }\
         .v028-open-link__hint {\
-            font-size: var(--text-micro, 0.625rem);\
+            font-size: var(--text-small, 0.75rem);\
             color: var(--color-text-secondary, #8892A0);\
-            margin-top: var(--space-1, 0.25rem);\
+            margin-top: var(--space-2, 0.5rem);\
             opacity: 0.7;\
         }\
         \
         /* Two-column processing layout: messages left, stats right */\
         .v028-process-columns {\
             display: flex;\
-            gap: var(--space-4, 1rem);\
-            margin-top: var(--space-3, 0.75rem);\
-            min-height: 100px;\
+            gap: var(--space-5, 1.25rem);\
+            margin-top: var(--space-4, 1rem);\
+            min-height: 120px;\
+            align-items: stretch;\
         }\
         .v028-process-col {\
             flex: 1;\
             min-width: 0;\
+            display: flex;\
         }\
         .v028-process-col--messages {\
-            display: flex;\
             align-items: center;\
+            padding: var(--space-3, 0.75rem);\
+            background: var(--bg-secondary, #16213E);\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.1));\
+            border-radius: var(--radius-sm, 6px);\
         }\
         .v028-process-col--messages .v027-carousel {\
             width: 100%;\
         }\
         .v028-process-col--stats {\
-            display: flex;\
-            align-items: flex-start;\
+            align-items: center;\
             justify-content: flex-end;\
+            padding: var(--space-3, 0.75rem);\
         }\
         \
         /* Live timing rows during processing */\
