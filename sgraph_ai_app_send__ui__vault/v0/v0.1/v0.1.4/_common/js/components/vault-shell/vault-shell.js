@@ -239,13 +239,15 @@
         _populateLayoutPanels() {
             if (!this._sgLayout) return;
 
-            // Populate preview panel with components
+            // Populate preview panel — now a lightweight landing page
+            // File actions (Rename/Download/Delete) are in each file tab
             const previewEl = this._sgLayout.getPanelElement('t-preview');
             if (previewEl) {
                 previewEl.className = 'vs-main-content';
                 previewEl.innerHTML = `
-                    <vault-file-properties></vault-file-properties>
-                    <vault-file-preview></vault-file-preview>
+                    <div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--color-text-secondary); font-size:var(--text-sm);">
+                        Select a file from the tree to preview
+                    </div>
                     <vault-upload-dropzone></vault-upload-dropzone>
                     <div class="vs-upload-panel" style="display:none">
                         <vault-upload></vault-upload>
@@ -365,14 +367,7 @@
             this._selectedFile = { folderPath, fileName, ...fileEntry };
             this._currentPath  = folderPath;
 
-            // Load file content into the preview panel
-            const props = this.querySelector('vault-file-properties');
-            if (props) props.setFile(fileName, fileEntry, folderPath);
-
-            const preview = this.querySelector('vault-file-preview');
-            if (preview) preview.loadFile(this._vault, folderPath, fileName, fileEntry);
-
-            // Also open as a tab in sg-layout for multi-file viewing
+            // Open file as a tab with inline actions (Rename/Download/Delete)
             this._openFileTab(folderPath, fileName, fileEntry);
 
             window.sgraphVault.events.emit('file-selected', { folderPath, fileName });
@@ -405,16 +400,88 @@
                 try {
                     const data = await this._vault.getFile(folderPath, fileName);
                     const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(fileName) : null;
-                    this._renderFileInTab(el, data, fileName, type);
+                    this._renderFileInTab(el, data, fileName, type, folderPath, fileEntry);
                 } catch (err) {
                     el.innerHTML = `<div class="vs-file-tab-error">Failed to load: ${this._escapeHtml(err.message)}</div>`;
                 }
             });
         }
 
-        _renderFileInTab(container, data, fileName, type) {
+        _renderFileInTab(container, data, fileName, type, folderPath, fileEntry) {
             container.innerHTML = '';
-            container.style.cssText = 'padding: 1rem; overflow: auto; height: 100%; box-sizing: border-box;';
+            container.style.cssText = 'display:flex; flex-direction:column; height:100%; box-sizing:border-box; overflow:hidden;';
+
+            // Action bar at top of tab
+            const actionBar = document.createElement('div');
+            actionBar.style.cssText = 'display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; border-bottom:1px solid var(--color-border); flex-shrink:0; background:var(--bg-surface);';
+
+            const nameEl = document.createElement('span');
+            nameEl.style.cssText = 'font-weight:600; font-size:var(--text-sm); color:var(--color-text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+            nameEl.textContent = fileName;
+            if (fileEntry && fileEntry.size !== undefined) {
+                nameEl.textContent += `  (${VaultHelpers.formatBytes(fileEntry.size || 0)})`;
+            }
+            actionBar.appendChild(nameEl);
+
+            const makeBtn = (label, cls) => {
+                const btn = document.createElement('button');
+                btn.textContent = label;
+                btn.className = cls || '';
+                btn.style.cssText = 'font-size:var(--text-small); padding:0.2rem 0.5rem; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:transparent; color:var(--color-text-secondary); cursor:pointer; font-family:var(--font-family);';
+                return btn;
+            };
+
+            const rawBtn = makeBtn('raw');
+            rawBtn.style.fontSize = '0.625rem';
+            rawBtn.style.opacity = '0.6';
+            rawBtn.addEventListener('click', () => {
+                const path = (folderPath || '/') + (folderPath === '/' ? '' : '/') + fileName;
+                this._showRawView({ path, type: 'file', name: fileName, entry: fileEntry, folderPath: folderPath || '/' });
+            });
+            actionBar.appendChild(rawBtn);
+
+            const renameBtn = makeBtn('Rename');
+            renameBtn.addEventListener('click', () => {
+                const newName = prompt('Rename to:', fileName);
+                if (newName && newName !== fileName) {
+                    this.dispatchEvent(new CustomEvent('file-rename-request', {
+                        detail: { oldName: fileName, newName, folderPath: folderPath || this._currentPath },
+                        bubbles: true, composed: true
+                    }));
+                }
+            });
+            actionBar.appendChild(renameBtn);
+
+            const downloadBtn = makeBtn('Download');
+            downloadBtn.style.color = 'var(--color-primary)';
+            downloadBtn.style.borderColor = 'var(--color-primary)';
+            downloadBtn.addEventListener('click', () => {
+                const blob = new Blob([data]);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fileName; a.click();
+                URL.revokeObjectURL(url);
+            });
+            actionBar.appendChild(downloadBtn);
+
+            const deleteBtn = makeBtn('Delete');
+            deleteBtn.addEventListener('mouseenter', () => { deleteBtn.style.color = 'var(--color-error)'; deleteBtn.style.borderColor = 'var(--color-error)'; });
+            deleteBtn.addEventListener('mouseleave', () => { deleteBtn.style.color = 'var(--color-text-secondary)'; deleteBtn.style.borderColor = 'var(--color-border)'; });
+            deleteBtn.addEventListener('click', () => {
+                if (confirm(`Delete "${fileName}"?`)) {
+                    this.dispatchEvent(new CustomEvent('file-delete-request', {
+                        detail: { fileName, folderPath: folderPath || this._currentPath },
+                        bubbles: true, composed: true
+                    }));
+                }
+            });
+            actionBar.appendChild(deleteBtn);
+
+            container.appendChild(actionBar);
+
+            // Content area
+            const content = document.createElement('div');
+            content.style.cssText = 'flex:1; overflow:auto; padding:1rem;';
 
             switch (type) {
                 case 'text':
@@ -424,7 +491,7 @@
                     const pre = document.createElement('pre');
                     pre.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
                     pre.textContent = text;
-                    container.appendChild(pre);
+                    content.appendChild(pre);
                     break;
                 }
                 case 'image': {
@@ -433,22 +500,23 @@
                     const img = document.createElement('img');
                     img.src = URL.createObjectURL(blob);
                     img.style.cssText = 'max-width:100%; max-height:100%;';
-                    container.appendChild(img);
+                    content.appendChild(img);
                     break;
                 }
                 default: {
-                    // Try to render as text
                     try {
                         const text = new TextDecoder().decode(data);
                         const pre = document.createElement('pre');
                         pre.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
                         pre.textContent = text;
-                        container.appendChild(pre);
+                        content.appendChild(pre);
                     } catch (_) {
-                        container.innerHTML = `<div style="text-align:center; color:var(--color-text-secondary); padding:2rem;">Binary file — ${VaultHelpers.formatBytes(data.byteLength)}</div>`;
+                        content.innerHTML = `<div style="text-align:center; color:var(--color-text-secondary); padding:2rem;">Binary file — ${VaultHelpers.formatBytes(data.byteLength)}</div>`;
                     }
                 }
             }
+
+            container.appendChild(content);
         }
 
         _escapeHtml(str) {
@@ -477,10 +545,10 @@
                 title = 'raw: vault';
             } else if (type === 'folder') {
                 const node = this._vault._findNode(path);
-                rawData = { path, type: 'folder', children: node ? Object.keys(node.children || {}) : [], node };
+                rawData = { path, type: 'folder', children: node ? Object.keys(node.children || {}) : [], node, vaultId: this._vault._vaultId, vaultName: this._vault.name };
                 title = `raw: ${name}/`;
             } else {
-                rawData = { path, type: 'file', folderPath, entry };
+                rawData = { path, type: 'file', name, folderPath, vaultId: this._vault._vaultId, vaultName: this._vault.name, entry };
                 title = `raw: ${name}`;
             }
 
@@ -494,6 +562,18 @@
                 const el = this._sgLayout.getPanelElement(tabId);
                 if (!el) return;
                 el.style.cssText = 'padding: 1rem; overflow: auto; height: 100%; box-sizing: border-box;';
+
+                // Header showing name and vault location
+                const header = document.createElement('div');
+                header.style.cssText = 'margin-bottom:0.75rem; padding-bottom:0.75rem; border-bottom:1px solid var(--color-border); font-size:var(--text-sm); color:var(--color-text-secondary);';
+                const rawName = rawData.name || rawData.path || title;
+                const vaultName = rawData.vaultName || '';
+                const vaultId = rawData.vaultId || '';
+                header.innerHTML = `<div style="font-weight:600; color:var(--color-text); font-size:var(--text-body); margin-bottom:0.25rem;">${this._escapeHtml(rawName)}</div>` +
+                    (rawData.folderPath ? `<div>Location: <span style="font-family:var(--font-mono); color:var(--color-primary);">${this._escapeHtml(rawData.folderPath)}</span></div>` : '') +
+                    (vaultName ? `<div>Vault: <span style="font-family:var(--font-mono);">${this._escapeHtml(vaultName)}</span>${vaultId ? ` (${this._escapeHtml(vaultId)})` : ''}</div>` : '');
+                el.appendChild(header);
+
                 const pre = document.createElement('pre');
                 pre.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
                 pre.textContent = JSON.stringify(rawData, null, 2);

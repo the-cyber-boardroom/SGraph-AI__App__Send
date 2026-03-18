@@ -390,7 +390,19 @@ class SGVault {
                 const fullPath = prefix ? `${prefix}/${name}` : name
 
                 if (entry.type === 'folder') {
-                    walk(entry, fullPath)
+                    const childKeys = Object.keys(entry.children || {})
+                    if (childKeys.length === 0) {
+                        // Persist empty folders as entries with trailing /
+                        entries.push({
+                            name:         fullPath + '/',
+                            size:         0,
+                            content_hash: null,
+                            blob_id:      null,
+                            tree_id:      null
+                        })
+                    } else {
+                        walk(entry, fullPath)
+                    }
                 } else {
                     entries.push({
                         name:         fullPath,
@@ -410,6 +422,20 @@ class SGVault {
     // --- Insert a flat entry into the nested in-memory tree ----------------------
 
     _insertEntry(entry) {
+        // Empty folder entries have trailing / (e.g. "folder-a/")
+        if (entry.name.endsWith('/')) {
+            const folderPath = entry.name.slice(0, -1)
+            const parts = folderPath.split('/').filter(Boolean)
+            let node = this._tree['/']
+            for (const part of parts) {
+                if (!node.children[part]) {
+                    node.children[part] = { type: 'folder', children: {} }
+                }
+                node = node.children[part]
+            }
+            return
+        }
+
         const parts    = entry.name.split('/')
         const fileName = parts.pop()
         let node       = this._tree['/']
