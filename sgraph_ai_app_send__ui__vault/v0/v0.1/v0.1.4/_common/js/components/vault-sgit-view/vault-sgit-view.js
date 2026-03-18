@@ -146,39 +146,45 @@
 
             const entries = Object.entries(node.children);
             // Sort: folders first, then alphabetical
+            const isFolderEntry = (e) => e.type === 'folder' || (e.children !== undefined && e.children !== null);
             entries.sort(([aName, aEntry], [bName, bEntry]) => {
-                if (aEntry.type === 'folder' && bEntry.type !== 'folder') return -1;
-                if (aEntry.type !== 'folder' && bEntry.type === 'folder') return 1;
+                if (isFolderEntry(aEntry) && !isFolderEntry(bEntry)) return -1;
+                if (!isFolderEntry(aEntry) && isFolderEntry(bEntry)) return 1;
                 return aName.localeCompare(bName);
             });
 
             for (const [name, entry] of entries) {
-                const isFolder = entry.type === 'folder';
+                const isFolder = entry.type === 'folder' || (entry.children !== undefined && entry.children !== null);
                 const row = document.createElement('div');
                 row.className = 'vsg-tree-row';
                 row.style.paddingLeft = (depth * 20 + 8) + 'px';
 
                 if (isFolder) {
                     const childCount = Object.keys(entry.children || {}).length;
-                    const chevron = childCount > 0 ? '\u25B6' : '\u00B7';
-                    row.innerHTML = `<span class="vsg-tree-chevron">${chevron}</span> <span class="vsg-tree-icon">\uD83D\uDCC1</span> <span class="vsg-tree-name">${this._esc(name)}/</span> <span class="vsg-tree-meta">(${childCount} items, type: folder)</span>`;
+                    row.innerHTML = `<span class="vsg-tree-chevron">\u25B6</span> <span class="vsg-tree-icon" style="font-size:1rem;">\uD83D\uDCC1</span> <span class="vsg-tree-name">${this._esc(name)}/</span> <span class="vsg-tree-meta">(${childCount} items)</span>`;
+                    row.style.cursor = 'pointer';
 
+                    const childContainer = document.createElement('div');
+                    childContainer.style.display = 'none';
+
+                    row.addEventListener('click', () => {
+                        const isOpen = childContainer.style.display !== 'none';
+                        childContainer.style.display = isOpen ? 'none' : '';
+                        row.querySelector('.vsg-tree-chevron').textContent = isOpen ? '\u25B6' : '\u25BC';
+                        row.querySelector('.vsg-tree-icon').textContent = isOpen ? '\uD83D\uDCC1' : '\uD83D\uDCC2';
+                    });
+
+                    parentEl.appendChild(row);
                     if (childCount > 0) {
-                        const childContainer = document.createElement('div');
-                        childContainer.style.display = 'none';
-                        row.style.cursor = 'pointer';
-                        row.addEventListener('click', () => {
-                            const isOpen = childContainer.style.display !== 'none';
-                            childContainer.style.display = isOpen ? 'none' : '';
-                            row.querySelector('.vsg-tree-chevron').textContent = isOpen ? '\u25B6' : '\u25BC';
-                            row.querySelector('.vsg-tree-icon').textContent = isOpen ? '\uD83D\uDCC1' : '\uD83D\uDCC2';
-                        });
-                        parentEl.appendChild(row);
                         this._renderTreeNode(childContainer, entry, path === '/' ? '/' + name : path + '/' + name, depth + 1);
-                        parentEl.appendChild(childContainer);
                     } else {
-                        parentEl.appendChild(row);
+                        const emptyHint = document.createElement('div');
+                        emptyHint.className = 'vsg-tree-row';
+                        emptyHint.style.paddingLeft = ((depth + 1) * 20 + 8) + 'px';
+                        emptyHint.innerHTML = '<span class="vsg-tree-meta">(empty folder)</span>';
+                        childContainer.appendChild(emptyHint);
                     }
+                    parentEl.appendChild(childContainer);
                 } else {
                     const blobShort = entry.blob_id ? entry.blob_id.substring(0, 20) + '...' : '--';
                     const size = typeof VaultHelpers !== 'undefined' ? VaultHelpers.formatBytes(entry.size || 0) : (entry.size || 0) + ' B';

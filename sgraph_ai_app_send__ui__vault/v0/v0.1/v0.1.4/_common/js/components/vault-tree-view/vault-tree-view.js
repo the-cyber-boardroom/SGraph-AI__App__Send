@@ -109,7 +109,7 @@
 
             for (const [name, entry] of entries) {
                 const fullPath = path === '/' ? '/' + name : path + '/' + name;
-                const isFolder = entry.type === 'folder';
+                const isFolder = entry.type === 'folder' || (entry.children !== undefined && entry.children !== null);
                 const isExpanded = this._expandedPaths.has(fullPath);
                 const isSelected = this._selectedPath === fullPath;
 
@@ -143,10 +143,8 @@
                 });
 
                 if (isFolder) {
-                    const hasChildren = Object.keys(entry.children || {}).length > 0;
-                    const chevron = hasChildren ? (isExpanded ? '\u25BC' : '\u25B6') : '\u00B7';
-                    const folderIcon = isExpanded ? '\uD83D\uDCC2' : '\uD83D\uDCC1';
-                    row.innerHTML = `<span class="vt-chevron">${chevron}</span><span class="vt-icon">${folderIcon}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw folder data" href="#">raw</a>`;
+                    const chevron = isExpanded ? '\u25BC' : '\u25B6';
+                    row.innerHTML = `<span class="vt-chevron vt-chevron--folder">${chevron}</span><span class="vt-icon vt-icon--folder">${isExpanded ? '\uD83D\uDCC2' : '\uD83D\uDCC1'}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw folder data" href="#">raw</a>`;
 
                     // --- Drop target (folders only) ---
                     row.addEventListener('dragover', (e) => {
@@ -507,7 +505,9 @@
                 .vt-row:hover { background: var(--bg-secondary); }
                 .vt-row--selected { background: rgba(78, 205, 196, 0.08); border-left-color: var(--color-primary); color: var(--color-primary); }
                 .vt-chevron { font-size: 0.6rem; flex-shrink: 0; width: 0.75rem; text-align: center; color: var(--color-text-secondary); }
+                .vt-chevron--folder { color: var(--color-primary, #4ECDC4); }
                 .vt-icon { flex-shrink: 0; font-size: 0.875rem; }
+                .vt-icon--folder { font-size: 1rem; filter: saturate(1.5) brightness(1.1); }
                 .vt-name { overflow: hidden; text-overflow: ellipsis; }
                 .vt-raw-link { display: none; margin-left: auto; font-size: 0.625rem; color: var(--color-text-secondary); text-decoration: none; padding: 0 0.25rem; border-radius: 2px; opacity: 0.6; flex-shrink: 0; }
                 .vt-raw-link:hover { color: var(--color-primary); opacity: 1; background: rgba(78, 205, 196, 0.08); }
