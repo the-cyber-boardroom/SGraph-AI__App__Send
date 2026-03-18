@@ -327,12 +327,11 @@ SendUpload.prototype._v023_renderStep2 = function() {
     if (this._v0212_galleryPreview) {
         return this._v0212_renderGalleryPreview();
     }
-    // Otherwise call v0.2.11's Step 2 but suppress its gallery
-    // We temporarily null out _folderScan so v0.2.11 skips its preview grid
-    var savedScan = this._folderScan;
-    this._folderScan = null;
+    // Otherwise call v0.2.11's Step 2 but suppress its inline preview grid
+    // Use a flag instead of nulling _folderScan (which breaks the file summary)
+    this._v0212_suppressPreview = true;
     var html = _v0211_renderStep2.call(this);
-    this._folderScan = savedScan;
+    this._v0212_suppressPreview = false;
     return html;
 };
 
