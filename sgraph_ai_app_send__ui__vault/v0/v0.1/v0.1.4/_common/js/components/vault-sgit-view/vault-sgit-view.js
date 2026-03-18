@@ -152,6 +152,9 @@
                 return aName.localeCompare(bName);
             });
 
+            const folderSvg = '<svg class="vsg-svg-icon" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.146a1.5 1.5 0 011.094.474L8.3 3.1a.5.5 0 00.365.158H13A1.5 1.5 0 0114.5 4.75v7.75A1.5 1.5 0 0113 14H3a1.5 1.5 0 01-1.5-1.5V3z" fill="var(--color-warning, #fbbf24)"/></svg>';
+            const fileSvg = '<svg class="vsg-svg-icon" viewBox="0 0 16 16"><path d="M3.5 1.5A1.5 1.5 0 015 0h4.586a1.5 1.5 0 011.06.44l2.415 2.414A1.5 1.5 0 0113.5 3.914V14.5a1.5 1.5 0 01-1.5 1.5H5a1.5 1.5 0 01-1.5-1.5v-13z" fill="var(--color-text-secondary, #8892A0)" opacity="0.6"/></svg>';
+
             for (const [name, entry] of entries) {
                 const isFolder = entry.type === 'folder';
                 const row = document.createElement('div');
@@ -160,8 +163,8 @@
 
                 if (isFolder) {
                     const childCount = Object.keys(entry.children || {}).length;
-                    const chevron = childCount > 0 ? '\u25B6' : '\u00B7';
-                    row.innerHTML = `<span class="vsg-tree-chevron">${chevron}</span> <span class="vsg-tree-icon">\uD83D\uDCC1</span> <span class="vsg-tree-name">${this._esc(name)}/</span> <span class="vsg-tree-meta">(${childCount} items, type: folder)</span>`;
+                    const toggle = childCount > 0 ? '+' : ' ';
+                    row.innerHTML = `<span class="vsg-tree-toggle">${toggle}</span> <span class="vsg-tree-icon">${folderSvg}</span> <span class="vsg-tree-name">${this._esc(name)}/</span> <span class="vsg-tree-meta">(${childCount} items)</span>`;
 
                     if (childCount > 0) {
                         const childContainer = document.createElement('div');
@@ -170,8 +173,7 @@
                         row.addEventListener('click', () => {
                             const isOpen = childContainer.style.display !== 'none';
                             childContainer.style.display = isOpen ? 'none' : '';
-                            row.querySelector('.vsg-tree-chevron').textContent = isOpen ? '\u25B6' : '\u25BC';
-                            row.querySelector('.vsg-tree-icon').textContent = isOpen ? '\uD83D\uDCC1' : '\uD83D\uDCC2';
+                            row.querySelector('.vsg-tree-toggle').textContent = isOpen ? '+' : '−';
                         });
                         parentEl.appendChild(row);
                         this._renderTreeNode(childContainer, entry, path === '/' ? '/' + name : path + '/' + name, depth + 1);
@@ -182,7 +184,7 @@
                 } else {
                     const blobShort = entry.blob_id ? entry.blob_id.substring(0, 20) + '...' : '--';
                     const size = typeof VaultHelpers !== 'undefined' ? VaultHelpers.formatBytes(entry.size || 0) : (entry.size || 0) + ' B';
-                    row.innerHTML = `<span class="vsg-tree-chevron">\u00A0\u00A0</span> <span class="vsg-tree-icon">\uD83D\uDCC4</span> <span class="vsg-tree-name">${this._esc(name)}</span> <span class="vsg-tree-meta">${size} \u2022 blob: ${this._esc(blobShort)}</span>`;
+                    row.innerHTML = `<span class="vsg-tree-toggle">\u00A0</span> <span class="vsg-tree-icon">${fileSvg}</span> <span class="vsg-tree-name">${this._esc(name)}</span> <span class="vsg-tree-meta">${size} \u2022 blob: ${this._esc(blobShort)}</span>`;
                     parentEl.appendChild(row);
                 }
             }
@@ -266,7 +268,9 @@
                 .vsg-tree-row { display: flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.5rem; font-size: var(--text-small, 0.75rem); color: var(--color-text, #E0E0E0); white-space: nowrap; }
                 .vsg-tree-row:hover { background: rgba(78,205,196,0.05); }
                 .vsg-tree-chevron { font-size: 0.6rem; flex-shrink: 0; width: 0.75rem; text-align: center; color: var(--color-text-secondary, #8892A0); }
-                .vsg-tree-icon { flex-shrink: 0; font-size: 0.875rem; }
+                .vsg-tree-toggle { font-size: 0.75rem; flex-shrink: 0; width: 1rem; text-align: center; color: var(--color-text-secondary, #8892A0); font-weight: 700; font-family: monospace; line-height: 1; }
+                .vsg-tree-icon { flex-shrink: 0; font-size: 0.875rem; display: flex; align-items: center; }
+                .vsg-svg-icon { width: 14px; height: 14px; flex-shrink: 0; }
                 .vsg-tree-name { font-family: var(--font-mono, monospace); color: var(--color-text, #E0E0E0); }
                 .vsg-tree-meta { font-family: var(--font-mono, monospace); color: var(--color-text-secondary, #8892A0); font-size: 0.625rem; margin-left: 0.5rem; }
             `;

@@ -210,15 +210,14 @@
             // Wait for sg-layout custom element to be defined (ES module loads async)
             customElements.whenDefined('sg-layout').then(() => {
                 // Use setLayout() to define the full layout tree — files panel at 20% width
+                // No default Preview tab — file tabs are added on demand when files are clicked
                 layoutEl.setLayout({
                     type: 'row', id: 'root', sizes: [0.20, 0.80],
                     children: [
                         { type: 'stack', id: 's-files', activeTab: 0, tabs: [
                             { type: 'tab', id: 't-files', title: 'Files', tag: 'vault-tree-view', state: {}, locked: true }
                         ]},
-                        { type: 'stack', id: 's-preview', activeTab: 0, tabs: [
-                            { type: 'tab', id: 't-preview', title: 'Preview', tag: 'div', state: {} }
-                        ]}
+                        { type: 'stack', id: 's-preview', activeTab: 0, tabs: [] }
                     ]
                 });
 
@@ -238,22 +237,7 @@
 
         _populateLayoutPanels() {
             if (!this._sgLayout) return;
-
-            // Populate preview panel — now a lightweight landing page
-            // File actions (Rename/Download/Delete) are in each file tab
-            const previewEl = this._sgLayout.getPanelElement('t-preview');
-            if (previewEl) {
-                previewEl.className = 'vs-main-content';
-                previewEl.innerHTML = `
-                    <div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--color-text-secondary); font-size:var(--text-sm);">
-                        Select a file from the tree to preview
-                    </div>
-                    <vault-upload-dropzone></vault-upload-dropzone>
-                    <div class="vs-upload-panel" style="display:none">
-                        <vault-upload></vault-upload>
-                    </div>
-                `;
-            }
+            // Layout panels are populated on demand when files are clicked
         }
 
         // --- Tree View Finder (handles sg-layout panel hosting) ----------------
@@ -364,6 +348,13 @@
         // --- File Selection -----------------------------------------------------
 
         _onFileSelected(folderPath, fileName, fileEntry) {
+            // Guard: if this is actually a folder, handle as folder selection instead
+            if (fileEntry && fileEntry.type === 'folder') {
+                const path = folderPath === '/' ? '/' + fileName : folderPath + '/' + fileName;
+                this._onFolderSelected(path);
+                return;
+            }
+
             this._selectedFile = { folderPath, fileName, ...fileEntry };
             this._currentPath  = folderPath;
 
