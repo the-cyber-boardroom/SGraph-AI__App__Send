@@ -6,6 +6,7 @@
 class VaultEntry extends VaultComponent {
 
     bindElements() {
+        this._endpointInput   = this.$('#server-endpoint-input')
         this._accessKeyInput  = this.$('#access-key-input')
         this._keyInput        = this.$('#vault-key-input')
         this._openBtn         = this.$('#vault-open-btn')
@@ -24,9 +25,14 @@ class VaultEntry extends VaultComponent {
         this.addTrackedListener(this._createBtn,       'click',    this._onCreate)
         this.addTrackedListener(this._keyInput,        'keydown',  this._onKeyDown)
         this.addTrackedListener(this._accessKeyInput,  'input',    this._onAccessKeyChange)
+        this.addTrackedListener(this._endpointInput,   'input',    this._onEndpointChange)
     }
 
     onReady() {
+        // Restore server endpoint from sessionStorage
+        const savedEndpoint = sessionStorage.getItem('sg-vault-endpoint')
+        if (savedEndpoint) this._endpointInput.value = savedEndpoint
+
         // Restore access key from sessionStorage
         const saved = sessionStorage.getItem('sg-vault-access-key')
         if (saved) this._accessKeyInput.value = saved
@@ -50,6 +56,15 @@ class VaultEntry extends VaultComponent {
         el.textContent  = build
             ? `${build.appVersion}  ·  UI ${build.uiVersion} (IFD)`
             : `UI ${uiVersion}`
+    }
+
+    _onEndpointChange() {
+        const endpoint = this._endpointInput.value.trim()
+        if (endpoint) {
+            sessionStorage.setItem('sg-vault-endpoint', endpoint)
+        } else {
+            sessionStorage.removeItem('sg-vault-endpoint')
+        }
     }
 
     _onAccessKeyChange() {
@@ -143,7 +158,9 @@ class VaultEntry extends VaultComponent {
     }
 
     _getSGSend() {
-        const endpoint = this.getAttribute('data-endpoint') || 'https://dev.send.sgraph.ai'
+        const endpoint = this._endpointInput.value.trim()
+                      || this.getAttribute('data-endpoint')
+                      || 'https://dev.send.sgraph.ai'
         const token    = this._accessKeyInput.value.trim()
                       || this.getAttribute('data-token')
                       || ''
