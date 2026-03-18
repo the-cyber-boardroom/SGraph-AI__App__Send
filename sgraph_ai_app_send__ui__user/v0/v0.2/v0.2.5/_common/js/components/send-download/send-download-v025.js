@@ -107,6 +107,8 @@ SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) 
 
 // ─── Override: setupEventListeners — gallery events ─────────────────────────
 SendDownload.prototype.setupEventListeners = function() {
+    // Ensure _tabs is initialised (v0.2.2's setupEventListeners reads _tabs.length)
+    if (!this._tabs) this._tabs = [];
     _v022_setupEvents.call(this);
 
     var self = this;
