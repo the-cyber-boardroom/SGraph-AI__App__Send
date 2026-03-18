@@ -131,10 +131,35 @@
             const content     = this.querySelector('.vfpv-content');
             const loading     = this.querySelector('.vfpv-loading');
             const errorEl     = this.querySelector('.vfpv-error');
+            const toolbar     = this.querySelector('.vfpv-toolbar');
             if (placeholder) placeholder.style.display = '';
             if (content)     { content.style.display = 'none'; content.innerHTML = ''; }
             if (loading)     loading.style.display = 'none';
             if (errorEl)     errorEl.style.display = 'none';
+            if (toolbar)     toolbar.style.display = 'none';
+        }
+
+        showFolderInfo(path, folderCount, fileCount) {
+            this._revokeBlob();
+            const placeholder = this.querySelector('.vfpv-placeholder');
+            const content     = this.querySelector('.vfpv-content');
+            const loading     = this.querySelector('.vfpv-loading');
+            const errorEl     = this.querySelector('.vfpv-error');
+            const toolbar     = this.querySelector('.vfpv-toolbar');
+            if (placeholder) placeholder.style.display = 'none';
+            if (loading)     loading.style.display = 'none';
+            if (errorEl)     errorEl.style.display = 'none';
+            if (toolbar)     toolbar.style.display = 'none';
+            if (content) {
+                content.style.display = '';
+                content.innerHTML = `
+                    <div class="vfpv-folder-info">
+                        <span class="vfpv-folder-icon">\uD83D\uDCC2</span>
+                        <span class="vfpv-folder-path">${this._escapeHtml(path)}</span>
+                        <span class="vfpv-folder-stats">${folderCount} folder${folderCount !== 1 ? 's' : ''}, ${fileCount} file${fileCount !== 1 ? 's' : ''}</span>
+                    </div>
+                `;
+            }
         }
 
         // --- Renderers ----------------------------------------------------------
@@ -371,6 +396,10 @@
                 .vfpv-audio { width: 100%; margin: 1rem 0; }
                 .vfpv-video { width: 100%; max-height: 70vh; border-radius: var(--radius-sm); }
                 .vfpv-text { background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-sm); overflow-x: auto; font-size: var(--text-small); font-family: var(--font-mono); color: var(--color-text); margin: 0; max-height: 70vh; overflow-y: auto; white-space: pre-wrap; }
+                .vfpv-folder-info { padding: 3rem; text-align: center; color: var(--color-text-secondary); }
+                .vfpv-folder-icon { font-size: 3rem; display: block; margin-bottom: var(--space-2); }
+                .vfpv-folder-path { display: block; font-weight: 600; color: var(--color-text); font-family: var(--font-mono); margin-bottom: var(--space-1); }
+                .vfpv-folder-stats { font-size: var(--text-small); font-family: var(--font-mono); }
                 .vfpv-binary { padding: 3rem; text-align: center; color: var(--color-text-secondary); }
                 .vfpv-binary-icon { font-size: 3rem; display: block; margin-bottom: var(--space-2); }
                 .vfpv-binary-name { display: block; font-weight: 600; color: var(--color-text); margin-bottom: var(--space-1); }

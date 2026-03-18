@@ -28,6 +28,7 @@
                             <input class="vfp-rename-input" style="display:none" autocomplete="off">
                         </div>
                         <div class="vfp-actions">
+                            <a class="vfp-raw-btn" title="View raw file metadata" href="#">raw</a>
                             <button class="vfp-rename-btn" title="Rename">Rename</button>
                             <button class="vfp-download-btn" title="Download">Download</button>
                             <button class="vfp-delete-btn" title="Delete">Delete</button>
@@ -42,6 +43,14 @@
                 </div>
             `;
 
+            this.querySelector('.vfp-raw-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!this._fileName) return;
+                this.dispatchEvent(new CustomEvent('tree-raw-requested', {
+                    detail: { path: this._folderPath + (this._folderPath === '/' ? '' : '/') + this._fileName, type: 'file', name: this._fileName, entry: this._fileEntry, folderPath: this._folderPath },
+                    bubbles: true, composed: true
+                }));
+            });
             this.querySelector('.vfp-download-btn').addEventListener('click', () => {
                 this.dispatchEvent(new CustomEvent('file-download-request', {
                     detail: { fileName: this._fileName },
@@ -157,6 +166,8 @@
                 .vfp-row-meta { display: flex; gap: var(--space-3); font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono); margin-top: var(--space-2); flex-wrap: wrap; }
                 .vfp-folder { color: var(--color-primary); opacity: 0.8; }
                 .vfp-actions { display: flex; gap: var(--space-2); flex-shrink: 0; }
+                .vfp-raw-btn { font-size: 0.625rem; color: var(--color-text-secondary); text-decoration: none; padding: 0.25rem 0.5rem; opacity: 0.6; }
+                .vfp-raw-btn:hover { color: var(--color-primary); opacity: 1; }
                 .vfp-download-btn, .vfp-delete-btn, .vfp-rename-btn { font-size: var(--text-small); padding: 0.25rem 0.625rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family); }
                 .vfp-download-btn:hover, .vfp-rename-btn:hover { background: var(--bg-secondary); color: var(--color-primary); border-color: var(--color-primary); }
                 .vfp-delete-btn:hover { background: rgba(233,69,96,0.1); color: var(--color-error); border-color: var(--color-error); }

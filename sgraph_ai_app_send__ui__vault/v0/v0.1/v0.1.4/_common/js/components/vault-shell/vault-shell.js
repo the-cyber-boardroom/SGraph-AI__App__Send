@@ -36,6 +36,7 @@
             this._loadingCount  = 0;             // track concurrent API requests
             this._appVersion    = '';            // fetched from /api/health
             this._sgLayout      = null;          // reference to sg-layout element
+            this._debugPanelId  = null;          // sg-layout panel id for debug
             this._loadPreferences();
         }
 
@@ -124,10 +125,12 @@
 
             const filesView    = this.querySelector('.vs-view-files');
             const settingsView = this.querySelector('.vs-view-settings');
+            const sgitView     = this.querySelector('.vs-view-sgit');
             const layoutEl     = this.querySelector('.vs-layout-container');
 
             if (filesView)    filesView.style.display    = viewId === 'files' ? '' : 'none';
             if (settingsView) settingsView.style.display = viewId === 'settings' ? 'block' : 'none';
+            if (sgitView)     sgitView.style.display     = viewId === 'sgit' ? 'block' : 'none';
             if (layoutEl)     layoutEl.style.display      = viewId === 'files' ? '' : 'none';
 
             // Update nav active state
@@ -136,6 +139,7 @@
             });
 
             if (viewId === 'settings') this._populateSettings();
+            if (viewId === 'sgit') this._populateSgitView();
         }
 
         _populateSettings() {
@@ -203,47 +207,65 @@
             if (!layoutEl) return;
             this._sgLayout = layoutEl;
 
-            // Create child components and add them to sg-layout's light DOM.
-            // sg-layout auto-parses children into a row of stacks.
-            const tree = document.createElement('vault-tree-view');
-            tree.dataset.panelTitle = 'Files';
-            layoutEl.appendChild(tree);
-
-            const mainContent = document.createElement('div');
-            mainContent.className = 'vs-main-content';
-            mainContent.dataset.panelTitle = 'Preview';
-            mainContent.innerHTML = `
-                <vault-file-properties></vault-file-properties>
-                <vault-file-preview></vault-file-preview>
-                <vault-upload-dropzone></vault-upload-dropzone>
-                <div class="vs-upload-panel" style="display:none">
-                    <vault-upload></vault-upload>
-                </div>
-                <div class="vs-share-panel">
-                    <vault-share></vault-share>
-                </div>
-            `;
-            layoutEl.appendChild(mainContent);
-
             // Wait for sg-layout custom element to be defined (ES module loads async)
             customElements.whenDefined('sg-layout').then(() => {
-                // Lock the tree panel so it can't be dragged or closed
-                this._lockTreePanel(layoutEl);
+                // Use setLayout() to define the full layout tree — files panel at 20% width
+                layoutEl.setLayout({
+                    type: 'row', id: 'root', sizes: [0.20, 0.80],
+                    children: [
+                        { type: 'stack', id: 's-files', activeTab: 0, tabs: [
+                            { type: 'tab', id: 't-files', title: 'Files', tag: 'vault-tree-view', state: {}, locked: true }
+                        ]},
+                        { type: 'stack', id: 's-preview', activeTab: 0, tabs: [
+                            { type: 'tab', id: 't-preview', title: 'Preview', tag: 'div', state: {} }
+                        ]}
+                    ]
+                });
 
-                // Listen for layout changes to save preferences
-                if (layoutEl.events) {
-                    layoutEl.events.on('layout:changed', () => {
-                        this._savePreferences();
-                    });
-                }
+                // Wait a frame for panels to render, then populate
+                requestAnimationFrame(() => {
+                    this._populateLayoutPanels();
+
+                    // Listen for layout changes to save preferences
+                    if (layoutEl.events) {
+                        layoutEl.events.on('layout:changed', () => {
+                            this._savePreferences();
+                        });
+                    }
+                });
             });
         }
 
-        _lockTreePanel(layoutEl) {
-            const tree = this.querySelector('vault-tree-view');
-            if (tree && tree.dataset.panelId) {
-                layoutEl.lockPanel(tree.dataset.panelId);
+        _populateLayoutPanels() {
+            if (!this._sgLayout) return;
+
+            // Populate preview panel with components
+            const previewEl = this._sgLayout.getPanelElement('t-preview');
+            if (previewEl) {
+                previewEl.className = 'vs-main-content';
+                previewEl.innerHTML = `
+                    <vault-file-properties></vault-file-properties>
+                    <vault-file-preview></vault-file-preview>
+                    <vault-upload-dropzone></vault-upload-dropzone>
+                    <div class="vs-upload-panel" style="display:none">
+                        <vault-upload></vault-upload>
+                    </div>
+                `;
             }
+        }
+
+        // --- Tree View Finder (handles sg-layout panel hosting) ----------------
+
+        _findTreeView() {
+            // First try direct child (fallback)
+            let tree = this.querySelector('vault-tree-view');
+            if (tree) return tree;
+            // Try sg-layout panel element
+            if (this._sgLayout) {
+                const el = this._sgLayout.getPanelElement('t-files');
+                if (el && el.tagName === 'VAULT-TREE-VIEW') return el;
+            }
+            return null;
         }
 
         // --- Vault Lifecycle ----------------------------------------------------
@@ -263,18 +285,16 @@
             this.querySelector('.vs-header-vault-name').textContent = vault.name || '';
             this.querySelector('.vs-lock-btn').style.display = '';
 
-            // Wire tree
-            const tree = this.querySelector('vault-tree-view');
+            // Wire tree (may be inside sg-layout shadow DOM or light DOM)
+            const tree = this._findTreeView();
             if (tree) {
                 tree.vault = vault;
                 tree.refresh();
             }
 
-            // Wire upload + share
+            // Wire upload
             const uploader = this.querySelector('vault-upload');
             if (uploader) uploader.vault = vault;
-            const share = this.querySelector('vault-share');
-            if (share) share.vaultKey = vaultKey;
 
             // Update status bar
             this._updateStatusBar();
@@ -323,7 +343,7 @@
                 const vault   = await SGVault.open(sgSend, this._vaultKey);
                 this._vault   = vault;
 
-                const tree = this.querySelector('vault-tree-view');
+                const tree = this._findTreeView();
                 if (tree) { tree.vault = vault; tree.refresh(); }
 
                 const uploader = this.querySelector('vault-upload');
@@ -345,13 +365,140 @@
             this._selectedFile = { folderPath, fileName, ...fileEntry };
             this._currentPath  = folderPath;
 
+            // Load file content into the preview panel
             const props = this.querySelector('vault-file-properties');
             if (props) props.setFile(fileName, fileEntry, folderPath);
 
             const preview = this.querySelector('vault-file-preview');
             if (preview) preview.loadFile(this._vault, folderPath, fileName, fileEntry);
 
+            // Also open as a tab in sg-layout for multi-file viewing
+            this._openFileTab(folderPath, fileName, fileEntry);
+
             window.sgraphVault.events.emit('file-selected', { folderPath, fileName });
+        }
+
+        _openFileTab(folderPath, fileName, fileEntry) {
+            if (!this._sgLayout) return;
+            const tabId = `t-file-${folderPath.replace(/\//g, '-')}-${fileName}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+            // Check if tab already exists — just focus it
+            const existing = this._sgLayout.getPanelElement(tabId);
+            if (existing) {
+                try { this._sgLayout.focusPanel(tabId); } catch (_) {}
+                return;
+            }
+
+            // Add a new tab to the preview stack
+            const newId = this._sgLayout.addTabToStack('s-preview', {
+                tag: 'div', title: fileName, state: { folderPath, fileName }
+            }, true);
+            if (!newId) return;
+
+            // Populate the tab with preview content after a frame
+            requestAnimationFrame(async () => {
+                const el = this._sgLayout.getPanelElement(newId);
+                if (!el) return;
+                el.className = 'vs-file-tab-content';
+                el.innerHTML = '<div class="vs-file-tab-loading">Loading...</div>';
+
+                try {
+                    const data = await this._vault.getFile(folderPath, fileName);
+                    const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(fileName) : null;
+                    this._renderFileInTab(el, data, fileName, type);
+                } catch (err) {
+                    el.innerHTML = `<div class="vs-file-tab-error">Failed to load: ${this._escapeHtml(err.message)}</div>`;
+                }
+            });
+        }
+
+        _renderFileInTab(container, data, fileName, type) {
+            container.innerHTML = '';
+            container.style.cssText = 'padding: 1rem; overflow: auto; height: 100%; box-sizing: border-box;';
+
+            switch (type) {
+                case 'text':
+                case 'code':
+                case 'markdown': {
+                    const text = new TextDecoder().decode(data);
+                    const pre = document.createElement('pre');
+                    pre.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
+                    pre.textContent = text;
+                    container.appendChild(pre);
+                    break;
+                }
+                case 'image': {
+                    const mime = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.getImageMime(fileName) : 'image/png';
+                    const blob = new Blob([data], { type: mime });
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(blob);
+                    img.style.cssText = 'max-width:100%; max-height:100%;';
+                    container.appendChild(img);
+                    break;
+                }
+                default: {
+                    // Try to render as text
+                    try {
+                        const text = new TextDecoder().decode(data);
+                        const pre = document.createElement('pre');
+                        pre.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
+                        pre.textContent = text;
+                        container.appendChild(pre);
+                    } catch (_) {
+                        container.innerHTML = `<div style="text-align:center; color:var(--color-text-secondary); padding:2rem;">Binary file — ${VaultHelpers.formatBytes(data.byteLength)}</div>`;
+                    }
+                }
+            }
+        }
+
+        _escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = String(str);
+            return d.innerHTML;
+        }
+
+        // --- Raw View (opens raw JSON in new sg-layout tab) ----------------------
+
+        _showRawView(detail) {
+            if (!this._sgLayout || !this._vault) return;
+            const { path, type, name, entry, folderPath } = detail;
+
+            let rawData;
+            let title;
+
+            if (type === 'vault') {
+                rawData = {
+                    tree: this._vault._tree,
+                    settings: this._vault._settings,
+                    headCommitId: this._vault._headCommitId,
+                    vaultId: this._vault._vaultId,
+                    refFileId: this._vault._refFileId
+                };
+                title = 'raw: vault';
+            } else if (type === 'folder') {
+                const node = this._vault._findNode(path);
+                rawData = { path, type: 'folder', children: node ? Object.keys(node.children || {}) : [], node };
+                title = `raw: ${name}/`;
+            } else {
+                rawData = { path, type: 'file', folderPath, entry };
+                title = `raw: ${name}`;
+            }
+
+            // Add as tab in preview stack
+            const tabId = this._sgLayout.addTabToStack('s-preview', {
+                tag: 'div', title, state: { rawView: true }
+            }, true);
+            if (!tabId) return;
+
+            requestAnimationFrame(() => {
+                const el = this._sgLayout.getPanelElement(tabId);
+                if (!el) return;
+                el.style.cssText = 'padding: 1rem; overflow: auto; height: 100%; box-sizing: border-box;';
+                const pre = document.createElement('pre');
+                pre.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
+                pre.textContent = JSON.stringify(rawData, null, 2);
+                el.appendChild(pre);
+            });
         }
 
         _onFolderSelected(path) {
@@ -362,10 +509,18 @@
             if (props) props.clearFile();
 
             const preview = this.querySelector('vault-file-preview');
-            if (preview) preview.clearPreview();
-
-            const browser = this.querySelector('vault-browser');
-            if (browser) browser.navigateTo(path);
+            if (preview) {
+                // Show folder contents summary instead of clearing
+                const node = this._vault ? this._vault._findNode(path) : null;
+                if (node && node.type === 'folder') {
+                    const children = Object.entries(node.children || {});
+                    const folders = children.filter(([,e]) => e.type === 'folder');
+                    const files = children.filter(([,e]) => e.type !== 'folder');
+                    preview.showFolderInfo(path, folders.length, files.length);
+                } else {
+                    preview.clearPreview();
+                }
+            }
 
             const dropzone = this.querySelector('vault-upload-dropzone');
             if (dropzone) dropzone.targetPath = path;
@@ -430,7 +585,7 @@
         }
 
         _onFileAdded() {
-            const tree = this.querySelector('vault-tree-view');
+            const tree = this._findTreeView();
             if (tree) tree.refresh();
             this._updateVaultKey();
             this._updateStatusBar();
@@ -470,7 +625,7 @@
                 if (props) props.clearFile();
                 const preview = this.querySelector('vault-file-preview');
                 if (preview) preview.clearPreview();
-                const tree = this.querySelector('vault-tree-view');
+                const tree = this._findTreeView();
                 if (tree) tree.refresh();
                 this._updateVaultKey();
                 this._updateStatusBar();
@@ -495,7 +650,7 @@
                     const props = this.querySelector('vault-file-properties');
                     if (props) props.setFile(newName, entry, path);
                 }
-                const tree = this.querySelector('vault-tree-view');
+                const tree = this._findTreeView();
                 if (tree) tree.refresh();
                 this._updateVaultKey();
             } catch (err) {
@@ -511,7 +666,7 @@
             try {
                 await this._vault.renameFolder(oldPath, newName);
                 window.sgraphVault.messages.success(`Folder renamed to "${newName}"`);
-                const tree = this.querySelector('vault-tree-view');
+                const tree = this._findTreeView();
                 if (tree) tree.refresh();
                 this._updateVaultKey();
             } catch (err) {
@@ -535,7 +690,7 @@
                     parts.pop();
                     this._currentPath = '/' + parts.join('/') || '/';
                 }
-                const tree = this.querySelector('vault-tree-view');
+                const tree = this._findTreeView();
                 if (tree) tree.refresh();
                 const browser = this.querySelector('vault-browser');
                 if (browser) browser.navigateTo(this._currentPath);
@@ -559,7 +714,7 @@
                 if (props) props.clearFile();
                 const preview = this.querySelector('vault-file-preview');
                 if (preview) preview.clearPreview();
-                const tree = this.querySelector('vault-tree-view');
+                const tree = this._findTreeView();
                 if (tree) tree.refresh();
                 const browser = this.querySelector('vault-browser');
                 if (browser) browser.refresh();
@@ -579,7 +734,7 @@
                 await this._vault.moveFolder(srcPath, destParentPath);
                 const folderName = srcPath.split('/').filter(Boolean).pop();
                 window.sgraphVault.messages.success(`Moved "${folderName}" to ${destParentPath === '/' ? 'root' : destParentPath}`);
-                const tree = this.querySelector('vault-tree-view');
+                const tree = this._findTreeView();
                 if (tree) tree.refresh();
                 const browser = this.querySelector('vault-browser');
                 if (browser) browser.refresh();
@@ -597,9 +752,6 @@
         _updateVaultKey() {
             if (!this._vault) return;
             this._vaultKey = this._vault.getVaultKey();
-
-            const share = this.querySelector('vault-share');
-            if (share) share.updateKey(this._vaultKey);
         }
 
         // --- Settings Panel (now inline view, not modal) -------------------------
@@ -615,6 +767,14 @@
         _updateSettingsView() {
             if (this._activeView === 'settings') {
                 this._populateSettings();
+            }
+        }
+
+        _populateSgitView() {
+            const sgitView = this.querySelector('vault-sgit-view');
+            if (sgitView && this._vault) {
+                sgitView.vault = this._vault;
+                sgitView.refresh();
             }
         }
 
@@ -653,6 +813,9 @@
             });
             this.addEventListener('tree-refresh-requested', () => {
                 this._onRefreshVault();
+            });
+            this.addEventListener('tree-raw-requested', (e) => {
+                this._showRawView(e.detail);
             });
 
             // Upload events
@@ -712,6 +875,11 @@
                 }
                 if (e.target.closest('.vs-debug-toggle')) {
                     this._toggleDebugPanel();
+                    return;
+                }
+                if (e.target.closest('.vs-raw-vault-link')) {
+                    e.preventDefault();
+                    this._showRawView({ path: '/', type: 'vault', name: 'vault' });
                     return;
                 }
                 if (e.target.closest('.vs-auth-submit')) {
@@ -794,60 +962,61 @@
         _toggleDebugPanel() {
             if (!this._sgLayout) return;
 
-            // Check if debug panel already exists
-            const existing = this.querySelector('.vs-debug-container');
-            if (existing) {
-                // Remove the debug panel via sg-layout
-                const panelId = existing.dataset.panelId;
-                if (panelId) {
-                    this._sgLayout.removePanel(panelId);
-                } else {
-                    existing.remove();
-                }
+            // Check if debug panel already exists — remove it
+            if (this._debugPanelId) {
+                try {
+                    this._sgLayout.removePanel(this._debugPanelId);
+                } catch (_) { /* panel may already be gone */ }
+                this._debugPanelId = null;
                 return;
             }
 
-            // Create debug container and add it via sg-layout
-            const debug = document.createElement('div');
-            debug.className = 'vs-debug-container';
-            debug.dataset.panelTitle = 'Debug';
-            debug.innerHTML = `
-                <div class="vs-debug-tabs">
-                    <button class="vs-debug-tab vs-debug-tab--active" data-tab="messages">Msgs</button>
-                    <button class="vs-debug-tab" data-tab="events">Events</button>
-                    <button class="vs-debug-tab" data-tab="api">API</button>
-                    <button class="vs-debug-tab" data-tab="storage">Storage</button>
-                </div>
-                <div class="vs-debug-content">
-                    <div class="vs-debug-panel" data-panel="messages">
-                        <vault-messages-panel></vault-messages-panel>
-                    </div>
-                    <div class="vs-debug-panel" data-panel="events" style="display:none">
-                        <vault-events-viewer></vault-events-viewer>
-                    </div>
-                    <div class="vs-debug-panel" data-panel="api" style="display:none">
-                        <vault-api-logger></vault-api-logger>
-                    </div>
-                    <div class="vs-debug-panel" data-panel="storage" style="display:none">
-                        <vault-storage-viewer></vault-storage-viewer>
-                    </div>
-                </div>
-            `;
+            // Add debug panel via sg-layout API
+            const panelId = this._sgLayout.addPanel({ tag: 'div', title: 'Debug' });
+            this._debugPanelId = panelId;
 
-            // Add click handler for debug tabs
-            debug.addEventListener('click', (e) => {
-                const tab = e.target.closest('.vs-debug-tab');
-                if (!tab) return;
-                const tabId = tab.dataset.tab;
-                debug.querySelectorAll('.vs-debug-tab').forEach(t => {
-                    t.classList.toggle('vs-debug-tab--active', t.dataset.tab === tabId);
-                });
-                debug.querySelectorAll('.vs-debug-panel').forEach(p => {
-                    p.style.display = p.dataset.panel === tabId ? '' : 'none';
+            // Populate the debug panel after a frame
+            requestAnimationFrame(() => {
+                const debugEl = this._sgLayout.getPanelElement(panelId);
+                if (!debugEl) return;
+
+                debugEl.className = 'vs-debug-container';
+                debugEl.innerHTML = `
+                    <div class="vs-debug-tabs">
+                        <button class="vs-debug-tab vs-debug-tab--active" data-tab="messages">Msgs</button>
+                        <button class="vs-debug-tab" data-tab="events">Events</button>
+                        <button class="vs-debug-tab" data-tab="api">API</button>
+                        <button class="vs-debug-tab" data-tab="storage">Storage</button>
+                    </div>
+                    <div class="vs-debug-content">
+                        <div class="vs-debug-panel" data-panel="messages">
+                            <vault-messages-panel></vault-messages-panel>
+                        </div>
+                        <div class="vs-debug-panel" data-panel="events" style="display:none">
+                            <vault-events-viewer></vault-events-viewer>
+                        </div>
+                        <div class="vs-debug-panel" data-panel="api" style="display:none">
+                            <vault-api-logger></vault-api-logger>
+                        </div>
+                        <div class="vs-debug-panel" data-panel="storage" style="display:none">
+                            <vault-storage-viewer></vault-storage-viewer>
+                        </div>
+                    </div>
+                `;
+
+                // Tab switching
+                debugEl.addEventListener('click', (e) => {
+                    const tab = e.target.closest('.vs-debug-tab');
+                    if (!tab) return;
+                    const tabId = tab.dataset.tab;
+                    debugEl.querySelectorAll('.vs-debug-tab').forEach(t => {
+                        t.classList.toggle('vs-debug-tab--active', t.dataset.tab === tabId);
+                    });
+                    debugEl.querySelectorAll('.vs-debug-panel').forEach(p => {
+                        p.style.display = p.dataset.panel === tabId ? '' : 'none';
+                    });
                 });
             });
-
-            this._sgLayout.addPanel({ el: debug, title: 'Debug' });
         }
 
         _setupMessageBadge() {
@@ -901,6 +1070,7 @@
                             <span class="vs-readonly-badge" style="display:none">Read-only</span>
                             <button class="vs-upload-btn">Upload</button>
                             <button class="vs-debug-toggle">Debug</button>
+                            <a class="vs-raw-vault-link" title="View raw vault data" href="#">raw</a>
                             <button class="vs-lock-btn" style="display:none">Lock</button>
                             <span class="vs-header-version">v0.1.4</span>
                         </div>
@@ -913,6 +1083,10 @@
                         <a class="vs-nav-item vs-nav-item--active" data-view="files" href="#">
                             <span class="vs-nav-icon">&#128194;</span>
                             <span class="vs-nav-label">Files</span>
+                        </a>
+                        <a class="vs-nav-item" data-view="sgit" href="#">
+                            <span class="vs-nav-icon">&#128268;</span>
+                            <span class="vs-nav-label">SGit</span>
                         </a>
                         <a class="vs-nav-item" data-view="settings" href="#">
                             <span class="vs-nav-icon">&#9881;</span>
@@ -944,6 +1118,7 @@
                                         <input class="vs-settings-key-input" type="text" readonly>
                                         <button class="vs-settings-copy-key">Copy</button>
                                     </div>
+                                    <p class="vs-settings-hint vs-settings-key-warning">Anyone with this key can access all files in this vault.</p>
                                 </div>
                                 <div class="vs-settings-section">
                                     <label class="vs-settings-label">Access Key</label>
@@ -967,6 +1142,11 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- SGit view (branches, commits, raw objects) -->
+                        <div class="vs-view-sgit" style="display:none">
+                            <vault-sgit-view></vault-sgit-view>
                         </div>
                     </div>
 
@@ -1084,6 +1264,19 @@
                 .vs-upload-btn:hover, .vs-lock-btn:hover, .vs-debug-toggle:hover {
                     background: var(--bg-secondary);
                     color: var(--color-text);
+                }
+
+                .vs-raw-vault-link {
+                    font-size: 0.625rem;
+                    color: var(--color-text-secondary);
+                    text-decoration: none;
+                    opacity: 0.6;
+                    padding: 0.25rem 0.375rem;
+                }
+
+                .vs-raw-vault-link:hover {
+                    color: var(--color-primary);
+                    opacity: 1;
                 }
 
                 .vs-upload-btn {
@@ -1381,6 +1574,14 @@
                     font-weight: 600;
                 }
 
+                /* --- SGit View --- */
+                .vs-view-sgit {
+                    padding: var(--space-4);
+                    overflow-y: auto;
+                    height: 100%;
+                    box-sizing: border-box;
+                }
+
                 /* --- Settings Panel (inline view) --- */
                 .vs-view-settings {
                     padding: var(--space-4);
@@ -1458,6 +1659,10 @@
                     font-size: var(--text-small);
                     color: var(--color-text-secondary);
                     margin: var(--space-1) 0 0;
+                }
+
+                .vs-settings-key-warning {
+                    color: var(--color-primary);
                 }
 
                 .vs-stats-grid {
