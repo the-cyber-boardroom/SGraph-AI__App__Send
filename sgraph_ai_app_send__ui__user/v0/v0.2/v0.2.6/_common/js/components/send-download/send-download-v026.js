@@ -446,6 +446,24 @@ SendDownload.prototype._v026_saveFile = function() {
     var s = document.createElement('style');
     s.id = 'v026-download-styles';
     s.textContent = '\
+        /* ── View mode toggle (v0.2.6 owns these styles) ── */\
+        .v025-view-modes { display: flex; gap: 2px; background: rgba(255,255,255,0.04); border-radius: var(--radius-sm, 6px); padding: 2px; }\
+        .v025-view-btn {\
+            background: none; border: none; color: rgba(255,255,255,0.35); padding: 5px 7px;\
+            border-radius: 4px; cursor: pointer; display: flex; align-items: center;\
+            transition: color 0.15s, background 0.15s;\
+        }\
+        .v025-view-btn:hover { color: rgba(255,255,255,0.6); }\
+        .v025-view-btn--active { background: rgba(255,255,255,0.1); color: var(--accent, #4ECDC4); }\
+        /* ── Grid modes ── */\
+        .v025-grid--compact { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important; gap: var(--space-2, 0.5rem) !important; }\
+        .v025-grid--compact .v025-thumb__img { aspect-ratio: 1/1; }\
+        .v025-grid--compact .v025-thumb__label { padding: 3px 6px; font-size: 0.7rem; }\
+        .v025-grid--grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important; }\
+        .v025-grid--large { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important; gap: var(--space-4, 1rem) !important; }\
+        .v025-grid--large .v025-thumb__img { aspect-ratio: 16/10; }\
+        .v025-grid { align-content: start; }\
+        \
         /* ── Share buttons ── */\
         .v026-share-group { display: flex; gap: 2px; }\
         .v026-share-btn {\
