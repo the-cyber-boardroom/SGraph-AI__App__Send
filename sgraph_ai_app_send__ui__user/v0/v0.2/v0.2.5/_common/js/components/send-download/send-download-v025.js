@@ -137,7 +137,7 @@ SendDownload.prototype.setupEventListeners = function() {
     var saveZip = this.querySelector('#v025-save-zip');
     if (saveZip) {
         saveZip.addEventListener('click', function() {
-            self._saveZipFile();
+            self.saveFile(self._zipOrigBytes, self._zipOrigName || 'archive.zip');
         });
     }
 
