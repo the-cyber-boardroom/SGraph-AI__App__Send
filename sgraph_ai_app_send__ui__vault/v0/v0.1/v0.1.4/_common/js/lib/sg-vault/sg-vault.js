@@ -468,6 +468,20 @@ class SGVault {
             return
         }
 
+        // Entries with no blob_id are folders (v2 compat — older vaults may store
+        // empty folders without trailing /)
+        if (!entry.blob_id) {
+            const parts = entry.name.split('/').filter(Boolean)
+            let node = this._tree['/']
+            for (const part of parts) {
+                if (!node.children[part]) {
+                    node.children[part] = { type: 'folder', children: {} }
+                }
+                node = node.children[part]
+            }
+            return
+        }
+
         const parts    = entry.name.split('/')
         const fileName = parts.pop()
         let node       = this._tree['/']

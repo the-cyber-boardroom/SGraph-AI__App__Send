@@ -210,13 +210,14 @@
             // Wait for sg-layout custom element to be defined (ES module loads async)
             customElements.whenDefined('sg-layout').then(() => {
                 // Use setLayout() to define the full layout tree — files panel at 20% width
+                // No default Preview tab — file tabs are added on demand when files are clicked
                 layoutEl.setLayout({
                     type: 'row', id: 'root', sizes: [0.20, 0.80],
                     children: [
                         { type: 'stack', id: 's-files', activeTab: 0, tabs: [
                             { type: 'tab', id: 't-files', title: 'Files', tag: 'vault-tree-view', state: {}, locked: true }
                         ]},
-                        { type: 'stack', id: 's-preview', tabs: [] }
+                        { type: 'stack', id: 's-preview', activeTab: 0, tabs: [] }
                     ]
                 });
 
@@ -235,7 +236,8 @@
         }
 
         _populateLayoutPanels() {
-            // No initial preview tab — file tabs are added on demand when files are clicked
+            if (!this._sgLayout) return;
+            // Layout panels are populated on demand when files are clicked
         }
 
         // --- Tree View Finder (handles sg-layout panel hosting) ----------------
@@ -346,6 +348,15 @@
         // --- File Selection -----------------------------------------------------
 
         _onFileSelected(folderPath, fileName, fileEntry) {
+            // Guard: if this is actually a folder, handle as folder selection instead
+            // Detect folders by type OR by absence of blob_id (v2 compat)
+            const isFolder = fileEntry && (fileEntry.type === 'folder' || (!fileEntry.blob_id && fileEntry.children));
+            if (isFolder) {
+                const path = folderPath === '/' ? '/' + fileName : folderPath + '/' + fileName;
+                this._onFolderSelected(path);
+                return;
+            }
+
             this._selectedFile = { folderPath, fileName, ...fileEntry };
             this._currentPath  = folderPath;
 

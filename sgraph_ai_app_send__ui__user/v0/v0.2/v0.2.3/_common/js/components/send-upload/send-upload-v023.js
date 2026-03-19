@@ -73,10 +73,10 @@ function detectDeliveryOptions(file, folderScan) {
 
     if (folderScan) {
         options.push({ id: 'browse', icon: '\uD83D\uDCC2', title: 'Let them browse the folder', desc: 'Recipient sees files in a browsable view with inline preview', hint: 'Best for: sharing documents, reports' });
-        const allImages = folderScan.entries
+        const hasImages = folderScan.entries
             .filter(e => !e.isDir)
-            .every(e => IMAGE_EXTENSIONS.has(e.name.split('.').pop().toLowerCase()));
-        if (allImages) {
+            .some(e => IMAGE_EXTENSIONS.has(e.name.split('.').pop().toLowerCase()));
+        if (hasImages) {
             options.push({ id: 'gallery', icon: '\uD83D\uDDBC\uFE0F', title: 'Show as photo gallery', desc: 'Recipient browses images in a gallery layout', hint: 'Best for: photo sets, design assets' });
         }
     } else if (VIEWABLE_EXTENSIONS.has(ext)) {

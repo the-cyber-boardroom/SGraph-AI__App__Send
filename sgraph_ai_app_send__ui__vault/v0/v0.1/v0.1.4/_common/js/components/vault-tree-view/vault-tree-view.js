@@ -143,8 +143,12 @@
                 });
 
                 if (isFolder) {
-                    const chevron = isExpanded ? '\u25BC' : '\u25B6';
-                    row.innerHTML = `<span class="vt-chevron vt-chevron--folder">${chevron}</span><span class="vt-icon vt-icon--folder">${isExpanded ? '\uD83D\uDCC2' : '\uD83D\uDCC1'}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw folder data" href="#">raw</a>`;
+                    const hasChildren = Object.keys(entry.children || {}).length > 0;
+                    const toggleIcon = hasChildren ? (isExpanded ? '\u2212' : '+') : ' ';
+                    const folderSvg = isExpanded
+                        ? '<svg class="vt-svg-icon" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.146a1.5 1.5 0 011.094.474L8.3 3.1a.5.5 0 00.365.158H13A1.5 1.5 0 0114.5 4.75v7.75A1.5 1.5 0 0113 14H3a1.5 1.5 0 01-1.5-1.5V3z" fill="var(--color-warning, #fbbf24)"/></svg>'
+                        : '<svg class="vt-svg-icon" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.146a1.5 1.5 0 011.094.474L8.3 3.1a.5.5 0 00.365.158H13A1.5 1.5 0 0114.5 4.75v7.75A1.5 1.5 0 0113 14H3a1.5 1.5 0 01-1.5-1.5V3z" fill="var(--color-warning, #fbbf24)"/></svg>';
+                    row.innerHTML = `<span class="vt-toggle">${toggleIcon}</span><span class="vt-icon">${folderSvg}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw folder data" href="#">raw</a>`;
 
                     // --- Drop target (folders only) ---
                     row.addEventListener('dragover', (e) => {
@@ -201,9 +205,8 @@
                         this._showContextMenu(e.pageX, e.pageY, name, fullPath, 'folder');
                     });
                 } else {
-                    const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-                    const icon = this._getFileIcon(ext);
-                    row.innerHTML = `<span class="vt-chevron">\u00A0\u00A0</span><span class="vt-icon">${icon}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw file data" href="#">raw</a>`;
+                    const fileSvg = '<svg class="vt-svg-icon" viewBox="0 0 16 16"><path d="M3.5 1.5A1.5 1.5 0 015 0h4.586a1.5 1.5 0 011.06.44l2.415 2.414A1.5 1.5 0 0113.5 3.914V14.5a1.5 1.5 0 01-1.5 1.5H5a1.5 1.5 0 01-1.5-1.5v-13z" fill="var(--color-text-secondary, #8892A0)" opacity="0.6"/></svg>';
+                    row.innerHTML = `<span class="vt-toggle"> </span><span class="vt-icon">${fileSvg}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw file data" href="#">raw</a>`;
 
                     // Raw link click — open raw file data
                     const fileRawLink = row.querySelector('.vt-raw-link');
@@ -247,19 +250,6 @@
                     this._renderNode(parentEl, entry, fullPath, depth + 1);
                 }
             }
-        }
-
-        _getFileIcon(ext) {
-            const iconMap = {
-                'md': '\uD83D\uDCDD', 'markdown': '\uD83D\uDCDD',
-                'png': '\uD83D\uDDBC', 'jpg': '\uD83D\uDDBC', 'jpeg': '\uD83D\uDDBC', 'gif': '\uD83D\uDDBC', 'svg': '\uD83D\uDDBC', 'webp': '\uD83D\uDDBC',
-                'pdf': '\uD83D\uDCC4',
-                'js': '\uD83D\uDCBB', 'ts': '\uD83D\uDCBB', 'py': '\uD83D\uDCBB', 'json': '\uD83D\uDCBB', 'html': '\uD83D\uDCBB', 'css': '\uD83D\uDCBB',
-                'mp3': '\uD83C\uDFB5', 'wav': '\uD83C\uDFB5', 'ogg': '\uD83C\uDFB5',
-                'mp4': '\uD83C\uDFA5', 'webm': '\uD83C\uDFA5', 'mov': '\uD83C\uDFA5',
-                'zip': '\uD83D\uDCE6',
-            };
-            return iconMap[ext] || '\uD83D\uDCC4';
         }
 
         async _onNewFolder() {
@@ -505,9 +495,9 @@
                 .vt-row:hover { background: var(--bg-secondary); }
                 .vt-row--selected { background: rgba(78, 205, 196, 0.08); border-left-color: var(--color-primary); color: var(--color-primary); }
                 .vt-chevron { font-size: 0.6rem; flex-shrink: 0; width: 0.75rem; text-align: center; color: var(--color-text-secondary); }
-                .vt-chevron--folder { color: var(--color-primary, #4ECDC4); }
-                .vt-icon { flex-shrink: 0; font-size: 0.875rem; }
-                .vt-icon--folder { font-size: 1rem; filter: saturate(1.5) brightness(1.1); }
+                .vt-toggle { font-size: 0.75rem; flex-shrink: 0; width: 1rem; text-align: center; color: var(--color-text-secondary); font-weight: 700; font-family: var(--font-mono, monospace); line-height: 1; }
+                .vt-icon { flex-shrink: 0; font-size: 0.875rem; display: flex; align-items: center; }
+                .vt-svg-icon { width: 14px; height: 14px; flex-shrink: 0; }
                 .vt-name { overflow: hidden; text-overflow: ellipsis; }
                 .vt-raw-link { display: none; margin-left: auto; font-size: 0.625rem; color: var(--color-text-secondary); text-decoration: none; padding: 0 0.25rem; border-radius: 2px; opacity: 0.6; flex-shrink: 0; }
                 .vt-raw-link:hover { color: var(--color-primary); opacity: 1; background: rgba(78, 205, 196, 0.08); }
