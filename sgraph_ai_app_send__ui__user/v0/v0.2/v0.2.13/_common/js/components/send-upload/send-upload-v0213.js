@@ -814,6 +814,10 @@ SendUpload.prototype._v0213_updateProgress = function(label, current, total) {
     document.head.appendChild(style);
 })();
 
-console.log('[send-upload-v0213] Phase 2: PDF + markdown + video thumbnails, content-hashed preview, progress');
+// NOTE: Gallery delivery card language ("Gallery mode") and dot-file filtering
+// are now handled at the source in v0.2.3 (detectDeliveryOptions) and v0.2.12
+// (_v0212_renderGalleryPreview / _v0212_loadGalleryThumbnails).
+
+console.log('[send-upload-v0213] Phase 2: PDF + markdown + video thumbnails, content-hashed preview, progress, gallery mode labels');
 
 })();

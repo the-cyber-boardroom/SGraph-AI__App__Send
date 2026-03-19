@@ -338,7 +338,13 @@ SendUpload.prototype._v023_renderStep2 = function() {
 // ─── Render the gallery preview page ────────────────────────────────────────
 SendUpload.prototype._v0212_renderGalleryPreview = function() {
     var entries = this._v0212_savedScan ? this._v0212_savedScan.entries : [];
-    var files = entries.filter(function(e) { return !e.isDir && e.file; });
+    var files = entries.filter(function(e) {
+        if (e.isDir || !e.file) return false;
+        // Filter out dot-files (.DS_Store, .gitkeep, etc.)
+        var name = e.name || '';
+        if (name.charAt(0) === '.') return false;
+        return true;
+    });
 
     // Build thumbnail grid
     var thumbs = files.map(function(entry, idx) {
@@ -383,7 +389,7 @@ SendUpload.prototype._v0212_renderGalleryPreview = function() {
                 '<circle cx="8.5" cy="8.5" r="1.5"/>' +
                 '<path d="M21 15l-5-5L5 21"/>' +
             '</svg>' +
-            '<span>This is what the gallery will look like for the recipient</span>' +
+            '<span>This is what gallery mode will look like for the recipient</span>' +
         '</div>' +
         '<div class="v0212-gp-grid">' + thumbs + '</div>' +
         '<div class="v0212-gp-actions">' +
@@ -451,7 +457,12 @@ SendUpload.prototype.setupEventListeners = function() {
 // ─── Load thumbnails for gallery preview ────────────────────────────────────
 SendUpload.prototype._v0212_loadGalleryThumbnails = function() {
     var entries = this._v0212_savedScan ? this._v0212_savedScan.entries : [];
-    var files = entries.filter(function(e) { return !e.isDir && e.file; });
+    var files = entries.filter(function(e) {
+        if (e.isDir || !e.file) return false;
+        var name = e.name || '';
+        if (name.charAt(0) === '.') return false;
+        return true;
+    });
     var self = this;
 
     if (!this._v0212_blobUrls) this._v0212_blobUrls = [];

@@ -77,7 +77,7 @@ function detectDeliveryOptions(file, folderScan) {
             .filter(e => !e.isDir)
             .some(e => IMAGE_EXTENSIONS.has(e.name.split('.').pop().toLowerCase()));
         if (hasImages) {
-            options.push({ id: 'gallery', icon: '\uD83D\uDDBC\uFE0F', title: 'Show as photo gallery', desc: 'Recipient browses images in a gallery layout', hint: 'Best for: photo sets, design assets' });
+            options.push({ id: 'gallery', icon: '\uD83D\uDDBC\uFE0F', title: 'Gallery mode', desc: 'Recipient browses files with preview', hint: 'Best for: photo sets, documents, mixed files' });
         }
     } else if (VIEWABLE_EXTENSIONS.has(ext)) {
         options.push({ id: 'view', icon: '\uD83D\uDC41\uFE0F', title: 'Let them view in the browser', desc: 'Recipient reads/views directly, no download needed', hint: 'Best for: documents, reports' });
