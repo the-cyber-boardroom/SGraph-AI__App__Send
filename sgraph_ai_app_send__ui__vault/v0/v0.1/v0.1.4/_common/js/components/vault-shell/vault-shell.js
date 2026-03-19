@@ -538,7 +538,7 @@
                 title = 'raw: vault';
             } else if (type === 'folder') {
                 const node = this._vault._findNode(path);
-                rawData = { path, type: 'folder', children: node ? Object.keys(node.children || {}) : [], node, vaultId: this._vault._vaultId, vaultName: this._vault.name };
+                rawData = { path, type: 'folder', children: node ? node.children : {}, vaultId: this._vault._vaultId, vaultName: this._vault.name };
                 title = `raw: ${name}/`;
             } else {
                 rawData = { path, type: 'file', name, folderPath, vaultId: this._vault._vaultId, vaultName: this._vault.name, entry };

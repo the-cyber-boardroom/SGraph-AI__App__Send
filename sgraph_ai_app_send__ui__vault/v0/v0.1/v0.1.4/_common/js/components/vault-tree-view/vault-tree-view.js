@@ -109,7 +109,7 @@
 
             for (const [name, entry] of entries) {
                 const fullPath = path === '/' ? '/' + name : path + '/' + name;
-                const isFolder = entry.type === 'folder';
+                const isFolder = entry.type === 'folder' || (entry.children !== undefined && entry.children !== null);
                 const isExpanded = this._expandedPaths.has(fullPath);
                 const isSelected = this._selectedPath === fullPath;
 
@@ -144,7 +144,7 @@
 
                 if (isFolder) {
                     const hasChildren = Object.keys(entry.children || {}).length > 0;
-                    const toggleIcon = hasChildren ? (isExpanded ? '−' : '+') : ' ';
+                    const toggleIcon = hasChildren ? (isExpanded ? '\u2212' : '+') : ' ';
                     const folderSvg = isExpanded
                         ? '<svg class="vt-svg-icon" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.146a1.5 1.5 0 011.094.474L8.3 3.1a.5.5 0 00.365.158H13A1.5 1.5 0 0114.5 4.75v7.75A1.5 1.5 0 0113 14H3a1.5 1.5 0 01-1.5-1.5V3z" fill="var(--color-warning, #fbbf24)"/></svg>'
                         : '<svg class="vt-svg-icon" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.146a1.5 1.5 0 011.094.474L8.3 3.1a.5.5 0 00.365.158H13A1.5 1.5 0 0114.5 4.75v7.75A1.5 1.5 0 0113 14H3a1.5 1.5 0 01-1.5-1.5V3z" fill="var(--color-warning, #fbbf24)"/></svg>';
