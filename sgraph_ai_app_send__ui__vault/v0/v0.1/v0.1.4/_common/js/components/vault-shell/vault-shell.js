@@ -456,13 +456,8 @@
 
             const renameBtn = makeBtn('Rename');
             renameBtn.addEventListener('click', () => {
-                const newName = prompt('Rename to:', fileName);
-                if (newName && newName !== fileName) {
-                    this.dispatchEvent(new CustomEvent('file-rename-request', {
-                        detail: { oldName: fileName, newName, folderPath: folderPath || this._currentPath },
-                        bubbles: true, composed: true
-                    }));
-                }
+                // Show inline rename bar below the action bar
+                this._showInlineRename(container, actionBar, fileName, folderPath);
             });
             actionBar.appendChild(renameBtn);
 
@@ -482,12 +477,13 @@
             deleteBtn.addEventListener('mouseenter', () => { deleteBtn.style.color = 'var(--color-error)'; deleteBtn.style.borderColor = 'var(--color-error)'; });
             deleteBtn.addEventListener('mouseleave', () => { deleteBtn.style.color = 'var(--color-text-secondary)'; deleteBtn.style.borderColor = 'var(--color-border)'; });
             deleteBtn.addEventListener('click', () => {
-                if (confirm(`Delete "${fileName}"?`)) {
+                // Show inline delete confirmation bar below the action bar
+                this._showInlineConfirm(container, actionBar, `Delete "${fileName}"?`, () => {
                     this.dispatchEvent(new CustomEvent('file-delete-request', {
                         detail: { fileName, folderPath: folderPath || this._currentPath },
                         bubbles: true, composed: true
                     }));
-                }
+                });
             });
             actionBar.appendChild(deleteBtn);
 
@@ -561,6 +557,10 @@
 
             const saveEdit = async () => {
                 if (!textareaEl || !this._vault) return;
+                if (!this._accessKey) {
+                    this._requireAccessKey(() => saveEdit());
+                    return;
+                }
                 const newText = textareaEl.value;
                 const newData = new TextEncoder().encode(newText);
 
@@ -633,6 +633,89 @@
             const d = document.createElement('div');
             d.textContent = String(str);
             return d.innerHTML;
+        }
+
+        // --- Inline Confirmation Bar (replaces confirm() popups) -----------------
+
+        _showInlineConfirm(container, insertBeforeEl, message, onConfirm) {
+            // Remove any existing inline bar in this container
+            const existing = container.querySelector('.vs-inline-bar');
+            if (existing) existing.remove();
+
+            const bar = document.createElement('div');
+            bar.className = 'vs-inline-bar vs-inline-bar--danger';
+            bar.innerHTML = `
+                <span class="vs-inline-bar-msg">${this._escapeHtml(message)}</span>
+                <button class="vs-inline-bar-confirm">Delete</button>
+                <button class="vs-inline-bar-cancel">Cancel</button>
+            `;
+
+            const remove = () => bar.remove();
+
+            bar.querySelector('.vs-inline-bar-confirm').addEventListener('click', () => {
+                remove();
+                onConfirm();
+            });
+            bar.querySelector('.vs-inline-bar-cancel').addEventListener('click', remove);
+
+            // Insert after the action bar (or at start of container)
+            if (insertBeforeEl && insertBeforeEl.nextSibling) {
+                container.insertBefore(bar, insertBeforeEl.nextSibling);
+            } else {
+                container.prepend(bar);
+            }
+
+            // Auto-focus cancel for safety
+            bar.querySelector('.vs-inline-bar-cancel').focus();
+        }
+
+        // --- Inline Rename Bar (replaces prompt() popup) -------------------------
+
+        _showInlineRename(container, insertBeforeEl, currentName, folderPath) {
+            const existing = container.querySelector('.vs-inline-bar');
+            if (existing) existing.remove();
+
+            const bar = document.createElement('div');
+            bar.className = 'vs-inline-bar';
+            bar.innerHTML = `
+                <span class="vs-inline-bar-label">Rename to:</span>
+                <input class="vs-inline-bar-input" type="text" autocomplete="off">
+                <button class="vs-inline-bar-confirm">Rename</button>
+                <button class="vs-inline-bar-cancel">Cancel</button>
+            `;
+
+            const input  = bar.querySelector('.vs-inline-bar-input');
+            input.value  = currentName;
+
+            const remove = () => bar.remove();
+
+            const commit = () => {
+                const newName = input.value.trim();
+                remove();
+                if (!newName || newName === currentName) return;
+                this.dispatchEvent(new CustomEvent('file-rename-request', {
+                    detail: { oldName: currentName, newName, folderPath: folderPath || this._currentPath },
+                    bubbles: true, composed: true
+                }));
+            };
+
+            bar.querySelector('.vs-inline-bar-confirm').addEventListener('click', commit);
+            bar.querySelector('.vs-inline-bar-cancel').addEventListener('click', remove);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+                if (e.key === 'Escape') { e.preventDefault(); remove(); }
+            });
+
+            if (insertBeforeEl && insertBeforeEl.nextSibling) {
+                container.insertBefore(bar, insertBeforeEl.nextSibling);
+            } else {
+                container.prepend(bar);
+            }
+
+            input.focus();
+            // Select filename without extension
+            const dotIndex = currentName.lastIndexOf('.');
+            input.setSelectionRange(0, dotIndex > 0 ? dotIndex : currentName.length);
         }
 
         // --- Raw View (opens raw JSON in new sg-layout tab) ----------------------
@@ -726,18 +809,18 @@
                 return;
             }
             this._pendingUploadAction = onSuccess;
-            const modal = this.querySelector('.vs-auth-modal');
-            if (modal) {
-                modal.style.display = '';
-                const input = modal.querySelector('.vs-auth-input');
+            const banner = this.querySelector('.vs-auth-banner');
+            if (banner) {
+                banner.style.display = '';
+                const input = banner.querySelector('.vs-auth-input');
                 if (input) { input.value = ''; input.focus(); }
             }
         }
 
         _onAuthSubmit() {
-            const modal = this.querySelector('.vs-auth-modal');
-            const input = modal?.querySelector('.vs-auth-input');
-            const key   = input?.value?.trim();
+            const banner = this.querySelector('.vs-auth-banner');
+            const input  = banner?.querySelector('.vs-auth-input');
+            const key    = input?.value?.trim();
             if (!key) return;
 
             this._accessKey = key;
@@ -747,11 +830,11 @@
                 this._vault._sgSend.token = key;
             }
 
-            if (modal) modal.style.display = 'none';
+            if (banner) banner.style.display = 'none';
             const badge = this.querySelector('.vs-readonly-badge');
             if (badge) badge.style.display = 'none';
 
-            window.sgraphVault.messages.success('Access key set — uploads enabled');
+            window.sgraphVault.messages.success('Access key set — write operations enabled');
 
             if (this._pendingUploadAction) {
                 this._pendingUploadAction();
@@ -760,8 +843,8 @@
         }
 
         _onAuthCancel() {
-            const modal = this.querySelector('.vs-auth-modal');
-            if (modal) modal.style.display = 'none';
+            const banner = this.querySelector('.vs-auth-banner');
+            if (banner) banner.style.display = 'none';
             this._pendingUploadAction = null;
         }
 
@@ -806,6 +889,10 @@
 
         async _onDeleteFile(fileName, folderPath) {
             if (!this._vault || !fileName) return;
+            if (!this._accessKey) {
+                this._requireAccessKey(() => this._onDeleteFile(fileName, folderPath));
+                return;
+            }
             this._showLoading();
             try {
                 await this._vault.removeFile(folderPath || this._currentPath, fileName);
@@ -828,6 +915,10 @@
 
         async _onRenameFile(oldName, newName, folderPath) {
             if (!this._vault || !oldName || !newName) return;
+            if (!this._accessKey) {
+                this._requireAccessKey(() => this._onRenameFile(oldName, newName, folderPath));
+                return;
+            }
             const path = folderPath || this._currentPath;
             this._showLoading();
             try {
@@ -852,6 +943,10 @@
 
         async _onRenameFolder(oldPath, newName) {
             if (!this._vault || !oldPath || !newName) return;
+            if (!this._accessKey) {
+                this._requireAccessKey(() => this._onRenameFolder(oldPath, newName));
+                return;
+            }
             this._showLoading();
             try {
                 await this._vault.renameFolder(oldPath, newName);
@@ -868,8 +963,21 @@
 
         async _onDeleteFolder(folderPath) {
             if (!this._vault || !folderPath || folderPath === '/') return;
+            if (!this._accessKey) {
+                this._requireAccessKey(() => this._onDeleteFolder(folderPath));
+                return;
+            }
             const folderName = folderPath.split('/').filter(Boolean).pop();
-            if (!confirm(`Delete folder "${folderName}" and all its contents?`)) return;
+
+            // Show inline confirmation in the content area
+            const contentArea = this.querySelector('.vs-content-area');
+            if (!contentArea) return;
+            this._showInlineConfirm(contentArea, contentArea.firstElementChild, `Delete folder "${folderName}" and all its contents?`, () => {
+                this._executeDeleteFolder(folderPath, folderName);
+            });
+        }
+
+        async _executeDeleteFolder(folderPath, folderName) {
             this._showLoading();
             try {
                 await this._vault.removeFolder(folderPath);
@@ -895,6 +1003,10 @@
 
         async _onMoveFile(fileName, srcFolderPath, destFolderPath) {
             if (!this._vault || !fileName) return;
+            if (!this._accessKey) {
+                this._requireAccessKey(() => this._onMoveFile(fileName, srcFolderPath, destFolderPath));
+                return;
+            }
             this._showLoading();
             try {
                 await this._vault.moveFile(srcFolderPath, fileName, destFolderPath);
@@ -919,6 +1031,10 @@
 
         async _onMoveFolder(srcPath, destParentPath) {
             if (!this._vault || !srcPath) return;
+            if (!this._accessKey) {
+                this._requireAccessKey(() => this._onMoveFolder(srcPath, destParentPath));
+                return;
+            }
             this._showLoading();
             try {
                 await this._vault.moveFolder(srcPath, destParentPath);
@@ -1078,12 +1194,6 @@
                 }
                 if (e.target.closest('.vs-auth-cancel')) {
                     this._onAuthCancel();
-                    return;
-                }
-                if (e.target.closest('.vs-auth-overlay')) {
-                    if (e.target.classList.contains('vs-auth-overlay')) {
-                        this._onAuthCancel();
-                    }
                     return;
                 }
             });
@@ -1268,6 +1378,14 @@
                         <div class="vs-loading-bar" style="display:none"><div class="vs-loading-bar-inner"></div></div>
                     </header>
 
+                    <!-- Inline Access Key Banner (shown when write operation needs auth) -->
+                    <div class="vs-auth-banner vs-auth-modal" style="display:none">
+                        <span class="vs-auth-banner-msg">Access key needed for write operations</span>
+                        <input class="vs-auth-input" type="password" placeholder="Paste access key" autocomplete="off">
+                        <button class="vs-auth-submit">Set Key</button>
+                        <button class="vs-auth-cancel">&times;</button>
+                    </div>
+
                     <!-- Left navigation -->
                     <nav class="vs-nav">
                         <a class="vs-nav-item vs-nav-item--active" data-view="files" href="#">
@@ -1346,19 +1464,6 @@
                         <button class="vs-msg-badge" title="Messages" style="display:none">0</button>
                     </footer>
                 </div>
-
-                <!-- Auth Token Prompt Modal (kept as modal — destructive action gate) -->
-                <div class="vs-auth-overlay vs-auth-modal" style="display:none">
-                    <div class="vs-auth-dialog">
-                        <h3 class="vs-auth-title">Access Key Required</h3>
-                        <p class="vs-auth-desc">An access key is needed to upload files. Enter it below.</p>
-                        <input class="vs-auth-input" type="password" placeholder="Paste your access key" autocomplete="off">
-                        <div class="vs-auth-actions">
-                            <button class="vs-auth-cancel">Cancel</button>
-                            <button class="vs-auth-submit">Continue</button>
-                        </div>
-                    </div>
-                </div>
             `;
 
             // Initialize sg-layout after DOM is ready
@@ -1387,10 +1492,11 @@
                     display: grid;
                     grid-template-areas:
                         "header  header"
+                        "auth    auth"
                         "nav     content"
                         "status  status";
                     grid-template-columns: var(--nav-width) 1fr;
-                    grid-template-rows: 48px 1fr auto;
+                    grid-template-rows: 48px auto 1fr auto;
                     height: 100vh;
                     overflow: hidden;
                 }
@@ -1685,44 +1791,31 @@
                     letter-spacing: 0.02em;
                 }
 
-                /* --- Auth Modal --- */
-                .vs-auth-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: rgba(0, 0, 0, 0.6);
+                /* --- Auth Banner (inline, replaces overlay modal) --- */
+                .vs-auth-banner {
+                    grid-area: auth;
                     display: flex;
                     align-items: center;
-                    justify-content: center;
-                    z-index: 100;
-                    backdrop-filter: blur(4px);
+                    gap: var(--space-2);
+                    padding: 0.375rem var(--space-4);
+                    background: rgba(233, 196, 69, 0.1);
+                    border-bottom: 1px solid rgba(233, 196, 69, 0.3);
+                    flex-shrink: 0;
+                    z-index: 10;
                 }
 
-                .vs-auth-dialog {
-                    background: var(--bg-surface);
-                    border: 1px solid var(--color-border);
-                    border-radius: var(--radius);
-                    padding: var(--space-6);
-                    max-width: 420px;
-                    width: 90%;
-                }
-
-                .vs-auth-title {
-                    font-size: var(--text-h3);
-                    font-weight: 700;
-                    color: var(--color-text);
-                    margin: 0 0 var(--space-2);
-                }
-
-                .vs-auth-desc {
+                .vs-auth-banner-msg {
                     font-size: var(--text-sm);
-                    color: var(--color-text-secondary);
-                    margin: 0 0 var(--space-4);
+                    color: #E9C445;
+                    font-weight: 600;
+                    white-space: nowrap;
                 }
 
-                .vs-auth-input {
-                    width: 100%;
-                    padding: 0.625rem 0.75rem;
-                    font-size: var(--text-body);
+                .vs-auth-banner .vs-auth-input {
+                    flex: 1;
+                    max-width: 320px;
+                    padding: 0.25rem 0.5rem;
+                    font-size: var(--text-sm);
                     font-family: var(--font-mono);
                     background: var(--bg-primary);
                     border: 1px solid var(--color-border);
@@ -1732,36 +1825,118 @@
                     box-sizing: border-box;
                 }
 
-                .vs-auth-input:focus {
+                .vs-auth-banner .vs-auth-input:focus {
                     border-color: var(--color-primary);
                 }
 
-                .vs-auth-actions {
-                    display: flex;
-                    gap: var(--space-2);
-                    justify-content: flex-end;
-                    margin-top: var(--space-4);
-                }
-
-                .vs-auth-cancel, .vs-auth-submit {
-                    padding: 0.375rem 1rem;
+                .vs-auth-banner .vs-auth-submit {
+                    padding: 0.25rem 0.625rem;
                     border-radius: var(--radius-sm);
                     font-size: var(--text-sm);
                     cursor: pointer;
-                    border: 1px solid var(--color-border);
+                    border: 1px solid var(--color-primary);
+                    background: var(--color-primary);
+                    color: var(--bg-primary);
+                    font-weight: 600;
                     font-family: var(--font-family);
                 }
 
-                .vs-auth-cancel {
+                .vs-auth-banner .vs-auth-cancel {
+                    padding: 0.25rem 0.5rem;
+                    border-radius: var(--radius-sm);
+                    font-size: var(--text-body);
+                    cursor: pointer;
+                    border: none;
                     background: transparent;
                     color: var(--color-text-secondary);
+                    font-family: var(--font-family);
+                    line-height: 1;
                 }
 
-                .vs-auth-submit {
+                .vs-auth-banner .vs-auth-cancel:hover {
+                    color: var(--color-text);
+                }
+
+                /* --- Inline Bars (confirm, rename — replaces alert/confirm/prompt) --- */
+                .vs-inline-bar {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--space-2);
+                    padding: 0.375rem 1rem;
+                    background: var(--bg-surface);
+                    border-bottom: 1px solid var(--color-border);
+                    flex-shrink: 0;
+                    animation: vs-bar-slide 0.15s ease-out;
+                }
+
+                .vs-inline-bar--danger {
+                    background: rgba(233, 69, 96, 0.08);
+                    border-bottom-color: rgba(233, 69, 96, 0.3);
+                }
+
+                @keyframes vs-bar-slide {
+                    from { opacity: 0; transform: translateY(-4px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+
+                .vs-inline-bar-msg {
+                    font-size: var(--text-sm);
+                    color: var(--color-text);
+                    font-weight: 600;
+                    white-space: nowrap;
+                }
+
+                .vs-inline-bar-label {
+                    font-size: var(--text-sm);
+                    color: var(--color-text-secondary);
+                    white-space: nowrap;
+                }
+
+                .vs-inline-bar-input {
+                    flex: 1;
+                    max-width: 300px;
+                    padding: 0.2rem 0.5rem;
+                    font-size: var(--text-sm);
+                    font-family: var(--font-mono);
+                    background: var(--bg-primary);
+                    border: 1px solid var(--color-primary);
+                    border-radius: var(--radius-sm);
+                    color: var(--color-text);
+                    outline: none;
+                    box-sizing: border-box;
+                }
+
+                .vs-inline-bar-confirm {
+                    padding: 0.2rem 0.625rem;
+                    border-radius: var(--radius-sm);
+                    font-size: var(--text-small);
+                    cursor: pointer;
+                    border: 1px solid var(--color-primary);
                     background: var(--color-primary);
                     color: var(--bg-primary);
-                    border-color: var(--color-primary);
                     font-weight: 600;
+                    font-family: var(--font-family);
+                }
+
+                .vs-inline-bar--danger .vs-inline-bar-confirm {
+                    background: var(--color-error, #E94560);
+                    border-color: var(--color-error, #E94560);
+                }
+
+                .vs-inline-bar-cancel {
+                    padding: 0.2rem 0.5rem;
+                    border-radius: var(--radius-sm);
+                    font-size: var(--text-small);
+                    cursor: pointer;
+                    border: 1px solid var(--color-border);
+                    background: transparent;
+                    color: var(--color-text-secondary);
+                    font-family: var(--font-family);
+                }
+
+                .vs-inline-bar-cancel:hover {
+                    background: var(--bg-secondary);
+                    color: var(--color-text);
                 }
 
                 /* --- SGit View --- */
