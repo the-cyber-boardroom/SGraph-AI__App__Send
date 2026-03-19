@@ -1,6 +1,6 @@
 /* =================================================================================
    SGraph Vault — Client-Side Encrypted Vault Logic
-   v0.1.3 — Self-describing IDs, bare/ paths, on-demand sub-tree loading
+   v0.1.4 — Lazy sub-tree loading: folders load on demand when expanded
 
    A vault is a collection of encrypted files stored via the vault pointer API.
    The server sees only encrypted blobs — it has no concept of folders or file names.
@@ -124,8 +124,13 @@ class SGVault {
                 const decrypted    = await SGSendCrypto.decrypt(settingsBlob, vault._readKey)
                 vault._settings    = JSON.parse(new TextDecoder().decode(decrypted))
             } else if (entry.tree_id) {
-                // Sub-tree: load recursively (CLI creates separate tree objects per folder)
-                await vault._loadSubTree(entry.name, entry.tree_id)
+                // Sub-tree: store lazy placeholder (loaded on demand when folder is expanded)
+                vault._tree['/'].children[entry.name] = {
+                    type:     'folder',
+                    children: {},
+                    _tree_id: entry.tree_id,
+                    _loaded:  false
+                }
             } else {
                 vault._insertEntry(entry)
             }
@@ -234,6 +239,46 @@ class SGVault {
             size:         entry.size || 0,
             content_hash: entry.content_hash || null
         }))
+    }
+
+    // --- Lazy Sub-Tree Loading (called by UI when folder is expanded) -----------
+
+    async loadSubTreeOnDemand(folderPath) {
+        const node = this._findNode(folderPath)
+        if (!node || node.type !== 'folder') return false
+        if (node._loaded !== false || !node._tree_id) return false  // already loaded or no tree_id
+
+        // Load one level: fetch the sub-tree entries
+        const subTree = await this._commitManager.loadTree(node._tree_id)
+        for (const entry of subTree.entries) {
+            if (entry.tree_id) {
+                // Nested folder: store lazy placeholder (will load when expanded)
+                node.children[entry.name] = {
+                    type:     'folder',
+                    children: {},
+                    _tree_id: entry.tree_id,
+                    _loaded:  false
+                }
+            } else {
+                // File entry
+                node.children[entry.name] = {
+                    type:         'file',
+                    blob_id:      entry.blob_id,
+                    size:         entry.size || 0,
+                    content_hash: entry.content_hash || null
+                }
+            }
+        }
+
+        node._loaded = true
+        delete node._tree_id
+        return true
+    }
+
+    // Check if a folder needs loading (for UI to show loading indicator)
+    needsLoading(folderPath) {
+        const node = this._findNode(folderPath)
+        return node && node.type === 'folder' && node._loaded === false && !!node._tree_id
     }
 
     async removeFolder(folderPath) {
@@ -503,6 +548,8 @@ class SGVault {
     }
 
     // --- Load a sub-tree object and insert its entries into the in-memory tree ----
+    //     Used during full vault reload (e.g. refresh from server).
+    //     Nested folders get lazy placeholders — they load on demand when expanded.
 
     async _loadSubTree(folderName, treeId, parentPath = '') {
         const subTree  = await this._commitManager.loadTree(treeId)
@@ -518,11 +565,20 @@ class SGVault {
             node = node.children[part]
         }
 
+        // Mark this level as loaded
+        node._loaded = true
+        delete node._tree_id
+
         // Process entries in the sub-tree
         for (const entry of subTree.entries) {
             if (entry.tree_id) {
-                // Nested sub-tree (e.g. folder-b/folder-b-1)
-                await this._loadSubTree(entry.name, entry.tree_id, fullPath)
+                // Nested sub-tree: store lazy placeholder instead of recursing
+                node.children[entry.name] = {
+                    type:     'folder',
+                    children: {},
+                    _tree_id: entry.tree_id,
+                    _loaded:  false
+                }
             } else {
                 // File entry — insert with full path prefix
                 this._insertEntry({

@@ -1,6 +1,6 @@
 /* =============================================================================
    SGraph Vault — Tree View Component
-   v0.1.3 — Hierarchical folder tree with file selection
+   v0.1.4 — Lazy sub-tree loading + inline folder rename/delete buttons
 
    Light DOM component for the left sidebar. Renders a collapsible folder tree
    from the vault's tree structure. Clicking a file emits 'tree-file-selected',
@@ -143,12 +143,13 @@
                 });
 
                 if (isFolder) {
-                    const hasChildren = Object.keys(entry.children || {}).length > 0;
+                    const needsLoading = entry._loaded === false && !!entry._tree_id;
+                    const hasChildren = needsLoading || Object.keys(entry.children || {}).length > 0;
                     const toggleIcon = hasChildren ? (isExpanded ? '\u2212' : '+') : ' ';
                     const folderSvg = isExpanded
                         ? '<svg class="vt-svg-icon" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.146a1.5 1.5 0 011.094.474L8.3 3.1a.5.5 0 00.365.158H13A1.5 1.5 0 0114.5 4.75v7.75A1.5 1.5 0 0113 14H3a1.5 1.5 0 01-1.5-1.5V3z" fill="var(--color-warning, #fbbf24)"/></svg>'
                         : '<svg class="vt-svg-icon" viewBox="0 0 16 16"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.146a1.5 1.5 0 011.094.474L8.3 3.1a.5.5 0 00.365.158H13A1.5 1.5 0 0114.5 4.75v7.75A1.5 1.5 0 0113 14H3a1.5 1.5 0 01-1.5-1.5V3z" fill="var(--color-warning, #fbbf24)"/></svg>';
-                    row.innerHTML = `<span class="vt-toggle">${toggleIcon}</span><span class="vt-icon">${folderSvg}</span><span class="vt-name">${this._escapeHtml(name)}</span><a class="vt-raw-link" title="Raw folder data" href="#">raw</a>`;
+                    row.innerHTML = `<span class="vt-toggle">${toggleIcon}</span><span class="vt-icon">${folderSvg}</span><span class="vt-name">${this._escapeHtml(name)}</span><button class="vt-action-btn vt-rename-btn" title="Rename folder">&#9998;</button><button class="vt-action-btn vt-delete-btn" title="Delete folder">&times;</button><a class="vt-raw-link" title="Raw folder data" href="#">raw</a>`;
 
                     // --- Drop target (folders only) ---
                     row.addEventListener('dragover', (e) => {
@@ -182,16 +183,52 @@
                         });
                     }
 
-                    // Single click: toggle expand + select folder
+                    // Inline rename button
+                    const renameBtnEl = row.querySelector('.vt-rename-btn');
+                    if (renameBtnEl) {
+                        renameBtnEl.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this._startInlineRename(row, name, fullPath, 'folder');
+                        });
+                    }
+
+                    // Inline delete button
+                    const deleteBtnEl = row.querySelector('.vt-delete-btn');
+                    if (deleteBtnEl) {
+                        deleteBtnEl.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this.dispatchEvent(new CustomEvent('folder-delete-request', {
+                                detail: { folderPath: fullPath },
+                                bubbles: true, composed: true
+                            }));
+                        });
+                    }
+
+                    // Single click: toggle expand + select folder (with lazy loading)
                     row.addEventListener('click', (e) => {
-                        if (e.target.closest('.vt-raw-link')) return;
+                        if (e.target.closest('.vt-raw-link') || e.target.closest('.vt-action-btn')) return;
+                        this._selectedPath = fullPath;
+
                         if (isExpanded) {
                             this._expandedPaths.delete(fullPath);
+                            this.refresh();
                         } else {
                             this._expandedPaths.add(fullPath);
+                            // Check if this folder needs lazy loading
+                            if (this._vault && this._vault.needsLoading && this._vault.needsLoading(fullPath)) {
+                                // Show loading indicator
+                                const toggleEl = row.querySelector('.vt-toggle');
+                                if (toggleEl) toggleEl.innerHTML = '<span class="vt-spinner"></span>';
+                                this._vault.loadSubTreeOnDemand(fullPath).then(() => {
+                                    this.refresh();
+                                }).catch(() => {
+                                    this.refresh();
+                                });
+                            } else {
+                                this.refresh();
+                            }
                         }
-                        this._selectedPath = fullPath;
-                        this.refresh();
+
                         this.dispatchEvent(new CustomEvent('tree-folder-selected', {
                             detail: { path: fullPath },
                             bubbles: true, composed: true
@@ -502,6 +539,14 @@
                 .vt-raw-link { display: none; margin-left: auto; font-size: 0.625rem; color: var(--color-text-secondary); text-decoration: none; padding: 0 0.25rem; border-radius: 2px; opacity: 0.6; flex-shrink: 0; }
                 .vt-raw-link:hover { color: var(--color-primary); opacity: 1; background: rgba(78, 205, 196, 0.08); }
                 .vt-row:hover .vt-raw-link { display: inline; }
+                .vt-action-btn { display: none; margin-left: auto; padding: 0 0.25rem; font-size: 0.75rem; line-height: 1; background: transparent; border: none; color: var(--color-text-secondary); cursor: pointer; opacity: 0.6; flex-shrink: 0; border-radius: 2px; }
+                .vt-action-btn:hover { opacity: 1; background: rgba(78, 205, 196, 0.08); }
+                .vt-delete-btn:hover { color: var(--danger, #E94560); background: rgba(233, 69, 96, 0.1); }
+                .vt-rename-btn:hover { color: var(--color-primary, #4ECDC4); }
+                .vt-row:hover .vt-action-btn { display: inline-flex; }
+                .vt-row:hover .vt-action-btn + .vt-raw-link { margin-left: 0; }
+                .vt-spinner { display: inline-block; width: 0.625rem; height: 0.625rem; border: 1.5px solid var(--color-text-secondary); border-top-color: var(--color-primary, #4ECDC4); border-radius: 50%; animation: vt-spin 0.6s linear infinite; }
+                @keyframes vt-spin { to { transform: rotate(360deg); } }
                 .vt-row[draggable="true"] { cursor: grab; }
                 .vt-row[draggable="true"]:active { cursor: grabbing; }
                 .vt-row--dragging { opacity: 0.4; }
