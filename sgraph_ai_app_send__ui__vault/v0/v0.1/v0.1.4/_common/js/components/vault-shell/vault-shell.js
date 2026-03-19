@@ -404,6 +404,9 @@
             container.innerHTML = '';
             container.style.cssText = 'display:flex; flex-direction:column; height:100%; box-sizing:border-box; overflow:hidden;';
 
+            const isEditable = type === 'text' || type === 'code' || type === 'markdown';
+            let isEditing = false;
+
             // Action bar at top of tab
             const actionBar = document.createElement('div');
             actionBar.style.cssText = 'display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; border-bottom:1px solid var(--color-border); flex-shrink:0; background:var(--bg-surface);';
@@ -432,6 +435,24 @@
                 this._showRawView({ path, type: 'file', name: fileName, entry: fileEntry, folderPath: folderPath || '/' });
             });
             actionBar.appendChild(rawBtn);
+
+            // Edit / Save / Cancel buttons (only for text-editable files)
+            let editBtn, saveBtn, cancelBtn;
+            if (isEditable) {
+                editBtn = makeBtn('Edit');
+                editBtn.addEventListener('click', () => enterEditMode());
+                actionBar.appendChild(editBtn);
+
+                saveBtn = makeBtn('Save');
+                saveBtn.style.cssText += 'display:none; color:var(--color-primary); border-color:var(--color-primary); font-weight:600;';
+                saveBtn.addEventListener('click', () => saveEdit());
+                actionBar.appendChild(saveBtn);
+
+                cancelBtn = makeBtn('Cancel');
+                cancelBtn.style.display = 'none';
+                cancelBtn.addEventListener('click', () => exitEditMode());
+                actionBar.appendChild(cancelBtn);
+            }
 
             const renameBtn = makeBtn('Rename');
             renameBtn.addEventListener('click', () => {
@@ -476,15 +497,111 @@
             const content = document.createElement('div');
             content.style.cssText = 'flex:1; overflow:auto; padding:1rem;';
 
+            // References for edit mode toggling
+            let preEl = null;
+            let textareaEl = null;
+            let currentText = '';
+
+            const enterEditMode = () => {
+                if (isEditing) return;
+                isEditing = true;
+                currentText = preEl ? preEl.textContent : new TextDecoder().decode(data);
+
+                // Create textarea
+                textareaEl = document.createElement('textarea');
+                textareaEl.value = currentText;
+                textareaEl.style.cssText = 'width:100%; height:100%; margin:0; padding:0; resize:none; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5; background:var(--bg-primary); border:1px solid var(--color-primary); border-radius:var(--radius-sm); outline:none; box-sizing:border-box; tab-size:4;';
+                textareaEl.addEventListener('keydown', (e) => {
+                    // Ctrl/Cmd+S to save
+                    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                        e.preventDefault();
+                        saveEdit();
+                    }
+                    // Escape to cancel
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        exitEditMode();
+                    }
+                    // Tab inserts spaces
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const start = textareaEl.selectionStart;
+                        const end   = textareaEl.selectionEnd;
+                        textareaEl.value = textareaEl.value.substring(0, start) + '    ' + textareaEl.value.substring(end);
+                        textareaEl.selectionStart = textareaEl.selectionEnd = start + 4;
+                    }
+                });
+
+                // Swap pre → textarea
+                content.style.padding = '0';
+                if (preEl) preEl.style.display = 'none';
+                content.appendChild(textareaEl);
+                textareaEl.focus();
+
+                // Toggle buttons
+                if (editBtn) editBtn.style.display = 'none';
+                if (saveBtn) saveBtn.style.display = '';
+                if (cancelBtn) cancelBtn.style.display = '';
+            };
+
+            const exitEditMode = () => {
+                if (!isEditing) return;
+                isEditing = false;
+
+                // Swap textarea → pre
+                if (textareaEl) { textareaEl.remove(); textareaEl = null; }
+                content.style.padding = '1rem';
+                if (preEl) preEl.style.display = '';
+
+                // Toggle buttons
+                if (editBtn) editBtn.style.display = '';
+                if (saveBtn) saveBtn.style.display = 'none';
+                if (cancelBtn) cancelBtn.style.display = 'none';
+            };
+
+            const saveEdit = async () => {
+                if (!textareaEl || !this._vault) return;
+                const newText = textareaEl.value;
+                const newData = new TextEncoder().encode(newText);
+
+                // Disable save button while saving
+                if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+
+                try {
+                    const path = folderPath || this._currentPath;
+                    await this._vault.updateFile(path, fileName, newData);
+
+                    // Update the pre element with new content
+                    if (preEl) preEl.textContent = newText;
+
+                    // Update displayed size
+                    nameEl.textContent = fileName + `  (${VaultHelpers.formatBytes(newData.byteLength)})`;
+
+                    exitEditMode();
+
+                    // Refresh tree and status
+                    const tree = this._findTreeView();
+                    if (tree) tree.refresh();
+                    this._updateVaultKey();
+                    this._updateStatusBar();
+
+                    window.sgraphVault.messages.success(`"${fileName}" saved`);
+                } catch (err) {
+                    window.sgraphVault.messages.error(`Save failed: ${err.message}`);
+                } finally {
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+                }
+            };
+
             switch (type) {
                 case 'text':
                 case 'code':
                 case 'markdown': {
                     const text = new TextDecoder().decode(data);
-                    const pre = document.createElement('pre');
-                    pre.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
-                    pre.textContent = text;
-                    content.appendChild(pre);
+                    preEl = document.createElement('pre');
+                    preEl.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
+                    preEl.textContent = text;
+                    content.appendChild(preEl);
                     break;
                 }
                 case 'image': {
@@ -499,10 +616,10 @@
                 default: {
                     try {
                         const text = new TextDecoder().decode(data);
-                        const pre = document.createElement('pre');
-                        pre.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
-                        pre.textContent = text;
-                        content.appendChild(pre);
+                        preEl = document.createElement('pre');
+                        preEl.style.cssText = 'margin:0; white-space:pre-wrap; font-family:var(--font-mono); font-size:var(--text-small); color:var(--color-text); line-height:1.5;';
+                        preEl.textContent = text;
+                        content.appendChild(preEl);
                     } catch (_) {
                         content.innerHTML = `<div style="text-align:center; color:var(--color-text-secondary); padding:2rem;">Binary file — ${VaultHelpers.formatBytes(data.byteLength)}</div>`;
                     }

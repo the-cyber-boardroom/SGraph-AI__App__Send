@@ -186,6 +186,32 @@ class SGVault {
         return { blobId, fileName, folderPath }
     }
 
+    async updateFile(folderPath, fileName, fileData) {
+        const data = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData
+
+        const folder = this._findNode(folderPath)
+        if (!folder || folder.type !== 'folder') throw new Error(`Folder not found: ${folderPath}`)
+        if (!folder.children[fileName] || folder.children[fileName].type !== 'file') {
+            throw new Error(`File not found: ${fileName}`)
+        }
+
+        // Encrypt and store new blob (content-addressed — old blob is still valid for history)
+        const encrypted   = await this._sgSend.encrypt(data, this._readKey)
+        const blobId      = await this._objectStore.store(encrypted)
+        const contentHash = await this._commitManager.computeContentHash(data)
+
+        // Update in-memory tree entry
+        folder.children[fileName] = {
+            type:         'file',
+            blob_id:      blobId,
+            size:         data.byteLength || data.length,
+            content_hash: contentHash
+        }
+
+        await this._commit(`Edit ${fileName}`)
+        return { blobId, fileName, folderPath }
+    }
+
     async getFile(folderPath, fileName) {
         const folder = this._findNode(folderPath)
         if (!folder) throw new Error(`Folder not found: ${folderPath}`)
@@ -434,16 +460,29 @@ class SGVault {
         const entries = []
         for (const [name, entry] of Object.entries(node.children || {})) {
             if (entry.type === 'folder') {
-                // Recursively create sub-tree object for this folder
-                const childEntries = await this._buildTreeEntries(entry)
-                const childTreeId  = await this._commitManager.createTree(childEntries)
-                entries.push({
-                    name,
-                    size:         0,
-                    content_hash: null,
-                    blob_id:      null,
-                    tree_id:      childTreeId
-                })
+                // If folder was never loaded (lazy), reuse its existing tree_id
+                // This is critical: without this, committing would create an empty
+                // tree object and destroy all the folder's contents on the server
+                if (entry._loaded === false && entry._tree_id) {
+                    entries.push({
+                        name,
+                        size:         0,
+                        content_hash: null,
+                        blob_id:      null,
+                        tree_id:      entry._tree_id
+                    })
+                } else {
+                    // Loaded folder: recursively create sub-tree object
+                    const childEntries = await this._buildTreeEntries(entry)
+                    const childTreeId  = await this._commitManager.createTree(childEntries)
+                    entries.push({
+                        name,
+                        size:         0,
+                        content_hash: null,
+                        blob_id:      null,
+                        tree_id:      childTreeId
+                    })
+                }
             } else {
                 entries.push({
                     name,
