@@ -1,1 +1,1 @@
-../../../../v0.2.0/_common/js/components/send-access-gate/send-access-gate.js
+../../../../../v0.2.0/_common/js/components/send-access-gate/send-access-gate.js
