@@ -235,82 +235,36 @@ function addPreviewToZip(zip, entries) {
     });
 }
 
-// ─── Override: _startFolderZip — inject preview generation ──────────────────
-var _origStartFolderZip = SendUpload.prototype._startFolderZip;
+// ─── Override: _v023_compressFolder — inject preview generation ──────────────
+// NOTE: v0.2.3 replaced _startFolderZip with a no-op and uses
+// _v023_compressFolder as the actual zip path (called from _v023_startProcessing).
+// We must override _v023_compressFolder to inject preview generation.
+var _orig_v023_compressFolder = SendUpload.prototype._v023_compressFolder;
 
-SendUpload.prototype._startFolderZip = async function() {
-    // Read current option values from the DOM (same as base)
-    var levelSelect      = this.querySelector('#folder-compression');
-    var includeEmptyChk  = this.querySelector('#folder-include-empty');
-    var includeHiddenChk = this.querySelector('#folder-include-hidden');
+SendUpload.prototype._v023_compressFolder = async function() {
+    await this._loadJSZip();
 
-    this._folderOptions = {
-        level:         levelSelect      ? parseInt(levelSelect.value, 10) : 4,
-        includeEmpty:  includeEmptyChk  ? includeEmptyChk.checked : false,
-        includeHidden: includeHiddenChk ? includeHiddenChk.checked : false
-    };
+    var zip     = new JSZip();
+    var entries = this._folderScan.entries.filter(function(e) { return !e.isDir; });
+    var opts    = this._folderOptions || {};
 
-    // Check total size
-    var totalSize = this._folderScan.totalSize;
-    if (totalSize > SendUpload.MAX_FILE_SIZE) {
-        this.errorMessage = this.t('upload.folder.error_too_large', {
-            limit: this.formatBytes(SendUpload.MAX_FILE_SIZE)
-        });
-        this.state = 'error'; this.render(); this.setupEventListeners();
-        return;
-    }
-
-    try {
-        this.state = 'zipping'; this.render();
-
-        // Lazy-load JSZip
-        await this._loadJSZip();
-
-        var opts    = this._folderOptions;
-        var entries = this._folderScan.entries.filter(function(e) {
-            if (!opts.includeHidden && e.name.startsWith('.')) return false;
-            if (e.isDir && !opts.includeEmpty) return false;
-            return true;
-        });
-
-        var zip = new JSZip();
-
-        // Add original files (same as base v0.2.0)
-        for (var i = 0; i < entries.length; i++) {
-            var entry = entries[i];
-            if (entry.isDir) {
-                zip.folder(entry.path);
-            } else {
-                var buffer = await entry.file.arrayBuffer();
-                zip.file(entry.path, buffer);
-            }
+    for (var i = 0; i < entries.length; i++) {
+        var entry = entries[i];
+        if (!opts.includeHidden && entry.name.startsWith('.')) continue;
+        if (entry.file) {
+            zip.file(entry.path, entry.file, {
+                compression: (opts.level || 4) > 0 ? 'DEFLATE' : 'STORE',
+                compressionOptions: { level: opts.level || 4 }
+            });
         }
-
-        // ═══ v0.2.12: Generate _preview/ folder with thumbnails ═══
-        await addPreviewToZip(zip, entries);
-
-        var compression = opts.level === 0 ? 'STORE' : 'DEFLATE';
-        var zipBlob = await zip.generateAsync({
-            type:               'blob',
-            compression:        compression,
-            compressionOptions: { level: opts.level }
-        });
-
-        // Feed into existing pipeline as a File object
-        this.selectedFile = new File(
-            [zipBlob],
-            this._folderName + '.zip',
-            { type: 'application/zip' }
-        );
-
-        // Clear folder state and go straight to upload
-        this._folderScan = null;
-        this.state = 'idle';
-        this.startUpload();
-    } catch (err) {
-        this.errorMessage = err.message || this.t('upload.folder.error_zip_failed');
-        this.state = 'error'; this.render(); this.setupEventListeners();
     }
+
+    // ═══ v0.2.12: Generate _preview/ folder with thumbnails ═══
+    await addPreviewToZip(zip, entries);
+
+    var blob    = await zip.generateAsync({ type: 'blob' });
+    var zipName = (this._folderName || 'folder') + '.zip';
+    this.selectedFile = new File([blob], zipName, { type: 'application/zip' });
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
