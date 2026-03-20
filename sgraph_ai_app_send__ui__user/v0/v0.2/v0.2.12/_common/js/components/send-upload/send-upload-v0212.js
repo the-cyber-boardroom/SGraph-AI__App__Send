@@ -25,7 +25,7 @@ if (typeof SendUpload === 'undefined') {
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-var THUMB_MAX_WIDTH  = 200;
+var THUMB_MAX_WIDTH  = 400;
 var THUMB_QUALITY    = 0.75;      // JPEG quality for thumbnails
 var THUMB_FORMAT     = 'image/jpeg';
 var MANIFEST_VERSION = '0.1';
