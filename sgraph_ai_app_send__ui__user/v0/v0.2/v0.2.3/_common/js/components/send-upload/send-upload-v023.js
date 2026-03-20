@@ -67,22 +67,22 @@ const IMAGE_EXTENSIONS = new Set([
 function detectDeliveryOptions(file, folderScan) {
     const ext = (file?.name || '').split('.').pop().toLowerCase();
     const isFolder = !!folderScan;
-    const downloadTitle = isFolder ? 'Send as a zip' : 'Send as download';
+    const downloadTitle = isFolder ? 'Download zip mode' : 'Download mode';
     const downloadDesc  = isFolder ? 'Recipient downloads a single zip file'  : 'Recipient gets a file to save to their device';
     const options = [{ id: 'download', icon: '\uD83D\uDCE5', title: downloadTitle, desc: downloadDesc, hint: 'Best for: large archives, backups' }];
 
     if (folderScan) {
-        options.push({ id: 'browse', icon: '\uD83D\uDCC2', title: 'Let them browse the folder', desc: 'Recipient sees files in a browsable view with inline preview', hint: 'Best for: sharing documents, reports' });
+        options.push({ id: 'browse', icon: '\uD83D\uDCC2', title: 'Folder view mode', desc: 'Recipient sees files in a browsable view with inline preview', hint: 'Best for: sharing documents, reports' });
         const hasImages = folderScan.entries
             .filter(e => !e.isDir)
             .some(e => IMAGE_EXTENSIONS.has(e.name.split('.').pop().toLowerCase()));
         if (hasImages) {
-            options.push({ id: 'gallery', icon: '\uD83D\uDDBC\uFE0F', title: 'Gallery mode', desc: 'Recipient browses files with preview', hint: 'Best for: photo sets, documents, mixed files' });
+            options.push({ id: 'gallery', icon: '\uD83D\uDDBC\uFE0F', title: 'Gallery mode', desc: 'Recipient browses files with preview. Thumbnails and metadata will be generated.', hint: 'Best for: photo sets, documents, mixed files' });
         }
     } else if (VIEWABLE_EXTENSIONS.has(ext)) {
-        options.push({ id: 'view', icon: '\uD83D\uDC41\uFE0F', title: 'Let them view in the browser', desc: 'Recipient reads/views directly, no download needed', hint: 'Best for: documents, reports' });
+        options.push({ id: 'view', icon: '\uD83D\uDC41\uFE0F', title: 'View mode', desc: 'Recipient reads/views directly, no download needed', hint: 'Best for: documents, reports' });
     } else if (ext === 'zip') {
-        options.push({ id: 'browse', icon: '\uD83D\uDCC2', title: 'Let them browse the folder', desc: 'Recipient sees files in a browsable view with inline preview', hint: 'Best for: sharing documents, reports' });
+        options.push({ id: 'browse', icon: '\uD83D\uDCC2', title: 'Folder view mode', desc: 'Recipient sees files in a browsable view with inline preview', hint: 'Best for: sharing documents, reports' });
     }
 
     return options;

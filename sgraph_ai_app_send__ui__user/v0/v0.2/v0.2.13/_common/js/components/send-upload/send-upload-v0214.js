@@ -14,6 +14,10 @@
      - Always show gallery option for all folder uploads (not just images).
      - Consistent card order: browse → gallery → download (never reorder).
      - Gallery is always DEFAULT (recommended) — it supports all file types.
+     - Consistent "mode" naming: Folder view mode, Gallery mode, Download zip mode.
+     - Gallery card shows thumbnail/metadata generation note on Step 2.
+     - Fix back from Share Mode preserving delivery selection.
+     - Clickable completed steps in step indicator for full back-navigation.
      - Add thumbnail generation note to confirmation step.
 
    Loads AFTER v0.2.13 — overrides via prototype mutation.
@@ -60,7 +64,7 @@ SendUpload.prototype._v023_advanceToDelivery = function() {
             id: 'gallery',
             icon: '\uD83D\uDDBC\uFE0F',
             title: 'Gallery mode',
-            desc: 'Recipient browses files with preview',
+            desc: 'Recipient browses files with preview. Thumbnails and metadata will be generated.',
             hint: 'Best for: photo sets, documents, mixed files'
         });
         this._v023_deliveryOptions = opts;
@@ -90,7 +94,7 @@ SendUpload.prototype._v023_advanceToDelivery = function() {
     this.setupEventListeners();
 };
 
-// ─── Override: setupEventListeners — fix gallery card + hover styling ───────
+// ─── Override: setupEventListeners — fix gallery card + hover + step clicks ──
 var _v0213_setupListeners = SendUpload.prototype.setupEventListeners;
 
 SendUpload.prototype.setupEventListeners = function() {
@@ -104,13 +108,24 @@ SendUpload.prototype.setupEventListeners = function() {
     var self = this;
 
     if (this.state === 'choosing-delivery') {
-        // ── Fix ALL delivery cards: re-clone with proper handlers ──
-        // This fixes gallery click (broken by v0.2.12 clone) and
-        // replaces v0.2.8's hover handlers with dim-based ones.
-        var recommended = self._v023_recommendedDelivery || 'download';
+        // ── When returning from a later step, highlight previously selected card ──
+        var selected = this._v023_selectedDelivery;
+        var recommended = this._v023_recommendedDelivery || 'download';
+        var highlightId = selected || recommended;
+
+        // Apply v028-default-selected to the right card
         var allCards = this.querySelectorAll('.v023-delivery-card');
+        allCards.forEach(function(card) {
+            card.classList.remove('v028-default-selected');
+            if (card.getAttribute('data-delivery') === highlightId) {
+                card.classList.add('v028-default-selected');
+            }
+        });
+
         var defaultCard = this.querySelector('.v028-default-selected');
 
+        // ── Fix ALL delivery cards: re-clone with proper handlers ──
+        allCards = this.querySelectorAll('.v023-delivery-card');
         allCards.forEach(function(card) {
             var isDefault = card.classList.contains('v028-default-selected');
             var delivery = card.getAttribute('data-delivery');
@@ -138,13 +153,63 @@ SendUpload.prototype.setupEventListeners = function() {
                 newCard.addEventListener('mouseleave', function() {
                     newCard.classList.remove('v028-hover-highlight');
                     defaultCard.classList.remove('v0214-default-dimmed');
-                    if (!self._v023_selectedDelivery) {
+                    if (!self._v023_selectedDelivery || self._v023_selectedDelivery === highlightId) {
                         defaultCard.classList.add('v028-default-selected');
                     }
                 });
             }
         });
     }
+
+    // ── Clickable completed steps in the step indicator ──
+    this._v0214_setupStepClicks();
+};
+
+// ─── Step click navigation — click any completed step to go back ─────────
+SendUpload.prototype._v0214_setupStepClicks = function() {
+    var self = this;
+    var indicator = this.querySelector('send-step-indicator');
+    if (!indicator || !indicator.shadowRoot) return;
+
+    // Collect all .step elements (not .line) to get correct step numbers
+    var allStepEls = indicator.shadowRoot.querySelectorAll('.step');
+    allStepEls.forEach(function(stepEl, idx) {
+        var stepNum = idx + 1; // 1-based
+        var isCompleted = stepEl.classList.contains('step--completed');
+        var isActive    = stepEl.classList.contains('step--active');
+
+        if (isCompleted || isActive) {
+            stepEl.style.cursor = 'pointer';
+            stepEl.addEventListener('click', function() {
+                self._v023_goingBack = true;
+                self._v0214_navigateToStep(stepNum);
+            });
+        }
+    });
+};
+
+// ─── Navigate to a specific step number ──────────────────────────────────
+SendUpload.prototype._v0214_navigateToStep = function(step) {
+    // Map step numbers to states (using 6-step wizard from v0.2.8)
+    // 1=Upload, 2=Delivery, 3=Share mode, 4=Confirm, 5=Encrypt, 6=Done
+    switch (step) {
+        case 1:
+            this.state = 'idle';
+            break;
+        case 2:
+            this.state = 'choosing-delivery';
+            break;
+        case 3:
+            this.state = 'choosing-share';
+            break;
+        case 4:
+            this.state = 'confirming';
+            break;
+        default:
+            return; // Can't navigate to processing/done
+    }
+    this.render();
+    this.setupEventListeners();
 };
 
 // ─── Override: confirm step — add thumbnail generation note ─────────────────
@@ -226,6 +291,26 @@ SendUpload.prototype._v026_renderConfirm = function() {
     document.head.appendChild(style);
 })();
 
-console.log('[send-upload-v0214] Gallery always shown, smart defaults, click fix, hover dim, thumbnail note');
+// ─── Make step indicator completed steps look clickable ──────────────────
+// We patch the _render method of SendStepIndicator to add :hover styles
+(function patchStepIndicator() {
+    if (typeof SendStepIndicator === 'undefined') return;
+    var _origRender = SendStepIndicator.prototype._render;
+    SendStepIndicator.prototype._render = function() {
+        _origRender.call(this);
+        // Inject clickable styles into shadow root
+        if (this.shadowRoot && !this.shadowRoot.querySelector('#v0214-step-click-styles')) {
+            var extraStyle = document.createElement('style');
+            extraStyle.id = 'v0214-step-click-styles';
+            extraStyle.textContent =
+                '.step--completed, .step--active { cursor: pointer; } ' +
+                '.step--completed:hover .step__label, .step--active:hover .step__label { text-decoration: underline; } ' +
+                '.step--completed:hover .dot--completed, .step--active:hover .dot--active { box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.4); }';
+            this.shadowRoot.appendChild(extraStyle);
+        }
+    };
+})();
+
+console.log('[send-upload-v0214] Gallery always shown, smart defaults, click fix, hover dim, thumbnail note, clickable steps');
 
 })();
