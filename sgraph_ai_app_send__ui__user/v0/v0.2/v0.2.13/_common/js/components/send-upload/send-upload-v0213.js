@@ -80,9 +80,6 @@ function loadPdfJs() {
             return;
         }
 
-        // Try vendor path first (non-module)
-        var vendorPath = '../_common/js/vendor/pdf.min.js';
-
         function tryLoad(urls, idx) {
             if (idx >= urls.length) {
                 reject(new Error('Failed to load pdf.js from all sources'));
@@ -109,10 +106,8 @@ function loadPdfJs() {
             document.head.appendChild(script);
         }
 
-        // Build URL list: vendor first, then CDN fallbacks
-        var urls = [
-            { js: vendorPath, worker: '../_common/js/vendor/pdf.worker.min.js' }
-        ].concat(PDF_JS_CDNS);
+        // CDN fallback list
+        var urls = PDF_JS_CDNS;
 
         tryLoad(urls, 0);
     });

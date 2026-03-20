@@ -201,6 +201,14 @@ SendUpload.prototype._v0214_setupStepClicks = function() {
 SendUpload.prototype._v0214_navigateToStep = function(step) {
     // Map step numbers to states (using 6-step wizard from v0.2.8)
     // 1=Upload, 2=Delivery, 3=Share mode, 4=Confirm, 5=Encrypt, 6=Done
+
+    // If navigating back past share mode (step ≤ 3), clear the friendly key
+    // so a new transfer ID is derived on the next upload (avoids ID collision)
+    if (step <= 3) {
+        this._v026_friendlyParts = null;
+        this._v026_friendlyKey   = null;
+    }
+
     switch (step) {
         case 1:
             this.state = 'idle';
