@@ -20,6 +20,7 @@
 const FileTypeDetect = {
 
     _extMap: {
+        '.txt': 'text', '.text': 'text', '.log': 'text', '.csv': 'text',
         '.md': 'markdown', '.markdown': 'markdown', '.mdown': 'markdown',
         '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.gif': 'image',
         '.webp': 'image', '.svg': 'image',

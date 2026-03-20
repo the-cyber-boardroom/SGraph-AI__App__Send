@@ -366,6 +366,41 @@
             window.sgraphVault.events.emit('file-selected', { folderPath, fileName });
         }
 
+        _ensurePreviewStack() {
+            if (!this._sgLayout) return false;
+            // Check if the preview stack still exists
+            try {
+                const testId = this._sgLayout.addTabToStack('s-preview', {
+                    tag: 'div', title: '_probe', state: {}
+                }, false);
+                if (testId) {
+                    this._sgLayout.removePanel(testId);
+                    return true;
+                }
+            } catch (_) { /* stack gone */ }
+
+            // Preview stack was removed (all tabs closed) — recreate the layout
+            this._sgLayout.setLayout({
+                type: 'row', id: 'root', sizes: [0.20, 0.80],
+                children: [
+                    { type: 'stack', id: 's-files', activeTab: 0, tabs: [
+                        { type: 'tab', id: 't-files', title: 'Files', tag: 'vault-tree-view', state: {}, locked: true }
+                    ]},
+                    { type: 'stack', id: 's-preview', activeTab: 0, tabs: [] }
+                ]
+            });
+
+            // Re-wire tree view after layout reset
+            requestAnimationFrame(() => {
+                const tree = this._findTreeView();
+                if (tree && this._vault) {
+                    tree.vault = this._vault;
+                    tree.refresh();
+                }
+            });
+            return true;
+        }
+
         _openFileTab(folderPath, fileName, fileEntry) {
             if (!this._sgLayout) return;
             const tabId = `t-file-${folderPath.replace(/\//g, '-')}-${fileName}`.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -376,6 +411,9 @@
                 try { this._sgLayout.focusPanel(tabId); } catch (_) {}
                 return;
             }
+
+            // Ensure the preview stack exists (may have been removed when last tab closed)
+            this._ensurePreviewStack();
 
             // Add a new tab to the preview stack
             const newId = this._sgLayout.addTabToStack('s-preview', {
@@ -1076,6 +1114,31 @@
             }
         }
 
+        async _onSaveVaultName() {
+            if (!this._vault) return;
+            if (!this._accessKey) {
+                this._requireAccessKey(() => this._onSaveVaultName());
+                return;
+            }
+            const nameInput = this.querySelector('.vs-settings-name-input');
+            const newName = nameInput?.value?.trim();
+            if (!newName) return;
+
+            const btn = this.querySelector('.vs-settings-save-name');
+            if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+            try {
+                await this._vault.setName(newName);
+                this.querySelector('.vs-header-vault-name').textContent = newName;
+                this._updateVaultKey();
+                window.sgraphVault.messages.success(`Vault renamed to "${newName}"`);
+            } catch (err) {
+                window.sgraphVault.messages.error(`Rename failed: ${err.message}`);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+            }
+        }
+
         _populateSgitView() {
             const sgitView = this.querySelector('vault-sgit-view');
             if (sgitView && this._vault) {
@@ -1210,6 +1273,10 @@
 
             // Settings panel handlers
             this.addEventListener('click', (e) => {
+                if (e.target.closest('.vs-settings-save-name')) {
+                    this._onSaveVaultName();
+                    return;
+                }
                 if (e.target.closest('.vs-settings-copy-key')) {
                     const keyInput = this.querySelector('.vs-settings-key-input');
                     if (keyInput) {
@@ -1418,7 +1485,10 @@
 
                                 <div class="vs-settings-section">
                                     <label class="vs-settings-label">Vault Name</label>
-                                    <input class="vs-settings-name-input" type="text" placeholder="Vault name">
+                                    <div class="vs-settings-key-row">
+                                        <input class="vs-settings-name-input" type="text" placeholder="Vault name">
+                                        <button class="vs-settings-save-name">Save</button>
+                                    </div>
                                 </div>
                                 <div class="vs-settings-section">
                                     <label class="vs-settings-label">Vault Key</label>
@@ -2004,7 +2074,7 @@
 
                 .vs-settings-key-row input { flex: 1; }
 
-                .vs-settings-copy-key, .vs-settings-save-access {
+                .vs-settings-copy-key, .vs-settings-save-access, .vs-settings-save-name {
                     padding: 0.5rem 0.75rem;
                     font-size: var(--text-sm);
                     border-radius: var(--radius-sm);
@@ -2015,7 +2085,7 @@
                     font-family: var(--font-family);
                 }
 
-                .vs-settings-copy-key:hover, .vs-settings-save-access:hover {
+                .vs-settings-copy-key:hover, .vs-settings-save-access:hover, .vs-settings-save-name:hover {
                     background: var(--bg-secondary);
                     color: var(--color-text);
                 }

@@ -158,6 +158,12 @@ class SGVault {
     get name()      { return this._settings?.vault_name }
     get created()   { return this._settings?.created    }
 
+    async setName(newName) {
+        if (!this._settings) throw new Error('Vault not initialized')
+        this._settings.vault_name = newName
+        await this._commit(`Rename vault to "${newName}"`)
+    }
+
     // --- File Operations --------------------------------------------------------
 
     async addFile(folderPath, fileName, fileData) {
