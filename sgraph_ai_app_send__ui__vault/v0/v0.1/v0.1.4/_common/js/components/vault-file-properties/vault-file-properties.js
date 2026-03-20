@@ -60,13 +60,7 @@
 
             this.querySelector('.vfp-delete-btn').addEventListener('click', () => {
                 if (!this._fileName) return;
-                const confirmed = confirm(`Delete "${this._fileName}"?`);
-                if (confirmed) {
-                    this.dispatchEvent(new CustomEvent('file-delete-request', {
-                        detail: { fileName: this._fileName, folderPath: this._folderPath },
-                        bubbles: true, composed: true
-                    }));
-                }
+                this._showDeleteConfirm();
             });
 
             this.querySelector('.vfp-rename-btn').addEventListener('click', () => {
@@ -155,6 +149,42 @@
             }));
         }
 
+        _showDeleteConfirm() {
+            // Remove existing confirm bar
+            const existing = this.querySelector('.vfp-confirm-bar');
+            if (existing) { existing.remove(); return; }
+
+            const bar = document.createElement('div');
+            bar.className = 'vfp-confirm-bar';
+            bar.innerHTML = `
+                <span class="vfp-confirm-msg">Delete "${this._escapeHtml(this._fileName)}"?</span>
+                <button class="vfp-confirm-yes">Delete</button>
+                <button class="vfp-confirm-no">Cancel</button>
+            `;
+
+            const fileName   = this._fileName;
+            const folderPath = this._folderPath;
+            const remove     = () => bar.remove();
+
+            bar.querySelector('.vfp-confirm-yes').addEventListener('click', () => {
+                remove();
+                this.dispatchEvent(new CustomEvent('file-delete-request', {
+                    detail: { fileName, folderPath },
+                    bubbles: true, composed: true
+                }));
+            });
+            bar.querySelector('.vfp-confirm-no').addEventListener('click', remove);
+
+            const banner = this.querySelector('.vfp-banner');
+            if (banner) banner.appendChild(bar);
+        }
+
+        _escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = String(str);
+            return d.innerHTML;
+        }
+
         getStyles() {
             return `
                 .vfp-banner { padding: var(--space-3) var(--space-4); background: var(--bg-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: var(--space-4); }
@@ -171,6 +201,12 @@
                 .vfp-download-btn, .vfp-delete-btn, .vfp-rename-btn { font-size: var(--text-small); padding: 0.25rem 0.625rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family); }
                 .vfp-download-btn:hover, .vfp-rename-btn:hover { background: var(--bg-secondary); color: var(--color-primary); border-color: var(--color-primary); }
                 .vfp-delete-btn:hover { background: rgba(233,69,96,0.1); color: var(--color-error); border-color: var(--color-error); }
+                .vfp-confirm-bar { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid rgba(233,69,96,0.2); animation: vfp-fade 0.15s ease-out; }
+                .vfp-confirm-msg { font-size: var(--text-sm); font-weight: 600; color: var(--color-error, #E94560); flex: 1; }
+                .vfp-confirm-yes { font-size: var(--text-small); padding: 0.2rem 0.625rem; border-radius: var(--radius-sm); border: 1px solid var(--color-error, #E94560); background: var(--color-error, #E94560); color: #fff; cursor: pointer; font-weight: 600; font-family: var(--font-family); }
+                .vfp-confirm-no { font-size: var(--text-small); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family); }
+                .vfp-confirm-no:hover { background: var(--bg-secondary); color: var(--color-text); }
+                @keyframes vfp-fade { from { opacity: 0; } to { opacity: 1; } }
             `;
         }
     }
