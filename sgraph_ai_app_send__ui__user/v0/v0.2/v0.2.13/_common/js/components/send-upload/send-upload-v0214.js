@@ -12,7 +12,8 @@
      - Dim default-selected card when hovering another delivery option
        (instead of fully removing styling).
      - Always show gallery option for all folder uploads (not just images).
-     - Gallery is DEFAULT for image-only folders, RECOMMENDED for mixed.
+     - Consistent card order: browse → gallery → download (never reorder).
+     - Gallery is always DEFAULT (recommended) — it supports all file types.
      - Add thumbnail generation note to confirmation step.
 
    Loads AFTER v0.2.13 — overrides via prototype mutation.
@@ -73,23 +74,17 @@ SendUpload.prototype._v023_advanceToDelivery = function() {
         return IMAGE_EXTS.indexOf(ext) !== -1;
     });
 
-    // ── Reorder: gallery first for all folder uploads ──
-    var gallery = [], browse = [], rest = [];
+    // ── Consistent order: always browse → gallery → download ──
+    var browse = [], gallery = [], rest = [];
     opts.forEach(function(o) {
-        if (o.id === 'gallery')       gallery.push(o);
-        else if (o.id === 'browse')   browse.push(o);
+        if (o.id === 'browse')        browse.push(o);
+        else if (o.id === 'gallery')  gallery.push(o);
         else                          rest.push(o);
     });
+    this._v023_deliveryOptions = browse.concat(gallery).concat(rest);
 
-    if (allImages) {
-        // Images only: gallery first + DEFAULT
-        this._v023_deliveryOptions = gallery.concat(browse).concat(rest);
-        this._v023_recommendedDelivery = 'gallery';
-    } else {
-        // Mixed files: gallery second (after browse), but RECOMMENDED
-        this._v023_deliveryOptions = browse.concat(gallery).concat(rest);
-        this._v023_recommendedDelivery = 'gallery';
-    }
+    // Gallery is always recommended (default badge) — it supports all file types
+    this._v023_recommendedDelivery = 'gallery';
 
     this.render();
     this.setupEventListeners();
