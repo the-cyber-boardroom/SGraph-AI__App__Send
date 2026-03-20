@@ -55,71 +55,66 @@ function fileId(index) {
 }
 
 // ─── PDF.js lazy loader ─────────────────────────────────────────────────────
+// Uses non-module CDN (pdf.min.js, not .mjs) to reliably set window.pdfjsLib.
+// ES module versions don't expose globals on window and fail silently.
 var _pdfJsLoaded = false;
 var _pdfJsLoading = null;
+
+// CDN URLs — non-module versions that set window.pdfjsLib
+var PDF_JS_CDNS = [
+    { js: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+      worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js' },
+    { js: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+      worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js' }
+];
 
 function loadPdfJs() {
     if (_pdfJsLoaded && window.pdfjsLib) return Promise.resolve();
     if (_pdfJsLoading) return _pdfJsLoading;
 
     _pdfJsLoading = new Promise(function(resolve, reject) {
-        // Check if already available (vendored)
+        // Check if already available
         if (window.pdfjsLib) {
             _pdfJsLoaded = true;
             resolve();
             return;
         }
 
-        // Try to load from vendor path first
-        var vendorPath = '../_common/js/vendor/pdf.min.mjs';
-        var script = document.createElement('script');
-        script.src = vendorPath;
-        script.onload = function() {
-            if (window.pdfjsLib) {
-                window.pdfjsLib.GlobalWorkerOptions.workerSrc = '../_common/js/vendor/pdf.worker.min.mjs';
-                _pdfJsLoaded = true;
-                resolve();
-            } else {
-                // Vendored not found, try CDN as fallback for development
-                var cdnScript = document.createElement('script');
-                cdnScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
-                cdnScript.type = 'module';
-                cdnScript.onload = function() {
-                    if (window.pdfjsLib) {
-                        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-                            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
-                        _pdfJsLoaded = true;
-                        resolve();
-                    } else {
-                        reject(new Error('pdf.js loaded but pdfjsLib not available'));
-                    }
-                };
-                cdnScript.onerror = function() {
-                    reject(new Error('Failed to load pdf.js from CDN'));
-                };
-                document.head.appendChild(cdnScript);
+        // Try vendor path first (non-module)
+        var vendorPath = '../_common/js/vendor/pdf.min.js';
+
+        function tryLoad(urls, idx) {
+            if (idx >= urls.length) {
+                reject(new Error('Failed to load pdf.js from all sources'));
+                return;
             }
-        };
-        script.onerror = function() {
-            // Vendored script not found — try legacy-style script tag with CDN
-            var cdnScript = document.createElement('script');
-            cdnScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-            cdnScript.onload = function() {
+            var entry = urls[idx];
+            var script = document.createElement('script');
+            script.src = entry.js;
+            script.onload = function() {
                 if (window.pdfjsLib) {
-                    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-                        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = entry.worker;
                     _pdfJsLoaded = true;
+                    console.log('[v0213] pdf.js loaded from: ' + entry.js);
                     resolve();
                 } else {
-                    reject(new Error('pdf.js loaded but pdfjsLib not available'));
+                    console.warn('[v0213] pdf.js loaded but pdfjsLib not on window, trying next...');
+                    tryLoad(urls, idx + 1);
                 }
             };
-            cdnScript.onerror = function() {
-                reject(new Error('Failed to load pdf.js'));
+            script.onerror = function() {
+                console.warn('[v0213] Failed to load pdf.js from: ' + entry.js);
+                tryLoad(urls, idx + 1);
             };
-            document.head.appendChild(cdnScript);
-        };
-        document.head.appendChild(script);
+            document.head.appendChild(script);
+        }
+
+        // Build URL list: vendor first, then CDN fallbacks
+        var urls = [
+            { js: vendorPath, worker: '../_common/js/vendor/pdf.worker.min.js' }
+        ].concat(PDF_JS_CDNS);
+
+        tryLoad(urls, 0);
     });
 
     return _pdfJsLoading;
@@ -172,109 +167,222 @@ function generatePdfThumbnail(file) {
     });
 }
 
-// ─── Markdown thumbnail: render → SVG foreignObject → canvas → JPEG ─────────
+// ─── Markdown thumbnail: render text directly to canvas → JPEG ──────────────
+// Uses direct canvas text drawing — reliable across all browsers
+// (SVG foreignObject approach is fragile due to security/tainted canvas)
 function generateMarkdownThumbnail(file) {
     return new Promise(function(resolve, reject) {
         var reader = new FileReader();
         reader.onload = function() {
             var text = reader.result || '';
 
-            // Parse markdown using existing MarkdownParser
-            var html;
-            if (typeof MarkdownParser !== 'undefined' && MarkdownParser.parse) {
-                html = MarkdownParser.parse(text);
-            } else {
-                // Fallback: basic text rendering
-                html = '<pre style="margin:0;font-size:11px;line-height:1.4;color:#333;white-space:pre-wrap;word-break:break-word;">' +
-                    text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+            var canvas = document.createElement('canvas');
+            canvas.width  = THUMB_MAX_WIDTH;
+            canvas.height = THUMB_HEIGHT;
+            var ctx = canvas.getContext('2d');
+
+            // White background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Parse markdown into lines with basic formatting
+            var lines = text.split('\n');
+            var y = 14;
+            var padding = 12;
+            var maxWidth = THUMB_MAX_WIDTH - (padding * 2);
+            var lineHeight;
+            var maxY = THUMB_HEIGHT - 10;
+
+            for (var i = 0; i < lines.length && y < maxY; i++) {
+                var line = lines[i];
+                var trimmed = line.trim();
+
+                if (!trimmed) {
+                    y += 6; // Empty line spacing
+                    continue;
+                }
+
+                // Heading detection
+                if (trimmed.match(/^#{1,2}\s/)) {
+                    var headingText = trimmed.replace(/^#+\s*/, '');
+                    ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+                    ctx.fillStyle = '#111111';
+                    lineHeight = 13;
+
+                    // Draw heading underline for H1
+                    if (trimmed.match(/^#\s/)) {
+                        var wrappedH = wrapText(ctx, headingText, maxWidth);
+                        for (var wh = 0; wh < wrappedH.length && y < maxY; wh++) {
+                            ctx.fillText(wrappedH[wh], padding, y);
+                            y += lineHeight;
+                        }
+                        ctx.strokeStyle = '#e0e0e0';
+                        ctx.lineWidth = 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(padding, y - 2);
+                        ctx.lineTo(THUMB_MAX_WIDTH - padding, y - 2);
+                        ctx.stroke();
+                        y += 4;
+                    } else {
+                        var wrappedH2 = wrapText(ctx, headingText, maxWidth);
+                        for (var wh2 = 0; wh2 < wrappedH2.length && y < maxY; wh2++) {
+                            ctx.fillText(wrappedH2[wh2], padding, y);
+                            y += lineHeight;
+                        }
+                        y += 3;
+                    }
+                }
+                else if (trimmed.match(/^#{3,6}\s/)) {
+                    var h3Text = trimmed.replace(/^#+\s*/, '');
+                    ctx.font = 'bold 8px system-ui, -apple-system, sans-serif';
+                    ctx.fillStyle = '#222222';
+                    lineHeight = 11;
+                    var wrappedH3 = wrapText(ctx, h3Text, maxWidth);
+                    for (var wh3 = 0; wh3 < wrappedH3.length && y < maxY; wh3++) {
+                        ctx.fillText(wrappedH3[wh3], padding, y);
+                        y += lineHeight;
+                    }
+                    y += 2;
+                }
+                // Code block
+                else if (trimmed.match(/^```/)) {
+                    ctx.fillStyle = '#f5f5f5';
+                    var codeY = y - 8;
+                    var codeLines = 0;
+                    i++;
+                    var codeStart = y;
+                    ctx.font = '7px monospace';
+                    while (i < lines.length && !lines[i].trim().match(/^```/) && y < maxY) {
+                        codeLines++;
+                        y += 9;
+                        i++;
+                    }
+                    // Draw code block background
+                    if (codeLines > 0) {
+                        ctx.fillStyle = '#f5f5f5';
+                        ctx.fillRect(padding - 2, codeY, maxWidth + 4, y - codeY + 2);
+                        // Re-draw code text
+                        ctx.fillStyle = '#333333';
+                        var cy = codeStart;
+                        for (var ci = 0; ci < codeLines && ci < 8; ci++) {
+                            var codeLine = lines[i - codeLines + ci] || '';
+                            ctx.fillText(codeLine.substring(0, 40), padding + 2, cy);
+                            cy += 9;
+                        }
+                    }
+                    y += 3;
+                }
+                // Blockquote
+                else if (trimmed.match(/^>/)) {
+                    var quoteText = trimmed.replace(/^>\s*/, '');
+                    ctx.font = 'italic 7px system-ui, -apple-system, sans-serif';
+                    ctx.fillStyle = '#555555';
+                    lineHeight = 10;
+                    // Draw quote bar
+                    ctx.fillStyle = '#dddddd';
+                    ctx.fillRect(padding, y - 8, 2, 12);
+                    ctx.fillStyle = '#555555';
+                    var wrappedQ = wrapText(ctx, quoteText, maxWidth - 10);
+                    for (var wq = 0; wq < wrappedQ.length && y < maxY; wq++) {
+                        ctx.fillText(wrappedQ[wq], padding + 8, y);
+                        y += lineHeight;
+                    }
+                    y += 2;
+                }
+                // Horizontal rule
+                else if (trimmed.match(/^[-*_]{3,}$/)) {
+                    ctx.strokeStyle = '#e0e0e0';
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, y);
+                    ctx.lineTo(THUMB_MAX_WIDTH - padding, y);
+                    ctx.stroke();
+                    y += 6;
+                }
+                // List items
+                else if (trimmed.match(/^[-*+]\s/) || trimmed.match(/^\d+\.\s/)) {
+                    var listText = trimmed.replace(/^[-*+]\s*/, '').replace(/^\d+\.\s*/, '');
+                    ctx.font = '7px system-ui, -apple-system, sans-serif';
+                    ctx.fillStyle = '#1a1a2e';
+                    lineHeight = 10;
+                    ctx.fillText('\u2022', padding, y);
+                    var wrappedL = wrapText(ctx, listText, maxWidth - 10);
+                    for (var wl = 0; wl < wrappedL.length && y < maxY; wl++) {
+                        ctx.fillText(wrappedL[wl], padding + 10, y);
+                        y += lineHeight;
+                    }
+                }
+                // Regular text
+                else {
+                    // Strip inline markdown formatting
+                    var cleanText = trimmed
+                        .replace(/\*\*([^*]+)\*\*/g, '$1')
+                        .replace(/__([^_]+)__/g, '$1')
+                        .replace(/\*([^*]+)\*/g, '$1')
+                        .replace(/_([^_]+)_/g, '$1')
+                        .replace(/`([^`]+)`/g, '$1')
+                        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+                    ctx.font = '7px system-ui, -apple-system, sans-serif';
+                    ctx.fillStyle = '#1a1a2e';
+                    lineHeight = 10;
+                    var wrapped = wrapText(ctx, cleanText, maxWidth);
+                    for (var w = 0; w < wrapped.length && y < maxY; w++) {
+                        ctx.fillText(wrapped[w], padding, y);
+                        y += lineHeight;
+                    }
+                    y += 2;
+                }
             }
 
-            // Build a self-contained HTML document for the foreignObject
-            var styledHtml =
-                '<div xmlns="http://www.w3.org/1999/xhtml" style="' +
-                    'width:' + THUMB_MAX_WIDTH + 'px;' +
-                    'height:' + THUMB_HEIGHT + 'px;' +
-                    'overflow:hidden;' +
-                    'background:#ffffff;' +
-                    'padding:12px 14px;' +
-                    'font-family:system-ui,-apple-system,sans-serif;' +
-                    'font-size:8px;' +
-                    'line-height:1.4;' +
-                    'color:#1a1a2e;' +
-                    'box-sizing:border-box;' +
-                '">' +
-                    '<style xmlns="http://www.w3.org/1999/xhtml">' +
-                        'h1{font-size:13px;margin:0 0 4px 0;color:#111;border-bottom:1px solid #eee;padding-bottom:3px;}' +
-                        'h2{font-size:11px;margin:6px 0 3px 0;color:#111;}' +
-                        'h3{font-size:10px;margin:5px 0 2px 0;color:#222;}' +
-                        'p{margin:3px 0;font-size:8px;}' +
-                        'strong{color:#111;}' +
-                        'pre{background:#f5f5f5;padding:4px;border-radius:2px;font-size:7px;overflow:hidden;}' +
-                        'code{font-size:7px;color:#d63384;}' +
-                        'pre code{color:#333;}' +
-                        'blockquote{border-left:2px solid #ddd;padding-left:6px;margin:3px 0;color:#555;}' +
-                        'hr{border:none;border-top:1px solid #e0e0e0;margin:4px 0;}' +
-                        'table{border-collapse:collapse;width:100%;font-size:7px;}' +
-                        'th,td{border:1px solid #ddd;padding:2px 4px;text-align:left;}' +
-                        'th{background:#f5f5f5;font-weight:600;}' +
-                        'a{color:#0969da;text-decoration:none;}' +
-                        'ul,ol{margin:3px 0;padding-left:14px;}' +
-                        'li{margin:1px 0;}' +
-                    '</style>' +
-                    html +
-                '</div>';
+            // Fade-out at bottom if content was truncated
+            if (y >= maxY) {
+                var gradient = ctx.createLinearGradient(0, THUMB_HEIGHT - 30, 0, THUMB_HEIGHT);
+                gradient.addColorStop(0, 'rgba(255,255,255,0)');
+                gradient.addColorStop(1, 'rgba(255,255,255,1)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, THUMB_HEIGHT - 30, THUMB_MAX_WIDTH, 30);
+            }
 
-            var svgData =
-                '<svg xmlns="http://www.w3.org/2000/svg" width="' + THUMB_MAX_WIDTH + '" height="' + THUMB_HEIGHT + '">' +
-                    '<foreignObject width="100%" height="100%">' +
-                        styledHtml +
-                    '</foreignObject>' +
-                '</svg>';
-
-            var svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-            var url = URL.createObjectURL(svgBlob);
-            var img = new Image();
-
-            img.onload = function() {
-                var canvas = document.createElement('canvas');
-                canvas.width  = THUMB_MAX_WIDTH;
-                canvas.height = THUMB_HEIGHT;
-                var ctx = canvas.getContext('2d');
-
-                // White background
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
-
-                URL.revokeObjectURL(url);
-
-                canvas.toBlob(function(blob) {
-                    if (!blob) {
-                        reject(new Error('Markdown canvas toBlob failed'));
-                        return;
-                    }
-                    blob.arrayBuffer().then(function(thumbBuf) {
-                        resolve({
-                            buffer:   thumbBuf,
-                            width:    THUMB_MAX_WIDTH,
-                            height:   THUMB_HEIGHT,
-                            format:   THUMB_FORMAT,
-                            textLen:  text.length
-                        });
-                    }).catch(reject);
-                }, THUMB_FORMAT, THUMB_QUALITY);
-            };
-
-            img.onerror = function() {
-                URL.revokeObjectURL(url);
-                reject(new Error('Failed to render markdown SVG to image'));
-            };
-
-            img.src = url;
+            canvas.toBlob(function(blob) {
+                if (!blob) {
+                    reject(new Error('Markdown canvas toBlob failed'));
+                    return;
+                }
+                blob.arrayBuffer().then(function(thumbBuf) {
+                    resolve({
+                        buffer:   thumbBuf,
+                        width:    THUMB_MAX_WIDTH,
+                        height:   THUMB_HEIGHT,
+                        format:   THUMB_FORMAT,
+                        textLen:  text.length
+                    });
+                }).catch(reject);
+            }, THUMB_FORMAT, THUMB_QUALITY);
         };
         reader.onerror = function() { reject(new Error('Failed to read markdown file')); };
         reader.readAsText(file);
     });
+}
+
+// ─── Helper: wrap text to fit within maxWidth ───────────────────────────────
+function wrapText(ctx, text, maxWidth) {
+    var words = text.split(' ');
+    var lines = [];
+    var currentLine = '';
+
+    for (var i = 0; i < words.length; i++) {
+        var testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
+        var metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = words[i];
+        } else {
+            currentLine = testLine;
+        }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines.length > 0 ? lines : [''];
 }
 
 // ─── Video thumbnail: capture first frame → JPEG ────────────────────────────
@@ -410,80 +518,40 @@ function computeFolderHash(fileHashes) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Override: _startFolderZip — add progress indicators + content hash
+// Override: _v023_compressFolder — replace v0.2.12's preview with enhanced version
+//
+// NOTE: v0.2.3 replaced _startFolderZip with a no-op and uses
+// _v023_compressFolder as the actual zip path (called from _v023_startProcessing).
+// We must override _v023_compressFolder (not _startFolderZip) to inject
+// PDF/MD/video thumbnail generation.
 // ═══════════════════════════════════════════════════════════════════════════
 
-var _v0212_startFolderZip = SendUpload.prototype._startFolderZip;
+var _v0212_compressFolder = SendUpload.prototype._v023_compressFolder;
 
-SendUpload.prototype._startFolderZip = async function() {
-    var levelSelect      = this.querySelector('#folder-compression');
-    var includeEmptyChk  = this.querySelector('#folder-include-empty');
-    var includeHiddenChk = this.querySelector('#folder-include-hidden');
+SendUpload.prototype._v023_compressFolder = async function() {
+    await this._loadJSZip();
 
-    this._folderOptions = {
-        level:         levelSelect      ? parseInt(levelSelect.value, 10) : 4,
-        includeEmpty:  includeEmptyChk  ? includeEmptyChk.checked : false,
-        includeHidden: includeHiddenChk ? includeHiddenChk.checked : false
-    };
+    var zip     = new JSZip();
+    var entries = this._folderScan.entries.filter(function(e) { return !e.isDir; });
+    var opts    = this._folderOptions || {};
 
-    var totalSize = this._folderScan.totalSize;
-    if (totalSize > SendUpload.MAX_FILE_SIZE) {
-        this.errorMessage = this.t('upload.folder.error_too_large', {
-            limit: this.formatBytes(SendUpload.MAX_FILE_SIZE)
-        });
-        this.state = 'error'; this.render(); this.setupEventListeners();
-        return;
-    }
-
-    try {
-        this.state = 'zipping'; this.render();
-
-        // Lazy-load JSZip
-        await this._loadJSZip();
-
-        var opts    = this._folderOptions;
-        var entries = this._folderScan.entries.filter(function(e) {
-            if (!opts.includeHidden && e.name.startsWith('.')) return false;
-            if (e.isDir && !opts.includeEmpty) return false;
-            return true;
-        });
-
-        var zip = new JSZip();
-
-        // Add original files
-        for (var i = 0; i < entries.length; i++) {
-            var entry = entries[i];
-            if (entry.isDir) {
-                zip.folder(entry.path);
-            } else {
-                var buffer = await entry.file.arrayBuffer();
-                zip.file(entry.path, buffer);
-            }
+    for (var i = 0; i < entries.length; i++) {
+        var entry = entries[i];
+        if (!opts.includeHidden && entry.name.startsWith('.')) continue;
+        if (entry.file) {
+            zip.file(entry.path, entry.file, {
+                compression: (opts.level || 4) > 0 ? 'DEFLATE' : 'STORE',
+                compressionOptions: { level: opts.level || 4 }
+            });
         }
-
-        // ═══ v0.2.13: Generate _preview.{hash}/ folder with all thumbnails ═══
-        await this._v0213_addPreviewToZip(zip, entries);
-
-        var compression = opts.level === 0 ? 'STORE' : 'DEFLATE';
-        var zipBlob = await zip.generateAsync({
-            type:               'blob',
-            compression:        compression,
-            compressionOptions: { level: opts.level }
-        });
-
-        this.selectedFile = new File(
-            [zipBlob],
-            this._folderName + '.zip',
-            { type: 'application/zip' }
-        );
-
-        this._folderScan = null;
-        this.state = 'idle';
-        this.startUpload();
-    } catch (err) {
-        this.errorMessage = err.message || this.t('upload.folder.error_zip_failed');
-        this.state = 'error'; this.render(); this.setupEventListeners();
     }
+
+    // ═══ v0.2.13: Generate _preview/ folder with PDF + MD + video thumbnails ═══
+    await this._v0213_addPreviewToZip(zip, entries);
+
+    var blob    = await zip.generateAsync({ type: 'blob' });
+    var zipName = (this._folderName || 'folder') + '.zip';
+    this.selectedFile = new File([blob], zipName, { type: 'application/zip' });
 };
 
 // ─── Core: generate _preview.{hash}/ folder ─────────────────────────────────
@@ -507,7 +575,7 @@ SendUpload.prototype._v0213_addPreviewToZip = async function(zip, entries) {
         }
     }
     var folderHash = await computeFolderHash(fileHashes);
-    var previewDir = '_preview.' + folderHash;
+    var previewDir = '_preview';  // Use simple name for compatibility with gallery renderer
 
     // Step 2: Check if PDF.js is needed and preload it
     var hasPdfs = files.some(function(e) { return getFileCategory(e.name) === 'pdf'; });
