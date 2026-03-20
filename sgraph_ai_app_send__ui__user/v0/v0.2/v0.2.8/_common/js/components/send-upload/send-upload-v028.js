@@ -584,16 +584,31 @@ SendUpload.prototype._v026_renderConfirm = function() {
             flex: 1;\
             min-width: 0;\
             display: flex;\
+            align-self: stretch;\
         }\
         .v028-process-col--messages {\
-            align-items: center;\
-            padding: var(--space-3, 0.75rem);\
-            background: var(--bg-secondary, #16213E);\
-            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.1));\
-            border-radius: var(--radius-sm, 6px);\
+            align-items: stretch;\
+            justify-content: center;\
+            padding: 0;\
+            background: none;\
+            border: none;\
+            border-radius: 0;\
         }\
         .v028-process-col--messages .v027-carousel {\
             width: 100%;\
+            height: 100%;\
+            margin-top: 0;\
+            min-height: auto;\
+            display: flex;\
+            align-items: stretch;\
+        }\
+        .v028-process-col--messages .v027-carousel__message {\
+            flex: 1;\
+            display: flex;\
+            align-items: center;\
+            background: var(--bg-secondary, #16213E);\
+            border: 1px solid var(--color-border, rgba(78, 205, 196, 0.1));\
+            border-radius: var(--radius-sm, 6px);\
         }\
         .v028-process-col--stats {\
             align-items: center;\
