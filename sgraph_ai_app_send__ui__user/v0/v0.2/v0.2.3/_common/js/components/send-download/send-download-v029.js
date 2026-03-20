@@ -8,6 +8,7 @@
      - Folder view: filter _preview* folders from auto-select first file
      - Folder view: hide _preview* folders from folder tree
      - Hash fragment preserved after decrypt (simple key not removed from URL)
+     - Print: opens clean print window for markdown (beautiful A4 output)
 
    Loads AFTER v0.2.8 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -297,6 +298,185 @@ var _v029_patchedReplace = history.replaceState;
 })();
 
 // ═══════════════════════════════════════════════════════════════════════════
+// FIX 5: Print-friendly markdown — opens clean print window
+// ═══════════════════════════════════════════════════════════════════════════
+
+var PRINT_STYLES = '\
+    *, *::before, *::after { box-sizing: border-box; }\
+    body {\
+        font-family: "DM Sans", system-ui, -apple-system, sans-serif;\
+        font-size: 11pt; line-height: 1.6; color: #1a1a1a; background: #fff;\
+        margin: 0; padding: 2cm 2.5cm; word-wrap: break-word;\
+    }\
+    .print-header {\
+        display: flex; align-items: center; gap: 8px;\
+        padding-bottom: 0.5em; margin-bottom: 1.5em;\
+        border-bottom: 2px solid #4ECDC4; color: #888; font-size: 9pt;\
+    }\
+    .print-header b { color: #555; }\
+    .print-header .print-filename {\
+        margin-left: auto; font-style: italic; color: #999;\
+    }\
+    h1, h2, h3, h4, h5, h6 { color: #111; margin: 1.5em 0 0.5em; line-height: 1.3; page-break-after: avoid; }\
+    h1 { font-size: 1.6em; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.3em; }\
+    h2 { font-size: 1.35em; }\
+    h3 { font-size: 1.15em; }\
+    p { margin: 0.8em 0; orphans: 3; widows: 3; }\
+    a { color: #0066cc; text-decoration: none; }\
+    code {\
+        font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;\
+        font-size: 0.88em; background: #f5f5f5; padding: 0.15em 0.4em;\
+        border-radius: 3px; color: #d63384;\
+    }\
+    pre {\
+        background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 6px;\
+        padding: 0.8em 1em; overflow-x: auto; margin: 1em 0;\
+        page-break-inside: avoid;\
+    }\
+    pre code { background: none; padding: 0; color: #333; font-size: 0.85em; }\
+    blockquote {\
+        border-left: 3px solid #ccc; margin: 1em 0; padding: 0.5em 1em;\
+        background: #fafafa; color: #555; page-break-inside: avoid;\
+    }\
+    ul, ol { padding-left: 1.5em; margin: 0.8em 0; }\
+    li { margin: 0.3em 0; }\
+    hr { border: none; border-top: 1px solid #e0e0e0; margin: 1.5em 0; }\
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; page-break-inside: avoid; }\
+    th, td { border: 1px solid #ddd; padding: 0.4em 0.75em; text-align: left; font-size: 0.95em; }\
+    th { background: #f5f5f5; font-weight: 600; color: #111; }\
+    strong { color: #111; }\
+    del { color: #999; }\
+    img { max-width: 100%; page-break-inside: avoid; }\
+    .print-footer {\
+        margin-top: 2em; padding-top: 0.5em;\
+        border-top: 1px solid #e0e0e0; color: #bbb; font-size: 8pt;\
+        display: flex; justify-content: space-between;\
+    }\
+    @page { margin: 0; size: A4; }\
+';
+
+function openPrintWindow(htmlContent, filename) {
+    var printDoc = '<!DOCTYPE html><html><head>' +
+        '<meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>' + (filename || 'Document') + '</title>' +
+        '<style>' + PRINT_STYLES + '</style>' +
+        '</head><body>' +
+        '<div class="print-header">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' +
+            '<span>SG/<b>Send</b></span>' +
+            '<span class="print-filename">' + (filename || '') + '</span>' +
+        '</div>' +
+        htmlContent +
+        '<div class="print-footer">' +
+            '<span>SG/Send &mdash; sgraph.ai</span>' +
+            '<span>Printed ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>' +
+        '</div>' +
+        '</body></html>';
+
+    var w = window.open('', '_blank');
+    if (!w) {
+        // Popup blocked — fall back to window.print()
+        window.print();
+        return;
+    }
+    w.document.write(printDoc);
+    w.document.close();
+    // Wait for fonts/styles to load
+    setTimeout(function() {
+        w.print();
+        // Close after print dialog (some browsers fire onafterprint, some don't)
+        w.onafterprint = function() { w.close(); };
+    }, 300);
+}
+
+// Override lightbox print button — prints markdown beautifully
+var _v029_setupLightbox = SendDownload.prototype._v025_openLightbox;
+var _v029_lightboxPatched = false;
+
+SendDownload.prototype._v025_openLightbox = function(index) {
+    _v029_setupLightbox.call(this, index);
+
+    // Patch the print button once after the lightbox is created
+    if (!_v029_lightboxPatched) {
+        _v029_lightboxPatched = true;
+        var lbPrint = document.getElementById('v027-lb-print');
+        if (lbPrint) {
+            // Replace the event listener
+            var newBtn = lbPrint.cloneNode(true);
+            lbPrint.parentNode.replaceChild(newBtn, lbPrint);
+            newBtn.addEventListener('click', function() {
+                var mdEl = document.querySelector('.v027-lightbox__md');
+                if (mdEl) {
+                    var nameEl = document.getElementById('v025-lb-name');
+                    var filename = nameEl ? nameEl.textContent : '';
+                    openPrintWindow(mdEl.innerHTML, filename);
+                } else {
+                    // Not markdown — fallback to window.print()
+                    window.print();
+                }
+            });
+        }
+    }
+};
+
+// Override gallery print button — if lightbox is open with markdown, print that
+var _v029_gallerySetup = SendDownload.prototype.setupEventListeners;
+SendDownload.prototype.setupEventListeners = function() {
+    _v029_gallerySetup.call(this);
+
+    var galleryPrint = this.querySelector('#v026-print-btn');
+    if (galleryPrint) {
+        // Replace the event listener
+        var newBtn = galleryPrint.cloneNode(true);
+        galleryPrint.parentNode.replaceChild(newBtn, galleryPrint);
+        newBtn.addEventListener('click', function() {
+            // If lightbox is open with markdown, print that
+            var mdEl = document.querySelector('.v027-lightbox__md');
+            if (mdEl) {
+                var nameEl = document.getElementById('v025-lb-name');
+                var filename = nameEl ? nameEl.textContent : '';
+                openPrintWindow(mdEl.innerHTML, filename);
+            } else {
+                window.print();
+            }
+        });
+    }
+};
+
+// Also handle the single-file markdown view (download page with iframe)
+// When printing from the download page, extract iframe content
+(function() {
+    // Listen for Ctrl+P / Cmd+P on the page and intercept if markdown is showing
+    window.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            var mdEl = document.querySelector('.v027-lightbox__md');
+            if (mdEl) {
+                e.preventDefault();
+                var nameEl = document.getElementById('v025-lb-name');
+                var filename = nameEl ? nameEl.textContent : '';
+                openPrintWindow(mdEl.innerHTML, filename);
+                return;
+            }
+            // Single-file markdown iframe
+            var iframe = document.getElementById('md-iframe');
+            if (iframe) {
+                e.preventDefault();
+                try {
+                    var iframeBody = iframe.contentDocument || iframe.contentWindow.document;
+                    var content = iframeBody.body.innerHTML;
+                    var titleEl = document.querySelector('.filename') || document.querySelector('h1');
+                    var filename = titleEl ? titleEl.textContent : '';
+                    openPrintWindow(content, filename);
+                } catch(err) {
+                    window.print();
+                }
+            }
+        }
+    });
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
 // STYLES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -346,6 +526,6 @@ var _v029_patchedReplace = history.replaceState;
     document.head.appendChild(s);
 })();
 
-console.log('[send-download-v029] Gallery: type icons, large view fix, _preview filter, hash preservation');
+console.log('[send-download-v029] Gallery: type icons, large view fix, _preview filter, hash preservation, print-friendly markdown');
 
 })();
