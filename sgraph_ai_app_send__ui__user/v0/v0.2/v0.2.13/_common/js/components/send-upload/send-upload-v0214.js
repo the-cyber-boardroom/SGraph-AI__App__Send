@@ -165,6 +165,15 @@ SendUpload.prototype.setupEventListeners = function() {
     this._v0214_setupStepClicks();
 };
 
+// ─── Override: setupDynamicListeners — also set up step clicks on Done page ──
+var _v0214_prevDynamic = SendUpload.prototype.setupDynamicListeners;
+
+SendUpload.prototype.setupDynamicListeners = function() {
+    _v0214_prevDynamic.call(this);
+    // Step clicks need to work on the Done page too
+    this._v0214_setupStepClicks();
+};
+
 // ─── Step click navigation — click any completed step to go back ─────────
 SendUpload.prototype._v0214_setupStepClicks = function() {
     var self = this;
