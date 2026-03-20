@@ -1,1 +1,1 @@
-../../../../v0.2.0/_common/js/i18n.js
+../../../v0.2.0/_common/js/i18n.js

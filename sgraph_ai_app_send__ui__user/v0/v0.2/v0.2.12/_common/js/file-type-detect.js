@@ -1,1 +1,1 @@
-../../../../v0.2.0/_common/js/file-type-detect.js
+../../../v0.2.0/_common/js/file-type-detect.js

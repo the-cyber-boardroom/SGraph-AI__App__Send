@@ -1,1 +1,1 @@
-../../../../v0.2.0/_common/js/friendly-crypto.js
+../../../v0.2.3/_common/js/friendly-crypto.js
