@@ -541,8 +541,11 @@ SendUpload.prototype._v023_compressFolder = async function() {
         }
     }
 
-    // ═══ v0.2.13: Generate _preview/ folder with PDF + MD + video thumbnails ═══
-    await this._v0213_addPreviewToZip(zip, entries);
+    // ═══ v0.2.13: Generate _gallery.{hash}/ folder — only for gallery delivery ═══
+    var delivery = this._v023_selectedDelivery || 'download';
+    if (delivery === 'gallery') {
+        await this._v0213_addPreviewToZip(zip, entries);
+    }
 
     var blob    = await zip.generateAsync({ type: 'blob' });
     var zipName = (this._folderName || 'folder') + '.zip';
@@ -570,7 +573,7 @@ SendUpload.prototype._v0213_addPreviewToZip = async function(zip, entries) {
         }
     }
     var folderHash = await computeFolderHash(fileHashes);
-    var previewDir = '_gallery';  // Use simple name for compatibility with gallery renderer
+    var previewDir = '_gallery.' + folderHash;  // Content-hashed folder name
 
     // Step 2: Check if PDF.js is needed and preload it
     var hasPdfs = files.some(function(e) { return getFileCategory(e.name) === 'pdf'; });

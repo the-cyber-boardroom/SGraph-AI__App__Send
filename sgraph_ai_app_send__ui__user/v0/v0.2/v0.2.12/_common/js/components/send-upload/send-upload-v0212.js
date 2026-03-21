@@ -259,8 +259,11 @@ SendUpload.prototype._v023_compressFolder = async function() {
         }
     }
 
-    // ═══ v0.2.12: Generate _gallery/ folder with thumbnails ═══
-    await addPreviewToZip(zip, entries);
+    // ═══ v0.2.12: Generate _gallery/ folder — only for gallery delivery ═══
+    var delivery = this._v023_selectedDelivery || 'download';
+    if (delivery === 'gallery') {
+        await addPreviewToZip(zip, entries);
+    }
 
     var blob    = await zip.generateAsync({ type: 'blob' });
     var zipName = (this._folderName || 'folder') + '.zip';
