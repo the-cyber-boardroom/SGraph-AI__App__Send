@@ -303,7 +303,7 @@ var _v029_patchedReplace = history.replaceState;
 
 var PRINT_STYLES = '\
     *, *::before, *::after { box-sizing: border-box; }\
-    @page { margin: 2cm 2.5cm; size: A4; }\
+    @page { margin: 2cm 2.5cm; }\
     body {\
         font-family: "DM Sans", system-ui, -apple-system, sans-serif;\
         font-size: 11pt; line-height: 1.6; color: #1a1a1a; background: #fff;\
