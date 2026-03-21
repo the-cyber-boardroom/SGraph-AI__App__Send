@@ -5,11 +5,14 @@
    Changes:
      - Fix red text flash: suppress stale error renders during gallery transition
      - Gallery: add extension badge (PNG, JPG, etc.) to image thumbnails
-     - Folder view: hide _preview* files and _manifest.json from file list
-     - Folder view: select root folder and first non-preview file by default
-     - Folder view: bigger save buttons, remove disabled beta buttons (Edit/Rename/Delete)
+     - Folder view: select root folder and first non-gallery file by default
+       (folder view shows ALL files — no filtering; _gallery folder is hidden
+       by v0.2.9's tree filter, not here)
+     - Folder view: bigger save buttons, remove disabled beta buttons
      - Folder view: fix Share button (opens Share tab with content)
      - Folder view: fix tab underline not clearing when switching tabs
+     - Single file viewer: add print button for markdown files
+       (uses SgPrint component if available)
 
    Loads AFTER v0.2.9 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -23,34 +26,29 @@ if (typeof SendDownload === 'undefined') {
     return;
 }
 
+// Helper: check if path is a gallery/preview metadata path
+function isGalleryOrPreviewPath(path) {
+    return path.indexOf('_gallery') !== -1 || path.indexOf('_preview') !== -1;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // FIX 1: Suppress red error flash during gallery page transitions
-//
-// When a friendly token is in the URL, v0.2.0's unpatched loadTransferInfo
-// fires before overlays load, gets a 404, sets state='error' and calls render().
-// The v024-head-suppress hides it initially, but once removed, stale error
-// messages can flash during async transitions (during startDownload awaits).
-// Fix: override renderError to return '' while a friendly token is resolving
-// or while startDownload is in progress (state === 'decrypting').
 // ═══════════════════════════════════════════════════════════════════════════
 
 var _v022_renderError = SendDownload.prototype.renderError;
 
 SendDownload.prototype.renderError = function() {
-    // Suppress errors during friendly token resolution or decryption
     if (this._friendlyToken && !this._friendlyResolved) return '';
     if (this.state === 'decrypting') return '';
     if (this.state === 'complete') return '';
     if (this.state === 'loading') return '';
     if (this.state === 'ready') {
-        // If we had a previous error but state is now ready, clear it
         this.errorMessage = null;
         return '';
     }
     return _v022_renderError.call(this);
 };
 
-// Also clear stale errorMessage when entering startDownload
 var _v0210_startDownload = SendDownload.prototype.startDownload;
 SendDownload.prototype.startDownload = async function(keyOverride) {
     this.errorMessage = null;
@@ -73,14 +71,9 @@ SendDownload.prototype.setupEventListeners = function() {
         files.forEach(function(entry, idx) {
             var thumbEl = self.querySelector('#v025-thumb-' + idx);
             if (!thumbEl) return;
-
             var ext = (entry.name || '').split('.').pop().toUpperCase();
             if (!ext) return;
-
-            // Check if this thumbnail already has a badge
             if (thumbEl.querySelector('.v026-thumb__type-badge')) return;
-
-            // Add badge to all thumbnails (images included)
             var badge = document.createElement('span');
             badge.className = 'v026-thumb__type-badge';
             badge.textContent = ext;
@@ -88,65 +81,38 @@ SendDownload.prototype.setupEventListeners = function() {
         });
     }
 
-    // ── Fix tab underline: properly update active state ──
+    // Fix tab underline
     if (this._tabs && this._tabs.length > 0) {
         this._v0210_fixTabUnderlines();
     }
-};
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FIX 3: Hide _preview* files and _manifest.json from folder file list
-// ═══════════════════════════════════════════════════════════════════════════
-
-var _origRenderFileList = SendDownload.prototype._renderFileList;
-
-SendDownload.prototype._renderFileList = function(folderPath) {
-    // Temporarily filter _preview* and _manifest.json entries from zipTree
-    var originalTree = this._zipTree;
-    if (originalTree) {
-        this._zipTree = originalTree.filter(function(e) {
-            if (e.dir) return true; // keep dirs for the folder check
-            // Hide files inside _preview* folders
-            if (e.path.indexOf('_preview') === 0 || e.path.indexOf('/_preview') !== -1) return false;
-            // Hide _manifest.json at any level
-            var name = e.name || '';
-            if (name === '_manifest.json') return false;
-            // Hide dot-files
-            if (name.charAt(0) === '.') return false;
-            // Hide __MACOSX
-            if (e.path.indexOf('__MACOSX') !== -1) return false;
-            return true;
-        });
+    // Single file viewer: add print button for markdown
+    if (this.state === 'complete' && this._renderType === 'markdown' && !this._zipTree) {
+        this._v0210_addPrintButton();
     }
-
-    var html = _origRenderFileList.call(this, folderPath);
-
-    // Restore original tree
-    this._zipTree = originalTree;
-    return html;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FIX 4: Select root folder and first non-preview file by default
+// FIX 3: Select root folder and first non-gallery file by default
+// (NO folder view filtering — folder view shows everything)
 // ═══════════════════════════════════════════════════════════════════════════
 
 var _v0210_origRender = SendDownload.prototype.render;
 
 SendDownload.prototype.render = function() {
-    // Before rendering, fix the auto-selected file if it's in _preview
+    // Before rendering, fix the auto-selected file if it's in _gallery/_preview
     if (this.state === 'complete' && this._zipTree && this._selectedZipPath) {
         var selected = this._selectedZipPath;
-        var isPreview = selected.indexOf('_preview') !== -1 ||
-                        (selected === '_manifest.json') ||
-                        selected.indexOf('__MACOSX') !== -1;
+        var needsFix = isGalleryOrPreviewPath(selected) ||
+                       selected === '_manifest.json' ||
+                       selected.indexOf('__MACOSX') !== -1;
 
-        if (isPreview) {
-            // Find the first real file (not in _preview, not _manifest, not dotfile)
+        if (needsFix) {
             var firstReal = null;
             for (var i = 0; i < this._zipTree.length; i++) {
                 var e = this._zipTree[i];
                 if (e.dir) continue;
-                if (e.path.indexOf('_preview') !== -1) continue;
+                if (isGalleryOrPreviewPath(e.path)) continue;
                 var name = e.name || '';
                 if (name === '_manifest.json') continue;
                 if (name.charAt(0) === '.') continue;
@@ -154,7 +120,6 @@ SendDownload.prototype.render = function() {
                 firstReal = e;
                 break;
             }
-
             if (firstReal) {
                 this._selectedZipPath = firstReal.path;
                 var parts = firstReal.path.split('/');
@@ -162,8 +127,8 @@ SendDownload.prototype.render = function() {
             }
         }
 
-        // Ensure root folder is selected if current folder is _preview
-        if (this._selectedZipFolder && this._selectedZipFolder.indexOf('_preview') !== -1) {
+        // Ensure root folder is selected if current folder is _gallery/_preview
+        if (this._selectedZipFolder && isGalleryOrPreviewPath(this._selectedZipFolder)) {
             this._selectedZipFolder = '';
         }
     }
@@ -171,11 +136,8 @@ SendDownload.prototype.render = function() {
     _v0210_origRender.call(this);
 };
 
-// Also fix initial file selection after zip parse
-var _origStartDownload = SendDownload.prototype.startDownload;
-
 // ═══════════════════════════════════════════════════════════════════════════
-// FIX 5: Bigger save buttons, remove beta buttons, fix command strip
+// FIX 4: Bigger save buttons, remove beta buttons
 // ═══════════════════════════════════════════════════════════════════════════
 
 var _v022_renderZipLayout = SendDownload.prototype._renderZipLayout;
@@ -183,22 +145,19 @@ var _v022_renderZipLayout = SendDownload.prototype._renderZipLayout;
 SendDownload.prototype._renderZipLayout = function(timingHtml, sendAnotherHtml) {
     var html = _v022_renderZipLayout.call(this, timingHtml, sendAnotherHtml);
 
-    // Replace the command strip with a cleaner version (bigger save, no beta buttons)
     var betaButtonsPattern = '<span class="v022-command-strip__divider"></span>' +
         '                <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">Edit</button>' +
         '                <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">Rename</button>' +
         '                <button class="btn btn-sm btn-secondary v022-cmd--disabled" disabled title="Coming soon">Delete</button>';
 
     html = html.replace(betaButtonsPattern, '');
-
     return html;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FIX 6: Fix Share button — create tab with share content
+// FIX 5: Fix Share button — create tab with share content
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Override _v022_showActiveTabContent for share tab to populate properly
 var _v022_showActiveTabContent = SendDownload.prototype._v022_showActiveTabContent;
 
 SendDownload.prototype._v022_showActiveTabContent = function() {
@@ -233,7 +192,6 @@ SendDownload.prototype._v022_showActiveTabContent = function() {
 
             preview.innerHTML = maxBtn + shareHtml;
 
-            // Wire copy button
             var self = this;
             var copyBtn = preview.querySelector('#v0210-copy-url');
             if (copyBtn) {
@@ -242,8 +200,6 @@ SendDownload.prototype._v022_showActiveTabContent = function() {
                     if (input) self.copyToClipboard(input.value, copyBtn);
                 });
             }
-
-            // Wire email button
             var emailBtn = preview.querySelector('#v0210-email-link');
             if (emailBtn) {
                 emailBtn.addEventListener('click', function() {
@@ -253,8 +209,6 @@ SendDownload.prototype._v022_showActiveTabContent = function() {
                                 '&body=' + encodeURIComponent(body), '_blank');
                 });
             }
-
-            // Wire maximise button
             var newMaxBtn = preview.querySelector('#maximise-btn');
             if (newMaxBtn) newMaxBtn.addEventListener('click', function() { self._toggleMaximise(); });
         }
@@ -263,19 +217,17 @@ SendDownload.prototype._v022_showActiveTabContent = function() {
         return;
     }
 
-    // For non-share tabs, call original then fix underlines
     _v022_showActiveTabContent.call(this);
     this._v0210_fixTabUnderlines();
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FIX 7: Fix tab underline — ensure only active tab has the underline
+// FIX 6: Fix tab underline
 // ═══════════════════════════════════════════════════════════════════════════
 
 SendDownload.prototype._v0210_fixTabUnderlines = function() {
     var tabBar = this.querySelector('#v022-tab-bar');
     if (!tabBar) return;
-
     var activeId = this._activeTabId;
     tabBar.querySelectorAll('.v022-tab').forEach(function(el) {
         if (el.dataset.tabId === activeId) {
@@ -286,14 +238,85 @@ SendDownload.prototype._v0210_fixTabUnderlines = function() {
     });
 };
 
-// Also override _v022_renderTabs to always fix underlines
 var _orig_renderTabs = SendDownload.prototype._v022_renderTabs;
-
 SendDownload.prototype._v022_renderTabs = function() {
     _orig_renderTabs.call(this);
-    // Re-apply underline fix after render
     this._v0210_fixTabUnderlines();
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FIX 7: Print button for single-file markdown viewer
+// ═══════════════════════════════════════════════════════════════════════════
+
+SendDownload.prototype._v0210_addPrintButton = function() {
+    // Find the button row in the two-column layout
+    var copyBtn = this.querySelector('#copy-content-btn');
+    if (!copyBtn) return;
+
+    var row = copyBtn.parentElement;
+    if (!row) return;
+
+    // Check if print button already exists
+    if (row.querySelector('#v0210-print-btn')) return;
+
+    var printBtn = document.createElement('button');
+    printBtn.className = 'btn btn-sm btn-secondary';
+    printBtn.id = 'v0210-print-btn';
+    printBtn.style.cssText = 'flex: 1;';
+    printBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6V1h8v5"/><rect x="1" y="6" width="14" height="6" rx="1"/><path d="M4 10h8v5H4z"/></svg> Print';
+
+    row.appendChild(printBtn);
+
+    var self = this;
+    printBtn.addEventListener('click', function() {
+        // Use SgPrint if available, otherwise fallback
+        if (typeof SgPrint !== 'undefined' && self.decryptedBytes) {
+            var rawText = new TextDecoder().decode(self.decryptedBytes);
+            var safeHtml = (typeof MarkdownParser !== 'undefined') ? MarkdownParser.parse(rawText) : self.escapeHtml(rawText);
+            SgPrint.printHtml(safeHtml, self.fileName || 'Document');
+        } else {
+            // Fallback: try iframe content
+            var iframe = self.querySelector('#md-iframe');
+            if (iframe) {
+                try {
+                    var iframeBody = iframe.contentDocument || iframe.contentWindow.document;
+                    var content = iframeBody.body.innerHTML;
+                    if (typeof SgPrint !== 'undefined') {
+                        SgPrint.printHtml(content, self.fileName || 'Document');
+                    } else {
+                        window.print();
+                    }
+                } catch(err) {
+                    window.print();
+                }
+            } else {
+                window.print();
+            }
+        }
+    });
+};
+
+// Also intercept Ctrl+P / Cmd+P for single file markdown
+(function() {
+    window.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            // Single-file markdown iframe
+            var iframe = document.getElementById('md-iframe');
+            if (iframe && typeof SgPrint !== 'undefined') {
+                e.preventDefault();
+                try {
+                    var iframeBody = iframe.contentDocument || iframe.contentWindow.document;
+                    var content = iframeBody.body.innerHTML;
+                    var titleEl = document.querySelector('.filename') || document.querySelector('h3');
+                    var filename = titleEl ? titleEl.textContent : '';
+                    SgPrint.printHtml(content, filename);
+                } catch(err) {
+                    window.print();
+                }
+            }
+        }
+    });
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // STYLES
@@ -361,6 +384,6 @@ SendDownload.prototype._v022_renderTabs = function() {
     document.head.appendChild(s);
 })();
 
-console.log('[send-download-v0210] Error flash fix, image badges, _preview filter, bigger save, share fix, tab underline fix');
+console.log('[send-download-v0210] Error flash fix, image badges, smart selection, bigger save, share fix, tab fix, markdown print');
 
 })();

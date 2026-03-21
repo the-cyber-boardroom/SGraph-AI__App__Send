@@ -570,7 +570,7 @@ SendUpload.prototype._v0213_addPreviewToZip = async function(zip, entries) {
         }
     }
     var folderHash = await computeFolderHash(fileHashes);
-    var previewDir = '_preview';  // Use simple name for compatibility with gallery renderer
+    var previewDir = '_gallery';  // Use simple name for compatibility with gallery renderer
 
     // Step 2: Check if PDF.js is needed and preload it
     var hasPdfs = files.some(function(e) { return getFileCategory(e.name) === 'pdf'; });

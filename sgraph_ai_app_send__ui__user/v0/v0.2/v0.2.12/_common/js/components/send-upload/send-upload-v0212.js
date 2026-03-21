@@ -4,10 +4,10 @@
 
    Changes:
      - Phase 1: Rich Preview — sender-side thumbnail generation for images
-     - During zip creation, generates _preview/ folder with:
-       - _preview/_manifest.json  — gallery config, file index, metadata
-       - _preview/thumbnails/     — 200px-wide JPEG thumbnails per image
-       - _preview/metadata/       — per-file metadata JSON (type, size, dimensions)
+     - During zip creation, generates _gallery/ folder with:
+       - _gallery/_manifest.json  — gallery config, file index, metadata
+       - _gallery/thumbnails/     — 200px-wide JPEG thumbnails per image
+       - _gallery/metadata/       — per-file metadata JSON (type, size, dimensions)
      - Uses Canvas API (zero dependencies) to resize images client-side
      - All processing happens in the browser — server never sees plaintext
      - Receiver gets instant preview without re-processing full images
@@ -123,7 +123,7 @@ function generateImageThumbnail(file) {
     });
 }
 
-// ─── Core: build _preview/ folder contents and add to zip ───────────────────
+// ─── Core: build _gallery/ folder contents and add to zip ───────────────────
 function addPreviewToZip(zip, entries) {
     // Filter to actual files (not directories)
     var files = entries.filter(function(e) { return !e.isDir && e.file; });
@@ -165,7 +165,7 @@ function addPreviewToZip(zip, entries) {
             type:      category,
             size:      entry.file.size,
             thumbnail: null,
-            metadata:  '_preview/metadata/' + id + '.meta.json'
+            metadata:  '_gallery/metadata/' + id + '.meta.json'
         };
 
         // For images: generate thumbnail + extract dimensions
@@ -173,7 +173,7 @@ function addPreviewToZip(zip, entries) {
             return generateImageThumbnail(entry.file).then(function(result) {
                 // Add thumbnail to zip
                 var thumbExt = ext === 'svg' ? 'svg' : 'jpg';
-                var thumbPath = '_preview/thumbnails/' + id + '.thumb.' + thumbExt;
+                var thumbPath = '_gallery/thumbnails/' + id + '.thumb.' + thumbExt;
                 zip.file(thumbPath, result.buffer);
 
                 // Enrich metadata with dimensions
@@ -192,21 +192,21 @@ function addPreviewToZip(zip, entries) {
                 manifestEntry.thumbnail = thumbPath;
 
                 // Add metadata JSON to zip
-                zip.file('_preview/metadata/' + id + '.meta.json',
+                zip.file('_gallery/metadata/' + id + '.meta.json',
                     JSON.stringify(meta, null, 2));
 
                 return manifestEntry;
             }).catch(function(err) {
                 // Thumbnail generation failed — still include metadata without thumbnail
                 console.warn('[v0212] Thumbnail failed for ' + entry.name + ':', err.message);
-                zip.file('_preview/metadata/' + id + '.meta.json',
+                zip.file('_gallery/metadata/' + id + '.meta.json',
                     JSON.stringify(meta, null, 2));
                 return manifestEntry;
             });
         }
 
         // For non-images: just metadata (Phase 2+ will add PDF/MD thumbnails)
-        zip.file('_preview/metadata/' + id + '.meta.json',
+        zip.file('_gallery/metadata/' + id + '.meta.json',
             JSON.stringify(meta, null, 2));
         return Promise.resolve(manifestEntry);
     });
@@ -227,7 +227,7 @@ function addPreviewToZip(zip, entries) {
         }).length;
 
         // Write manifest
-        zip.file('_preview/_manifest.json', JSON.stringify(manifest, null, 2));
+        zip.file('_gallery/_manifest.json', JSON.stringify(manifest, null, 2));
 
         console.log('[v0212] Preview generated: ' +
             manifest.thumbnails_generated + ' thumbnails for ' +
@@ -259,7 +259,7 @@ SendUpload.prototype._v023_compressFolder = async function() {
         }
     }
 
-    // ═══ v0.2.12: Generate _preview/ folder with thumbnails ═══
+    // ═══ v0.2.12: Generate _gallery/ folder with thumbnails ═══
     await addPreviewToZip(zip, entries);
 
     var blob    = await zip.generateAsync({ type: 'blob' });
