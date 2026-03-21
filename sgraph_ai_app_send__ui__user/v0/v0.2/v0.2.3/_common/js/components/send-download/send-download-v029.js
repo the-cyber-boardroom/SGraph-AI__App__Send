@@ -225,40 +225,8 @@ SendDownload.prototype.render = function() {
     }
 };
 
-// ─── Also hide _gallery* folders from the folder tree ───────────────────────
-var _origBuildFolderStructure = SendDownload.prototype._buildFolderStructure;
-
-SendDownload.prototype._buildFolderStructure = function() {
-    var result = _origBuildFolderStructure.call(this);
-
-    // Filter out _gallery* and _preview* entries from the tree
-    function filterGalleryFolders(node) {
-        if (!node || !node.children) return node;
-        node.children = node.children.filter(function(child) {
-            var name = child.name || '';
-            if (name.indexOf('_gallery') === 0) return false;
-            if (name.indexOf('_preview') === 0) return false;
-            return true;
-        });
-        node.children.forEach(filterGalleryFolders);
-        return node;
-    }
-
-    if (result && result.children) {
-        filterGalleryFolders(result);
-    }
-    return result;
-};
-
-// Also filter _gallery from file listing
-var _origRenderFileList = SendDownload.prototype._renderFileList;
-
-SendDownload.prototype._renderFileList = function(folderPath) {
-    var html = _origRenderFileList.call(this, folderPath);
-    // If the current folder IS a _preview folder, show it but add a note
-    // Otherwise, this is handled by the tree filter above
-    return html;
-};
+// Folder view: NO filtering — show everything exactly as it is in the zip.
+// The _gallery.{hash} folder is real content that gets downloaded too.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FIX 4: Preserve hash fragment after decrypt (simple key stays in URL)
