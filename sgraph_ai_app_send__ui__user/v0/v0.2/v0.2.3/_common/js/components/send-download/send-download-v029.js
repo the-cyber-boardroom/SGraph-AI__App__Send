@@ -309,6 +309,48 @@ var PRINT_STYLES = '\
         font-size: 11pt; line-height: 1.6; color: #1a1a1a; background: #fff;\
         margin: 0; padding: 0; word-wrap: break-word;\
     }\
+    /* --- Screen-only toolbar and layout --- */\
+    @media screen {\
+        body { background: #f0f0f0; padding: 0; margin: 0; }\
+        .screen-toolbar {\
+            position: sticky; top: 0; z-index: 100;\
+            background: #2d2d2d; color: #fff; padding: 12px 24px;\
+            display: flex; align-items: center; gap: 16px;\
+            font-family: system-ui, -apple-system, sans-serif; font-size: 13px;\
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);\
+        }\
+        .screen-toolbar .toolbar-brand {\
+            display: flex; align-items: center; gap: 6px; font-size: 14px;\
+        }\
+        .screen-toolbar .toolbar-brand b { color: #4ECDC4; }\
+        .screen-toolbar .toolbar-sep {\
+            width: 1px; height: 20px; background: #555;\
+        }\
+        .screen-toolbar .toolbar-info { color: #bbb; flex: 1; }\
+        .screen-toolbar .toolbar-info strong { color: #fff; }\
+        .screen-toolbar button {\
+            padding: 6px 16px; border: none; border-radius: 4px;\
+            font-size: 13px; cursor: pointer; font-weight: 500;\
+        }\
+        .screen-toolbar .btn-print {\
+            background: #4ECDC4; color: #1a1a1a;\
+        }\
+        .screen-toolbar .btn-print:hover { background: #3dbdb5; }\
+        .screen-toolbar .btn-close {\
+            background: transparent; color: #bbb; border: 1px solid #555;\
+        }\
+        .screen-toolbar .btn-close:hover { background: #444; color: #fff; }\
+        .print-page {\
+            max-width: 210mm; margin: 24px auto; background: #fff;\
+            padding: 2cm 2.5cm; box-shadow: 0 2px 12px rgba(0,0,0,0.15);\
+            border-radius: 2px; min-height: 297mm;\
+        }\
+    }\
+    @media print {\
+        .screen-toolbar { display: none !important; }\
+        .print-page { max-width: none; margin: 0; padding: 0; box-shadow: none; border-radius: 0; min-height: auto; }\
+    }\
+    /* --- Document styles (both screen and print) --- */\
     .print-header {\
         display: flex; align-items: center; gap: 8px;\
         padding-bottom: 0.5em; margin-bottom: 1.5em;\
@@ -356,12 +398,24 @@ var PRINT_STYLES = '\
 ';
 
 function openPrintWindow(htmlContent, filename) {
+    var displayName = filename || 'Document';
     var printDoc = '<!DOCTYPE html><html><head>' +
         '<meta charset="utf-8">' +
         '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>' + (filename || 'Document') + '</title>' +
+        '<title>' + displayName + '</title>' +
         '<style>' + PRINT_STYLES + '</style>' +
         '</head><body>' +
+        '<div class="screen-toolbar">' +
+            '<div class="toolbar-brand">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' +
+                '<span>SG/<b>Send</b></span>' +
+            '</div>' +
+            '<div class="toolbar-sep"></div>' +
+            '<div class="toolbar-info">Print preview for <strong>' + displayName + '</strong></div>' +
+            '<button class="btn-print" onclick="window.print()">Print / Save PDF</button>' +
+            '<button class="btn-close" onclick="window.close()">Close</button>' +
+        '</div>' +
+        '<div class="print-page">' +
         '<div class="print-header">' +
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' +
             '<span>SG/<b>Send</b></span>' +
@@ -371,6 +425,7 @@ function openPrintWindow(htmlContent, filename) {
         '<div class="print-footer">' +
             '<span>SG/Send &mdash; sgraph.ai</span>' +
             '<span>Printed ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>' +
+        '</div>' +
         '</div>' +
         '</body></html>';
 
@@ -385,8 +440,6 @@ function openPrintWindow(htmlContent, filename) {
     // Wait for fonts/styles to load
     setTimeout(function() {
         w.print();
-        // Close after print dialog (some browsers fire onafterprint, some don't)
-        w.onafterprint = function() { w.close(); };
     }, 300);
 }
 
