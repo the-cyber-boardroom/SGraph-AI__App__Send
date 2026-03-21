@@ -235,11 +235,11 @@ var _v026_renderConfirm = SendUpload.prototype._v026_renderConfirm;
 SendUpload.prototype._v026_renderConfirm = function() {
     var html = _v026_renderConfirm.call(this);
 
-    // Add thumbnail note for gallery delivery on folder uploads
+    // Add thumbnail note for gallery delivery (folders and single file gallery)
     var delivery = this._v023_selectedDelivery || 'download';
     var isFolder = !!this._folderScan;
 
-    if (isFolder && (delivery === 'gallery' || delivery === 'browse')) {
+    if (delivery === 'gallery' || (isFolder && delivery === 'browse')) {
         var noteHtml =
             '<div class="v0214-thumbnail-note">' +
                 '<span class="v0214-thumbnail-note__icon">&#128247;</span>' +
