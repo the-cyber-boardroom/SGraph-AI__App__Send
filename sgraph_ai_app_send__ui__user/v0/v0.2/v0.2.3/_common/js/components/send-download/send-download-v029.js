@@ -303,10 +303,11 @@ var _v029_patchedReplace = history.replaceState;
 
 var PRINT_STYLES = '\
     *, *::before, *::after { box-sizing: border-box; }\
+    @page { margin: 2cm 2.5cm; size: A4; }\
     body {\
         font-family: "DM Sans", system-ui, -apple-system, sans-serif;\
         font-size: 11pt; line-height: 1.6; color: #1a1a1a; background: #fff;\
-        margin: 0; padding: 2cm 2.5cm; word-wrap: break-word;\
+        margin: 0; padding: 0; word-wrap: break-word;\
     }\
     .print-header {\
         display: flex; align-items: center; gap: 8px;\
@@ -352,7 +353,6 @@ var PRINT_STYLES = '\
         border-top: 1px solid #e0e0e0; color: #bbb; font-size: 8pt;\
         display: flex; justify-content: space-between;\
     }\
-    @page { margin: 0; size: A4; }\
 ';
 
 function openPrintWindow(htmlContent, filename) {
