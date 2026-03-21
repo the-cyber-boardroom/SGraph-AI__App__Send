@@ -52,17 +52,20 @@ function isDownloadPage() {
            window.location.pathname.indexOf('/browse')   !== -1;
 }
 
-// ─── Helper: filter out _preview* folders and dot-files from zip tree ────────
+// ─── Helper: filter out _gallery* folders and dot-files from zip tree ────────
 function filterGalleryFiles(zipTree) {
     return zipTree.filter(function(e) {
         if (e.dir) return false;
-        // Filter out _preview* folder contents
+        // Filter out _gallery* folder contents (and legacy _preview* folders)
+        if (e.path.indexOf('_gallery') === 0 || e.path.indexOf('/_gallery') !== -1) return false;
         if (e.path.indexOf('_preview') === 0 || e.path.indexOf('/_preview') !== -1) return false;
         // Filter out dot-files (.DS_Store, .gitkeep, etc.)
         var name = e.name || '';
         if (name.charAt(0) === '.') return false;
         // Filter out __MACOSX entries
         if (e.path.indexOf('__MACOSX') !== -1) return false;
+        // Filter out _manifest.json
+        if (name === '_manifest.json') return false;
         return true;
     });
 }

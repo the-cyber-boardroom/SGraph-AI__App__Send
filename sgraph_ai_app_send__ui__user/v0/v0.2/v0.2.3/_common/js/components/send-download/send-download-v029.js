@@ -179,34 +179,38 @@ SendDownload.prototype.setupEventListeners = function() {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FIX 3: Filter _preview* from auto-select first file in folder view
+// FIX 3: Filter _gallery* from auto-select first file in folder view
 // ═══════════════════════════════════════════════════════════════════════════
 
 var _origParseZip = SendDownload.prototype._parseZip;
 
 SendDownload.prototype._parseZip = function(bytes) {
     return _origParseZip.call(this, bytes).then(function(result) {
-        // Store the original tree for folder browser (it needs _preview for completeness)
-        // But we'll override the "first file" selection logic below
         return result;
     });
 };
+
+// Helper: check if a path belongs to a gallery/preview metadata folder
+function isGalleryPath(path) {
+    return path.indexOf('_gallery') === 0 || path.indexOf('/_gallery') !== -1 ||
+           path.indexOf('_preview') === 0 || path.indexOf('/_preview') !== -1;
+}
 
 // Override render to fix the auto-select after zip parse
 var _v029_origRender = SendDownload.prototype.render;
 SendDownload.prototype.render = function() {
     _v029_origRender.call(this);
 
-    // After render, if we're in zip mode and the selected file is in _preview,
-    // re-select the first non-preview file
+    // After render, if we're in zip mode and the selected file is in _gallery/_preview,
+    // re-select the first non-gallery file
     if (this._zipTree && this._selectedZipPath) {
-        if (this._selectedZipPath.indexOf('_preview') === 0 ||
-            this._selectedZipPath.indexOf('/_preview') !== -1) {
+        if (isGalleryPath(this._selectedZipPath) ||
+            (this._selectedZipPath === '_manifest.json')) {
             var firstReal = this._zipTree.find(function(e) {
                 if (e.dir) return false;
-                if (e.path.indexOf('_preview') === 0) return false;
-                if (e.path.indexOf('/_preview') !== -1) return false;
+                if (isGalleryPath(e.path)) return false;
                 var name = e.name || '';
+                if (name === '_manifest.json') return false;
                 if (name.charAt(0) === '.') return false;
                 if (e.path.indexOf('__MACOSX') !== -1) return false;
                 return true;
@@ -221,32 +225,32 @@ SendDownload.prototype.render = function() {
     }
 };
 
-// ─── Also hide _preview* folders from the folder tree ───────────────────────
+// ─── Also hide _gallery* folders from the folder tree ───────────────────────
 var _origBuildFolderStructure = SendDownload.prototype._buildFolderStructure;
 
 SendDownload.prototype._buildFolderStructure = function() {
     var result = _origBuildFolderStructure.call(this);
 
-    // Filter out _preview* entries from the tree
-    function filterPreview(node) {
+    // Filter out _gallery* and _preview* entries from the tree
+    function filterGalleryFolders(node) {
         if (!node || !node.children) return node;
         node.children = node.children.filter(function(child) {
             var name = child.name || '';
+            if (name.indexOf('_gallery') === 0) return false;
             if (name.indexOf('_preview') === 0) return false;
             return true;
         });
-        node.children.forEach(filterPreview);
+        node.children.forEach(filterGalleryFolders);
         return node;
     }
 
-    // result can be an object with children property or an array
     if (result && result.children) {
-        filterPreview(result);
+        filterGalleryFolders(result);
     }
     return result;
 };
 
-// Also filter _preview from file listing
+// Also filter _gallery from file listing
 var _origRenderFileList = SendDownload.prototype._renderFileList;
 
 SendDownload.prototype._renderFileList = function(folderPath) {
@@ -398,49 +402,13 @@ var PRINT_STYLES = '\
 ';
 
 function openPrintWindow(htmlContent, filename) {
-    var displayName = filename || 'Document';
-    var printDoc = '<!DOCTYPE html><html><head>' +
-        '<meta charset="utf-8">' +
-        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '<title>' + displayName + '</title>' +
-        '<style>' + PRINT_STYLES + '</style>' +
-        '</head><body>' +
-        '<div class="screen-toolbar">' +
-            '<div class="toolbar-brand">' +
-                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' +
-                '<span>SG/<b>Send</b></span>' +
-            '</div>' +
-            '<div class="toolbar-sep"></div>' +
-            '<div class="toolbar-info">Print preview for <strong>' + displayName + '</strong></div>' +
-            '<button class="btn-print" onclick="window.print()">Print / Save PDF</button>' +
-            '<button class="btn-close" onclick="window.close()">Close</button>' +
-        '</div>' +
-        '<div class="print-page">' +
-        '<div class="print-header">' +
-            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' +
-            '<span>SG/<b>Send</b></span>' +
-            '<span class="print-filename">' + (filename || '') + '</span>' +
-        '</div>' +
-        htmlContent +
-        '<div class="print-footer">' +
-            '<span>SG/Send &mdash; sgraph.ai</span>' +
-            '<span>Printed ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span>' +
-        '</div>' +
-        '</div>' +
-        '</body></html>';
-
-    var w = window.open('', '_blank');
-    if (!w) {
-        // Popup blocked — fall back to window.print()
-        window.print();
+    // Delegate to SgPrint component if available (reusable, extractable to __Tools)
+    if (typeof SgPrint !== 'undefined') {
+        SgPrint.printHtml(htmlContent, filename);
         return;
     }
-    w.document.write(printDoc);
-    w.document.close();
-    // Wait for fonts/styles to load
-    setTimeout(function() {
-        w.print();
-    }, 300);
+    // Fallback: basic window.print()
+    window.print();
 }
 
 // Override lightbox print button — prints markdown beautifully

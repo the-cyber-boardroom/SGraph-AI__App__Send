@@ -23,9 +23,9 @@ if (typeof SendDownload === 'undefined') {
 // ─── Save references to v0.2.7 methods ─────────────────────────────────────
 var _v027_setupEvents = SendDownload.prototype.setupEventListeners;
 
-// ─── Find the _preview folder in the zip tree ──────────────────────────────
+// ─── Find the _gallery folder in the zip tree ──────────────────────────────
 function findPreviewFolder(zipTree) {
-    // Look for _preview or _preview.{hash} folder
+    // Look for _gallery or _gallery.{hash} folder (also legacy _preview)
     var previewEntries = {};
     var previewDir = null;
 
@@ -33,8 +33,8 @@ function findPreviewFolder(zipTree) {
         var entry = zipTree[i];
         var path  = entry.path || '';
 
-        // Match _preview/ or _preview.{hash}/
-        var match = path.match(/^(_preview[^/]*)\//);
+        // Match _gallery/ or _gallery.{hash}/ (and legacy _preview/)
+        var match = path.match(/^(_gallery[^/]*|_preview[^/]*)\//);
         if (match) {
             previewDir = match[1];
             previewEntries[path] = entry;
