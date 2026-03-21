@@ -82,9 +82,10 @@ SendDownload.prototype.renderComplete = function() {
         return this._v0211_renderDownloadConfirmation();
     }
 
-    // /gallery/ → full-width gallery-style presentation
+    // /gallery/ → for single files, use the same two-column viewer as browse
+    // (single files can't be "galleryified" — gallery makes sense for folders/zips)
     if (route === 'gallery') {
-        return this._v0211_renderGallerySingle();
+        return _v0210_renderComplete.call(this);
     }
 
     return _v0210_renderComplete.call(this);
