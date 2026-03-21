@@ -102,36 +102,42 @@ SendDownload.prototype._v0211_renderDownloadConfirmation = function() {
     var downloads  = this.transferInfo ? (this.transferInfo.download_count || 0) : 0;
     var timingHtml = this._renderTimings ? this._renderTimings() : '';
 
-    // Build share section
-    var hash      = window.location.hash || '';
-    var viewerUrl = window.location.pathname.replace('/download', '/browse') + hash;
+    // Build view links
+    var hash       = window.location.hash || '';
+    var viewerUrl  = window.location.pathname.replace('/download', '/browse') + hash;
     var galleryUrl = window.location.pathname.replace('/download', '/gallery') + hash;
 
     return '\
-        <div class="status status--success" style="font-size: var(--text-sm); padding: 0.5rem 0.75rem; margin-bottom: var(--space-4);">\
-            File decrypted and downloading...\
-        </div>\
-        <div style="max-width: 600px; margin: 0 auto;">\
-            <div style="text-align: center; margin-bottom: var(--space-6);">\
-                <div style="font-size: 3rem; margin-bottom: var(--space-3);">\u2B07\uFE0F</div>\
+        <div style="max-width: 520px; margin: 0 auto; padding: var(--space-4) 0;">\
+            <div style="background: var(--accent-subtle); border: 1px solid var(--accent); border-radius: var(--radius-lg); padding: var(--space-6); text-align: center; margin-bottom: var(--space-5);">\
+                <div style="width: 48px; height: 48px; margin: 0 auto var(--space-4); background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center;">\
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--bg-primary);">\
+                        <polyline points="20 6 9 17 4 12"></polyline>\
+                    </svg>\
+                </div>\
+                <div style="font-size: var(--text-body); font-weight: var(--weight-bold); color: var(--color-text); margin-bottom: var(--space-2);">File saved to your device</div>\
                 <h3 style="margin: 0 0 var(--space-2) 0; font-size: var(--text-h3); font-weight: var(--weight-bold); color: var(--color-text); word-break: break-all;">' + this.escapeHtml(filename) + '</h3>\
-                <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center; margin-bottom: var(--space-2);">\
-                    <span style="font-size: var(--text-small); color: var(--accent); font-family: var(--font-mono); background: var(--accent-subtle); padding: 2px 8px; border-radius: var(--radius-sm);">' + this.escapeHtml(badgeLabel) + '</span>\
+                <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center;">\
+                    <span style="font-size: var(--text-small); color: var(--accent); font-family: var(--font-mono); background: rgba(0,0,0,0.15); padding: 2px 8px; border-radius: var(--radius-sm);">' + this.escapeHtml(badgeLabel) + '</span>\
                     <span style="font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono);">' + this.escapeHtml(sizeStr) + '</span>\
                 </div>\
-                <div style="font-size: var(--text-sm); color: var(--color-text-secondary);">\
-                    Uploaded: ' + this.escapeHtml(uploadDate) + '\
-                    ' + (downloads > 0 ? '&nbsp;&middot;&nbsp; Downloads: ' + downloads : '') + '\
-                </div>\
             </div>\
-            <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-5);">\
-                <button class="btn btn-primary" id="save-file-btn" style="width: 100%; padding: var(--space-4); font-size: var(--text-body); font-weight: var(--weight-bold);">\
-                    Save Again\
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-2); margin-bottom: var(--space-5);">\
+                <button class="btn btn-primary btn-sm" id="save-file-btn" style="padding: var(--space-3); font-weight: var(--weight-bold);">\
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>\
+                    Save again\
                 </button>\
-                <div style="display: flex; gap: var(--space-2);">\
-                    <a href="' + this.escapeHtml(viewerUrl) + '" class="btn btn-sm btn-secondary" style="flex: 1; text-align: center; text-decoration: none;">\uD83D\uDCC4 View file</a>\
-                    <a href="' + this.escapeHtml(galleryUrl) + '" class="btn btn-sm btn-secondary" style="flex: 1; text-align: center; text-decoration: none;">\uD83D\uDDBC\uFE0F Gallery view</a>\
-                </div>\
+                <a href="' + this.escapeHtml(viewerUrl) + '" class="btn btn-sm btn-secondary" style="text-align: center; text-decoration: none; padding: var(--space-3);">\
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>\
+                    View file\
+                </a>\
+                <a href="' + this.escapeHtml(galleryUrl) + '" class="btn btn-sm btn-secondary" style="text-align: center; text-decoration: none; padding: var(--space-3);">\
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>\
+                    Gallery\
+                </a>\
+            </div>\
+            <div style="font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; margin-bottom: var(--space-4);">\
+                Uploaded ' + this.escapeHtml(uploadDate) + (downloads > 0 ? '&nbsp;&middot;&nbsp;' + downloads + ' downloads' : '') + '\
             </div>\
             <send-transparency id="transparency-panel"></send-transparency>\
             ' + timingHtml + '\
