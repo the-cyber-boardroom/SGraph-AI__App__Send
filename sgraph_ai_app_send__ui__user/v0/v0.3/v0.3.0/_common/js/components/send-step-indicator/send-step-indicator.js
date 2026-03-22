@@ -1,8 +1,8 @@
 /* =============================================================================
    SGraph Send — Step Indicator Component
-   v0.2.3 — Four-step upload wizard progress display
+   v0.3.0 — Six-step upload wizard progress display
 
-   Usage:  <send-step-indicator step="1" total="4"></send-step-indicator>
+   Usage:  <send-step-indicator step="1" total="6"></send-step-indicator>
    Attrs:  step  — current step (1-based)
            total — total number of steps
 
@@ -11,7 +11,7 @@
 
 class SendStepIndicator extends HTMLElement {
 
-    static STEP_LABELS = ['Upload', 'Choose delivery', 'Encrypt & Send', 'Share'];
+    static STEP_LABELS = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Encrypt & Upload', 'Done'];
 
     constructor() {
         super();

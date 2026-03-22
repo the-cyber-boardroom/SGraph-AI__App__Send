@@ -78,10 +78,24 @@
     <script src="../_common/js/components/send-footer/send-footer.js"></script>
     <script src="../_common/js/components/send-transparency/send-transparency.js"></script>
 
-    <!-- 4. Upload components (consolidated — no overlays) -->
+    <!-- 4. Upload components (v0.3.0 — decomposed into orchestrator + step sub-components) -->
     <script src="../_common/js/components/send-step-indicator/send-step-indicator.js"></script>
     <script src="../_common/js/qr-code.js"></script>
     <script src="../_common/js/components/send-access-gate/send-access-gate.js"></script>
+
+    <!-- Upload shared utilities -->
+    <script src="../_common/js/components/send-upload/upload-file-utils.js"></script>
+    <script src="../_common/js/components/send-upload/upload-crypto.js"></script>
+
+    <!-- Upload step sub-components (Shadow DOM, self-contained) -->
+    <script src="../_common/js/components/send-upload/upload-step-select/upload-step-select.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-delivery/upload-step-delivery.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-share/upload-step-share.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-confirm/upload-step-confirm.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-progress/upload-step-progress.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-done/upload-step-done.js"></script>
+
+    <!-- Upload orchestrator (composes step sub-components) -->
     <script src="../_common/js/components/send-upload/send-upload.js"></script>
     <script src="../_common/js/components/send-test-files/send-test-files.js"></script>
 
