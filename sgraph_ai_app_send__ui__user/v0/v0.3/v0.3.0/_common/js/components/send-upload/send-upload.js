@@ -395,6 +395,19 @@ class SendUpload extends HTMLElement {
             this._setBeforeUnload(true);
             this._stageTimestamps = {};
 
+            // Single file + gallery delivery → wrap in zip with thumbnails (v0.2.17)
+            var delivery = this._selectedDelivery || 'download';
+            if (delivery === 'gallery' && !this._folderScan && this.selectedFile) {
+                var file = this.selectedFile;
+                this._folderScan = {
+                    entries:   [{ name: file.name, path: file.name, isDir: false, file: file }],
+                    totalSize: file.size,
+                    fileCount: 1
+                };
+                this._folderName = file.name.replace(/\.[^.]+$/, '') || 'file';
+                this._folderOptions = this._folderOptions || { level: 4, includeEmpty: false, includeHidden: false };
+            }
+
             if (this._folderScan) {
                 this.state = 'zipping';
                 this.selectedFile = await UploadFolder.compressToZip(
