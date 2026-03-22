@@ -1,0 +1,320 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Upload Step Select (Step 1: File Selection)
+   v0.3.0 — Shadow DOM component styles
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Step content transition ─────────────────────────────────────────────── */
+.step-select__content {
+    animation: step-fade 200ms ease;
+}
+@keyframes step-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ─── Drop zone ──────────────────────────────────────────────────────────── */
+.drop-zone {
+    border: 2px dashed var(--color-drop-zone-border, rgba(78, 205, 196, 0.25));
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-drop-zone-bg, #16213E);
+    padding: var(--space-8, 2rem) var(--space-6, 1.5rem);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--transition, 150ms ease),
+                background-color var(--transition, 150ms ease);
+}
+
+.drop-zone:hover {
+    border-color: var(--color-drop-zone-active, #4ECDC4);
+    background: rgba(78, 205, 196, 0.05);
+}
+
+.drop-zone__label {
+    font-size: var(--text-h3, 1.25rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--accent, #4ECDC4);
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.drop-zone__hint {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+/* ─── Drag-over state ────────────────────────────────────────────────────── */
+.drop-zone.dragover {
+    border-color: var(--color-primary, #4ECDC4) !important;
+    background: rgba(78, 205, 196, 0.08) !important;
+    animation: drop-zone-pulse 1.2s ease-in-out infinite;
+}
+.drop-zone.dragover .drop-zone__label {
+    color: var(--color-primary, #4ECDC4);
+    font-weight: var(--weight-semibold, 600);
+}
+@keyframes drop-zone-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(78, 205, 196, 0.15); }
+    50%      { box-shadow: 0 0 0 8px rgba(78, 205, 196, 0.05); }
+}
+
+/* ─── Paste hint ─────────────────────────────────────────────────────────── */
+.drop-zone__paste-hint {
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.6;
+    margin-top: var(--space-1, 0.25rem);
+}
+
+/* ─── Browse buttons (ghost style) ───────────────────────────────────────── */
+.browse-buttons {
+    display: flex;
+    gap: var(--space-3, 0.75rem);
+    justify-content: center;
+    margin-top: var(--space-4, 1rem);
+}
+.browse-btn {
+    background: transparent;
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    color: var(--color-text-secondary, #8892A0);
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--text-small, 0.75rem);
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+}
+.browse-btn:hover {
+    border-color: var(--color-primary, #4ECDC4);
+    color: var(--color-primary, #4ECDC4);
+}
+
+/* ─── Trust badge ────────────────────────────────────────────────────────── */
+.trust-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    margin-top: var(--space-4, 1rem);
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    border-radius: var(--radius-sm, 6px);
+    background: rgba(78, 205, 196, 0.04);
+}
+.trust-badge__icon { flex-shrink: 0; }
+
+/* ─── File summary ───────────────────────────────────────────────────────── */
+.file-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    background: rgba(78, 205, 196, 0.04);
+    border-radius: var(--radius-sm, 6px);
+    margin-bottom: var(--space-4, 1rem);
+}
+.file-summary--compact { margin-bottom: var(--space-3, 0.75rem); }
+.file-summary--error { border: 1px solid var(--color-error, #FF6B6B); }
+.file-summary__icon { font-size: 1.25rem; flex-shrink: 0; }
+.file-summary__name {
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text, #E0E0E0);
+    font-size: var(--text-sm, 0.875rem);
+}
+.file-summary__meta {
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+.file-summary__status {
+    margin-left: auto;
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-success, #4ECDC4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+}
+
+/* ─── File icon (larger for type-specific) ───────────────────────────────── */
+.file-icon {
+    font-size: 1.5rem;
+}
+
+/* ─── File info (flex column for name + meta) ────────────────────────────── */
+.file-info {
+    flex: 1;
+    min-width: 0;
+}
+.file-info .file-summary__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ─── File type breakdown for folders ────────────────────────────────────── */
+.file-breakdown {
+    font-size: var(--text-micro, 0.625rem);
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+/* ─── Large file warning ─────────────────────────────────────────────────── */
+.large-warning {
+    margin-top: var(--space-3, 0.75rem);
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    background: rgba(255, 107, 107, 0.08);
+    border: 1px solid rgba(255, 107, 107, 0.2);
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+/* ─── Image thumbnail preview ────────────────────────────────────────────── */
+.thumbnail {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-3, 0.75rem);
+    margin-bottom: var(--space-3, 0.75rem);
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
+}
+.thumbnail__img {
+    max-width: 100%;
+    max-height: 160px;
+    border-radius: var(--radius-xs, 4px);
+    object-fit: contain;
+    opacity: 0;
+    animation: thumb-fade 300ms ease forwards;
+}
+@keyframes thumb-fade {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Back link ──────────────────────────────────────────────────────────── */
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+    margin-top: var(--space-4, 1rem);
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    background: none;
+    padding: 0;
+}
+.back-link:hover {
+    color: var(--color-primary, #4ECDC4);
+}
+
+/* ─── Shared button styles (from design tokens) ─────────────────────────── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2, 0.5rem);
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: var(--weight-semibold, 600);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    background: transparent;
+    color: var(--color-text, #E0E0E0);
+}
+.btn:hover {
+    border-color: var(--color-primary, #4ECDC4);
+    color: var(--color-primary, #4ECDC4);
+}
+.btn-primary {
+    background: var(--color-primary, #4ECDC4);
+    color: var(--color-bg, #0A1628);
+    border-color: var(--color-primary, #4ECDC4);
+}
+.btn-primary:hover {
+    background: var(--color-primary-hover, #45b8b0);
+    border-color: var(--color-primary-hover, #45b8b0);
+}
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.btn-sm {
+    padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+    font-size: var(--text-small, 0.75rem);
+}
+
+/* ─── Folder options panel ───────────────────────────────────────────────── */
+.folder-options {
+    background: var(--bg-secondary, #16213E);
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius-md, 12px);
+    padding: var(--space-4, 1rem);
+    text-align: left;
+}
+.folder-options__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    margin-bottom: var(--space-1, 0.25rem);
+}
+.folder-options__icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+.folder-options__name {
+    font-weight: var(--weight-semibold, 600);
+    font-size: var(--text-body, 1rem);
+}
+.folder-options__summary {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-secondary, #8892A0);
+    margin-bottom: var(--space-2, 0.5rem);
+    padding-left: 1.75rem;
+}
+.folder-options__section {
+    border-top: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    padding-top: var(--space-3, 0.75rem);
+    margin-top: var(--space-3, 0.75rem);
+}
+.folder-options__label {
+    display: block;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text-secondary, #8892A0);
+    margin-bottom: var(--space-2, 0.5rem);
+}
+.folder-options__select {
+    width: 100%;
+    background: var(--bg-secondary, #16213E);
+    color: var(--color-text, #E0E0E0);
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius-sm, 6px);
+    padding: 0.5rem 0.625rem;
+    font-size: var(--text-sm, 0.875rem);
+    appearance: auto;
+}
+.folder-options__checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2, 0.5rem);
+}
+.folder-options__checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    font-size: var(--text-sm, 0.875rem);
+    cursor: pointer;
+}
+.folder-options__actions {
+    display: flex;
+    gap: var(--space-2, 0.5rem);
+    justify-content: flex-end;
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .browse-buttons { flex-direction: column; gap: var(--space-2, 0.5rem); }
+    .browse-btn { width: 100%; padding: var(--space-3, 0.75rem) var(--space-4, 1rem); }
+}
