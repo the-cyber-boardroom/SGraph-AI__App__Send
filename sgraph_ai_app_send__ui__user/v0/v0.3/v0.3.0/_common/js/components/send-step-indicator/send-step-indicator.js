@@ -1,6 +1,6 @@
 /* =============================================================================
    SGraph Send — Step Indicator Component
-   v0.3.0 — Six-step upload wizard progress display
+   v0.3.0 — Six-step upload wizard progress display (extends SendComponent)
 
    Usage:  <send-step-indicator step="1" total="6"></send-step-indicator>
    Attrs:  step  — current step (1-based)
@@ -9,33 +9,21 @@
    Reacts to attribute changes — parent sets step="2" and indicator updates.
    ============================================================================= */
 
-class SendStepIndicator extends HTMLElement {
+class SendStepIndicator extends SendComponent {
 
     static STEP_LABELS = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Encrypt & Upload', 'Done'];
 
-    constructor() {
-        super();
-        this.attachShadow({ mode: 'open' });
-        this._cssLink = null;
-    }
+    /** Shadow DOM: yes (inherited default). HTML template: no (dynamic render). */
+    static useTemplate = false;
 
     static get observedAttributes() { return ['step', 'total']; }
 
-    attributeChangedCallback() { this._render(); }
-
-    connectedCallback() {
-        this._ensureCss();
-        this._render();
+    attributeChangedCallback() {
+        if (this._resourcesLoaded) this._render();
     }
 
-    _ensureCss() {
-        if (this._cssLink) return;
-        const base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath)
-            || '../_common';
-        this._cssLink = document.createElement('link');
-        this._cssLink.rel  = 'stylesheet';
-        this._cssLink.href = base + '/js/components/send-step-indicator/send-step-indicator.css';
-        this.shadowRoot.appendChild(this._cssLink);
+    onReady() {
+        this._render();
     }
 
     get step()  { return parseInt(this.getAttribute('step')  || '1', 10); }
@@ -72,8 +60,7 @@ class SendStepIndicator extends HTMLElement {
             }
         }
 
-        // Preserve the <link> element, replace only the content
-        const content = this.shadowRoot.querySelector('.si-content');
+        // Update only the content wrapper, preserving CSS <style> tags
         const html = `
             <nav class="steps" role="navigation" aria-label="Upload progress">
                 ${stepsHtml.join('')}
@@ -81,31 +68,26 @@ class SendStepIndicator extends HTMLElement {
             <div class="label">Step ${step} of ${total}</div>
         `;
 
+        let content = this.$('.si-content');
         if (content) {
             content.innerHTML = html;
         } else {
             const wrapper = document.createElement('div');
             wrapper.className = 'si-content';
             wrapper.innerHTML = html;
-            this.shadowRoot.appendChild(wrapper);
+            this.renderRoot.appendChild(wrapper);
         }
 
-        // Wire click events on completed/active steps
         this._wireStepClicks();
     }
 
     _wireStepClicks() {
         var self = this;
-        var stepEls = this.shadowRoot.querySelectorAll('.step');
-        stepEls.forEach(function(el, idx) {
+        this.$$('.step').forEach(function(el, idx) {
             var stepNum = idx + 1;
             if (el.classList.contains('step--completed') || el.classList.contains('step--active')) {
                 el.addEventListener('click', function() {
-                    self.dispatchEvent(new CustomEvent('step-nav', {
-                        bubbles: true,
-                        composed: true,
-                        detail: { step: stepNum }
-                    }));
+                    self.emit('step-nav', { step: stepNum });
                 });
             }
         });
