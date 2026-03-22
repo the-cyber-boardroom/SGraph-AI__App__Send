@@ -207,7 +207,7 @@ class SendDownload extends HTMLElement {
 
     // ─── SGMETA Envelope ────────────────────────────────────────────────────
 
-    static SGMETA_MAGIC = [0x53, 0x47, 0x4D, 0x45, 0x54, 0x41, 0x00];
+    static SGMETA_MAGIC = [0x53, 0x47, 0x4D, 0x45, 0x54, 0x41];  // "SGMETA" — 6 bytes, matches upload-constants.js
 
     _extractMetadata(buf) {
         const bytes = new Uint8Array(buf);
