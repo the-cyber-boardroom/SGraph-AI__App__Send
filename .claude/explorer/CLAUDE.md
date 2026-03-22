@@ -6,7 +6,7 @@
 
 ## Reality Check — READ FIRST
 
-Before starting any Explorer session, read **`team/roles/librarian/reality/v0.6.36__what-exists-today.md`** — this is the code-verified record of what exists. When processing briefs or writing assessments, always distinguish between what EXISTS (listed in reality doc) and what is PROPOSED (not yet built). **When you ship new code, update the reality document in the same commit.**
+Before starting any Explorer session, read **`team/roles/librarian/reality/v0.16.26__what-exists-today.md`** — this is the code-verified record of what exists. When processing briefs or writing assessments, always distinguish between what EXISTS (listed in reality doc) and what is PROPOSED (not yet built). **When you ship new code, update the reality document in the same commit.**
 
 ---
 
@@ -108,14 +108,13 @@ When a component is mature enough for the Villager team:
 
 | Document | Path |
 |----------|------|
-| **Reality document** | `team/roles/librarian/reality/v0.6.36__what-exists-today.md` |
+| **Reality document** | `team/roles/librarian/reality/v0.16.26__what-exists-today.md` |
 | Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
 | Wardley Maps context | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
-| Daily brief (v0.3.2) | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__daily-brief__sgraph-send-14-feb-2026.md` |
-| Daily brief (v0.3.0) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.3.0__daily-brief__sgraph-send-14-feb-2026.md` |
 | IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |
-| Latest debrief | `team/humans/dinis_cruz/debriefs/02/14/v0.3.0__debrief__daily-brief-responses-and-admin-ui.md` |
-| Master index | `team/roles/librarian/reviews/02/14/v0.3.0__master-index__daily-brief-responses-14-feb.md` |
+| Latest debrief | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__debrief__briefs-processing-13-to-18-march.md` |
+| Session handoff | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` |
+| Master index | `team/roles/librarian/reviews/03/18/v0.16.26__master-index__briefs-13-to-18-march.md` |
 
 ---
 
