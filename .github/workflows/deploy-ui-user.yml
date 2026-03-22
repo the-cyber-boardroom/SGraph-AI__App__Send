@@ -35,6 +35,7 @@ on:
       - main
     paths:
       - 'sgraph_ai_app_send__ui__user/v0/v0.2/**'
+      - 'sgraph_ai_app_send__ui__user/v0/v0.3/**'
       - 'sgraph_ai_app_send/version'
       - 'scripts/generate_send_i18n_pages.py'
       - 'scripts/inject_build_version.py'
@@ -61,7 +62,8 @@ concurrency:
 
 env:
   AWS_REGION       : eu-west-2
-  UI_BASE_DIR      : sgraph_ai_app_send__ui__user/v0/v0.2
+  UI_BASE_DIR_V02  : sgraph_ai_app_send__ui__user/v0/v0.2
+  UI_BASE_DIR_V03  : sgraph_ai_app_send__ui__user/v0/v0.3
   UI_VERSION_BASE  : v0.2.0
 
 jobs:
@@ -84,23 +86,40 @@ jobs:
         id: discover
         run: |
           # Find all v0.2.x directories, sort by version number
-          VERSIONS=$(ls -d ${{ env.UI_BASE_DIR }}/v0.2.* | xargs -n1 basename | sort -t. -k3 -n)
-          echo "Found IFD versions:"
-          echo "$VERSIONS"
-          # Store as space-separated list
-          echo "versions=$(echo $VERSIONS | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          VERSIONS_V02=$(ls -d ${{ env.UI_BASE_DIR_V02 }}/v0.2.* 2>/dev/null | xargs -n1 basename | sort -t. -k3 -n || true)
+          echo "Found v0.2.x IFD versions:"
+          echo "$VERSIONS_V02"
+          echo "versions_v02=$(echo $VERSIONS_V02 | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+          # Find all v0.3.x directories (self-contained, no overlays)
+          VERSIONS_V03=$(ls -d ${{ env.UI_BASE_DIR_V03 }}/v0.3.* 2>/dev/null | xargs -n1 basename | sort -t. -k3 -n || true)
+          echo "Found v0.3.x versions:"
+          echo "$VERSIONS_V03"
+          echo "versions_v03=$(echo $VERSIONS_V03 | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+          # Combined list for build steps
+          ALL_VERSIONS="$VERSIONS_V02 $VERSIONS_V03"
+          echo "versions=$(echo $ALL_VERSIONS | tr '\n' ' ' | xargs)" >> $GITHUB_OUTPUT
 
       - name: Inject build version into all IFD versions
         run: |
-          for VERSION in ${{ steps.discover.outputs.versions }}; do
-            echo "Injecting build version into $VERSION"
+          for VERSION in ${{ steps.discover.outputs.versions_v02 }}; do
+            echo "Injecting build version into $VERSION (v0.2.x)"
+            python scripts/inject_build_version.py --version "$VERSION"
+          done
+          for VERSION in ${{ steps.discover.outputs.versions_v03 }}; do
+            echo "Injecting build version into $VERSION (v0.3.x)"
             python scripts/inject_build_version.py --version "$VERSION"
           done
 
       - name: Generate i18n locale pages for all IFD versions
         run: |
-          for VERSION in ${{ steps.discover.outputs.versions }}; do
-            echo "Generating i18n pages for $VERSION"
+          for VERSION in ${{ steps.discover.outputs.versions_v02 }}; do
+            echo "Generating i18n pages for $VERSION (v0.2.x)"
+            python scripts/generate_send_i18n_pages.py --version "$VERSION"
+          done
+          for VERSION in ${{ steps.discover.outputs.versions_v03 }}; do
+            echo "Generating i18n pages for $VERSION (v0.3.x)"
             python scripts/generate_send_i18n_pages.py --version "$VERSION"
           done
 
@@ -143,14 +162,18 @@ jobs:
       - name: Deploy all IFD versions to S3 (base + overlays in order)
         if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
-          VERSIONS=(${{ steps.discover.outputs.versions }})
-          LAST_INDEX=$(( ${#VERSIONS[@]} - 1 ))
+          # Deploy v0.2.x versions (IFD overlay chain)
+          VERSIONS_V02=(${{ steps.discover.outputs.versions_v02 }})
+          VERSIONS_V03=(${{ steps.discover.outputs.versions_v03 }})
+          TOTAL=$(( ${#VERSIONS_V02[@]} + ${#VERSIONS_V03[@]} ))
+          DEPLOY_COUNT=0
 
-          for i in "${!VERSIONS[@]}"; do
-            VERSION="${VERSIONS[$i]}"
-            SOURCE_DIR="${{ env.UI_BASE_DIR }}/$VERSION"
+          for i in "${!VERSIONS_V02[@]}"; do
+            VERSION="${VERSIONS_V02[$i]}"
+            SOURCE_DIR="${{ env.UI_BASE_DIR_V02 }}/$VERSION"
+            DEPLOY_COUNT=$((DEPLOY_COUNT + 1))
             echo ""
-            echo "=== Deploying $VERSION ($SOURCE_DIR) ==="
+            echo "=== Deploying $VERSION ($SOURCE_DIR) [v0.2.x overlay $DEPLOY_COUNT/$TOTAL] ==="
 
             EXTRA_FLAGS=""
 
@@ -159,8 +182,29 @@ jobs:
               EXTRA_FLAGS="--clean-latest"
             fi
 
-            # Last version: include CloudFront invalidation and version file
-            if [ "$i" -eq "$LAST_INDEX" ]; then
+            python scripts/deploy_static_site.py \
+              --site sgraph-send \
+              --version "$VERSION" \
+              --source-dir "$SOURCE_DIR" \
+              --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
+              --region ${{ env.AWS_REGION }} \
+              --deploy-env ${{ steps.env.outputs.deploy_env }} \
+              --skip-validation \
+              $EXTRA_FLAGS
+          done
+
+          # Deploy v0.3.x versions (self-contained, no overlay chain)
+          for i in "${!VERSIONS_V03[@]}"; do
+            VERSION="${VERSIONS_V03[$i]}"
+            SOURCE_DIR="${{ env.UI_BASE_DIR_V03 }}/$VERSION"
+            DEPLOY_COUNT=$((DEPLOY_COUNT + 1))
+            echo ""
+            echo "=== Deploying $VERSION ($SOURCE_DIR) [v0.3.x self-contained $DEPLOY_COUNT/$TOTAL] ==="
+
+            EXTRA_FLAGS=""
+
+            # Last overall version: include CloudFront invalidation and version file
+            if [ "$DEPLOY_COUNT" -eq "$TOTAL" ]; then
               EXTRA_FLAGS="$EXTRA_FLAGS --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} --version-file sgraph_ai_app_send/version"
             fi
 
@@ -176,4 +220,4 @@ jobs:
           done
 
           echo ""
-          echo "=== Deployed ${#VERSIONS[@]} IFD versions: ${VERSIONS[*]} ==="
+          echo "=== Deployed $TOTAL versions: ${VERSIONS_V02[*]} ${VERSIONS_V03[*]} ==="

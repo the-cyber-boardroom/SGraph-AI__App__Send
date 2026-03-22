@@ -1,0 +1,701 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Browse Component v0.3.0
+   Clean rewrite — folder tree + tabbed file preview using sg-layout
+
+   Uses sg-layout for:
+     - Left panel:  folder tree (locked, ~20% width)
+     - Right panel: tabbed file previews (tabs added on click)
+
+   Zero dependency on v0.1.x / v0.2.x overlay chain.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+class SendBrowse extends HTMLElement {
+
+    constructor() {
+        super();
+        this.zipTree      = null;
+        this.zipInstance   = null;
+        this.zipOrigBytes = null;
+        this.zipOrigName  = null;
+        this.fileName     = null;
+        this.transferId   = null;
+        this.downloadUrl  = null;
+
+        this._sgLayout    = null;
+        this._tabCounter  = 0;
+        this._objectUrls  = [];
+    }
+
+    connectedCallback() {
+        if (this.zipTree) this._build();
+    }
+
+    disconnectedCallback() {
+        this._objectUrls.forEach(u => URL.revokeObjectURL(u));
+        this._objectUrls = [];
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Build
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    _build() {
+        this.innerHTML = `
+            <style>${SendBrowse.CSS}</style>
+            <div class="sb-container">
+                <div class="sb-header">
+                    <div class="sb-header__left">
+                        <span class="sb-header__icon">${SendBrowse.ICON_FOLDER}</span>
+                        <span class="sb-header__name">${SendHelpers.escapeHtml(this.fileName || 'Archive')}</span>
+                        <span class="sb-header__meta">${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)}</span>
+                        <span class="sb-header__status">&#10003; Decrypted</span>
+                    </div>
+                    <div class="sb-header__right">
+                        <button class="sb-action-btn" id="sb-copy-link">${SendBrowse.ICON_LINK} Copy Link</button>
+                        <button class="sb-save-btn" id="sb-save-zip">${SendBrowse.ICON_DOWNLOAD} Save locally</button>
+                        <a href="?id=${this.transferId}#gallery" class="sb-action-btn">Gallery view</a>
+                    </div>
+                </div>
+                <sg-layout id="sb-layout"></sg-layout>
+            </div>
+        `;
+
+        this._sgLayout = this.querySelector('#sb-layout');
+        this._setupHeaderListeners();
+        this._initLayout();
+    }
+
+    // ─── sg-layout Initialisation ───────────────────────────────────────────
+
+    _initLayout() {
+        const layoutEl = this._sgLayout;
+        if (!layoutEl) return;
+
+        customElements.whenDefined('sg-layout').then(() => {
+            layoutEl.setLayout({
+                type: 'row', id: 'root', sizes: [0.22, 0.78],
+                children: [
+                    {
+                        type: 'stack', id: 's-tree', activeTab: 0,
+                        tabs: [
+                            { type: 'tab', id: 't-tree', title: 'Files', tag: 'div', state: {}, locked: true }
+                        ]
+                    },
+                    {
+                        type: 'stack', id: 's-preview', activeTab: 0,
+                        tabs: []
+                    }
+                ]
+            });
+
+            requestAnimationFrame(() => {
+                this._populateTree();
+                this._autoOpenFirstFile();
+            });
+        });
+    }
+
+    // ─── Folder Tree ────────────────────────────────────────────────────────
+
+    _populateTree() {
+        if (!this._sgLayout) return;
+        const treeEl = this._sgLayout.getPanelElement('t-tree');
+        if (!treeEl) return;
+
+        treeEl.style.cssText = 'overflow-y: auto; height: 100%; padding: 0.5rem;';
+        treeEl.innerHTML = '';
+
+        // Build folder structure
+        const tree = this._buildFolderTree();
+        const treeHtml = this._renderFolderNode(tree, '');
+        treeEl.innerHTML = `
+            <div class="sb-tree__controls">
+                <button class="sb-tree__ctrl-btn" id="sb-expand-all" title="Expand all">+</button>
+                <button class="sb-tree__ctrl-btn" id="sb-collapse-all" title="Collapse all">−</button>
+            </div>
+            ${treeHtml}
+        `;
+
+        this._setupTreeListeners(treeEl);
+    }
+
+    _buildFolderTree() {
+        const root = { name: '', children: {}, files: [] };
+        const files = this.zipTree.filter(e => !e.dir);
+
+        for (const file of files) {
+            const parts = file.path.split('/');
+            let node = root;
+            for (let i = 0; i < parts.length - 1; i++) {
+                if (!node.children[parts[i]]) {
+                    node.children[parts[i]] = { name: parts[i], children: {}, files: [] };
+                }
+                node = node.children[parts[i]];
+            }
+            node.files.push(file);
+        }
+        return root;
+    }
+
+    _renderFolderNode(node, prefix) {
+        let html = '';
+
+        // Folders
+        const folders = Object.keys(node.children).sort();
+        for (const name of folders) {
+            const child = node.children[name];
+            const childPath = prefix ? `${prefix}/${name}` : name;
+            const fileCount = this._countFiles(child);
+            html += `
+                <div class="sb-tree__folder" data-path="${SendHelpers.escapeHtml(childPath)}">
+                    <div class="sb-tree__folder-header">
+                        <span class="sb-tree__toggle">▸</span>
+                        <span class="sb-tree__folder-icon">${SendBrowse.ICON_FOLDER_SM}</span>
+                        <span class="sb-tree__folder-name">${SendHelpers.escapeHtml(name)}</span>
+                        <span class="sb-tree__count">${fileCount}</span>
+                    </div>
+                    <div class="sb-tree__folder-content" style="display: none;">
+                        ${this._renderFolderNode(child, childPath)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Files
+        for (const file of node.files) {
+            const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(file.name, null) : null;
+            const icon = SendBrowse.FILE_ICONS[type] || SendBrowse.FILE_ICONS.other;
+            html += `
+                <div class="sb-tree__file" data-path="${SendHelpers.escapeHtml(file.path)}">
+                    <span class="sb-tree__file-icon">${icon}</span>
+                    <span class="sb-tree__file-name">${SendHelpers.escapeHtml(file.name)}</span>
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    _countFiles(node) {
+        let count = node.files.length;
+        for (const child of Object.values(node.children)) {
+            count += this._countFiles(child);
+        }
+        return count;
+    }
+
+    _setupTreeListeners(treeEl) {
+        // Folder expand/collapse
+        treeEl.querySelectorAll('.sb-tree__folder-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const folder = header.closest('.sb-tree__folder');
+                const content = folder.querySelector('.sb-tree__folder-content');
+                const toggle = header.querySelector('.sb-tree__toggle');
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    toggle.textContent = '▾';
+                } else {
+                    content.style.display = 'none';
+                    toggle.textContent = '▸';
+                }
+            });
+        });
+
+        // File click → open in tab
+        treeEl.querySelectorAll('.sb-tree__file').forEach(fileEl => {
+            fileEl.addEventListener('click', () => {
+                const path = fileEl.dataset.path;
+                if (path) this._openFileTab(path);
+
+                // Highlight active file
+                treeEl.querySelectorAll('.sb-tree__file').forEach(f => f.classList.remove('sb-tree__file--active'));
+                fileEl.classList.add('sb-tree__file--active');
+            });
+        });
+
+        // Expand/collapse all
+        const expandAll = treeEl.querySelector('#sb-expand-all');
+        if (expandAll) expandAll.addEventListener('click', () => {
+            treeEl.querySelectorAll('.sb-tree__folder-content').forEach(c => c.style.display = 'block');
+            treeEl.querySelectorAll('.sb-tree__toggle').forEach(t => t.textContent = '▾');
+        });
+
+        const collapseAll = treeEl.querySelector('#sb-collapse-all');
+        if (collapseAll) collapseAll.addEventListener('click', () => {
+            treeEl.querySelectorAll('.sb-tree__folder-content').forEach(c => c.style.display = 'none');
+            treeEl.querySelectorAll('.sb-tree__toggle').forEach(t => t.textContent = '▸');
+        });
+    }
+
+    // ─── Auto-open first file ───────────────────────────────────────────────
+
+    _autoOpenFirstFile() {
+        const files = this.zipTree.filter(e => !e.dir);
+        // Prefer first root-level non-metadata file
+        const root = files.find(f => !f.path.includes('/') && !f.name.startsWith('_') && !f.name.startsWith('.'));
+        const first = root || files[0];
+        if (first) this._openFileTab(first.path);
+    }
+
+    // ─── Open File in Tab ───────────────────────────────────────────────────
+
+    async _openFileTab(path) {
+        if (!this._sgLayout) return;
+
+        const entry = this.zipTree.find(e => e.path === path && !e.dir);
+        if (!entry) return;
+
+        // Sanitised tab ID
+        const tabId = 't-file-' + path.replace(/[^a-zA-Z0-9]/g, '_');
+
+        // If tab exists, focus it
+        const existing = this._sgLayout.getPanelElement(tabId);
+        if (existing) {
+            try { this._sgLayout.focusPanel(tabId); } catch (_) {}
+            return;
+        }
+
+        // Ensure preview stack exists
+        this._ensurePreviewStack();
+
+        // Add tab
+        const newId = this._sgLayout.addTabToStack('s-preview', {
+            tag: 'div', title: entry.name, state: { path }
+        }, true);
+
+        if (!newId) return;
+
+        requestAnimationFrame(async () => {
+            const el = this._sgLayout.getPanelElement(newId);
+            if (!el) return;
+            el.style.cssText = 'display: flex; flex-direction: column; height: 100%; overflow: hidden;';
+            el.innerHTML = '<div style="padding: 1rem; color: var(--color-text-secondary);">Loading...</div>';
+
+            try {
+                const bytes = await entry.entry.async('arraybuffer');
+                const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(entry.name, null) : null;
+                this._renderFileContent(el, bytes, entry.name, type);
+            } catch (err) {
+                el.innerHTML = `<div style="padding: 1rem; color: var(--color-error, #e74c3c);">Failed to load: ${SendHelpers.escapeHtml(err.message)}</div>`;
+            }
+        });
+    }
+
+    _ensurePreviewStack() {
+        if (!this._sgLayout) return;
+        // Test if preview stack exists
+        try {
+            const testId = this._sgLayout.addTabToStack('s-preview', { tag: 'div', title: '__test__' }, false);
+            if (testId) this._sgLayout.removePanel(testId);
+        } catch (_) {
+            // Stack was destroyed — rebuild layout
+            this._initLayout();
+        }
+    }
+
+    // ─── File Rendering ─────────────────────────────────────────────────────
+
+    _renderFileContent(container, bytes, fileName, type) {
+        container.innerHTML = '';
+
+        // Action bar
+        const bar = document.createElement('div');
+        bar.className = 'sb-file__actions';
+        bar.innerHTML = `
+            <span class="sb-file__name">${SendHelpers.escapeHtml(fileName)}</span>
+            <span class="sb-file__size">${SendHelpers.formatBytes(bytes.byteLength)}</span>
+            <button class="sb-action-btn sb-file__save">${SendBrowse.ICON_DOWNLOAD} Save</button>
+        `;
+        container.appendChild(bar);
+
+        bar.querySelector('.sb-file__save').addEventListener('click', () => {
+            const blob = new Blob([bytes]);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = fileName;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // Content area
+        const content = document.createElement('div');
+        content.className = 'sb-file__content';
+        container.appendChild(content);
+
+        if (type === 'image') {
+            const mime = FileTypeDetect.getImageMime(fileName) || 'image/jpeg';
+            const blob = new Blob([bytes], { type: mime });
+            const url = URL.createObjectURL(blob);
+            this._objectUrls.push(url);
+            content.innerHTML = `<img src="${url}" class="sb-file__image" alt="${SendHelpers.escapeHtml(fileName)}">`;
+
+        } else if (type === 'markdown') {
+            const text = new TextDecoder().decode(bytes);
+            const html = typeof MarkdownParser !== 'undefined' ? MarkdownParser.parse(text) : SendHelpers.escapeHtml(text);
+            content.innerHTML = `<div class="sb-file__markdown">${html}</div>`;
+
+        } else if (type === 'pdf') {
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            this._objectUrls.push(url);
+            content.innerHTML = `<iframe src="${url}" class="sb-file__pdf"></iframe>`;
+
+        } else if (type === 'code' || type === 'text') {
+            const text = new TextDecoder().decode(bytes);
+            content.innerHTML = `<pre class="sb-file__code">${SendHelpers.escapeHtml(text)}</pre>`;
+
+        } else if (type === 'audio') {
+            const mime = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.getAudioMime(fileName) : 'audio/mpeg';
+            const blob = new Blob([bytes], { type: mime });
+            const url = URL.createObjectURL(blob);
+            this._objectUrls.push(url);
+            content.innerHTML = `<audio controls src="${url}" style="width: 100%; margin: 2rem 0;"></audio>`;
+
+        } else if (type === 'video') {
+            const mime = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.getVideoMime(fileName) : 'video/mp4';
+            const blob = new Blob([bytes], { type: mime });
+            const url = URL.createObjectURL(blob);
+            this._objectUrls.push(url);
+            content.innerHTML = `<video controls src="${url}" style="max-width: 100%; max-height: 80vh;"></video>`;
+
+        } else {
+            content.innerHTML = `
+                <div style="padding: 2rem; text-align: center; color: var(--color-text-secondary);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
+                    <p>No preview available for this file type.</p>
+                    <p style="font-size: 0.8rem;">${SendHelpers.escapeHtml(fileName)} · ${SendHelpers.formatBytes(bytes.byteLength)}</p>
+                </div>`;
+        }
+    }
+
+    // ─── Header Listeners ───────────────────────────────────────────────────
+
+    _setupHeaderListeners() {
+        const saveBtn = this.querySelector('#sb-save-zip');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+            if (this.zipOrigBytes) {
+                const blob = new Blob([this.zipOrigBytes]);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = this.zipOrigName || 'archive.zip';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        });
+
+        const copyBtn = this.querySelector('#sb-copy-link');
+        if (copyBtn) copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(this.downloadUrl || window.location.href);
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.innerHTML = `${SendBrowse.ICON_LINK} Copy Link`; }, 2000);
+            } catch (_) {}
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Static Assets
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    static ICON_FOLDER    = '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 3h4l2 2h6v8H2z"/></svg>';
+    static ICON_FOLDER_SM = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--accent, #4ECDC4)" stroke-width="1.5"><path d="M2 3h4l2 2h6v8H2z"/></svg>';
+    static ICON_LINK      = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 8.5a3 3 0 004.2.4l2-2a3 3 0 00-4.2-4.2L7.3 3.9"/><path d="M9.5 7.5a3 3 0 00-4.2-.4l-2 2a3 3 0 004.2 4.2l1.2-1.2"/></svg>';
+    static ICON_DOWNLOAD  = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 13h12"/></svg>';
+
+    static FILE_ICONS = {
+        image:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#4ECDC4" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="6" cy="6" r="1.5"/><path d="M2 12l4-4 3 3 2-2 3 3"/></svg>',
+        pdf:      '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#e74c3c" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M6 6h4M6 9h4"/></svg>',
+        markdown: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#3498db" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M4 10V6l2 2.5L8 6v4M11 8l1.5 1.5L14 8"/></svg>',
+        code:     '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#9b59b6" stroke-width="1.5"><path d="M5 4L2 8l3 4M11 4l3 4-3 4M7 12l2-8"/></svg>',
+        text:     '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#95a5a6" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M6 5h4M6 8h4M6 11h2"/></svg>',
+        audio:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#e67e22" stroke-width="1.5"><path d="M7 4v8l-3-3H2v-2h2l3-3z"/><path d="M10 5.5a3.5 3.5 0 010 5"/></svg>',
+        video:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#d35400" stroke-width="1.5"><rect x="1" y="3" width="10" height="10" rx="1.5"/><path d="M11 6l4-2v8l-4-2z"/></svg>',
+        other:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#7f8c8d" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M10 1v4h3"/></svg>',
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CSS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    static CSS = `
+/* ─── Container ──────────────────────────────────────────────────────── */
+
+.sb-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 80px);
+    overflow: hidden;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────── */
+
+.sb-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+}
+
+.sb-header__left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sb-header__right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sb-header__icon { color: var(--accent, #4ECDC4); display: flex; }
+
+.sb-header__name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.sb-header__meta {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.sb-header__status {
+    font-size: 0.75rem;
+    color: #2ecc71;
+}
+
+/* ─── sg-layout ──────────────────────────────────────────────────────── */
+
+#sb-layout {
+    flex: 1;
+    min-height: 0;
+}
+
+/* ─── Action Buttons ─────────────────────────────────────────────────── */
+
+.sb-action-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.sb-action-btn:hover {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
+}
+
+.sb-save-btn {
+    background: var(--accent, #4ECDC4);
+    color: #0a0e17;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.sb-save-btn:hover { opacity: 0.85; }
+
+/* ─── Tree View ──────────────────────────────────────────────────────── */
+
+.sb-tree__controls {
+    display: flex;
+    gap: 4px;
+    padding: 4px 0;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.sb-tree__ctrl-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sb-tree__ctrl-btn:hover {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
+}
+
+.sb-tree__folder {
+    margin-left: 4px;
+}
+
+.sb-tree__folder-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    user-select: none;
+}
+
+.sb-tree__folder-header:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.sb-tree__toggle {
+    font-size: 0.65rem;
+    color: var(--color-text-secondary, #8892A0);
+    width: 12px;
+    text-align: center;
+}
+
+.sb-tree__folder-icon { display: flex; }
+
+.sb-tree__folder-name {
+    flex: 1;
+    color: var(--color-text, #E0E0E0);
+}
+
+.sb-tree__count {
+    font-size: 0.65rem;
+    color: var(--color-text-secondary, #8892A0);
+    background: rgba(255,255,255,0.05);
+    padding: 0 4px;
+    border-radius: 8px;
+}
+
+.sb-tree__folder-content {
+    margin-left: 12px;
+}
+
+.sb-tree__file {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px 3px 20px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.sb-tree__file:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.sb-tree__file--active {
+    background: rgba(78, 205, 196, 0.1);
+    border-left: 2px solid var(--accent, #4ECDC4);
+}
+
+.sb-tree__file-icon { display: flex; flex-shrink: 0; }
+
+.sb-tree__file-name {
+    color: var(--color-text, #E0E0E0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ─── File Content ───────────────────────────────────────────────────── */
+
+.sb-file__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+}
+
+.sb-file__name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sb-file__size {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.sb-file__content {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.sb-file__image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+    margin: auto;
+    background: repeating-conic-gradient(#80808015 0% 25%, transparent 0% 50%) 50% / 16px 16px;
+}
+
+.sb-file__markdown {
+    background: white;
+    color: #1a1a1a;
+    padding: 2rem;
+    line-height: 1.6;
+    max-width: 800px;
+    margin: 0 auto;
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+.sb-file__markdown h1, .sb-file__markdown h2 { border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
+.sb-file__markdown code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+.sb-file__markdown pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+.sb-file__markdown pre code { background: none; padding: 0; }
+.sb-file__markdown blockquote { border-left: 3px solid #ddd; margin-left: 0; padding-left: 1rem; color: #555; }
+.sb-file__markdown table { border-collapse: collapse; width: 100%; }
+.sb-file__markdown th, .sb-file__markdown td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+.sb-file__markdown th { background: #f4f4f4; }
+
+.sb-file__pdf {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.sb-file__code {
+    margin: 0;
+    padding: 1.5rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+}
+`;
+}
+
+customElements.define('send-browse', SendBrowse);
