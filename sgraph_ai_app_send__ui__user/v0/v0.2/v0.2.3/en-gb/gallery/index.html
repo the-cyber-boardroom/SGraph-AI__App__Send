@@ -83,6 +83,26 @@
     <script src="../../_common/js/markdown-parser.js"></script>
     <script src="../../_common/js/sg-print.js"></script>
 
+    <!-- 1b. SECURITY: Block early API calls that would leak friendly tokens -->
+    <script>
+    (function() {
+        var origFetch = window.fetch;
+        window.fetch = function(url) {
+            if (typeof url === 'string') {
+                var match = url.match(/\/api\/transfers\/info\/(.+?)(?:\?|$)/);
+                if (match && typeof FriendlyCrypto !== 'undefined' &&
+                    FriendlyCrypto.isFriendlyToken(match[1])) {
+                    console.warn('[security] Blocked API call that would leak friendly token:', match[1]);
+                    return Promise.resolve(new Response('{"error":"blocked"}', {
+                        status: 404, headers: { 'Content-Type': 'application/json' }
+                    }));
+                }
+            }
+            return origFetch.apply(this, arguments);
+        };
+    })();
+    </script>
+
     <!-- 2. Base system -->
     <script src="../../_common/js/base/send-helpers.js"></script>
     <script src="../../_common/js/base/send-component-paths.js"></script>
