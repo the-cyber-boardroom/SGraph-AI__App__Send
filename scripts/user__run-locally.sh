@@ -90,11 +90,8 @@ JSEOF
 
 # ─── Test files ──────────────────────────────────────────────────────────────
 # The send-test-files component resolves ../test-files from en-gb/ → /test-files/
-TEST_FILES_V020="$STATIC_DIR/v0/v0.2/v0.2.0/test-files"
 if [ -d "$UI_DIR/test-files" ]; then
     ln -sf "$UI_DIR/test-files" "$SERVE_DIR/test-files"
-elif [ -d "$TEST_FILES_V020" ]; then
-    ln -sf "$TEST_FILES_V020" "$SERVE_DIR/test-files"
 fi
 
 # ─── Root redirect ───────────────────────────────────────────────────────────
