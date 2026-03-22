@@ -249,7 +249,7 @@ class UploadStepSelect extends HTMLElement {
             name = file.name;
             const typeParts = [];
             if (info.label) typeParts.push(info.label);
-            if (info.ext)   typeParts.push(info.ext);
+            if (info.ext)   typeParts.push(this._esc(info.ext));
             const typeLabel = typeParts.length > 0 ? typeParts.join(' &middot; ') + ' &middot; ' : '';
             meta = `${typeLabel}${this._fmt(file.size)}`;
         } else {
