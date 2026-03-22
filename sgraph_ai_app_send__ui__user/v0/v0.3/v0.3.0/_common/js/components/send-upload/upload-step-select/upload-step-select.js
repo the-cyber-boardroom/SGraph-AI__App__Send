@@ -386,21 +386,42 @@ class UploadStepSelect extends HTMLElement {
         e.preventDefault();
         e.stopPropagation();
         const dropZone = this.shadowRoot.querySelector('#drop-zone');
-        if (dropZone) dropZone.classList.add('dragover');
+        if (dropZone) {
+            dropZone.classList.add('dragover');
+            const label = dropZone.querySelector('.drop-zone__label');
+            if (label && !label._originalText) {
+                label._originalText = label.textContent;
+                label.textContent = 'Release to upload';
+            }
+        }
     }
 
     _onDragLeave(e) {
         e.preventDefault();
         e.stopPropagation();
         const dropZone = this.shadowRoot.querySelector('#drop-zone');
-        if (dropZone) dropZone.classList.remove('dragover');
+        if (dropZone) {
+            dropZone.classList.remove('dragover');
+            const label = dropZone.querySelector('.drop-zone__label');
+            if (label && label._originalText) {
+                label.textContent = label._originalText;
+                label._originalText = null;
+            }
+        }
     }
 
     _onDrop(e) {
         e.preventDefault();
         e.stopPropagation();
         const dropZone = this.shadowRoot.querySelector('#drop-zone');
-        if (dropZone) dropZone.classList.remove('dragover');
+        if (dropZone) {
+            dropZone.classList.remove('dragover');
+            const label = dropZone.querySelector('.drop-zone__label');
+            if (label && label._originalText) {
+                label.textContent = label._originalText;
+                label._originalText = null;
+            }
+        }
         this._emit('step-file-dropped', {
             files: e.dataTransfer.files,
             items: e.dataTransfer.items,
