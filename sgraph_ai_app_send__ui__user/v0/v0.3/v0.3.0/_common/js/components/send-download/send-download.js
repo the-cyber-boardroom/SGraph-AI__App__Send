@@ -167,10 +167,11 @@ class SendDownload extends HTMLElement {
 
     async _resolveFriendlyToken(gen) {
         try {
-            const resolved = await FriendlyCrypto.resolve(this._friendlyToken);
+            // Derive transfer ID (SHA-256 → 12 hex chars) and AES key (PBKDF2)
+            this.transferId = await FriendlyCrypto.deriveTransferId(this._friendlyToken);
+            const cryptoKey = await FriendlyCrypto.deriveKey(this._friendlyToken);
+            this.hashKey    = await FriendlyCrypto.exportKey(cryptoKey);
             if (gen !== this._loadGeneration) return;  // stale
-            this.transferId = resolved.transferId;
-            this.hashKey    = resolved.key;
 
             this.transferInfo = await ApiClient.getTransferInfo(this.transferId);
             if (gen !== this._loadGeneration) return;  // stale
