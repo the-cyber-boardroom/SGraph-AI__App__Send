@@ -1,12 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Gallery Component v0.3.0
-   Clean rewrite — responsive thumbnail grid with lightbox
+   SGraph Send — Gallery Component v0.3.0 (extends SendComponent)
+   Responsive thumbnail grid with lightbox
 
    View modes:  compact (5+ cols)  |  grid (4 cols)  |  large (2-3 cols)
    Features:    Lightbox, type badges, file save, share, print
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-class SendGallery extends HTMLElement {
+class SendGallery extends SendComponent {
+
+    /** Light DOM — CSS goes to document.head. No HTML template — dynamic render. */
+    static useShadow   = false;
+    static useTemplate = false;
 
     constructor() {
         super();
@@ -24,11 +28,14 @@ class SendGallery extends HTMLElement {
         this._entries       = [];
     }
 
-    connectedCallback() {
+    async connectedCallback() {
+        await this.loadResources();
+        this._resourcesLoaded = true;
         if (this.zipTree) this._build();
     }
 
     disconnectedCallback() {
+        super.disconnectedCallback();
         this._revokeUrls();
     }
 
@@ -50,15 +57,14 @@ class SendGallery extends HTMLElement {
         const files = this.zipTree.filter(e => !e.dir);
         this._entries = files;
 
-        SendGallery._injectCss();
         this.innerHTML = `
             <div class="sg-gallery">
                 <div class="sg-gallery__header">
                     <div class="sg-gallery__header-left">
                         <span class="sg-gallery__icon">${SendIcons.GRID}</span>
-                        <span class="sg-gallery__name">${SendHelpers.escapeHtml(this.fileName || 'Archive')}</span>
+                        <span class="sg-gallery__name">${this.escapeHtml(this.fileName || 'Archive')}</span>
                         <span class="sg-gallery__badge">gallery</span>
-                        <span class="sg-gallery__meta">${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)} · ${files.length} files</span>
+                        <span class="sg-gallery__meta">${this.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)} · ${files.length} files</span>
                     </div>
                     <div class="sg-gallery__header-right">
                         <div class="sg-gallery__modes">
@@ -86,7 +92,7 @@ class SendGallery extends HTMLElement {
     // ─── Thumbnail Loading ──────────────────────────────────────────────────
 
     async _loadThumbnails() {
-        const grid = this.querySelector('#sg-grid');
+        const grid = this.$('#sg-grid');
         if (!grid) return;
 
         for (let i = 0; i < this._entries.length; i++) {
@@ -110,7 +116,6 @@ class SendGallery extends HTMLElement {
             imgDiv.appendChild(badge);
 
             if (type === 'image') {
-                // Load preview thumbnail if available, else load actual image
                 const previewPath = this._findPreview(entry.path);
                 const thumbEntry = previewPath
                     ? this.zipTree.find(e => e.path === previewPath)
@@ -127,7 +132,6 @@ class SendGallery extends HTMLElement {
                     imgDiv.innerHTML += SendIcons.TYPE_ICONS.image;
                 }
             } else {
-                // Non-image: show type icon
                 imgDiv.innerHTML += (SendIcons.TYPE_ICONS[type] || SendIcons.TYPE_ICONS.other);
             }
 
@@ -139,13 +143,11 @@ class SendGallery extends HTMLElement {
             card.appendChild(label);
             grid.appendChild(card);
 
-            // Click handler
             card.addEventListener('click', () => this._openLightbox(i));
         }
     }
 
     _findPreview(path) {
-        // Look for _preview/ version of this file
         const name = path.split('/').pop();
         const candidates = [
             `_preview/${name}`,
@@ -183,7 +185,7 @@ class SendGallery extends HTMLElement {
 
     async _openLightbox(index) {
         this._lightboxIndex = index;
-        const lb = this.querySelector('#sg-lightbox');
+        const lb = this.$('#sg-lightbox');
         if (!lb) return;
         lb.style.display = 'flex';
         await this._showLightboxItem(index);
@@ -191,7 +193,7 @@ class SendGallery extends HTMLElement {
     }
 
     _closeLightbox() {
-        const lb = this.querySelector('#sg-lightbox');
+        const lb = this.$('#sg-lightbox');
         if (lb) lb.style.display = 'none';
         document.removeEventListener('keydown', this._lbKeyHandler);
     }
@@ -201,9 +203,9 @@ class SendGallery extends HTMLElement {
         if (!entry) return;
 
         this._lightboxIndex = index;
-        const title   = this.querySelector('#sg-lb-title');
-        const content = this.querySelector('#sg-lb-content');
-        const counter = this.querySelector('#sg-lb-counter');
+        const title   = this.$('#sg-lb-title');
+        const content = this.$('#sg-lb-content');
+        const counter = this.$('#sg-lb-counter');
         if (title)   title.textContent = entry.name;
         if (counter) counter.textContent = `${index + 1} / ${this._entries.length}`;
         if (!content) return;
@@ -221,10 +223,10 @@ class SendGallery extends HTMLElement {
                 const blob = new Blob([bytes], { type: mime });
                 const url = URL.createObjectURL(blob);
                 this._thumbUrls.push(url);
-                content.innerHTML = `<img src="${url}" class="sg-lightbox__img" alt="${SendHelpers.escapeHtml(entry.name)}">`;
+                content.innerHTML = `<img src="${url}" class="sg-lightbox__img" alt="${this.escapeHtml(entry.name)}">`;
             } else if (type === 'markdown') {
                 const text = new TextDecoder().decode(bytes);
-                const html = typeof MarkdownParser !== 'undefined' ? MarkdownParser.parse(text) : SendHelpers.escapeHtml(text);
+                const html = typeof MarkdownParser !== 'undefined' ? MarkdownParser.parse(text) : this.escapeHtml(text);
                 content.innerHTML = `<div class="sg-lightbox__doc">${html}</div>`;
             } else if (type === 'pdf') {
                 const blob = new Blob([bytes], { type: 'application/pdf' });
@@ -233,10 +235,10 @@ class SendGallery extends HTMLElement {
                 content.innerHTML = `<iframe src="${url}" class="sg-lightbox__pdf"></iframe>`;
             } else {
                 const text = new TextDecoder().decode(bytes);
-                content.innerHTML = `<pre class="sg-lightbox__code">${SendHelpers.escapeHtml(text)}</pre>`;
+                content.innerHTML = `<pre class="sg-lightbox__code">${this.escapeHtml(text)}</pre>`;
             }
         } catch (err) {
-            content.innerHTML = `<div style="color: var(--color-error);">Failed to load: ${SendHelpers.escapeHtml(err.message)}</div>`;
+            content.innerHTML = `<div style="color: var(--color-error);">Failed to load: ${this.escapeHtml(err.message)}</div>`;
         }
     }
 
@@ -250,11 +252,11 @@ class SendGallery extends HTMLElement {
 
     _setupListeners() {
         // View mode buttons
-        this.querySelectorAll('.sg-gallery__mode-btn').forEach(btn => {
+        this.$$('.sg-gallery__mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                this.querySelectorAll('.sg-gallery__mode-btn').forEach(b => b.classList.remove('sg-gallery__mode-btn--active'));
+                this.$$('.sg-gallery__mode-btn').forEach(b => b.classList.remove('sg-gallery__mode-btn--active'));
                 btn.classList.add('sg-gallery__mode-btn--active');
-                const grid = this.querySelector('#sg-grid');
+                const grid = this.$('#sg-grid');
                 if (grid) {
                     grid.className = 'sg-gallery__grid sg-gallery__grid--' + btn.dataset.mode;
                 }
@@ -262,21 +264,21 @@ class SendGallery extends HTMLElement {
         });
 
         // Lightbox controls
-        const close = this.querySelector('#sg-lb-close');
+        const close = this.$('#sg-lb-close');
         if (close) close.addEventListener('click', () => this._closeLightbox());
 
-        const prev = this.querySelector('#sg-lb-prev');
+        const prev = this.$('#sg-lb-prev');
         if (prev) prev.addEventListener('click', () => {
             this._showLightboxItem(Math.max(0, this._lightboxIndex - 1));
         });
 
-        const next = this.querySelector('#sg-lb-next');
+        const next = this.$('#sg-lb-next');
         if (next) next.addEventListener('click', () => {
             this._showLightboxItem(Math.min(this._entries.length - 1, this._lightboxIndex + 1));
         });
 
         // Save zip
-        const saveBtn = this.querySelector('#sg-save-zip');
+        const saveBtn = this.$('#sg-save-zip');
         if (saveBtn) saveBtn.addEventListener('click', () => {
             if (this.zipOrigBytes) {
                 const blob = new Blob([this.zipOrigBytes]);
@@ -289,7 +291,7 @@ class SendGallery extends HTMLElement {
         });
 
         // Save single from lightbox
-        const lbSave = this.querySelector('#sg-lb-save');
+        const lbSave = this.$('#sg-lb-save');
         if (lbSave) lbSave.addEventListener('click', async () => {
             const entry = this._entries[this._lightboxIndex];
             if (!entry) return;
@@ -303,55 +305,36 @@ class SendGallery extends HTMLElement {
         });
 
         // Copy link
-        const copyBtn = this.querySelector('#sg-copy-link');
+        const copyBtn = this.$('#sg-copy-link');
         if (copyBtn) copyBtn.addEventListener('click', async () => {
             try {
-                await navigator.clipboard.writeText(this.downloadUrl || window.location.href);
+                await this.copyToClipboard(this.downloadUrl || window.location.href);
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => { copyBtn.innerHTML = `${SendIcons.LINK} Copy Link`; }, 2000);
             } catch (_) {}
         });
 
         // Print
-        const printBtn = this.querySelector('#sg-print');
+        const printBtn = this.$('#sg-print');
         if (printBtn) printBtn.addEventListener('click', () => window.print());
 
         // Email
-        const emailBtn = this.querySelector('#sg-email');
+        const emailBtn = this.$('#sg-email');
         if (emailBtn) emailBtn.addEventListener('click', () => {
             const url = this.downloadUrl || window.location.href;
             window.location.href = `mailto:?subject=Shared files via SG/Send&body=${encodeURIComponent(url)}`;
         });
 
         // Lightbox click-outside-to-close
-        const lb = this.querySelector('#sg-lightbox');
+        const lb = this.$('#sg-lightbox');
         if (lb) lb.addEventListener('click', (e) => {
             if (e.target === lb) this._closeLightbox();
         });
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Static Assets
+    // Static Assets — Icons, badges, type icons in SendIcons (send-icons.js)
     // ═══════════════════════════════════════════════════════════════════════════
-
-    // Icons, badges, and type icons are in SendIcons (send-icons.js)
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CSS Loading
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    static _cssInjected = false;
-
-    static _injectCss() {
-        if (SendGallery._cssInjected) return;
-        SendGallery._cssInjected = true;
-        const base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath)
-            || '../_common';
-        const link  = document.createElement('link');
-        link.rel    = 'stylesheet';
-        link.href   = base + '/js/components/send-download/send-gallery.css';
-        document.head.appendChild(link);
-    }
 }
 
 customElements.define('send-gallery', SendGallery);

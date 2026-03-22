@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Browse Component v0.3.0
-   Clean rewrite — folder tree + tabbed file preview using sg-layout
+   SGraph Send — Browse Component v0.3.0 (extends SendComponent)
+   Folder tree + tabbed file preview using sg-layout
 
    Uses sg-layout for:
      - Left panel:  folder tree (locked, ~20% width)
@@ -9,7 +9,11 @@
    Zero dependency on v0.1.x / v0.2.x overlay chain.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-class SendBrowse extends HTMLElement {
+class SendBrowse extends SendComponent {
+
+    /** Light DOM — CSS goes to document.head. No HTML template — dynamic render. */
+    static useShadow   = false;
+    static useTemplate = false;
 
     constructor() {
         super();
@@ -26,11 +30,14 @@ class SendBrowse extends HTMLElement {
         this._objectUrls  = [];
     }
 
-    connectedCallback() {
+    async connectedCallback() {
+        await this.loadResources();
+        this._resourcesLoaded = true;
         if (this.zipTree) this._build();
     }
 
     disconnectedCallback() {
+        super.disconnectedCallback();
         this._objectUrls.forEach(u => URL.revokeObjectURL(u));
         this._objectUrls = [];
         if (this._boundKeyHandler) {
@@ -49,7 +56,6 @@ class SendBrowse extends HTMLElement {
     // ═══════════════════════════════════════════════════════════════════════════
 
     _build() {
-        SendBrowse._injectCss();
         this.innerHTML = `
             <div class="sb-container">
                 <div class="sb-header">
@@ -574,22 +580,6 @@ class SendBrowse extends HTMLElement {
         other:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#7f8c8d" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M10 1v4h3"/></svg>',
     };
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CSS Loading
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    static _cssInjected = false;
-
-    static _injectCss() {
-        if (SendBrowse._cssInjected) return;
-        SendBrowse._cssInjected = true;
-        const base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath)
-            || '../_common';
-        const link  = document.createElement('link');
-        link.rel    = 'stylesheet';
-        link.href   = base + '/js/components/send-download/send-browse.css';
-        document.head.appendChild(link);
-    }
 }
 
 customElements.define('send-browse', SendBrowse);
