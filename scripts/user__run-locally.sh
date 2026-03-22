@@ -57,23 +57,19 @@ cp -rL "$UI_DIR/_common" "$SERVE_DIR/_common"
 mkdir -p "$SERVE_DIR/en-gb"
 
 # Upload page
-ln -sf "$UI_DIR/en-gb/index.html" "$SERVE_DIR/en-gb/index.html"
+cp "$UI_DIR/en-gb/index.html" "$SERVE_DIR/en-gb/index.html"
 
-# Download page
-mkdir -p "$SERVE_DIR/en-gb/download"
-ln -sf "$UI_DIR/en-gb/download/index.html" "$SERVE_DIR/en-gb/download/index.html"
-
-# Viewer route pages (browse, gallery, v, view)
-for route in browse gallery v view; do
+# Download + viewer route pages (each has its own index.html)
+for route in download browse gallery v view; do
     if [ -d "$UI_DIR/en-gb/$route" ]; then
         mkdir -p "$SERVE_DIR/en-gb/$route"
-        ln -sf "$UI_DIR/en-gb/$route/index.html" "$SERVE_DIR/en-gb/$route/index.html"
+        cp "$UI_DIR/en-gb/$route/index.html" "$SERVE_DIR/en-gb/$route/index.html"
     fi
 done
 
 # Welcome page
 if [ -d "$UI_DIR/en-gb/welcome" ]; then
-    ln -sf "$UI_DIR/en-gb/welcome" "$SERVE_DIR/en-gb/welcome"
+    cp -r "$UI_DIR/en-gb/welcome" "$SERVE_DIR/en-gb/welcome"
 fi
 
 # ─── Inject build-info.js ────────────────────────────────────────────────────
