@@ -500,12 +500,16 @@ class SendDownload extends HTMLElement {
     }
 
     _resolveViewMode() {
-        // Route takes priority
-        if (this._routeMode === 'view') return 'view';  // force single-file inline view
-        if (this._routeMode !== 'auto') return this._routeMode;
+        const isZip = this._renderType === 'zip' && this._zipTree;
 
-        // Zip with images → gallery; zip without → browse
-        if (this._renderType === 'zip' && this._zipTree) {
+        // Route takes priority — but only if the content supports it
+        if (this._routeMode === 'view') return 'view';
+        if (this._routeMode === 'download') return 'download';
+        if (this._routeMode === 'gallery' && isZip) return 'gallery';
+        if (this._routeMode === 'browse'  && isZip) return 'browse';
+
+        // Auto-detect: zip with images → gallery; zip without → browse
+        if (isZip) {
             const files   = this._zipTree.filter(e => !e.dir);
             const images  = files.filter(e => {
                 const t = FileTypeDetect.detect(e.name, null);
@@ -514,7 +518,7 @@ class SendDownload extends HTMLElement {
             return images.length >= 3 ? 'gallery' : 'browse';
         }
 
-        // Single file
+        // Single file — inline preview (regardless of route)
         return 'single';
     }
 
