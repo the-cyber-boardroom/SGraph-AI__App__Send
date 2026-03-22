@@ -85,12 +85,19 @@ class SendUpload extends HTMLElement {
     // ═══ Rendering ══════════════════════════════════════════════════════════
 
     _render() {
-        var step = UploadConstants.stepForState(this._state);
+        var step   = UploadConstants.stepForState(this._state);
+        var isProc = UploadConstants.isProcessing(this._state);
 
+        // Build shell on first render
         if (!this._els.select) {
             this.innerHTML =
                 '<div class="card">' +
-                    '<send-step-indicator step="' + step + '" total="' + UploadConstants.TOTAL_STEPS + '"></send-step-indicator>' +
+                    '<div class="upload-header-row">' +
+                        '<div class="upload-header-row__steps">' +
+                            '<send-step-indicator step="' + step + '" total="' + UploadConstants.TOTAL_STEPS + '"></send-step-indicator>' +
+                        '</div>' +
+                        '<div class="upload-header-row__action"></div>' +
+                    '</div>' +
                     '<div class="step-content"></div>' +
                 '</div>';
             var container = this.querySelector('.step-content');
@@ -111,12 +118,31 @@ class SendUpload extends HTMLElement {
             this._wireEvents();
         }
 
+        // Step indicator
         var indicator = this.querySelector('send-step-indicator');
         if (indicator) {
             indicator.setAttribute('step', step);
             indicator.setAttribute('total', UploadConstants.TOTAL_STEPS);
         }
 
+        // Inline Next button (changes per state)
+        var actionSlot = this.querySelector('.upload-header-row__action');
+        if (actionSlot) {
+            var btnHtml = '';
+            if (this._state === 'choosing-delivery' || this._state === 'choosing-share') {
+                btnHtml = '<button class="upload-next-btn" id="upload-next-btn">Next \u2192</button>';
+            } else if (this._state === 'confirming') {
+                btnHtml = '<button class="upload-next-btn upload-next-btn--send" id="upload-next-btn">Encrypt & Upload \u2192</button>';
+            } else if (isProc) {
+                btnHtml = '<button class="upload-next-btn upload-next-btn--disabled" disabled>Encrypting\u2026</button>';
+            } else if (this._state === 'complete') {
+                btnHtml = '<button class="upload-next-btn" id="upload-email-btn">Email Link</button>';
+            }
+            actionSlot.innerHTML = btnHtml;
+            this._wireNextButton();
+        }
+
+        // Show/hide sub-components
         var activeKey = this._activeComponent();
         var keys = ['select','delivery','share','confirm','progress','done','error'];
         for (var k = 0; k < keys.length; k++) {
@@ -124,7 +150,7 @@ class SendUpload extends HTMLElement {
         }
         this._syncComponent(activeKey);
 
-        if (UploadConstants.isProcessing(this._state)) this._startCarousel();
+        if (isProc) this._startCarousel();
         else this._stopCarousel();
     }
 
@@ -253,11 +279,34 @@ class SendUpload extends HTMLElement {
         c.addEventListener('step-email-link', function() { self._openEmailLink(); });
         c.addEventListener('step-back', function() {
             switch (self._state) {
-                case 'choosing-delivery': self.state = 'file-ready'; break;
+                case 'choosing-delivery': self._resetSelection(); self.state = 'idle'; break;
                 case 'choosing-share':    self.state = 'choosing-delivery'; break;
                 case 'confirming':        self.state = 'choosing-share'; break;
             }
         });
+    }
+
+    _wireNextButton() {
+        var self = this;
+        var nextBtn = this.querySelector('#upload-next-btn');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function() {
+                if (self._state === 'choosing-delivery') {
+                    // Advance with current default
+                    self._selectedDelivery = self._selectedDelivery || self._recommendedDelivery || 'download';
+                    self.state = 'choosing-share';
+                } else if (self._state === 'choosing-share') {
+                    self._shareMode = self._shareMode || 'token';
+                    self.state = 'confirming';
+                } else if (self._state === 'confirming') {
+                    self._startProcessing();
+                }
+            });
+        }
+        var emailBtn = this.querySelector('#upload-email-btn');
+        if (emailBtn) {
+            emailBtn.addEventListener('click', function() { self._openEmailLink(); });
+        }
     }
 
     // ═══ File Handlers ══════════════════════════════════════════════════════
