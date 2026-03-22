@@ -516,13 +516,9 @@ class UploadStepDone extends HTMLElement {
     }
 
     _detectLocalePrefix() {
-        if (typeof window === 'undefined') return 'en';
-        var parts = window.location.pathname.split('/').filter(Boolean);
-        // First path segment is typically the locale (e.g. "en", "pt")
-        if (parts.length > 0 && parts[0].length === 2) {
-            return parts[0];
-        }
-        return 'en';
+        if (typeof window === 'undefined') return 'en-gb';
+        var match = window.location.pathname.match(/^\/([a-z]{2}(?:-[a-z]{2})?)\//);
+        return match ? match[1] : 'en-gb';
     }
 
     _resolveBasePath() {
