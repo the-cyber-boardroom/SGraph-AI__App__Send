@@ -68,7 +68,7 @@ class Transfer__Service(Type_Safe):                                             
                     events            = []                )                     # todo: same here [] is the default value of a list, note that this needs to be Type_Safe lis
 
         self.save_meta(transfer_id, meta)                                        # Persist to storage backend
-        upload_url = f'/transfers/upload/{transfer_id}'                          # todo: we shouldn't be hardcoding this url here, the caller should know where to find it from the transfer_id
+        upload_url = f'/api/transfers/upload/{transfer_id}'                      # todo: we shouldn't be hardcoding this url here, the caller should know where to find it from the transfer_id
         return dict(transfer_id = transfer_id,
                     upload_url  = upload_url  )
 
