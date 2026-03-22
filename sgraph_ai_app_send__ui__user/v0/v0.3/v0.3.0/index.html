@@ -1,1 +1,148 @@
-../../v0.2/v0.2.0/index.html
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SG/Send — Zero-Knowledge Encrypted File Sharing</title>
+  <meta name="description" content="Share files securely with zero-knowledge encryption. Files are encrypted in your browser — the server never sees your data, your file names, or your keys.">
+  <meta name="theme-color" content="#1A1A2E">
+
+  <!-- Open Graph — social preview cards (WhatsApp, LinkedIn, Slack, etc.) -->
+  <meta property="og:title"       content="SG/Send — Zero-Knowledge Encrypted File Sharing">
+  <meta property="og:description" content="Share files securely with zero-knowledge encryption. Files are encrypted in your browser — the server never sees your data.">
+  <meta property="og:url"         content="https://send.sgraph.ai/">
+  <meta property="og:type"        content="website">
+  <meta property="og:site_name"   content="SGraph AI">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary">
+  <meta name="twitter:title"       content="SG/Send — Zero-Knowledge Encrypted File Sharing">
+  <meta name="twitter:description" content="Share files securely with zero-knowledge encryption. Files are encrypted in your browser.">
+
+  <!-- SEO: tell crawlers about locale variants -->
+  <link rel="canonical" href="https://send.sgraph.ai/">
+  <link rel="alternate" hreflang="en-GB" href="https://send.sgraph.ai/en-gb/">
+  <link rel="alternate" hreflang="en-US" href="https://send.sgraph.ai/en-us/">
+  <link rel="alternate" hreflang="pt-PT" href="https://send.sgraph.ai/pt-pt/">
+  <link rel="alternate" hreflang="pt-BR" href="https://send.sgraph.ai/pt-br/">
+  <link rel="alternate" hreflang="de-DE" href="https://send.sgraph.ai/de-de/">
+  <link rel="alternate" hreflang="de-CH" href="https://send.sgraph.ai/de-ch/">
+  <link rel="alternate" hreflang="es-ES" href="https://send.sgraph.ai/es-es/">
+  <link rel="alternate" hreflang="es-AR" href="https://send.sgraph.ai/es-ar/">
+  <link rel="alternate" hreflang="es-MX" href="https://send.sgraph.ai/es-mx/">
+  <link rel="alternate" hreflang="fr-FR" href="https://send.sgraph.ai/fr-fr/">
+  <link rel="alternate" hreflang="fr-CA" href="https://send.sgraph.ai/fr-ca/">
+  <link rel="alternate" hreflang="it-IT" href="https://send.sgraph.ai/it-it/">
+  <link rel="alternate" hreflang="nl-NL" href="https://send.sgraph.ai/nl-nl/">
+  <link rel="alternate" hreflang="pl-PL" href="https://send.sgraph.ai/pl-pl/">
+  <link rel="alternate" hreflang="hr-HR" href="https://send.sgraph.ai/hr-hr/">
+  <link rel="alternate" hreflang="ro-RO" href="https://send.sgraph.ai/ro-ro/">
+  <link rel="alternate" hreflang="x-default" href="https://send.sgraph.ai/en-gb/">
+
+  <!-- Inline styles: brand background loads instantly, no external files, no white flicker -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1A1A2E;
+      color: #E0E0E0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+    .brand {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .brand-prefix { color: #FFFFFF; }
+    .brand-slash  { color: #4ECDC4; }
+    .brand-product { color: #8892A0; }
+    .tagline {
+      font-size: 0.875rem;
+      color: #8892A0;
+      margin-bottom: 0.5rem;
+    }
+    noscript a {
+      color: #4ECDC4;
+      text-decoration: none;
+    }
+    noscript a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <div class="brand">
+    <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+  </div>
+  <p class="tagline">Redirecting&hellip;</p>
+
+  <noscript>
+    <p><a href="./en-gb/">Continue to SG/Send (English)</a></p>
+  </noscript>
+
+  <script>
+    // ── Locale detection and redirect ────────────────────────────────
+    //
+    // Detects the user's preferred language from the browser and
+    // redirects to the matching locale folder. No external files are
+    // loaded — this runs instantly on the branded dark background.
+    //
+    // Priority:
+    //   1. Exact match:   navigator.language "pt-BR" → /pt-br/
+    //   2. Language match: navigator.language "de"    → /de-de/
+    //   3. Default:        → /en-gb/
+
+    (function () {
+      var LOCALES = [
+        'en-gb', 'en-us', 'pt-pt', 'pt-br',
+        'de-de', 'de-ch', 'es-es', 'es-ar', 'es-mx',
+        'fr-fr', 'fr-ca', 'it-it', 'nl-nl', 'pl-pl',
+        'hr-hr', 'ro-ro', 'tlh'
+      ];
+
+      // Language-only fallback → primary locale for that language
+      var LANG_FALLBACKS = {
+        'en': 'en-gb',
+        'pt': 'pt-pt',
+        'de': 'de-de',
+        'es': 'es-es',
+        'fr': 'fr-fr',
+        'it': 'it-it',
+        'nl': 'nl-nl',
+        'pl': 'pl-pl',
+        'hr': 'hr-hr',
+        'ro': 'ro-ro'
+      };
+
+      var DEFAULT = 'en-gb';
+
+      function detect() {
+        var langs = navigator.languages || [navigator.language || navigator.userLanguage || ''];
+        for (var i = 0; i < langs.length; i++) {
+          var tag = langs[i].toLowerCase();
+
+          // 1. Exact match (e.g. "pt-br" → "pt-br")
+          if (LOCALES.indexOf(tag) !== -1) return tag;
+
+          // 2. Language-only fallback (e.g. "de" → "de-de")
+          var lang = tag.split('-')[0];
+          if (LANG_FALLBACKS[lang]) return LANG_FALLBACKS[lang];
+        }
+        return DEFAULT;
+      }
+
+      var locale = detect();
+      var base   = document.location.pathname.replace(/\/+$/, '');
+
+      // Redirect: ./en-gb/  (relative to current path)
+      document.location.replace(base + '/' + locale + '/');
+    })();
+  </script>
+
+</body>
+</html>

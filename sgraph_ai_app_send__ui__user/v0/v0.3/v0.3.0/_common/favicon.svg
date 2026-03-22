@@ -1,1 +1,13 @@
-../../../v0.2/v0.2.0/_common/favicon.svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#1A1A2E"/>
+  <!-- Bold S curve -->
+  <path d="M20 9 C20 9 22 9 22 11.5 C22 14 18 14.5 16 14.5 C14 14.5 10 15 10 17.5 C10 20 12 21 14 21" 
+        fill="none" stroke="#4ECDC4" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+  <!-- Iconic slash -->
+  <line x1="20" y1="5" x2="12" y2="27" stroke="#E94560" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Subtle encryption dots -->
+  <circle cx="7" cy="7" r="1" fill="#8892A0" opacity="0.3"/>
+  <circle cx="7" cy="11" r="1" fill="#8892A0" opacity="0.2"/>
+  <circle cx="25" cy="21" r="1" fill="#8892A0" opacity="0.3"/>
+  <circle cx="25" cy="25" r="1" fill="#8892A0" opacity="0.2"/>
+</svg>

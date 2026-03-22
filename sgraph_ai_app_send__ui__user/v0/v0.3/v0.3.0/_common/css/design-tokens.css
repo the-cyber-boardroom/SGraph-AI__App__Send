@@ -1,1 +1,135 @@
-../../../../v0.2/v0.2.0/_common/css/design-tokens.css
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Design Tokens
+   v0.2.0 — Aurora dark theme (navy + teal accents)
+
+   Loaded via <link> in the page HTML, NOT inside Shadow DOM.
+   CSS custom properties defined on :root cross Shadow DOM boundaries
+   automatically — theming works globally without breaking encapsulation.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* ── Colour: Aurora palette ── */
+    --color-bg:               #1A1A2E;
+    --color-surface:          #1E2A4A;
+    --color-primary:          #4ECDC4;
+    --color-primary-hover:    #3DBDB4;
+    --color-text:             #E0E0E0;
+    --color-text-secondary:   #8892A0;
+    --color-border:           rgba(78, 205, 196, 0.15);
+    --color-success:          #4ECDC4;
+    --color-error:            #E94560;
+    --color-warning:          #E07C4F;
+    --color-drop-zone-bg:     #16213E;
+    --color-drop-zone-border: rgba(78, 205, 196, 0.25);
+    --color-drop-zone-active: #4ECDC4;
+
+    /* ── Extended palette ── */
+    --bg-primary:       #1A1A2E;
+    --bg-secondary:     #16213E;
+    --bg-surface:       #1E2A4A;
+    --accent:           #4ECDC4;
+    --accent-hover:     #3DBDB4;
+    --accent-subtle:    rgba(78, 205, 196, 0.12);
+    --danger:           #E94560;
+    --success:          #4ECDC4;
+
+    /* ── Typography ── */
+    --font-family:     'DM Sans', system-ui, -apple-system, sans-serif;
+    --font-display:    'DM Sans', system-ui, sans-serif;
+    --font-body:       'DM Sans', system-ui, sans-serif;
+    --font-mono:       'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
+
+    --text-display:    2.5rem;
+    --text-h1:         2rem;
+    --text-h2:         1.6rem;
+    --text-h3:         1.25rem;
+    --text-body:       1rem;
+    --text-sm:         0.875rem;
+    --text-small:      0.8rem;
+    --text-micro:      0.625rem;
+
+    --weight-regular:  400;
+    --weight-medium:   500;
+    --weight-semibold: 600;
+    --weight-bold:     700;
+
+    /* ── Spacing (4px base) ── */
+    --space-1:   4px;
+    --space-2:   8px;
+    --space-3:  12px;
+    --space-4:  16px;
+    --space-6:  24px;
+    --space-8:  32px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    /* ── Geometry ── */
+    --radius:         8px;
+    --radius-sm:      6px;
+    --radius-md:     12px;
+    --radius-lg:     20px;
+    --shadow:         0 4px 24px rgba(0, 0, 0, 0.3);
+    --shadow-lg:      0 8px 32px rgba(0, 0, 0, 0.4);
+    --transition:     150ms ease;
+}
+
+/* ─── Base Overrides ────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html {
+    background-color: var(--bg-primary);
+    min-height: 100%;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-primary);
+    color: var(--color-text);
+    font-family: var(--font-family);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Links ────────────────────────────────────────────────────────────── */
+
+a { color: var(--accent); }
+a:hover { color: var(--accent-hover); }
+
+/* ─── Selection ────────────────────────────────────────────────────────── */
+
+::selection {
+    background: rgba(78, 205, 196, 0.3);
+    color: var(--color-text);
+}
+
+/* ─── Scrollbar (webkit) ───────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-secondary); }
+
+/* ─── Page Layout ──────────────────────────────────────────────────────── */
+
+main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 var(--space-6) var(--space-6);
+}
+
+/* ─── Disclaimer ───────────────────────────────────────────────────────── */
+
+.disclaimer {
+    text-align: center;
+    font-size: var(--text-small);
+    color: var(--color-text-secondary);
+    opacity: 0.7;
+    margin-top: var(--space-4);
+}
