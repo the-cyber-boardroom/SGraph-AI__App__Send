@@ -321,6 +321,72 @@
     justify-content: flex-end;
 }
 
+/* ─── Mode toggle (file / text) ──────────────────────────────────────────── */
+.mode-toggle {
+    display: flex;
+    gap: var(--space-1, 0.25rem);
+    margin-bottom: var(--space-4, 1rem);
+}
+.mode-toggle__btn {
+    flex: 0 0 auto;
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    background: transparent;
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-secondary, #8892A0);
+    font-size: var(--text-sm, 0.875rem);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.mode-toggle__btn:hover {
+    border-color: var(--color-primary, #4ECDC4);
+    color: var(--color-primary, #4ECDC4);
+}
+.mode-toggle__btn--active {
+    background: var(--color-primary, #4ECDC4);
+    border-color: var(--color-primary, #4ECDC4);
+    color: var(--color-bg, #1A1A2E);
+    font-weight: var(--weight-semibold, 600);
+}
+
+/* ─── Text input area ────────────────────────────────────────────────────── */
+.text-input-area {
+    margin-bottom: var(--space-4, 1rem);
+}
+.text-input {
+    width: 100%;
+    min-height: 180px;
+    padding: var(--space-4, 1rem);
+    background: var(--color-drop-zone-bg, #16213E);
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius-md, 12px);
+    color: var(--color-text, #E0E0E0);
+    font-family: inherit;
+    font-size: var(--text-base, 1rem);
+    line-height: 1.6;
+    resize: vertical;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease;
+}
+.text-input:focus {
+    outline: none;
+    border-color: var(--color-primary, #4ECDC4);
+}
+.text-input::placeholder {
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.6;
+}
+.text-input-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--space-3, 0.75rem);
+}
+.text-input-count {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
 /* ─── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
     .browse-buttons { flex-direction: column; gap: var(--space-2, 0.5rem); }

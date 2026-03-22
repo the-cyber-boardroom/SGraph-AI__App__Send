@@ -274,6 +274,7 @@ class SendUpload extends HTMLElement {
         c.addEventListener('step-folder-upload',    function(e) { self._onFolderUpload(e.detail.options); });
         c.addEventListener('step-folder-cancel',    function()  { self._folderScan = null; self._folderName = null; self.state = 'idle'; });
         c.addEventListener('step-back-to-idle',     function()  { self._resetSelection(); self.state = 'idle'; });
+        c.addEventListener('step-text-submit',      function(e) { self._onTextSubmit(e.detail.text); });
         c.addEventListener('step-delivery-selected',function(e) { self._selectedDelivery = e.detail.deliveryId; self.state = 'choosing-share'; });
         c.addEventListener('step-share-selected',   function(e) { self._shareMode = e.detail.mode; self.state = 'confirming'; });
         c.addEventListener('step-confirmed',        function()  { self._startProcessing(); });
@@ -380,6 +381,14 @@ class SendUpload extends HTMLElement {
         this.selectedFile = null;
         // Smart skip: folders/multi-file go straight to delivery
         this._advanceToDelivery();
+    }
+
+    _onTextSubmit(text) {
+        // Convert text to a .txt File and feed into the normal upload pipeline
+        var blob = new Blob([text], { type: 'text/plain' });
+        var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        var file = new File([blob], 'message-' + ts + '.txt', { type: 'text/plain' });
+        this._setFile(file);
     }
 
     _onFolderInput(files) {
