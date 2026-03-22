@@ -1,14 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — API Client v0.3.0
-   CloudFront-ready with /api/* prefix + local dev base URL support
+   SGraph Send — API Client
+   v0.2.2 — Configurable API endpoint for local dev / cross-origin
 
-   All API routes use /api/* prefix for CloudFront separation:
-     CloudFront behaviour: /api/* → Lambda origin, /* → S3 static files
-
-   Local development:
-     When window.SGRAPH_BUILD.apiEndpoint is set (by build-info.js),
-     all API calls are prefixed with that URL instead of using relative paths.
-     This allows the static file server to proxy API calls to a remote backend.
+   In production (CloudFront), API calls go to same-origin /api/*.
+   For local development, set window.SGRAPH_BUILD.apiEndpoint to point
+   at a remote API (e.g. 'https://dev.send.sgraph.ai').
 
    Routes:
      /api/transfers/create                    POST  — create transfer
@@ -30,12 +26,20 @@
 
 const ApiClient = {
 
-    // ─── Base URL ─────────────────────────────────────────────────────────
+    // ─── API Endpoint ─────────────────────────────────────────────────
 
-    _baseUrl() {
-        const build = window.SGRAPH_BUILD;
-        if (build && build.apiEndpoint) return build.apiEndpoint.replace(/\/+$/, '');
-        return '';
+    _baseUrl: undefined,
+
+    baseUrl() {
+        if (this._baseUrl !== undefined) return this._baseUrl;
+        this._baseUrl = (window.SGRAPH_BUILD && window.SGRAPH_BUILD.apiEndpoint)
+                      ? window.SGRAPH_BUILD.apiEndpoint.replace(/\/$/, '')
+                      : '';
+        return this._baseUrl;
+    },
+
+    _corsMode() {
+        return this.baseUrl() ? 'cors' : 'same-origin';
     },
 
     // ─── Token Management ────────────────────────────────────────────────
@@ -68,10 +72,18 @@ const ApiClient = {
         return { 'x-sgraph-access-token': token };
     },
 
+    // ─── Internal fetch helper ────────────────────────────────────────
+
+    async _fetch(path, options = {}) {
+        const url = `${this.baseUrl()}${path}`;
+        const res = await fetch(url, { mode: this._corsMode(), ...options });
+        return res;
+    },
+
     // ─── Transfer Lifecycle ──────────────────────────────────────────────
 
     async createTransfer(fileSize, contentType) {
-        const res = await fetch(`${this._baseUrl()}/api/transfers/create`, {
+        const res = await this._fetch('/api/transfers/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -90,7 +102,7 @@ const ApiClient = {
     },
 
     async uploadPayload(transferId, encrypted) {
-        const res = await fetch(`${this._baseUrl()}/api/transfers/upload/${transferId}`, {
+        const res = await this._fetch(`/api/transfers/upload/${transferId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/octet-stream',
@@ -106,7 +118,7 @@ const ApiClient = {
     },
 
     async completeTransfer(transferId) {
-        const res = await fetch(`${this._baseUrl()}/api/transfers/complete/${transferId}`, {
+        const res = await this._fetch(`/api/transfers/complete/${transferId}`, {
             method: 'POST',
             headers: this._authHeaders()
         });
@@ -120,13 +132,13 @@ const ApiClient = {
     // ─── Token Validation ────────────────────────────────────────────────
 
     async checkToken(token) {
-        const res = await fetch(`${this._baseUrl()}/api/transfers/check-token/${encodeURIComponent(token)}`);
+        const res = await this._fetch(`/api/transfers/check-token/${encodeURIComponent(token)}`);
         if (!res.ok) throw new Error(`Token check failed: ${res.status}`);
         return res.json();
     },
 
     async validateToken(tokenName) {
-        const res = await fetch(`${this._baseUrl()}/api/transfers/validate-token/${encodeURIComponent(tokenName)}`, {
+        const res = await this._fetch(`/api/transfers/validate-token/${encodeURIComponent(tokenName)}`, {
             method: 'POST'
         });
         if (!res.ok) throw new Error(`Token validate failed: ${res.status}`);
@@ -136,7 +148,7 @@ const ApiClient = {
     // ─── Transfer Info & Download ────────────────────────────────────────
 
     async getTransferInfo(transferId) {
-        const res = await fetch(`${this._baseUrl()}/api/transfers/info/${transferId}`, {
+        const res = await this._fetch(`/api/transfers/info/${transferId}`, {
             headers: this._authHeaders()
         });
         if (!res.ok) throw new Error(`Transfer info failed: ${res.status}`);
@@ -144,7 +156,7 @@ const ApiClient = {
     },
 
     async downloadPayload(transferId) {
-        const res = await fetch(`${this._baseUrl()}/api/transfers/download/${transferId}`, {
+        const res = await this._fetch(`/api/transfers/download/${transferId}`, {
             headers: this._authHeaders()
         });
         if (!res.ok) {
@@ -157,7 +169,7 @@ const ApiClient = {
     // ─── Presigned URLs (S3) ─────────────────────────────────────────────
 
     async getPresignedDownloadUrl(transferId) {
-        const res = await fetch(`${this._baseUrl()}/api/presigned/download-url/${transferId}`, {
+        const res = await this._fetch(`/api/presigned/download-url/${transferId}`, {
             headers: this._authHeaders()
         });
         if (!res.ok) throw new Error(`Presigned download URL failed: ${res.status}`);
@@ -165,7 +177,7 @@ const ApiClient = {
     },
 
     async getCapabilities() {
-        const res = await fetch(`${this._baseUrl()}/api/presigned/capabilities`, {
+        const res = await this._fetch('/api/presigned/capabilities', {
             headers: this._authHeaders()
         });
         if (!res.ok) throw new Error(`Capabilities failed: ${res.status}`);
@@ -175,7 +187,7 @@ const ApiClient = {
     // ─── Multipart Upload ────────────────────────────────────────────────
 
     async initiateMultipart(transferId, totalSize, numParts) {
-        const res = await fetch(`${this._baseUrl()}/api/presigned/initiate`, {
+        const res = await this._fetch('/api/presigned/initiate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -201,7 +213,7 @@ const ApiClient = {
     },
 
     async completeMultipart(transferId, uploadId, parts) {
-        const res = await fetch(`${this._baseUrl()}/api/presigned/complete`, {
+        const res = await this._fetch('/api/presigned/complete', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -219,7 +231,7 @@ const ApiClient = {
 
     async abortMultipart(transferId, uploadId) {
         try {
-            await fetch(`${this._baseUrl()}/api/presigned/abort/${transferId}/${uploadId}`, {
+            await this._fetch(`/api/presigned/abort/${transferId}/${uploadId}`, {
                 method: 'POST',
                 headers: this._authHeaders()
             });

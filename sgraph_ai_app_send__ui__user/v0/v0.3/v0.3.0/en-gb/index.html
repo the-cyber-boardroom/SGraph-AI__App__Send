@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Send — Zero-knowledge encrypted file sharing</title>
+    <meta name="description" content="Share files securely with zero-knowledge encryption. Your files are encrypted in your browser before upload. The server never sees your data.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="../_common/favicon.svg">
+
+    <!-- Fonts -->
+    <link rel="stylesheet" href="../_common/fonts/fonts.css">
+
+    <!-- Design tokens + shared styles -->
+    <link rel="stylesheet" href="../_common/css/design-tokens.css">
+    <link rel="stylesheet" href="../_common/css/shared-components.css">
+
+    <!-- Component styles -->
+    <link rel="stylesheet" href="../_common/js/components/send-upload/send-upload.css">
+    <link rel="stylesheet" href="../_common/js/components/send-transparency/send-transparency.css">
+    <link rel="stylesheet" href="../_common/js/components/send-header/send-header.css">
+    <link rel="stylesheet" href="../_common/js/components/send-footer/send-footer.css">
+    <link rel="stylesheet" href="../_common/js/components/send-locale/send-locale.css">
+    <link rel="stylesheet" href="../_common/js/components/send-test-files/send-test-files.css">
+</head>
+<body>
+
+    <send-header></send-header>
+
+    <main>
+        <send-access-gate>
+            <send-upload></send-upload>
+        </send-access-gate>
+
+        <send-test-files></send-test-files>
+
+        <p class="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
+    </main>
+
+    <send-footer></send-footer>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         v0.3.0 — Upload page (consolidated, zero overlays)
+
+         send-upload.js and send-access-gate.js are single consolidated files
+         containing all functionality from v0.2.0 base + v0.2.3–v0.2.17.
+         No IFD overlay files needed — everything is in one file per component.
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- 0. Build info -->
+    <script src="../_common/js/build-info.js"></script>
+    <script>
+        if (!window.SGRAPH_BUILD) {
+            window.SGRAPH_BUILD = { appVersion: 'dev', uiVersion: 'v0.3.0' };
+        } else {
+            window.SGRAPH_BUILD.uiVersion = 'v0.3.0';
+        }
+    </script>
+
+    <!-- 1. Utilities -->
+    <script src="../_common/js/i18n.js"></script>
+    <script src="../_common/js/crypto.js"></script>
+    <script src="../_common/js/friendly-crypto.js"></script>
+    <script src="../_common/js/api-client.js"></script>
+    <script src="../_common/js/file-type-detect.js"></script>
+    <script src="../_common/js/markdown-parser.js"></script>
+
+    <!-- 2. Base system -->
+    <script src="../_common/js/base/send-helpers.js"></script>
+    <script src="../_common/js/base/send-component-paths.js"></script>
+    <script src="../_common/js/base/send-component.js"></script>
+
+    <!-- 3. Shared components -->
+    <script src="../_common/js/components/send-locale/send-locale.js"></script>
+    <script src="../_common/js/components/send-header/send-header.js"></script>
+    <script src="../_common/js/components/send-header/send-header-beta.js"></script>
+    <script src="../_common/js/components/send-footer/send-footer.js"></script>
+    <script src="../_common/js/components/send-transparency/send-transparency.js"></script>
+
+    <!-- 4. Upload components (consolidated — no overlays) -->
+    <script src="../_common/js/components/send-step-indicator/send-step-indicator.js"></script>
+    <script src="../_common/js/qr-code.js"></script>
+    <script src="../_common/js/components/send-access-gate/send-access-gate.js"></script>
+    <script src="../_common/js/components/send-upload/send-upload.js"></script>
+    <script src="../_common/js/components/send-test-files/send-test-files.js"></script>
+
+    <!-- 5. Init -->
+    <script>
+        SendComponentPaths.init('../_common');
+        I18n.init();
+    </script>
+
+</body>
+</html>
