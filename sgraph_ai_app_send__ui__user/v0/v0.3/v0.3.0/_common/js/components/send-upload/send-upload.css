@@ -37,25 +37,26 @@
 
 /* ── Header row: step indicator + Next button inline (v0.2.8) ────────────── */
 
-.header-row {
+.upload-header-row {
     display: flex;
     align-items: flex-start;
     gap: var(--space-5, 1.25rem);
     margin-bottom: var(--space-5, 1.25rem);
+    min-height: 70px;
 }
 
-.header-row__steps {
+.upload-header-row__steps {
     flex: 1;
     min-width: 0;
 }
 
-.header-row__action {
+.upload-header-row__action {
     flex-shrink: 0;
 }
 
 /* ── Inline Next button (v0.2.8) ─────────────────────────────────────────── */
 
-.inline-next {
+.upload-next-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -74,21 +75,21 @@
     box-sizing: border-box;
 }
 
-.inline-next:hover:not(:disabled) {
+.upload-next-btn:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
     background: #5DE0D6;
 }
 
-.inline-next:active:not(:disabled) {
+.upload-next-btn:active:not(:disabled) {
     transform: translateY(0);
 }
 
-.inline-next--send {
+.upload-next-btn--send {
     box-shadow: 0 2px 8px rgba(78, 205, 196, 0.25);
 }
 
-.inline-next--disabled {
+.upload-next-btn--disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
@@ -170,13 +171,13 @@
 /* ── Mobile ──────────────────────────────────────────────────────────────── */
 
 @media (max-width: 480px) {
-    .header-row {
+    .upload-header-row {
         flex-direction: column;
     }
-    .header-row__action {
+    .upload-header-row__action {
         align-self: flex-end;
     }
-    .inline-next {
+    .upload-next-btn {
         min-width: 120px;
         padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
         font-size: var(--text-small, 0.75rem);

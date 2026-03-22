@@ -18,6 +18,7 @@ class UploadStepSelect extends HTMLElement {
 
         // Internal state
         this._state        = 'idle';
+        this._inputMode    = 'file';   // 'file' or 'text'
         this._selectedFile = null;
         this._folderScan   = null;
         this._folderName   = null;
@@ -43,7 +44,7 @@ class UploadStepSelect extends HTMLElement {
     }
 
     async _init() {
-        const base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.base)
+        const base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath)
             || '../_common';
         const dir = base + '/js/components/send-upload/upload-step-select';
 
@@ -111,28 +112,61 @@ class UploadStepSelect extends HTMLElement {
 
     _renderIdle() {
         const maxSize = this._fmt(this._maxFileSize);
-        this._container.innerHTML = `
-            <div class="drop-zone" id="drop-zone">
-                <div class="drop-zone__label">Drop files or a folder</div>
-                <div class="drop-zone__paste-hint">or paste from clipboard (Ctrl+V)</div>
-                <div class="browse-buttons">
-                    <button class="browse-btn" id="browse-file-btn">Browse files</button>
-                    <button class="browse-btn" id="browse-folder-btn">Browse folder</button>
-                </div>
-                <div class="drop-zone__hint" style="margin-top: var(--space-3, 0.75rem);">
-                    Your files are encrypted in your browser before upload
-                </div>
-                <div class="drop-zone__hint" style="margin-top: var(--space-1, 0.25rem); font-size: var(--text-small, 0.75rem); opacity: 0.7;">
-                    Maximum upload: ${this._esc(maxSize)}
-                </div>
-                <input type="file" id="file-input" style="display: none;">
-                <input type="file" id="folder-input" style="display: none;" webkitdirectory>
-            </div>
-            <div class="trust-badge">
-                <span class="trust-badge__icon">&#128274;</span>
-                <span>Zero cookies &middot; Zero tracking &middot; We cannot read your files</span>
+        const isFile = this._inputMode === 'file';
+        const isText = this._inputMode === 'text';
+
+        const modeToggle = `
+            <div class="mode-toggle">
+                <button class="mode-toggle__btn ${isFile ? 'mode-toggle__btn--active' : ''}" id="mode-file">File</button>
+                <button class="mode-toggle__btn ${isText ? 'mode-toggle__btn--active' : ''}" id="mode-text">Text</button>
             </div>
         `;
+
+        if (isText) {
+            this._container.innerHTML = `
+                ${modeToggle}
+                <div class="text-input-area">
+                    <textarea class="text-input" id="text-input"
+                              placeholder="Type or paste text to encrypt and share..."
+                              spellcheck="true"></textarea>
+                    <div class="text-input-footer">
+                        <span class="text-input-count" id="text-char-count">0 characters</span>
+                        <button class="btn btn-primary btn-sm" id="text-send-btn">Encrypt & Send</button>
+                    </div>
+                    <div class="drop-zone__hint" style="margin-top: var(--space-2, 0.5rem); text-align: center;">
+                        Your text is encrypted in your browser before upload
+                    </div>
+                </div>
+                <div class="trust-badge">
+                    <span class="trust-badge__icon">&#128274;</span>
+                    <span>Zero cookies &middot; Zero tracking &middot; We cannot read your text</span>
+                </div>
+            `;
+        } else {
+            this._container.innerHTML = `
+                ${modeToggle}
+                <div class="drop-zone" id="drop-zone">
+                    <div class="drop-zone__label">Drop files or a folder</div>
+                    <div class="drop-zone__paste-hint">or paste from clipboard (Ctrl+V)</div>
+                    <div class="browse-buttons">
+                        <button class="browse-btn" id="browse-file-btn">Browse files</button>
+                        <button class="browse-btn" id="browse-folder-btn">Browse folder</button>
+                    </div>
+                    <div class="drop-zone__hint" style="margin-top: var(--space-3, 0.75rem);">
+                        Your files are encrypted in your browser before upload
+                    </div>
+                    <div class="drop-zone__hint" style="margin-top: var(--space-1, 0.25rem); font-size: var(--text-small, 0.75rem); opacity: 0.7;">
+                        Maximum upload: ${this._esc(maxSize)}
+                    </div>
+                    <input type="file" id="file-input" style="display: none;" multiple>
+                    <input type="file" id="folder-input" style="display: none;" webkitdirectory>
+                </div>
+                <div class="trust-badge">
+                    <span class="trust-badge__icon">&#128274;</span>
+                    <span>Zero cookies &middot; Zero tracking &middot; We cannot read your files</span>
+                </div>
+            `;
+        }
     }
 
     // ─── Folder options state ───────────────────────────────────────────────
@@ -378,6 +412,37 @@ class UploadStepSelect extends HTMLElement {
                 this._emit('step-back-to-idle');
             });
         }
+
+        // Mode toggle (file/text)
+        const modeFileBtn = sr.querySelector('#mode-file');
+        const modeTextBtn = sr.querySelector('#mode-text');
+        if (modeFileBtn) {
+            modeFileBtn.addEventListener('click', () => {
+                if (this._inputMode !== 'file') { this._inputMode = 'file'; this.render(); }
+            });
+        }
+        if (modeTextBtn) {
+            modeTextBtn.addEventListener('click', () => {
+                if (this._inputMode !== 'text') { this._inputMode = 'text'; this.render(); }
+            });
+        }
+
+        // Text mode: char counter + send button
+        const textInput = sr.querySelector('#text-input');
+        const textCount = sr.querySelector('#text-char-count');
+        if (textInput && textCount) {
+            textInput.addEventListener('input', () => {
+                textCount.textContent = textInput.value.length + ' characters';
+            });
+        }
+        const textSendBtn = sr.querySelector('#text-send-btn');
+        if (textSendBtn) {
+            textSendBtn.addEventListener('click', () => {
+                const ta = sr.querySelector('#text-input');
+                if (!ta || !ta.value.trim()) return;
+                this._emit('step-text-submit', { text: ta.value });
+            });
+        }
     }
 
     // ─── Drag and drop handlers ─────────────────────────────────────────────
@@ -386,21 +451,42 @@ class UploadStepSelect extends HTMLElement {
         e.preventDefault();
         e.stopPropagation();
         const dropZone = this.shadowRoot.querySelector('#drop-zone');
-        if (dropZone) dropZone.classList.add('dragover');
+        if (dropZone) {
+            dropZone.classList.add('dragover');
+            const label = dropZone.querySelector('.drop-zone__label');
+            if (label && !label._originalText) {
+                label._originalText = label.textContent;
+                label.textContent = 'Release to upload';
+            }
+        }
     }
 
     _onDragLeave(e) {
         e.preventDefault();
         e.stopPropagation();
         const dropZone = this.shadowRoot.querySelector('#drop-zone');
-        if (dropZone) dropZone.classList.remove('dragover');
+        if (dropZone) {
+            dropZone.classList.remove('dragover');
+            const label = dropZone.querySelector('.drop-zone__label');
+            if (label && label._originalText) {
+                label.textContent = label._originalText;
+                label._originalText = null;
+            }
+        }
     }
 
     _onDrop(e) {
         e.preventDefault();
         e.stopPropagation();
         const dropZone = this.shadowRoot.querySelector('#drop-zone');
-        if (dropZone) dropZone.classList.remove('dragover');
+        if (dropZone) {
+            dropZone.classList.remove('dragover');
+            const label = dropZone.querySelector('.drop-zone__label');
+            if (label && label._originalText) {
+                label.textContent = label._originalText;
+                label._originalText = null;
+            }
+        }
         this._emit('step-file-dropped', {
             files: e.dataTransfer.files,
             items: e.dataTransfer.items,

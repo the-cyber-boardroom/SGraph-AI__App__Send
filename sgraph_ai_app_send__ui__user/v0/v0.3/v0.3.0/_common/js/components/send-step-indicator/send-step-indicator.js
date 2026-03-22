@@ -87,6 +87,15 @@ class SendStepIndicator extends HTMLElement {
 
                 .step--completed {
                     color: var(--color-success, #4ECDC4);
+                    cursor: pointer;
+                }
+
+                .step--completed:hover .dot--completed {
+                    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.2);
+                }
+
+                .step--active {
+                    cursor: pointer;
                 }
 
                 .dot {
@@ -143,6 +152,26 @@ class SendStepIndicator extends HTMLElement {
             </nav>
             <div class="label">Step ${step} of ${total}</div>
         `;
+
+        // Wire click events on completed/active steps
+        this._wireStepClicks();
+    }
+
+    _wireStepClicks() {
+        var self = this;
+        var stepEls = this.shadowRoot.querySelectorAll('.step');
+        stepEls.forEach(function(el, idx) {
+            var stepNum = idx + 1;
+            if (el.classList.contains('step--completed') || el.classList.contains('step--active')) {
+                el.addEventListener('click', function() {
+                    self.dispatchEvent(new CustomEvent('step-nav', {
+                        bubbles: true,
+                        composed: true,
+                        detail: { step: stepNum }
+                    }));
+                });
+            }
+        });
     }
 }
 

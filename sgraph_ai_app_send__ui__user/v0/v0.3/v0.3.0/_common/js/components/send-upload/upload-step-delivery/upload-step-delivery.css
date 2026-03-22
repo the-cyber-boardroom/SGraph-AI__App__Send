@@ -94,7 +94,7 @@
 }
 
 .delivery-card--recommended::after {
-    content: "\2605 RECOMMENDED";
+    content: "\2605 DEFAULT";
     position: absolute;
     bottom: var(--space-3, 0.75rem);
     right: var(--space-3, 0.75rem);

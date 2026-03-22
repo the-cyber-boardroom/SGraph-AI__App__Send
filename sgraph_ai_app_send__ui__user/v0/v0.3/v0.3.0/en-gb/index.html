@@ -83,9 +83,15 @@
     <script src="../_common/js/qr-code.js"></script>
     <script src="../_common/js/components/send-access-gate/send-access-gate.js"></script>
 
-    <!-- Upload shared utilities -->
-    <script src="../_common/js/components/send-upload/upload-file-utils.js"></script>
+    <!-- Upload shared modules (no inter-dependencies) -->
+    <script src="../_common/js/components/send-upload/upload-constants.js"></script>
     <script src="../_common/js/components/send-upload/upload-crypto.js"></script>
+    <script src="../_common/js/components/send-upload/upload-file-utils.js"></script>
+    <script src="../_common/js/components/send-upload/upload-thumbnails.js"></script>
+
+    <!-- Upload business logic (depend on shared modules) -->
+    <script src="../_common/js/components/send-upload/upload-folder.js"></script>
+    <script src="../_common/js/components/send-upload/upload-engine.js"></script>
 
     <!-- Upload step sub-components (Shadow DOM, self-contained) -->
     <script src="../_common/js/components/send-upload/upload-step-select/upload-step-select.js"></script>
@@ -95,7 +101,7 @@
     <script src="../_common/js/components/send-upload/upload-step-progress/upload-step-progress.js"></script>
     <script src="../_common/js/components/send-upload/upload-step-done/upload-step-done.js"></script>
 
-    <!-- Upload orchestrator (composes step sub-components) -->
+    <!-- Upload orchestrator (thin — wires everything together) -->
     <script src="../_common/js/components/send-upload/send-upload.js"></script>
     <script src="../_common/js/components/send-test-files/send-test-files.js"></script>
 

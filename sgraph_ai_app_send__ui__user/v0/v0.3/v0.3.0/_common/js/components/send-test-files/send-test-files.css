@@ -26,7 +26,7 @@
     flex-wrap: wrap;
 }
 
-/* Individual file card — draggable and clickable */
+/* Individual file card — clickable and draggable */
 .test-file {
     display: inline-flex;
     align-items: center;
@@ -38,7 +38,7 @@
     color: var(--color-text, #E0E0E0);
     font-size: var(--text-small, 0.8rem);
     font-family: var(--font-body, 'DM Sans', system-ui, sans-serif);
-    cursor: grab;
+    cursor: pointer;
     text-decoration: none;
     transition: border-color 150ms ease, background 150ms ease, transform 0.1s ease;
     user-select: none;
@@ -52,8 +52,12 @@
 }
 
 .test-file:active {
-    cursor: grabbing;
     transform: translateY(0);
+}
+
+/* Special cards (multi-image, folder) */
+.test-file--special {
+    border-style: dashed;
 }
 
 .test-file__icon {

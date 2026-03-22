@@ -127,19 +127,10 @@ class UploadStepProgress extends HTMLElement {
     /* ─── CSS path resolution ────────────────────────────────────────── */
 
     _cssPath() {
-        if (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.forComponent) {
-            return SendComponentPaths.forComponent('send-upload/upload-step-progress', 'upload-step-progress.css');
-        }
-        // Fallback: resolve relative to current script
-        try {
-            var scripts = document.querySelectorAll('script[src]');
-            for (var i = scripts.length - 1; i >= 0; i--) {
-                if (scripts[i].src.indexOf('upload-step-progress') !== -1) {
-                    return scripts[i].src.replace(/\.js$/, '.css');
-                }
-            }
-        } catch (e) { /* ignore */ }
-        return 'upload-step-progress.css';
+        var base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath)
+            ? SendComponentPaths.basePath
+            : '../_common';
+        return base + '/js/components/send-upload/upload-step-progress/upload-step-progress.css';
     }
 
     /* ─── Incremental update ─────────────────────────────────────────── */

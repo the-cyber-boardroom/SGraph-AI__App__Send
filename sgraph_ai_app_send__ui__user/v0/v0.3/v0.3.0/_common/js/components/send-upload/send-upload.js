@@ -1,127 +1,37 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — Upload Orchestrator (v0.3.0)
-   Clean rewrite — delegates rendering to Shadow DOM sub-components,
-   keeps all business logic (upload engine, crypto, SGMETA, thumbnails).
+
+   Thin coordinator — owns the state machine and wires sub-components together.
+   All business logic is in dedicated modules:
+
+     UploadConstants    — step labels, state mapping, carousel, size limits
+     UploadEngine       — read → encrypt → create → upload → complete pipeline
+     UploadFolder       — directory scanning, JSZip compression, gallery preview
+     UploadThumbnails   — image/PDF/markdown/video thumbnail generation
+     UploadCrypto       — friendly keys, PBKDF2 key derivation
+     UploadFileUtils    — file type detection, delivery options
 
    Sub-components (Shadow DOM):
-     <upload-step-select>    — Step 1: File/folder selection, drag-drop, paste
-     <upload-step-delivery>  — Step 2: Delivery mode (download/view/browse/gallery)
-     <upload-step-share>     — Step 3: Share mode (token/combined/separate)
-     <upload-step-confirm>   — Step 4: Review + word picker + encrypt button
-     <upload-step-progress>  — Step 5: Encrypt & upload progress with carousel
-     <upload-step-done>      — Step 6: Share links, QR, send another
-
-   Shared utilities:
-     upload-crypto.js        — Friendly key generation, PBKDF2 derivation
-     upload-file-utils.js    — File type detection, delivery options
+     <upload-step-select>    — Step 1: file/folder selection
+     <upload-step-delivery>  — Step 2: delivery mode
+     <upload-step-share>     — Step 3: share mode
+     <upload-step-confirm>   — Step 4: review + word picker
+     <upload-step-progress>  — Step 5: encrypt & upload progress
+     <upload-step-done>      — Step 6: share links + QR
    ═══════════════════════════════════════════════════════════════════════════════ */
-
-// ─── Thumbnail constants ────────────────────────────────────────────────────
-var THUMB_MAX_WIDTH = 400;
-var THUMB_HEIGHT    = 520;
-var THUMB_QUALITY   = 0.75;
-var THUMB_FORMAT    = 'image/jpeg';
-
-var IMAGE_EXTS = ['png','jpg','jpeg','gif','webp','bmp','svg'];
-var PDF_EXTS   = ['pdf'];
-var MD_EXTS    = ['md','markdown'];
-var VIDEO_EXTS = ['mp4','webm','mov','avi','mkv'];
-var AUDIO_EXTS = ['mp3','wav','ogg','flac','aac','m4a'];
-
-function _getExt(name)  { return (name || '').split('.').pop().toLowerCase(); }
-function _fileId(index) { var n = String(index+1); while(n.length<3) n='0'+n; return 'file-'+n; }
-function _getFileCategory(name) {
-    var ext = _getExt(name);
-    if (IMAGE_EXTS.indexOf(ext) !== -1) return 'image';
-    if (PDF_EXTS.indexOf(ext)   !== -1) return 'pdf';
-    if (MD_EXTS.indexOf(ext)    !== -1) return 'markdown';
-    if (VIDEO_EXTS.indexOf(ext) !== -1) return 'video';
-    if (AUDIO_EXTS.indexOf(ext) !== -1) return 'audio';
-    return 'other';
-}
-
-// ─── Carousel messages ──────────────────────────────────────────────────────
-var CAROUSEL_MESSAGES = [
-    { icon: '\uD83D\uDD12', text: 'Your file is encrypted with AES-256-GCM. The key never leaves your device.' },
-    { icon: '\uD83D\uDEE1\uFE0F', text: "Even we can't read what you're uploading. That's the point." },
-    { icon: '\uD83C\uDF6A', text: 'Zero cookies. Zero tracking. Verify: open DevTools \u2192 Application \u2192 Cookies.' },
-    { icon: '\uD83C\uDFD4\uFE0F', text: 'Tip: Share the code by voice, the link by text \u2014 different channels, maximum security.' },
-    { icon: '\uD83D\uDCDC', text: 'Our privacy policy is six sentences. No lawyers needed.' },
-    { icon: '\uD83D\uDD11', text: 'The decryption key is only in your browser. We never see it, store it, or transmit it.' },
-    { icon: '\u2705', text: 'No account required. No email collected. Just encrypted file sharing.' },
-    { icon: '\uD83D\uDD2C', text: "Don't trust us \u2014 verify. Open the Network tab and inspect every request we make." },
-    { icon: '\uD83C\uDF0D', text: 'Available in 17 languages. Same zero-knowledge encryption everywhere.' },
-    { icon: '\uD83D\uDCE6', text: 'Files are split into encrypted chunks. Each chunk is meaningless without your key.' }
-];
-var CAROUSEL_INTERVAL_MS = 4000;
-
-// ─── PDF.js lazy loader ─────────────────────────────────────────────────────
-var _pdfJsLoaded = false, _pdfJsLoading = null;
-var PDF_JS_CDNS = [
-    { js: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-      worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js' },
-    { js: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
-      worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js' }
-];
-function _loadPdfJs() {
-    if (_pdfJsLoaded && window.pdfjsLib) return Promise.resolve();
-    if (_pdfJsLoading) return _pdfJsLoading;
-    _pdfJsLoading = new Promise(function(resolve, reject) {
-        if (window.pdfjsLib) { _pdfJsLoaded = true; resolve(); return; }
-        function tryLoad(urls, idx) {
-            if (idx >= urls.length) { reject(new Error('Failed to load pdf.js')); return; }
-            var entry = urls[idx], script = document.createElement('script');
-            script.src = entry.js;
-            script.onload = function() {
-                if (window.pdfjsLib) { window.pdfjsLib.GlobalWorkerOptions.workerSrc = entry.worker; _pdfJsLoaded = true; resolve(); }
-                else tryLoad(urls, idx + 1);
-            };
-            script.onerror = function() { tryLoad(urls, idx + 1); };
-            document.head.appendChild(script);
-        }
-        tryLoad(PDF_JS_CDNS, 0);
-    });
-    return _pdfJsLoading;
-}
-
-// ─── Step labels and state mapping ──────────────────────────────────────────
-var STEP_LABELS   = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Encrypt & Upload', 'Done'];
-var TOTAL_STEPS   = 6;
-var STATE_TO_STEP = {
-    'idle': 1, 'folder-options': 1, 'file-ready': 1,
-    'choosing-delivery': 2, 'choosing-share': 3, 'confirming': 4,
-    'zipping': 5, 'reading': 5, 'encrypting': 5, 'creating': 5, 'uploading': 5, 'completing': 5,
-    'complete': 6, 'error': 1
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SendUpload — Orchestrator Web Component
-// ═══════════════════════════════════════════════════════════════════════════════
 
 class SendUpload extends HTMLElement {
 
-    static SGMETA_MAGIC           = new Uint8Array([0x53, 0x47, 0x4D, 0x45, 0x54, 0x41]);
-    static MAX_FILE_SIZE_DIRECT   = 5 * 1024 * 1024;
-    static MAX_FILE_SIZE_PRESIGNED= 10 * 1024 * 1024 * 1024;
-    static MAX_FILE_SIZE          = 5 * 1024 * 1024;
-    static PARALLEL_UPLOADS       = 5;
-    static CAROUSEL_MESSAGES      = CAROUSEL_MESSAGES;
-
     constructor() {
         super();
-        // ── State ───────────────────────────────────────────────────────
         this._state            = 'idle';
-        this._mode             = 'file';           // 'file' or 'text'
+        this._mode             = 'file';
         this.selectedFile      = null;
         this.result            = null;
         this.errorMessage      = '';
-
-        // ── Folder state ────────────────────────────────────────────────
         this._folderScan       = null;
         this._folderName       = null;
         this._folderOptions    = { level: 4, includeEmpty: false, includeHidden: false };
-
-        // ── Wizard state ────────────────────────────────────────────────
         this._deliveryOptions     = null;
         this._recommendedDelivery = null;
         this._selectedDelivery    = null;
@@ -129,81 +39,76 @@ class SendUpload extends HTMLElement {
         this._friendlyParts       = null;
         this._friendlyKey         = null;
         this._thumbnailUrl        = null;
-
-        // ── Upload state ────────────────────────────────────────────────
         this._stageTimestamps  = {};
         this._capabilities     = null;
         this._beforeUnloadHandler = null;
-
-        // ── Carousel ────────────────────────────────────────────────────
         this._carouselIndex    = 0;
         this._carouselTimer    = null;
-
-        // ── Sub-component refs ──────────────────────────────────────────
-        this._els = {};
+        this._els              = {};
     }
 
-    // ─── State property (triggers render) ───────────────────────────────
     get state()  { return this._state; }
-    set state(v) {
-        this._state = v;
-        this._stageTimestamps[v] = Date.now();
-        this._render();
-    }
+    set state(v) { this._state = v; this._stageTimestamps[v] = Date.now(); this._render(); }
 
-    // ─── Lifecycle ──────────────────────────────────────────────────────
+    // ═══ Lifecycle ══════════════════════════════════════════════════════════
 
     connectedCallback() {
-        // Update step indicator labels
         if (typeof SendStepIndicator !== 'undefined') {
-            SendStepIndicator.STEP_LABELS = STEP_LABELS;
+            SendStepIndicator.STEP_LABELS = UploadConstants.STEP_LABELS;
         }
-        // Check upload capabilities
         this._checkCapabilities();
-        // Initial render
         this._render();
         this._wireEvents();
-        // Locale changes
-        this._localeHandler = () => { if (this._state === 'idle' || this._state === 'complete') this._render(); };
+        this._localeHandler = () => {
+            if (this._state === 'idle' || this._state === 'complete') this._render();
+        };
         document.addEventListener('locale-changed', this._localeHandler);
+        // Test files component dispatches on document (it's outside our tree)
+        this._testFileHandler = (e) => {
+            var files = e.detail && e.detail.files;
+            if (!files || files.length === 0) return;
+            if (files.length > 1) this._onMultiFile(files);
+            else this._setFile(files[0]);
+        };
+        document.addEventListener('test-file-loaded', this._testFileHandler);
     }
 
     disconnectedCallback() {
         this._stopCarousel();
         this._setBeforeUnload(false);
         document.removeEventListener('locale-changed', this._localeHandler);
+        if (this._testFileHandler) document.removeEventListener('test-file-loaded', this._testFileHandler);
     }
-
-    // ─── Capabilities ───────────────────────────────────────────────────
 
     async _checkCapabilities() {
         try {
             var caps = await ApiClient.getCapabilities();
             this._capabilities = caps;
-            SendUpload.MAX_FILE_SIZE = caps.multipart_upload
-                ? SendUpload.MAX_FILE_SIZE_PRESIGNED
-                : SendUpload.MAX_FILE_SIZE_DIRECT;
-            // Update select step's max size
-            if (this._els.select) this._els.select.maxFileSize = SendUpload.MAX_FILE_SIZE;
+            UploadConstants.setMaxFileSize(
+                caps.multipart_upload ? UploadConstants.MAX_FILE_SIZE_PRESIGNED : UploadConstants.MAX_FILE_SIZE_DIRECT
+            );
+            if (this._els.select) this._els.select.maxFileSize = UploadConstants.MAX_FILE_SIZE;
         } catch (e) { /* default to direct */ }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Rendering — show/hide sub-components
-    // ═══════════════════════════════════════════════════════════════════════
+    // ═══ Rendering ══════════════════════════════════════════════════════════
 
     _render() {
-        var step    = STATE_TO_STEP[this._state] || 1;
-        var isProcessing = ['zipping','reading','encrypting','creating','uploading','completing'].indexOf(this._state) !== -1;
+        var step   = UploadConstants.stepForState(this._state);
+        var isProc = UploadConstants.isProcessing(this._state);
 
-        // Build the shell if first render
+        // Build shell on first render
         if (!this._els.select) {
             this.innerHTML =
                 '<div class="card">' +
-                    '<send-step-indicator step="' + step + '" total="' + TOTAL_STEPS + '"></send-step-indicator>' +
+                    '<div class="upload-header-row">' +
+                        '<div class="upload-header-row__steps">' +
+                            '<send-step-indicator step="' + step + '" total="' + UploadConstants.TOTAL_STEPS + '"></send-step-indicator>' +
+                        '</div>' +
+                        '<div class="upload-header-row__action"></div>' +
+                    '</div>' +
                     '<div class="step-content"></div>' +
                 '</div>';
-
             var container = this.querySelector('.step-content');
             var names = ['select','delivery','share','confirm','progress','done'];
             var tags  = ['upload-step-select','upload-step-delivery','upload-step-share',
@@ -214,41 +119,51 @@ class SendUpload extends HTMLElement {
                 container.appendChild(el);
                 this._els[names[i]] = el;
             }
-            // Error container
             var errDiv = document.createElement('div');
             errDiv.className = 'status status--error';
             errDiv.style.display = 'none';
             container.appendChild(errDiv);
             this._els.error = errDiv;
-
             this._wireEvents();
         }
 
-        // Update step indicator
+        // Step indicator
         var indicator = this.querySelector('send-step-indicator');
         if (indicator) {
             indicator.setAttribute('step', step);
-            indicator.setAttribute('total', TOTAL_STEPS);
+            indicator.setAttribute('total', UploadConstants.TOTAL_STEPS);
+        }
+
+        // Inline Next button (changes per state)
+        var actionSlot = this.querySelector('.upload-header-row__action');
+        if (actionSlot) {
+            var btnHtml = '';
+            if (this._state === 'choosing-delivery' || this._state === 'choosing-share') {
+                btnHtml = '<button class="upload-next-btn" id="upload-next-btn">Next \u2192</button>';
+            } else if (this._state === 'confirming') {
+                btnHtml = '<button class="upload-next-btn upload-next-btn--send" id="upload-next-btn">Encrypt & Upload \u2192</button>';
+            } else if (isProc) {
+                btnHtml = '<button class="upload-next-btn upload-next-btn--disabled" disabled>Encrypting\u2026</button>';
+            } else if (this._state === 'complete') {
+                btnHtml = '<button class="upload-next-btn" id="upload-email-btn">Email Link</button>';
+            }
+            actionSlot.innerHTML = btnHtml;
+            this._wireNextButton();
         }
 
         // Show/hide sub-components
-        var activeKey = this._stateToComponent();
+        var activeKey = this._activeComponent();
         var keys = ['select','delivery','share','confirm','progress','done','error'];
         for (var k = 0; k < keys.length; k++) {
-            if (this._els[keys[k]]) {
-                this._els[keys[k]].style.display = keys[k] === activeKey ? '' : 'none';
-            }
+            if (this._els[keys[k]]) this._els[keys[k]].style.display = keys[k] === activeKey ? '' : 'none';
         }
+        this._syncComponent(activeKey);
 
-        // Push data to active component
-        this._updateActiveComponent(activeKey);
-
-        // Carousel management
-        if (isProcessing) this._startCarousel();
+        if (isProc) this._startCarousel();
         else this._stopCarousel();
     }
 
-    _stateToComponent() {
+    _activeComponent() {
         switch (this._state) {
             case 'idle': case 'file-ready': case 'folder-options': return 'select';
             case 'choosing-delivery': return 'delivery';
@@ -262,228 +177,252 @@ class SendUpload extends HTMLElement {
         }
     }
 
-    _updateActiveComponent(key) {
+    _syncComponent(key) {
         var e = this._els;
-        switch (key) {
-            case 'select':
-                if (e.select) {
-                    e.select.state       = this._state === 'file-ready' ? 'file-ready'
-                                         : this._state === 'folder-options' ? 'folder-options' : 'idle';
-                    e.select.selectedFile = this.selectedFile;
-                    e.select.folderScan   = this._folderScan;
-                    e.select.folderName   = this._folderName;
-                    e.select.folderOptions= this._folderOptions;
-                    e.select.maxFileSize  = SendUpload.MAX_FILE_SIZE;
-                    e.select.thumbnailUrl = this._thumbnailUrl;
-                }
-                break;
-            case 'delivery':
-                if (e.delivery) {
-                    var fileSummary = this._buildFileSummary();
-                    e.delivery.deliveryOptions     = this._deliveryOptions;
-                    e.delivery.recommendedDelivery = this._recommendedDelivery;
-                    e.delivery.selectedDelivery    = this._selectedDelivery;
-                    e.delivery.fileSummary          = fileSummary;
-                }
-                break;
-            case 'share':
-                if (e.share) {
-                    e.share.shareMode = this._shareMode;
-                }
-                break;
-            case 'confirm':
-                if (e.confirm) {
-                    var fs = this._buildFileSummary();
-                    var deliveryOpt = this._deliveryOptions
-                        ? this._deliveryOptions.find(function(o) { return o.id === this._selectedDelivery; }.bind(this))
-                        : null;
-                    var shareModes = UploadCrypto.SHARE_MODES;
-                    var shareModeConfig = shareModes.find(function(m) { return m.id === this._shareMode; }.bind(this));
-                    if (!this._friendlyParts && this._shareMode === 'token') {
-                        this._friendlyParts = UploadCrypto.newFriendlyKey();
-                        this._friendlyKey   = UploadCrypto.formatFriendly(this._friendlyParts);
-                    }
-                    e.confirm.fileSummary       = fs;
-                    e.confirm.deliveryOption     = deliveryOpt || null;
-                    e.confirm.shareModeConfig    = shareModeConfig || null;
-                    e.confirm.shareMode          = this._shareMode;
-                    e.confirm.friendlyParts      = this._friendlyParts;
-                    e.confirm.friendlyKey        = this._friendlyKey;
-                    e.confirm.fileSize           = this.selectedFile ? this.selectedFile.size : 0;
-                    e.confirm.showThumbnailNote  = this._selectedDelivery === 'gallery';
-                }
-                break;
-            case 'progress':
-                if (e.progress) {
-                    e.progress.stage           = this._state;
-                    e.progress.stageTimestamps = this._stageTimestamps;
-                }
-                break;
-            case 'done':
-                if (e.done && this.result) {
-                    var fs2 = this._buildFileSummary();
-                    e.done.result          = this.result;
-                    e.done.shareMode       = this._shareMode;
-                    e.done.fileSummary     = fs2;
-                    e.done.deliveryOptions = this._deliveryOptions || [];
-                    e.done.stageTimestamps = this._stageTimestamps;
-                    e.done.selectedDelivery= this._selectedDelivery;
-                    e.done.showPicker      = false;
-                }
-                break;
-            case 'error':
-                if (e.error) {
-                    e.error.textContent = this.errorMessage;
-                    e.error.style.display = '';
-                }
-                break;
+
+        if (key === 'select' && e.select) {
+            e.select.state        = this._state === 'file-ready' ? 'file-ready'
+                                  : this._state === 'folder-options' ? 'folder-options' : 'idle';
+            e.select.selectedFile = this.selectedFile;
+            e.select.folderScan   = this._folderScan;
+            e.select.folderName   = this._folderName;
+            e.select.folderOptions= this._folderOptions;
+            e.select.maxFileSize  = UploadConstants.MAX_FILE_SIZE;
+            e.select.thumbnailUrl = this._thumbnailUrl;
+        }
+        if (key === 'delivery' && e.delivery) {
+            e.delivery.deliveryOptions     = this._deliveryOptions;
+            e.delivery.recommendedDelivery = this._recommendedDelivery;
+            e.delivery.selectedDelivery    = this._selectedDelivery;
+            e.delivery.fileSummary         = this._fileSummary();
+        }
+        if (key === 'share' && e.share) {
+            e.share.shareMode = this._shareMode;
+        }
+        if (key === 'confirm' && e.confirm) {
+            if (!this._friendlyParts && this._shareMode === 'token') {
+                this._friendlyParts = UploadCrypto.newFriendlyKey();
+                this._friendlyKey   = UploadCrypto.formatFriendly(this._friendlyParts);
+            }
+            var allDelivery = this._deliveryOptions || [];
+            var selDel = this._selectedDelivery;
+            var deliveryOpt = allDelivery.find(function(o) { return o.id === selDel; });
+            var shareModes = UploadCrypto.SHARE_MODES;
+            var sm = this._shareMode;
+            var shareCfg = shareModes.find(function(m) { return m.id === sm; });
+
+            e.confirm.fileSummary       = this._fileSummary();
+            e.confirm.deliveryOption    = deliveryOpt || null;
+            e.confirm.shareModeConfig   = shareCfg || null;
+            e.confirm.shareMode         = this._shareMode;
+            e.confirm.friendlyParts     = this._friendlyParts;
+            e.confirm.friendlyKey       = this._friendlyKey;
+            e.confirm.fileSize          = this.selectedFile ? this.selectedFile.size : 0;
+            e.confirm.showThumbnailNote = this._selectedDelivery === 'gallery';
+        }
+        if (key === 'progress' && e.progress) {
+            e.progress.stage           = this._state;
+            e.progress.stageTimestamps = this._stageTimestamps;
+        }
+        if (key === 'done' && e.done && this.result) {
+            e.done.result          = this.result;
+            e.done.shareMode       = this._shareMode;
+            e.done.fileSummary     = this._fileSummary();
+            e.done.deliveryOptions = this._deliveryOptions || [];
+            e.done.stageTimestamps = this._stageTimestamps;
+            e.done.selectedDelivery= this._selectedDelivery;
+            e.done.showPicker      = false;
+        }
+        if (key === 'error' && e.error) {
+            e.error.textContent = this.errorMessage;
         }
     }
 
-    // ─── Helpers ────────────────────────────────────────────────────────
-
-    _buildFileSummary() {
+    _fileSummary() {
         return UploadFileUtils.buildFileSummary(
             this.selectedFile, this._folderScan, this._folderName,
             SendHelpers.formatBytes, SendHelpers.escapeHtml
         );
     }
 
-    _t(key, params) { return (typeof I18n !== 'undefined') ? I18n.t(key, params) : key; }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Event Wiring — listen to sub-component custom events
-    // ═══════════════════════════════════════════════════════════════════════
+    // ═══ Event Wiring ═══════════════════════════════════════════════════════
 
     _wireEvents() {
         var self = this;
-        var container = this.querySelector('.step-content');
-        if (!container || container._eventsWired) return;
-        container._eventsWired = true;
+        var c = this.querySelector('.step-content');
+        if (!c || c._wired) return;
+        c._wired = true;
 
-        // ── Step 1: Select ──────────────────────────────────────────────
-        container.addEventListener('step-file-dropped', function(e)  { self._handleDrop(e.detail); });
-        container.addEventListener('step-file-selected', function(e) { self._handleFileInput(e.detail.files); });
-        container.addEventListener('step-folder-selected', function(e) { self._handleFolderInput(e.detail.files); });
-        container.addEventListener('step-paste', function(e)         { self._handlePaste(e.detail.files); });
-        container.addEventListener('step-continue', function()       { self._advanceToDelivery(); });
-        container.addEventListener('step-folder-upload', function(e) { self._startFolderZip(e.detail.options); });
-        container.addEventListener('step-folder-cancel', function()  { self._folderScan = null; self._folderName = null; self.state = 'idle'; });
-        container.addEventListener('step-back-to-idle', function()   { self._resetSelection(); self.state = 'idle'; });
-
-        // ── Step 2: Delivery ────────────────────────────────────────────
-        container.addEventListener('step-delivery-selected', function(e) {
-            self._selectedDelivery = e.detail.deliveryId;
-            self.state = 'choosing-share';
+        // Step indicator click navigation (bubbles from send-step-indicator)
+        this.addEventListener('step-nav', function(e) {
+            var step = e.detail.step;
+            // Clear friendly key when navigating back past share mode (avoid ID collision)
+            if (step <= 3) {
+                self._friendlyParts = null;
+                self._friendlyKey   = null;
+            }
+            // Step 1 click resets file selection (v0.2.16)
+            if (step === 1) {
+                self._resetSelection();
+                self.state = 'idle';
+            } else if (step === 2) {
+                self.state = 'choosing-delivery';
+            } else if (step === 3) {
+                self.state = 'choosing-share';
+            } else if (step === 4) {
+                self.state = 'confirming';
+            }
+            // Steps 5-6 (processing/done) are not navigable
         });
 
-        // ── Step 3: Share ───────────────────────────────────────────────
-        container.addEventListener('step-share-selected', function(e) {
-            self._shareMode = e.detail.mode;
-            self.state = 'confirming';
-        });
-
-        // ── Step 4: Confirm ─────────────────────────────────────────────
-        container.addEventListener('step-confirmed', function()      { self._startProcessing(); });
-        container.addEventListener('step-change-delivery', function(){ self.state = 'choosing-delivery'; });
-        container.addEventListener('step-change-share', function()   { self.state = 'choosing-share'; });
-        container.addEventListener('step-shuffle-word', function(e)  {
+        c.addEventListener('step-file-dropped',    function(e) { self._onDrop(e.detail); });
+        c.addEventListener('step-file-selected',    function(e) { self._onFileInput(e.detail.files); });
+        c.addEventListener('step-folder-selected',  function(e) { self._onFolderInput(e.detail.files); });
+        c.addEventListener('step-paste',            function(e) { self._onPaste(e.detail.files); });
+        c.addEventListener('step-continue',         function()  { self._advanceToDelivery(); });
+        c.addEventListener('step-folder-upload',    function(e) { self._onFolderUpload(e.detail.options); });
+        c.addEventListener('step-folder-cancel',    function()  { self._folderScan = null; self._folderName = null; self.state = 'idle'; });
+        c.addEventListener('step-back-to-idle',     function()  { self._resetSelection(); self.state = 'idle'; });
+        c.addEventListener('step-text-submit',      function(e) { self._onTextSubmit(e.detail.text); });
+        c.addEventListener('step-delivery-selected',function(e) { self._selectedDelivery = e.detail.deliveryId; self.state = 'choosing-share'; });
+        c.addEventListener('step-share-selected',   function(e) { self._shareMode = e.detail.mode; self.state = 'confirming'; });
+        c.addEventListener('step-confirmed',        function()  { self._startProcessing(); });
+        c.addEventListener('step-change-delivery',  function()  { self.state = 'choosing-delivery'; });
+        c.addEventListener('step-change-share',     function()  { self.state = 'choosing-share'; });
+        c.addEventListener('step-shuffle-word',     function(e) {
             var idx = e.detail.index;
             if (self._friendlyParts && self._friendlyParts.words[idx] !== undefined) {
                 self._friendlyParts.words[idx] = UploadCrypto.randomWord();
                 self._friendlyKey = UploadCrypto.formatFriendly(self._friendlyParts);
-                self.state = 'confirming'; // re-render
+                self.state = 'confirming';
             }
         });
-        container.addEventListener('step-shuffle-all', function() {
+        c.addEventListener('step-shuffle-all', function() {
             self._friendlyParts = UploadCrypto.newFriendlyKey();
             self._friendlyKey   = UploadCrypto.formatFriendly(self._friendlyParts);
             self.state = 'confirming';
         });
-
-        // ── Step 5: Progress — no events (display only) ─────────────────
-
-        // ── Step 6: Done ────────────────────────────────────────────────
-        container.addEventListener('step-send-another', function()   { self._resetForNew(); });
-        container.addEventListener('step-change-mode', function()    {
-            if (self._els.done) self._els.done.showPicker = true;
-        });
-        container.addEventListener('step-share-mode-changed', function(e) {
+        c.addEventListener('step-send-another',       function()  { self._resetForNew(); });
+        c.addEventListener('step-change-mode',        function()  { if (self._els.done) self._els.done.showPicker = true; });
+        c.addEventListener('step-share-mode-changed', function(e) {
             self._shareMode = e.detail.mode;
             if (self._els.done) { self._els.done.shareMode = e.detail.mode; self._els.done.showPicker = false; }
         });
-        container.addEventListener('step-email-link', function()     { self._openEmailLink(); });
-
-        // ── Back navigation (shared across steps) ───────────────────────
-        container.addEventListener('step-back', function() {
+        c.addEventListener('step-email-link', function() { self._openEmailLink(); });
+        c.addEventListener('step-back', function() {
             switch (self._state) {
-                case 'choosing-delivery': self.state = 'file-ready'; break;
+                case 'choosing-delivery': self._resetSelection(); self.state = 'idle'; break;
                 case 'choosing-share':    self.state = 'choosing-delivery'; break;
                 case 'confirming':        self.state = 'choosing-share'; break;
-                default: break;
             }
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // File Selection Handlers
-    // ═══════════════════════════════════════════════════════════════════════
+    _wireNextButton() {
+        var self = this;
+        var nextBtn = this.querySelector('#upload-next-btn');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function() {
+                if (self._state === 'choosing-delivery') {
+                    // Advance with current default
+                    self._selectedDelivery = self._selectedDelivery || self._recommendedDelivery || 'download';
+                    self.state = 'choosing-share';
+                } else if (self._state === 'choosing-share') {
+                    self._shareMode = self._shareMode || 'token';
+                    self.state = 'confirming';
+                } else if (self._state === 'confirming') {
+                    self._startProcessing();
+                }
+            });
+        }
+        var emailBtn = this.querySelector('#upload-email-btn');
+        if (emailBtn) {
+            emailBtn.addEventListener('click', function() { self._openEmailLink(); });
+        }
+    }
 
-    _handleDrop(detail) {
-        var files = detail.files;
+    // ═══ File Handlers ══════════════════════════════════════════════════════
+
+    _onDrop(detail) {
         var items = detail.items;
-        // Check for folder drop via webkitGetAsEntry
         if (items && items.length === 1 && items[0].webkitGetAsEntry) {
             var entry = items[0].webkitGetAsEntry();
-            if (entry && entry.isDirectory) {
-                this._handleFolderEntry(entry);
-                return;
-            }
+            if (entry && entry.isDirectory) { this._onFolderDrop(entry); return; }
         }
-        if (files && files.length > 0) {
+        var files = detail.files;
+        if (files && files.length > 1) {
+            this._onMultiFile(files);
+        } else if (files && files.length > 0) {
             this._setFile(files[0]);
         }
     }
 
-    _handleFileInput(files) {
-        if (files && files.length > 0) this._setFile(files[0]);
+    _onFileInput(files) {
+        if (!files || files.length === 0) return;
+        if (files.length > 1) {
+            this._onMultiFile(files);
+        } else {
+            this._setFile(files[0]);
+        }
     }
 
-    _handleFolderInput(files) {
+    _onPaste(files) {
         if (!files || files.length === 0) return;
-        // Build folder scan from input files
-        var entries = [];
-        var folderName = '';
-        for (var i = 0; i < files.length; i++) {
-            var f = files[i];
-            var path = f.webkitRelativePath || f.name;
-            if (!folderName && path.indexOf('/') > 0) folderName = path.split('/')[0];
-            entries.push({ path: path, file: f, isDir: false, name: f.name });
+        if (files.length > 1) {
+            this._onMultiFile(files);
+        } else {
+            this._setFile(files[0]);
         }
-        this._folderName = folderName || 'folder';
-        this._folderScan = {
-            entries:     entries,
-            fileCount:   entries.length,
-            folderCount: 0,
-            totalSize:   entries.reduce(function(s, e) { return s + (e.file ? e.file.size : 0); }, 0)
-        };
+    }
+
+    _onMultiFile(files) {
+        // Multiple files → treat as folder bundle, skip file-ready
+        var entries = [];
+        var totalSize = 0;
+        for (var i = 0; i < files.length; i++) {
+            entries.push({ path: files[i].name, file: files[i], isDir: false, name: files[i].name });
+            totalSize += files[i].size;
+        }
+        this._folderName = files.length + ' files';
+        this._folderScan = { entries: entries, fileCount: entries.length, folderCount: 0, totalSize: totalSize };
+        this._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
+        if (this._thumbnailUrl) { URL.revokeObjectURL(this._thumbnailUrl); this._thumbnailUrl = null; }
+        this.selectedFile = null;
+        // Smart skip: folders/multi-file go straight to delivery
+        this._advanceToDelivery();
+    }
+
+    _onTextSubmit(text) {
+        // Convert text to a .txt File and feed into the normal upload pipeline
+        var blob = new Blob([text], { type: 'text/plain' });
+        var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        var file = new File([blob], 'message-' + ts + '.txt', { type: 'text/plain' });
+        this._setFile(file);
+    }
+
+    _onFolderInput(files) {
+        if (!files || files.length === 0) return;
+        var result = UploadFolder.buildFolderScan(files);
+        this._folderName = result.folderName;
+        this._folderScan = result.scan;
         this.state = 'folder-options';
     }
 
-    _handlePaste(files) {
-        if (files && files.length > 0) this._setFile(files[0]);
+    async _onFolderDrop(directoryEntry) {
+        var result = await UploadFolder.scanDirectoryEntry(directoryEntry);
+        this._folderName = result.folderName;
+        this._folderScan = result.scan;
+        this.state = 'folder-options';
     }
 
     _setFile(file) {
         this.selectedFile  = file;
         this._folderScan   = null;
         this._folderName   = null;
-        this._thumbnailUrl = null;
-        // Generate image thumbnail for preview
-        if (UploadFileUtils.isImageFile(file)) {
-            this._thumbnailUrl = URL.createObjectURL(file);
-        }
-        this.state = 'file-ready';
+        if (this._thumbnailUrl) URL.revokeObjectURL(this._thumbnailUrl);
+        this._thumbnailUrl = UploadFileUtils.isImageFile(file) ? URL.createObjectURL(file) : null;
+        // Smart skip: go straight to delivery (v0.2.6+)
+        this._advanceToDelivery();
     }
 
     _resetSelection() {
@@ -493,165 +432,82 @@ class SendUpload extends HTMLElement {
         this._folderName  = null;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Folder Entry (from drag-drop)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    async _handleFolderEntry(directoryEntry) {
-        this._folderName = directoryEntry.name;
-        var entries = await this._readDirectoryTree(directoryEntry);
-        this._folderScan = {
-            entries:     entries,
-            fileCount:   entries.filter(function(e) { return !e.isDir; }).length,
-            folderCount: entries.filter(function(e) { return e.isDir; }).length,
-            totalSize:   entries.reduce(function(s, e) { return s + (e.file ? e.file.size : 0); }, 0)
-        };
-        this.state = 'folder-options';
-    }
-
-    async _readDirectoryTree(dirEntry) {
-        var results = [];
-        var readEntries = function(dir, path) {
-            return new Promise(function(resolve, reject) {
-                var reader = dir.createReader();
-                var all = [];
-                var readBatch = function() {
-                    reader.readEntries(async function(entries) {
-                        if (entries.length === 0) {
-                            for (var i = 0; i < all.length; i++) {
-                                var e = all[i];
-                                if (e.isFile) {
-                                    try {
-                                        var file = await new Promise(function(res, rej) { e.file(res, rej); });
-                                        results.push({ path: path + e.name, file: file, isDir: false, name: e.name });
-                                    } catch (err) { /* skip */ }
-                                } else if (e.isDirectory) {
-                                    results.push({ path: path + e.name + '/', file: null, isDir: true, name: e.name });
-                                    await readEntries(e, path + e.name + '/');
-                                }
-                            }
-                            resolve();
-                        } else {
-                            all.push.apply(all, entries);
-                            readBatch();
-                        }
-                    }, reject);
-                };
-                readBatch();
-            });
-        };
-        await readEntries(dirEntry, '');
-        return results;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Step Advancement
-    // ═══════════════════════════════════════════════════════════════════════
+    // ═══ Wizard Flow ════════════════════════════════════════════════════════
 
     _advanceToDelivery() {
-        var file       = this.selectedFile;
-        var folderScan = this._folderScan;
-        this._deliveryOptions     = UploadFileUtils.detectDeliveryOptions(file, folderScan);
-        this._recommendedDelivery = UploadFileUtils.getRecommendedDelivery(this._deliveryOptions, folderScan);
+        this._deliveryOptions     = UploadFileUtils.detectDeliveryOptions(this.selectedFile, this._folderScan);
+        this._recommendedDelivery = UploadFileUtils.getSmartDefault(this.selectedFile, this._folderScan);
         this._selectedDelivery    = this._recommendedDelivery;
         this.state = 'choosing-delivery';
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Upload Engine
-    // ═══════════════════════════════════════════════════════════════════════
+    _onFolderUpload(options) {
+        if (options) this._folderOptions = options;
+        if (this._folderScan.totalSize > UploadConstants.MAX_FILE_SIZE) {
+            this.errorMessage = 'Folder too large. Maximum: ' + SendHelpers.formatBytes(UploadConstants.MAX_FILE_SIZE);
+            this.state = 'error';
+            return;
+        }
+        this._advanceToDelivery();
+    }
+
+    // ═══ Upload Pipeline ════════════════════════════════════════════════════
 
     async _startProcessing() {
         if (!SendCrypto.isAvailable()) {
-            this.errorMessage = this._t('crypto.error.unavailable');
+            this.errorMessage = 'Web Crypto API not available (requires HTTPS)';
             this.state = 'error';
             return;
         }
         if (!this.selectedFile && !this._folderScan) return;
 
         var checkSize = this._folderScan ? this._folderScan.totalSize : (this.selectedFile ? this.selectedFile.size : 0);
-        if (checkSize > SendUpload.MAX_FILE_SIZE) {
-            this.errorMessage = this._t('upload.error.file_too_large', { limit: SendHelpers.formatBytes(SendUpload.MAX_FILE_SIZE) });
+        if (checkSize > UploadConstants.MAX_FILE_SIZE) {
+            this.errorMessage = 'File too large. Maximum: ' + SendHelpers.formatBytes(UploadConstants.MAX_FILE_SIZE);
             this.state = 'error';
             return;
         }
 
+        var self = this;
         try {
             this._setBeforeUnload(true);
             this._stageTimestamps = {};
 
-            // Compress folder if needed
+            // Single file + gallery delivery → wrap in zip with thumbnails (v0.2.17)
+            var delivery = this._selectedDelivery || 'download';
+            if (delivery === 'gallery' && !this._folderScan && this.selectedFile) {
+                var file = this.selectedFile;
+                this._folderScan = {
+                    entries:   [{ name: file.name, path: file.name, isDir: false, file: file }],
+                    totalSize: file.size,
+                    fileCount: 1
+                };
+                this._folderName = file.name.replace(/\.[^.]+$/, '') || 'file';
+                this._folderOptions = this._folderOptions || { level: 4, includeEmpty: false, includeHidden: false };
+            }
+
             if (this._folderScan) {
                 this.state = 'zipping';
-                await this._compressFolder();
+                this.selectedFile = await UploadFolder.compressToZip(
+                    this._folderScan, this._folderName, this._folderOptions, this._selectedDelivery
+                );
             }
 
-            // Read file
-            var file = this.selectedFile;
-            this.state = 'reading';
-            var rawContent  = await this._readFileAsArrayBuffer(file);
-            var contentType = file.type || 'application/octet-stream';
-            var plaintext   = this._packageWithMetadata(rawContent, { filename: file.name });
-            var fileSizeBytes = plaintext.byteLength;
-
-            // Encrypt
-            this.state = 'encrypting';
-            var key, keyString;
-            if (this._shareMode === 'token' && this._friendlyKey) {
-                key       = await UploadCrypto.deriveKeyFromFriendly(this._friendlyKey);
-                keyString = await SendCrypto.exportKey(key);
-            } else {
-                key       = await SendCrypto.generateKey();
-                keyString = await SendCrypto.exportKey(key);
-            }
-            var encrypted = await SendCrypto.encryptFile(key, plaintext);
-
-            // Create transfer
-            this.state = 'creating';
-            var createResult;
-            if (this._shareMode === 'token' && this._friendlyKey) {
-                var derivedId = await UploadCrypto.deriveTransferId(this._friendlyKey);
-                createResult  = await this._createTransferWithId(fileSizeBytes, contentType, derivedId);
-            } else {
-                createResult = await ApiClient.createTransfer(fileSizeBytes, contentType);
-            }
-
-            // Upload
-            this.state = 'uploading';
-            var usePresigned = encrypted.byteLength > SendUpload.MAX_FILE_SIZE_DIRECT
-                            && this._capabilities && this._capabilities.multipart_upload;
-            if (usePresigned) {
-                await this._uploadViaPresigned(createResult.transfer_id, encrypted);
-            } else {
-                await ApiClient.uploadPayload(createResult.transfer_id, encrypted);
-            }
-
-            // Complete
-            this.state = 'completing';
-            var completeResult = await ApiClient.completeTransfer(createResult.transfer_id);
-
-            // Build result
-            var delivery   = this._selectedDelivery || 'download';
-            var combinedUrl = this._buildUrl(createResult.transfer_id, keyString, delivery);
-            var linkOnlyUrl = this._buildLinkOnlyUrl(createResult.transfer_id);
-
-            this.result = {
-                transferId:   createResult.transfer_id,
-                combinedUrl:  combinedUrl,
-                linkOnlyUrl:  linkOnlyUrl,
-                keyString:    keyString,
-                friendlyKey:  (this._shareMode === 'token') ? this._friendlyKey : null,
-                delivery:     delivery,
-                isText:       false,
-                transparency: completeResult.transparency || null
-            };
+            this.result = await UploadEngine.run({
+                file:         this.selectedFile,
+                shareMode:    this._shareMode,
+                friendlyKey:  this._friendlyKey,
+                delivery:     this._selectedDelivery || 'download',
+                capabilities: this._capabilities,
+                onStage:      function(stage) { self.state = stage; }
+            });
 
             this._setBeforeUnload(false);
             this._stageTimestamps.complete = Date.now();
             this.state = 'complete';
 
             this.dispatchEvent(new CustomEvent('upload-complete', {
-                detail: { transferId: createResult.transfer_id, downloadUrl: combinedUrl, key: keyString },
+                detail: { transferId: this.result.transferId, downloadUrl: this.result.combinedUrl, key: this.result.keyString },
                 bubbles: true
             }));
 
@@ -666,322 +522,29 @@ class SendUpload extends HTMLElement {
                 document.dispatchEvent(new CustomEvent('access-token-invalid'));
                 return;
             }
-            this.errorMessage = err.message || this._t('upload.error.upload_failed');
+            this.errorMessage = err.message || 'Upload failed';
             this.state = 'error';
         }
     }
 
-    // ─── Create transfer with deterministic ID (token mode) ─────────────
-
-    async _createTransferWithId(fileSize, contentType, transferId) {
-        var fetchFn = typeof ApiClient._fetch === 'function'
-            ? ApiClient._fetch.bind(ApiClient)
-            : function(path, opts) { return fetch(path, opts); };
-        var res = await fetchFn('/api/transfers/create', {
-            method: 'POST',
-            headers: Object.assign({ 'Content-Type': 'application/json' }, ApiClient._authHeaders()),
-            body: JSON.stringify({
-                file_size_bytes:   fileSize,
-                content_type_hint: contentType || 'application/octet-stream',
-                transfer_id:       transferId
-            })
-        });
-        if (!res.ok) {
-            if (res.status === 401) throw new Error('ACCESS_TOKEN_INVALID');
-            if (res.status === 409) throw new Error('Transfer ID collision — please retry');
-            throw new Error('Create transfer failed: ' + res.status);
-        }
-        return res.json();
-    }
-
-    // ─── Presigned Multipart Upload ─────────────────────────────────────
-
-    async _uploadViaPresigned(transferId, encrypted) {
-        var partSize = (this._capabilities && this._capabilities.max_part_size) || (10 * 1024 * 1024);
-        var numParts = Math.ceil(encrypted.byteLength / partSize);
-        var initResult = await ApiClient.initiateMultipart(transferId, encrypted.byteLength, numParts);
-        var uploadId   = initResult.upload_id;
-        var partUrls   = initResult.part_urls;
-
-        try {
-            var completedParts = new Array(partUrls.length);
-            var partsCompleted = 0;
-            var self = this;
-
-            var uploadOnePart = async function(i) {
-                var start  = i * partSize;
-                var end    = Math.min(start + partSize, encrypted.byteLength);
-                var partBuf= encrypted.slice(start, end);
-                var etag   = await ApiClient.uploadPart(partUrls[i].upload_url, partBuf);
-                completedParts[i] = { part_number: partUrls[i].part_number, etag: etag };
-                partsCompleted++;
-            };
-
-            var active  = new Set();
-            var maxPool = SendUpload.PARALLEL_UPLOADS;
-            for (var i = 0; i < partUrls.length; i++) {
-                var p = uploadOnePart(i).then(function() { active.delete(p); });
-                active.add(p);
-                if (active.size >= maxPool) await Promise.race(active);
-            }
-            await Promise.all(active);
-            await ApiClient.completeMultipart(transferId, uploadId, completedParts);
-        } catch (err) {
-            try { await ApiClient.abortMultipart(transferId, uploadId); } catch (e) { /* ignore */ }
-            throw err;
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Folder Compression + Gallery Thumbnails
-    // ═══════════════════════════════════════════════════════════════════════
-
-    async _startFolderZip(options) {
-        if (options) this._folderOptions = options;
-        var totalSize = this._folderScan.totalSize;
-        if (totalSize > SendUpload.MAX_FILE_SIZE) {
-            this.errorMessage = this._t('upload.folder.error_too_large', { limit: SendHelpers.formatBytes(SendUpload.MAX_FILE_SIZE) });
-            this.state = 'error';
-            return;
-        }
-        // Feed directly into processing pipeline
-        this._advanceToDelivery();
-    }
-
-    async _compressFolder() {
-        await this._loadJSZip();
-        var opts    = this._folderOptions || {};
-        var entries = this._folderScan.entries.filter(function(e) {
-            if (!opts.includeHidden && e.name.startsWith('.')) return false;
-            if (e.isDir && !opts.includeEmpty) return false;
-            return true;
-        });
-
-        var zip = new JSZip();
-        for (var i = 0; i < entries.length; i++) {
-            var entry = entries[i];
-            if (entry.isDir) { zip.folder(entry.path); }
-            else if (entry.file) {
-                var buf = await entry.file.arrayBuffer();
-                zip.file(entry.path, buf, {
-                    compression: (opts.level || 4) > 0 ? 'DEFLATE' : 'STORE',
-                    compressionOptions: { level: opts.level || 4 }
-                });
-            }
-        }
-
-        // Gallery thumbnails
-        var delivery = this._selectedDelivery || 'download';
-        if (delivery === 'gallery') {
-            await this._addPreviewToZip(zip, entries.filter(function(e) { return !e.isDir; }));
-        }
-
-        var blob    = await zip.generateAsync({ type: 'blob' });
-        var zipName = (this._folderName || 'folder') + '.zip';
-        this.selectedFile = new File([blob], zipName, { type: 'application/zip' });
-    }
-
-    async _loadJSZip() {
-        if (typeof JSZip !== 'undefined') return;
-        return new Promise(function(resolve, reject) {
-            var script   = document.createElement('script');
-            var basePath = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.base) || '../_common';
-            script.src   = basePath + '/js/vendor/jszip.min.js';
-            script.onload  = resolve;
-            script.onerror = function() { reject(new Error('Failed to load JSZip')); };
-            document.head.appendChild(script);
-        });
-    }
-
-    // ─── Gallery preview generation ─────────────────────────────────────
-
-    async _addPreviewToZip(zip, fileEntries) {
-        var files = fileEntries.filter(function(e) { return e.file; });
-        if (files.length === 0) return;
-
-        // Compute content hashes
-        var fileHashes = [];
-        for (var h = 0; h < files.length; h++) {
-            try { fileHashes.push(await _computeFileHash(files[h].file)); }
-            catch (e) { fileHashes.push('0000000000000000'); }
-        }
-        var folderHash = await _computeFolderHash(fileHashes);
-        var previewDir = '_gallery.' + folderHash;
-
-        // Load PDF.js if needed
-        var hasPdfs = files.some(function(e) { return _getFileCategory(e.name) === 'pdf'; });
-        if (hasPdfs) {
-            try { await _loadPdfJs(); }
-            catch (e) { hasPdfs = false; }
-        }
-
-        // Generate thumbnails + metadata
-        var manifest = {
-            version: '0.2', preview_enabled: true, generated_at: new Date().toISOString(),
-            folder_hash: folderHash, thumbnail_max_width: THUMB_MAX_WIDTH,
-            thumbnail_format: THUMB_FORMAT, thumbnail_quality: THUMB_QUALITY,
-            total_files: files.length, file_hashes: {}, files: []
-        };
-        var thumbnailsGenerated = 0;
-        var self = this;
-
-        for (var i = 0; i < files.length; i++) {
-            var entry    = files[i];
-            var id       = _fileId(i);
-            var category = _getFileCategory(entry.name);
-            var meta = {
-                id: id, name: entry.name, path: entry.path, type: category,
-                extension: _getExt(entry.name), size: entry.file.size,
-                mime: entry.file.type || 'application/octet-stream', hash: fileHashes[i]
-            };
-            var manifestEntry = {
-                id: id, name: entry.name, path: entry.path, type: category,
-                size: entry.file.size, hash: fileHashes[i], thumbnail: null,
-                metadata: previewDir + '/metadata/' + id + '.meta.json'
-            };
-            manifest.file_hashes[id] = fileHashes[i];
-
-            // Generate thumbnail per type
-            try {
-                var thumbResult = null, thumbExt = 'jpg';
-                if (category === 'image') {
-                    thumbResult = await self._generateImageThumbnail(entry.file);
-                    thumbExt = _getExt(entry.name) === 'svg' ? 'svg' : 'jpg';
-                    meta.dimensions = { width: thumbResult.originalWidth, height: thumbResult.originalHeight };
-                } else if (category === 'pdf' && hasPdfs) {
-                    thumbResult = await _generatePdfThumbnail(entry.file);
-                    meta.pageCount = thumbResult.pageCount;
-                } else if (category === 'markdown') {
-                    thumbResult = await _generateMarkdownThumbnail(entry.file);
-                    meta.textLength = thumbResult.textLen;
-                } else if (category === 'video') {
-                    thumbResult = await _generateVideoThumbnail(entry.file);
-                    meta.duration = thumbResult.duration;
-                    meta.dimensions = { width: thumbResult.videoW, height: thumbResult.videoH };
-                } else if (category === 'audio') {
-                    var audioMeta = await _extractAudioMetadata(entry.file);
-                    meta.duration = audioMeta.duration;
-                }
-                if (thumbResult && thumbResult.buffer) {
-                    var thumbPath = previewDir + '/thumbnails/' + id + '.thumb.' + thumbExt;
-                    zip.file(thumbPath, thumbResult.buffer);
-                    meta.thumbnail = { path: thumbPath, width: thumbResult.width, height: thumbResult.height, format: THUMB_FORMAT, size: thumbResult.buffer.byteLength };
-                    manifestEntry.thumbnail = thumbPath;
-                    thumbnailsGenerated++;
-                }
-            } catch (e) { /* skip failed thumbnails */ }
-
-            zip.file(previewDir + '/metadata/' + id + '.meta.json', JSON.stringify(meta, null, 2));
-            manifest.files.push(manifestEntry);
-        }
-
-        manifest.thumbnails_generated = thumbnailsGenerated;
-        zip.file(previewDir + '/_manifest.json', JSON.stringify(manifest, null, 2));
-    }
-
-    // ─── Image thumbnail (canvas resize) ────────────────────────────────
-
-    _generateImageThumbnail(file) {
-        return new Promise(function(resolve, reject) {
-            if (_getExt(file.name) === 'svg') {
-                file.arrayBuffer().then(function(buf) {
-                    resolve({ buffer: buf, width: THUMB_MAX_WIDTH, height: THUMB_MAX_WIDTH, format: 'image/svg+xml', originalWidth: 0, originalHeight: 0 });
-                }).catch(reject);
-                return;
-            }
-            var url = URL.createObjectURL(file);
-            var img = new Image();
-            img.onload = function() {
-                var origW = img.naturalWidth, origH = img.naturalHeight;
-                var scale = Math.min(1, THUMB_MAX_WIDTH / origW);
-                var w = Math.round(origW * scale), h = Math.round(origH * scale);
-                var canvas = document.createElement('canvas');
-                canvas.width = w; canvas.height = h;
-                var ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
-                URL.revokeObjectURL(url);
-                canvas.toBlob(function(blob) {
-                    if (!blob) { reject(new Error('toBlob failed')); return; }
-                    blob.arrayBuffer().then(function(buf) {
-                        resolve({ buffer: buf, width: w, height: h, format: THUMB_FORMAT, originalWidth: origW, originalHeight: origH });
-                    }).catch(reject);
-                }, THUMB_FORMAT, THUMB_QUALITY);
-            };
-            img.onerror = function() { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
-            img.src = url;
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // SGMETA + Helpers
-    // ═══════════════════════════════════════════════════════════════════════
-
-    _packageWithMetadata(contentBuffer, metadata) {
-        var magic    = SendUpload.SGMETA_MAGIC;
-        var metaBytes= new TextEncoder().encode(JSON.stringify(metadata));
-        var metaLen  = metaBytes.length;
-        var result   = new Uint8Array(magic.length + 4 + metaLen + contentBuffer.byteLength);
-        result.set(magic, 0);
-        result[magic.length]     = (metaLen >> 24) & 0xFF;
-        result[magic.length + 1] = (metaLen >> 16) & 0xFF;
-        result[magic.length + 2] = (metaLen >> 8) & 0xFF;
-        result[magic.length + 3] = metaLen & 0xFF;
-        result.set(metaBytes, magic.length + 4);
-        result.set(new Uint8Array(contentBuffer), magic.length + 4 + metaLen);
-        return result.buffer;
-    }
-
-    _readFileAsArrayBuffer(file) {
-        return new Promise(function(resolve, reject) {
-            var reader = new FileReader();
-            reader.onload  = function() { resolve(reader.result); };
-            reader.onerror = function() { reject(new Error('Failed to read file')); };
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
-    _buildUrl(transferId, keyString, delivery) {
-        var locale = this._detectLocalePrefix();
-        var route  = delivery === 'download' ? 'download' : delivery;
-        return window.location.origin + '/' + locale + '/' + route + '/#' + transferId + '/' + keyString;
-    }
-
-    _buildLinkOnlyUrl(transferId) {
-        var locale = this._detectLocalePrefix();
-        return window.location.origin + '/' + locale + '/download/#' + transferId;
-    }
-
-    _detectLocalePrefix() {
-        var match = window.location.pathname.match(/^\/([a-z]{2}(?:-[a-z]{2})?)\//);
-        return match ? match[1] : 'en-gb';
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Carousel
-    // ═══════════════════════════════════════════════════════════════════════
+    // ═══ Carousel ═══════════════════════════════════════════════════════════
 
     _startCarousel() {
         if (this._carouselTimer) return;
         var self = this;
+        var msgs = UploadConstants.CAROUSEL_MESSAGES;
+        if (this._els.progress) this._els.progress.carouselMessage = msgs[this._carouselIndex];
         this._carouselTimer = setInterval(function() {
-            self._carouselIndex = (self._carouselIndex + 1) % CAROUSEL_MESSAGES.length;
-            if (self._els.progress) {
-                self._els.progress.carouselMessage = CAROUSEL_MESSAGES[self._carouselIndex];
-            }
-        }, CAROUSEL_INTERVAL_MS);
-        // Set initial message
-        if (this._els.progress) {
-            this._els.progress.carouselMessage = CAROUSEL_MESSAGES[this._carouselIndex];
-        }
+            self._carouselIndex = (self._carouselIndex + 1) % msgs.length;
+            if (self._els.progress) self._els.progress.carouselMessage = msgs[self._carouselIndex];
+        }, UploadConstants.CAROUSEL_INTERVAL_MS);
     }
 
     _stopCarousel() {
         if (this._carouselTimer) { clearInterval(this._carouselTimer); this._carouselTimer = null; }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Before-unload guard
-    // ═══════════════════════════════════════════════════════════════════════
+    // ═══ Utilities ══════════════════════════════════════════════════════════
 
     _setBeforeUnload(active) {
         if (active && !this._beforeUnloadHandler) {
@@ -993,175 +556,26 @@ class SendUpload extends HTMLElement {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Reset
-    // ═══════════════════════════════════════════════════════════════════════
-
     _resetForNew() {
         this._resetSelection();
-        this.result            = null;
-        this.errorMessage      = '';
-        this._deliveryOptions  = null;
+        this.result             = null;
+        this.errorMessage       = '';
+        this._deliveryOptions   = null;
         this._recommendedDelivery = null;
-        this._selectedDelivery = null;
-        this._shareMode        = 'token';
-        this._friendlyParts    = null;
-        this._friendlyKey      = null;
-        this._stageTimestamps  = {};
-        this._carouselIndex    = 0;
+        this._selectedDelivery  = null;
+        this._shareMode         = 'token';
+        this._friendlyParts     = null;
+        this._friendlyKey       = null;
+        this._stageTimestamps   = {};
+        this._carouselIndex     = 0;
         this.state = 'idle';
     }
 
-    // ─── Email link ─────────────────────────────────────────────────────
-
     _openEmailLink() {
         if (!this.result) return;
-        var subject = 'Secure file for you';
-        var url     = this.result.combinedUrl || '';
-        var body    = 'I\'ve sent you an encrypted file via SG/Send.\n\nOpen this link to download:\n' + url;
-        window.open('mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body));
+        var body = "I've sent you an encrypted file via SG/Send.\n\nOpen this link to download:\n" + (this.result.combinedUrl || '');
+        window.open('mailto:?subject=' + encodeURIComponent('Secure file for you') + '&body=' + encodeURIComponent(body));
     }
 }
 
 customElements.define('send-upload', SendUpload);
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Module-level thumbnail helpers (not on prototype — avoid polluting the class)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function _computeFileHash(file) {
-    return file.arrayBuffer().then(function(buf) {
-        return crypto.subtle.digest('SHA-256', buf);
-    }).then(function(hashBuf) {
-        var arr = new Uint8Array(hashBuf);
-        var hex = '';
-        for (var i = 0; i < arr.length; i++) hex += ('0' + arr[i].toString(16)).slice(-2);
-        return hex;
-    });
-}
-
-function _computeFolderHash(fileHashes) {
-    var data = new TextEncoder().encode(fileHashes.join(''));
-    return crypto.subtle.digest('SHA-256', data).then(function(hashBuf) {
-        var arr = new Uint8Array(hashBuf);
-        var hex = '';
-        for (var i = 0; i < 8; i++) hex += ('0' + arr[i].toString(16)).slice(-2);
-        return hex;
-    });
-}
-
-function _generatePdfThumbnail(file) {
-    return _loadPdfJs().then(function() { return file.arrayBuffer(); })
-    .then(function(buf) { return window.pdfjsLib.getDocument({ data: buf }).promise; })
-    .then(function(pdfDoc) {
-        var pageCount = pdfDoc.numPages;
-        return pdfDoc.getPage(1).then(function(page) {
-            var vp = page.getViewport({ scale: 1.0 });
-            var scale = THUMB_MAX_WIDTH / vp.width;
-            var svp = page.getViewport({ scale: scale });
-            var canvas = document.createElement('canvas');
-            canvas.width = Math.round(svp.width); canvas.height = Math.round(svp.height);
-            var ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            return page.render({ canvasContext: ctx, viewport: svp }).promise.then(function() {
-                return new Promise(function(resolve, reject) {
-                    canvas.toBlob(function(blob) {
-                        if (!blob) { reject(new Error('PDF toBlob failed')); return; }
-                        blob.arrayBuffer().then(function(buf) {
-                            resolve({ buffer: buf, width: canvas.width, height: canvas.height, format: THUMB_FORMAT, pageCount: pageCount });
-                        }).catch(reject);
-                    }, THUMB_FORMAT, THUMB_QUALITY);
-                });
-            });
-        });
-    });
-}
-
-function _generateMarkdownThumbnail(file) {
-    return new Promise(function(resolve, reject) {
-        var reader = new FileReader();
-        reader.onload = function() {
-            var text = reader.result || '';
-            var canvas = document.createElement('canvas');
-            canvas.width = THUMB_MAX_WIDTH; canvas.height = THUMB_HEIGHT;
-            var ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            var padding = 12, y = padding, maxWidth = canvas.width - padding * 2, maxY = canvas.height - 20;
-            var lines = text.split('\n');
-            for (var li = 0; li < lines.length && y < maxY; li++) {
-                var line = lines[li];
-                if (line.match(/^#{1,3}\s/)) {
-                    ctx.font = 'bold 10px system-ui, sans-serif'; ctx.fillStyle = '#1a1a2e';
-                    var cleanLine = line.replace(/^#+\s*/, '');
-                    ctx.fillText(cleanLine, padding, y); y += 14;
-                } else if (line.trim()) {
-                    var cleanText = line.replace(/[*_`~]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-                    ctx.font = '7px system-ui, sans-serif'; ctx.fillStyle = '#1a1a2e';
-                    var words = cleanText.split(' '), currentLine = '';
-                    for (var wi = 0; wi < words.length && y < maxY; wi++) {
-                        var testLine = currentLine ? currentLine + ' ' + words[wi] : words[wi];
-                        if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-                            ctx.fillText(currentLine, padding, y); y += 10; currentLine = words[wi];
-                        } else { currentLine = testLine; }
-                    }
-                    if (currentLine && y < maxY) { ctx.fillText(currentLine, padding, y); y += 10; }
-                    y += 2;
-                }
-            }
-            if (y >= maxY) {
-                var grad = ctx.createLinearGradient(0, THUMB_HEIGHT - 30, 0, THUMB_HEIGHT);
-                grad.addColorStop(0, 'rgba(255,255,255,0)'); grad.addColorStop(1, 'rgba(255,255,255,1)');
-                ctx.fillStyle = grad; ctx.fillRect(0, THUMB_HEIGHT - 30, THUMB_MAX_WIDTH, 30);
-            }
-            canvas.toBlob(function(blob) {
-                if (!blob) { reject(new Error('MD toBlob failed')); return; }
-                blob.arrayBuffer().then(function(buf) {
-                    resolve({ buffer: buf, width: THUMB_MAX_WIDTH, height: THUMB_HEIGHT, format: THUMB_FORMAT, textLen: text.length });
-                }).catch(reject);
-            }, THUMB_FORMAT, THUMB_QUALITY);
-        };
-        reader.onerror = function() { reject(new Error('Failed to read markdown')); };
-        reader.readAsText(file);
-    });
-}
-
-function _generateVideoThumbnail(file) {
-    return new Promise(function(resolve, reject) {
-        var url = URL.createObjectURL(file), video = document.createElement('video');
-        video.preload = 'metadata'; video.muted = true;
-        var timeout = setTimeout(function() { URL.revokeObjectURL(url); reject(new Error('Video timeout')); }, 10000);
-        video.onloadeddata = function() { video.currentTime = Math.min(1, video.duration / 4); };
-        video.onseeked = function() {
-            clearTimeout(timeout);
-            var origW = video.videoWidth, origH = video.videoHeight;
-            var scale = Math.min(1, THUMB_MAX_WIDTH / origW);
-            var w = Math.round(origW * scale), h = Math.round(origH * scale);
-            var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(video, 0, 0, w, h);
-            URL.revokeObjectURL(url);
-            canvas.toBlob(function(blob) {
-                if (!blob) { reject(new Error('Video toBlob failed')); return; }
-                blob.arrayBuffer().then(function(buf) {
-                    resolve({ buffer: buf, width: w, height: h, format: THUMB_FORMAT, duration: video.duration, videoW: origW, videoH: origH });
-                }).catch(reject);
-            }, THUMB_FORMAT, THUMB_QUALITY);
-        };
-        video.onerror = function() { clearTimeout(timeout); URL.revokeObjectURL(url); reject(new Error('Video load failed')); };
-        video.src = url;
-    });
-}
-
-function _extractAudioMetadata(file) {
-    return new Promise(function(resolve, reject) {
-        var url = URL.createObjectURL(file), audio = document.createElement('audio');
-        audio.preload = 'metadata';
-        var timeout = setTimeout(function() { URL.revokeObjectURL(url); reject(new Error('Audio timeout')); }, 5000);
-        audio.onloadedmetadata = function() {
-            clearTimeout(timeout); var d = audio.duration; URL.revokeObjectURL(url);
-            var m = Math.floor(d / 60), s = Math.floor(d % 60);
-            resolve({ duration: d, durationFormatted: m + ':' + (s < 10 ? '0' : '') + s });
-        };
-        audio.onerror = function() { clearTimeout(timeout); URL.revokeObjectURL(url); reject(new Error('Audio load failed')); };
-        audio.src = url;
-    });
-}

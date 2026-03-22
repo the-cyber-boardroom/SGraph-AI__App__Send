@@ -92,13 +92,27 @@ class SendTestFiles extends HTMLElement {
             const icon = SendTestFiles.ICONS[f.type] || SendTestFiles.ICONS.txt;
             const url  = `${basePath}/${f.name}`;
             return `
-                <a class="test-file" href="${url}" download="${f.name}"
+                <div class="test-file" role="button" tabindex="0"
                    draggable="true" data-file-url="${url}" data-file-name="${f.name}" data-file-mime="${f.mime}">
                     ${icon}
                     <span class="test-file__name">${f.name}</span>
                     <span class="test-file__size">${f.size}</span>
-                </a>`;
+                </div>`;
         }).join('');
+
+        // Special test cards
+        const specialCards = `
+            <div class="test-file test-file--special" role="button" tabindex="0" id="test-multi-images">
+                ${SendTestFiles.ICONS.png}
+                <span class="test-file__name">4 test images</span>
+                <span class="test-file__size">click to load</span>
+            </div>
+            <div class="test-file test-file--special" role="button" tabindex="0" id="test-folder">
+                ${SendTestFiles.ICONS.txt}
+                <span class="test-file__name">Test folder</span>
+                <span class="test-file__size">all ${SendTestFiles.FILES.length} files</span>
+            </div>
+        `;
 
         this.innerHTML = `
             <div class="test-files">
@@ -106,30 +120,97 @@ class SendTestFiles extends HTMLElement {
                 <p class="test-files__desc">${this.t('test_files.description')}</p>
                 <div class="test-files__grid">
                     ${cards}
+                    ${specialCards}
                 </div>
                 <p class="test-files__desc" style="margin-top: var(--space-3, 0.75rem);">${this.t('test_files.folder_hint')}</p>
             </div>
         `;
 
-        this._setupDragHandlers();
+        this._setupHandlers();
     }
 
-    _setupDragHandlers() {
-        // Make each card draggable — on dragstart, fetch the file and attach it
-        // as a real File in the DataTransfer so the upload drop zone accepts it
-        this.querySelectorAll('.test-file[draggable]').forEach(card => {
-            card.addEventListener('dragstart', (e) => {
-                const url  = card.getAttribute('data-file-url');
-                const name = card.getAttribute('data-file-name');
-                const mime = card.getAttribute('data-file-mime');
+    _setupHandlers() {
+        var self = this;
 
-                // Set URL as fallback for standard drag behaviour
+        // Click-to-load: fetch file and dispatch event for upload component
+        this.querySelectorAll('.test-file[data-file-url]').forEach(function(card) {
+            card.addEventListener('click', function(e) {
+                e.preventDefault();
+                var url  = card.getAttribute('data-file-url');
+                var name = card.getAttribute('data-file-name');
+                var mime = card.getAttribute('data-file-mime');
+                fetch(url).then(function(r) { return r.arrayBuffer(); }).then(function(buf) {
+                    var file = new File([buf], name, { type: mime });
+                    document.dispatchEvent(new CustomEvent('test-file-loaded', {
+                        detail: { files: [file] }
+                    }));
+                }).catch(function(err) {
+                    console.warn('[send-test-files] Failed to fetch ' + name, err);
+                });
+            });
+
+            // Drag support
+            card.addEventListener('dragstart', function(e) {
+                var url  = card.getAttribute('data-file-url');
+                var name = card.getAttribute('data-file-name');
+                var mime = card.getAttribute('data-file-mime');
                 e.dataTransfer.setData('text/uri-list', url);
                 e.dataTransfer.setData('text/plain', url);
-                e.dataTransfer.setData('application/x-sgraph-test-file', JSON.stringify({ url, name, mime }));
+                e.dataTransfer.setData('application/x-sgraph-test-file', JSON.stringify({ url: url, name: name, mime: mime }));
                 e.dataTransfer.effectAllowed = 'copy';
             });
         });
+
+        // "4 test images" — generate sample colored images
+        var imagesCard = this.querySelector('#test-multi-images');
+        if (imagesCard) {
+            imagesCard.addEventListener('click', function() {
+                var colors = ['#4ECDC4', '#E94560', '#FFD93D', '#6C5CE7'];
+                var names  = ['teal.png', 'coral.png', 'gold.png', 'purple.png'];
+                var files  = [];
+                var pending = colors.length;
+                colors.forEach(function(color, idx) {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 200; canvas.height = 200;
+                    var ctx = canvas.getContext('2d');
+                    ctx.fillStyle = color;
+                    ctx.fillRect(0, 0, 200, 200);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 16px system-ui';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Test ' + (idx + 1), 100, 105);
+                    canvas.toBlob(function(blob) {
+                        files[idx] = new File([blob], names[idx], { type: 'image/png' });
+                        pending--;
+                        if (pending === 0) {
+                            document.dispatchEvent(new CustomEvent('test-file-loaded', {
+                                detail: { files: files }
+                            }));
+                        }
+                    }, 'image/png');
+                });
+            });
+        }
+
+        // "Test folder" — fetch all files and bundle as multi-file
+        var folderCard = this.querySelector('#test-folder');
+        if (folderCard) {
+            folderCard.addEventListener('click', function() {
+                var basePath = self._basePath();
+                var promises = SendTestFiles.FILES.map(function(f) {
+                    return fetch(basePath + '/' + f.name)
+                        .then(function(r) { return r.arrayBuffer(); })
+                        .then(function(buf) { return new File([buf], f.name, { type: f.mime }); });
+                });
+                Promise.all(promises).then(function(files) {
+                    document.dispatchEvent(new CustomEvent('test-file-loaded', {
+                        detail: { files: files }
+                    }));
+                }).catch(function(err) {
+                    console.warn('[send-test-files] Failed to fetch test folder', err);
+                });
+            });
+        }
     }
 }
 

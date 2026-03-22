@@ -91,34 +91,66 @@ var UploadFileUtils = (function() {
         return parts.length > 0 ? parts.join(', ') : '';
     }
 
+    // ─── Viewable extensions for smart defaults ───────────────────────────
+    var SMART_VIEWABLE_EXTS = new Set([
+        'md', 'markdown', 'txt', 'json', 'html', 'htm', 'css', 'js', 'ts',
+        'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'sh', 'bash',
+        'xml', 'yaml', 'yml', 'csv', 'log', 'toml', 'ini', 'cfg',
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico',
+        'pdf', 'mp3', 'wav', 'ogg', 'mp4', 'webm', 'mov'
+    ]);
+
     function detectDeliveryOptions(file, folderScan) {
-        var ext = (file && file.name ? file.name : '').split('.').pop().toLowerCase();
         var isFolder = !!folderScan;
         var downloadTitle = isFolder ? 'Download zip mode' : 'Download mode';
         var downloadDesc  = isFolder ? 'Recipient downloads a single zip file' : 'Recipient gets a file to save to their device';
-        var options = [{ id: 'download', icon: '\uD83D\uDCE5', title: downloadTitle, desc: downloadDesc, hint: 'Best for: large archives, backups' }];
 
-        if (folderScan) {
-            options.push({ id: 'browse', icon: '\uD83D\uDCC2', title: 'Folder view mode', desc: 'Recipient sees files in a browsable view with inline preview', hint: 'Best for: sharing documents, reports' });
-            var hasImages = folderScan.entries
-                .filter(function(e) { return !e.isDir; })
-                .some(function(e) { return IMAGE_EXTENSIONS.has(e.name.split('.').pop().toLowerCase()); });
-            if (hasImages) {
-                options.push({ id: 'gallery', icon: '\uD83D\uDDBC\uFE0F', title: 'Gallery mode', desc: 'Recipient browses files with preview. Thumbnails and metadata will be generated.', hint: 'Best for: photo sets, documents, mixed files' });
+        // Always show all 3 options (v0.2.15): browse/viewer → gallery → download
+        return [
+            {
+                id: 'browse',
+                icon: '\uD83D\uDCC2',
+                title: isFolder ? 'Folder view mode' : 'File viewer mode',
+                desc: isFolder
+                    ? 'Recipient sees files in a browsable view with inline preview'
+                    : 'Recipient reads/views the file directly with inline preview',
+                hint: 'Best for: documents, reports, code files'
+            },
+            {
+                id: 'gallery',
+                icon: '\uD83D\uDDBC\uFE0F',
+                title: 'Gallery mode',
+                desc: isFolder
+                    ? 'Recipient browses files with thumbnails and preview. Metadata will be generated.'
+                    : 'Recipient views the file in a gallery-style layout with metadata.',
+                hint: 'Best for: photo sets, documents, mixed files'
+            },
+            {
+                id: 'download',
+                icon: '\uD83D\uDCE5',
+                title: downloadTitle,
+                desc: downloadDesc,
+                hint: 'Best for: large archives, backups, binary files'
             }
-        } else if (VIEWABLE_EXTENSIONS.has(ext)) {
-            options.push({ id: 'view', icon: '\uD83D\uDC41\uFE0F', title: 'View mode', desc: 'Recipient reads/views directly, no download needed', hint: 'Best for: documents, reports' });
-        } else if (ext === 'zip') {
-            options.push({ id: 'browse', icon: '\uD83D\uDCC2', title: 'Folder view mode', desc: 'Recipient sees files in a browsable view with inline preview', hint: 'Best for: sharing documents, reports' });
-        }
-
-        return options;
+        ];
     }
 
     function getRecommendedDelivery(options, folderScan) {
-        if (folderScan) return 'browse';
-        if (options.find(function(o) { return o.id === 'view'; }))    return 'view';
-        if (options.find(function(o) { return o.id === 'gallery'; })) return 'gallery';
+        if (folderScan) return 'gallery';  // folders → gallery (best with thumbnails)
+
+        // Single file: check extension
+        // (options is unused here — smart default is based on file context passed via folderScan)
+        return 'browse';  // default for single files — caller can override
+    }
+
+    // Extended version: takes the file directly for smart defaults
+    function getSmartDefault(file, folderScan) {
+        if (folderScan) return 'gallery';
+        if (!file) return 'download';
+
+        var ext = (file.name || '').split('.').pop().toLowerCase();
+        if (SMART_VIEWABLE_EXTS.has(ext)) return 'browse';
+        if (ext === 'zip') return 'browse';
         return 'download';
     }
 
@@ -163,6 +195,7 @@ var UploadFileUtils = (function() {
         getFolderBreakdown:     getFolderBreakdown,
         detectDeliveryOptions:  detectDeliveryOptions,
         getRecommendedDelivery: getRecommendedDelivery,
+        getSmartDefault:        getSmartDefault,
         buildFileSummary:       buildFileSummary
     };
 })();
