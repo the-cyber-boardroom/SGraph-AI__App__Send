@@ -62,6 +62,7 @@ class SendDownload extends HTMLElement {
             this._setupEntryListeners();
             return;
         }
+        this.render();                                                          // Show loading state immediately (don't leave page blank)
         this._loadTransferInfo();
         document.addEventListener('locale-changed', this._localeHandler);
     }
@@ -287,8 +288,9 @@ class SendDownload extends HTMLElement {
             // Capture the full URL before clearing hash (for share/copy link)
             this._downloadUrl = window.location.href;
 
-            // Clear hash after decrypt (don't leak key in URL)
-            if (window.location.hash) {
+            // Clear hash after decrypt — but only for raw crypto keys (not friendly tokens)
+            // Friendly tokens (word-word-NNNN) are safe to keep in the URL bar
+            if (window.location.hash && !this._friendlyToken) {
                 history.replaceState(null, '', window.location.pathname + window.location.search);
             }
 
@@ -554,7 +556,7 @@ class SendDownload extends HTMLElement {
         this.innerHTML = `
             <div class="card">
                 <div class="status status--success" style="font-size: var(--text-sm);">
-                    ${this._esc(this.t('download.result.success'))}
+                    ${this._esc(this.t('download.result.file_success'))}
                 </div>
                 ${url ? `
                 <div style="margin-top: 1rem;">
