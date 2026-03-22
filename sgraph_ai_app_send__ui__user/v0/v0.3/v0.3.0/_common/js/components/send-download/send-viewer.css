@@ -41,6 +41,69 @@
 
 .sv-save-btn:hover { opacity: 0.85; }
 
+.sv-action-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.sv-action-btn:hover {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
+}
+
+.sv-action-btn--active {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
+}
+
+.sv-share {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02);
+}
+
+.sv-share__row {
+    margin-bottom: 0.5rem;
+}
+
+.sv-share__label {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #8892A0);
+    margin-bottom: 0.35rem;
+}
+
+.sv-share__input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sv-share__url {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    color: var(--color-text, #E0E0E0);
+    font-family: monospace;
+    min-width: 0;
+}
+
+.sv-share__actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
 .sv-content {
     flex: 1;
     overflow: auto;

@@ -14,11 +14,13 @@ class SendViewer extends SendComponent {
 
     constructor() {
         super();
-        this.fileBytes  = null;
-        this.fileName   = null;
-        this.fileType   = null;
-        this.fileText   = null;
-        this._objectUrl = null;
+        this.fileBytes   = null;
+        this.fileName    = null;
+        this.fileType    = null;
+        this.fileText    = null;
+        this.downloadUrl = null;
+        this.transferId  = null;
+        this._objectUrl  = null;
     }
 
     async connectedCallback() {
@@ -33,14 +35,29 @@ class SendViewer extends SendComponent {
     }
 
     _build() {
+        const url = this.downloadUrl || '';
         this.innerHTML = `
             <div class="sv-container">
                 <div class="sv-header">
                     <span class="sv-header__name">${this.escapeHtml(this.fileName || 'File')}</span>
                     <span class="sv-header__size">${this.formatBytes(this.fileBytes ? this.fileBytes.byteLength : 0)}</span>
+                    <button class="sv-action-btn" id="sv-share-toggle">${SendIcons.LINK_SM || '🔗'} Share</button>
                     <button class="sv-save-btn" id="sv-print">${SendIcons.PRINT || '🖨️'} Print</button>
                     <button class="sv-save-btn" id="sv-save">${SendIcons.DOWNLOAD} Save locally</button>
                 </div>
+                ${url ? `
+                <div class="sv-share" id="sv-share" style="display: none;">
+                    <div class="sv-share__row">
+                        <span class="sv-share__label">Download link</span>
+                        <div class="sv-share__input-row">
+                            <input type="text" class="sv-share__url" value="${this.escapeHtml(url)}" readonly id="sv-share-url">
+                            <button class="sv-action-btn" id="sv-copy-link">${SendIcons.LINK_SM || '🔗'} Copy</button>
+                        </div>
+                    </div>
+                    <div class="sv-share__actions">
+                        <button class="sv-action-btn" id="sv-email">${SendIcons.MAIL || '✉'} Email link</button>
+                    </div>
+                </div>` : ''}
                 <div class="sv-content" id="sv-content"></div>
             </div>
         `;
@@ -135,6 +152,37 @@ class SendViewer extends SendComponent {
         const printBtn = this.$('#sv-print');
         if (printBtn) {
             printBtn.addEventListener('click', () => this._print());
+        }
+
+        // Share panel toggle
+        const shareToggle = this.$('#sv-share-toggle');
+        const sharePanel  = this.$('#sv-share');
+        if (shareToggle && sharePanel) {
+            shareToggle.addEventListener('click', () => {
+                const visible = sharePanel.style.display !== 'none';
+                sharePanel.style.display = visible ? 'none' : '';
+                shareToggle.classList.toggle('sv-action-btn--active', !visible);
+            });
+        }
+
+        // Copy link
+        const copyLink = this.$('#sv-copy-link');
+        if (copyLink && this.downloadUrl) {
+            copyLink.addEventListener('click', async () => {
+                try {
+                    await this.copyToClipboard(this.downloadUrl);
+                    copyLink.textContent = 'Copied!';
+                    setTimeout(() => { copyLink.innerHTML = `${SendIcons.LINK_SM || '🔗'} Copy`; }, 2000);
+                } catch (_) {}
+            });
+        }
+
+        // Email link
+        const emailBtn = this.$('#sv-email');
+        if (emailBtn && this.downloadUrl) {
+            emailBtn.addEventListener('click', () => {
+                window.location.href = `mailto:?subject=Shared file via SG/Send&body=${encodeURIComponent(this.downloadUrl)}`;
+            });
         }
     }
 

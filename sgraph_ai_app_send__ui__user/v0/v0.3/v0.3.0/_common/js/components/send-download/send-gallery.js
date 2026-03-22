@@ -3,7 +3,8 @@
    Responsive thumbnail grid with lightbox
 
    View modes:  compact (5+ cols)  |  grid (4 cols)  |  large (2-3 cols)
-   Features:    Lightbox, type badges, file save, share, print
+   Features:    Lightbox, type badges, file save, share, print, info panel,
+                PDF present mode
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 class SendGallery extends SendComponent {
@@ -81,6 +82,15 @@ class SendGallery extends SendComponent {
                     </div>
                 </div>
                 <div class="sg-gallery__grid sg-gallery__grid--grid" id="sg-grid"></div>
+                <div class="sg-gallery__info" id="sg-info-panel" style="display: none;">
+                    <div class="sg-gallery__info-content">
+                        <div class="sg-gallery__info-row"><span>Transfer ID</span><span>${this.escapeHtml(this.transferId || '—')}</span></div>
+                        <div class="sg-gallery__info-row"><span>Archive</span><span>${this.escapeHtml(this.fileName || 'Unknown')}</span></div>
+                        <div class="sg-gallery__info-row"><span>Size</span><span>${this.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)}</span></div>
+                        <div class="sg-gallery__info-row"><span>Files</span><span>${files.length}</span></div>
+                        <div class="sg-gallery__info-row"><span>Encryption</span><span>AES-256-GCM (client-side)</span></div>
+                    </div>
+                </div>
             </div>
             ${this._buildLightbox()}
         `;
@@ -177,6 +187,7 @@ class SendGallery extends SendComponent {
                 </div>
                 <div class="sg-lightbox__footer">
                     <span id="sg-lb-counter"></span>
+                    <button class="sg-gallery__action-btn sg-lightbox__present" id="sg-lb-present" style="display: none;" title="Present mode (f)">⛶ Present</button>
                     <button class="sg-gallery__save-btn sg-lightbox__save" id="sg-lb-save">${SendIcons.DOWNLOAD} Save</button>
                 </div>
             </div>
@@ -203,9 +214,10 @@ class SendGallery extends SendComponent {
         if (!entry) return;
 
         this._lightboxIndex = index;
-        const title   = this.$('#sg-lb-title');
-        const content = this.$('#sg-lb-content');
-        const counter = this.$('#sg-lb-counter');
+        const title      = this.$('#sg-lb-title');
+        const content    = this.$('#sg-lb-content');
+        const counter    = this.$('#sg-lb-counter');
+        const presentBtn = this.$('#sg-lb-present');
         if (title)   title.textContent = entry.name;
         if (counter) counter.textContent = `${index + 1} / ${this._entries.length}`;
         if (!content) return;
@@ -214,6 +226,10 @@ class SendGallery extends SendComponent {
 
         const type = typeof FileTypeDetect !== 'undefined'
             ? FileTypeDetect.detect(entry.name, null) : null;
+        this._lightboxType = type;
+
+        // Show present button only for PDFs
+        if (presentBtn) presentBtn.style.display = (type === 'pdf') ? '' : 'none';
 
         try {
             const bytes = await entry.entry.async('arraybuffer');
@@ -232,6 +248,7 @@ class SendGallery extends SendComponent {
                 const blob = new Blob([bytes], { type: 'application/pdf' });
                 const url = URL.createObjectURL(blob);
                 this._thumbUrls.push(url);
+                this._lightboxPdfUrl = url;
                 content.innerHTML = `<iframe src="${url}" class="sg-lightbox__pdf"></iframe>`;
             } else {
                 const text = new TextDecoder().decode(bytes);
@@ -246,7 +263,19 @@ class SendGallery extends SendComponent {
         if (e.key === 'Escape') this._closeLightbox();
         if (e.key === 'ArrowLeft')  this._showLightboxItem(Math.max(0, this._lightboxIndex - 1));
         if (e.key === 'ArrowRight') this._showLightboxItem(Math.min(this._entries.length - 1, this._lightboxIndex + 1));
+        if (e.key === 'f') this._presentPdf();
     };
+
+    _presentPdf() {
+        if (this._lightboxType !== 'pdf' || !this._lightboxPdfUrl) return;
+        // Open PDF in a new window for fullscreen presentation
+        const win = window.open(this._lightboxPdfUrl + '#toolbar=1&navpanes=0&view=Fit', '_blank');
+        if (!win) {
+            // Popup blocked — try fullscreen on the iframe instead
+            const iframe = this.$('.sg-lightbox__pdf');
+            if (iframe && iframe.requestFullscreen) iframe.requestFullscreen();
+        }
+    }
 
     // ─── Event Listeners ────────────────────────────────────────────────────
 
@@ -304,6 +333,10 @@ class SendGallery extends SendComponent {
             URL.revokeObjectURL(url);
         });
 
+        // PDF present mode
+        const presentBtn = this.$('#sg-lb-present');
+        if (presentBtn) presentBtn.addEventListener('click', () => this._presentPdf());
+
         // Copy link
         const copyBtn = this.$('#sg-copy-link');
         if (copyBtn) copyBtn.addEventListener('click', async () => {
@@ -330,11 +363,18 @@ class SendGallery extends SendComponent {
         if (lb) lb.addEventListener('click', (e) => {
             if (e.target === lb) this._closeLightbox();
         });
-    }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Static Assets — Icons, badges, type icons in SendIcons (send-icons.js)
-    // ═══════════════════════════════════════════════════════════════════════════
+        // Info panel toggle
+        const infoBtn   = this.$('#sg-info');
+        const infoPanel = this.$('#sg-info-panel');
+        if (infoBtn && infoPanel) {
+            infoBtn.addEventListener('click', () => {
+                const visible = infoPanel.style.display !== 'none';
+                infoPanel.style.display = visible ? 'none' : '';
+                infoBtn.classList.toggle('sg-gallery__action-btn--active', !visible);
+            });
+        }
+    }
 }
 
 customElements.define('send-gallery', SendGallery);
