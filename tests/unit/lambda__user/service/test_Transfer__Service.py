@@ -19,7 +19,7 @@ class test_Transfer__Service(TestCase):
         assert 'transfer_id' in result
         assert 'upload_url'  in result
         assert len(result['transfer_id'])         == 12
-        assert result['upload_url'].startswith('/transfers/upload/')
+        assert result['upload_url'].startswith('/api/transfers/upload/')
 
     def test__upload_payload(self):
         result  = self.service.create_transfer(file_size_bytes = 100, content_type_hint = '', sender_ip = '')
