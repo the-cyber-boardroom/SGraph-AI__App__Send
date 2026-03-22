@@ -9,6 +9,7 @@ from sgraph_ai_app_send.lambda__user.service.Transfer__Service                  
 from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls               import Service__Presigned_Urls
 from sgraph_ai_app_send.lambda__user.service.Service__Early_Access                 import Service__Early_Access
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer               import Service__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.service.Service__Vault__Zip                  import Service__Vault__Zip
 from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
@@ -27,6 +28,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
     admin_service_client : Admin__Service__Client = None                            # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
     early_access_service : Service__Early_Access  = None                            # Early Access signup (n8n webhook)
     vault_service        : Service__Vault__Pointer = None                            # Vault pointer service (mutable files)
+    vault_zip_service    : Service__Vault__Zip      = None                            # Vault zip builder with content-addressable caching
 
     def app_kwargs(self, **kwargs):                                                   # Override: move docs under /api/ so CloudFront routes them to Lambda
         kwargs = super().app_kwargs(**kwargs)
@@ -75,6 +77,10 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         if self.vault_service is None:                                           # Auto-create vault pointer service (shares storage backend)
             self.vault_service = Service__Vault__Pointer(storage_fs=storage_fs)
 
+        if self.vault_zip_service is None:                                     # Auto-create vault zip service (shares storage backend for cache)
+            self.vault_zip_service = Service__Vault__Zip(vault_service = self.vault_service,
+                                                          storage_fs    = storage_fs       )
+
         return super().setup()
 
 
@@ -100,6 +106,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                         service_early_access = self.early_access_service )
         self.add_routes(Routes__Vault__Pointer ,
                         vault_service        = self.vault_service        ,
+                        vault_zip_service    = self.vault_zip_service    ,
                         admin_service_client = self.admin_service_client )
 
         self.setup_mcp()                                                              # Mount MCP server (after all routes registered)

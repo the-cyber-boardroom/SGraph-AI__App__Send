@@ -9,6 +9,7 @@ from osbot_fast_api.api.decorators.route_path                                   
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.service.Service__Vault__Zip                import Service__Vault__Zip
 from sgraph_ai_app_send.lambda__user.user__config                                import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY
 
 TAG__ROUTES_VAULT = 'api/vault'
@@ -20,6 +21,7 @@ ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id:path}
                        f'/{TAG__ROUTES_VAULT}/batch/{{vault_id}}'                         ,
                        f'/{TAG__ROUTES_VAULT}/list/{{vault_id}}'                          ,
                        f'/{TAG__ROUTES_VAULT}/health/{{vault_id}}'                        ,
+                       f'/{TAG__ROUTES_VAULT}/zip/{{vault_id}}'                           ,
                        f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}'                         ,
                        f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}'                          ,
                        f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}'                   ,
@@ -29,9 +31,10 @@ ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id:path}
 LAMBDA_BASE64_LIMIT = 3750000                                                    # ~3.75MB (base64 adds ~33%, must stay under Lambda 5MB response limit)
 BATCH_MAX_OPERATIONS = 100                                                       # Max operations per batch request
 
-class Routes__Vault__Pointer(Fast_API__Routes):                                  # Vault file endpoints (write, read, delete, batch, list)
+class Routes__Vault__Pointer(Fast_API__Routes):                                  # Vault file endpoints (write, read, delete, batch, list, zip)
     tag                  : str = TAG__ROUTES_VAULT
     vault_service        : Service__Vault__Pointer                               # Auto-initialized by Type_Safe
+    vault_zip_service    : Service__Vault__Zip      = None                       # Vault zip builder (optional — injected by app)
     admin_service_client : object = None                                         # Optional Admin__Service__Client
 
     def check_access_token(self, request: Request):                              # Validate access token from header
@@ -184,6 +187,40 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         raise HTTPException(status_code = 404,
                             detail      = 'Vault not found')
 
+    @route_path('/zip/{vault_id}')
+    def zip__vault_id(self, vault_id : Safe_Str__Id,                             # GET /vault/zip/{vault_id} — download vault as zip
+                            request  : Request
+                      ) -> Response:
+        self.check_access_token(request)
+        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
+        if not write_key:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Missing write key')
+        if self.vault_zip_service is None:
+            raise HTTPException(status_code = 501,
+                                detail      = 'Zip service not configured')
+        result = self.vault_zip_service.get_or_create_zip(vault_id      = str(vault_id),
+                                                           write_key_hex = write_key    )
+        if result is None:
+            raise HTTPException(status_code = 403,
+                                detail      = 'Write key mismatch')
+        if result.get('status') == 'error':
+            raise HTTPException(status_code = 404,
+                                detail      = result.get('detail', 'Vault not found'))
+        if result.get('file_count', 0) == 0:
+            return result                                                        # Empty vault — return JSON status
+
+        # In memory mode, return zip bytes directly
+        zip_path  = result.get('zip_path', '')
+        zip_bytes = self.vault_zip_service.storage_fs.file__bytes(zip_path)
+        if zip_bytes is None:
+            raise HTTPException(status_code = 500,
+                                detail      = 'Failed to read zip archive')
+
+        return Response(content    = zip_bytes                ,
+                        media_type = 'application/zip'        ,
+                        headers    = {'content-disposition': f'attachment; filename="{vault_id}.zip"'})
+
     # --- Catch routes: prevent redirect loops when file_id is missing ----------
 
     @route_path('/write/{vault_id}')
@@ -210,6 +247,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         self.add_route_post  (self.batch__vault_id                )
         self.add_route_get   (self.list__vault_id                 )
         self.add_route_get   (self.health__vault_id               )
+        self.add_route_get   (self.zip__vault_id                  )
         self.add_route_put   (self.write__vault_id                )              # Catch: missing file_id
         self.add_route_get   (self.read__vault_id                 )              # Catch: missing file_id
         self.add_route_get   (self.read_base64__vault_id          )              # Catch: missing file_id
