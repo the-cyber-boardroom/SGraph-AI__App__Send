@@ -172,7 +172,7 @@ var UploadFileUtils = (function() {
             name = file.name;
             var typeParts = [];
             if (info.label) typeParts.push(info.label);
-            if (info.ext)   typeParts.push(info.ext);
+            if (info.ext)   typeParts.push(escapeHtml(info.ext));
             var typeLabel = typeParts.length > 0 ? typeParts.join(' \u00B7 ') + ' \u00B7 ' : '';
             meta = typeLabel + formatBytes(file.size);
         } else {
