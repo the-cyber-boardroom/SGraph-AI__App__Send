@@ -9,11 +9,13 @@ class SendViewer extends HTMLElement {
 
     constructor() {
         super();
-        this.fileBytes  = null;
-        this.fileName   = null;
-        this.fileType   = null;
-        this.fileText   = null;
-        this._objectUrl = null;
+        this.fileBytes   = null;
+        this.fileName    = null;
+        this.fileType    = null;
+        this.fileText    = null;
+        this.downloadUrl = null;
+        this.transferId  = null;
+        this._objectUrl  = null;
     }
 
     connectedCallback() {
@@ -25,15 +27,30 @@ class SendViewer extends HTMLElement {
     }
 
     _build() {
+        const url = this.downloadUrl || '';
         this.innerHTML = `
             <style>${SendViewer.CSS}</style>
             <div class="sv-container">
                 <div class="sv-header">
                     <span class="sv-header__name">${SendHelpers.escapeHtml(this.fileName || 'File')}</span>
                     <span class="sv-header__size">${SendHelpers.formatBytes(this.fileBytes ? this.fileBytes.byteLength : 0)}</span>
+                    <button class="sv-action-btn" id="sv-share-toggle">${SendIcons.LINK_SM || '🔗'} Share</button>
                     <button class="sv-save-btn" id="sv-print">${SendIcons.PRINT || '🖨️'} Print</button>
                     <button class="sv-save-btn" id="sv-save">${SendIcons.DOWNLOAD} Save locally</button>
                 </div>
+                ${url ? `
+                <div class="sv-share" id="sv-share" style="display: none;">
+                    <div class="sv-share__row">
+                        <span class="sv-share__label">Download link</span>
+                        <div class="sv-share__input-row">
+                            <input type="text" class="sv-share__url" value="${SendHelpers.escapeHtml(url)}" readonly id="sv-share-url">
+                            <button class="sv-action-btn" id="sv-copy-link">${SendIcons.LINK_SM || '🔗'} Copy</button>
+                        </div>
+                    </div>
+                    <div class="sv-share__actions">
+                        <button class="sv-action-btn" id="sv-email">${SendIcons.MAIL || '✉'} Email link</button>
+                    </div>
+                </div>` : ''}
                 <div class="sv-content" id="sv-content"></div>
             </div>
         `;
@@ -130,6 +147,37 @@ class SendViewer extends HTMLElement {
         if (printBtn) {
             printBtn.addEventListener('click', () => this._print());
         }
+
+        // Share panel toggle
+        const shareToggle = this.querySelector('#sv-share-toggle');
+        const sharePanel  = this.querySelector('#sv-share');
+        if (shareToggle && sharePanel) {
+            shareToggle.addEventListener('click', () => {
+                const visible = sharePanel.style.display !== 'none';
+                sharePanel.style.display = visible ? 'none' : '';
+                shareToggle.classList.toggle('sv-action-btn--active', !visible);
+            });
+        }
+
+        // Copy link
+        const copyLink = this.querySelector('#sv-copy-link');
+        if (copyLink && this.downloadUrl) {
+            copyLink.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(this.downloadUrl);
+                    copyLink.textContent = 'Copied!';
+                    setTimeout(() => { copyLink.innerHTML = `${SendIcons.LINK_SM || '🔗'} Copy`; }, 2000);
+                } catch (_) {}
+            });
+        }
+
+        // Email link
+        const emailBtn = this.querySelector('#sv-email');
+        if (emailBtn && this.downloadUrl) {
+            emailBtn.addEventListener('click', () => {
+                window.location.href = `mailto:?subject=Shared file via SG/Send&body=${encodeURIComponent(this.downloadUrl)}`;
+            });
+        }
     }
 
     _print() {
@@ -201,6 +249,69 @@ class SendViewer extends HTMLElement {
 }
 
 .sv-save-btn:hover { opacity: 0.85; }
+
+.sv-action-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.sv-action-btn:hover {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
+}
+
+.sv-action-btn--active {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
+}
+
+.sv-share {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02);
+}
+
+.sv-share__row {
+    margin-bottom: 0.5rem;
+}
+
+.sv-share__label {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #8892A0);
+    margin-bottom: 0.35rem;
+}
+
+.sv-share__input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sv-share__url {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    color: var(--color-text, #E0E0E0);
+    font-family: monospace;
+    min-width: 0;
+}
+
+.sv-share__actions {
+    display: flex;
+    gap: 0.5rem;
+}
 
 .sv-content {
     flex: 1;

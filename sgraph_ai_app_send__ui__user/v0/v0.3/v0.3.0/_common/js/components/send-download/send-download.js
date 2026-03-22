@@ -41,6 +41,9 @@ class SendDownload extends HTMLElement {
         // Route mode
         this._routeMode       = this._detectRouteMode();
 
+        // Original download URL (captured before hash is cleared)
+        this._downloadUrl     = window.location.href;
+
         // Stale response guard (v0.2.4)
         this._loadGeneration  = 0;
 
@@ -281,6 +284,9 @@ class SendDownload extends HTMLElement {
                 this._saveFile(content, this.fileName || 'download');
             }
 
+            // Capture the full URL before clearing hash (for share/copy link)
+            this._downloadUrl = window.location.href;
+
             // Clear hash after decrypt (don't leak key in URL)
             if (window.location.hash) {
                 history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -520,7 +526,7 @@ class SendDownload extends HTMLElement {
         gallery.zipOrigName  = this._zipOrigName;
         gallery.fileName     = this._zipOrigName;
         gallery.transferId   = this.transferId;
-        gallery.downloadUrl  = window.location.href;
+        gallery.downloadUrl  = this._downloadUrl;
         this.innerHTML = '';
         this.appendChild(gallery);
     }
@@ -535,7 +541,7 @@ class SendDownload extends HTMLElement {
         browse.zipOrigName  = this._zipOrigName;
         browse.fileName     = this._zipOrigName;
         browse.transferId   = this.transferId;
-        browse.downloadUrl  = window.location.href;
+        browse.downloadUrl  = this._downloadUrl;
         this.innerHTML = '';
         this.appendChild(browse);
     }
@@ -544,22 +550,41 @@ class SendDownload extends HTMLElement {
 
     _renderDownloadMode() {
         this._saveFile(this.decryptedBytes, this.fileName || 'download');
+        const url = this._downloadUrl || '';
         this.innerHTML = `
             <div class="card">
                 <div class="status status--success" style="font-size: var(--text-sm);">
                     ${this._esc(this.t('download.result.success'))}
                 </div>
+                ${url ? `
+                <div style="margin-top: 1rem;">
+                    <div style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: 0.5rem;">Download link</div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" class="input" value="${this._esc(url)}" readonly style="flex: 1; font-size: 0.75rem; font-family: monospace;">
+                        <button class="btn btn-sm btn-secondary" id="dl-copy-link">Copy</button>
+                    </div>
+                </div>` : ''}
             </div>`;
+        const copyBtn = this.querySelector('#dl-copy-link');
+        if (copyBtn) copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(url);
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+            } catch (_) {}
+        });
     }
 
     // ─── Single File View ───────────────────────────────────────────────────
 
     _renderSingleFile() {
         const viewer = document.createElement('send-viewer');
-        viewer.fileBytes = this.decryptedBytes;
-        viewer.fileName  = this.fileName;
-        viewer.fileType  = this._renderType;
-        viewer.fileText  = this.decryptedText;
+        viewer.fileBytes   = this.decryptedBytes;
+        viewer.fileName    = this.fileName;
+        viewer.fileType    = this._renderType;
+        viewer.fileText    = this.decryptedText;
+        viewer.downloadUrl = this._downloadUrl;
+        viewer.transferId  = this.transferId;
         this.innerHTML = '';
         this.appendChild(viewer);
     }

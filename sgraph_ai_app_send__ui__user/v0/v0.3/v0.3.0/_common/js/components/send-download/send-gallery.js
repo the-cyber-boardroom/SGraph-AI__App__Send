@@ -75,6 +75,15 @@ class SendGallery extends HTMLElement {
                     </div>
                 </div>
                 <div class="sg-gallery__grid sg-gallery__grid--grid" id="sg-grid"></div>
+                <div class="sg-gallery__info" id="sg-info-panel" style="display: none;">
+                    <div class="sg-gallery__info-content">
+                        <div class="sg-gallery__info-row"><span>Transfer ID</span><span>${SendHelpers.escapeHtml(this.transferId || '—')}</span></div>
+                        <div class="sg-gallery__info-row"><span>Archive</span><span>${SendHelpers.escapeHtml(this.fileName || 'Unknown')}</span></div>
+                        <div class="sg-gallery__info-row"><span>Size</span><span>${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)}</span></div>
+                        <div class="sg-gallery__info-row"><span>Files</span><span>${files.length}</span></div>
+                        <div class="sg-gallery__info-row"><span>Encryption</span><span>AES-256-GCM (client-side)</span></div>
+                    </div>
+                </div>
             </div>
             ${this._buildLightbox()}
         `;
@@ -175,6 +184,7 @@ class SendGallery extends HTMLElement {
                 </div>
                 <div class="sg-lightbox__footer">
                     <span id="sg-lb-counter"></span>
+                    <button class="sg-gallery__action-btn sg-lightbox__present" id="sg-lb-present" style="display: none;" title="Present mode (f)">⛶ Present</button>
                     <button class="sg-gallery__save-btn sg-lightbox__save" id="sg-lb-save">${SendIcons.DOWNLOAD} Save</button>
                 </div>
             </div>
@@ -201,9 +211,10 @@ class SendGallery extends HTMLElement {
         if (!entry) return;
 
         this._lightboxIndex = index;
-        const title   = this.querySelector('#sg-lb-title');
-        const content = this.querySelector('#sg-lb-content');
-        const counter = this.querySelector('#sg-lb-counter');
+        const title      = this.querySelector('#sg-lb-title');
+        const content    = this.querySelector('#sg-lb-content');
+        const counter    = this.querySelector('#sg-lb-counter');
+        const presentBtn = this.querySelector('#sg-lb-present');
         if (title)   title.textContent = entry.name;
         if (counter) counter.textContent = `${index + 1} / ${this._entries.length}`;
         if (!content) return;
@@ -212,6 +223,10 @@ class SendGallery extends HTMLElement {
 
         const type = typeof FileTypeDetect !== 'undefined'
             ? FileTypeDetect.detect(entry.name, null) : null;
+        this._lightboxType = type;
+
+        // Show present button only for PDFs
+        if (presentBtn) presentBtn.style.display = (type === 'pdf') ? '' : 'none';
 
         try {
             const bytes = await entry.entry.async('arraybuffer');
@@ -230,6 +245,7 @@ class SendGallery extends HTMLElement {
                 const blob = new Blob([bytes], { type: 'application/pdf' });
                 const url = URL.createObjectURL(blob);
                 this._thumbUrls.push(url);
+                this._lightboxPdfUrl = url;
                 content.innerHTML = `<iframe src="${url}" class="sg-lightbox__pdf"></iframe>`;
             } else {
                 const text = new TextDecoder().decode(bytes);
@@ -244,7 +260,19 @@ class SendGallery extends HTMLElement {
         if (e.key === 'Escape') this._closeLightbox();
         if (e.key === 'ArrowLeft')  this._showLightboxItem(Math.max(0, this._lightboxIndex - 1));
         if (e.key === 'ArrowRight') this._showLightboxItem(Math.min(this._entries.length - 1, this._lightboxIndex + 1));
+        if (e.key === 'f') this._presentPdf();
     };
+
+    _presentPdf() {
+        if (this._lightboxType !== 'pdf' || !this._lightboxPdfUrl) return;
+        // Open PDF in a new window for fullscreen presentation
+        const win = window.open(this._lightboxPdfUrl + '#toolbar=1&navpanes=0&view=Fit', '_blank');
+        if (!win) {
+            // Popup blocked — try fullscreen on the iframe instead
+            const iframe = this.querySelector('.sg-lightbox__pdf');
+            if (iframe && iframe.requestFullscreen) iframe.requestFullscreen();
+        }
+    }
 
     // ─── Event Listeners ────────────────────────────────────────────────────
 
@@ -304,6 +332,11 @@ class SendGallery extends HTMLElement {
 
         // Copy link
         const copyBtn = this.querySelector('#sg-copy-link');
+
+        // PDF present mode
+        const presentBtn = this.querySelector('#sg-lb-present');
+        if (presentBtn) presentBtn.addEventListener('click', () => this._presentPdf());
+
         if (copyBtn) copyBtn.addEventListener('click', async () => {
             try {
                 await navigator.clipboard.writeText(this.downloadUrl || window.location.href);
@@ -328,6 +361,17 @@ class SendGallery extends HTMLElement {
         if (lb) lb.addEventListener('click', (e) => {
             if (e.target === lb) this._closeLightbox();
         });
+
+        // Info panel toggle
+        const infoBtn   = this.querySelector('#sg-info');
+        const infoPanel = this.querySelector('#sg-info-panel');
+        if (infoBtn && infoPanel) {
+            infoBtn.addEventListener('click', () => {
+                const visible = infoPanel.style.display !== 'none';
+                infoPanel.style.display = visible ? 'none' : '';
+                infoBtn.classList.toggle('sg-gallery__action-btn--active', !visible);
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -743,6 +787,43 @@ class SendGallery extends HTMLElement {
 .sg-lightbox__save {
     font-size: 0.75rem;
     padding: 4px 12px;
+}
+
+/* ─── Info Panel ─────────────────────────────────────────────────────── */
+
+.sg-gallery__info {
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 1rem;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.02);
+}
+
+.sg-gallery__info-content {
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.sg-gallery__info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    padding: 2px 0;
+}
+
+.sg-gallery__info-row span:first-child {
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.sg-gallery__info-row span:last-child {
+    color: var(--color-text, #E0E0E0);
+    font-weight: 500;
+}
+
+.sg-gallery__action-btn--active {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
 }
 
 /* ─── Print ──────────────────────────────────────────────────────────── */
