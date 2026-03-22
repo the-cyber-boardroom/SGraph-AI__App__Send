@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Browse Component v0.3.0
-   Clean rewrite — folder tree + tabbed file preview using sg-layout
+   SGraph Send — Browse Component v0.3.0 (extends SendComponent)
+   Folder tree + tabbed file preview using sg-layout
 
    Uses sg-layout for:
      - Left panel:  folder tree (locked, ~20% width)
@@ -9,7 +9,11 @@
    Zero dependency on v0.1.x / v0.2.x overlay chain.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-class SendBrowse extends HTMLElement {
+class SendBrowse extends SendComponent {
+
+    /** Light DOM — CSS goes to document.head. No HTML template — dynamic render. */
+    static useShadow   = false;
+    static useTemplate = false;
 
     constructor() {
         super();
@@ -26,11 +30,14 @@ class SendBrowse extends HTMLElement {
         this._objectUrls  = [];
     }
 
-    connectedCallback() {
+    async connectedCallback() {
+        await this.loadResources();
+        this._resourcesLoaded = true;
         if (this.zipTree) this._build();
     }
 
     disconnectedCallback() {
+        super.disconnectedCallback();
         this._objectUrls.forEach(u => URL.revokeObjectURL(u));
         this._objectUrls = [];
         if (this._boundKeyHandler) {
@@ -50,7 +57,6 @@ class SendBrowse extends HTMLElement {
 
     _build() {
         this.innerHTML = `
-            <style>${SendBrowse.CSS}</style>
             <div class="sb-container">
                 <div class="sb-header">
                     <div class="sb-header__left">
@@ -574,350 +580,6 @@ class SendBrowse extends HTMLElement {
         other:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#7f8c8d" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M10 1v4h3"/></svg>',
     };
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CSS
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    static CSS = `
-/* ─── Container ──────────────────────────────────────────────────────── */
-
-.sb-container {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 80px);
-    overflow: hidden;
-}
-
-/* ─── Header ─────────────────────────────────────────────────────────── */
-
-.sb-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    flex-shrink: 0;
-}
-
-.sb-header__left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.sb-header__right {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.sb-header__icon { color: var(--accent, #4ECDC4); display: flex; }
-
-.sb-header__name {
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-
-.sb-header__meta {
-    font-size: 0.8rem;
-    color: var(--color-text-secondary, #8892A0);
-}
-
-.sb-header__status {
-    font-size: 0.75rem;
-    color: #2ecc71;
-}
-
-/* ─── sg-layout ──────────────────────────────────────────────────────── */
-
-#sb-layout {
-    flex: 1;
-    min-height: 0;
-}
-
-/* ─── Action Buttons ─────────────────────────────────────────────────── */
-
-.sb-action-btn {
-    background: none;
-    border: 1px solid rgba(255,255,255,0.1);
-    color: var(--color-text-secondary, #8892A0);
-    cursor: pointer;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    text-decoration: none;
-    transition: border-color 0.15s, color 0.15s;
-    white-space: nowrap;
-}
-
-.sb-action-btn:hover {
-    border-color: var(--accent, #4ECDC4);
-    color: var(--accent, #4ECDC4);
-}
-
-.sb-save-btn {
-    background: var(--accent, #4ECDC4);
-    color: #0a0e17;
-    border: none;
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-}
-
-.sb-save-btn:hover { opacity: 0.85; }
-
-/* ─── Tree View ──────────────────────────────────────────────────────── */
-
-.sb-tree__controls {
-    display: flex;
-    gap: 4px;
-    padding: 4px 0;
-    margin-bottom: 4px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-
-.sb-tree__ctrl-btn {
-    background: none;
-    border: 1px solid rgba(255,255,255,0.1);
-    color: var(--color-text-secondary, #8892A0);
-    cursor: pointer;
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.sb-tree__ctrl-btn:hover {
-    border-color: var(--accent, #4ECDC4);
-    color: var(--accent, #4ECDC4);
-}
-
-.sb-tree__folder {
-    margin-left: 4px;
-}
-
-.sb-tree__folder-header {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 6px;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    user-select: none;
-}
-
-.sb-tree__folder-header:hover {
-    background: rgba(255,255,255,0.05);
-}
-
-.sb-tree__toggle {
-    font-size: 0.65rem;
-    color: var(--color-text-secondary, #8892A0);
-    width: 12px;
-    text-align: center;
-}
-
-.sb-tree__folder-icon { display: flex; }
-
-.sb-tree__folder-name {
-    flex: 1;
-    color: var(--color-text, #E0E0E0);
-}
-
-.sb-tree__count {
-    font-size: 0.65rem;
-    color: var(--color-text-secondary, #8892A0);
-    background: rgba(255,255,255,0.05);
-    padding: 0 4px;
-    border-radius: 8px;
-}
-
-.sb-tree__folder-content {
-    margin-left: 12px;
-}
-
-.sb-tree__file {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 6px 3px 20px;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 0.8rem;
-}
-
-.sb-tree__file:hover {
-    background: rgba(255,255,255,0.05);
-}
-
-.sb-tree__file--active {
-    background: rgba(78, 205, 196, 0.1);
-    border-left: 2px solid var(--accent, #4ECDC4);
-}
-
-.sb-tree__file-icon { display: flex; flex-shrink: 0; }
-
-.sb-tree__file-name {
-    color: var(--color-text, #E0E0E0);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ─── File Content ───────────────────────────────────────────────────── */
-
-.sb-file__actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    flex-shrink: 0;
-}
-
-.sb-file__name {
-    font-weight: 600;
-    font-size: 0.85rem;
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.sb-file__size {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary, #8892A0);
-}
-
-.sb-file__content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-}
-
-.sb-file__image {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    display: block;
-    margin: auto;
-    background: repeating-conic-gradient(#80808015 0% 25%, transparent 0% 50%) 50% / 16px 16px;
-}
-
-.sb-file__markdown {
-    background: white;
-    color: #1a1a1a;
-    padding: 2rem;
-    line-height: 1.6;
-    max-width: 800px;
-    margin: 0 auto;
-    min-height: 100%;
-    box-sizing: border-box;
-}
-
-.sb-file__markdown h1, .sb-file__markdown h2 { border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
-.sb-file__markdown code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
-.sb-file__markdown pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
-.sb-file__markdown pre code { background: none; padding: 0; }
-.sb-file__markdown blockquote { border-left: 3px solid #ddd; margin-left: 0; padding-left: 1rem; color: #555; }
-.sb-file__markdown table { border-collapse: collapse; width: 100%; }
-.sb-file__markdown th, .sb-file__markdown td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-.sb-file__markdown th { background: #f4f4f4; }
-
-.sb-file__pdf {
-    width: 100%;
-    height: 100%;
-    border: none;
-}
-
-.sb-file__code {
-    margin: 0;
-    padding: 1.5rem;
-    font-size: 0.85rem;
-    line-height: 1.5;
-    background: #0d1117;
-    color: #e6edf3;
-    min-height: 100%;
-    box-sizing: border-box;
-    overflow: auto;
-}
-
-/* ─── Share / Info Tabs ─────────────────────────────────────────────── */
-
-.sb-share {
-    max-width: 480px;
-}
-
-.sb-share__title {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-text, #E0E0E0);
-    margin: 0 0 1rem 0;
-}
-
-.sb-share__url-row {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-
-.sb-share__url {
-    flex: 1;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 0.75rem;
-    color: var(--color-text, #E0E0E0);
-    font-family: monospace;
-    min-width: 0;
-}
-
-.sb-share__actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-}
-
-.sb-share__details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.sb-share__row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    font-size: 0.8rem;
-}
-
-.sb-share__label {
-    color: var(--color-text-secondary, #8892A0);
-}
-
-.sb-share__value {
-    color: var(--color-text, #E0E0E0);
-    font-weight: 500;
-}
-`;
 }
 
 customElements.define('send-browse', SendBrowse);

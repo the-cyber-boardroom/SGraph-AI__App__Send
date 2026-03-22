@@ -1,12 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Gallery Component v0.3.0
-   Clean rewrite — responsive thumbnail grid with lightbox
+   SGraph Send — Gallery Component v0.3.0 (extends SendComponent)
+   Responsive thumbnail grid with lightbox
 
    View modes:  compact (5+ cols)  |  grid (4 cols)  |  large (2-3 cols)
-   Features:    Lightbox, type badges, file save, share, print
+   Features:    Lightbox, type badges, file save, share, print, info panel,
+                PDF present mode
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-class SendGallery extends HTMLElement {
+class SendGallery extends SendComponent {
+
+    /** Light DOM — CSS goes to document.head. No HTML template — dynamic render. */
+    static useShadow   = false;
+    static useTemplate = false;
 
     constructor() {
         super();
@@ -24,11 +29,14 @@ class SendGallery extends HTMLElement {
         this._entries       = [];
     }
 
-    connectedCallback() {
+    async connectedCallback() {
+        await this.loadResources();
+        this._resourcesLoaded = true;
         if (this.zipTree) this._build();
     }
 
     disconnectedCallback() {
+        super.disconnectedCallback();
         this._revokeUrls();
     }
 
@@ -51,14 +59,13 @@ class SendGallery extends HTMLElement {
         this._entries = files;
 
         this.innerHTML = `
-            <style>${SendGallery.CSS}</style>
             <div class="sg-gallery">
                 <div class="sg-gallery__header">
                     <div class="sg-gallery__header-left">
                         <span class="sg-gallery__icon">${SendIcons.GRID}</span>
-                        <span class="sg-gallery__name">${SendHelpers.escapeHtml(this.fileName || 'Archive')}</span>
+                        <span class="sg-gallery__name">${this.escapeHtml(this.fileName || 'Archive')}</span>
                         <span class="sg-gallery__badge">gallery</span>
-                        <span class="sg-gallery__meta">${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)} · ${files.length} files</span>
+                        <span class="sg-gallery__meta">${this.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)} · ${files.length} files</span>
                     </div>
                     <div class="sg-gallery__header-right">
                         <div class="sg-gallery__modes">
@@ -77,9 +84,9 @@ class SendGallery extends HTMLElement {
                 <div class="sg-gallery__grid sg-gallery__grid--grid" id="sg-grid"></div>
                 <div class="sg-gallery__info" id="sg-info-panel" style="display: none;">
                     <div class="sg-gallery__info-content">
-                        <div class="sg-gallery__info-row"><span>Transfer ID</span><span>${SendHelpers.escapeHtml(this.transferId || '—')}</span></div>
-                        <div class="sg-gallery__info-row"><span>Archive</span><span>${SendHelpers.escapeHtml(this.fileName || 'Unknown')}</span></div>
-                        <div class="sg-gallery__info-row"><span>Size</span><span>${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)}</span></div>
+                        <div class="sg-gallery__info-row"><span>Transfer ID</span><span>${this.escapeHtml(this.transferId || '—')}</span></div>
+                        <div class="sg-gallery__info-row"><span>Archive</span><span>${this.escapeHtml(this.fileName || 'Unknown')}</span></div>
+                        <div class="sg-gallery__info-row"><span>Size</span><span>${this.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)}</span></div>
                         <div class="sg-gallery__info-row"><span>Files</span><span>${files.length}</span></div>
                         <div class="sg-gallery__info-row"><span>Encryption</span><span>AES-256-GCM (client-side)</span></div>
                     </div>
@@ -95,7 +102,7 @@ class SendGallery extends HTMLElement {
     // ─── Thumbnail Loading ──────────────────────────────────────────────────
 
     async _loadThumbnails() {
-        const grid = this.querySelector('#sg-grid');
+        const grid = this.$('#sg-grid');
         if (!grid) return;
 
         for (let i = 0; i < this._entries.length; i++) {
@@ -119,7 +126,6 @@ class SendGallery extends HTMLElement {
             imgDiv.appendChild(badge);
 
             if (type === 'image') {
-                // Load preview thumbnail if available, else load actual image
                 const previewPath = this._findPreview(entry.path);
                 const thumbEntry = previewPath
                     ? this.zipTree.find(e => e.path === previewPath)
@@ -136,7 +142,6 @@ class SendGallery extends HTMLElement {
                     imgDiv.innerHTML += SendIcons.TYPE_ICONS.image;
                 }
             } else {
-                // Non-image: show type icon
                 imgDiv.innerHTML += (SendIcons.TYPE_ICONS[type] || SendIcons.TYPE_ICONS.other);
             }
 
@@ -148,13 +153,11 @@ class SendGallery extends HTMLElement {
             card.appendChild(label);
             grid.appendChild(card);
 
-            // Click handler
             card.addEventListener('click', () => this._openLightbox(i));
         }
     }
 
     _findPreview(path) {
-        // Look for _preview/ version of this file
         const name = path.split('/').pop();
         const candidates = [
             `_preview/${name}`,
@@ -193,7 +196,7 @@ class SendGallery extends HTMLElement {
 
     async _openLightbox(index) {
         this._lightboxIndex = index;
-        const lb = this.querySelector('#sg-lightbox');
+        const lb = this.$('#sg-lightbox');
         if (!lb) return;
         lb.style.display = 'flex';
         await this._showLightboxItem(index);
@@ -201,7 +204,7 @@ class SendGallery extends HTMLElement {
     }
 
     _closeLightbox() {
-        const lb = this.querySelector('#sg-lightbox');
+        const lb = this.$('#sg-lightbox');
         if (lb) lb.style.display = 'none';
         document.removeEventListener('keydown', this._lbKeyHandler);
     }
@@ -211,10 +214,10 @@ class SendGallery extends HTMLElement {
         if (!entry) return;
 
         this._lightboxIndex = index;
-        const title      = this.querySelector('#sg-lb-title');
-        const content    = this.querySelector('#sg-lb-content');
-        const counter    = this.querySelector('#sg-lb-counter');
-        const presentBtn = this.querySelector('#sg-lb-present');
+        const title      = this.$('#sg-lb-title');
+        const content    = this.$('#sg-lb-content');
+        const counter    = this.$('#sg-lb-counter');
+        const presentBtn = this.$('#sg-lb-present');
         if (title)   title.textContent = entry.name;
         if (counter) counter.textContent = `${index + 1} / ${this._entries.length}`;
         if (!content) return;
@@ -236,10 +239,10 @@ class SendGallery extends HTMLElement {
                 const blob = new Blob([bytes], { type: mime });
                 const url = URL.createObjectURL(blob);
                 this._thumbUrls.push(url);
-                content.innerHTML = `<img src="${url}" class="sg-lightbox__img" alt="${SendHelpers.escapeHtml(entry.name)}">`;
+                content.innerHTML = `<img src="${url}" class="sg-lightbox__img" alt="${this.escapeHtml(entry.name)}">`;
             } else if (type === 'markdown') {
                 const text = new TextDecoder().decode(bytes);
-                const html = typeof MarkdownParser !== 'undefined' ? MarkdownParser.parse(text) : SendHelpers.escapeHtml(text);
+                const html = typeof MarkdownParser !== 'undefined' ? MarkdownParser.parse(text) : this.escapeHtml(text);
                 content.innerHTML = `<div class="sg-lightbox__doc">${html}</div>`;
             } else if (type === 'pdf') {
                 const blob = new Blob([bytes], { type: 'application/pdf' });
@@ -249,10 +252,10 @@ class SendGallery extends HTMLElement {
                 content.innerHTML = `<iframe src="${url}" class="sg-lightbox__pdf"></iframe>`;
             } else {
                 const text = new TextDecoder().decode(bytes);
-                content.innerHTML = `<pre class="sg-lightbox__code">${SendHelpers.escapeHtml(text)}</pre>`;
+                content.innerHTML = `<pre class="sg-lightbox__code">${this.escapeHtml(text)}</pre>`;
             }
         } catch (err) {
-            content.innerHTML = `<div style="color: var(--color-error);">Failed to load: ${SendHelpers.escapeHtml(err.message)}</div>`;
+            content.innerHTML = `<div style="color: var(--color-error);">Failed to load: ${this.escapeHtml(err.message)}</div>`;
         }
     }
 
@@ -269,7 +272,7 @@ class SendGallery extends HTMLElement {
         const win = window.open(this._lightboxPdfUrl + '#toolbar=1&navpanes=0&view=Fit', '_blank');
         if (!win) {
             // Popup blocked — try fullscreen on the iframe instead
-            const iframe = this.querySelector('.sg-lightbox__pdf');
+            const iframe = this.$('.sg-lightbox__pdf');
             if (iframe && iframe.requestFullscreen) iframe.requestFullscreen();
         }
     }
@@ -278,11 +281,11 @@ class SendGallery extends HTMLElement {
 
     _setupListeners() {
         // View mode buttons
-        this.querySelectorAll('.sg-gallery__mode-btn').forEach(btn => {
+        this.$$('.sg-gallery__mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                this.querySelectorAll('.sg-gallery__mode-btn').forEach(b => b.classList.remove('sg-gallery__mode-btn--active'));
+                this.$$('.sg-gallery__mode-btn').forEach(b => b.classList.remove('sg-gallery__mode-btn--active'));
                 btn.classList.add('sg-gallery__mode-btn--active');
-                const grid = this.querySelector('#sg-grid');
+                const grid = this.$('#sg-grid');
                 if (grid) {
                     grid.className = 'sg-gallery__grid sg-gallery__grid--' + btn.dataset.mode;
                 }
@@ -290,21 +293,21 @@ class SendGallery extends HTMLElement {
         });
 
         // Lightbox controls
-        const close = this.querySelector('#sg-lb-close');
+        const close = this.$('#sg-lb-close');
         if (close) close.addEventListener('click', () => this._closeLightbox());
 
-        const prev = this.querySelector('#sg-lb-prev');
+        const prev = this.$('#sg-lb-prev');
         if (prev) prev.addEventListener('click', () => {
             this._showLightboxItem(Math.max(0, this._lightboxIndex - 1));
         });
 
-        const next = this.querySelector('#sg-lb-next');
+        const next = this.$('#sg-lb-next');
         if (next) next.addEventListener('click', () => {
             this._showLightboxItem(Math.min(this._entries.length - 1, this._lightboxIndex + 1));
         });
 
         // Save zip
-        const saveBtn = this.querySelector('#sg-save-zip');
+        const saveBtn = this.$('#sg-save-zip');
         if (saveBtn) saveBtn.addEventListener('click', () => {
             if (this.zipOrigBytes) {
                 const blob = new Blob([this.zipOrigBytes]);
@@ -317,7 +320,7 @@ class SendGallery extends HTMLElement {
         });
 
         // Save single from lightbox
-        const lbSave = this.querySelector('#sg-lb-save');
+        const lbSave = this.$('#sg-lb-save');
         if (lbSave) lbSave.addEventListener('click', async () => {
             const entry = this._entries[this._lightboxIndex];
             if (!entry) return;
@@ -330,41 +333,40 @@ class SendGallery extends HTMLElement {
             URL.revokeObjectURL(url);
         });
 
-        // Copy link
-        const copyBtn = this.querySelector('#sg-copy-link');
-
         // PDF present mode
-        const presentBtn = this.querySelector('#sg-lb-present');
+        const presentBtn = this.$('#sg-lb-present');
         if (presentBtn) presentBtn.addEventListener('click', () => this._presentPdf());
 
+        // Copy link
+        const copyBtn = this.$('#sg-copy-link');
         if (copyBtn) copyBtn.addEventListener('click', async () => {
             try {
-                await navigator.clipboard.writeText(this.downloadUrl || window.location.href);
+                await this.copyToClipboard(this.downloadUrl || window.location.href);
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => { copyBtn.innerHTML = `${SendIcons.LINK} Copy Link`; }, 2000);
             } catch (_) {}
         });
 
         // Print
-        const printBtn = this.querySelector('#sg-print');
+        const printBtn = this.$('#sg-print');
         if (printBtn) printBtn.addEventListener('click', () => window.print());
 
         // Email
-        const emailBtn = this.querySelector('#sg-email');
+        const emailBtn = this.$('#sg-email');
         if (emailBtn) emailBtn.addEventListener('click', () => {
             const url = this.downloadUrl || window.location.href;
             window.location.href = `mailto:?subject=Shared files via SG/Send&body=${encodeURIComponent(url)}`;
         });
 
         // Lightbox click-outside-to-close
-        const lb = this.querySelector('#sg-lightbox');
+        const lb = this.$('#sg-lightbox');
         if (lb) lb.addEventListener('click', (e) => {
             if (e.target === lb) this._closeLightbox();
         });
 
         // Info panel toggle
-        const infoBtn   = this.querySelector('#sg-info');
-        const infoPanel = this.querySelector('#sg-info-panel');
+        const infoBtn   = this.$('#sg-info');
+        const infoPanel = this.$('#sg-info-panel');
         if (infoBtn && infoPanel) {
             infoBtn.addEventListener('click', () => {
                 const visible = infoPanel.style.display !== 'none';
@@ -373,484 +375,6 @@ class SendGallery extends HTMLElement {
             });
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Static Assets
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // Icons, badges, and type icons are in SendIcons (send-icons.js)
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CSS
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    static CSS = `
-/* ─── Gallery Container ──────────────────────────────────────────────── */
-
-.sg-gallery {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 80px);
-    overflow: hidden;
-}
-
-/* ─── Header ─────────────────────────────────────────────────────────── */
-
-.sg-gallery__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    flex-shrink: 0;
-}
-
-.sg-gallery__header-left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    min-width: 0;
-}
-
-.sg-gallery__header-right {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    flex-wrap: wrap;
-}
-
-.sg-gallery__icon {
-    color: var(--accent, #4ECDC4);
-    display: flex;
-}
-
-.sg-gallery__name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 300px;
-}
-
-.sg-gallery__badge {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: var(--accent, #4ECDC4);
-    color: #0a0e17;
-    letter-spacing: 0.04em;
-}
-
-.sg-gallery__meta {
-    font-size: 0.8rem;
-    color: var(--color-text-secondary, #8892A0);
-}
-
-/* ─── View Mode Buttons ──────────────────────────────────────────────── */
-
-.sg-gallery__modes {
-    display: flex;
-    gap: 2px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 6px;
-    padding: 2px;
-}
-
-.sg-gallery__mode-btn {
-    background: none;
-    border: none;
-    color: var(--color-text-secondary, #8892A0);
-    cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    transition: background 0.15s, color 0.15s;
-}
-
-.sg-gallery__mode-btn:hover {
-    background: rgba(255,255,255,0.08);
-    color: var(--color-text, #E0E0E0);
-}
-
-.sg-gallery__mode-btn--active {
-    background: rgba(78, 205, 196, 0.15);
-    color: var(--accent, #4ECDC4);
-}
-
-/* ─── Action Buttons ─────────────────────────────────────────────────── */
-
-.sg-gallery__action-btn {
-    background: none;
-    border: 1px solid rgba(255,255,255,0.1);
-    color: var(--color-text-secondary, #8892A0);
-    cursor: pointer;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    text-decoration: none;
-    transition: border-color 0.15s, color 0.15s;
-    white-space: nowrap;
-}
-
-.sg-gallery__action-btn:hover {
-    border-color: var(--accent, #4ECDC4);
-    color: var(--accent, #4ECDC4);
-}
-
-.sg-gallery__save-btn {
-    background: var(--accent, #4ECDC4);
-    color: #0a0e17;
-    border: none;
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: opacity 0.15s;
-    white-space: nowrap;
-}
-
-.sg-gallery__save-btn:hover { opacity: 0.85; }
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Grid — The Core Layout
-   ═══════════════════════════════════════════════════════════════════════ */
-
-.sg-gallery__grid {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 1rem;
-    display: grid;
-    gap: 0.75rem;
-    align-content: start;
-}
-
-/* Grid mode: 4 columns, responsive */
-.sg-gallery__grid--grid {
-    grid-template-columns: repeat(4, 1fr);
-}
-
-/* Compact mode: 5+ columns */
-.sg-gallery__grid--compact {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 0.5rem;
-}
-
-/* Large mode: 2 columns */
-.sg-gallery__grid--large {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-}
-
-/* ─── Responsive breakpoints ─────────────────────────────────────────── */
-
-@media (max-width: 1200px) {
-    .sg-gallery__grid--grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (max-width: 800px) {
-    .sg-gallery__grid--grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .sg-gallery__grid--large {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 500px) {
-    .sg-gallery__grid--grid {
-        grid-template-columns: 1fr;
-    }
-    .sg-gallery__grid--compact {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .sg-gallery__header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .sg-gallery__header-right {
-        width: 100%;
-        justify-content: flex-start;
-    }
-}
-
-/* ─── Thumbnail Cards ────────────────────────────────────────────────── */
-
-.sg-thumb {
-    cursor: pointer;
-    border-radius: 8px;
-    overflow: hidden;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-    min-width: 0;
-    max-width: 100%;
-}
-
-.sg-thumb:hover {
-    border-color: var(--accent, #4ECDC4);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-}
-
-.sg-thumb__img {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    background-size: cover;
-    background-position: center;
-    background-color: rgba(255,255,255,0.02);
-    background-repeat: no-repeat;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.sg-thumb__badge {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    font-size: 0.55rem;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 3px;
-    line-height: 1.4;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: white;
-    z-index: 2;
-    pointer-events: none;
-}
-
-.sg-thumb__label {
-    padding: 6px 8px;
-    font-size: 0.75rem;
-    color: var(--color-text-secondary, #8892A0);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Lightbox
-   ═══════════════════════════════════════════════════════════════════════ */
-
-.sg-lightbox {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    background: rgba(0, 0, 0, 0.92);
-    display: none;
-    flex-direction: column;
-}
-
-.sg-lightbox__header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    flex-shrink: 0;
-}
-
-.sg-lightbox__brand {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 700;
-    color: var(--accent, #4ECDC4);
-    font-size: 0.85rem;
-}
-
-.sg-lightbox__title {
-    flex: 1;
-    font-size: 0.85rem;
-    color: var(--color-text, #E0E0E0);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.sg-lightbox__close {
-    background: none;
-    border: none;
-    color: var(--color-text, #E0E0E0);
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 4px 8px;
-    line-height: 1;
-}
-
-.sg-lightbox__body {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 0;
-    padding: 1rem;
-    gap: 0.5rem;
-}
-
-.sg-lightbox__nav {
-    background: rgba(255,255,255,0.1);
-    border: none;
-    color: white;
-    font-size: 2rem;
-    cursor: pointer;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    flex-shrink: 0;
-    transition: background 0.15s;
-}
-
-.sg-lightbox__nav:hover {
-    background: rgba(255,255,255,0.2);
-}
-
-.sg-lightbox__content {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 0;
-    min-width: 0;
-    overflow: auto;
-}
-
-.sg-lightbox__img {
-    max-width: 90%;
-    max-height: 80vh;
-    object-fit: contain;
-    border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-}
-
-.sg-lightbox__doc {
-    background: white;
-    color: #1a1a1a;
-    padding: 2rem;
-    border-radius: 8px;
-    max-width: 800px;
-    max-height: 80vh;
-    overflow: auto;
-    line-height: 1.6;
-}
-
-.sg-lightbox__pdf {
-    width: 90%;
-    height: 80vh;
-    border: none;
-    border-radius: 8px;
-}
-
-.sg-lightbox__code {
-    background: #1a1a2e;
-    color: #e0e0e0;
-    padding: 1.5rem;
-    border-radius: 8px;
-    max-width: 900px;
-    max-height: 80vh;
-    overflow: auto;
-    font-size: 0.85rem;
-    line-height: 1.5;
-}
-
-.sg-lightbox__footer {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    color: var(--color-text-secondary, #8892A0);
-    font-size: 0.8rem;
-    flex-shrink: 0;
-}
-
-.sg-lightbox__save {
-    font-size: 0.75rem;
-    padding: 4px 12px;
-}
-
-/* ─── Info Panel ─────────────────────────────────────────────────────── */
-
-.sg-gallery__info {
-    border-top: 1px solid rgba(255,255,255,0.08);
-    padding: 1rem;
-    flex-shrink: 0;
-    background: rgba(255,255,255,0.02);
-}
-
-.sg-gallery__info-content {
-    max-width: 400px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.sg-gallery__info-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.8rem;
-    padding: 2px 0;
-}
-
-.sg-gallery__info-row span:first-child {
-    color: var(--color-text-secondary, #8892A0);
-}
-
-.sg-gallery__info-row span:last-child {
-    color: var(--color-text, #E0E0E0);
-    font-weight: 500;
-}
-
-.sg-gallery__action-btn--active {
-    border-color: var(--accent, #4ECDC4);
-    color: var(--accent, #4ECDC4);
-}
-
-/* ─── Print ──────────────────────────────────────────────────────────── */
-
-@media print {
-    .sg-gallery__header { display: none !important; }
-    .sg-lightbox { display: none !important; }
-    .sg-gallery__grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
-        gap: 6px !important;
-        overflow: visible !important;
-        padding: 6px 0 !important;
-    }
-    .sg-thumb {
-        break-inside: avoid;
-        border: 1px solid #ccc !important;
-        background: #f5f5f5 !important;
-    }
-    .sg-thumb__img {
-        aspect-ratio: 4/3 !important;
-        background-size: cover !important;
-        print-color-adjust: exact !important;
-        -webkit-print-color-adjust: exact !important;
-    }
-}
-`;
 }
 
 customElements.define('send-gallery', SendGallery);

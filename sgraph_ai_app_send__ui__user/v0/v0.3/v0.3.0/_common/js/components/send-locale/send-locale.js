@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Locale Selector Component
-   v0.2.0 — Grid dropdown language picker (matches sgraph.ai design)
+   SGraph Send — Locale Selector Component (extends SendComponent)
+   v0.3.0 — Grid dropdown language picker (matches sgraph.ai design)
 
    Renders a trigger button showing current locale flag + code.
    Opens a two-column grid dropdown of available locales.
@@ -10,18 +10,22 @@
      <send-locale></send-locale>
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-class SendLocale extends HTMLElement {
+class SendLocale extends SendComponent {
+
+    static useShadow   = false;
+    static useTemplate = false;
 
     connectedCallback() {
         this.render();
         this._onOutsideClick = () => {
-            const dropdown = this.querySelector('.locale-dropdown');
+            const dropdown = this.$('.locale-dropdown');
             if (dropdown) dropdown.classList.remove('open');
         };
         document.addEventListener('click', this._onOutsideClick);
     }
 
     disconnectedCallback() {
+        super.disconnectedCallback();
         if (this._onOutsideClick) {
             document.removeEventListener('click', this._onOutsideClick);
         }
@@ -55,19 +59,19 @@ class SendLocale extends HTMLElement {
         `;
 
         // Trigger toggle
-        const trigger = this.querySelector('.locale-dropdown__trigger');
+        const trigger = this.$('.locale-dropdown__trigger');
         if (trigger) {
             trigger.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.querySelector('.locale-dropdown').classList.toggle('open');
+                this.$('.locale-dropdown').classList.toggle('open');
             });
         }
 
         // Item click → navigate to locale URL
-        this.querySelectorAll('.locale-dropdown__item').forEach(btn => {
+        this.$$('.locale-dropdown__item').forEach(btn => {
             btn.addEventListener('click', () => {
                 const code = btn.getAttribute('data-locale');
-                this.querySelector('.locale-dropdown').classList.remove('open');
+                this.$('.locale-dropdown').classList.remove('open');
                 if (code !== currentCode && typeof I18n !== 'undefined') {
                     I18n.navigateToLocale(code);
                 }

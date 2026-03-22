@@ -1,8 +1,6 @@
 /* =============================================================================
-   SGraph Send — Upload Step Delivery Component
-   Shadow DOM Web Component for Step 2: Delivery Mode Selection
-
-   Extracted from monolith send-upload.js (v0.2.3, v0.2.5, v0.2.8, v0.2.14)
+   SGraph Send — Upload Step Delivery Component (extends SendComponent)
+   Step 2: Delivery Mode Selection (Shadow DOM with HTML template)
 
    Properties (set by orchestrator):
      - deliveryOptions    — Array of { id, icon, title, desc, hint }
@@ -15,16 +13,12 @@
      - step-back              — user clicked back
    ============================================================================= */
 
-class UploadStepDelivery extends HTMLElement {
+class UploadStepDelivery extends SendComponent {
 
-    // ─── Template cache (shared across all instances) ────────────────────────
-    static _templateCache = null;
+    /** Shadow DOM with external HTML template (defaults). */
 
     constructor() {
         super();
-        this.attachShadow({ mode: 'open' });
-
-        // Properties
         this._deliveryOptions     = [];
         this._recommendedDelivery = 'download';
         this._selectedDelivery    = null;
@@ -47,55 +41,14 @@ class UploadStepDelivery extends HTMLElement {
 
     // ─── Lifecycle ───────────────────────────────────────────────────────────
 
-    async connectedCallback() {
-        await this._loadTemplate();
+    onReady() {
         this._render();
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-
-    _esc(s) { return SendHelpers.escapeHtml(s); }
-
-    _basePath() {
-        if (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath) {
-            return SendComponentPaths.basePath;
-        }
-        return '../_common';
-    }
-
-    _componentPath() {
-        return this._basePath() + '/js/components/send-upload/upload-step-delivery';
-    }
-
-    // ─── Template loading ────────────────────────────────────────────────────
-
-    async _loadTemplate() {
-        // Inject CSS link into shadow root
-        const link = document.createElement('link');
-        link.rel  = 'stylesheet';
-        link.href = this._componentPath() + '/upload-step-delivery.css';
-        this.shadowRoot.appendChild(link);
-
-        // Fetch and cache HTML template
-        if (!UploadStepDelivery._templateCache) {
-            try {
-                const resp = await fetch(this._componentPath() + '/upload-step-delivery.html');
-                UploadStepDelivery._templateCache = await resp.text();
-            } catch (e) {
-                UploadStepDelivery._templateCache = '<div class="step-delivery"><div class="step-delivery__content"></div></div>';
-            }
-        }
-
-        // Create template container
-        const container = document.createElement('div');
-        container.innerHTML = UploadStepDelivery._templateCache;
-        this.shadowRoot.appendChild(container.firstElementChild || container);
     }
 
     // ─── Rendering ───────────────────────────────────────────────────────────
 
     _render() {
-        const content = this.shadowRoot.querySelector('.step-delivery__content');
+        const content = this.$('.step-delivery__content');
         if (!content) return;
 
         const options     = this._deliveryOptions;
@@ -109,7 +62,7 @@ class UploadStepDelivery extends HTMLElement {
                 <div class="file-summary file-summary--compact">
                     <span class="file-summary__icon">${summary.icon}</span>
                     <div>
-                        <div class="file-summary__name">${this._esc(summary.name)}</div>
+                        <div class="file-summary__name">${this.escapeHtml(summary.name)}</div>
                         <div class="file-summary__meta">${summary.meta}</div>
                     </div>
                 </div>`;
@@ -121,12 +74,12 @@ class UploadStepDelivery extends HTMLElement {
             let classes = 'delivery-card';
             if (isRecommended) classes += ' delivery-card--recommended default-selected';
             return `
-                <div class="${classes}" data-delivery="${this._esc(opt.id)}">
+                <div class="${classes}" data-delivery="${this.escapeHtml(opt.id)}">
                     <div class="delivery-card__icon">${opt.icon}</div>
                     <div class="delivery-card__body">
-                        <div class="delivery-card__title">${this._esc(opt.title)}</div>
-                        <div class="delivery-card__desc">${this._esc(opt.desc)}</div>
-                        <div class="delivery-card__hint">${this._esc(opt.hint)}</div>
+                        <div class="delivery-card__title">${this.escapeHtml(opt.title)}</div>
+                        <div class="delivery-card__desc">${this.escapeHtml(opt.desc)}</div>
+                        <div class="delivery-card__hint">${this.escapeHtml(opt.hint)}</div>
                     </div>
                 </div>`;
         }).join('');
@@ -144,26 +97,19 @@ class UploadStepDelivery extends HTMLElement {
     // ─── Event listeners ─────────────────────────────────────────────────────
 
     _setupListeners() {
-        const root        = this.shadowRoot;
         const recommended = this._recommendedDelivery;
-        const cards       = root.querySelectorAll('.delivery-card');
-        const defaultCard = root.querySelector('.delivery-card[data-delivery="' + recommended + '"]');
+        const cards       = this.$$('.delivery-card');
+        const defaultCard = this.$('.delivery-card[data-delivery="' + recommended + '"]');
 
         // Card click — emit selection event
         cards.forEach(card => {
             card.addEventListener('click', () => {
                 const deliveryId = card.getAttribute('data-delivery');
-                this.dispatchEvent(new CustomEvent('step-delivery-selected', {
-                    bubbles:  true,
-                    composed: true,
-                    detail:   { deliveryId }
-                }));
+                this.emit('step-delivery-selected', { deliveryId });
             });
         });
 
         // Hover deselect/reselect behavior (v0.2.8)
-        // When hovering a non-default card, dim the default card.
-        // On mouse leave, restore the default highlight (unless user already selected).
         cards.forEach(card => {
             const isDefault = card.getAttribute('data-delivery') === recommended;
 
@@ -185,13 +131,10 @@ class UploadStepDelivery extends HTMLElement {
         });
 
         // Back link
-        const backBtn = root.querySelector('.back-link');
+        const backBtn = this.$('.back-link');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
-                this.dispatchEvent(new CustomEvent('step-back', {
-                    bubbles:  true,
-                    composed: true
-                }));
+                this.emit('step-back');
             });
         }
     }

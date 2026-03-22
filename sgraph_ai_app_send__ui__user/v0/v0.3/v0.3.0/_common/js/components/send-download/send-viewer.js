@@ -1,11 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Viewer Component v0.3.0
-   Clean rewrite — single file preview (markdown, image, PDF, code, text, audio, video)
+   SGraph Send — Viewer Component v0.3.0 (extends SendComponent)
+   Single file preview — markdown, image, PDF, code, text, audio, video
 
    Used for non-zip single-file transfers.
+   Properties set by parent (send-download) before element is connected.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-class SendViewer extends HTMLElement {
+class SendViewer extends SendComponent {
+
+    /** Light DOM — CSS goes to document.head. No HTML template — dynamic render. */
+    static useShadow   = false;
+    static useTemplate = false;
 
     constructor() {
         super();
@@ -18,22 +23,24 @@ class SendViewer extends HTMLElement {
         this._objectUrl  = null;
     }
 
-    connectedCallback() {
+    async connectedCallback() {
+        await this.loadResources();
+        this._resourcesLoaded = true;
         if (this.fileBytes || this.fileText) this._build();
     }
 
     disconnectedCallback() {
+        super.disconnectedCallback();
         if (this._objectUrl) { URL.revokeObjectURL(this._objectUrl); this._objectUrl = null; }
     }
 
     _build() {
         const url = this.downloadUrl || '';
         this.innerHTML = `
-            <style>${SendViewer.CSS}</style>
             <div class="sv-container">
                 <div class="sv-header">
-                    <span class="sv-header__name">${SendHelpers.escapeHtml(this.fileName || 'File')}</span>
-                    <span class="sv-header__size">${SendHelpers.formatBytes(this.fileBytes ? this.fileBytes.byteLength : 0)}</span>
+                    <span class="sv-header__name">${this.escapeHtml(this.fileName || 'File')}</span>
+                    <span class="sv-header__size">${this.formatBytes(this.fileBytes ? this.fileBytes.byteLength : 0)}</span>
                     <button class="sv-action-btn" id="sv-share-toggle">${SendIcons.LINK_SM || '🔗'} Share</button>
                     <button class="sv-save-btn" id="sv-print">${SendIcons.PRINT || '🖨️'} Print</button>
                     <button class="sv-save-btn" id="sv-save">${SendIcons.DOWNLOAD} Save locally</button>
@@ -43,7 +50,7 @@ class SendViewer extends HTMLElement {
                     <div class="sv-share__row">
                         <span class="sv-share__label">Download link</span>
                         <div class="sv-share__input-row">
-                            <input type="text" class="sv-share__url" value="${SendHelpers.escapeHtml(url)}" readonly id="sv-share-url">
+                            <input type="text" class="sv-share__url" value="${this.escapeHtml(url)}" readonly id="sv-share-url">
                             <button class="sv-action-btn" id="sv-copy-link">${SendIcons.LINK_SM || '🔗'} Copy</button>
                         </div>
                     </div>
@@ -60,7 +67,7 @@ class SendViewer extends HTMLElement {
     }
 
     _renderContent() {
-        const content = this.querySelector('#sv-content');
+        const content = this.$('#sv-content');
         if (!content) return;
 
         const type = this.fileType;
@@ -70,11 +77,11 @@ class SendViewer extends HTMLElement {
                 ? FileTypeDetect.getImageMime(this.fileName) : 'image/jpeg';
             const blob = new Blob([this.fileBytes], { type: mime });
             this._objectUrl = URL.createObjectURL(blob);
-            content.innerHTML = `<img src="${this._objectUrl}" class="sv-image" alt="${SendHelpers.escapeHtml(this.fileName)}">`;
+            content.innerHTML = `<img src="${this._objectUrl}" class="sv-image" alt="${this.escapeHtml(this.fileName)}">`;
 
         } else if (type === 'markdown') {
             const text = this.fileText || new TextDecoder().decode(this.fileBytes);
-            const html = typeof MarkdownParser !== 'undefined' ? MarkdownParser.parse(text) : SendHelpers.escapeHtml(text);
+            const html = typeof MarkdownParser !== 'undefined' ? MarkdownParser.parse(text) : this.escapeHtml(text);
             content.innerHTML = `<div class="sv-markdown">${html}</div>`;
 
         } else if (type === 'pdf') {
@@ -98,13 +105,12 @@ class SendViewer extends HTMLElement {
 
         } else if (type === 'code' || type === 'text') {
             const text = this.fileText || new TextDecoder().decode(this.fileBytes);
-            content.innerHTML = `<pre class="sv-code">${SendHelpers.escapeHtml(text)}</pre>`;
+            content.innerHTML = `<pre class="sv-code">${this.escapeHtml(text)}</pre>`;
 
         } else if (this.fileText !== null) {
-            // Fallback text display
             content.innerHTML = `
                 <div class="sv-text-display">
-                    <pre>${SendHelpers.escapeHtml(this.fileText)}</pre>
+                    <pre>${this.escapeHtml(this.fileText)}</pre>
                     <div style="margin-top: 1rem; text-align: center;">
                         <button class="sv-copy-btn" id="sv-copy">Copy to clipboard</button>
                     </div>
@@ -114,13 +120,13 @@ class SendViewer extends HTMLElement {
             content.innerHTML = `
                 <div style="padding: 3rem; text-align: center; color: var(--color-text-secondary);">
                     <p>File downloaded successfully.</p>
-                    <p style="font-size: 0.85rem;">${SendHelpers.escapeHtml(this.fileName || 'download')} · ${SendHelpers.formatBytes(this.fileBytes ? this.fileBytes.byteLength : 0)}</p>
+                    <p style="font-size: 0.85rem;">${this.escapeHtml(this.fileName || 'download')} · ${this.formatBytes(this.fileBytes ? this.fileBytes.byteLength : 0)}</p>
                 </div>`;
         }
     }
 
     _setupListeners() {
-        const saveBtn = this.querySelector('#sv-save');
+        const saveBtn = this.$('#sv-save');
         if (saveBtn && this.fileBytes) {
             saveBtn.addEventListener('click', () => {
                 const blob = new Blob([this.fileBytes]);
@@ -132,25 +138,25 @@ class SendViewer extends HTMLElement {
             });
         }
 
-        const copyBtn = this.querySelector('#sv-copy');
+        const copyBtn = this.$('#sv-copy');
         if (copyBtn && this.fileText) {
             copyBtn.addEventListener('click', async () => {
                 try {
-                    await navigator.clipboard.writeText(this.fileText);
+                    await this.copyToClipboard(this.fileText);
                     copyBtn.textContent = 'Copied!';
                     setTimeout(() => { copyBtn.textContent = 'Copy to clipboard'; }, 2000);
                 } catch (_) {}
             });
         }
 
-        const printBtn = this.querySelector('#sv-print');
+        const printBtn = this.$('#sv-print');
         if (printBtn) {
             printBtn.addEventListener('click', () => this._print());
         }
 
         // Share panel toggle
-        const shareToggle = this.querySelector('#sv-share-toggle');
-        const sharePanel  = this.querySelector('#sv-share');
+        const shareToggle = this.$('#sv-share-toggle');
+        const sharePanel  = this.$('#sv-share');
         if (shareToggle && sharePanel) {
             shareToggle.addEventListener('click', () => {
                 const visible = sharePanel.style.display !== 'none';
@@ -160,11 +166,11 @@ class SendViewer extends HTMLElement {
         }
 
         // Copy link
-        const copyLink = this.querySelector('#sv-copy-link');
+        const copyLink = this.$('#sv-copy-link');
         if (copyLink && this.downloadUrl) {
             copyLink.addEventListener('click', async () => {
                 try {
-                    await navigator.clipboard.writeText(this.downloadUrl);
+                    await this.copyToClipboard(this.downloadUrl);
                     copyLink.textContent = 'Copied!';
                     setTimeout(() => { copyLink.innerHTML = `${SendIcons.LINK_SM || '🔗'} Copy`; }, 2000);
                 } catch (_) {}
@@ -172,7 +178,7 @@ class SendViewer extends HTMLElement {
         }
 
         // Email link
-        const emailBtn = this.querySelector('#sv-email');
+        const emailBtn = this.$('#sv-email');
         if (emailBtn && this.downloadUrl) {
             emailBtn.addEventListener('click', () => {
                 window.location.href = `mailto:?subject=Shared file via SG/Send&body=${encodeURIComponent(this.downloadUrl)}`;
@@ -181,16 +187,15 @@ class SendViewer extends HTMLElement {
     }
 
     _print() {
-        var content = this.querySelector('#sv-content');
+        var content = this.$('#sv-content');
         if (!content) return;
 
-        // Use sg-print if available (clean A4 output), otherwise window.print
         if (typeof SgPrint !== 'undefined' && SgPrint.print) {
             SgPrint.print(content.innerHTML, this.fileName || 'File');
         } else {
             var win = window.open('', '_blank');
             if (!win) return;
-            win.document.write('<html><head><title>' + SendHelpers.escapeHtml(this.fileName || 'Print') + '</title>');
+            win.document.write('<html><head><title>' + this.escapeHtml(this.fileName || 'Print') + '</title>');
             win.document.write('<style>body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; } img { max-width: 100%; } pre { white-space: pre-wrap; }</style>');
             win.document.write('</head><body>');
             win.document.write(content.innerHTML);
@@ -199,205 +204,6 @@ class SendViewer extends HTMLElement {
             win.print();
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Static Assets
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // Icons are in SendIcons (send-icons.js)
-
-    static CSS = `
-.sv-container {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 80px);
-    overflow: hidden;
-}
-
-.sv-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    flex-shrink: 0;
-}
-
-.sv-header__name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    flex: 1;
-}
-
-.sv-header__size {
-    font-size: 0.8rem;
-    color: var(--color-text-secondary, #8892A0);
-}
-
-.sv-save-btn {
-    background: var(--accent, #4ECDC4);
-    color: #0a0e17;
-    border: none;
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.sv-save-btn:hover { opacity: 0.85; }
-
-.sv-action-btn {
-    background: none;
-    border: 1px solid rgba(255,255,255,0.1);
-    color: var(--color-text-secondary, #8892A0);
-    cursor: pointer;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: border-color 0.15s, color 0.15s;
-    white-space: nowrap;
-}
-
-.sv-action-btn:hover {
-    border-color: var(--accent, #4ECDC4);
-    color: var(--accent, #4ECDC4);
-}
-
-.sv-action-btn--active {
-    border-color: var(--accent, #4ECDC4);
-    color: var(--accent, #4ECDC4);
-}
-
-.sv-share {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.02);
-}
-
-.sv-share__row {
-    margin-bottom: 0.5rem;
-}
-
-.sv-share__label {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary, #8892A0);
-    margin-bottom: 0.35rem;
-}
-
-.sv-share__input-row {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.sv-share__url {
-    flex: 1;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 0.75rem;
-    color: var(--color-text, #E0E0E0);
-    font-family: monospace;
-    min-width: 0;
-}
-
-.sv-share__actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.sv-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-}
-
-.sv-image {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    display: block;
-    margin: auto;
-    padding: 1rem;
-    box-sizing: border-box;
-}
-
-.sv-markdown {
-    background: white;
-    color: #1a1a1a;
-    padding: 2rem;
-    line-height: 1.6;
-    max-width: 800px;
-    margin: 0 auto;
-    min-height: 100%;
-    box-sizing: border-box;
-}
-
-.sv-markdown h1, .sv-markdown h2 { border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
-.sv-markdown code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
-.sv-markdown pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
-.sv-markdown pre code { background: none; padding: 0; }
-.sv-markdown blockquote { border-left: 3px solid #ddd; margin-left: 0; padding-left: 1rem; color: #555; }
-.sv-markdown table { border-collapse: collapse; width: 100%; }
-.sv-markdown th, .sv-markdown td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-.sv-markdown th { background: #f4f4f4; }
-
-.sv-pdf {
-    width: 100%;
-    height: 100%;
-    border: none;
-}
-
-.sv-code {
-    margin: 0;
-    padding: 1.5rem;
-    font-size: 0.85rem;
-    line-height: 1.5;
-    background: #0d1117;
-    color: #e6edf3;
-    min-height: 100%;
-    box-sizing: border-box;
-    overflow: auto;
-}
-
-.sv-text-display {
-    padding: 1.5rem;
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-.sv-text-display pre {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px;
-    padding: 1.5rem;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-
-.sv-copy-btn {
-    background: none;
-    border: 1px solid rgba(255,255,255,0.15);
-    color: var(--accent, #4ECDC4);
-    padding: 6px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.8rem;
-}
-
-.sv-copy-btn:hover {
-    border-color: var(--accent, #4ECDC4);
-}
-`;
 }
 
 customElements.define('send-viewer', SendViewer);

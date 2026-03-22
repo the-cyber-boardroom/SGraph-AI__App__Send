@@ -1,12 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — Base Component Class
-   v0.2.0 — Foundation for Shadow DOM components with resource loading
+   v0.3.0 — Foundation for Shadow DOM components with resource loading
 
    Adapted from MGraph's BaseComponent pattern.
 
    Provides:
-   - Shadow DOM encapsulation
+   - Shadow DOM encapsulation (opt-out via static useShadow = false)
    - Async CSS/HTML template loading from separate files
+   - CSS-only mode (no .html template required — for dynamic-render components)
+   - Centralised basePath resolution
    - Event listener tracking and cleanup
    - Common utility method access via SendHelpers
    - Standardized lifecycle hooks
@@ -14,9 +16,17 @@
 
 class SendComponent extends HTMLElement {
 
+    /** Override to false in subclasses that use light DOM (e.g. send-header) */
+    static useShadow = true;
+
+    /** Override to false in subclasses that generate HTML dynamically */
+    static useTemplate = true;
+
     constructor() {
         super();
-        this.attachShadow({ mode: 'open' });
+        if (this.constructor.useShadow) {
+            this.attachShadow({ mode: 'open' });
+        }
         this._eventListeners  = [];
         this._isReady          = false;
         this._resourcesLoaded  = false;
@@ -57,27 +67,66 @@ class SendComponent extends HTMLElement {
     // Resource Loading
     // ═══════════════════════════════════════════════════════════════════════════
 
+    /** The DOM root for this component — shadowRoot or the element itself */
+    get renderRoot() {
+        return this.shadowRoot || this;
+    }
+
+    /** Centralised basePath — replaces scattered SendComponentPaths checks */
+    get basePath() {
+        if (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath) {
+            return SendComponentPaths.basePath;
+        }
+        return '../_common';
+    }
+
     async loadResources() {
         if (this._resourcesLoaded) return;
 
         const componentName = this.tagName.toLowerCase();
         const paths         = SendComponentPaths.resolve(componentName);
 
-        // Load CSS and HTML in parallel
-        const [sharedCss, componentCss, templateHtml] = await Promise.all([
-            this.fetchCss(SendComponentPaths.sharedCss.components()),
-            this.fetchCss(paths.css),
-            this.fetchHtml(paths.html)
-        ]);
+        if (this.constructor.useShadow) {
+            // Shadow DOM: inject CSS as <style> tags + HTML template
+            const fetches = [
+                this.fetchCss(SendComponentPaths.sharedCss.components()),
+                this.fetchCss(paths.css)
+            ];
+            if (this.constructor.useTemplate) {
+                fetches.push(this.fetchHtml(paths.html));
+            }
 
-        // Inject into Shadow DOM
-        this.shadowRoot.innerHTML = `
-            <style>${sharedCss}</style>
-            <style>${componentCss}</style>
-            ${templateHtml}
-        `;
+            const results      = await Promise.all(fetches);
+            const sharedCss    = results[0];
+            const componentCss = results[1];
+            const templateHtml = results[2] || '';
+
+            this.renderRoot.innerHTML = `
+                <style>${sharedCss}</style>
+                <style>${componentCss}</style>
+                ${templateHtml}
+            `;
+        } else {
+            // Light DOM: inject CSS via <link> in document.head (deduplicated)
+            SendComponent._injectHeadCss(componentName, paths.css);
+        }
 
         this._resourcesLoaded = true;
+    }
+
+    /** Inject a CSS <link> into document.head, once per component tag name */
+    static _headCssInjected = new Set();
+
+    static _injectHeadCss(tagName, cssUrl) {
+        if (SendComponent._headCssInjected.has(tagName)) return;
+        SendComponent._headCssInjected.add(tagName);
+        // Skip if a <link> with this href already exists in <head>
+        const existing = document.head.querySelector(`link[href$="${tagName}.css"]`);
+        if (existing) return;
+        const link  = document.createElement('link');
+        link.rel    = 'stylesheet';
+        link.href   = cssUrl;
+        document.head.appendChild(link);
     }
 
     async fetchCss(url) {
@@ -93,13 +142,10 @@ class SendComponent extends HTMLElement {
     async fetchHtml(url) {
         try {
             const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+            if (!response.ok) return '';         // No template — component generates HTML dynamically
             return await response.text();
-        } catch (error) {
-            console.error(`[${this.tagName}] Failed to load template: ${url}`, error);
-            throw error;
+        } catch {
+            return '';                           // Network error — degrade gracefully
         }
     }
 
@@ -121,8 +167,8 @@ class SendComponent extends HTMLElement {
         this._eventListeners.push({ target, eventType, handler: boundHandler, options });
     }
 
-    $(selector)  { return this.shadowRoot.querySelector(selector);    }
-    $$(selector) { return this.shadowRoot.querySelectorAll(selector); }
+    $(selector)  { return this.renderRoot.querySelector(selector);    }
+    $$(selector) { return this.renderRoot.querySelectorAll(selector); }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Utility Accessors (delegate to SendHelpers)
@@ -139,7 +185,7 @@ class SendComponent extends HTMLElement {
     // ═══════════════════════════════════════════════════════════════════════════
 
     showError(message) {
-        this.shadowRoot.innerHTML = `
+        this.renderRoot.innerHTML = `
             <style>
                 .component-error {
                     padding: 20px;

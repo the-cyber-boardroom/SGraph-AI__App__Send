@@ -1,6 +1,6 @@
 /* =============================================================================
    SGraph Send — Step Indicator Component
-   v0.3.0 — Six-step upload wizard progress display
+   v0.3.0 — Six-step upload wizard progress display (extends SendComponent)
 
    Usage:  <send-step-indicator step="1" total="6"></send-step-indicator>
    Attrs:  step  — current step (1-based)
@@ -9,20 +9,22 @@
    Reacts to attribute changes — parent sets step="2" and indicator updates.
    ============================================================================= */
 
-class SendStepIndicator extends HTMLElement {
+class SendStepIndicator extends SendComponent {
 
     static STEP_LABELS = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Encrypt & Upload', 'Done'];
 
-    constructor() {
-        super();
-        this.attachShadow({ mode: 'open' });
-    }
+    /** Shadow DOM: yes (inherited default). HTML template: no (dynamic render). */
+    static useTemplate = false;
 
     static get observedAttributes() { return ['step', 'total']; }
 
-    attributeChangedCallback() { this._render(); }
+    attributeChangedCallback() {
+        if (this._resourcesLoaded) this._render();
+    }
 
-    connectedCallback() { this._render(); }
+    onReady() {
+        this._render();
+    }
 
     get step()  { return parseInt(this.getAttribute('step')  || '1', 10); }
     get total() { return parseInt(this.getAttribute('total') || '3', 10); }
@@ -58,117 +60,34 @@ class SendStepIndicator extends HTMLElement {
             }
         }
 
-        this.shadowRoot.innerHTML = `
-            <style>
-                :host {
-                    display: block;
-                    margin-bottom: var(--space-4, 1rem);
-                }
-
-                .steps {
-                    display: flex;
-                    align-items: center;
-                    gap: var(--space-2, 0.5rem);
-                }
-
-                .step {
-                    display: flex;
-                    align-items: center;
-                    gap: var(--space-2, 0.5rem);
-                    font-size: var(--text-sm, 0.875rem);
-                    color: var(--color-text-secondary, #8892A0);
-                    white-space: nowrap;
-                }
-
-                .step--active {
-                    color: var(--color-primary, #4ECDC4);
-                    font-weight: var(--weight-semibold, 600);
-                }
-
-                .step--completed {
-                    color: var(--color-success, #4ECDC4);
-                    cursor: pointer;
-                }
-
-                .step--completed:hover .dot--completed {
-                    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.2);
-                }
-
-                .step--active {
-                    cursor: pointer;
-                }
-
-                .dot {
-                    width: 10px;
-                    height: 10px;
-                    border-radius: 50%;
-                    border: 2px solid var(--color-text-secondary, #8892A0);
-                    background: transparent;
-                    flex-shrink: 0;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 8px;
-                    line-height: 1;
-                }
-
-                .dot--active {
-                    border-color: var(--color-primary, #4ECDC4);
-                    background: var(--color-primary, #4ECDC4);
-                }
-
-                .dot--completed {
-                    border-color: var(--color-success, #4ECDC4);
-                    background: var(--color-success, #4ECDC4);
-                    color: var(--color-bg, #1A1A2E);
-                }
-
-                .line {
-                    flex: 1;
-                    height: 2px;
-                    background: var(--color-border, rgba(78, 205, 196, 0.15));
-                    min-width: 20px;
-                }
-
-                .line--completed {
-                    background: var(--color-success, #4ECDC4);
-                }
-
-                .label {
-                    font-size: var(--text-small, 0.75rem);
-                    color: var(--color-text-secondary, #8892A0);
-                    margin-top: var(--space-2, 0.5rem);
-                }
-
-                @media (max-width: 480px) {
-                    .steps { gap: var(--space-1, 0.25rem); }
-                    .step  { font-size: var(--text-small, 0.75rem); }
-                    .step__label { display: none; }
-                }
-            </style>
-
+        // Update only the content wrapper, preserving CSS <style> tags
+        const html = `
             <nav class="steps" role="navigation" aria-label="Upload progress">
                 ${stepsHtml.join('')}
             </nav>
             <div class="label">Step ${step} of ${total}</div>
         `;
 
-        // Wire click events on completed/active steps
+        let content = this.$('.si-content');
+        if (content) {
+            content.innerHTML = html;
+        } else {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'si-content';
+            wrapper.innerHTML = html;
+            this.renderRoot.appendChild(wrapper);
+        }
+
         this._wireStepClicks();
     }
 
     _wireStepClicks() {
         var self = this;
-        var stepEls = this.shadowRoot.querySelectorAll('.step');
-        stepEls.forEach(function(el, idx) {
+        this.$$('.step').forEach(function(el, idx) {
             var stepNum = idx + 1;
             if (el.classList.contains('step--completed') || el.classList.contains('step--active')) {
                 el.addEventListener('click', function() {
-                    self.dispatchEvent(new CustomEvent('step-nav', {
-                        bubbles: true,
-                        composed: true,
-                        detail: { step: stepNum }
-                    }));
+                    self.emit('step-nav', { step: stepNum });
                 });
             }
         });
