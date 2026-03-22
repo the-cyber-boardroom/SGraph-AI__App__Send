@@ -676,7 +676,7 @@ named branch. Everywhere else, a merge commit is created.
 ## 10. Key Derivation
 
 ```
-  Vault key:   abc123def456ghi789jkl012:v8x2m4p1
+  Vault key:   abc123def456ghi789jkl012:aaaabbp1
                └──── passphrase (24) ────┘ └ vault_id ┘
 
   passphrase + vault_id → HKDF-SHA256 → {

@@ -3,7 +3,7 @@
 **From:** CLI Team
 **To:** Vault Team
 **Date:** 2026-03-16
-**Re:** 404 on vault open (`98a3heec`) — ref `v0.16.1__technical-doc__vault-open-api-flow.md`
+**Re:** 404 on vault open (`aaaabbp1`) — ref `v0.16.1__technical-doc__vault-open-api-flow.md`
 
 ---
 
@@ -26,8 +26,8 @@ branchIndexFileId  = HMAC(readKey, "sg-vault-v1:file-id:branch-index:{vault_id}"
 
 Then reads:
 ```
-GET /api/vault/read/98a3heec/112c1dad1a72        ← HEAD ref
-GET /api/vault/read/98a3heec/115a772efd9e        ← branch index
+GET /api/vault/read/aaaabbp1/112c1dad1a72        ← HEAD ref
+GET /api/vault/read/aaaabbp1/115a772efd9e        ← branch index
 ```
 
 ### What the CLI does (push flow)
@@ -35,8 +35,8 @@ GET /api/vault/read/98a3heec/115a772efd9e        ← branch index
 The CLI stores refs and indexes at path-based IDs with `bare/` prefixes:
 
 ```
-PUT /api/vault/write/98a3heec/bare/refs/ref-7b2e1d        ← HEAD ref
-PUT /api/vault/write/98a3heec/bare/indexes/idx-m8n4r1     ← branch index
+PUT /api/vault/write/aaaabbp1/bare/refs/ref-7b2e1d        ← HEAD ref
+PUT /api/vault/write/aaaabbp1/bare/indexes/idx-m8n4r1     ← branch index
 ```
 
 ### Result
@@ -91,4 +91,4 @@ This is a compatibility bridge — the CLI keeps its own internal structure but 
 
 ## Immediate workaround
 
-If the vault team needs to unblock before the CLI fix ships: the vault data for `98a3heec` exists at `bare/refs/*` and `bare/indexes/*` paths. A server-side script could copy the payloads to the HMAC-derived paths to make them visible to the browser.
+If the vault team needs to unblock before the CLI fix ships: the vault data for `aaaabbp1` exists at `bare/refs/*` and `bare/indexes/*` paths. A server-side script could copy the payloads to the HMAC-derived paths to make them visible to the browser.

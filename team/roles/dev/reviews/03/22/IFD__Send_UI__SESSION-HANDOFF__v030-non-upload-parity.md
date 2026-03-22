@@ -1,7 +1,7 @@
 # Session Handoff Brief — v0.3.0 Non-Upload Parity
 
 **Date:** 2026-03-22
-**Vault:** `2y0tyre74nw684v09hf9ucx0:4xw8kugl` (token: `owasp`)
+**Vault:** `abc123def456ghi789jkl012:aaaabbp1` (token: `owasp`)
 **Repo:** `SGraph-AI__App__Send` (github.com/the-cyber-boardroom/SGraph-AI__App__Send)
 
 ---
@@ -117,7 +117,7 @@ sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.0/en-gb/download/index.html
 
 **To apply 0013+0014 on a fresh branch:**
 ```bash
-sg-send-cli clone 2y0tyre74nw684v09hf9ucx0:4xw8kugl
+sg-send-cli clone abc123def456ghi789jkl012:aaaabbp1
 cd SGraph-AI__App__Send
 git checkout dev && git pull
 git checkout -b ifd-v0.3.0__non-upload-parity
@@ -133,6 +133,6 @@ Note: 0013 and 0014 are `git format-patch` format (include commit metadata), use
 
 - Create a local working branch: `claude/{description}`
 - Generate patches against the remote branch HEAD (not local commits)
-- Push patches to vault `2y0tyre74nw684v09hf9ucx0:4xw8kugl` with token `owasp`
+- Push patches to vault `abc123def456ghi789jkl012:aaaabbp1` with token `owasp`
 - Sequential naming: next patch would be `0015__*`
 - Conductor confirms patch applied, pushes to GitHub, dev agent pulls to verify
