@@ -51,9 +51,9 @@ class SendDownload extends HTMLElement {
     connectedCallback() {
         this._parseUrl();
         if (!this.transferId) {
-            this.state = 'error';
-            this.errorMessage = this.t('download.error.no_id');
+            this.state = 'entry';
             this.render();
+            this._setupEntryListeners();
             return;
         }
         this._loadTransferInfo();
@@ -89,7 +89,9 @@ class SendDownload extends HTMLElement {
         const path = window.location.pathname.toLowerCase();
         if (path.includes('/gallery')) return 'gallery';
         if (path.includes('/browse'))  return 'browse';
+        if (path.includes('/view'))    return 'view';
         if (path.includes('/download')) return 'download';
+        // /v/ is a short URL — auto-detect content type
         return 'auto';
     }
 
@@ -350,6 +352,26 @@ class SendDownload extends HTMLElement {
     }
 
     _renderPreDecrypt() {
+        if (this.state === 'entry') {
+            return `
+                <h3 style="margin: 0 0 0.5rem 0; color: var(--color-primary, #4ECDC4);">Receive a file</h3>
+                <p style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: 1rem;">
+                    Enter the token or transfer ID you were given.
+                </p>
+                <div>
+                    <input type="text" class="input" id="entry-input"
+                           placeholder="e.g. ocean-maple-4217 or a3b2c1d4e5f6"
+                           autocomplete="off" spellcheck="false"
+                           style="width: 100%; padding: 0.75rem; font-size: var(--text-base, 1rem);">
+                    <button class="btn btn-primary" id="entry-btn"
+                            style="margin-top: 0.75rem; width: 100%;">
+                        Decrypt &amp; Download
+                    </button>
+                </div>
+                <div style="font-size: var(--text-small, 0.75rem); color: var(--color-text-secondary); margin-top: 1rem; text-align: center;">
+                    The token was shared by the sender. It derives both the transfer ID and the decryption key.
+                </div>`;
+        }
         if (this.state === 'loading') {
             return `<div class="status status--info">${this._esc(this.t('download.loading'))}</div>`;
         }
@@ -398,6 +420,38 @@ class SendDownload extends HTMLElement {
         if (inp) inp.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') this.startDownload();
         });
+
+        // Also wire entry form listeners if the state is 'entry' and form is visible
+        this._setupEntryListeners();
+    }
+
+    _setupEntryListeners() {
+        const entryBtn = this.querySelector('#entry-btn');
+        const entryInp = this.querySelector('#entry-input');
+        if (!entryBtn || !entryInp) return;
+
+        const submit = () => {
+            const val = entryInp.value.trim();
+            if (!val) return;
+            // Set as hash and re-navigate (the page will re-parse)
+            window.location.hash = val;
+            // Re-parse and load
+            this._parseUrl();
+            if (this.transferId) {
+                this._loadTransferInfo();
+            } else {
+                this.state = 'error';
+                this.errorMessage = 'Could not resolve token or transfer ID';
+                this.render();
+            }
+        };
+
+        entryBtn.addEventListener('click', submit);
+        entryInp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submit();
+        });
+        // Auto-focus the input
+        setTimeout(() => entryInp.focus(), 50);
     }
 
     // ─── Post-Decrypt Rendering ─────────────────────────────────────────────
@@ -421,12 +475,14 @@ class SendDownload extends HTMLElement {
         } else if (mode === 'download') {
             this._renderDownloadMode();
         } else {
+            // 'view' or 'auto' single-file fallback
             this._renderSingleFile();
         }
     }
 
     _resolveViewMode() {
         // Route takes priority
+        if (this._routeMode === 'view') return 'view';  // force single-file inline view
         if (this._routeMode !== 'auto') return this._routeMode;
 
         // Zip with images → gallery; zip without → browse
