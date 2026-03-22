@@ -37,6 +37,11 @@ class SendGallery extends HTMLElement {
         this._thumbUrls = [];
     }
 
+    _buildSwitchUrl(targetMode) {
+        const path = window.location.pathname.replace(/\/(gallery|browse|download|view)(\/|$)/, `/${targetMode}$2`);
+        return path + window.location.search + window.location.hash;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Build
     // ═══════════════════════════════════════════════════════════════════════════
@@ -65,7 +70,7 @@ class SendGallery extends HTMLElement {
                         <button class="sg-gallery__action-btn" id="sg-email" title="Email">${SendIcons.MAIL}</button>
                         <button class="sg-gallery__action-btn" id="sg-print" title="Print">${SendIcons.PRINT}</button>
                         <button class="sg-gallery__save-btn" id="sg-save-zip">${SendIcons.DOWNLOAD} Save locally</button>
-                        <a href="?id=${this.transferId}#folder" class="sg-gallery__action-btn" title="Folder view">${SendIcons.FOLDER_MD} Folder view</a>
+                        <a href="${this._buildSwitchUrl('browse')}" class="sg-gallery__action-btn" title="Folder view">${SendIcons.FOLDER_MD} Folder view</a>
                         <button class="sg-gallery__action-btn" id="sg-info" title="Info">${SendIcons.INFO}</button>
                     </div>
                 </div>

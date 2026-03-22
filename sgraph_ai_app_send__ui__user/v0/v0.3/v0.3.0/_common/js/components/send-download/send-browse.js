@@ -39,6 +39,11 @@ class SendBrowse extends HTMLElement {
         }
     }
 
+    _buildSwitchUrl(targetMode) {
+        const path = window.location.pathname.replace(/\/(gallery|browse|download|view)(\/|$)/, `/${targetMode}$2`);
+        return path + window.location.search + window.location.hash;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Build
     // ═══════════════════════════════════════════════════════════════════════════
@@ -59,7 +64,7 @@ class SendBrowse extends HTMLElement {
                         <button class="sb-action-btn" id="sb-email">${SendIcons.MAIL || '✉'}</button>
                         <button class="sb-action-btn" id="sb-print">${SendIcons.PRINT || '🖨️'}</button>
                         <button class="sb-save-btn" id="sb-save-zip">${SendIcons.DOWNLOAD_SM} Save locally</button>
-                        <a href="?id=${this.transferId}#gallery" class="sb-action-btn">Gallery view</a>
+                        <a href="${this._buildSwitchUrl('gallery')}" class="sb-action-btn">Gallery view</a>
                     </div>
                 </div>
                 <sg-layout id="sb-layout"></sg-layout>
@@ -89,14 +94,20 @@ class SendBrowse extends HTMLElement {
                     },
                     {
                         type: 'stack', id: 's-preview', activeTab: 0,
-                        tabs: []
+                        tabs: [
+                            { type: 'tab', id: 't-share', title: 'Share', tag: 'div', state: {} },
+                            { type: 'tab', id: 't-info',  title: 'Info',  tag: 'div', state: {} }
+                        ]
                     }
                 ]
             });
 
             requestAnimationFrame(() => {
                 this._populateTree();
+                this._populateShareTab();
+                this._populateInfoTab();
                 this._autoOpenFirstFile();
+                this._setupKeyboard();
             });
         });
     }
@@ -231,6 +242,99 @@ class SendBrowse extends HTMLElement {
             treeEl.querySelectorAll('.sb-tree__folder-content').forEach(c => c.style.display = 'none');
             treeEl.querySelectorAll('.sb-tree__toggle').forEach(t => t.textContent = '▸');
         });
+    }
+
+    // ─── Share Tab (v0.2.2 parity) ─────────────────────────────────────────
+
+    _populateShareTab() {
+        if (!this._sgLayout) return;
+        const el = this._sgLayout.getPanelElement('t-share');
+        if (!el) return;
+
+        el.style.cssText = 'overflow-y: auto; height: 100%; padding: 1.5rem;';
+
+        const files = this.zipTree.filter(e => !e.dir);
+        const url = this.downloadUrl || window.location.href;
+
+        el.innerHTML = `
+            <div class="sb-share">
+                <h3 class="sb-share__title">Share this transfer</h3>
+                <div class="sb-share__url-row">
+                    <input type="text" class="sb-share__url" value="${SendHelpers.escapeHtml(url)}" readonly id="sb-share-url">
+                    <button class="sb-action-btn" id="sb-share-copy">${SendIcons.LINK_SM} Copy</button>
+                </div>
+                <div class="sb-share__actions">
+                    <button class="sb-action-btn" id="sb-share-email">${SendIcons.MAIL || '✉'} Email link</button>
+                </div>
+                <div class="sb-share__details">
+                    <div class="sb-share__row"><span class="sb-share__label">Transfer ID</span><span class="sb-share__value">${SendHelpers.escapeHtml(this.transferId || '—')}</span></div>
+                    <div class="sb-share__row"><span class="sb-share__label">Archive</span><span class="sb-share__value">${SendHelpers.escapeHtml(this.fileName || 'Unknown')}</span></div>
+                    <div class="sb-share__row"><span class="sb-share__label">Size</span><span class="sb-share__value">${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)}</span></div>
+                    <div class="sb-share__row"><span class="sb-share__label">Files</span><span class="sb-share__value">${files.length}</span></div>
+                </div>
+            </div>
+        `;
+
+        const copyBtn = el.querySelector('#sb-share-copy');
+        if (copyBtn) copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(url);
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.innerHTML = `${SendIcons.LINK_SM} Copy`; }, 2000);
+            } catch (_) {}
+        });
+
+        const emailBtn = el.querySelector('#sb-share-email');
+        if (emailBtn) emailBtn.addEventListener('click', () => {
+            window.location.href = `mailto:?subject=Shared files via SG/Send&body=${encodeURIComponent(url)}`;
+        });
+    }
+
+    // ─── Info Tab (v0.2.12 parity) ───────────────────────────────────────────
+
+    _populateInfoTab() {
+        if (!this._sgLayout) return;
+        const el = this._sgLayout.getPanelElement('t-info');
+        if (!el) return;
+
+        el.style.cssText = 'overflow-y: auto; height: 100%; padding: 1.5rem;';
+
+        const files = this.zipTree.filter(e => !e.dir);
+        const folders = this.zipTree.filter(e => e.dir);
+
+        // Count by type
+        const typeCounts = {};
+        let totalSize = 0;
+        for (const f of files) {
+            const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(f.name, null) : 'other';
+            typeCounts[type] = (typeCounts[type] || 0) + 1;
+        }
+
+        const typeRows = Object.entries(typeCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([type, count]) => `<div class="sb-share__row"><span class="sb-share__label">${SendHelpers.escapeHtml(type)}</span><span class="sb-share__value">${count}</span></div>`)
+            .join('');
+
+        el.innerHTML = `
+            <div class="sb-share">
+                <h3 class="sb-share__title">Archive info</h3>
+                <div class="sb-share__details">
+                    <div class="sb-share__row"><span class="sb-share__label">Total files</span><span class="sb-share__value">${files.length}</span></div>
+                    <div class="sb-share__row"><span class="sb-share__label">Folders</span><span class="sb-share__value">${folders.length}</span></div>
+                    <div class="sb-share__row"><span class="sb-share__label">Archive size</span><span class="sb-share__value">${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)}</span></div>
+                </div>
+                <h3 class="sb-share__title" style="margin-top: 1.5rem;">Files by type</h3>
+                <div class="sb-share__details">
+                    ${typeRows}
+                </div>
+                <h3 class="sb-share__title" style="margin-top: 1.5rem;">Encryption</h3>
+                <div class="sb-share__details">
+                    <div class="sb-share__row"><span class="sb-share__label">Algorithm</span><span class="sb-share__value">AES-256-GCM</span></div>
+                    <div class="sb-share__row"><span class="sb-share__label">Decryption</span><span class="sb-share__value">Client-side only</span></div>
+                    <div class="sb-share__row"><span class="sb-share__label">Server sees</span><span class="sb-share__value">Encrypted ciphertext only</span></div>
+                </div>
+            </div>
+        `;
     }
 
     // ─── Auto-open first file ───────────────────────────────────────────────
@@ -751,6 +855,67 @@ class SendBrowse extends HTMLElement {
     min-height: 100%;
     box-sizing: border-box;
     overflow: auto;
+}
+
+/* ─── Share / Info Tabs ─────────────────────────────────────────────── */
+
+.sb-share {
+    max-width: 480px;
+}
+
+.sb-share__title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text, #E0E0E0);
+    margin: 0 0 1rem 0;
+}
+
+.sb-share__url-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.sb-share__url {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    color: var(--color-text, #E0E0E0);
+    font-family: monospace;
+    min-width: 0;
+}
+
+.sb-share__actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.sb-share__details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.sb-share__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.8rem;
+}
+
+.sb-share__label {
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.sb-share__value {
+    color: var(--color-text, #E0E0E0);
+    font-weight: 500;
 }
 `;
 }
