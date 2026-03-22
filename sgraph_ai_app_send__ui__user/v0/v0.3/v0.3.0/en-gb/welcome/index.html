@@ -47,6 +47,7 @@
     <!-- 2. Base system -->
     <script src="../../_common/js/base/send-helpers.js"></script>
     <script src="../../_common/js/base/send-component-paths.js"></script>
+    <script>SendComponentPaths.init('../../_common');</script>
     <script src="../../_common/js/base/send-component.js"></script>
 
     <!-- 3. Components -->
@@ -57,7 +58,6 @@
 
     <!-- 4. Init -->
     <script>
-        SendComponentPaths.init('../../_common');
         I18n.init();
     </script>
 
