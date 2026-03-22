@@ -45,14 +45,14 @@ class SendBrowse extends HTMLElement {
             <div class="sb-container">
                 <div class="sb-header">
                     <div class="sb-header__left">
-                        <span class="sb-header__icon">${SendBrowse.ICON_FOLDER}</span>
+                        <span class="sb-header__icon">${SendIcons.FOLDER}</span>
                         <span class="sb-header__name">${SendHelpers.escapeHtml(this.fileName || 'Archive')}</span>
                         <span class="sb-header__meta">${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)}</span>
                         <span class="sb-header__status">&#10003; Decrypted</span>
                     </div>
                     <div class="sb-header__right">
-                        <button class="sb-action-btn" id="sb-copy-link">${SendBrowse.ICON_LINK} Copy Link</button>
-                        <button class="sb-save-btn" id="sb-save-zip">${SendBrowse.ICON_DOWNLOAD} Save locally</button>
+                        <button class="sb-action-btn" id="sb-copy-link">${SendIcons.LINK_SM} Copy Link</button>
+                        <button class="sb-save-btn" id="sb-save-zip">${SendIcons.DOWNLOAD_SM} Save locally</button>
                         <a href="?id=${this.transferId}#gallery" class="sb-action-btn">Gallery view</a>
                     </div>
                 </div>
@@ -150,7 +150,7 @@ class SendBrowse extends HTMLElement {
                 <div class="sb-tree__folder" data-path="${SendHelpers.escapeHtml(childPath)}">
                     <div class="sb-tree__folder-header">
                         <span class="sb-tree__toggle">▸</span>
-                        <span class="sb-tree__folder-icon">${SendBrowse.ICON_FOLDER_SM}</span>
+                        <span class="sb-tree__folder-icon">${SendIcons.FOLDER_SM}</span>
                         <span class="sb-tree__folder-name">${SendHelpers.escapeHtml(name)}</span>
                         <span class="sb-tree__count">${fileCount}</span>
                     </div>
@@ -304,7 +304,7 @@ class SendBrowse extends HTMLElement {
         bar.innerHTML = `
             <span class="sb-file__name">${SendHelpers.escapeHtml(fileName)}</span>
             <span class="sb-file__size">${SendHelpers.formatBytes(bytes.byteLength)}</span>
-            <button class="sb-action-btn sb-file__save">${SendBrowse.ICON_DOWNLOAD} Save</button>
+            <button class="sb-action-btn sb-file__save">${SendIcons.DOWNLOAD_SM} Save</button>
         `;
         container.appendChild(bar);
 
@@ -388,7 +388,7 @@ class SendBrowse extends HTMLElement {
             try {
                 await navigator.clipboard.writeText(this.downloadUrl || window.location.href);
                 copyBtn.textContent = 'Copied!';
-                setTimeout(() => { copyBtn.innerHTML = `${SendBrowse.ICON_LINK} Copy Link`; }, 2000);
+                setTimeout(() => { copyBtn.innerHTML = `${SendIcons.LINK_SM} Copy Link`; }, 2000);
             } catch (_) {}
         });
     }
@@ -397,10 +397,7 @@ class SendBrowse extends HTMLElement {
     // Static Assets
     // ═══════════════════════════════════════════════════════════════════════════
 
-    static ICON_FOLDER    = '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 3h4l2 2h6v8H2z"/></svg>';
-    static ICON_FOLDER_SM = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--accent, #4ECDC4)" stroke-width="1.5"><path d="M2 3h4l2 2h6v8H2z"/></svg>';
-    static ICON_LINK      = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 8.5a3 3 0 004.2.4l2-2a3 3 0 00-4.2-4.2L7.3 3.9"/><path d="M9.5 7.5a3 3 0 00-4.2-.4l-2 2a3 3 0 004.2 4.2l1.2-1.2"/></svg>';
-    static ICON_DOWNLOAD  = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 13h12"/></svg>';
+    // Shared icons (FOLDER, LINK, DOWNLOAD) are in SendIcons (send-icons.js)
 
     static FILE_ICONS = {
         image:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#4ECDC4" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="6" cy="6" r="1.5"/><path d="M2 12l4-4 3 3 2-2 3 3"/></svg>',

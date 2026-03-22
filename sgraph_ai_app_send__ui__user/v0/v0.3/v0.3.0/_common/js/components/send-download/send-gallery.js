@@ -50,23 +50,23 @@ class SendGallery extends HTMLElement {
             <div class="sg-gallery">
                 <div class="sg-gallery__header">
                     <div class="sg-gallery__header-left">
-                        <span class="sg-gallery__icon">${SendGallery.ICON_GRID}</span>
+                        <span class="sg-gallery__icon">${SendIcons.GRID}</span>
                         <span class="sg-gallery__name">${SendHelpers.escapeHtml(this.fileName || 'Archive')}</span>
                         <span class="sg-gallery__badge">gallery</span>
                         <span class="sg-gallery__meta">${SendHelpers.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)} · ${files.length} files</span>
                     </div>
                     <div class="sg-gallery__header-right">
                         <div class="sg-gallery__modes">
-                            <button class="sg-gallery__mode-btn" data-mode="compact" title="Compact">${SendGallery.ICON_COMPACT}</button>
-                            <button class="sg-gallery__mode-btn sg-gallery__mode-btn--active" data-mode="grid" title="Grid">${SendGallery.ICON_GRID_SM}</button>
-                            <button class="sg-gallery__mode-btn" data-mode="large" title="Large">${SendGallery.ICON_LARGE}</button>
+                            <button class="sg-gallery__mode-btn" data-mode="compact" title="Compact">${SendIcons.COMPACT}</button>
+                            <button class="sg-gallery__mode-btn sg-gallery__mode-btn--active" data-mode="grid" title="Grid">${SendIcons.GRID_SM}</button>
+                            <button class="sg-gallery__mode-btn" data-mode="large" title="Large">${SendIcons.LARGE}</button>
                         </div>
-                        <button class="sg-gallery__action-btn" id="sg-copy-link" title="Copy Link">${SendGallery.ICON_LINK} Copy Link</button>
-                        <button class="sg-gallery__action-btn" id="sg-email" title="Email">${SendGallery.ICON_MAIL}</button>
-                        <button class="sg-gallery__action-btn" id="sg-print" title="Print">${SendGallery.ICON_PRINT}</button>
-                        <button class="sg-gallery__save-btn" id="sg-save-zip">${SendGallery.ICON_DOWNLOAD} Save locally</button>
-                        <a href="?id=${this.transferId}#folder" class="sg-gallery__action-btn" title="Folder view">${SendGallery.ICON_FOLDER} Folder view</a>
-                        <button class="sg-gallery__action-btn" id="sg-info" title="Info">${SendGallery.ICON_INFO}</button>
+                        <button class="sg-gallery__action-btn" id="sg-copy-link" title="Copy Link">${SendIcons.LINK} Copy Link</button>
+                        <button class="sg-gallery__action-btn" id="sg-email" title="Email">${SendIcons.MAIL}</button>
+                        <button class="sg-gallery__action-btn" id="sg-print" title="Print">${SendIcons.PRINT}</button>
+                        <button class="sg-gallery__save-btn" id="sg-save-zip">${SendIcons.DOWNLOAD} Save locally</button>
+                        <a href="?id=${this.transferId}#folder" class="sg-gallery__action-btn" title="Folder view">${SendIcons.FOLDER_MD} Folder view</a>
+                        <button class="sg-gallery__action-btn" id="sg-info" title="Info">${SendIcons.INFO}</button>
                     </div>
                 </div>
                 <div class="sg-gallery__grid sg-gallery__grid--grid" id="sg-grid"></div>
@@ -101,7 +101,7 @@ class SendGallery extends HTMLElement {
             const badge = document.createElement('span');
             badge.className = 'sg-thumb__badge';
             badge.textContent = ext;
-            badge.style.background = SendGallery.BADGE_COLORS[type] || 'rgba(0,0,0,0.6)';
+            badge.style.background = SendIcons.BADGE_COLORS[type] || 'rgba(0,0,0,0.6)';
             imgDiv.appendChild(badge);
 
             if (type === 'image') {
@@ -119,11 +119,11 @@ class SendGallery extends HTMLElement {
                     this._thumbUrls.push(url);
                     imgDiv.style.backgroundImage = `url(${url})`;
                 } catch (_) {
-                    imgDiv.innerHTML += SendGallery.TYPE_ICONS.image;
+                    imgDiv.innerHTML += SendIcons.TYPE_ICONS.image;
                 }
             } else {
                 // Non-image: show type icon
-                imgDiv.innerHTML += (SendGallery.TYPE_ICONS[type] || SendGallery.TYPE_ICONS.other);
+                imgDiv.innerHTML += (SendIcons.TYPE_ICONS[type] || SendIcons.TYPE_ICONS.other);
             }
 
             const label = document.createElement('div');
@@ -159,7 +159,7 @@ class SendGallery extends HTMLElement {
         return `
             <div class="sg-lightbox" id="sg-lightbox">
                 <div class="sg-lightbox__header">
-                    <span class="sg-lightbox__brand">${SendGallery.ICON_LOGO} SG/Send</span>
+                    <span class="sg-lightbox__brand">${SendIcons.LOGO} SG/Send</span>
                     <span class="sg-lightbox__title" id="sg-lb-title"></span>
                     <button class="sg-lightbox__close" id="sg-lb-close">&times;</button>
                 </div>
@@ -170,7 +170,7 @@ class SendGallery extends HTMLElement {
                 </div>
                 <div class="sg-lightbox__footer">
                     <span id="sg-lb-counter"></span>
-                    <button class="sg-gallery__save-btn sg-lightbox__save" id="sg-lb-save">${SendGallery.ICON_DOWNLOAD} Save</button>
+                    <button class="sg-gallery__save-btn sg-lightbox__save" id="sg-lb-save">${SendIcons.DOWNLOAD} Save</button>
                 </div>
             </div>
         `;
@@ -303,7 +303,7 @@ class SendGallery extends HTMLElement {
             try {
                 await navigator.clipboard.writeText(this.downloadUrl || window.location.href);
                 copyBtn.textContent = 'Copied!';
-                setTimeout(() => { copyBtn.innerHTML = `${SendGallery.ICON_LINK} Copy Link`; }, 2000);
+                setTimeout(() => { copyBtn.innerHTML = `${SendIcons.LINK} Copy Link`; }, 2000);
             } catch (_) {}
         });
 
@@ -329,38 +329,7 @@ class SendGallery extends HTMLElement {
     // Static Assets
     // ═══════════════════════════════════════════════════════════════════════════
 
-    static ICON_GRID    = '<svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>';
-    static ICON_COMPACT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="4" height="4" rx="0.5"/><rect x="6" y="1" width="4" height="4" rx="0.5"/><rect x="11" y="1" width="4" height="4" rx="0.5"/><rect x="1" y="6" width="4" height="4" rx="0.5"/><rect x="6" y="6" width="4" height="4" rx="0.5"/><rect x="11" y="6" width="4" height="4" rx="0.5"/><rect x="1" y="11" width="4" height="4" rx="0.5"/><rect x="6" y="11" width="4" height="4" rx="0.5"/><rect x="11" y="11" width="4" height="4" rx="0.5"/></svg>';
-    static ICON_GRID_SM = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="0.5"/><rect x="9" y="1" width="6" height="6" rx="0.5"/><rect x="1" y="9" width="6" height="6" rx="0.5"/><rect x="9" y="9" width="6" height="6" rx="0.5"/></svg>';
-    static ICON_LARGE   = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="14" height="6" rx="0.5"/><rect x="1" y="9" width="14" height="6" rx="0.5"/></svg>';
-    static ICON_LINK    = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 8.5a3 3 0 004.2.4l2-2a3 3 0 00-4.2-4.2L7.3 3.9"/><path d="M9.5 7.5a3 3 0 00-4.2-.4l-2 2a3 3 0 004.2 4.2l1.2-1.2"/></svg>';
-    static ICON_MAIL    = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="M2 5l6 4 6-4"/></svg>';
-    static ICON_PRINT   = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><rect x="4" y="1" width="8" height="4"/><rect x="1" y="5" width="14" height="7" rx="1"/><rect x="4" y="10" width="8" height="5"/></svg>';
-    static ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 13h12"/></svg>';
-    static ICON_FOLDER  = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 3h4l2 2h6v8H2z"/></svg>';
-    static ICON_INFO    = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="8" cy="8" r="6.5"/><path d="M8 7v4"/><circle cx="8" cy="5" r="0.5" fill="currentColor"/></svg>';
-    static ICON_LOGO    = '<svg width="16" height="16" viewBox="0 0 16 16" fill="var(--accent, #4ECDC4)"><circle cx="8" cy="8" r="7"/></svg>';
-
-    static BADGE_COLORS = {
-        image:    '#2d7d46',
-        pdf:      '#c0392b',
-        markdown: '#2980b9',
-        code:     '#8e44ad',
-        text:     '#7f8c8d',
-        audio:    '#e67e22',
-        video:    '#d35400',
-    };
-
-    static TYPE_ICONS = {
-        image:    '<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#4ECDC4" stroke-width="2"><rect x="6" y="6" width="36" height="36" rx="4"/><circle cx="18" cy="18" r="4"/><path d="M6 34l10-10 8 8 6-6 12 12"/></svg>',
-        pdf:      '<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#e74c3c" stroke-width="2"><rect x="8" y="4" width="28" height="40" rx="3"/><path d="M14 16h16M14 22h16M14 28h10"/><path d="M36 14V4h-4l4 10z" fill="#e74c3c" opacity="0.3"/></svg>',
-        markdown: '<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#3498db" stroke-width="2"><rect x="4" y="8" width="40" height="32" rx="3"/><path d="M12 30V18l6 7 6-7v12M32 24l5 5 5-5M37 29v-11"/></svg>',
-        code:     '<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#9b59b6" stroke-width="2"><path d="M16 14l-8 10 8 10M32 14l8 10-8 10M22 36l4-24"/></svg>',
-        text:     '<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#95a5a6" stroke-width="2"><rect x="8" y="4" width="32" height="40" rx="3"/><path d="M14 14h20M14 22h20M14 30h12"/></svg>',
-        audio:    '<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#e67e22" stroke-width="2"><path d="M20 12v24l-8-8H6v-8h6l8-8z"/><path d="M28 16a8 8 0 010 16M32 12a14 14 0 010 24"/></svg>',
-        video:    '<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#d35400" stroke-width="2"><rect x="4" y="10" width="30" height="28" rx="3"/><path d="M34 20l10-6v20l-10-6z"/></svg>',
-        other:    '<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#7f8c8d" stroke-width="2"><rect x="8" y="4" width="28" height="40" rx="3"/><path d="M28 4v10h8"/></svg>',
-    };
+    // Icons, badges, and type icons are in SendIcons (send-icons.js)
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CSS
