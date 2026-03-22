@@ -339,11 +339,48 @@ class SendUpload extends HTMLElement {
             var entry = items[0].webkitGetAsEntry();
             if (entry && entry.isDirectory) { this._onFolderDrop(entry); return; }
         }
-        if (detail.files && detail.files.length > 0) this._setFile(detail.files[0]);
+        var files = detail.files;
+        if (files && files.length > 1) {
+            this._onMultiFile(files);
+        } else if (files && files.length > 0) {
+            this._setFile(files[0]);
+        }
     }
 
-    _onFileInput(files)  { if (files && files.length > 0) this._setFile(files[0]); }
-    _onPaste(files)      { if (files && files.length > 0) this._setFile(files[0]); }
+    _onFileInput(files) {
+        if (!files || files.length === 0) return;
+        if (files.length > 1) {
+            this._onMultiFile(files);
+        } else {
+            this._setFile(files[0]);
+        }
+    }
+
+    _onPaste(files) {
+        if (!files || files.length === 0) return;
+        if (files.length > 1) {
+            this._onMultiFile(files);
+        } else {
+            this._setFile(files[0]);
+        }
+    }
+
+    _onMultiFile(files) {
+        // Multiple files → treat as folder bundle, skip file-ready
+        var entries = [];
+        var totalSize = 0;
+        for (var i = 0; i < files.length; i++) {
+            entries.push({ path: files[i].name, file: files[i], isDir: false, name: files[i].name });
+            totalSize += files[i].size;
+        }
+        this._folderName = files.length + ' files';
+        this._folderScan = { entries: entries, fileCount: entries.length, folderCount: 0, totalSize: totalSize };
+        this._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
+        if (this._thumbnailUrl) { URL.revokeObjectURL(this._thumbnailUrl); this._thumbnailUrl = null; }
+        this.selectedFile = null;
+        // Smart skip: folders/multi-file go straight to delivery
+        this._advanceToDelivery();
+    }
 
     _onFolderInput(files) {
         if (!files || files.length === 0) return;
@@ -366,7 +403,8 @@ class SendUpload extends HTMLElement {
         this._folderName   = null;
         if (this._thumbnailUrl) URL.revokeObjectURL(this._thumbnailUrl);
         this._thumbnailUrl = UploadFileUtils.isImageFile(file) ? URL.createObjectURL(file) : null;
-        this.state = 'file-ready';
+        // Smart skip: go straight to delivery (v0.2.6+)
+        this._advanceToDelivery();
     }
 
     _resetSelection() {

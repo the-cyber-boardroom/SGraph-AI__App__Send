@@ -125,7 +125,7 @@ class UploadStepSelect extends HTMLElement {
                 <div class="drop-zone__hint" style="margin-top: var(--space-1, 0.25rem); font-size: var(--text-small, 0.75rem); opacity: 0.7;">
                     Maximum upload: ${this._esc(maxSize)}
                 </div>
-                <input type="file" id="file-input" style="display: none;">
+                <input type="file" id="file-input" style="display: none;" multiple>
                 <input type="file" id="folder-input" style="display: none;" webkitdirectory>
             </div>
             <div class="trust-badge">
