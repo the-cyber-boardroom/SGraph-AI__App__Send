@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Footer Component
-   v0.2.0 — Links back to sgraph.ai, shows build version
+   SGraph Send — Footer Component (extends SendComponent)
+   v0.3.0 — Links back to sgraph.ai, shows build version
 
    Usage:
      <send-footer></send-footer>
@@ -11,7 +11,10 @@
      Falls back gracefully when build-info.js is absent (local dev).
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-class SendFooter extends HTMLElement {
+class SendFooter extends SendComponent {
+
+    static useShadow   = false;
+    static useTemplate = false;
 
     connectedCallback() {
         this._onLocaleChanged = () => this.render();
@@ -20,6 +23,7 @@ class SendFooter extends HTMLElement {
     }
 
     disconnectedCallback() {
+        super.disconnectedCallback();
         if (this._onLocaleChanged) document.removeEventListener('locale-changed', this._onLocaleChanged);
     }
 

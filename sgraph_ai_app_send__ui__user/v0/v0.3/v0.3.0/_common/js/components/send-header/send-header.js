@@ -1,15 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Header Component
-   v0.2.0 — Brand header with favicon, navigation, and locale selector
-
-   Renders the SG/Send brand header with inline SVG favicon,
-   text logo, tagline, and the locale selector component.
+   SGraph Send — Header Component (extends SendComponent)
+   v0.3.0 — Brand header with favicon, navigation, and locale selector
 
    Usage:
      <send-header></send-header>
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-class SendHeader extends HTMLElement {
+class SendHeader extends SendComponent {
+
+    static useShadow   = false;
+    static useTemplate = false;
 
     connectedCallback() {
         this._onLocaleChanged = () => this.render();
@@ -18,6 +18,7 @@ class SendHeader extends HTMLElement {
     }
 
     disconnectedCallback() {
+        super.disconnectedCallback();
         if (this._onLocaleChanged) document.removeEventListener('locale-changed', this._onLocaleChanged);
     }
 

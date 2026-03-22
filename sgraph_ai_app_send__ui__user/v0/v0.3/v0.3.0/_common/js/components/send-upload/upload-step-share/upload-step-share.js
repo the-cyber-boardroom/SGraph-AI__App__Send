@@ -1,5 +1,5 @@
 /* =============================================================================
-   SGraph Send — Upload Step Share Component
+   SGraph Send — Upload Step Share Component (extends SendComponent)
    Step 3: Share mode selection (token, combined, separate)
 
    Usage:  <upload-step-share></upload-step-share>
@@ -12,48 +12,17 @@
      step-back           — user clicked back
    ============================================================================= */
 
-class UploadStepShare extends HTMLElement {
+class UploadStepShare extends SendComponent {
 
-    static _templateHtml = null;
+    /** Shadow DOM with external HTML template (defaults). */
 
     constructor() {
         super();
-        this.attachShadow({ mode: 'open' });
-        this._ready     = false;
         this._shareMode = 'token';
     }
 
-    connectedCallback() { this._init(); }
-
-    async _init() {
-        var basePath = this._resolveBasePath();
-        var compPath = basePath + '/js/components/send-upload/upload-step-share';
-
-        // Load CSS
-        var link  = document.createElement('link');
-        link.rel  = 'stylesheet';
-        link.href = compPath + '/upload-step-share.css';
-        this.shadowRoot.appendChild(link);
-
-        // Load and cache HTML template
-        if (!UploadStepShare._templateHtml) {
-            try {
-                var resp = await fetch(compPath + '/upload-step-share.html');
-                UploadStepShare._templateHtml = await resp.text();
-            } catch (e) {
-                UploadStepShare._templateHtml = '<div class="step-share"><div class="step-share__content"></div></div>';
-            }
-        }
-
-        // Clone template into shadow root
-        var wrapper = document.createElement('div');
-        wrapper.innerHTML = UploadStepShare._templateHtml;
-        while (wrapper.firstChild) {
-            this.shadowRoot.appendChild(wrapper.firstChild);
-        }
-
-        this._container = this.shadowRoot.querySelector('.step-share__content');
-        this._ready = true;
+    onReady() {
+        this._container = this.$('.step-share__content');
         this.render();
     }
 
@@ -71,7 +40,7 @@ class UploadStepShare extends HTMLElement {
     // ── Rendering ───────────────────────────────────────────────────────────────
 
     render() {
-        if (!this._ready) return;
+        if (!this._resourcesLoaded || !this._container) return;
 
         var self         = this;
         var modes        = (typeof UploadCrypto !== 'undefined' && UploadCrypto.SHARE_MODES)
@@ -84,9 +53,9 @@ class UploadStepShare extends HTMLElement {
             return '<div class="share-card' + activeClass + '" data-mode="' + mode.id + '">' +
                 '<div class="share-card__icon">' + mode.icon + '</div>' +
                 '<div class="share-card__body">' +
-                    '<div class="share-card__title">' + self._esc(mode.title) + '</div>' +
-                    '<div class="share-card__desc">' + self._esc(mode.desc) + '</div>' +
-                    '<div class="share-card__hint">' + self._esc(mode.hint) + '</div>' +
+                    '<div class="share-card__title">' + self.escapeHtml(mode.title) + '</div>' +
+                    '<div class="share-card__desc">' + self.escapeHtml(mode.desc) + '</div>' +
+                    '<div class="share-card__hint">' + self.escapeHtml(mode.hint) + '</div>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -104,41 +73,18 @@ class UploadStepShare extends HTMLElement {
     _setupListeners() {
         var self = this;
 
-        this.shadowRoot.querySelectorAll('.share-card[data-mode]').forEach(function(card) {
+        this.$$('.share-card[data-mode]').forEach(function(card) {
             card.addEventListener('click', function() {
-                self._emit('step-share-selected', { mode: card.getAttribute('data-mode') });
+                self.emit('step-share-selected', { mode: card.getAttribute('data-mode') });
             });
         });
 
-        var backBtn = this.shadowRoot.querySelector('#back-btn');
+        var backBtn = this.$('#back-btn');
         if (backBtn) {
             backBtn.addEventListener('click', function() {
-                self._emit('step-back');
+                self.emit('step-back');
             });
         }
-    }
-
-    // ── Helpers ─────────────────────────────────────────────────────────────────
-
-    _emit(name, detail) {
-        this.dispatchEvent(new CustomEvent(name, {
-            bubbles:  true,
-            composed: true,
-            detail:   detail || {}
-        }));
-    }
-
-    _esc(str) {
-        return (typeof SendHelpers !== 'undefined' && SendHelpers.escapeHtml)
-            ? SendHelpers.escapeHtml(str)
-            : String(str);
-    }
-
-    _resolveBasePath() {
-        if (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath) {
-            return SendComponentPaths.basePath;
-        }
-        return '../_common';
     }
 }
 

@@ -120,6 +120,9 @@ class SendComponent extends HTMLElement {
     static _injectHeadCss(tagName, cssUrl) {
         if (SendComponent._headCssInjected.has(tagName)) return;
         SendComponent._headCssInjected.add(tagName);
+        // Skip if a <link> with this href already exists in <head>
+        const existing = document.head.querySelector(`link[href$="${tagName}.css"]`);
+        if (existing) return;
         const link  = document.createElement('link');
         link.rel    = 'stylesheet';
         link.href   = cssUrl;
