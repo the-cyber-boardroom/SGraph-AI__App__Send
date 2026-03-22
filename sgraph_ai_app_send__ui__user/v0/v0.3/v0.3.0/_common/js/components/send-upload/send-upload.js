@@ -244,6 +244,28 @@ class SendUpload extends HTMLElement {
         if (!c || c._wired) return;
         c._wired = true;
 
+        // Step indicator click navigation (bubbles from send-step-indicator)
+        this.addEventListener('step-nav', function(e) {
+            var step = e.detail.step;
+            // Clear friendly key when navigating back past share mode (avoid ID collision)
+            if (step <= 3) {
+                self._friendlyParts = null;
+                self._friendlyKey   = null;
+            }
+            // Step 1 click resets file selection (v0.2.16)
+            if (step === 1) {
+                self._resetSelection();
+                self.state = 'idle';
+            } else if (step === 2) {
+                self.state = 'choosing-delivery';
+            } else if (step === 3) {
+                self.state = 'choosing-share';
+            } else if (step === 4) {
+                self.state = 'confirming';
+            }
+            // Steps 5-6 (processing/done) are not navigable
+        });
+
         c.addEventListener('step-file-dropped',    function(e) { self._onDrop(e.detail); });
         c.addEventListener('step-file-selected',    function(e) { self._onFileInput(e.detail.files); });
         c.addEventListener('step-folder-selected',  function(e) { self._onFolderInput(e.detail.files); });
