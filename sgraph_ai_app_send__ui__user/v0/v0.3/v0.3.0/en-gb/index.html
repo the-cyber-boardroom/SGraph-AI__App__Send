@@ -41,11 +41,11 @@
     <send-footer></send-footer>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         v0.3.0 — Upload page (consolidated from v0.2.0 + v0.2.3–v0.2.17)
+         v0.3.0 — Upload page (consolidated, zero overlays)
 
-         Uses v0.3.0 api-client.js with apiEndpoint support for local dev.
-         Components loaded: send-upload (base + IFD overlays), send-access-gate,
-         send-step-indicator, send-test-files, send-transparency.
+         send-upload.js and send-access-gate.js are single consolidated files
+         containing all functionality from v0.2.0 base + v0.2.3–v0.2.17.
+         No IFD overlay files needed — everything is in one file per component.
          ═══════════════════════════════════════════════════════════════════ -->
 
     <!-- 0. Build info -->
@@ -78,34 +78,12 @@
     <script src="../_common/js/components/send-footer/send-footer.js"></script>
     <script src="../_common/js/components/send-transparency/send-transparency.js"></script>
 
-    <!-- 4. Upload components -->
+    <!-- 4. Upload components (consolidated — no overlays) -->
+    <script src="../_common/js/components/send-step-indicator/send-step-indicator.js"></script>
+    <script src="../_common/js/qr-code.js"></script>
     <script src="../_common/js/components/send-access-gate/send-access-gate.js"></script>
     <script src="../_common/js/components/send-upload/send-upload.js"></script>
     <script src="../_common/js/components/send-test-files/send-test-files.js"></script>
-
-    <!-- 4a. Step indicator -->
-    <script src="../_common/js/components/send-step-indicator/send-step-indicator.js"></script>
-
-    <!-- 4b. QR code generator -->
-    <script src="../_common/js/qr-code.js"></script>
-
-    <!-- 4c. Upload IFD overlays (v0.2.3–v0.2.17) -->
-    <script src="../_common/js/components/send-upload/send-upload-v023.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v024.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v025.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v026.js"></script>
-    <script src="../_common/js/components/send-access-gate/send-access-gate-v026.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v027.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v028.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v029.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v0210.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v0211.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v0212.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v0213.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v0214.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v0215.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v0216.js"></script>
-    <script src="../_common/js/components/send-upload/send-upload-v0217.js"></script>
 
     <!-- 5. Init -->
     <script>
