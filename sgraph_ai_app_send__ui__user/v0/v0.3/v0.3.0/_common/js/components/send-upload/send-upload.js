@@ -63,12 +63,21 @@ class SendUpload extends HTMLElement {
             if (this._state === 'idle' || this._state === 'complete') this._render();
         };
         document.addEventListener('locale-changed', this._localeHandler);
+        // Test files component dispatches on document (it's outside our tree)
+        this._testFileHandler = (e) => {
+            var files = e.detail && e.detail.files;
+            if (!files || files.length === 0) return;
+            if (files.length > 1) this._onMultiFile(files);
+            else this._setFile(files[0]);
+        };
+        document.addEventListener('test-file-loaded', this._testFileHandler);
     }
 
     disconnectedCallback() {
         this._stopCarousel();
         this._setBeforeUnload(false);
         document.removeEventListener('locale-changed', this._localeHandler);
+        if (this._testFileHandler) document.removeEventListener('test-file-loaded', this._testFileHandler);
     }
 
     async _checkCapabilities() {
