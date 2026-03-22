@@ -69,6 +69,11 @@
     <!-- 2. Base system -->
     <script src="../_common/js/base/send-helpers.js"></script>
     <script src="../_common/js/base/send-component-paths.js"></script>
+    <script>
+        SendComponentPaths.init('../_common');
+        SendComponentPaths.alias('upload-step-share',    'send-upload/upload-step-share');
+        SendComponentPaths.alias('upload-step-delivery', 'send-upload/upload-step-delivery');
+    </script>
     <script src="../_common/js/base/send-component.js"></script>
 
     <!-- 3. Shared components -->
@@ -107,9 +112,6 @@
 
     <!-- 5. Init -->
     <script>
-        SendComponentPaths.init('../_common');
-        SendComponentPaths.alias('upload-step-share',    'send-upload/upload-step-share');
-        SendComponentPaths.alias('upload-step-delivery', 'send-upload/upload-step-delivery');
         I18n.init();
     </script>
 
