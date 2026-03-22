@@ -31,7 +31,7 @@ class SendViewer extends HTMLElement {
                 <div class="sv-header">
                     <span class="sv-header__name">${SendHelpers.escapeHtml(this.fileName || 'File')}</span>
                     <span class="sv-header__size">${SendHelpers.formatBytes(this.fileBytes ? this.fileBytes.byteLength : 0)}</span>
-                    <button class="sv-save-btn" id="sv-save">${SendViewer.ICON_DOWNLOAD} Save locally</button>
+                    <button class="sv-save-btn" id="sv-save">${SendIcons.DOWNLOAD} Save locally</button>
                 </div>
                 <div class="sv-content" id="sv-content"></div>
             </div>
@@ -130,7 +130,7 @@ class SendViewer extends HTMLElement {
     // Static Assets
     // ═══════════════════════════════════════════════════════════════════════════
 
-    static ICON_DOWNLOAD = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 13h12"/></svg>';
+    // Icons are in SendIcons (send-icons.js)
 
     static CSS = `
 .sv-container {
