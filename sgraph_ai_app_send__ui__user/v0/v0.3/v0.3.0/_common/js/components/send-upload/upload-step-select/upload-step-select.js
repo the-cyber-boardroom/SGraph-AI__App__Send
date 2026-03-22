@@ -113,7 +113,7 @@ class UploadStepSelect extends HTMLElement {
         const maxSize = this._fmt(this._maxFileSize);
         this._container.innerHTML = `
             <div class="drop-zone" id="drop-zone">
-                <div class="drop-zone__label">Drop a file or folder</div>
+                <div class="drop-zone__label">Drop files or a folder</div>
                 <div class="drop-zone__paste-hint">or paste from clipboard (Ctrl+V)</div>
                 <div class="browse-buttons">
                     <button class="browse-btn" id="browse-file-btn">Browse files</button>

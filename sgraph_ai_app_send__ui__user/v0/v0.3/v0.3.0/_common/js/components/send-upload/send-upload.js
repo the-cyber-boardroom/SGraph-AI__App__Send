@@ -85,13 +85,13 @@ function _loadPdfJs() {
 }
 
 // ─── Step labels and state mapping ──────────────────────────────────────────
-var STEP_LABELS   = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Done'];
-var TOTAL_STEPS   = 5;
+var STEP_LABELS   = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Encrypt & Upload', 'Done'];
+var TOTAL_STEPS   = 6;
 var STATE_TO_STEP = {
     'idle': 1, 'folder-options': 1, 'file-ready': 1,
     'choosing-delivery': 2, 'choosing-share': 3, 'confirming': 4,
-    'zipping': 4, 'reading': 4, 'encrypting': 4, 'creating': 4, 'uploading': 4, 'completing': 4,
-    'complete': 5, 'error': 1
+    'zipping': 5, 'reading': 5, 'encrypting': 5, 'creating': 5, 'uploading': 5, 'completing': 5,
+    'complete': 6, 'error': 1
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
