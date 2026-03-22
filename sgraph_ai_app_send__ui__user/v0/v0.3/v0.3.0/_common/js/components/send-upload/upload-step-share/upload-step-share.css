@@ -1,0 +1,117 @@
+/* =============================================================================
+   SGraph Send — Upload Step Share — Styles
+   Share mode selection cards (token, combined, separate)
+   ============================================================================= */
+
+:host {
+    display: block;
+}
+
+/* Step title */
+.step-title {
+    font-size: var(--text-body, 1rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text, #E0E0E0);
+    margin: 0 0 var(--space-2, 0.5rem) 0;
+}
+
+/* Share mode cards container */
+.share-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3, 0.75rem);
+    margin-top: var(--space-4, 1rem);
+}
+
+/* Individual share card */
+.share-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3, 0.75rem);
+    padding: var(--space-4, 1rem);
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-surface, #1E2A4A);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+}
+
+.share-card:hover {
+    border-color: var(--color-primary, #4ECDC4);
+    background: var(--accent-subtle, rgba(78, 205, 196, 0.12));
+    transform: translateY(-1px);
+}
+
+.share-card:active {
+    transform: translateY(0);
+    transition-duration: 0.05s;
+}
+
+.share-card--active {
+    border-color: var(--color-primary, #4ECDC4);
+    background: var(--accent-subtle, rgba(78, 205, 196, 0.08));
+}
+
+.share-card--active:hover {
+    background: var(--accent-subtle, rgba(78, 205, 196, 0.15));
+}
+
+/* Card icon */
+.share-card__icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+/* Card body */
+.share-card__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.share-card__title {
+    font-size: var(--text-body, 1rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text, #E0E0E0);
+    margin-bottom: var(--space-1, 0.25rem);
+}
+
+.share-card__desc {
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    line-height: 1.5;
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.share-card__hint {
+    font-size: var(--text-micro, 0.625rem);
+    color: var(--color-primary, #4ECDC4);
+    opacity: 0.8;
+}
+
+/* Back link */
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+    margin-top: var(--space-4, 1rem);
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    background: none;
+    padding: 0;
+    transition: color 0.2s;
+}
+
+.back-link:hover {
+    color: var(--color-primary, #4ECDC4);
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .share-card {
+        padding: var(--space-3, 0.75rem);
+    }
+}
