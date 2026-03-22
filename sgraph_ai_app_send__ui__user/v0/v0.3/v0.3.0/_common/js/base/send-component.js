@@ -86,28 +86,44 @@ class SendComponent extends HTMLElement {
         const componentName = this.tagName.toLowerCase();
         const paths         = SendComponentPaths.resolve(componentName);
 
-        // Load CSS (always) and HTML (only if useTemplate is true) in parallel
-        const fetches = [
-            this.fetchCss(SendComponentPaths.sharedCss.components()),
-            this.fetchCss(paths.css)
-        ];
-        if (this.constructor.useTemplate) {
-            fetches.push(this.fetchHtml(paths.html));
+        if (this.constructor.useShadow) {
+            // Shadow DOM: inject CSS as <style> tags + HTML template
+            const fetches = [
+                this.fetchCss(SendComponentPaths.sharedCss.components()),
+                this.fetchCss(paths.css)
+            ];
+            if (this.constructor.useTemplate) {
+                fetches.push(this.fetchHtml(paths.html));
+            }
+
+            const results      = await Promise.all(fetches);
+            const sharedCss    = results[0];
+            const componentCss = results[1];
+            const templateHtml = results[2] || '';
+
+            this.renderRoot.innerHTML = `
+                <style>${sharedCss}</style>
+                <style>${componentCss}</style>
+                ${templateHtml}
+            `;
+        } else {
+            // Light DOM: inject CSS via <link> in document.head (deduplicated)
+            SendComponent._injectHeadCss(componentName, paths.css);
         }
 
-        const results      = await Promise.all(fetches);
-        const sharedCss    = results[0];
-        const componentCss = results[1];
-        const templateHtml = results[2] || '';
-
-        // Inject into render root
-        this.renderRoot.innerHTML = `
-            <style>${sharedCss}</style>
-            <style>${componentCss}</style>
-            ${templateHtml}
-        `;
-
         this._resourcesLoaded = true;
+    }
+
+    /** Inject a CSS <link> into document.head, once per component tag name */
+    static _headCssInjected = new Set();
+
+    static _injectHeadCss(tagName, cssUrl) {
+        if (SendComponent._headCssInjected.has(tagName)) return;
+        SendComponent._headCssInjected.add(tagName);
+        const link  = document.createElement('link');
+        link.rel    = 'stylesheet';
+        link.href   = cssUrl;
+        document.head.appendChild(link);
     }
 
     async fetchCss(url) {
