@@ -99,16 +99,10 @@ class UploadStepConfirm extends HTMLElement {
     }
 
     _resolvePath(file) {
-        if (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.resolve) {
-            return SendComponentPaths.resolve('send-upload/upload-step-confirm/' + file);
-        }
-        // Fallback: relative to current component
-        var scripts = document.querySelectorAll('script[src*="upload-step-confirm"]');
-        if (scripts.length > 0) {
-            var src = scripts[scripts.length - 1].src;
-            return src.substring(0, src.lastIndexOf('/') + 1) + file;
-        }
-        return file;
+        var base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath)
+            ? SendComponentPaths.basePath
+            : '../_common';
+        return base + '/js/components/send-upload/upload-step-confirm/' + file;
     }
 
     _buildContent() {

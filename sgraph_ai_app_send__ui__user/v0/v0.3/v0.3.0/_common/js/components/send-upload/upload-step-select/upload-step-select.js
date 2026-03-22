@@ -43,7 +43,7 @@ class UploadStepSelect extends HTMLElement {
     }
 
     async _init() {
-        const base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.base)
+        const base = (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath)
             || '../_common';
         const dir = base + '/js/components/send-upload/upload-step-select';
 

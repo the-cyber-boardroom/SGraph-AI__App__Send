@@ -526,8 +526,8 @@ class UploadStepDone extends HTMLElement {
     }
 
     _resolveBasePath() {
-        if (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.base) {
-            return SendComponentPaths.base;
+        if (typeof SendComponentPaths !== 'undefined' && SendComponentPaths.basePath) {
+            return SendComponentPaths.basePath;
         }
         return '../_common';
     }
