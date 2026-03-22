@@ -121,8 +121,8 @@ sg-send-cli clone abc123def456ghi789jkl012:aaaabbp1
 cd SGraph-AI__App__Send
 git checkout dev && git pull
 git checkout -b ifd-v0.3.0__non-upload-parity
-git am ../4xw8kugl/0013__phase1-phase2-routes-packaging.patch
-git am ../4xw8kugl/0014__phase3-partial-print-email.patch
+git am ../aaaabbp1/0013__phase1-phase2-routes-packaging.patch
+git am ../aaaabbp1/0014__phase3-partial-print-email.patch
 ```
 
 Note: 0013 and 0014 are `git format-patch` format (include commit metadata), use `git am` not `git apply`.
