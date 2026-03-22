@@ -309,7 +309,7 @@ class SendUpload extends HTMLElement {
 
     _advanceToDelivery() {
         this._deliveryOptions     = UploadFileUtils.detectDeliveryOptions(this.selectedFile, this._folderScan);
-        this._recommendedDelivery = UploadFileUtils.getRecommendedDelivery(this._deliveryOptions, this._folderScan);
+        this._recommendedDelivery = UploadFileUtils.getSmartDefault(this.selectedFile, this._folderScan);
         this._selectedDelivery    = this._recommendedDelivery;
         this.state = 'choosing-delivery';
     }

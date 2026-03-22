@@ -241,3 +241,8 @@ sgraph_ai_app_send__ui__vault/**/tlh/
 **/build-info.js
 .local-server-vault
 .local-server-user
+
+# Make sure modules are not commited
+
+modules/
+
