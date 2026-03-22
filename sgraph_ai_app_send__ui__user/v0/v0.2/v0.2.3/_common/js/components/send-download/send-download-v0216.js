@@ -3,13 +3,16 @@
    v0.2.16 — Surgical overlay on v0.2.15
 
    Changes:
-     - Collapse/expand left rail toggle: chevron button in the left rail header
-       collapses the folder tree + file list panel, leaving only the document
-       tabs and preview visible. Click again to restore.
-     - Markdown print button in folder view: when viewing a markdown file in
-       a tab, adds a print button to the command strip that uses SgPrint.
-     - Fix maximise button: was showing blank page because the right column
-       lost its dimensions. Now properly toggles to full-width view.
+     1. Collapse/expand left rail toggle — chevron in the tree controls row
+        (not overlapping). When collapsed, only tabs + preview visible.
+        An expand chevron appears at the left edge of the right column.
+     2. Fix maximise button — was showing blank page. Now hides left rail
+        and shows content correctly, with restore support.
+     3. Markdown print button — when viewing .md in a tab, Print button
+        appears in the command strip. Uses SgPrint for A4 output.
+     4. Fix _originalDownloadUrl — v023's connectedCallback never fires
+        (v020 fires first). Ensure it's set so Share panel renders content.
+     5. Fix active tab styling — force distinct background on active tab.
 
    Loads AFTER v0.2.15 — overrides via prototype mutation.
    NO customElements.define() — reuses v0.2.0's registration.
@@ -25,8 +28,8 @@ if (typeof SendDownload === 'undefined') {
 }
 
 // ─── SVG icons ──────────────────────────────────────────────────────────────
-var ICON_COLLAPSE = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="10 3 5 8 10 13"/></svg>';
-var ICON_EXPAND   = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 3 11 8 6 13"/></svg>';
+var ICON_COLLAPSE = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 4 8 12 15 20"/></svg>';
+var ICON_EXPAND   = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 4 16 12 9 20"/></svg>';
 var ICON_PRINT    = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6V1h8v5"/><rect x="1" y="6" width="14" height="6" rx="1"/><path d="M4 10h8v5H4z"/></svg>';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -42,22 +45,28 @@ SendDownload.prototype.setupEventListeners = function() {
     var split = this.querySelector('#preview-split');
     if (!split) return;
 
-    // Add collapse toggle button if not already present
-    var leftRail = this.querySelector('#details-panel');
-    if (leftRail && !leftRail.querySelector('#v0216-collapse-btn')) {
+    // ── FIX 4: Ensure _originalDownloadUrl is always set ──
+    if (!this._originalDownloadUrl) {
+        this._originalDownloadUrl = window.location.href;
+    }
+
+    // ── Add collapse button into the tree controls row (not overlapping) ──
+    var treeControls = this.querySelector('.v0212-tree-controls');
+    if (treeControls && !treeControls.querySelector('#v0216-collapse-btn')) {
         var collapseBtn = document.createElement('button');
         collapseBtn.id = 'v0216-collapse-btn';
-        collapseBtn.className = 'v0216-collapse-btn';
+        collapseBtn.className = 'v0212-tree-ctrl v0216-collapse-btn';
         collapseBtn.title = 'Collapse sidebar';
         collapseBtn.innerHTML = ICON_COLLAPSE;
-        leftRail.insertBefore(collapseBtn, leftRail.firstChild);
+        // Insert at the beginning of tree controls (before expand/collapse all)
+        treeControls.insertBefore(collapseBtn, treeControls.firstChild);
 
         collapseBtn.addEventListener('click', function() {
             self._v0216_toggleCollapse();
         });
     }
 
-    // Add expand button on the right column (shown when collapsed)
+    // ── Add expand button on the right column (shown when collapsed) ──
     var rightCol = this.querySelector('.v022-right-column');
     if (rightCol && !rightCol.querySelector('#v0216-expand-btn')) {
         var expandBtn = document.createElement('button');
@@ -73,7 +82,7 @@ SendDownload.prototype.setupEventListeners = function() {
         });
     }
 
-    // Add markdown print button for current tab
+    // ── Markdown print button for current tab ──
     this._v0216_updatePrintButton();
 };
 
@@ -102,7 +111,7 @@ SendDownload.prototype._v0216_toggleCollapse = function() {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FIX 2: Fix maximise button — preserve content
+// FIX 2: Fix maximise button — preserve content, restore properly
 // ═══════════════════════════════════════════════════════════════════════════
 
 SendDownload.prototype._toggleMaximise = function() {
@@ -116,31 +125,31 @@ SendDownload.prototype._toggleMaximise = function() {
     this._isMaximised = !this._isMaximised;
 
     if (this._isMaximised) {
+        // Save current state before maximising
         this._savedGridColumns = split.style.gridTemplateColumns;
+        this._v0216_wasCollapsed = this._v0216_collapsed;
         split.style.gridTemplateColumns = '0px 0px 1fr';
         if (leftRail) leftRail.style.display = 'none';
         if (divider)  divider.style.display  = 'none';
         if (expandBtn) expandBtn.style.display = 'none';
-        // Also ensure the collapse state is synced
         this._v0216_collapsed = true;
     } else {
-        var cols = this._savedGridColumns;
-        // If saved columns were already collapsed, use the pre-collapse value
-        if (cols === '0px 0px 1fr') {
-            cols = this._v0216_savedColumns || '';
+        // Restore to pre-maximise state
+        if (this._v0216_wasCollapsed) {
+            // Was already collapsed before maximise — keep collapsed
+            split.style.gridTemplateColumns = '0px 0px 1fr';
+            if (leftRail) leftRail.style.display = 'none';
+            if (divider) divider.style.display = 'none';
+            if (expandBtn) expandBtn.style.display = '';
+            this._v0216_collapsed = true;
+        } else {
+            // Restore the full layout
+            split.style.gridTemplateColumns = this._savedGridColumns || '';
+            if (leftRail) leftRail.style.display = '';
+            if (divider)  divider.style.display  = '';
+            if (expandBtn) expandBtn.style.display = 'none';
+            this._v0216_collapsed = false;
         }
-        split.style.gridTemplateColumns = cols || '';
-        if (leftRail) leftRail.style.display = '';
-        if (divider)  divider.style.display  = '';
-        if (expandBtn) expandBtn.style.display = 'none';
-        this._v0216_collapsed = false;
-    }
-
-    // Ensure the right column is visible and sized correctly
-    var rightCol = this.querySelector('.v022-right-column');
-    if (rightCol) {
-        rightCol.style.minHeight = '0';
-        rightCol.style.overflow = '';
     }
 
     var btn = this.querySelector('#maximise-btn');
@@ -222,6 +231,36 @@ SendDownload.prototype._v0216_printCurrentMarkdown = function() {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+// FIX 5: Force active tab visual distinction after render
+// ═══════════════════════════════════════════════════════════════════════════
+
+var _v0215_renderTabs = SendDownload.prototype._v022_renderTabs;
+
+SendDownload.prototype._v022_renderTabs = function() {
+    _v0215_renderTabs.call(this);
+
+    // Force-apply active tab styling via inline styles as fallback
+    var tabBar = this.querySelector('#v022-tab-bar');
+    if (!tabBar) return;
+
+    tabBar.querySelectorAll('.v022-tab').forEach(function(el) {
+        if (el.classList.contains('v022-tab--active')) {
+            // Active: stronger background, teal text
+            if (!el.classList.contains('v0212-tab--share') && !el.classList.contains('v0212-tab--info')) {
+                el.style.background = 'rgba(78, 205, 196, 0.15)';
+                el.style.color = '#4ECDC4';
+                el.style.borderBottom = '2px solid #4ECDC4';
+            }
+        } else {
+            // Inactive: subdued
+            el.style.background = '';
+            el.style.color = '';
+            el.style.borderBottom = '';
+        }
+    });
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // STYLES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -230,27 +269,9 @@ SendDownload.prototype._v0216_printCurrentMarkdown = function() {
     var s = document.createElement('style');
     s.id = 'v0216-download-styles';
     s.textContent = '\
-        /* ── Collapse sidebar button ── */\
+        /* ── Collapse button: sits in tree-controls row, not overlapping ── */\
         .v0216-collapse-btn {\
-            position: absolute;\
-            top: 4px;\
-            right: 4px;\
-            z-index: 5;\
-            background: rgba(255,255,255,0.06);\
-            border: 1px solid rgba(78, 205, 196, 0.15);\
-            color: var(--color-text-secondary, #8892A0);\
-            cursor: pointer;\
-            padding: 3px 5px;\
-            border-radius: 3px;\
-            display: flex;\
-            align-items: center;\
-            justify-content: center;\
-            transition: background 0.15s, color 0.15s;\
-        }\
-        .v0216-collapse-btn:hover {\
-            background: rgba(78, 205, 196, 0.12);\
-            color: var(--accent, #4ECDC4);\
-            border-color: var(--accent, #4ECDC4);\
+            margin-right: auto;\
         }\
         \
         /* ── Expand sidebar button (shown when collapsed) ── */\
@@ -273,11 +294,6 @@ SendDownload.prototype._v0216_printCurrentMarkdown = function() {
             background: rgba(78, 205, 196, 0.18);\
         }\
         \
-        /* ── Make left rail position relative for absolute button ── */\
-        .zip-left-rail {\
-            position: relative;\
-        }\
-        \
         /* ── Fix maximise: ensure right column fills space ── */\
         .v022-right-column {\
             min-width: 0;\
@@ -292,6 +308,6 @@ SendDownload.prototype._v0216_printCurrentMarkdown = function() {
     document.head.appendChild(s);
 })();
 
-console.log('[send-download-v0216] Collapsible sidebar, markdown print in tabs, maximise fix');
+console.log('[send-download-v0216] Collapsible sidebar, maximise fix, markdown print, share fix, active tab styling');
 
 })();
