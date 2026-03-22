@@ -41,6 +41,9 @@ class SendDownload extends HTMLElement {
         // Route mode
         this._routeMode       = this._detectRouteMode();
 
+        // Stale response guard (v0.2.4)
+        this._loadGeneration  = 0;
+
         // Timing
         this._stageTimestamps = {};
 
@@ -127,16 +130,18 @@ class SendDownload extends HTMLElement {
     // ─── Data Loading ───────────────────────────────────────────────────────
 
     async _loadTransferInfo() {
+        var gen = ++this._loadGeneration;
         try {
             // Friendly token — resolve first, then load info
             if (this._friendlyToken) {
-                await this._resolveFriendlyToken();
+                await this._resolveFriendlyToken(gen);
                 return;
             }
 
             if (this.tokenName) {
                 try {
                     const result = await ApiClient.validateToken(this.tokenName);
+                    if (gen !== this._loadGeneration) return;  // stale
                     if (result.remaining !== undefined) this.tokenRemaining = result.remaining;
                     if (!result.success) {
                         this.state = 'error';
@@ -148,9 +153,11 @@ class SendDownload extends HTMLElement {
             }
 
             this.transferInfo = await ApiClient.getTransferInfo(this.transferId);
+            if (gen !== this._loadGeneration) return;  // stale
             this.state = this.transferInfo.status === 'completed' ? 'ready' : 'error';
             if (this.state === 'error') this.errorMessage = this.t('download.error.not_ready');
         } catch (e) {
+            if (gen !== this._loadGeneration) return;  // stale
             this.state = 'error';
             this.errorMessage = this.t('download.error.not_found');
         }
@@ -158,16 +165,19 @@ class SendDownload extends HTMLElement {
         if (this.state === 'ready' && this.hashKey) this.startDownload(this.hashKey);
     }
 
-    async _resolveFriendlyToken() {
+    async _resolveFriendlyToken(gen) {
         try {
             const resolved = await FriendlyCrypto.resolve(this._friendlyToken);
+            if (gen !== this._loadGeneration) return;  // stale
             this.transferId = resolved.transferId;
             this.hashKey    = resolved.key;
 
             this.transferInfo = await ApiClient.getTransferInfo(this.transferId);
+            if (gen !== this._loadGeneration) return;  // stale
             this.state = this.transferInfo.status === 'completed' ? 'ready' : 'error';
             if (this.state === 'error') this.errorMessage = this.t('download.error.not_ready');
         } catch (e) {
+            if (gen !== this._loadGeneration) return;  // stale
             this.state = 'error';
             this.errorMessage = this.t('download.error.not_found');
         }

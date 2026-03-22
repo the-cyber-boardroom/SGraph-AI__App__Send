@@ -33,6 +33,10 @@ class SendBrowse extends HTMLElement {
     disconnectedCallback() {
         this._objectUrls.forEach(u => URL.revokeObjectURL(u));
         this._objectUrls = [];
+        if (this._boundKeyHandler) {
+            document.removeEventListener('keydown', this._boundKeyHandler);
+            this._boundKeyHandler = null;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -52,6 +56,8 @@ class SendBrowse extends HTMLElement {
                     </div>
                     <div class="sb-header__right">
                         <button class="sb-action-btn" id="sb-copy-link">${SendIcons.LINK_SM} Copy Link</button>
+                        <button class="sb-action-btn" id="sb-email">${SendIcons.MAIL || '✉'}</button>
+                        <button class="sb-action-btn" id="sb-print">${SendIcons.PRINT || '🖨️'}</button>
                         <button class="sb-save-btn" id="sb-save-zip">${SendIcons.DOWNLOAD_SM} Save locally</button>
                         <a href="?id=${this.transferId}#gallery" class="sb-action-btn">Gallery view</a>
                     </div>
@@ -237,6 +243,43 @@ class SendBrowse extends HTMLElement {
         if (first) this._openFileTab(first.path);
     }
 
+    // ─── Keyboard Navigation (v0.2.1 parity) ────────────────────────────────
+
+    _setupKeyboard() {
+        this._boundKeyHandler = (e) => this._onKeydown(e);
+        document.addEventListener('keydown', this._boundKeyHandler);
+    }
+
+    _onKeydown(e) {
+        // Skip if typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        var treeEl = this._sgLayout ? this._sgLayout.getPanelElement('t-tree') : null;
+        if (!treeEl) return;
+
+        var files = Array.from(treeEl.querySelectorAll('.sb-tree__file'));
+        if (files.length === 0) return;
+
+        var active = treeEl.querySelector('.sb-tree__file--active');
+        var idx = active ? files.indexOf(active) : -1;
+
+        if (e.key === 'j' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            var next = Math.min(idx + 1, files.length - 1);
+            files[next].click();
+            files[next].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'k' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            var prev = Math.max(idx - 1, 0);
+            files[prev].click();
+            files[prev].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 's') {
+            // Save current file
+            var saveBtn = this.querySelector('.sb-file__save');
+            if (saveBtn) saveBtn.click();
+        }
+    }
+
     // ─── Open File in Tab ───────────────────────────────────────────────────
 
     async _openFileTab(path) {
@@ -390,6 +433,23 @@ class SendBrowse extends HTMLElement {
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => { copyBtn.innerHTML = `${SendIcons.LINK_SM} Copy Link`; }, 2000);
             } catch (_) {}
+        });
+
+        const printBtn = this.querySelector('#sb-print');
+        if (printBtn) printBtn.addEventListener('click', () => {
+            // Print the current preview content
+            var preview = this.querySelector('.sb-preview') || this.querySelector('#sb-layout');
+            if (typeof SgPrint !== 'undefined' && SgPrint.print) {
+                SgPrint.print(preview ? preview.innerHTML : '', this.fileName || 'File');
+            } else {
+                window.print();
+            }
+        });
+
+        const emailBtn = this.querySelector('#sb-email');
+        if (emailBtn) emailBtn.addEventListener('click', () => {
+            var url = this.downloadUrl || window.location.href;
+            window.location.href = 'mailto:?subject=Shared files via SG/Send&body=' + encodeURIComponent(url);
         });
     }
 

@@ -31,6 +31,7 @@ class SendViewer extends HTMLElement {
                 <div class="sv-header">
                     <span class="sv-header__name">${SendHelpers.escapeHtml(this.fileName || 'File')}</span>
                     <span class="sv-header__size">${SendHelpers.formatBytes(this.fileBytes ? this.fileBytes.byteLength : 0)}</span>
+                    <button class="sv-save-btn" id="sv-print">${SendIcons.PRINT || '🖨️'} Print</button>
                     <button class="sv-save-btn" id="sv-save">${SendIcons.DOWNLOAD} Save locally</button>
                 </div>
                 <div class="sv-content" id="sv-content"></div>
@@ -123,6 +124,31 @@ class SendViewer extends HTMLElement {
                     setTimeout(() => { copyBtn.textContent = 'Copy to clipboard'; }, 2000);
                 } catch (_) {}
             });
+        }
+
+        const printBtn = this.querySelector('#sv-print');
+        if (printBtn) {
+            printBtn.addEventListener('click', () => this._print());
+        }
+    }
+
+    _print() {
+        var content = this.querySelector('#sv-content');
+        if (!content) return;
+
+        // Use sg-print if available (clean A4 output), otherwise window.print
+        if (typeof SgPrint !== 'undefined' && SgPrint.print) {
+            SgPrint.print(content.innerHTML, this.fileName || 'File');
+        } else {
+            var win = window.open('', '_blank');
+            if (!win) return;
+            win.document.write('<html><head><title>' + SendHelpers.escapeHtml(this.fileName || 'Print') + '</title>');
+            win.document.write('<style>body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; } img { max-width: 100%; } pre { white-space: pre-wrap; }</style>');
+            win.document.write('</head><body>');
+            win.document.write(content.innerHTML);
+            win.document.write('</body></html>');
+            win.document.close();
+            win.print();
         }
     }
 
