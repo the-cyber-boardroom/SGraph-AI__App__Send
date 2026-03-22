@@ -479,3 +479,4 @@ SendAccessGate.prototype.updateTokenBar = function(bar, remaining) {
         }\
     ';
     document.head.appendChild(style);
+})();

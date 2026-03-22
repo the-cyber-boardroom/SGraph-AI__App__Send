@@ -1775,6 +1775,7 @@ SendUpload.prototype.resetForNew = function() {
         }
     `;
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.4 — Rich file icons, thumbnails, paste
@@ -2187,6 +2188,7 @@ SendUpload.prototype.disconnectedCallback = function() {
         }
     `;
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.5 — Multi-file drop, smart skip
@@ -3604,6 +3606,7 @@ SendUpload.prototype.resetForNew = function() {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.7 — Next button, trust carousel
@@ -3934,6 +3937,7 @@ SendUpload.prototype._v027_stopCarousel = function() {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.8 — Six-step wizard, inline Next, default selection
@@ -4635,6 +4639,7 @@ SendUpload.prototype._v026_renderConfirm = function() {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.10 — Gallery first, clickable test files, processing fix
@@ -4958,6 +4963,7 @@ if (typeof SendTestFiles !== 'undefined') {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.11 — Upload gallery preview in Step 2
@@ -5193,6 +5199,7 @@ SendUpload.prototype.resetForNew = function() {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.12 — Rich preview Phase 1: image thumbnails
@@ -5774,6 +5781,7 @@ SendUpload.prototype.resetForNew = function() {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.13 — Phase 2: PDF, markdown, video thumbnails
@@ -6651,6 +6659,7 @@ SendUpload.prototype._v0213_updateProgress = function(label, current, total) {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // NOTE: Gallery delivery card language ("Gallery mode") and dot-file filtering
 // are now handled at the source in v0.2.3 (detectDeliveryOptions) and v0.2.12
@@ -6960,6 +6969,7 @@ SendUpload.prototype._v026_renderConfirm = function() {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // ─── Make step indicator completed steps look clickable ──────────────────
 // We patch the _render method of SendStepIndicator to add :hover styles
@@ -6980,6 +6990,7 @@ SendUpload.prototype._v026_renderConfirm = function() {
         }
     };
 
+})();
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.15 — All 3 delivery options, smart defaults, taller carousel
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -7103,6 +7114,7 @@ SendUpload.prototype._v023_advanceToDelivery = function() {
         }\
     ';
     document.head.appendChild(style);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // v0.2.16 — Upload step resets file selection
