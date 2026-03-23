@@ -39,19 +39,21 @@
 
 .upload-header-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
-    gap: var(--space-5, 1.25rem);
+    gap: var(--space-3, 0.75rem) var(--space-5, 1.25rem);
     margin-bottom: var(--space-5, 1.25rem);
     min-height: 70px;
 }
 
 .upload-header-row__steps {
-    flex: 1;
+    flex: 1 1 100%;
     min-width: 0;
 }
 
 .upload-header-row__action {
     flex-shrink: 0;
+    margin-left: auto;
 }
 
 /* ── Inline Next button (v0.2.8) ─────────────────────────────────────────── */

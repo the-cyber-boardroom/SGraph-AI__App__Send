@@ -405,14 +405,20 @@ class SendUpload extends HTMLElement {
         var result = UploadFolder.buildFolderScan(files);
         this._folderName = result.folderName;
         this._folderScan = result.scan;
-        this.state = 'folder-options';
+        this._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
+        this.selectedFile = null;
+        // Smart skip: go straight to delivery with defaults (v0.2.5+ pattern)
+        this._advanceToDelivery();
     }
 
     async _onFolderDrop(directoryEntry) {
         var result = await UploadFolder.scanDirectoryEntry(directoryEntry);
         this._folderName = result.folderName;
         this._folderScan = result.scan;
-        this.state = 'folder-options';
+        this._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
+        this.selectedFile = null;
+        // Smart skip: go straight to delivery with defaults (v0.2.5+ pattern)
+        this._advanceToDelivery();
     }
 
     _setFile(file) {

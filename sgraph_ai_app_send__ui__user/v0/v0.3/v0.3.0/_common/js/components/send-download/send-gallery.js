@@ -55,7 +55,7 @@ class SendGallery extends SendComponent {
     // ═══════════════════════════════════════════════════════════════════════════
 
     async _build() {
-        const files = this.zipTree.filter(e => !e.dir);
+        const files = this.zipTree.filter(e => !e.dir && !e.path.startsWith('_gallery.'));
         this._entries = files;
 
         this.innerHTML = `

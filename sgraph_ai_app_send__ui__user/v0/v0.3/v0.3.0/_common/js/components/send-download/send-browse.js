@@ -144,7 +144,7 @@ class SendBrowse extends SendComponent {
 
     _buildFolderTree() {
         const root = { name: '', children: {}, files: [] };
-        const files = this.zipTree.filter(e => !e.dir);
+        const files = this.zipTree.filter(e => !e.dir && !e.path.startsWith('_gallery.'));
 
         for (const file of files) {
             const parts = file.path.split('/');
@@ -259,7 +259,7 @@ class SendBrowse extends SendComponent {
 
         el.style.cssText = 'overflow-y: auto; height: 100%; padding: 1.5rem;';
 
-        const files = this.zipTree.filter(e => !e.dir);
+        const files = this.zipTree.filter(e => !e.dir && !e.path.startsWith('_gallery.'));
         const url = this.downloadUrl || window.location.href;
 
         el.innerHTML = `
@@ -305,8 +305,8 @@ class SendBrowse extends SendComponent {
 
         el.style.cssText = 'overflow-y: auto; height: 100%; padding: 1.5rem;';
 
-        const files = this.zipTree.filter(e => !e.dir);
-        const folders = this.zipTree.filter(e => e.dir);
+        const files = this.zipTree.filter(e => !e.dir && !e.path.startsWith('_gallery.'));
+        const folders = this.zipTree.filter(e => e.dir && !e.path.startsWith('_gallery.'));
 
         // Count by type
         const typeCounts = {};
