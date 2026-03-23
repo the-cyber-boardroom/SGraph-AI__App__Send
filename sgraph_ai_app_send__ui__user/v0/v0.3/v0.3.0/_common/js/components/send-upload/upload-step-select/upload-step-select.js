@@ -26,10 +26,14 @@ class UploadStepSelect extends HTMLElement {
         this._maxFileSize  = 5 * 1024 * 1024;
         this._thumbnailUrl = null;
 
+        // Drag counter to prevent flicker when dragging over child elements
+        this._dragCounter = 0;
+
         // Bound handlers (for cleanup)
-        this._boundOnDragOver  = this._onDragOver.bind(this);
-        this._boundOnDragLeave = this._onDragLeave.bind(this);
-        this._boundOnDrop      = this._onDrop.bind(this);
+        this._boundOnDragOver   = this._onDragOver.bind(this);
+        this._boundOnDragEnter  = this._onDragEnter.bind(this);
+        this._boundOnDragLeave  = this._onDragLeave.bind(this);
+        this._boundOnDrop       = this._onDrop.bind(this);
         this._boundOnPaste     = this._onPaste.bind(this);
     }
 
@@ -317,6 +321,7 @@ class UploadStepSelect extends HTMLElement {
         const dropZone = sr.querySelector('#drop-zone');
         if (dropZone) {
             dropZone.addEventListener('dragover',  this._boundOnDragOver);
+            dropZone.addEventListener('dragenter', this._boundOnDragEnter);
             dropZone.addEventListener('dragleave', this._boundOnDragLeave);
             dropZone.addEventListener('drop',      this._boundOnDrop);
 
@@ -450,13 +455,21 @@ class UploadStepSelect extends HTMLElement {
     _onDragOver(e) {
         e.preventDefault();
         e.stopPropagation();
-        const dropZone = this.shadowRoot.querySelector('#drop-zone');
-        if (dropZone) {
-            dropZone.classList.add('dragover');
-            const label = dropZone.querySelector('.drop-zone__label');
-            if (label && !label._originalText) {
-                label._originalText = label.textContent;
-                label.textContent = 'Release to upload';
+    }
+
+    _onDragEnter(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._dragCounter++;
+        if (this._dragCounter === 1) {
+            const dropZone = this.shadowRoot.querySelector('#drop-zone');
+            if (dropZone) {
+                dropZone.classList.add('dragover');
+                const label = dropZone.querySelector('.drop-zone__label');
+                if (label && !label._originalText) {
+                    label._originalText = label.textContent;
+                    label.textContent = 'Release to upload';
+                }
             }
         }
     }
@@ -464,13 +477,17 @@ class UploadStepSelect extends HTMLElement {
     _onDragLeave(e) {
         e.preventDefault();
         e.stopPropagation();
-        const dropZone = this.shadowRoot.querySelector('#drop-zone');
-        if (dropZone) {
-            dropZone.classList.remove('dragover');
-            const label = dropZone.querySelector('.drop-zone__label');
-            if (label && label._originalText) {
-                label.textContent = label._originalText;
-                label._originalText = null;
+        this._dragCounter--;
+        if (this._dragCounter <= 0) {
+            this._dragCounter = 0;
+            const dropZone = this.shadowRoot.querySelector('#drop-zone');
+            if (dropZone) {
+                dropZone.classList.remove('dragover');
+                const label = dropZone.querySelector('.drop-zone__label');
+                if (label && label._originalText) {
+                    label.textContent = label._originalText;
+                    label._originalText = null;
+                }
             }
         }
     }
@@ -478,6 +495,7 @@ class UploadStepSelect extends HTMLElement {
     _onDrop(e) {
         e.preventDefault();
         e.stopPropagation();
+        this._dragCounter = 0;
         const dropZone = this.shadowRoot.querySelector('#drop-zone');
         if (dropZone) {
             dropZone.classList.remove('dragover');

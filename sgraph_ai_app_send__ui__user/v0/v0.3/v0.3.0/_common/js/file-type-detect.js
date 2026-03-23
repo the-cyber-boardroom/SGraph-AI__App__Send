@@ -28,6 +28,7 @@ const FileTypeDetect = {
         '.aac': 'audio', '.m4a': 'audio', '.wma': 'audio',
         '.mp4': 'video', '.webm': 'video', '.ogv': 'video', '.mov': 'video',
         '.avi': 'video', '.mkv': 'video',
+        '.txt': 'text', '.log': 'text', '.csv': 'text',
         '.zip': 'zip',
         '.js': 'code', '.mjs': 'code', '.cjs': 'code', '.ts': 'code',
         '.tsx': 'code', '.jsx': 'code', '.py': 'code', '.json': 'code',
