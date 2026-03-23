@@ -141,6 +141,30 @@ class SendGallery extends SendComponent {
                 } catch (_) {
                     imgDiv.innerHTML += SendIcons.TYPE_ICONS.image;
                 }
+            } else if (type === 'pdf' && typeof UploadThumbnails !== 'undefined') {
+                try {
+                    const bytes = await entry.entry.async('arraybuffer');
+                    const file = new File([bytes], entry.name, { type: 'application/pdf' });
+                    const thumb = await UploadThumbnails.generatePdfThumbnail(file);
+                    const blob = new Blob([thumb.buffer], { type: thumb.format });
+                    const url = URL.createObjectURL(blob);
+                    this._thumbUrls.push(url);
+                    imgDiv.style.backgroundImage = `url(${url})`;
+                } catch (_) {
+                    imgDiv.innerHTML += (SendIcons.TYPE_ICONS.pdf || SendIcons.TYPE_ICONS.other);
+                }
+            } else if (type === 'markdown' && typeof UploadThumbnails !== 'undefined') {
+                try {
+                    const bytes = await entry.entry.async('arraybuffer');
+                    const file = new File([bytes], entry.name, { type: 'text/markdown' });
+                    const thumb = await UploadThumbnails.generateMarkdownThumbnail(file);
+                    const blob = new Blob([thumb.buffer], { type: thumb.format });
+                    const url = URL.createObjectURL(blob);
+                    this._thumbUrls.push(url);
+                    imgDiv.style.backgroundImage = `url(${url})`;
+                } catch (_) {
+                    imgDiv.innerHTML += (SendIcons.TYPE_ICONS.markdown || SendIcons.TYPE_ICONS.other);
+                }
             } else {
                 imgDiv.innerHTML += (SendIcons.TYPE_ICONS[type] || SendIcons.TYPE_ICONS.other);
             }
