@@ -28,14 +28,14 @@
 
     <send-header></send-header>
 
-    <main>
-        <send-access-gate>
-            <send-upload></send-upload>
+    <main data-testid="main-content">
+        <send-access-gate data-testid="access-gate">
+            <send-upload data-testid="upload-component"></send-upload>
         </send-access-gate>
 
-        <send-test-files></send-test-files>
+        <send-test-files data-testid="test-files"></send-test-files>
 
-        <p class="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
+        <p class="disclaimer" data-testid="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
     </main>
 
     <send-footer></send-footer>
@@ -113,6 +113,7 @@
     <!-- 5. Init -->
     <script>
         I18n.init();
+        document.body.setAttribute('data-ready', 'true');
     </script>
 
 </body>

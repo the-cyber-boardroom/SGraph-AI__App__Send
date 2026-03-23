@@ -620,8 +620,8 @@ class SendDownload extends HTMLElement {
                     .sf-preview { border-left: none; border-top: 1px solid rgba(255,255,255,0.08); }
                 }
             </style>
-            <div class="sf-layout">
-                <div class="sf-details">
+            <div class="sf-layout" data-testid="download-layout">
+                <div class="sf-details" data-testid="download-details">
                     <!-- File info -->
                     <div>
                         <h3 class="sf-filename">${this._esc(filename)}</h3>
@@ -636,7 +636,7 @@ class SendDownload extends HTMLElement {
                     </div>
 
                     <!-- Actions -->
-                    <button class="btn btn-primary" id="sf-save" style="width: 100%;">
+                    <button class="btn btn-primary" id="sf-save" data-testid="save-locally-btn" style="width: 100%;">
                         ${SendIcons.DOWNLOAD} Save Locally
                     </button>
                     <div style="display: flex; gap: 0.5rem;">
@@ -663,7 +663,7 @@ class SendDownload extends HTMLElement {
                     </div>` : ''}
 
                     <!-- Transparency panel -->
-                    <send-transparency id="transparency-panel"></send-transparency>
+                    <send-transparency id="transparency-panel" data-testid="transparency-panel"></send-transparency>
 
                     <!-- Timing -->
                     ${this._renderTimings()}
@@ -681,7 +681,7 @@ class SendDownload extends HTMLElement {
                 <div class="sf-divider" id="sf-divider"></div>
 
                 <!-- Content preview -->
-                <div class="sf-preview" id="sf-preview"></div>
+                <div class="sf-preview" id="sf-preview" data-testid="download-preview"></div>
             </div>
         `;
 

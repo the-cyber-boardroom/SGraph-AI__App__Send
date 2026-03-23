@@ -248,8 +248,8 @@ class UploadStepDone extends HTMLElement {
         html += '<div class="share-value">' +
             '<label class="share-label">Simple token</label>' +
             '<div class="share-row">' +
-                '<div class="share-box share-box--friendly" id="simple-token">' + this._esc(friendlyKey) + '</div>' +
-                '<button class="copy-btn" data-copy="simple-token">Copy</button>' +
+                '<div class="share-box share-box--friendly" id="simple-token" data-testid="share-simple-token">' + this._esc(friendlyKey) + '</div>' +
+                '<button class="copy-btn" data-copy="simple-token" data-testid="copy-simple-token">Copy</button>' +
             '</div>' +
             '<div class="share-guidance">This token derives both the transfer ID and decryption key</div>' +
         '</div>';
@@ -258,8 +258,8 @@ class UploadStepDone extends HTMLElement {
         html += '<div class="share-value">' +
             '<label class="share-label">Full link</label>' +
             '<div class="share-row">' +
-                '<div class="share-box" id="full-link">' + this._esc(tokenLink) + '</div>' +
-                '<button class="copy-btn" data-copy="full-link">Copy</button>' +
+                '<div class="share-box" id="full-link" data-testid="share-full-link">' + this._esc(tokenLink) + '</div>' +
+                '<button class="copy-btn" data-copy="full-link" data-testid="copy-full-link">Copy</button>' +
             '</div>' +
             '<div class="share-guidance">Direct link &mdash; anyone with this can decrypt the file</div>' +
         '</div>';

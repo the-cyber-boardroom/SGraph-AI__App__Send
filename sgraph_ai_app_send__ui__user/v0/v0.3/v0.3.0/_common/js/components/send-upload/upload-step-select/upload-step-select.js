@@ -117,8 +117,8 @@ class UploadStepSelect extends HTMLElement {
 
         const modeToggle = `
             <div class="mode-toggle">
-                <button class="mode-toggle__btn ${isFile ? 'mode-toggle__btn--active' : ''}" id="mode-file">File</button>
-                <button class="mode-toggle__btn ${isText ? 'mode-toggle__btn--active' : ''}" id="mode-text">Text</button>
+                <button class="mode-toggle__btn ${isFile ? 'mode-toggle__btn--active' : ''}" id="mode-file" data-testid="mode-file">File</button>
+                <button class="mode-toggle__btn ${isText ? 'mode-toggle__btn--active' : ''}" id="mode-text" data-testid="mode-text">Text</button>
             </div>
         `;
 
@@ -126,12 +126,12 @@ class UploadStepSelect extends HTMLElement {
             this._container.innerHTML = `
                 ${modeToggle}
                 <div class="text-input-area">
-                    <textarea class="text-input" id="text-input"
+                    <textarea class="text-input" id="text-input" data-testid="text-input"
                               placeholder="Type or paste text to encrypt and share..."
                               spellcheck="true"></textarea>
                     <div class="text-input-footer">
                         <span class="text-input-count" id="text-char-count">0 characters</span>
-                        <button class="btn btn-primary btn-sm" id="text-send-btn">Encrypt & Send</button>
+                        <button class="btn btn-primary btn-sm" id="text-send-btn" data-testid="text-send-btn">Encrypt & Send</button>
                     </div>
                     <div class="drop-zone__hint" style="margin-top: var(--space-2, 0.5rem); text-align: center;">
                         Your text is encrypted in your browser before upload
@@ -145,12 +145,12 @@ class UploadStepSelect extends HTMLElement {
         } else {
             this._container.innerHTML = `
                 ${modeToggle}
-                <div class="drop-zone" id="drop-zone">
+                <div class="drop-zone" id="drop-zone" data-testid="drop-zone">
                     <div class="drop-zone__label">Drop files or a folder</div>
                     <div class="drop-zone__paste-hint">or paste from clipboard (Ctrl+V)</div>
                     <div class="browse-buttons">
-                        <button class="browse-btn" id="browse-file-btn">Browse files</button>
-                        <button class="browse-btn" id="browse-folder-btn">Browse folder</button>
+                        <button class="browse-btn" id="browse-file-btn" data-testid="browse-file-btn">Browse files</button>
+                        <button class="browse-btn" id="browse-folder-btn" data-testid="browse-folder-btn">Browse folder</button>
                     </div>
                     <div class="drop-zone__hint" style="margin-top: var(--space-3, 0.75rem);">
                         Your files are encrypted in your browser before upload
@@ -158,8 +158,8 @@ class UploadStepSelect extends HTMLElement {
                     <div class="drop-zone__hint" style="margin-top: var(--space-1, 0.25rem); font-size: var(--text-small, 0.75rem); opacity: 0.7;">
                         Maximum upload: ${this._esc(maxSize)}
                     </div>
-                    <input type="file" id="file-input" style="display: none;" multiple>
-                    <input type="file" id="folder-input" style="display: none;" webkitdirectory>
+                    <input type="file" id="file-input" data-testid="file-input" style="display: none;" multiple>
+                    <input type="file" id="folder-input" data-testid="folder-input" style="display: none;" webkitdirectory>
                 </div>
                 <div class="trust-badge">
                     <span class="trust-badge__icon">&#128274;</span>

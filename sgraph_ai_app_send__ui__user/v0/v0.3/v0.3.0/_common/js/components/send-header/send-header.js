@@ -46,8 +46,8 @@ class SendHeader extends SendComponent {
                     </a>
                     <span class="sg-header__tagline">${this.t('app.tagline')}</span>
                 </div>
-                <nav class="sg-header__nav">
-                    <a href="${sgraphUrl}" target="_blank" rel="noopener">sgraph.ai</a>
+                <nav class="sg-header__nav" data-testid="header-nav">
+                    <a href="${sgraphUrl}" target="_blank" rel="noopener" data-testid="nav-sgraph-link">sgraph.ai</a>
                     <send-locale></send-locale>
                 </nav>
             </header>

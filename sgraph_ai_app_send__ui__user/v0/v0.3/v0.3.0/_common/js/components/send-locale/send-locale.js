@@ -49,10 +49,10 @@ class SendLocale extends SendComponent {
         this.innerHTML = `
             <div class="locale-dropdown" style="display: inline-flex; align-items: center; gap: 0.5rem;">
                 ${englishLink}
-                <button type="button" class="locale-dropdown__trigger" aria-label="Select language">
+                <button type="button" class="locale-dropdown__trigger" data-testid="locale-trigger" aria-label="Select language">
                     ${current.flag} ${current.code.toUpperCase()} <svg viewBox="0 0 12 12" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5l3 3 3-3"/></svg>
                 </button>
-                <div class="locale-dropdown__menu">
+                <div class="locale-dropdown__menu" data-testid="locale-menu">
                     ${items}
                 </div>
             </div>

@@ -79,18 +79,20 @@ class SendAccessGate extends HTMLElement {
                     <div style="position: relative; flex: 1;">
                         <input type="password"
                                id="access-token-input"
+                               data-testid="access-gate-input"
                                class="input"
                                style="width: 100%; padding-right: 2.5rem;"
                                placeholder="${this.t('access_gate.placeholder')}"
                                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                         <button type="button" id="toggle-token-vis"
+                                data-testid="access-gate-visibility-toggle"
                                 title="${this.t('access_gate.show_token')}"
                                 style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; font-size: 1rem; color: var(--color-text-secondary); line-height: 1;">&#128065;</button>
                     </div>
-                    <button class="btn btn-primary" id="access-token-submit">${this.t('access_gate.button')}</button>
+                    <button class="btn btn-primary" id="access-token-submit" data-testid="access-gate-submit">${this.t('access_gate.button')}</button>
                 </div>
                 <p style="font-size: var(--text-small, 0.75rem); color: var(--color-text-secondary); margin-top: 0.5rem;">${this.t('access_gate.browser_scope_hint')}</p>
-                <div id="access-token-error" class="status status--error hidden" style="margin-top: 0.75rem;">
+                <div id="access-token-error" data-testid="access-gate-error" class="status status--error hidden" style="margin-top: 0.75rem;">
                     ${this.t('access_gate.invalid')}
                 </div>
             </div>
@@ -176,6 +178,7 @@ class SendAccessGate extends HTMLElement {
         // Token status bar
         const bar = document.createElement('div');
         bar.id = 'token-status-bar';
+        bar.setAttribute('data-testid', 'token-status-bar');
         bar.style.cssText = 'margin-top: 1rem; margin-bottom: 1rem; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm); background: var(--bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius);';
         bar.innerHTML = '<span style="color: var(--color-text-secondary);">...</span>';
 
@@ -306,7 +309,7 @@ SendAccessGate.prototype.updateTokenBar = function(bar, remaining) {
                 '<div class="v026-token-bar__share-note">' +
                     '&#128100; Share your access token with friends and colleagues so they can send files too' +
                 '</div>' +
-                '<button class="v026-token-bar__change-btn" id="v026-change-token">' +
+                '<button class="v026-token-bar__change-btn" id="v026-change-token" data-testid="token-change-btn">' +
                     this.t('access_gate.change_token') +
                 '</button>' +
             '</div>' +
