@@ -399,12 +399,12 @@ class SendBrowse extends SendComponent {
         const entry = this.zipTree.find(e => e.path === path && !e.dir);
         if (!entry) return;
 
-        // If tab already open for this path, focus it
+        // If tab already open for this path, focus it via tab-bar click
         const existingId = this._openTabs.get(path);
         if (existingId) {
-            const existingEl = this._sgLayout.getPanelElement(existingId);
-            if (existingEl) {
-                try { this._sgLayout.focusPanel(existingId); } catch (_) {}
+            const tabEl = this._sgLayout.shadowRoot?.querySelector(`.sgl-tab[data-tab-id="${existingId}"]`);
+            if (tabEl) {
+                tabEl.click();
                 return;
             }
             // Tab was removed externally — clean up stale entry
