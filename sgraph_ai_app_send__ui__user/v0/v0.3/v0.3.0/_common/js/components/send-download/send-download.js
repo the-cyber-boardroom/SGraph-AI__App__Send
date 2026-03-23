@@ -272,7 +272,7 @@ class SendDownload extends HTMLElement {
                     zip.forEach((path, entry) => {
                         // Filter macOS artifacts, preview/gallery metadata, and dotfiles
                         if (path.indexOf('__MACOSX') !== -1)                      return;
-                        if (path.startsWith('_preview') || path.startsWith('_gallery')) return;
+                        if (path.startsWith('_preview'))                             return;
                         if (path.startsWith('.'))                                  return;
                         const name = entry.name;
                         if (name === '.DS_Store' || (name.length > 2 && name.startsWith('._'))) return;

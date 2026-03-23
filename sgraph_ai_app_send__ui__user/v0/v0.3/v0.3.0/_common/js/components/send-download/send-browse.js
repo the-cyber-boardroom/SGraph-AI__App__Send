@@ -28,6 +28,7 @@ class SendBrowse extends SendComponent {
         this._sgLayout    = null;
         this._tabCounter  = 0;
         this._objectUrls  = [];
+        this._openTabs    = new Map();   // path → actual tab ID from sg-layout
     }
 
     async connectedCallback() {
@@ -144,7 +145,7 @@ class SendBrowse extends SendComponent {
 
     _buildFolderTree() {
         const root = { name: '', children: {}, files: [] };
-        const files = this.zipTree.filter(e => !e.dir && !e.path.startsWith('_gallery.'));
+        const files = this.zipTree.filter(e => !e.dir);
 
         for (const file of files) {
             const parts = file.path.split('/');
@@ -398,14 +399,16 @@ class SendBrowse extends SendComponent {
         const entry = this.zipTree.find(e => e.path === path && !e.dir);
         if (!entry) return;
 
-        // Sanitised tab ID
-        const tabId = 't-file-' + path.replace(/[^a-zA-Z0-9]/g, '_');
-
-        // If tab exists, focus it
-        const existing = this._sgLayout.getPanelElement(tabId);
-        if (existing) {
-            try { this._sgLayout.focusPanel(tabId); } catch (_) {}
-            return;
+        // If tab already open for this path, focus it
+        const existingId = this._openTabs.get(path);
+        if (existingId) {
+            const existingEl = this._sgLayout.getPanelElement(existingId);
+            if (existingEl) {
+                try { this._sgLayout.focusPanel(existingId); } catch (_) {}
+                return;
+            }
+            // Tab was removed externally — clean up stale entry
+            this._openTabs.delete(path);
         }
 
         // Ensure preview stack exists
@@ -417,6 +420,7 @@ class SendBrowse extends SendComponent {
         }, true);
 
         if (!newId) return;
+        this._openTabs.set(path, newId);
 
         requestAnimationFrame(async () => {
             const el = this._sgLayout.getPanelElement(newId);
