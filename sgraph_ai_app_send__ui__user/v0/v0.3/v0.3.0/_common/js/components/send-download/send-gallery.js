@@ -95,11 +95,33 @@ class SendGallery extends SendComponent {
             ${this._buildLightbox()}
         `;
 
+        this._thumbMap = await this._loadManifest();
         this._setupListeners();
         await this._loadThumbnails();
     }
 
+    // ─── Manifest Loading ───────────────────────────────────────────────────
+
+    async _loadManifest() {
+        const thumbMap = {};  // file path → thumbnail zip path
+        const manifestEntry = this.zipTree.find(e => e.path.startsWith('_gallery.') && e.path.endsWith('/_manifest.json'));
+        if (!manifestEntry) return thumbMap;
+
+        try {
+            const json = await manifestEntry.entry.async('string');
+            const manifest = JSON.parse(json);
+            for (const file of (manifest.files || [])) {
+                if (file.thumbnail && file.path) {
+                    thumbMap[file.path] = file.thumbnail;
+                }
+            }
+        } catch (_) { /* no manifest or bad JSON — no thumbnails */ }
+        return thumbMap;
+    }
+
     // ─── Thumbnail Loading ──────────────────────────────────────────────────
+    // Thumbnails are only created at upload time and stored in the zip.
+    // If no pre-generated thumbnail exists, show a type icon fallback.
 
     async _loadThumbnails() {
         const grid = this.$('#sg-grid');
@@ -125,14 +147,27 @@ class SendGallery extends SendComponent {
             badge.style.background = SendIcons.BADGE_COLORS[type] || 'rgba(0,0,0,0.6)';
             imgDiv.appendChild(badge);
 
-            if (type === 'image') {
-                const previewPath = this._findPreview(entry.path);
-                const thumbEntry = previewPath
-                    ? this.zipTree.find(e => e.path === previewPath)
-                    : entry;
+            // Look up pre-generated thumbnail from the manifest
+            const thumbPath = this._thumbMap[entry.path];
+            const thumbZipEntry = thumbPath
+                ? this.zipTree.find(e => e.path === thumbPath)
+                : null;
 
+            if (thumbZipEntry) {
+                // Use pre-generated thumbnail from the zip
                 try {
-                    const bytes = await (thumbEntry || entry).entry.async('arraybuffer');
+                    const bytes = await thumbZipEntry.entry.async('arraybuffer');
+                    const blob = new Blob([bytes], { type: 'image/jpeg' });
+                    const url = URL.createObjectURL(blob);
+                    this._thumbUrls.push(url);
+                    imgDiv.style.backgroundImage = `url(${url})`;
+                } catch (_) {
+                    imgDiv.innerHTML += (SendIcons.TYPE_ICONS[type] || SendIcons.TYPE_ICONS.other);
+                }
+            } else if (type === 'image') {
+                // Images can render directly as their own thumbnail
+                try {
+                    const bytes = await entry.entry.async('arraybuffer');
                     const mime = FileTypeDetect.getImageMime(entry.name) || 'image/jpeg';
                     const blob = new Blob([bytes], { type: mime });
                     const url = URL.createObjectURL(blob);
@@ -141,31 +176,8 @@ class SendGallery extends SendComponent {
                 } catch (_) {
                     imgDiv.innerHTML += SendIcons.TYPE_ICONS.image;
                 }
-            } else if (type === 'pdf' && typeof UploadThumbnails !== 'undefined') {
-                try {
-                    const bytes = await entry.entry.async('arraybuffer');
-                    const file = new File([bytes], entry.name, { type: 'application/pdf' });
-                    const thumb = await UploadThumbnails.generatePdfThumbnail(file);
-                    const blob = new Blob([thumb.buffer], { type: thumb.format });
-                    const url = URL.createObjectURL(blob);
-                    this._thumbUrls.push(url);
-                    imgDiv.style.backgroundImage = `url(${url})`;
-                } catch (_) {
-                    imgDiv.innerHTML += (SendIcons.TYPE_ICONS.pdf || SendIcons.TYPE_ICONS.other);
-                }
-            } else if (type === 'markdown' && typeof UploadThumbnails !== 'undefined') {
-                try {
-                    const bytes = await entry.entry.async('arraybuffer');
-                    const file = new File([bytes], entry.name, { type: 'text/markdown' });
-                    const thumb = await UploadThumbnails.generateMarkdownThumbnail(file);
-                    const blob = new Blob([thumb.buffer], { type: thumb.format });
-                    const url = URL.createObjectURL(blob);
-                    this._thumbUrls.push(url);
-                    imgDiv.style.backgroundImage = `url(${url})`;
-                } catch (_) {
-                    imgDiv.innerHTML += (SendIcons.TYPE_ICONS.markdown || SendIcons.TYPE_ICONS.other);
-                }
             } else {
+                // No pre-generated thumbnail — show type icon
                 imgDiv.innerHTML += (SendIcons.TYPE_ICONS[type] || SendIcons.TYPE_ICONS.other);
             }
 
@@ -179,19 +191,6 @@ class SendGallery extends SendComponent {
 
             card.addEventListener('click', () => this._openLightbox(i));
         }
-    }
-
-    _findPreview(path) {
-        const name = path.split('/').pop();
-        const candidates = [
-            `_preview/${name}`,
-            `_preview/${name.replace(/\.[^.]+$/, '.webp')}`,
-            `_preview/${name.replace(/\.[^.]+$/, '.jpg')}`,
-        ];
-        for (const c of candidates) {
-            if (this.zipTree.find(e => e.path === c)) return c;
-        }
-        return null;
     }
 
     // ─── Lightbox ───────────────────────────────────────────────────────────
