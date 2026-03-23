@@ -480,8 +480,10 @@ class SendUpload extends HTMLElement {
             this._stageTimestamps = {};
 
             // Single file + gallery delivery → wrap in zip with thumbnails (v0.2.17)
+            // Skip wrapping if the file is already a zip — treat it as a regular file
             var delivery = this._selectedDelivery || 'download';
-            if (delivery === 'gallery' && !this._folderScan && this.selectedFile) {
+            var fileExt  = (this.selectedFile && this.selectedFile.name || '').split('.').pop().toLowerCase();
+            if (delivery === 'gallery' && !this._folderScan && this.selectedFile && fileExt !== 'zip') {
                 var file = this.selectedFile;
                 this._folderScan = {
                     entries:   [{ name: file.name, path: file.name, isDir: false, file: file }],

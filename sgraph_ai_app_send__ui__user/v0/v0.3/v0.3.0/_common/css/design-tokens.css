@@ -119,7 +119,7 @@ a:hover { color: var(--accent-hover); }
 /* ─── Page Layout ──────────────────────────────────────────────────────── */
 
 main {
-    max-width: 960px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 0 var(--space-6) var(--space-6);
 }
