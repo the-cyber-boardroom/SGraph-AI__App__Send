@@ -5,8 +5,10 @@
 
 .steps {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2, 0.5rem);
+    row-gap: var(--space-1, 0.25rem);
 }
 
 .step {
@@ -59,10 +61,10 @@
 }
 
 .line {
-    flex: 1;
+    flex: 1 1 20px;
     height: 2px;
     background: var(--color-border, rgba(78, 205, 196, 0.15));
-    min-width: 20px;
+    min-width: 12px;
 }
 
 .line--completed {
