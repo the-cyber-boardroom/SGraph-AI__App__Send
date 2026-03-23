@@ -26,8 +26,8 @@
 
     <send-header></send-header>
 
-    <main>
-        <send-welcome></send-welcome>
+    <main data-testid="main-content">
+        <send-welcome data-testid="welcome-component"></send-welcome>
     </main>
 
     <send-footer></send-footer>
@@ -59,6 +59,7 @@
     <!-- 4. Init -->
     <script>
         I18n.init();
+        document.body.setAttribute('data-ready', 'true');
     </script>
 
 </body>
