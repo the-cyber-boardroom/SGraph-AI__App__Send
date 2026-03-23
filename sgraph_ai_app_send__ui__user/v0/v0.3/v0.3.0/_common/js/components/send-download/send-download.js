@@ -581,9 +581,112 @@ class SendDownload extends HTMLElement {
         });
     }
 
-    // ─── Single File View ───────────────────────────────────────────────────
+    // ─── Single File View (two-column layout) ──────────────────────────────
 
     _renderSingleFile() {
+        const filename  = this.fileName || 'download';
+        const type      = this._renderType;
+        const info      = this.transferInfo;
+        const url       = this._downloadUrl || '';
+
+        // Type badge label
+        const badgeLabel = (type === 'code' && typeof FileTypeDetect !== 'undefined')
+            ? FileTypeDetect.getLanguage(filename) : (type || 'file');
+        const sizeStr    = info ? this._fmtBytes(info.file_size_bytes) : '';
+        const uploadDate = info ? this._fmtTime(info.created_at) : '';
+        const downloads  = info ? (info.download_count || 0) : 0;
+
+        // Restore saved split width
+        let splitWidth = 320;
+        try { splitWidth = parseInt(localStorage.getItem('sg-send-split-width'), 10) || 320; } catch (_) {}
+
+        this.innerHTML = `
+            <style>
+                .sf-layout { display: grid; grid-template-columns: ${splitWidth}px 4px 1fr; min-height: calc(100vh - 120px); gap: 0; }
+                .sf-details { overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+                .sf-filename { margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 700; color: var(--color-text, #E0E0E0); word-break: break-all; }
+                .sf-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+                .sf-badge { font-size: 0.7rem; color: var(--accent, #4ECDC4); font-family: var(--font-mono, monospace); background: var(--accent-subtle, rgba(78,205,196,0.08)); padding: 2px 8px; border-radius: 4px; }
+                .sf-size { font-size: 0.75rem; color: var(--color-text-secondary, #8892A0); font-family: var(--font-mono, monospace); }
+                .sf-info { font-size: 0.8rem; color: var(--color-text-secondary, #8892A0); display: flex; flex-direction: column; gap: 0.25rem; }
+                .sf-divider { cursor: col-resize; background: transparent; transition: background 0.15s; z-index: 10; border-radius: 2px; }
+                .sf-divider:hover { background: rgba(78, 205, 196, 0.3); }
+                .sf-preview { overflow: auto; border-left: 1px solid rgba(255,255,255,0.08); min-height: 0; }
+                .sf-share { padding: 0.75rem; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); }
+                .sf-share-label { font-size: 0.75rem; color: var(--color-text-secondary, #8892A0); margin-bottom: 0.35rem; }
+                @media (max-width: 768px) {
+                    .sf-layout { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+                    .sf-divider { display: none; }
+                    .sf-preview { border-left: none; border-top: 1px solid rgba(255,255,255,0.08); }
+                }
+            </style>
+            <div class="sf-layout">
+                <div class="sf-details">
+                    <!-- File info -->
+                    <div>
+                        <h3 class="sf-filename">${this._esc(filename)}</h3>
+                        <div class="sf-meta">
+                            <span class="sf-badge">${this._esc(badgeLabel)}</span>
+                            <span class="sf-size">${this._esc(sizeStr)}</span>
+                        </div>
+                        <div class="sf-info">
+                            ${uploadDate ? `<div>Uploaded: ${this._esc(uploadDate)}</div>` : ''}
+                            ${downloads > 0 ? `<div>Downloaded ${downloads} time${downloads !== 1 ? 's' : ''}</div>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <button class="btn btn-primary" id="sf-save" style="width: 100%;">
+                        ${SendIcons.DOWNLOAD} Save Locally
+                    </button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-sm btn-secondary" id="sf-copy-link" style="flex: 1;">
+                            ${SendIcons.LINK_SM} Copy Link
+                        </button>
+                        <button class="btn btn-sm btn-secondary" id="sf-email">
+                            ${SendIcons.MAIL}
+                        </button>
+                        <button class="btn btn-sm btn-secondary" id="sf-print">
+                            ${SendIcons.PRINT}
+                        </button>
+                    </div>
+
+                    <!-- Share section -->
+                    ${url ? `
+                    <div class="sf-share">
+                        <div class="sf-share-label">Download link</div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" class="input" value="${this._esc(url)}" readonly
+                                   style="flex: 1; font-size: 0.75rem; font-family: monospace;">
+                            <button class="btn btn-sm btn-secondary" id="sf-copy-url">Copy</button>
+                        </div>
+                    </div>` : ''}
+
+                    <!-- Transparency panel -->
+                    <send-transparency id="transparency-panel"></send-transparency>
+
+                    <!-- Timing -->
+                    ${this._renderTimings()}
+
+                    <!-- Send another -->
+                    <div style="text-align: center; margin-top: 0.5rem;">
+                        <a href="${window.location.origin}/${typeof I18n !== 'undefined' ? I18n.locale : 'en-gb'}/"
+                           style="color: var(--accent); text-decoration: none; font-size: var(--text-sm);">
+                            Send another file
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Resizable divider -->
+                <div class="sf-divider" id="sf-divider"></div>
+
+                <!-- Content preview -->
+                <div class="sf-preview" id="sf-preview"></div>
+            </div>
+        `;
+
+        // Insert send-viewer into the preview panel
+        const previewPanel = this.querySelector('#sf-preview');
         const viewer = document.createElement('send-viewer');
         viewer.fileBytes   = this.decryptedBytes;
         viewer.fileName    = this.fileName;
@@ -591,8 +694,93 @@ class SendDownload extends HTMLElement {
         viewer.fileText    = this.decryptedText;
         viewer.downloadUrl = this._downloadUrl;
         viewer.transferId  = this.transferId;
-        this.innerHTML = '';
-        this.appendChild(viewer);
+        viewer.embedded    = true;
+        previewPanel.appendChild(viewer);
+
+        this._setupSingleFileListeners();
+    }
+
+    _renderTimings() {
+        if (!this._stageTimestamps || !this._stageTimestamps.decrypting || !this._stageTimestamps.complete) return '';
+        const totalMs = this._stageTimestamps.complete - this._stageTimestamps.decrypting;
+        return `
+            <div style="padding: 0.5rem 0.75rem; background: var(--accent-subtle, rgba(78,205,196,0.08));
+                 border-radius: 6px; font-family: var(--font-mono, monospace); font-size: 0.75rem;">
+                <span style="color: var(--accent, #4ECDC4); font-weight: 600;">
+                    Decrypted in ${(totalMs / 1000).toFixed(2)}s
+                </span>
+            </div>
+        `;
+    }
+
+    _setupSingleFileListeners() {
+        // Save locally
+        const saveBtn = this.querySelector('#sf-save');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+            this._saveFile(this.decryptedBytes, this.fileName || 'download');
+        });
+
+        // Copy link
+        const copyLink = this.querySelector('#sf-copy-link');
+        if (copyLink) copyLink.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(this._downloadUrl || '');
+                copyLink.textContent = 'Copied!';
+                setTimeout(() => { copyLink.innerHTML = `${SendIcons.LINK_SM} Copy Link`; }, 2000);
+            } catch (_) {}
+        });
+
+        // Copy URL from input
+        const copyUrl = this.querySelector('#sf-copy-url');
+        if (copyUrl) copyUrl.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(this._downloadUrl || '');
+                copyUrl.textContent = 'Copied!';
+                setTimeout(() => { copyUrl.textContent = 'Copy'; }, 2000);
+            } catch (_) {}
+        });
+
+        // Email
+        const emailBtn = this.querySelector('#sf-email');
+        if (emailBtn) emailBtn.addEventListener('click', () => {
+            window.location.href = `mailto:?subject=Shared file via SG/Send&body=${encodeURIComponent(this._downloadUrl || '')}`;
+        });
+
+        // Print
+        const printBtn = this.querySelector('#sf-print');
+        if (printBtn) printBtn.addEventListener('click', () => window.print());
+
+        // Resizable divider
+        this._setupDividerDrag();
+    }
+
+    _setupDividerDrag() {
+        const divider = this.querySelector('#sf-divider');
+        const layout  = this.querySelector('.sf-layout');
+        if (!divider || !layout) return;
+
+        let dragging = false;
+
+        divider.addEventListener('mousedown', (e) => {
+            dragging = true;
+            e.preventDefault();
+            divider.style.background = 'var(--accent, #4ECDC4)';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const rect  = layout.getBoundingClientRect();
+            const width = Math.max(200, Math.min(e.clientX - rect.left, rect.width - 200));
+            layout.style.gridTemplateColumns = `${width}px 4px 1fr`;
+            try { localStorage.setItem('sg-send-split-width', width); } catch (_) {}
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (dragging) {
+                dragging = false;
+                divider.style.background = 'transparent';
+            }
+        });
     }
 }
 
