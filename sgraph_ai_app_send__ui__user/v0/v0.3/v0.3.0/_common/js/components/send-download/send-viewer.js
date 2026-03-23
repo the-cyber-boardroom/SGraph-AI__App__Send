@@ -20,6 +20,7 @@ class SendViewer extends SendComponent {
         this.fileText    = null;
         this.downloadUrl = null;
         this.transferId  = null;
+        this.embedded    = false;   // When true, render without header (used in two-column layout)
         this._objectUrl  = null;
     }
 
@@ -35,6 +36,13 @@ class SendViewer extends SendComponent {
     }
 
     _build() {
+        if (this.embedded) {
+            // No header — just content (used when embedded in single-file two-column layout)
+            this.innerHTML = `<div class="sv-content" id="sv-content" style="height: 100%; overflow: auto;"></div>`;
+            this._renderContent();
+            return;
+        }
+
         const url = this.downloadUrl || '';
         this.innerHTML = `
             <div class="sv-container">
