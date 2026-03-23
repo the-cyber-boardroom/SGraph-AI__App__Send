@@ -270,9 +270,13 @@ class SendDownload extends HTMLElement {
                     this._zipInstance = zip;
                     this._zipTree = [];
                     zip.forEach((path, entry) => {
-                        // Filter _preview* folders and dotfiles
-                        if (path.startsWith('_preview') || path.startsWith('.')) return;
-                        this._zipTree.push({ path, name: entry.name, dir: entry.dir, entry });
+                        // Filter macOS artifacts, preview/gallery metadata, and dotfiles
+                        if (path.indexOf('__MACOSX') !== -1)                      return;
+                        if (path.startsWith('_preview') || path.startsWith('_gallery')) return;
+                        if (path.startsWith('.'))                                  return;
+                        const name = entry.name;
+                        if (name === '.DS_Store' || (name.length > 2 && name.startsWith('._'))) return;
+                        this._zipTree.push({ path, name, dir: entry.dir, entry });
                     });
                 } catch (zipErr) {
                     this._zipInstance = null;
