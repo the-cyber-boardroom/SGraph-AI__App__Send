@@ -454,6 +454,7 @@ class SendBrowse extends SendComponent {
 
     _renderFileContent(container, bytes, fileName, type) {
         container.innerHTML = '';
+        this._currentFileName = fileName;
 
         // Action bar
         const bar = document.createElement('div');
@@ -551,13 +552,13 @@ class SendBrowse extends SendComponent {
 
         const printBtn = this.querySelector('#sb-print');
         if (printBtn) printBtn.addEventListener('click', () => {
-            // Print the current preview content
-            var preview = this.querySelector('.sb-preview') || this.querySelector('#sb-layout');
-            if (typeof SgPrint !== 'undefined' && SgPrint.print) {
-                SgPrint.print(preview ? preview.innerHTML : '', this.fileName || 'File');
-            } else {
-                window.print();
+            // If viewing a markdown file, use SgPrint for A4-formatted output
+            const mdEl = this.querySelector('.sb-file__markdown');
+            if (mdEl && typeof SgPrint !== 'undefined') {
+                SgPrint.printHtml(mdEl.innerHTML, this._currentFileName || this.fileName || 'Document');
+                return;
             }
+            window.print();
         });
 
         const emailBtn = this.querySelector('#sb-email');

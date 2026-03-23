@@ -54,9 +54,18 @@ class SendGallery extends SendComponent {
     // Build
     // ═══════════════════════════════════════════════════════════════════════════
 
+    _autoViewMode(count) {
+        if (count <= 14) return 'large';
+        if (count <= 30) return 'grid';
+        return 'compact';
+    }
+
     async _build() {
         const files = this.zipTree.filter(e => !e.dir && !e.path.startsWith('_gallery.'));
         this._entries = files;
+
+        const autoMode = this._autoViewMode(files.length);
+        this._viewMode = autoMode;
 
         this.innerHTML = `
             <div class="sg-gallery">
@@ -66,12 +75,13 @@ class SendGallery extends SendComponent {
                         <span class="sg-gallery__name">${this.escapeHtml(this.fileName || 'Archive')}</span>
                         <span class="sg-gallery__badge">gallery</span>
                         <span class="sg-gallery__meta">${this.formatBytes(this.zipOrigBytes ? this.zipOrigBytes.byteLength : 0)} · ${files.length} files</span>
+                        <span class="sg-gallery__status">&#10003; Decrypted</span>
                     </div>
                     <div class="sg-gallery__header-right">
                         <div class="sg-gallery__modes">
-                            <button class="sg-gallery__mode-btn" data-mode="compact" title="Compact">${SendIcons.COMPACT}</button>
-                            <button class="sg-gallery__mode-btn sg-gallery__mode-btn--active" data-mode="grid" title="Grid">${SendIcons.GRID_SM}</button>
-                            <button class="sg-gallery__mode-btn" data-mode="large" title="Large">${SendIcons.LARGE}</button>
+                            <button class="sg-gallery__mode-btn${autoMode === 'compact' ? ' sg-gallery__mode-btn--active' : ''}" data-mode="compact" title="Compact">${SendIcons.COMPACT}</button>
+                            <button class="sg-gallery__mode-btn${autoMode === 'grid' ? ' sg-gallery__mode-btn--active' : ''}" data-mode="grid" title="Grid">${SendIcons.GRID_SM}</button>
+                            <button class="sg-gallery__mode-btn${autoMode === 'large' ? ' sg-gallery__mode-btn--active' : ''}" data-mode="large" title="Large">${SendIcons.LARGE}</button>
                         </div>
                         <button class="sg-gallery__action-btn" id="sg-copy-link" title="Copy Link">${SendIcons.LINK} Copy Link</button>
                         <button class="sg-gallery__action-btn" id="sg-email" title="Email">${SendIcons.MAIL}</button>
@@ -81,7 +91,7 @@ class SendGallery extends SendComponent {
                         <button class="sg-gallery__action-btn" id="sg-info" title="Info">${SendIcons.INFO}</button>
                     </div>
                 </div>
-                <div class="sg-gallery__grid sg-gallery__grid--grid" id="sg-grid"></div>
+                <div class="sg-gallery__grid sg-gallery__grid--${autoMode}" id="sg-grid"></div>
                 <div class="sg-gallery__info" id="sg-info-panel" style="display: none;">
                     <div class="sg-gallery__info-content">
                         <div class="sg-gallery__info-row"><span>Transfer ID</span><span>${this.escapeHtml(this.transferId || '—')}</span></div>
@@ -176,6 +186,27 @@ class SendGallery extends SendComponent {
                 } catch (_) {
                     imgDiv.innerHTML += SendIcons.TYPE_ICONS.image;
                 }
+            } else if (type === 'markdown') {
+                // Markdown preview: show stripped text in thumbnail
+                try {
+                    const text = await entry.entry.async('string');
+                    const preview = document.createElement('div');
+                    preview.className = 'sg-thumb__md-preview';
+                    // Strip markdown formatting: headings, bold/italic, links, images, tables
+                    const clean = text
+                        .replace(/^#+\s*/gm, '')
+                        .replace(/[*_`~\[\]]/g, '')
+                        .replace(/^\|.*\|$/gm, '')
+                        .replace(/^[-:|]+$/gm, '')
+                        .replace(/!\[.*?\]\(.*?\)/g, '')
+                        .replace(/\[([^\]]*)\]\(.*?\)/g, '$1')
+                        .replace(/\n{2,}/g, '\n')
+                        .trim();
+                    preview.textContent = clean.substring(0, 200);
+                    imgDiv.appendChild(preview);
+                } catch (_) {
+                    imgDiv.innerHTML += (SendIcons.TYPE_ICONS[type] || SendIcons.TYPE_ICONS.other);
+                }
             } else {
                 // No pre-generated thumbnail — show type icon
                 imgDiv.innerHTML += (SendIcons.TYPE_ICONS[type] || SendIcons.TYPE_ICONS.other);
@@ -211,6 +242,7 @@ class SendGallery extends SendComponent {
                 <div class="sg-lightbox__footer">
                     <span id="sg-lb-counter"></span>
                     <button class="sg-gallery__action-btn sg-lightbox__present" id="sg-lb-present" style="display: none;" title="Present mode (f)">⛶ Present</button>
+                    <button class="sg-gallery__action-btn" id="sg-lb-print" style="display: none;" title="Print">${SendIcons.PRINT} Print</button>
                     <button class="sg-gallery__save-btn sg-lightbox__save" id="sg-lb-save">${SendIcons.DOWNLOAD} Save</button>
                 </div>
             </div>
@@ -251,8 +283,10 @@ class SendGallery extends SendComponent {
             ? FileTypeDetect.detect(entry.name, null) : null;
         this._lightboxType = type;
 
-        // Show present button only for PDFs
+        // Show present button only for PDFs, print button for markdown/text/code
         if (presentBtn) presentBtn.style.display = (type === 'pdf') ? '' : 'none';
+        const lbPrintBtn = this.$('#sg-lb-print');
+        if (lbPrintBtn) lbPrintBtn.style.display = (type === 'markdown' || type === 'text' || type === 'code') ? '' : 'none';
 
         try {
             const bytes = await entry.entry.async('arraybuffer');
@@ -298,6 +332,22 @@ class SendGallery extends SendComponent {
             const iframe = this.$('.sg-lightbox__pdf');
             if (iframe && iframe.requestFullscreen) iframe.requestFullscreen();
         }
+    }
+
+    async _handlePrint() {
+        // If lightbox is open and showing markdown, use SgPrint for a beautiful A4 print
+        const lb = this.$('#sg-lightbox');
+        if (lb && lb.style.display === 'flex' && this._lightboxType === 'markdown') {
+            const entry = this._entries[this._lightboxIndex];
+            if (entry && typeof SgPrint !== 'undefined') {
+                try {
+                    const text = await entry.entry.async('string');
+                    SgPrint.printMarkdown(text, entry.name);
+                    return;
+                } catch (_) {}
+            }
+        }
+        window.print();
     }
 
     // ─── Event Listeners ────────────────────────────────────────────────────
@@ -370,9 +420,13 @@ class SendGallery extends SendComponent {
             } catch (_) {}
         });
 
-        // Print
+        // Print — use SgPrint for markdown when in lightbox, else window.print()
         const printBtn = this.$('#sg-print');
-        if (printBtn) printBtn.addEventListener('click', () => window.print());
+        if (printBtn) printBtn.addEventListener('click', () => this._handlePrint());
+
+        // Lightbox print button
+        const lbPrint = this.$('#sg-lb-print');
+        if (lbPrint) lbPrint.addEventListener('click', () => this._handlePrint());
 
         // Email
         const emailBtn = this.$('#sg-email');

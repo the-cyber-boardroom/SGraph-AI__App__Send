@@ -65,6 +65,12 @@
     color: var(--color-text-secondary, #8892A0);
 }
 
+.sg-gallery__status {
+    font-size: 0.8rem;
+    color: var(--accent, #4ECDC4);
+    font-weight: 500;
+}
+
 /* ─── View Mode Buttons ──────────────────────────────────────────────── */
 
 .sg-gallery__modes {
@@ -261,6 +267,20 @@
     text-overflow: ellipsis;
 }
 
+/* Markdown text preview in thumbnail cards */
+.sg-thumb__md-preview {
+    position: absolute;
+    inset: 0;
+    padding: 10px;
+    padding-right: 40px;
+    font-size: 0.65rem;
+    line-height: 1.4;
+    color: rgba(255,255,255,0.4);
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Lightbox
    ═══════════════════════════════════════════════════════════════════════ */
@@ -365,6 +385,20 @@
     overflow: auto;
     line-height: 1.6;
 }
+
+/* Markdown rendering in lightbox — parity with browse view */
+.sg-lightbox__doc h1, .sg-lightbox__doc h2 { border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
+.sg-lightbox__doc h3, .sg-lightbox__doc h4 { margin-top: 1.2em; }
+.sg-lightbox__doc code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; color: #d63384; }
+.sg-lightbox__doc pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+.sg-lightbox__doc pre code { background: none; padding: 0; color: #333; }
+.sg-lightbox__doc blockquote { border-left: 3px solid #ddd; margin-left: 0; padding-left: 1rem; color: #555; }
+.sg-lightbox__doc table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+.sg-lightbox__doc th, .sg-lightbox__doc td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+.sg-lightbox__doc th { background: #f4f4f4; font-weight: 600; }
+.sg-lightbox__doc a { color: #0066cc; }
+.sg-lightbox__doc img { max-width: 100%; }
+.sg-lightbox__doc hr { border: none; border-top: 1px solid #e0e0e0; margin: 1.5em 0; }
 
 .sg-lightbox__pdf {
     width: 90%;
