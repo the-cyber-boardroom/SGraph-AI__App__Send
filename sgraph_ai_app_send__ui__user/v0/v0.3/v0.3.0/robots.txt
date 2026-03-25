@@ -1,0 +1,29 @@
+# SG/Send — https://send.sgraph.ai
+# Zero-knowledge encrypted file sharing
+
+User-agent: *
+Allow: /
+
+# Locale pages
+Allow: /en-gb/
+Allow: /en-us/
+Allow: /pt-pt/
+Allow: /pt-br/
+Allow: /de-de/
+Allow: /de-ch/
+Allow: /es-es/
+Allow: /es-ar/
+Allow: /es-mx/
+Allow: /fr-fr/
+Allow: /fr-ca/
+Allow: /it-it/
+Allow: /nl-nl/
+Allow: /pl-pl/
+Allow: /hr-hr/
+Allow: /ro-ro/
+
+# Internal assets — no need to index
+Disallow: /_common/
+Disallow: /i18n/
+
+Sitemap: https://send.sgraph.ai/sitemap.xml

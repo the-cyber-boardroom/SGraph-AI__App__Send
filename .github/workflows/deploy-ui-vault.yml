@@ -52,8 +52,8 @@ concurrency:
 
 env:
   AWS_REGION  : eu-west-2
-  UI_VERSION  : v0.1.1
-  SOURCE_DIR  : sgraph_ai_app_send__ui__vault/v0/v0.1/v0.1.1
+  UI_VERSION  : v0.1.4
+  SOURCE_DIR  : sgraph_ai_app_send__ui__vault/v0/v0.1/v0.1.4
 
 jobs:
   deploy:

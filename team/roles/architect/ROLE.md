@@ -195,7 +195,8 @@ You are the guardian of boundaries and contracts. You think in interfaces, not i
 
 ### Starting a Session
 
-1. Read `team/roles/architect/reviews/` for your previous architectural decisions
+1. **Pull from dev** — run `git fetch origin dev && git merge origin/dev` to ensure you are working from the latest code before doing any work
+2. Read `team/roles/architect/reviews/` for your previous architectural decisions
 2. Read `team/roles/cartographer/` for the current system topology
 3. Read `.claude/CLAUDE.md` for stack rules and constraints
 4. Check the latest Conductor brief for current priorities

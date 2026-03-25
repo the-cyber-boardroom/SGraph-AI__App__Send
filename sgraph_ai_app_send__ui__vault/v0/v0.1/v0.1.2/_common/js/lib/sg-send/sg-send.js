@@ -136,4 +136,16 @@ class SGSend {
         })
         return response.json()
     }
+
+    // --- Vault Batch Read API ---------------------------------------------------
+
+    async vaultBatchRead(vaultId, fileIds) {
+        const operations = fileIds.map(file_id => ({ op: 'read', file_id }))
+        const response = await this._fetch('POST', `/api/vault/batch/${vaultId}`, {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ operations })
+        })
+        const result = await response.json()
+        return result.results || []
+    }
 }

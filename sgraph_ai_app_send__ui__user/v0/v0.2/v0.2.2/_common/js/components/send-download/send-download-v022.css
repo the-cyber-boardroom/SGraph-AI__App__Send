@@ -1,0 +1,427 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Download Component Styles
+   v0.2.2 — Surgical CSS overrides on v0.2.1 + v0.2.0
+   Loads AFTER v0.2.1 CSS — later selectors win via cascade.
+
+   Layout: Two columns — tree view (left) | command strip + tabs + preview (right)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Viewport lock — entire page fits in one screen ────────────────── */
+
+body.v022-viewport-lock {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+body.v022-viewport-lock > send-header {
+    flex-shrink: 0;
+}
+
+body.v022-viewport-lock > main {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+body.v022-viewport-lock > main > send-download {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+body.v022-viewport-lock > send-footer {
+    flex-shrink: 0;
+}
+
+/* ─── Compact footer — thin one-liner ───────────────────────────────── */
+
+body.v022-viewport-lock send-footer .sg-footer {
+    padding: 0.15rem 1rem;
+    font-size: 0.65rem;
+    opacity: 0.5;
+}
+
+body.v022-viewport-lock send-footer .sg-footer__version {
+    display: inline;
+    font-size: 0.6rem;
+    margin-top: 0;
+    margin-left: 0.5rem;
+}
+
+/* ─── Card fills main — minimal padding ─────────────────────────────── */
+
+body.v022-viewport-lock .card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-bottom: 0;
+    padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+}
+
+/* ─── v0.2.2 layout wrapper — fills the card ─────────────────────────── */
+
+.v022-layout {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ─── Compact header — single line with file info + status ────────────── */
+
+.v022-compact-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    gap: var(--space-2, 0.5rem);
+}
+
+.v022-compact-header__left {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.v022-compact-header__right {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+}
+
+.v022-compact-header__icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.v022-compact-header__name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text, #E0E0E0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+}
+
+.v022-compact-header__meta {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary, #8892A0);
+    white-space: nowrap;
+}
+
+.v022-compact-header__status {
+    font-size: 0.6rem;
+    color: var(--color-success, #4ECDC4);
+    background: rgba(78, 205, 196, 0.1);
+    padding: 1px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+/* ─── Main content area — fills remaining space ──────────────────────── */
+
+.v022-main-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ─── Two-column split ───────────────────────────────────────────────── */
+
+.v022-split {
+    display: grid;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ─── Right column: command strip + tabs + preview stacked vertically ── */
+
+.v022-right-column {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.v022-right-column #preview-panel {
+    flex: 1;
+    min-height: 0;
+}
+
+/* ─── Command strip (inside right column) ─────────────────────────────── */
+
+.v022-command-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px;
+    gap: var(--space-1, 0.25rem);
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+}
+
+.v022-command-strip__left,
+.v022-command-strip__right {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.v022-command-strip__divider {
+    width: 1px;
+    height: 18px;
+    background: var(--color-border, rgba(78, 205, 196, 0.15));
+    margin: 0 2px;
+}
+
+.v022-command-strip .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.68rem;
+    padding: 2px 6px;
+    white-space: nowrap;
+}
+
+.v022-cmd--disabled {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    position: relative;
+}
+
+.v022-cmd--disabled::after {
+    content: 'soon';
+    position: absolute;
+    top: -5px;
+    right: -3px;
+    font-size: 0.45rem;
+    background: var(--accent, #4ECDC4);
+    color: var(--bg-primary, #0D1B2A);
+    padding: 0 2px;
+    border-radius: 2px;
+    line-height: 1.3;
+    font-weight: 600;
+}
+
+/* ─── Tab bar (inside right column, below command strip) ──────────────── */
+
+.v022-tab-bar {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-shrink: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: rgba(0, 0, 0, 0.15);
+    min-height: 26px;
+    scrollbar-width: thin;
+}
+
+.v022-tab-bar:empty {
+    display: none;
+}
+
+.v022-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 7px 2px 9px;
+    font-size: 0.68rem;
+    font-family: var(--font-mono, monospace);
+    color: var(--color-text-secondary, #8892A0);
+    background: transparent;
+    border-right: 1px solid var(--color-border, rgba(78, 205, 196, 0.1));
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+    max-width: 200px;
+}
+
+.v022-tab:hover {
+    background: rgba(78, 205, 196, 0.06);
+    color: var(--color-text, #E0E0E0);
+}
+
+.v022-tab--active {
+    background: var(--bg-secondary, #16213E);
+    color: var(--accent, #4ECDC4);
+    border-bottom: 2px solid var(--accent, #4ECDC4);
+}
+
+.v022-tab__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.v022-tab__close {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    font-size: 0.82rem;
+    padding: 0 2px;
+    line-height: 1;
+    border-radius: 2px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.v022-tab__close:hover {
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.15);
+}
+
+/* ─── Override zip preview to fill flex container ─────────────────────── */
+
+body.v022-viewport-lock .zip-preview--split {
+    min-height: 0;
+    height: 100%;
+    overflow: auto;
+}
+
+body.v022-viewport-lock .zip-left-rail {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* ─── Hide the zip-info-panel (moved to tab) ─────────────────────────── */
+
+body.v022-viewport-lock .zip-info-panel {
+    display: none !important;
+}
+
+/* ─── Hide the old zip-header (replaced by compact header) ────────────── */
+
+body.v022-viewport-lock .zip-header--sticky {
+    display: none !important;
+}
+
+/* ─── Hide v0.2.1's save-entry button (use command strip instead) ─────── */
+
+body.v022-viewport-lock #save-entry-btn {
+    display: none !important;
+}
+
+/* ─── Manual entry form ───────────────────────────────────────────────── */
+
+.v022-manual-entry {
+    max-width: 520px;
+    margin: var(--space-8, 2rem) auto;
+    padding: var(--space-6, 1.5rem);
+}
+
+.v022-manual-entry__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.v022-manual-entry__header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--color-text, #E0E0E0);
+    font-weight: 600;
+}
+
+.v022-manual-entry__desc {
+    color: var(--color-text-secondary, #8892A0);
+    font-size: var(--text-sm, 0.875rem);
+    line-height: 1.5;
+    margin: 0 0 var(--space-5, 1.25rem) 0;
+}
+
+.v022-manual-entry__field {
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.v022-manual-entry__field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-text, #E0E0E0);
+    margin-bottom: var(--space-1, 0.25rem);
+}
+
+.v022-manual-entry__optional {
+    font-weight: 400;
+    color: var(--color-text-secondary, #8892A0);
+    font-size: 0.75rem;
+}
+
+.v022-manual-entry__field .input {
+    width: 100%;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85rem;
+}
+
+.v022-manual-entry__hint {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary, #8892A0);
+    margin-top: 0.3rem;
+}
+
+.v022-manual-entry__hint code {
+    background: rgba(78, 205, 196, 0.1);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    color: var(--accent, #4ECDC4);
+}
+
+.v022-manual-entry__error {
+    margin-top: var(--space-3, 0.75rem);
+    color: var(--color-error, #e74c3c);
+    font-size: var(--text-sm, 0.875rem);
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+    background: rgba(231, 76, 60, 0.1);
+    border-radius: var(--radius-sm, 4px);
+}
+
+/* ─── Mobile responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .v022-command-strip {
+        flex-wrap: wrap;
+    }
+    .v022-command-strip .v022-cmd--disabled {
+        display: none;
+    }
+    .v022-tab-bar {
+        min-height: 22px;
+    }
+    .v022-tab {
+        font-size: 0.6rem;
+        padding: 2px 5px 2px 7px;
+        max-width: 130px;
+    }
+    .v022-compact-header {
+        flex-wrap: wrap;
+    }
+    .v022-compact-header__meta {
+        display: none;
+    }
+    .v022-manual-entry {
+        padding: var(--space-4, 1rem);
+        margin: var(--space-4, 1rem) auto;
+    }
+}

@@ -239,3 +239,10 @@ sgraph_ai_app_send__ui__vault/**/tlh/
 
 # Generated build info (injected by CI via scripts/inject_build_version.py)
 **/build-info.js
+.local-server-vault
+.local-server-user
+
+# Make sure modules are not commited
+
+modules/
+

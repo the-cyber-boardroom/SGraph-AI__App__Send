@@ -6,6 +6,7 @@
 import base64
 import hashlib
 import json
+import os
 from fastapi                                                                     import HTTPException, Request, Response
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
@@ -32,10 +33,11 @@ class Routes__Transfers(Fast_API__Routes):                                      
     admin_service_client : object = None                                         # Optional Admin__Service__Client (typed as object to avoid circular import)
 
     def check_access_token(self, request: Request, access_token: str = ''):      # Validate access token — header, query param, or env-var fallback
-        provided_token = (access_token                                                 # MCP tool parameter (Claude.ai web)
+        raw_token      = (access_token                                                 # MCP tool parameter (Claude.ai web)
                           or request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '') # HTTP header (browser UI, Claude Code CLI)
                           or request.query_params.get('access_token', '')               # Query param fallback
                           )
+        provided_token = str(Safe_Str__Id(raw_token))                                  # Sanitise: strip path-traversal and injection chars
 
         if self.admin_service_client is not None:                                # Admin service available — validate via token_lookup
             if not provided_token:
@@ -87,7 +89,13 @@ class Routes__Transfers(Fast_API__Routes):                                      
         self.check_access_token(raw_request, access_token)
         result = self.transfer_service.create_transfer(file_size_bytes   = request.file_size_bytes  ,
                                                        content_type_hint = request.content_type_hint,
-                                                       sender_ip        = ''                        )
+                                                       sender_ip        = ''                        ,
+                                                       transfer_id      = request.transfer_id       )
+        if 'error' in result:
+            if result['error'] == 'transfer_id_exists':
+                raise HTTPException(status_code = 409, detail = 'Transfer ID already exists')
+            if result['error'] == 'invalid_transfer_id_format':
+                raise HTTPException(status_code = 400, detail = 'Invalid transfer ID format (must be 12 lowercase hex chars)')
         return dict(transfer_id = result['transfer_id'],                         # todo: return Type_Safe class from service
                     upload_url  = result['upload_url'] )
 
@@ -145,15 +153,21 @@ class Routes__Transfers(Fast_API__Routes):                                      
 
     LAMBDA_RESPONSE_LIMIT = 5 * 1024 * 1024                                     # 5MB safe limit (Lambda response limit is ~6MB)
 
+    @staticmethod
+    def _is_lambda_environment():                                                # Detect if running inside AWS Lambda
+        return bool(os.environ.get('AWS_LAMBDA_FUNCTION_NAME') or
+                    os.environ.get('LAMBDA_TASK_ROOT')         )
+
     def download__transfer_id(self, transfer_id : Safe_Str__Id,                  # GET /transfers/download/{transfer_id} (todo: should be Transfer_Id)
                                     request     : Request
                              ) -> Response:
         # Check file size before loading — prevent Lambda 6MB response blowup
+        # Skip size check when running locally (no Lambda payload limit applies)
         info = self.transfer_service.get_transfer_info(transfer_id)
         if info is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Transfer not found')
-        if info.get('file_size_bytes', 0) > self.LAMBDA_RESPONSE_LIMIT:
+        if self._is_lambda_environment() and info.get('file_size_bytes', 0) > self.LAMBDA_RESPONSE_LIMIT:
             raise HTTPException(status_code = 413,
                                 detail      = 'File too large for direct download. Use /presigned/download-url/{transfer_id} instead.')
 
@@ -175,7 +189,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
         if info is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Transfer not found')
-        if info.get('file_size_bytes', 0) > self.LAMBDA_BASE64_LIMIT:
+        if self._is_lambda_environment() and info.get('file_size_bytes', 0) > self.LAMBDA_BASE64_LIMIT:
             raise HTTPException(status_code = 413,
                                 detail      = 'File too large for base64 download. Use /presigned/download-url/{transfer_id} instead.')
 
@@ -189,7 +203,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                     data            = base64.b64encode(payload).decode('ascii'),
                     file_size_bytes = info.get('file_size_bytes', 0)         )
 
-    def check_token__token_name(self, token_name: str) -> dict:                  # GET /transfers/check_token/{token_name} — lookup only (no usage consumed)
+    def check_token__token_name(self, token_name: Safe_Str__Id) -> dict:          # GET /transfers/check_token/{token_name} — lookup only (no usage consumed)
         if self.admin_service_client is None:
             return dict(valid = True, status = 'active')                         # No admin service → always valid (dev mode)
         try:
@@ -205,7 +219,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
             raise HTTPException(status_code = 503,
                                 detail      = 'Token validation service unavailable')
 
-    def validate_token__token_name(self, token_name : str   ,                    # POST /transfers/validate_token/{token_name} — consume a use (for download page)
+    def validate_token__token_name(self, token_name : Safe_Str__Id,              # POST /transfers/validate_token/{token_name} — consume a use (for download page)
                                          request    : Request
                                   ) -> dict:
         if self.admin_service_client is None:

@@ -16,6 +16,7 @@ from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id 
 class Schema__Transfer__Create(Type_Safe):                                       # Request: create a new transfer
     file_size_bytes   : Safe_UInt__FileSize                                      # File size in bytes
     content_type_hint : Safe_Str__Http__Content_Type                             # MIME type hint
+    transfer_id       : Safe_Str__Id                                             # Optional client-provided transfer ID (PBKDF2 simple-token mode)
 
 
 class Schema__Transfer__Initiated(Type_Safe):                                    # Response: transfer created

@@ -74,5 +74,5 @@ class test_MCP__Mount__User(TestCase):
             assert has_vault, f'Expected vault pointer tools in User Lambda MCP, not found in {tool_names}'
 
             # Internal routes should NOT be present (info)
-            has_info = any('health' in name.lower() for name in tool_names)
+            has_info = any('status' in name.lower() for name in tool_names)
             assert not has_info, f'info routes should be excluded, found in {tool_names}'

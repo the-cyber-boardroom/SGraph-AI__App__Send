@@ -5,6 +5,7 @@
 
 import hashlib
 import json
+import re
 import secrets
 from   datetime                                                                  import datetime, timezone
 from   memory_fs.storage_fs.Storage_FS                                           import Storage_FS
@@ -39,11 +40,20 @@ class Transfer__Service(Type_Safe):                                             
     def has_payload(self, transfer_id):                                          # Check if payload exists
         return self.storage_fs.file__exists(self.payload_path(transfer_id))
 
+    TRANSFER_ID_PATTERN = re.compile(r'^[a-f0-9]{12}$')                           # Valid transfer ID: exactly 12 lowercase hex chars
+
     # todo: this signature needs to be protected by @type_safe and have a type safe primitive mapped to each var (see library/guides/development/code-formating/v3.63.4__for_llms__python_formatting_guide.md )
-    def create_transfer(self, file_size_bytes, content_type_hint, sender_ip):    # Create a new transfer record
-        # todo this code should be replaced with Transfer_Id() with Transfer_Id(Random_Guid)
-        #      for security purposes it will be better to use a full GUID/UUID for the transfer id
-        transfer_id = secrets.token_hex(6)                                       # 12-char random hex string
+    def create_transfer(self, file_size_bytes, content_type_hint, sender_ip,     # Create a new transfer record
+                              transfer_id=''):                                   # Optional client-provided ID (PBKDF2 simple-token mode)
+        if transfer_id:                                                          # Client-provided ID — validate format and uniqueness
+            if not self.TRANSFER_ID_PATTERN.match(transfer_id):
+                return dict(error = 'invalid_transfer_id_format')
+            if self.has_transfer(transfer_id):
+                return dict(error = 'transfer_id_exists')
+        else:
+            # todo this code should be replaced with Transfer_Id() with Transfer_Id(Random_Guid)
+            #      for security purposes it will be better to use a full GUID/UUID for the transfer id
+            transfer_id = secrets.token_hex(6)                                   # 12-char random hex string
         ip_hash     = self.hash_ip(sender_ip)
         now         = datetime.now(timezone.utc).isoformat()                    # todo all dates and timestamps to be created using Timestamp_Now()
 
@@ -58,7 +68,7 @@ class Transfer__Service(Type_Safe):                                             
                     events            = []                )                     # todo: same here [] is the default value of a list, note that this needs to be Type_Safe lis
 
         self.save_meta(transfer_id, meta)                                        # Persist to storage backend
-        upload_url = f'/transfers/upload/{transfer_id}'                          # todo: we shouldn't be hardcoding this url here, the caller should know where to find it from the transfer_id
+        upload_url = f'/api/transfers/upload/{transfer_id}'                      # todo: we shouldn't be hardcoding this url here, the caller should know where to find it from the transfer_id
         return dict(transfer_id = transfer_id,
                     upload_url  = upload_url  )
 

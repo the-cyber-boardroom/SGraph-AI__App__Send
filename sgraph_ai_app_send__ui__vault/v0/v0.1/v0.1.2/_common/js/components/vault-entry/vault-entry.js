@@ -115,7 +115,7 @@ class VaultEntry extends VaultComponent {
         try {
             const sgSend = this._getSGSend()
             const vault  = await SGVault.create(sgSend, passphrase, { name })
-            const vaultKey = vault.getVaultKey(passphrase)
+            const vaultKey = vault.getVaultKey()
 
             // Update URL hash
             window.history.replaceState(null, '', '#' + encodeURIComponent(vaultKey))
@@ -130,7 +130,7 @@ class VaultEntry extends VaultComponent {
     }
 
     _getSGSend() {
-        const endpoint = this.getAttribute('data-endpoint') || 'https://send.sgraph.ai'
+        const endpoint = this.getAttribute('data-endpoint') || 'https://dev.send.sgraph.ai'
         const token    = this._accessKeyInput.value.trim()
                       || this.getAttribute('data-token')
                       || ''

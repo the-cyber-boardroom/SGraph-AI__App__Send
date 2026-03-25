@@ -1,38 +1,22 @@
 name: Deploy User UI to S3
 
-# Publishes v0.2.0 (base) + v0.2.1 (IFD overlay) static UI files to S3.
+# Publishes v0.3.x user UI to S3.
+# v0.3.0 is a self-contained IFD major version — no overlay chain needed.
 # CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
 #
-# IFD deployment model:
-#   1. Deploy v0.2.0 base → releases/v0/v0.2/v0.2.0/ + overlay onto latest/
-#   2. Deploy v0.2.1 overlay → releases/v0/v0.2/v0.2.1/ + overlay onto latest/
-#   latest/ = union of v0.2.0 + v0.2.1 (overlay files win)
-#
-# Deploy is manifest-driven — manifest.json lists exactly what gets deployed:
-#   - source_folders: _common/, en-gb/, i18n/ (in git)
-#   - ci_generated_folders: locale HTML pages (generated here, never in git)
-#   - root_files: manifest.json
+# IFD deployment model (v0.3.0+):
+#   v0.3.0 is the base — deployed with --clean-latest to replace v0.2.x.
+#   Future v0.3.x patches overlay onto latest/ in version order.
 #
 # S3 path isolation by branch/environment:
 #   websites/sgraph-send/dev/    — dev branch (automatic)
 #   websites/sgraph-send/main/   — main branch (automatic)
 #   websites/sgraph-send/prod/   — production (manual dispatch)
 #
-# Steps:
-#   1. Generate i18n locale pages for v0.2.0 and v0.2.1
-#   2. Deploy v0.2.0 base to S3 (releases + latest overlay)
-#   3. Deploy v0.2.1 overlay to S3 (releases + latest overlay)
-#   4. Invalidate CloudFront cache
-#
 # Environments:
 #   - dev:        dev.send.sgraph.ai   (default — push to dev branch)
 #   - main:       main.send.sgraph.ai  (push to main branch)
 #   - production: send.sgraph.ai       (manual dispatch)
-#
-# Secrets per environment:
-#   - SGRAPH_SEND__UI_S3_BUCKET                   (shared — same bucket for now)
-#   - SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID      (production CF distribution)
-#   - SGRAPH_SEND__DEV__CLOUDFRONT_DISTRIBUTION_ID (dev CF distribution)
 
 on:
   push:
@@ -40,7 +24,7 @@ on:
       - dev
       - main
     paths:
-      - 'sgraph_ai_app_send__ui__user/v0/v0.2/**'
+      - 'sgraph_ai_app_send__ui__user/v0/v0.3/**'
       - 'sgraph_ai_app_send/version'
       - 'scripts/generate_send_i18n_pages.py'
       - 'scripts/inject_build_version.py'
@@ -55,10 +39,10 @@ on:
         options:
           - dev
           - production
-      rebuild_latest:
-        description: 'Clean latest/ first, then deploy v0.2.0 + v0.2.1 from scratch (removes stale files)'
+      clean_latest:
+        description: 'Clean latest/ before deploying (removes stale files from previous versions)'
         required: false
-        default: false
+        default: true
         type: boolean
 
 concurrency:
@@ -67,11 +51,7 @@ concurrency:
 
 env:
   AWS_REGION      : eu-west-2
-  UI_VERSION_BASE : v0.2.0
-  UI_VERSION      : v0.2.1
-  # IFD: base + overlay. Both get deployed in order.
-  SOURCE_DIR_BASE : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.0
-  SOURCE_DIR      : sgraph_ai_app_send__ui__user/v0/v0.2/v0.2.1
+  UI_BASE_DIR     : sgraph_ai_app_send__ui__user/v0/v0.3
 
 jobs:
   deploy:
@@ -89,15 +69,36 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Inject build version into UI (v0.2.0 base + v0.2.1 overlay)
+      - name: Discover IFD versions
+        id: discover
         run: |
-          python scripts/inject_build_version.py --version ${{ env.UI_VERSION_BASE }}
-          python scripts/inject_build_version.py --version ${{ env.UI_VERSION }}
+          # Find all v0.3.x directories, sort by version number
+          VERSIONS=$(ls -d ${{ env.UI_BASE_DIR }}/v0.3.* 2>/dev/null | xargs -n1 basename | sort -t. -k3 -n || true)
+          echo "Found v0.3.x versions:"
+          echo "$VERSIONS"
+          echo "versions=$(echo $VERSIONS | tr '\n' ' ')" >> $GITHUB_OUTPUT
 
-      - name: Generate i18n locale pages (v0.2.0 base + v0.2.1 overlay)
+          # Count for later steps
+          COUNT=$(echo "$VERSIONS" | wc -w)
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+          # First version (base — gets --clean-latest)
+          FIRST=$(echo "$VERSIONS" | head -n1 | xargs)
+          echo "first=$FIRST" >> $GITHUB_OUTPUT
+
+      - name: Inject build version into all IFD versions
         run: |
-          python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION_BASE }}
-          python scripts/generate_send_i18n_pages.py --version ${{ env.UI_VERSION }}
+          for VERSION in ${{ steps.discover.outputs.versions }}; do
+            echo "Injecting build version into $VERSION"
+            python scripts/inject_build_version.py --version "$VERSION"
+          done
+
+      - name: Generate i18n locale pages for all IFD versions
+        run: |
+          for VERSION in ${{ steps.discover.outputs.versions }}; do
+            echo "Generating i18n pages for $VERSION"
+            python scripts/generate_send_i18n_pages.py --version "$VERSION"
+          done
 
       - name: Check AWS credentials
         id: check-creds
@@ -135,34 +136,48 @@ jobs:
             echo "Deploying to DEV (dev.send.sgraph.ai) → S3: websites/sgraph-send/dev/"
           fi
 
-      - name: Deploy v0.2.0 base to S3
+      - name: Deploy v0.3.x to S3
         if: steps.check-creds.outputs.has-credentials == 'true'
         run: |
-          # Deploy v0.2.0 base first. On rebuild, clean latest/ before overlaying.
-          CLEAN_FLAG=""
-          if [ "${{ inputs.rebuild_latest }}" == "true" ]; then
-            CLEAN_FLAG="--clean-latest"
-          fi
-          python scripts/deploy_static_site.py \
-            --site sgraph-send \
-            --version ${{ env.UI_VERSION_BASE }} \
-            --source-dir ${{ env.SOURCE_DIR_BASE }} \
-            --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
-            --region ${{ env.AWS_REGION }} \
-            --deploy-env ${{ steps.env.outputs.deploy_env }} \
-            --skip-validation \
-            $CLEAN_FLAG
+          VERSIONS=(${{ steps.discover.outputs.versions }})
+          TOTAL=${#VERSIONS[@]}
+          FIRST="${{ steps.discover.outputs.first }}"
+          CLEAN_REQUESTED="${{ inputs.clean_latest }}"
 
-      - name: Deploy v0.2.1 overlay to S3
-        if: steps.check-creds.outputs.has-credentials == 'true'
-        run: |
-          python scripts/deploy_static_site.py \
-            --site sgraph-send \
-            --version ${{ env.UI_VERSION }} \
-            --source-dir ${{ env.SOURCE_DIR }} \
-            --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
-            --region ${{ env.AWS_REGION }} \
-            --deploy-env ${{ steps.env.outputs.deploy_env }} \
-            --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} \
-            --skip-validation \
-            --version-file sgraph_ai_app_send/version
+          for i in "${!VERSIONS[@]}"; do
+            VERSION="${VERSIONS[$i]}"
+            SOURCE_DIR="${{ env.UI_BASE_DIR }}/$VERSION"
+            STEP=$((i + 1))
+            echo ""
+            echo "=== Deploying $VERSION ($SOURCE_DIR) [$STEP/$TOTAL] ==="
+
+            EXTRA_FLAGS=""
+
+            # First version (v0.3.0): clean latest/ to remove stale v0.2.x files.
+            # For push-triggered deploys, always clean on first version.
+            # For manual dispatch, respect the clean_latest input.
+            if [ "$VERSION" == "$FIRST" ]; then
+              if [ "$CLEAN_REQUESTED" != "false" ]; then
+                EXTRA_FLAGS="--clean-latest"
+                echo "  → Cleaning latest/ (replacing previous version)"
+              fi
+            fi
+
+            # Last version: include CloudFront invalidation and version file
+            if [ "$STEP" -eq "$TOTAL" ]; then
+              EXTRA_FLAGS="$EXTRA_FLAGS --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} --version-file sgraph_ai_app_send/version"
+            fi
+
+            python scripts/deploy_static_site.py \
+              --site sgraph-send \
+              --version "$VERSION" \
+              --source-dir "$SOURCE_DIR" \
+              --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
+              --region ${{ env.AWS_REGION }} \
+              --deploy-env ${{ steps.env.outputs.deploy_env }} \
+              --skip-validation \
+              $EXTRA_FLAGS
+          done
+
+          echo ""
+          echo "=== Deployed $TOTAL version(s): ${VERSIONS[*]} ==="

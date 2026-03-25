@@ -1,0 +1,185 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Upload Orchestrator Styles
+   v0.3.0 — Extracted from v0.2.3 / v0.2.8 inline styles (card, header row,
+   inline next button, step content, drop zone, error)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Drop zone (v0.2.0 base) ────────────────────────────────────────────────── */
+
+.drop-zone {
+    border: 2px dashed var(--color-drop-zone-border, rgba(78, 205, 196, 0.25));
+    border-radius: var(--radius-md, 12px);
+    background: var(--color-drop-zone-bg, #16213E);
+    padding: var(--space-8, 2rem) var(--space-6, 1.5rem);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--transition, 150ms ease),
+                background-color var(--transition, 150ms ease);
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+    border-color: var(--color-drop-zone-active, #4ECDC4);
+    background: rgba(78, 205, 196, 0.05);
+}
+
+.drop-zone__label {
+    font-size: var(--text-h3, 1.25rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--accent, #4ECDC4);
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.drop-zone__hint {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+/* ── Header row: step indicator + Next button inline (v0.2.8) ────────────── */
+
+.upload-header-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-5, 1.25rem);
+    margin-bottom: var(--space-5, 1.25rem);
+    min-height: 70px;
+}
+
+.upload-header-row__steps {
+    flex: 1;
+    min-width: 0;
+}
+
+.upload-header-row__action {
+    flex-shrink: 0;
+}
+
+/* ── Inline Next button (v0.2.8) ─────────────────────────────────────────── */
+
+.upload-next-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 180px;
+    height: 54px;
+    padding: 0 var(--space-6, 1.5rem);
+    background: var(--color-primary, #4ECDC4);
+    color: var(--color-bg, #1A1A2E);
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--text-base, 1rem);
+    font-weight: var(--weight-semibold, 600);
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.upload-next-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+    background: #5DE0D6;
+}
+
+.upload-next-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.upload-next-btn--send {
+    box-shadow: 0 2px 8px rgba(78, 205, 196, 0.25);
+}
+
+.upload-next-btn--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Step content area ───────────────────────────────────────────────────── */
+
+.step-content {
+    min-height: 0;
+}
+
+/* ── Error display ───────────────────────────────────────────────────────── */
+
+.status--error {
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid var(--color-error, #FF6B6B);
+    border-radius: var(--radius-sm, 6px);
+    padding: var(--space-4, 1rem);
+    color: var(--color-error, #FF6B6B);
+    margin-bottom: var(--space-4, 1rem);
+    font-size: var(--text-sm, 0.875rem);
+    text-align: center;
+}
+
+.error__retry {
+    display: inline-block;
+    margin-top: var(--space-3, 0.75rem);
+    background: transparent;
+    border: 1px solid var(--color-error, #FF6B6B);
+    color: var(--color-error, #FF6B6B);
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    font-size: var(--text-sm, 0.875rem);
+    transition: background 0.2s;
+}
+
+.error__retry:hover {
+    background: rgba(255, 107, 107, 0.1);
+}
+
+/* ── Thumbnail progress (v0.2.13) ────────────────────────────────────────── */
+
+.thumb-progress {
+    margin-top: var(--space-3, 0.75rem);
+    padding: var(--space-3, 0.75rem);
+    background: rgba(77, 208, 225, 0.06);
+    border: 1px solid rgba(77, 208, 225, 0.12);
+    border-radius: var(--radius-md, 8px);
+}
+
+.thumb-progress__label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: var(--space-1, 0.25rem);
+}
+
+.thumb-progress__bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: var(--space-1, 0.25rem);
+}
+
+.thumb-progress__fill {
+    height: 100%;
+    background: var(--color-primary, #4DD0E1);
+    border-radius: 2px;
+    transition: width 0.2s ease;
+}
+
+.thumb-progress__count {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.4);
+    text-align: right;
+    font-family: var(--font-mono, monospace);
+}
+
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .upload-header-row {
+        flex-direction: column;
+    }
+    .upload-header-row__action {
+        align-self: flex-end;
+    }
+    .upload-next-btn {
+        min-width: 120px;
+        padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+        font-size: var(--text-small, 0.75rem);
+    }
+}

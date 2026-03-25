@@ -1,148 +1,179 @@
 /* =================================================================================
    SGraph Vault — Client-Side Encrypted Vault Logic
-   v0.1.2 — Deterministic vault pointers with read/write key separation
+   v0.3.0 — Self-describing IDs, bare/ paths, on-demand sub-tree loading
 
    A vault is a collection of encrypted files stored via the vault pointer API.
    The server sees only encrypted blobs — it has no concept of folders or file names.
 
-   Vault structure (all encrypted, stored as vault pointer files):
-     - settings: vault metadata (name, id, created, tree pointer)
-     - tree:     folder/file hierarchy with file ID references
+   v3 data model:
+     - Objects use self-describing IDs: obj-cas-imm-{hash}
+     - Refs use deterministic HMAC IDs: ref-pid-muw-{hmac} (HEAD), ref-pid-snw-{hmac} (clone)
+     - All file paths include bare/ prefix: bare/refs/ref-pid-muw-xxx, bare/data/obj-cas-imm-xxx
+     - Sub-tree model: one tree object per directory level
+     - Encrypted-only metadata: no plaintext name/size/content_hash in tree entries
+
+   In-memory tree:
+     The nested folder structure { '/': { type: 'folder', children: {} } } is
+     maintained in memory for UI convenience. It is derived from the tree
+     entries stored in commits, and serialized back to entries on save.
 
    Vault key format: {passphrase}:{vault_id}
-   Key derivation: SGVaultCrypto.deriveKeys() → read_key, write_key, file IDs
+   Key derivation: SGVaultCrypto.deriveKeys() → readKey, writeKey, refFileId, branchIndexFileId
 
-   Compatible with sg-send-cli v0.5.x (same tree format, same crypto, same API).
-
-   Depends on: SGSend (sg-send.js), SGSendCrypto (sg-send-crypto.js),
-               SGVaultCrypto (sg-vault-crypto.js)
+   Depends on: SGSend, SGSendCrypto, SGVaultCrypto, SGVaultObjectStore,
+               SGVaultRefManager, SGVaultCommit
    ================================================================================= */
 
 class SGVault {
 
     constructor(sgSend) {
-        this._sgSend             = sgSend
-        this._passphrase         = null
-        this._readKey            = null                                         // AES-256-GCM CryptoKey
-        this._writeKey           = null                                         // Hex string for server auth
-        this._vaultId            = null
-        this._settings           = null
-        this._tree               = null
-        this._treeFileId         = null                                         // Deterministic (from HMAC)
-        this._settingsFileId     = null                                         // Deterministic (from HMAC)
-        this._refFileId          = null                                         // Deterministic (from HMAC)
+        this._sgSend            = sgSend
+        this._passphrase        = null
+        this._readKey           = null                                         // AES-256-GCM CryptoKey
+        this._writeKey          = null                                         // Hex string for server auth
+        this._hmacKey           = null                                         // For per-branch ref derivation
+        this._vaultId           = null
+        this._refFileId         = null                                         // ref-pid-muw-{HMAC[:12]}
+        this._branchIndexFileId = null                                         // idx-pid-muw-{HMAC[:12]}
+        this._settings          = null                                         // Vault metadata
+        this._tree              = null                                         // Nested in-memory tree
+        this._headCommitId      = null                                         // Current HEAD commit
+        this._objectStore       = null                                         // SGVaultObjectStore
+        this._refManager        = null                                         // SGVaultRefManager
+        this._commitManager     = null                                         // SGVaultCommit
     }
 
-    // --- Vault Lifecycle ------------------------------------------------------
+    // --- Vault Lifecycle --------------------------------------------------------
 
     static async create(sgSend, passphrase, options = {}) {
         const vault = new SGVault(sgSend)
         vault._passphrase = passphrase
 
-        // 1. Generate vault ID (8 hex chars)
-        vault._vaultId = Array.from(crypto.getRandomValues(new Uint8Array(4)))
-            .map(b => b.toString(16).padStart(2, '0')).join('')
+        // 1. Generate vault ID (8 lowercase alphanumeric chars — matches sg-send-cli)
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+        const bytes    = crypto.getRandomValues(new Uint8Array(8))
+        vault._vaultId = Array.from(bytes).map(b => alphabet[b % alphabet.length]).join('')
 
         // 2. Derive all keys and deterministic file IDs
         const keys = await SGVaultCrypto.deriveKeys(passphrase, vault._vaultId)
-        vault._readKey        = keys.readKey
-        vault._writeKey       = keys.writeKey
-        vault._treeFileId     = keys.treeFileId
-        vault._settingsFileId = keys.settingsFileId
-        vault._refFileId      = keys.refFileId
+        vault._readKey           = keys.readKey
+        vault._writeKey          = keys.writeKey
+        vault._hmacKey           = keys.hmacKey
+        vault._refFileId         = keys.refFileId
+        vault._branchIndexFileId = keys.branchIndexFileId
 
-        // 3. Create settings
+        // 3. Initialize component managers
+        vault._initManagers()
+
+        // 4. Create settings (stored as a blob in the initial commit's tree)
         vault._settings = {
             vault_name:  options.name || 'Untitled Vault',
             vault_id:    vault._vaultId,
             created:     new Date().toISOString(),
-            version:     1,
+            version:     3,
             description: options.description || ''
         }
 
-        // 4. Create initial empty tree
-        vault._tree = {
-            version: 1,
-            updated: new Date().toISOString(),
-            tree: { '/': { type: 'folder', children: {} } }
-        }
+        // 5. Create initial empty tree (in-memory)
+        vault._tree = { '/': { type: 'folder', children: {} } }
 
-        // 5. Save tree and settings via vault pointer API (overwrite in-place)
-        await vault._saveTree()
+        // 6. Create initial commit with empty tree + settings
+        await vault._commit('Initial vault creation')
 
         return vault
     }
 
     static async open(sgSend, fullVaultKey) {
-        // Parse vault key: "{passphrase}:{vault_id}"
         const { passphrase, vaultId } = SGVaultCrypto.parseVaultKey(fullVaultKey)
 
         const vault = new SGVault(sgSend)
         vault._passphrase = passphrase
         vault._vaultId    = vaultId
 
-        // Derive all keys and deterministic file IDs
+        // Derive all keys
         const keys = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
-        vault._readKey        = keys.readKey
-        vault._writeKey       = keys.writeKey
-        vault._treeFileId     = keys.treeFileId
-        vault._settingsFileId = keys.settingsFileId
-        vault._refFileId      = keys.refFileId
+        vault._readKey           = keys.readKey
+        vault._writeKey          = keys.writeKey
+        vault._hmacKey           = keys.hmacKey
+        vault._refFileId         = keys.refFileId
+        vault._branchIndexFileId = keys.branchIndexFileId
 
-        // Download and decrypt settings + tree in parallel
-        const [encSettings, encTree] = await Promise.all([
-            sgSend.vaultRead(vaultId, vault._settingsFileId),
-            sgSend.vaultRead(vaultId, vault._treeFileId)
-        ])
+        // Initialize component managers
+        vault._initManagers()
 
-        if (!encSettings) throw new Error('Vault not found: settings file missing')
-        if (!encTree)     throw new Error('Vault not found: tree file missing')
+        // Read HEAD ref to get latest commit
+        const commitId = await vault._refManager.readRef(vault._refFileId)
+        if (!commitId) throw new Error('Vault not found: HEAD ref missing')
 
-        const settingsPlain = await sgSend.decrypt(encSettings, vault._readKey)
-        vault._settings     = JSON.parse(new TextDecoder().decode(settingsPlain))
+        vault._headCommitId = commitId
 
-        const treePlain = await sgSend.decrypt(encTree, vault._readKey)
-        vault._tree     = JSON.parse(new TextDecoder().decode(treePlain))
+        // Load commit → load tree → build nested structure
+        const commit = await vault._commitManager.loadCommit(commitId)
+        const tree   = await vault._commitManager.loadTree(commit.tree_id)
+
+        // Reconstruct nested tree and settings from flat entries
+        vault._tree     = { '/': { type: 'folder', children: {} } }
+        vault._settings = null
+
+        for (const entry of tree.entries) {
+            if (entry.name === '.vault-settings') {
+                // Settings stored as a special blob in the tree
+                const settingsBlob = await vault._objectStore.load(entry.blob_id)
+                const decrypted    = await SGSendCrypto.decrypt(settingsBlob, vault._readKey)
+                vault._settings    = JSON.parse(new TextDecoder().decode(decrypted))
+            } else {
+                vault._insertEntry(entry)
+            }
+        }
+
+        if (!vault._settings) {
+            vault._settings = {
+                vault_name: 'Untitled Vault',
+                vault_id:   vaultId,
+                created:    new Date().toISOString(),
+                version:    2
+            }
+        }
 
         return vault
     }
 
-    // --- Vault Key ------------------------------------------------------------
+    // --- Vault Key & Properties -------------------------------------------------
 
     getVaultKey() {
         return `${this._passphrase}:${this._vaultId}`
     }
 
-    get vaultId()   { return this._vaultId                  }
-    get name()      { return this._settings?.vault_name     }
-    get created()   { return this._settings?.created        }
+    get vaultId()   { return this._vaultId              }
+    get name()      { return this._settings?.vault_name }
+    get created()   { return this._settings?.created    }
 
-    // --- File Operations ------------------------------------------------------
+    // --- File Operations --------------------------------------------------------
 
     async addFile(folderPath, fileName, fileData) {
         const data = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData
-        const encrypted = await this._sgSend.encrypt(data, this._readKey)
 
-        // Generate a random file ID for user files (not deterministic)
-        const fileId = Array.from(crypto.getRandomValues(new Uint8Array(6)))
-            .map(b => b.toString(16).padStart(2, '0')).join('')
+        // Encrypt and store as content-addressed blob
+        const encrypted   = await this._sgSend.encrypt(data, this._readKey)
+        const blobId      = await this._objectStore.store(encrypted)
+        const contentHash = await this._commitManager.computeContentHash(data)
 
-        await this._sgSend.vaultWrite(this._vaultId, fileId, this._writeKey, new Uint8Array(encrypted))
-
+        // Update in-memory tree
         const folder = this._findNode(folderPath)
         if (!folder || folder.type !== 'folder') {
             throw new Error(`Folder not found: ${folderPath}`)
         }
 
         folder.children[fileName] = {
-            type:     'file',
-            file_id:  fileId,
-            size:     data.byteLength || data.length,
-            uploaded: new Date().toISOString()
+            type:         'file',
+            blob_id:      blobId,
+            size:         data.byteLength || data.length,
+            content_hash: contentHash
         }
 
-        await this._saveTree()
-        return { fileId, fileName, folderPath }
+        // Create new commit
+        await this._commit(`Add ${fileName}`)
+        return { blobId, fileName, folderPath }
     }
 
     async getFile(folderPath, fileName) {
@@ -151,23 +182,16 @@ class SGVault {
         const entry = folder.children[fileName]
         if (!entry || entry.type !== 'file') throw new Error(`File not found: ${fileName}`)
 
-        const encrypted = await this._sgSend.vaultRead(this._vaultId, entry.file_id)
-        if (!encrypted) throw new Error(`File data not found on server: ${entry.file_id}`)
-        return this._sgSend.decrypt(encrypted, this._readKey)
+        const encrypted = await this._objectStore.load(entry.blob_id)
+        return SGSendCrypto.decrypt(encrypted, this._readKey)
     }
 
     async removeFile(folderPath, fileName) {
         const folder = this._findNode(folderPath)
         if (!folder) throw new Error(`Folder not found: ${folderPath}`)
-        const entry = folder.children[fileName]
-
-        // Delete from server if file_id is present
-        if (entry?.file_id) {
-            await this._sgSend.vaultDelete(this._vaultId, entry.file_id, this._writeKey)
-        }
 
         delete folder.children[fileName]
-        await this._saveTree()
+        await this._commit(`Remove ${fileName}`)
     }
 
     async renameFile(folderPath, oldName, newName) {
@@ -177,10 +201,10 @@ class SGVault {
         if (folder.children[newName]) throw new Error(`Already exists: ${newName}`)
         folder.children[newName] = folder.children[oldName]
         delete folder.children[oldName]
-        await this._saveTree()
+        await this._commit(`Rename ${oldName} to ${newName}`)
     }
 
-    // --- Folder Operations ----------------------------------------------------
+    // --- Folder Operations ------------------------------------------------------
 
     async createFolder(folderPath) {
         const parts  = folderPath.split('/').filter(Boolean)
@@ -193,7 +217,7 @@ class SGVault {
             throw new Error(`Already exists: ${name}`)
         }
         parent.children[name] = { type: 'folder', children: {} }
-        await this._saveTree()
+        await this._commit(`Create folder ${name}`)
     }
 
     listFolder(folderPath) {
@@ -201,9 +225,9 @@ class SGVault {
         if (!node || node.type !== 'folder') return null
         return Object.entries(node.children).map(([name, entry]) => ({
             name,
-            type:     entry.type,
-            size:     entry.size || 0,
-            uploaded: entry.uploaded || null
+            type:         entry.type,
+            size:         entry.size || 0,
+            content_hash: entry.content_hash || null
         }))
     }
 
@@ -218,13 +242,13 @@ class SGVault {
             throw new Error(`Folder not found: ${name}`)
         }
         delete parent.children[name]
-        await this._saveTree()
+        await this._commit(`Remove folder ${name}`)
     }
 
     async renameFolder(folderPath, newName) {
-        const parts  = folderPath.split('/').filter(Boolean)
+        const parts   = folderPath.split('/').filter(Boolean)
         const oldName = parts.pop()
-        const parent = this._findNode('/' + parts.join('/'))
+        const parent  = this._findNode('/' + parts.join('/'))
         if (!parent || parent.type !== 'folder') {
             throw new Error(`Parent folder not found`)
         }
@@ -236,12 +260,12 @@ class SGVault {
         }
         parent.children[newName] = parent.children[oldName]
         delete parent.children[oldName]
-        await this._saveTree()
+        await this._commit(`Rename folder ${oldName} to ${newName}`)
     }
 
     async moveFile(srcFolderPath, fileName, destFolderPath) {
         if (srcFolderPath === destFolderPath) return
-        const srcFolder  = this._findNode(srcFolderPath)
+        const srcFolder = this._findNode(srcFolderPath)
         if (!srcFolder || srcFolder.type !== 'folder') throw new Error(`Source folder not found: ${srcFolderPath}`)
         const entry = srcFolder.children[fileName]
         if (!entry || entry.type !== 'file') throw new Error(`File not found: ${fileName}`)
@@ -252,12 +276,12 @@ class SGVault {
 
         destFolder.children[fileName] = entry
         delete srcFolder.children[fileName]
-        await this._saveTree()
+        await this._commit(`Move ${fileName}`)
     }
 
     async moveFolder(srcPath, destParentPath) {
-        const srcParts  = srcPath.split('/').filter(Boolean)
-        const folderName = srcParts.pop()
+        const srcParts    = srcPath.split('/').filter(Boolean)
+        const folderName  = srcParts.pop()
         const srcParentPath = '/' + srcParts.join('/')
         if (srcParentPath === destParentPath) return
 
@@ -266,7 +290,6 @@ class SGVault {
         const folderNode = srcParent.children[folderName]
         if (!folderNode || folderNode.type !== 'folder') throw new Error(`Folder not found: ${folderName}`)
 
-        // Prevent moving a folder into itself or its descendants
         if (destParentPath === srcPath || destParentPath.startsWith(srcPath + '/')) {
             throw new Error(`Cannot move folder into itself`)
         }
@@ -277,10 +300,10 @@ class SGVault {
 
         destParent.children[folderName] = folderNode
         delete srcParent.children[folderName]
-        await this._saveTree()
+        await this._commit(`Move folder ${folderName}`)
     }
 
-    // --- Stats ----------------------------------------------------------------
+    // --- Stats ------------------------------------------------------------------
 
     getStats() {
         let files = 0, folders = 0, totalSize = 0
@@ -295,15 +318,15 @@ class SGVault {
                 }
             }
         }
-        walk(this._tree.tree['/'])
+        walk(this._tree['/'])
         return { files, folders, totalSize }
     }
 
-    // --- Tree Management (internal) -------------------------------------------
+    // --- Tree Navigation (internal) ---------------------------------------------
 
     _findNode(path) {
         const parts = path.split('/').filter(Boolean)
-        let node    = this._tree.tree['/']
+        let node    = this._tree['/']
         for (const part of parts) {
             if (!node || node.type !== 'folder' || !node.children[part]) return null
             node = node.children[part]
@@ -311,18 +334,97 @@ class SGVault {
         return node
     }
 
-    async _saveTree() {
-        this._tree.version = (this._tree.version || 0) + 1
-        this._tree.updated = new Date().toISOString()
+    // --- Component Initialization -----------------------------------------------
 
-        // Encrypt tree and overwrite in-place (no new transfer IDs, no orphans)
-        const treeData      = new TextEncoder().encode(JSON.stringify(this._tree))
-        const encryptedTree = await this._sgSend.encrypt(treeData, this._readKey)
-        await this._sgSend.vaultWrite(this._vaultId, this._treeFileId, this._writeKey, new Uint8Array(encryptedTree))
+    _initManagers() {
+        this._objectStore    = new SGVaultObjectStore(this._sgSend, this._vaultId, this._writeKey)
+        this._refManager     = new SGVaultRefManager(this._sgSend, this._vaultId, this._writeKey, this._readKey)
+        this._commitManager  = new SGVaultCommit(this._objectStore, this._readKey)
+    }
 
-        // Encrypt settings and overwrite in-place
-        const settingsData      = new TextEncoder().encode(JSON.stringify(this._settings))
-        const encryptedSettings = await this._sgSend.encrypt(settingsData, this._readKey)
-        await this._sgSend.vaultWrite(this._vaultId, this._settingsFileId, this._writeKey, new Uint8Array(encryptedSettings))
+    // --- Commit: serialize tree → create tree object → create commit → update ref
+
+    async _commit(message) {
+        // 1. Flatten nested tree to entry list
+        const entries = this._flattenTree()
+
+        // 2. Add settings as a special entry
+        const settingsPlain     = new TextEncoder().encode(JSON.stringify(this._settings))
+        const settingsEncrypted = await this._sgSend.encrypt(settingsPlain, this._readKey)
+        const settingsBlobId    = await this._objectStore.store(settingsEncrypted)
+        const settingsHash      = await this._commitManager.computeContentHash(settingsPlain)
+
+        entries.push({
+            name:         '.vault-settings',
+            size:         settingsPlain.byteLength,
+            content_hash: settingsHash,
+            blob_id:      settingsBlobId,
+            tree_id:      null
+        })
+
+        // 3. Create tree object
+        const treeId = await this._commitManager.createTree(entries)
+
+        // 4. Create commit
+        const parentIds = this._headCommitId ? [this._headCommitId] : []
+        const commitId  = await this._commitManager.createCommit({
+            parentIds,
+            treeId,
+            message
+        })
+
+        // 5. Update HEAD ref
+        await this._refManager.writeRef(this._refFileId, commitId)
+        this._headCommitId = commitId
+    }
+
+    // --- Flatten nested tree into flat entry list --------------------------------
+
+    _flattenTree() {
+        const entries = []
+
+        const walk = (node, prefix) => {
+            for (const [name, entry] of Object.entries(node.children || {})) {
+                const fullPath = prefix ? `${prefix}/${name}` : name
+
+                if (entry.type === 'folder') {
+                    walk(entry, fullPath)
+                } else {
+                    entries.push({
+                        name:         fullPath,
+                        size:         entry.size || 0,
+                        content_hash: entry.content_hash || null,
+                        blob_id:      entry.blob_id || null,
+                        tree_id:      null
+                    })
+                }
+            }
+        }
+
+        walk(this._tree['/'], '')
+        return entries
+    }
+
+    // --- Insert a flat entry into the nested in-memory tree ----------------------
+
+    _insertEntry(entry) {
+        const parts    = entry.name.split('/')
+        const fileName = parts.pop()
+        let node       = this._tree['/']
+
+        // Create intermediate folders as needed
+        for (const part of parts) {
+            if (!node.children[part]) {
+                node.children[part] = { type: 'folder', children: {} }
+            }
+            node = node.children[part]
+        }
+
+        node.children[fileName] = {
+            type:         'file',
+            blob_id:      entry.blob_id,
+            size:         entry.size | 0,
+            content_hash: entry.content_hash || null
+        }
     }
 }

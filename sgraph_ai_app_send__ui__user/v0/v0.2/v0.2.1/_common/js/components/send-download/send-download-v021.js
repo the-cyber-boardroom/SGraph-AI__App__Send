@@ -111,32 +111,18 @@ SendDownload.prototype._renderSharePanel = function() {
         `);
     }
 
-    // Access key — from URL param or localStorage fallback
-    const tokenName = this.tokenName || (() => {
-        try { return localStorage.getItem('sgraph-send-token'); } catch(_) { return null; }
-    })();
-    if (tokenName) {
-        parts.push(`
-            <div class="share-panel__item">
-                <div class="share-panel__label">Access key</div>
-                <div class="share-panel__row">
-                    <code class="share-panel__code" id="share-token-name">${this.escapeHtml(tokenName)}</code>
-                    <button class="btn btn-sm btn-secondary" id="copy-token-name" title="Copy access key">Copy</button>
-                </div>
-            </div>
-        `);
-    }
-
-    // Access token value — from localStorage
+    // Access token value — from localStorage (masked by default)
     const accessToken = (() => {
         try { return localStorage.getItem('sgraph-send-access-token'); } catch(_) { return null; }
     })();
     if (accessToken) {
+        const masked = '\u2022'.repeat(Math.min(accessToken.length, 20));
         parts.push(`
             <div class="share-panel__item">
                 <div class="share-panel__label">Access token</div>
                 <div class="share-panel__row">
-                    <code class="share-panel__code" id="share-access-token">${this.escapeHtml(accessToken)}</code>
+                    <code class="share-panel__code" id="share-access-token" data-value="${this.escapeHtml(accessToken)}" data-masked="true">${masked}</code>
+                    <button class="btn btn-sm btn-secondary" id="toggle-access-token" title="Show/hide token">Show</button>
                     <button class="btn btn-sm btn-secondary" id="copy-access-token" title="Copy access token">Copy</button>
                 </div>
             </div>
@@ -481,18 +467,29 @@ SendDownload.prototype.setupEventListeners = function() {
             if (input) this.copyToClipboard(input.value, copyUrlBtn);
         });
     }
-    const copyTokenBtn = this.querySelector('#copy-token-name');
-    if (copyTokenBtn) {
-        copyTokenBtn.addEventListener('click', () => {
-            const code = this.querySelector('#share-token-name');
-            if (code) this.copyToClipboard(code.textContent, copyTokenBtn);
+    const toggleTokenBtn = this.querySelector('#toggle-access-token');
+    if (toggleTokenBtn) {
+        toggleTokenBtn.addEventListener('click', () => {
+            const code = this.querySelector('#share-access-token');
+            if (!code) return;
+            const isMasked = code.getAttribute('data-masked') === 'true';
+            if (isMasked) {
+                code.textContent = code.getAttribute('data-value');
+                code.setAttribute('data-masked', 'false');
+                toggleTokenBtn.textContent = 'Hide';
+            } else {
+                const val = code.getAttribute('data-value') || '';
+                code.textContent = '\u2022'.repeat(Math.min(val.length, 20));
+                code.setAttribute('data-masked', 'true');
+                toggleTokenBtn.textContent = 'Show';
+            }
         });
     }
     const copyAccessBtn = this.querySelector('#copy-access-token');
     if (copyAccessBtn) {
         copyAccessBtn.addEventListener('click', () => {
             const code = this.querySelector('#share-access-token');
-            if (code) this.copyToClipboard(code.textContent, copyAccessBtn);
+            if (code) this.copyToClipboard(code.getAttribute('data-value') || code.textContent, copyAccessBtn);
         });
     }
 

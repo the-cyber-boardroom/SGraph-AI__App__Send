@@ -20,7 +20,9 @@ class SendTestFiles extends HTMLElement {
         { name: 'test-data.json',      type: 'json', mime: 'application/json', size: '460 B'  },
         { name: 'test-page.html',      type: 'html', mime: 'text/html',        size: '1.9 KB' },
         { name: 'test-image.png',      type: 'png',  mime: 'image/png',        size: '522 B'  },
+        { name: 'test-photo-2.png',    type: 'png',  mime: 'image/png',        size: '10.4 KB'},
         { name: 'test-document.pdf',   type: 'pdf',  mime: 'application/pdf',  size: '933 B'  },
+        { name: 'test-readme.md',      type: 'md',   mime: 'text/markdown',    size: '1.0 KB' },
     ];
 
     // Inline SVG icons per file type (16×20 base document shape)
@@ -54,6 +56,11 @@ class SendTestFiles extends HTMLElement {
                 <path d="M8 0v4c0 1.1.9 2 2 2h4" stroke="#E94560" stroke-width=".75"/>
                 <text x="8" y="15" text-anchor="middle" fill="#E94560" font-size="5" font-weight="700" font-family="system-ui">PDF</text>
                </svg>`,
+        md: `<svg class="test-file__icon" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 2C0 .9.9 0 2 0h8l6 6v12c0 1.1-.9 2-2 2H2c-1.1 0-2-.9-2-2V2z" fill="#16213E" stroke="#58A6FF" stroke-width=".75"/>
+                <path d="M8 0v4c0 1.1.9 2 2 2h4" stroke="#58A6FF" stroke-width=".75"/>
+                <text x="8" y="15" text-anchor="middle" fill="#58A6FF" font-size="4.5" font-weight="700" font-family="system-ui">MD</text>
+              </svg>`,
     };
 
     connectedCallback() {

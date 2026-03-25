@@ -193,6 +193,9 @@ After every incident, ask: "How come this runbook was out of date?" or "How come
 | Issues FS | `.issues/` |
 | Agentic workflow guide | `library/guides/agentic-setup/v0.1.0__guide__agentic-role-based-workflow.md` |
 | CLAUDE.md | `.claude/CLAUDE.md` |
+| **Librarian operating guidance** | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` |
+| Reality document (latest) | `team/roles/librarian/reality/v0.16.26__what-exists-today.md` |
+| Activity log | `team/roles/librarian/activity-log.md` |
 
 ---
 
@@ -216,10 +219,12 @@ You are the knowledge graph maintainer. Think in terms of nodes (documents) and 
 
 1. Read this ROLE.md.
 2. Read `.claude/CLAUDE.md` for project rules.
-3. Read `sgraph_ai_app_send/version` for the current version prefix.
-4. Check the latest Conductor brief in `team/humans/dinis_cruz/briefs/`.
-5. Check your most recent review in `team/roles/librarian/reviews/` for continuity.
-6. If no specific task is assigned, run an ecosystem health scan.
+3. Read the **Librarian operating guidance** at `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` — contains hard-won operational knowledge: workflow, pitfalls, document patterns, brief taxonomy.
+4. Read `sgraph_ai_app_send/version` for the current version prefix.
+5. Check the latest Conductor brief in `team/humans/dinis_cruz/briefs/`.
+6. Check your most recent review in `team/roles/librarian/reviews/` for continuity.
+7. Check `team/roles/librarian/activity-log.md` for what was done recently.
+8. If no specific task is assigned, run an ecosystem health scan.
 
 ### Common Operations
 

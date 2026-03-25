@@ -14,7 +14,7 @@
 
 **Before describing, assessing, or assuming what SGraph Send can do, READ:**
 
-`team/roles/librarian/reality/v0.13.34__what-exists-today.md`
+`team/roles/librarian/reality/v0.16.26__what-exists-today.md`
 
 This is the **code-verified** record of every endpoint, UI page, test, and feature that actually exists. It was built by auditing source code, not briefs or reviews.
 
@@ -204,6 +204,7 @@ team/                            # Team structure
 23. **Feature branches** branch from `dev`
 24. **Branch naming:** `claude/{description}-{session-id}`
 25. **Always push with:** `git push -u origin {branch-name}`
+26. **Pull from dev before starting work** — always run `git fetch origin dev && git merge origin/dev` at the start of every session before making any changes
 
 ---
 
@@ -216,7 +217,7 @@ Each agent operates as a specific role. Roles produce review documents in their 
 **Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs, Villager briefs, and Town Planner briefs. **IMPORTANT: The `briefs/` folder is read-only for agents.** Only the human creates files there. Agent outputs go to `team/humans/dinis_cruz/claude-code-web/` or `team/roles/{role}/reviews/`.
 
 Before starting work, check:
-1. **Reality document** at `team/roles/librarian/reality/v0.13.34__what-exists-today.md` — what actually exists in code
+1. **Reality document** at `team/roles/librarian/reality/v0.16.26__what-exists-today.md` — what actually exists in code
 2. Latest human brief in `team/humans/dinis_cruz/briefs/`
 3. Latest debrief in `team/humans/dinis_cruz/debriefs/`
 4. Latest Librarian master index in `team/roles/librarian/reviews/`
@@ -246,14 +247,14 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 ---
 
-## Current State (v0.6.36)
+## Current State (v0.16.26)
 
-**See `team/roles/librarian/reality/v0.13.34__what-exists-today.md` for the full code-verified picture.**
+**See `team/roles/librarian/reality/v0.16.26__what-exists-today.md` for the full code-verified picture.**
 
-**Summary:** 73 HTTP endpoints (18 User + 55 Admin), 6 User UI pages, 17 Admin components, 393 passing tests, MCP on both Lambdas, full encryption pipeline, data rooms, personal vaults, PKI, audit trails, token management, analytics.
+**Summary:** 73+ HTTP endpoints (18 User + 55 Admin), 6 User UI pages, 17 Admin components, 393+ passing tests, MCP on both Lambdas, full encryption pipeline, data rooms, personal vaults, PKI, audit trails, token management, analytics. Reality document last code-audited at v0.13.34; PROPOSED items tracked through v0.16.26.
 
 **Three parallel tracks:**
-1. **Explorer track:** New features (rooms, vaults, PKI, MCP), experiments, first versions
+1. **Explorer track:** New features (rooms, vaults, PKI, MCP, vault redesign, upload UX), experiments, first versions
 2. **Villager track:** IFD production release, deployment hardening, performance, monitoring, stability
 3. **Town Planner track:** Investor materials, business strategy, Alchemist narratives
 
@@ -263,7 +264,7 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 | Document | Location |
 |---|---|
-| **Reality document** | `team/roles/librarian/reality/v0.13.34__what-exists-today.md` |
+| **Reality document** | `team/roles/librarian/reality/v0.16.26__what-exists-today.md` |
 | Project brief | `library/docs/_to_process/01-project-brief.md` |
 | Specs index | `library/docs/specs/README.md` |
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
@@ -272,10 +273,9 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 | Wardley Maps brief | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
 | Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
 | Villager role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md` |
-| Current brief (v0.3.2) | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__daily-brief__sgraph-send-14-feb-2026.md` |
-| Current brief (v0.3.0) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.3.0__daily-brief__sgraph-send-14-feb-2026.md` |
-| Decisions (14 Feb) | `team/humans/dinis_cruz/claude-code-web/02/14/v0.2.41__brief__decisions-14-feb-2026.md` |
-| Latest debrief | `team/humans/dinis_cruz/debriefs/02/14/v0.3.0__debrief__daily-brief-responses-and-admin-ui.md` |
-| Master index (latest) | `team/roles/librarian/reviews/02/14/v0.3.0__master-index__daily-brief-responses-14-feb.md` |
+| Latest debrief | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__debrief__briefs-processing-13-to-18-march.md` |
+| Session handoff | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` |
+| Master index (latest) | `team/roles/librarian/reviews/03/18/v0.16.26__master-index__briefs-13-to-18-march.md` |
+| Master index (addendum) | `team/roles/librarian/reviews/03/19/v0.16.21__master-index__briefs-18-march-addendum.md` |
 | Issues FS | `.issues/` |
 | IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |

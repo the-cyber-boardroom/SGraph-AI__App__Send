@@ -1,0 +1,186 @@
+/* =============================================================================
+   SGraph Send — Upload Step Delivery Styles
+   Extracted from monolith v0.2.3 / v0.2.8 / v0.2.14 inline IIFEs
+   ============================================================================= */
+
+:host {
+    display: block;
+}
+
+/* ─── File summary ────────────────────────────────────────────────────────── */
+
+.file-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    background: rgba(78, 205, 196, 0.04);
+    border-radius: var(--radius-sm, 6px);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.file-summary--compact {
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.file-summary__icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.file-summary__name {
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text, #E0E0E0);
+    font-size: var(--text-sm, 0.875rem);
+}
+
+.file-summary__meta {
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.file-breakdown {
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.8;
+    margin-top: 2px;
+}
+
+/* ─── Step title ──────────────────────────────────────────────────────────── */
+
+.step-title {
+    font-size: var(--text-body, 1rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text, #E0E0E0);
+    margin: 0 0 var(--space-2, 0.5rem) 0;
+}
+
+/* ─── Delivery cards grid ─────────────────────────────────────────────────── */
+
+.delivery-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4, 1rem);
+    margin-top: var(--space-4, 1rem);
+}
+
+/* ─── Individual delivery card ────────────────────────────────────────────── */
+
+.delivery-card {
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius-md, 12px);
+    padding: var(--space-6, 1.5rem);
+    background: var(--color-surface, #1E2A4A);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
+    text-align: left;
+    position: relative;
+}
+
+.delivery-card:hover {
+    border-color: var(--color-primary, #4ECDC4);
+    background: var(--accent-subtle, rgba(78, 205, 196, 0.12));
+    transform: translateY(-2px);
+}
+
+.delivery-card--selected {
+    border-color: var(--color-primary, #4ECDC4);
+    background: var(--accent-subtle, rgba(78, 205, 196, 0.12));
+    box-shadow: 0 0 0 1px var(--color-primary, #4ECDC4);
+}
+
+.delivery-card--recommended {
+    position: relative;
+}
+
+.delivery-card--recommended::after {
+    content: "\2605 DEFAULT";
+    position: absolute;
+    bottom: var(--space-3, 0.75rem);
+    right: var(--space-3, 0.75rem);
+    font-size: var(--text-micro, 0.625rem);
+    color: var(--color-primary, #4ECDC4);
+    font-weight: var(--weight-semibold, 600);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.delivery-card__icon {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.delivery-card__body {
+    display: flex;
+    flex-direction: column;
+}
+
+.delivery-card__title {
+    font-size: var(--text-body, 1rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--color-text, #E0E0E0);
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.delivery-card__desc {
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    line-height: 1.5;
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.delivery-card__hint {
+    font-size: var(--text-micro, 0.625rem);
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.7;
+}
+
+/* ─── Default-selected state (pre-selected card highlight) ────────────────── */
+
+.default-selected {
+    border-color: var(--color-primary, #4ECDC4);
+    background: var(--accent-subtle, rgba(78, 205, 196, 0.08));
+}
+
+/* ─── Hover highlight for non-default cards ───────────────────────────────── */
+
+.hover-highlight {
+    border-color: var(--color-primary, #4ECDC4);
+    background: var(--accent-subtle, rgba(78, 205, 196, 0.12));
+}
+
+/* ─── Dimmed default (when hovering a non-default card) ───────────────────── */
+
+.dimmed-default {
+    border-color: var(--color-border, rgba(78, 205, 196, 0.15));
+    background: var(--color-surface, #1E2A4A);
+}
+
+/* ─── Back link ───────────────────────────────────────────────────────────── */
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1, 0.25rem);
+    margin-top: var(--space-4, 1rem);
+    font-size: var(--text-small, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+}
+
+.back-link:hover {
+    color: var(--color-primary, #4ECDC4);
+}
+
+/* ─── Mobile ──────────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .delivery-cards {
+        grid-template-columns: 1fr;
+    }
+}

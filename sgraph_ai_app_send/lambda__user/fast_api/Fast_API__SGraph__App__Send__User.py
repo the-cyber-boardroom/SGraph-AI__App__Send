@@ -1,10 +1,6 @@
 from osbot_fast_api_serverless.fast_api.routes.Routes__Info import Routes__Info
 
-import sgraph_ai_app_send__ui__user
-from osbot_fast_api.api.decorators.route_path                                       import route_path
 from osbot_fast_api_serverless.fast_api.Serverless__Fast_API                        import Serverless__Fast_API
-from starlette.responses                                                            import RedirectResponse
-from starlette.staticfiles                                                          import StaticFiles
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import Routes__Transfers
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned             import Routes__Presigned
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Early_Access          import Routes__Early_Access
@@ -13,18 +9,14 @@ from sgraph_ai_app_send.lambda__user.service.Transfer__Service                  
 from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls               import Service__Presigned_Urls
 from sgraph_ai_app_send.lambda__user.service.Service__Early_Access                 import Service__Early_Access
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer               import Service__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.service.Service__Vault__Zip                  import Service__Vault__Zip
 from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
-from sgraph_ai_app_send.lambda__user.user__config                                   import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE, APP_SEND__UI__USER__LOCALE
+from sgraph_ai_app_send.lambda__user.user__config                                   import APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
 from sgraph_ai_app_send.lambda__user.user__config                                   import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY, ENV_VAR__N8N_WEBHOOK_URL, ENV_VAR__N8N_WEBHOOK_SECRET
 from sgraph_ai_app_send.utils.MCP__Setup                                            import MCP__Setup
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
-
-ROUTES_PATHS__APP_SEND__STATIC__USER  = ['/',
-                                         f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}',
-                                         '/tools/ssh-keygen',
-                                         '/welcome'                                     ]
 
 ROUTES_PATHS__API_DOCS                = ['/api/docs', '/api/openapi.json', '/api/redoc']
 
@@ -36,6 +28,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
     admin_service_client : Admin__Service__Client = None                            # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
     early_access_service : Service__Early_Access  = None                            # Early Access signup (n8n webhook)
     vault_service        : Service__Vault__Pointer = None                            # Vault pointer service (mutable files)
+    vault_zip_service    : Service__Vault__Zip      = None                            # Vault zip builder with content-addressable caching
 
     def app_kwargs(self, **kwargs):                                                   # Override: move docs under /api/ so CloudFront routes them to Lambda
         kwargs = super().app_kwargs(**kwargs)
@@ -84,6 +77,10 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         if self.vault_service is None:                                           # Auto-create vault pointer service (shares storage backend)
             self.vault_service = Service__Vault__Pointer(storage_fs=storage_fs)
 
+        if self.vault_zip_service is None:                                     # Auto-create vault zip service (shares storage backend for cache)
+            self.vault_zip_service = Service__Vault__Zip(vault_service = self.vault_service,
+                                                          storage_fs    = storage_fs       )
+
         return super().setup()
 
 
@@ -98,7 +95,6 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                                       expose_headers    = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization"]                                  )
 
     def setup_routes(self):
-        self.setup_static_routes()
         self.add_routes(Routes__Info             )
         self.add_routes(Routes__Transfers        ,
                         transfer_service     = self.transfer_service     ,
@@ -110,6 +106,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                         service_early_access = self.early_access_service )
         self.add_routes(Routes__Vault__Pointer ,
                         vault_service        = self.vault_service        ,
+                        vault_zip_service    = self.vault_zip_service    ,
                         admin_service_client = self.admin_service_client )
 
         self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
@@ -122,39 +119,3 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                                stateless       = True                                            )  # Lambda-compatible: no session state, authless discovery
         self.mcp = mcp_setup.mount_mcp(self.app())
 
-
-    # todo: refactor to separate class (focused on setting up this static route)
-    #       also these values should all be defined in a Type_Safe class
-    def setup_static_routes(self):
-
-
-        path_static_folder  = sgraph_ai_app_send__ui__user.path
-        path_static         = f"/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}"
-        path_name           = APP_SEND__UI__USER__ROUTE__PATH__CONSOLE
-        major_version       = APP_SEND__UI__USER__MAJOR__VERSION
-        latest_version      = APP_SEND__UI__USER__LATEST__VERSION
-        start_page          = APP_SEND__UI__USER__START_PAGE
-        locale              = APP_SEND__UI__USER__LOCALE
-        path_latest_version = f"/{path_name}/{major_version}/{latest_version}/{locale}/{start_page}.html"
-        self.app().mount(path_static, StaticFiles(directory=path_static_folder), name=path_name)
-
-        @route_path(path='/')
-        def redirect_root():
-            return RedirectResponse(url=path_latest_version)
-
-        @route_path(path=f'/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}')
-        def redirect_to_latest():
-            return RedirectResponse(url=path_latest_version)
-
-        @route_path(path='/tools/ssh-keygen')
-        def redirect_to_ssh_keygen():
-            return RedirectResponse(url=f'/{path_name}/tools/ssh-keygen/v0/v0.1/v0.1.0/index.html')
-
-        @route_path(path='/welcome')
-        def redirect_to_welcome():
-            return RedirectResponse(url=f'/{path_name}/{major_version}/{latest_version}/{locale}/welcome/index.html')
-
-        self.add_route_get(redirect_root)
-        self.add_route_get(redirect_to_latest)
-        self.add_route_get(redirect_to_ssh_keygen)
-        self.add_route_get(redirect_to_welcome)
