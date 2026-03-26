@@ -248,7 +248,7 @@ class UploadStepDone extends HTMLElement {
         html += '<div class="share-value">' +
             '<label class="share-label">Simple token</label>' +
             '<div class="share-row">' +
-                '<div class="share-box share-box--friendly" id="simple-token" data-testid="share-simple-token">' + this._esc(friendlyKey) + '</div>' +
+                '<div class="share-box share-box--friendly" id="simple-token" data-testid="share-simple-token" data-qa-mask="friendly-token">' + this._esc(friendlyKey) + '</div>' +
                 '<button class="copy-btn" data-copy="simple-token" data-testid="copy-simple-token">Copy</button>' +
             '</div>' +
             '<div class="share-guidance">This token derives both the transfer ID and decryption key</div>' +
@@ -258,7 +258,7 @@ class UploadStepDone extends HTMLElement {
         html += '<div class="share-value">' +
             '<label class="share-label">Full link</label>' +
             '<div class="share-row">' +
-                '<div class="share-box" id="full-link" data-testid="share-full-link">' + this._esc(tokenLink) + '</div>' +
+                '<div class="share-box" id="full-link" data-testid="share-full-link" data-qa-mask="transfer-url">' + this._esc(tokenLink) + '</div>' +
                 '<button class="copy-btn" data-copy="full-link" data-testid="copy-full-link">Copy</button>' +
             '</div>' +
             '<div class="share-guidance">Direct link &mdash; anyone with this can decrypt the file</div>' +
@@ -308,7 +308,7 @@ class UploadStepDone extends HTMLElement {
         return '<div class="share-value">' +
             '<label class="share-label">Share this link</label>' +
             '<div class="share-row">' +
-                '<div class="share-box" id="combined-link">' + this._esc(result.combinedUrl || '') + '</div>' +
+                '<div class="share-box" id="combined-link" data-qa-mask="transfer-url">' + this._esc(result.combinedUrl || '') + '</div>' +
                 '<button class="copy-btn" data-copy="combined-link">' + this._esc(this._t('upload.result.copy_link', 'Copy link')) + '</button>' +
             '</div>' +
             '<a href="' + this._esc(result.combinedUrl || '') + '" target="_blank" rel="noopener" class="open-link">Open in new tab &#8599;</a>' +
@@ -321,14 +321,14 @@ class UploadStepDone extends HTMLElement {
         return '<div class="share-value">' +
             '<label class="share-label">1. Send this link</label>' +
             '<div class="share-row">' +
-                '<div class="share-box" id="link-only">' + this._esc(result.linkOnlyUrl || '') + '</div>' +
+                '<div class="share-box" id="link-only" data-qa-mask="transfer-url">' + this._esc(result.linkOnlyUrl || '') + '</div>' +
                 '<button class="copy-btn" data-copy="link-only">' + this._esc(this._t('upload.result.copy', 'Copy')) + '</button>' +
             '</div>' +
         '</div>' +
         '<div class="share-value">' +
             '<label class="share-label">2. Send this key separately</label>' +
             '<div class="share-row">' +
-                '<div class="share-box share-box--key" id="decryption-key">' + this._esc(result.keyString || '') + '</div>' +
+                '<div class="share-box share-box--key" id="decryption-key" data-qa-mask="encryption-key">' + this._esc(result.keyString || '') + '</div>' +
                 '<button class="copy-btn" data-copy="decryption-key">' + this._esc(this._t('upload.result.copy', 'Copy')) + '</button>' +
             '</div>' +
             '<div class="share-guidance">Send through a different channel (e.g. link via email, key via chat)</div>' +
@@ -392,10 +392,10 @@ class UploadStepDone extends HTMLElement {
         if (rows.length === 0) return '';
 
         return '<div class="timings">' +
-            '<div class="timings__title">' +
+            '<div class="timings__title" data-qa-mask="timing">' +
                 this._esc(this._t('upload.timing.title', 'Completed in')) + ' ' + (totalMs / 1000).toFixed(2) + 's' +
             '</div>' +
-            '<div class="timings__rows">' + rows.join('') + '</div>' +
+            '<div class="timings__rows" data-qa-mask="timing-bars">' + rows.join('') + '</div>' +
         '</div>';
     }
 

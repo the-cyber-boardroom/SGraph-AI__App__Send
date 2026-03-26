@@ -267,7 +267,7 @@ class SendBrowse extends SendComponent {
             <div class="sb-share">
                 <h3 class="sb-share__title">Share this transfer</h3>
                 <div class="sb-share__url-row">
-                    <input type="text" class="sb-share__url" value="${SendHelpers.escapeHtml(url)}" readonly id="sb-share-url">
+                    <input type="text" class="sb-share__url" value="${SendHelpers.escapeHtml(url)}" readonly data-qa-mask="transfer-url" id="sb-share-url">
                     <button class="sb-action-btn" id="sb-share-copy">${SendIcons.LINK_SM} Copy</button>
                 </div>
                 <div class="sb-share__actions">

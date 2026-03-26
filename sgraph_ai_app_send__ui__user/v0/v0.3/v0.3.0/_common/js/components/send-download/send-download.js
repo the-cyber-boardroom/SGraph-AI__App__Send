@@ -418,7 +418,7 @@ class SendDownload extends HTMLElement {
         return `
             <div class="status status--info">
                 <strong>${this._esc(this.t(typeKey))}</strong> — ${this._fmtBytes(info.file_size_bytes)}
-                <br><small>${this._esc(this.t('download.info.uploaded', { timestamp: this._fmtTime(info.created_at) }))}</small>
+                <br><small data-qa-mask="timestamp">${this._esc(this.t('download.info.uploaded', { timestamp: this._fmtTime(info.created_at) }))}</small>
                 ${info.download_count > 0 ? `<br><small>${this._esc(this.t('download.info.download_count', { count: info.download_count }))}</small>` : ''}
             </div>
             <div style="margin-top: 1rem;">
@@ -570,7 +570,7 @@ class SendDownload extends HTMLElement {
                 <div style="margin-top: 1rem;">
                     <div style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: 0.5rem;">Download link</div>
                     <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" class="input" value="${this._esc(url)}" readonly style="flex: 1; font-size: 0.75rem; font-family: monospace;">
+                        <input type="text" class="input" value="${this._esc(url)}" readonly data-qa-mask="transfer-url" style="flex: 1; font-size: 0.75rem; font-family: monospace;">
                         <button class="btn btn-sm btn-secondary" id="dl-copy-link">Copy</button>
                     </div>
                 </div>` : ''}
@@ -634,7 +634,7 @@ class SendDownload extends HTMLElement {
                             <span class="sf-size">${this._esc(sizeStr)}</span>
                         </div>
                         <div class="sf-info">
-                            ${uploadDate ? `<div>Uploaded: ${this._esc(uploadDate)}</div>` : ''}
+                            ${uploadDate ? `<div data-qa-mask="timestamp">Uploaded: ${this._esc(uploadDate)}</div>` : ''}
                             ${downloads > 0 ? `<div>Downloaded ${downloads} time${downloads !== 1 ? 's' : ''}</div>` : ''}
                         </div>
                     </div>
@@ -660,7 +660,7 @@ class SendDownload extends HTMLElement {
                     <div class="sf-share">
                         <div class="sf-share-label">Download link</div>
                         <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" class="input" value="${this._esc(url)}" readonly
+                            <input type="text" class="input" value="${this._esc(url)}" readonly data-qa-mask="transfer-url"
                                    style="flex: 1; font-size: 0.75rem; font-family: monospace;">
                             <button class="btn btn-sm btn-secondary" id="sf-copy-url">Copy</button>
                         </div>
@@ -711,7 +711,7 @@ class SendDownload extends HTMLElement {
             <div style="padding: 0.5rem 0.75rem; background: var(--accent-subtle, rgba(78,205,196,0.08));
                  border-radius: 6px; font-family: var(--font-mono, monospace); font-size: 0.75rem;">
                 <span style="color: var(--accent, #4ECDC4); font-weight: 600;">
-                    Decrypted in ${(totalMs / 1000).toFixed(2)}s
+                    <span data-qa-mask="timing">Decrypted in ${(totalMs / 1000).toFixed(2)}s</span>
                 </span>
             </div>
         `;
