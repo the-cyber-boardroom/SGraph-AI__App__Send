@@ -185,8 +185,9 @@ class SendBrowse extends SendComponent {
             `;
         }
 
-        // Files
-        for (const file of node.files) {
+        // Files (sorted alphanumerically for natural reading order)
+        const sortedFiles = [...node.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+        for (const file of sortedFiles) {
             const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(file.name, null) : null;
             const icon = SendBrowse.FILE_ICONS[type] || SendBrowse.FILE_ICONS.other;
             html += `

@@ -161,6 +161,13 @@ class SendUpload extends HTMLElement {
 
         if (isProc) this._startCarousel();
         else this._stopCarousel();
+
+        // U-017: Hide Access Token and Test Files sections once past Step 1 idle
+        var showSiblings = (this._state === 'idle' || this._state === 'file-ready' || this._state === 'folder-options');
+        var testFiles = document.querySelector('send-test-files');
+        if (testFiles) testFiles.style.display = showSiblings ? '' : 'none';
+        var tokenBar = document.querySelector('.v026-token-bar');
+        if (tokenBar) tokenBar.style.display = showSiblings ? '' : 'none';
     }
 
     _activeComponent() {
@@ -581,8 +588,22 @@ class SendUpload extends HTMLElement {
 
     _openEmailLink() {
         if (!this.result) return;
-        var body = "I've sent you an encrypted file via SG/Send.\n\nOpen this link to download:\n" + (this.result.combinedUrl || '');
-        window.open('mailto:?subject=' + encodeURIComponent('Secure file for you') + '&body=' + encodeURIComponent(body));
+        var subject = 'Encrypted file via SG/Send';
+        var body;
+        if (this._shareMode === 'separate') {
+            // SECURITY: only include the link, NOT the key — key must travel separately
+            body = "I've sent you an encrypted file via SG/Send.\n\n" +
+                   "Open this link to download:\n" + (this.result.linkOnlyUrl || '') + "\n\n" +
+                   "You'll need the decryption key to open it \u2014 I'll send that separately.";
+        } else if (this._shareMode === 'token' && this.result.friendlyKey) {
+            var tokenLink = this.result.tokenLink || this.result.combinedUrl || '';
+            body = "I've sent you an encrypted file via SG/Send.\n\n" +
+                   "Open this link to view it:\n" + tokenLink;
+        } else {
+            body = "I've sent you an encrypted file via SG/Send.\n\n" +
+                   "Open this link to view it:\n" + (this.result.combinedUrl || '');
+        }
+        window.open('mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body), '_blank');
     }
 }
 

@@ -243,6 +243,7 @@ class SendGallery extends SendComponent {
                     <span id="sg-lb-counter"></span>
                     <button class="sg-gallery__action-btn sg-lightbox__present" id="sg-lb-present" style="display: none;" title="Present mode (f)">⛶ Present</button>
                     <button class="sg-gallery__action-btn" id="sg-lb-print" style="display: none;" title="Print">${SendIcons.PRINT} Print</button>
+                    <button class="sg-gallery__action-btn" id="sg-lb-share" title="Copy Link">${SendIcons.LINK} Copy Link</button>
                     <button class="sg-gallery__save-btn sg-lightbox__save" id="sg-lb-save">${SendIcons.DOWNLOAD} Save</button>
                 </div>
             </div>
@@ -427,6 +428,16 @@ class SendGallery extends SendComponent {
         // Lightbox print button
         const lbPrint = this.$('#sg-lb-print');
         if (lbPrint) lbPrint.addEventListener('click', () => this._handlePrint());
+
+        // Lightbox share/copy link button
+        const lbShare = this.$('#sg-lb-share');
+        if (lbShare) lbShare.addEventListener('click', async () => {
+            try {
+                await this.copyToClipboard(this.downloadUrl || window.location.href);
+                lbShare.textContent = 'Copied!';
+                setTimeout(() => { lbShare.innerHTML = `${SendIcons.LINK} Copy Link`; }, 2000);
+            } catch (_) {}
+        });
 
         // Email
         const emailBtn = this.$('#sg-email');

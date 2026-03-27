@@ -294,11 +294,6 @@ class UploadStepDone extends HTMLElement {
             html += '</div>';
         }
 
-        // Email link button
-        html += '<div style="text-align: center;">' +
-            '<button class="email-link-btn" id="email-link-btn">&#9993; Email link</button>' +
-        '</div>';
-
         return html;
     }
 

@@ -378,12 +378,14 @@
 .sg-lightbox__doc {
     background: white;
     color: #1a1a1a;
-    padding: 2rem;
+    width: 70vw;
+    padding: 2.5rem 3rem;
     border-radius: 8px;
-    max-width: 800px;
+    max-width: 900px;
     max-height: 80vh;
     overflow: auto;
     line-height: 1.6;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
 /* Markdown rendering in lightbox — parity with browse view */
@@ -476,6 +478,7 @@
 /* ─── Print ──────────────────────────────────────────────────────────── */
 
 @media print {
+    .sg-gallery { background: white !important; }
     .sg-gallery__header { display: none !important; }
     .sg-lightbox { display: none !important; }
     .sg-gallery__grid {

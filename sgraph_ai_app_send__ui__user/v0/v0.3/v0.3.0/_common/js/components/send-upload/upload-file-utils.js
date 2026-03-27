@@ -136,7 +136,7 @@ var UploadFileUtils = (function() {
     }
 
     function getRecommendedDelivery(options, folderScan) {
-        if (folderScan) return 'gallery';  // folders → gallery (best with thumbnails)
+        if (folderScan) return 'browse';  // folders → folder view (stable for all sizes)
 
         // Single file: check extension
         // (options is unused here — smart default is based on file context passed via folderScan)
@@ -145,7 +145,7 @@ var UploadFileUtils = (function() {
 
     // Extended version: takes the file directly for smart defaults
     function getSmartDefault(file, folderScan) {
-        if (folderScan) return 'gallery';
+        if (folderScan) return 'browse';  // folders → folder view (stable for all sizes)
         if (!file) return 'download';
 
         var ext = (file.name || '').split('.').pop().toLowerCase();
