@@ -12,9 +12,9 @@
 
 ## Reality Document — MANDATORY CHECK
 
-**Before describing, assessing, or assuming what SGraph Send can do, READ:**
+**Before describing, assessing, or assuming what SGraph Send can do, READ the reality document in:**
 
-`team/roles/librarian/reality/v0.16.26__what-exists-today.md`
+`team/roles/librarian/reality/` (single file, updated in-place)
 
 This is the **code-verified** record of every endpoint, UI page, test, and feature that actually exists. It was built by auditing source code, not briefs or reviews.
 
@@ -218,10 +218,10 @@ Each agent operates as a specific role. Roles produce review documents in their 
 **Dinis Cruz** is the human stakeholder, decision-maker, and project owner. He provides briefs in `team/humans/dinis_cruz/briefs/` and sometimes acts directly in any role. His briefs drive the team's priorities. **Daily briefs will be team-specific** — Explorer briefs, Villager briefs, and Town Planner briefs. **IMPORTANT: The `briefs/` folder is read-only for agents.** Only the human creates files there. Agent outputs go to `team/humans/dinis_cruz/claude-code-web/` or `team/roles/{role}/reviews/`.
 
 Before starting work, check:
-1. **Reality document** at `team/roles/librarian/reality/v0.16.26__what-exists-today.md` — what actually exists in code
-2. Latest human brief in `team/humans/dinis_cruz/briefs/`
-3. Latest debrief in `team/humans/dinis_cruz/debriefs/`
-4. Latest Librarian master index in `team/roles/librarian/reviews/`
+1. **Reality document** in `team/roles/librarian/reality/` — what actually exists in code
+2. Latest human brief in `team/humans/dinis_cruz/briefs/` (find the highest-dated subfolder)
+3. Latest debrief in `team/humans/dinis_cruz/debriefs/` (find the highest-dated subfolder)
+4. Latest Librarian master index in `team/roles/librarian/reviews/` (find the highest-dated subfolder)
 5. Your role's previous reviews in `team/roles/{your-role}/reviews/`
 
 ### Debriefs
@@ -248,11 +248,9 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 ---
 
-## Current State (v0.17.2)
+## Current State
 
-**See `team/roles/librarian/reality/v0.16.26__what-exists-today.md` for the full code-verified picture.**
-
-**Summary:** 73+ HTTP endpoints (18 User + 55 Admin), 6 User UI pages, 17 Admin components, 393+ passing tests, MCP on both Lambdas, full encryption pipeline, data rooms, personal vaults, PKI, audit trails, token management, analytics. v0.3.0 IFD major version complete (113 files, 0 symlinks). S3-cached vault zip download. `team/comms/` agent communication. QA site live at qa.send.sgraph.ai. Browser automation with persistent CDP (121+ tests). v0.3.0 pre-release review: 66 issues, 9 P1 blockers. Reality document last code-audited at v0.13.34; PROPOSED items tracked through v0.17.2.
+**See the reality document for the full code-verified picture.** The version file is at `sgraph_ai_app_send/version`.
 
 **Three parallel tracks:**
 1. **Explorer track:** New features (rooms, vaults, PKI, MCP, vault redesign, upload UX), experiments, first versions
@@ -263,21 +261,22 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 ## Key Documents
 
-| Document | Location |
-|---|---|
-| **Reality document** | `team/roles/librarian/reality/v0.16.26__what-exists-today.md` |
-| Project brief | `library/docs/_to_process/01-project-brief.md` |
-| Specs index | `library/docs/specs/README.md` |
-| Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
-| System landscape map | `team/roles/cartographer/v0.1.2/v0.1.2__system-landscape-map-revised.md` |
-| Architecture plans | `team/roles/architect/v0.1.1/` |
-| Wardley Maps brief | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
-| Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
-| Villager role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md` |
-| Latest debrief | `team/humans/dinis_cruz/debriefs/03/27/v0.17.2__debrief__briefs-processing-23-to-26-march.md` |
-| Session handoff | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` |
-| Master index (latest) | `team/roles/librarian/reviews/03/27/v0.17.2__master-index__briefs-23-to-26-march.md` |
-| Master index (previous) | `team/roles/librarian/reviews/03/23/v0.16.55__master-index__briefs-22-to-23-march.md` |
-| Comms operating model | `team/comms/README.md` |
-| Issues FS | `.issues/` |
-| IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |
+To find the **latest** file in any directory below, list the directory and pick the most recent by version prefix or date.
+
+| Document | Location | Notes |
+|---|---|---|
+| **Reality document** | `team/roles/librarian/reality/` | Single file, updated in-place |
+| **Master indexes** | `team/roles/librarian/reviews/` | Latest is the highest-dated subfolder |
+| **Debriefs** | `team/humans/dinis_cruz/debriefs/` | Latest is the highest-dated subfolder |
+| **Briefs** | `team/humans/dinis_cruz/briefs/` | Human input, read-only for agents |
+| Project brief | `library/docs/_to_process/01-project-brief.md` | Stable |
+| Specs index | `library/docs/specs/README.md` | Stable |
+| Phase roadmap | `library/roadmap/phases/` | Stable |
+| Architecture plans | `team/roles/architect/` | Browse for latest |
+| Wardley Maps brief | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` | Stable |
+| Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` | Stable |
+| Villager role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md` | Stable |
+| Comms operating model | `team/comms/README.md` | Stable |
+| Issues FS | `.issues/` | Stable |
+| IFD guide | `library/guides/development/ifd/` | Browse for latest |
+| Dev reviews | `team/roles/dev/reviews/` | Latest is the highest-dated subfolder |
