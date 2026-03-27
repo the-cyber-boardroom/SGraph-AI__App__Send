@@ -73,14 +73,16 @@ Dev:    Task-12 | todo | Build hero HTML  ← change from blocked to todo
 
 ## Dev Pack
 
-Full reference documentation: `library/sgraph-send/dev_packs/v0.18.2__sgraph-ai-website-redesign/`
+Full reference documentation lives alongside this folder in:
+`library/sgraph-send/dev_packs/v0.18.2__sgraph-ai-website-redesign/`
 
 | Phase file | Contains |
 |-----------|---------|
-| `phase_1__design/01_context-and-brand.md` | Product reality, brand, competitive positioning |
-| `phase_2__planning/02_decisions-and-site-map.md` | All decisions, site map, homepage copy |
-| `phase_3__development/03_implementation-map.md` | 7-phase build plan with code sketches |
-| `phase_3__development/04_tools-repo-strategy.md` | Web Components, __Tools integration |
-| `phase_4__qa/05_definition-of-done.md` | 13-item QA checklist |
-| `phase_5__release/06_launch-checklist.md` | PR 1/PR 2 steps, launch messaging |
-| `99_source-documents.md` | All source files with paths |
+| `../README.md` | Entry point — TL;DR, reading order, phase status |
+| `../phase_1__design/01_context-and-brand.md` | Product reality, brand, competitive positioning |
+| `../phase_2__planning/02_decisions-and-site-map.md` | All decisions, site map, homepage copy |
+| `../phase_3__development/03_implementation-map.md` | 7-phase build plan with code sketches |
+| `../phase_3__development/04_tools-repo-strategy.md` | Web Components, __Tools integration |
+| `../phase_4__qa/05_definition-of-done.md` | 13-item QA checklist |
+| `../phase_5__release/06_launch-checklist.md` | PR 1/PR 2 steps, launch messaging |
+| `../99_source-documents.md` | All source files with paths |

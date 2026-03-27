@@ -63,6 +63,13 @@ v0.18.2__sgraph-ai-website-redesign/
   phase_5__release/
     06_launch-checklist.md          ← Pre-launch steps + v0.3.0 messaging
   99_source-documents.md            ← Index of all source documents in repo
+  issues/                           ← Issues-FS task board (4 teams, ~120 tasks)
+    README.md                       ← Board overview + quick status
+    _teams/                         ← Team manifest + per-team overviews
+    explorer-website/               ← Team 1: 7 phase files + questions + bugs
+    explorer-platform/              ← Team 2: platform story + demo content
+    villager-release/               ← Team 3: PR 1 gate + PR 2 gate
+    town-planner-launch/            ← Team 4: launch comms + investor materials
 ```
 
 ---
