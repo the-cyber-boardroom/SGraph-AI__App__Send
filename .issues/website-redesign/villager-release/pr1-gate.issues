@@ -1,0 +1,79 @@
+# Villager — PR 1 Quality Gate (13-item DoD)
+# Team: Villager — Production Release (Team 3)
+# Lead: QA | Source: phase_4__qa/05_definition-of-done.md
+# BLOCKED until Team 1 (Explorer) confirms PR 1 content is complete
+
+Workstream-V1 | blocked | PR 1 Quality Gate
+# Blocked by: Team-1 Story-5 (all PR 1 content complete)
+
+# ---- CONTENT CHECKS ----
+
+	Task-1  | blocked | Verify homepage shows real product screenshots -> QA
+	# Not mockups. Gallery, folder, SgPrint screenshots from live send.sgraph.ai.
+
+	Task-2  | blocked | Verify 6-sentence privacy policy is VISIBLE on homepage body -> QA
+	# Must be inline in trust section, not linked. All 6 sentences rendered.
+
+	Task-3  | blocked | Verify /features/ covers all v0.3.0 shipped features -> Architect
+	# Cross-reference against reality doc. Flag any claim not code-verified.
+
+	Task-4  | blocked | Verify /security/ depth (8 sections, FAQ, schema) -> Architect
+	# 8 sections present. 5 FAQ questions answered. Schema validates.
+
+	Task-5  | blocked | Verify 5 /why/ pages exist (en-gb) -> QA
+	# All 5 paths return 200. All have breadcrumb. All have CTA.
+
+# ---- NAVIGATION AND UX CHECKS ----
+
+	Task-6  | blocked | Verify navigation shows: Features Security Pricing Tools -> QA
+	# No Architecture, no Team/Agents in nav.
+
+	Task-7  | blocked | Verify "Already have a token? →" link in header -> QA
+	# Links to send.sgraph.ai. Visible on desktop. In mobile menu.
+
+	Task-8  | blocked | Verify stats bar is removed from homepage -> QA
+	# Old stats bar (agents/endpoints/tests/human count) not present.
+	# Story section repositioned below fold with only 2 stats (18 agents, 1 human).
+
+# ---- TECHNICAL CHECKS ----
+
+	Task-9  | blocked | Verify <sg-public-viewer> loads or fallback displays -> QA
+	# Test: component loads in hero. Test: component fails gracefully (screenshot fallback).
+
+	Task-10 | blocked | Validate schema markup -> Architect
+	# SoftwareApplication on homepage. FAQ on /security/. HowTo on homepage.
+	# BreadcrumbList on /why/* pages. Use schema.org validator.
+
+	Task-11 | blocked | Verify sitemap.xml includes all new pages -> Architect
+	# Features, security, 5x why/, with locale alternates.
+
+# ---- CI AND SMOKE TESTS ----
+
+	Task-12 | blocked | CI smoke tests pass on all new page paths -> QA
+	# 9 paths (/ features/ security/ pricing/ 5x why/*) return 200.
+	# CI pipeline exits 0.
+
+	Task-13 | blocked | Mobile layout reviewed on all new pages -> Designer
+	# Two-column hero collapses. Demo above headline on mobile.
+	# No horizontal scroll. Nav hamburger works.
+
+# ---- APPSEC CHECKS ----
+
+	Task-14 | blocked | Cookie audit: zero cookies on all new pages -> AppSec
+	# Open DevTools → Application → Cookies on each new page.
+	# If any cookie exists, it is a build blocker.
+
+	Task-15 | blocked | Verify CSP headers allow <sg-public-viewer> to fetch from send.sgraph.ai -> AppSec
+	# The component fetches from a cross-origin. CSP must permit this.
+	# connect-src should include https://send.sgraph.ai
+
+	Task-16 | blocked | Verify CORS: send.sgraph.ai returns Access-Control-Allow-Origin: https://sgraph.ai -> AppSec
+	# curl -I -H "Origin: https://sgraph.ai" https://send.sgraph.ai/health
+
+# ---- CISO SIGN-OFF ----
+
+	Task-17 | blocked | CISO reviews /security/ page for accuracy -> CISO
+	# Specifically: subpoena/breach/retention Q&As must be architecturally accurate.
+	# "Cannot" framing verified. No overclaiming.
+
+# GATE: All 17 tasks done → QA signs off → PR 1 merges to production

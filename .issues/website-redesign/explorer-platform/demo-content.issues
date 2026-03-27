@@ -1,0 +1,42 @@
+# Explorer Platform — Demo Vault Content
+# Team: Explorer — Platform Story (Team 2)
+# Lead: Ambassador | Source: Vision doc v0.16.62 Section 13
+#
+# CONTEXT: The current demo vaults use generic test files (test-image.png etc.)
+# The vision doc proposes using real SGraph infographics from the NotebookLM repo.
+# These make the demo vault a product story, not a tech test.
+# The vault already demonstrates the feature — the content should tell the story.
+
+Workstream-P3 | todo | Demo vault content — SGraph infographics pack
+
+	Task-1  | todo | Select 7 infographics from NotebookLM repo -> Ambassador
+	# Vision doc Section 13 suggests:
+	# 1. The_Agentic_Communication_Plane.pdf (pitch deck)
+	# 2. Secure Collaboration Platform.jpg (investor infographic)
+	# 3. Five Tiers of Data Collaboration.jpg (use case compendium)
+	# 4. v0.16.26__brief__investor-positioning.md (markdown → SgPrint demo)
+	# 5. The Two Altitudes Framework Explained.jpg (article infographic)
+	# 6. Zero-Knowledge Secure Collaboration Platform.jpg (SG-Vault vision)
+	# 7. 18-Agent Powerhouse Software Workflow.jpg (agentic team)
+	#
+	# Mix: PDF + images + markdown = demonstrates all 3 viewer modes
+
+	Task-2  | todo | Prepare infographic files for demo vault -> Ambassador
+	# Resize images to reasonable file sizes (max 2MB each)
+	# Ensure PDF is well-formed and renders in browser
+	# Confirm markdown file will demonstrate SgPrint quality
+
+	Task-3  | blocked | Replace generic test files in demo-gallery-001 -> Dev
+	# Blocked by: Task-1, Task-2, Phase 0 Task-9 (demo vault created)
+	# Upload the 7 infographics as the demo vault content
+	# Keys are intentionally public
+
+	Task-4  | todo | Write demo vault caption for homepage -> Sherpa
+	# The caption under <sg-public-viewer> on homepage should reference the content:
+	# "Live demo — the SGraph platform story, encrypted and browsable."
+	# Or: "Live demo — actually encrypted. Explore the vault. Key is public."
+
+	Question-1 | open | Who downloads infographics from NotebookLM repo?
+	# Source: github.com/DinisCruz/NotebookLM__Infographics-and-slides
+	# Agents can access but cannot download binary files (images/PDFs)
+	# This is a human task — Dinis or a session with file access

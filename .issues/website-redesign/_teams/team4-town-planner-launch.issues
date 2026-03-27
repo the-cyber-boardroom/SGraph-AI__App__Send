@@ -1,0 +1,72 @@
+# Team 4: Town Planner — Launch and Investors
+# Lead: Alchemist | v0.18.3 | 27 March 2026
+#
+# CENTER OF GRAVITY (defined by Alchemist):
+# "The new website IS the pitch deck's homepage. Every investor claim now links
+#  to a live, verifiable page. The 6-sentence privacy policy is our most powerful
+#  slide — and it's VISIBLE on the homepage. We don't show investors screenshots
+#  of the site anymore. We show them the site. Success: an investor opens sgraph.ai
+#  and forwards the URL with the message 'this is what I meant by zero-knowledge'."
+#
+# TEAM COMPOSITION
+# Role         | Scope
+# Alchemist    | Leads — investor narrative, pitch deck refresh, ROI framing
+# Journalist   | Launch announcement, press release, LinkedIn article series
+# Ambassador   | Social posts, launch copy, competitive framing for public audience
+# Designer     | Investor-facing visual assets, infographic updates
+#
+# WARDLEY STAGE: Product → Commodity
+#   Town Planner translates technical output to business and investment value.
+#   Makes NO technical decisions. Does NOT create user-facing marketing (that's Ambassador).
+#   Speaks to: investors, board, strategic partners.
+#
+# WORKING FILES: .issues/website-redesign/town-planner-launch/
+#   launch-comms.issues
+#   investor-materials.issues
+#
+# KEY DOCS
+#   Conductor brief: team/roles/conductor/reviews/03/27/v0.18.2__conductor-brief__website-redesign-implementation.md
+#   Ambassador review: team/roles/ambassador/reviews/03/27/v0.17.2__ambassador-review__website-redesign.md
+#   Competitive research: team/roles/librarian/reviews/03/27/v0.18.2__competitive-research__perplexity-27-mar-2026.md
+#   Vision doc: team/humans/dinis_cruz/briefs/03/27/v0.16.62__vision__sgraph-platform-beyond-file-sharing.md
+#
+# DEPENDENCY
+#   Team 3 (Villager) PR 1 deployed before launch comms fire (Story-14, 15)
+#   Team 3 PR 2 deployed before competitive table claim is fully live (Story-16)
+#   Team 2 (Explorer Platform) output feeds investor platform narrative (Story-17)
+
+Team-4 | todo | Town Planner — Launch and Investors (Alchemist-led)
+
+# STORIES
+
+Story-14 | todo | Launch announcement leverages all new pages
+	# Acceptance: Launch email, LinkedIn post, and tweet thread reference specific
+	# new URLs (/features/, /security/, /why/*) — not just the homepage.
+	# "The feature your security team asked for is at sgraph.ai/security."
+	# Team: Journalist + Ambassador
+
+Story-15 | todo | Investor one-pager references live website (not screenshots)
+	# Acceptance: Investor one-pager updated — screenshots replaced with URLs.
+	# "Privacy policy: 6 sentences — see sgraph.ai#policy"
+	# "Zero cookies — open DevTools on sgraph.ai to verify"
+	# "Comparison table — sgraph.ai/features/#compare"
+	# Team: Alchemist
+
+Story-16 | todo | Competitive table on-site replaces slide in pitch deck
+	# Acceptance: Pitch deck "competitive landscape" slide links to sgraph.ai/features/
+	# instead of embedding a static comparison table.
+	# Rationale: Live page is always more current than the deck slide.
+	# Team: Alchemist
+
+Story-17 | todo | LinkedIn article series (3 posts timed to launch)
+	# Acceptance: 3 articles written, scheduled, and published around PR 1 deploy.
+	# Article 1: "The privacy policy as product feature" (6-sentence policy story)
+	# Article 2: "Why 'cannot' matters more than 'will not'" (architecture framing)
+	# Article 3: "How we built a security product that proves itself" (qa.send.sgraph.ai)
+	# Team: Journalist + Alchemist
+
+# WORKSTREAM OVERVIEW
+TownPlanner-WS-1 | todo | Launch announcement copy (Journalist)
+TownPlanner-WS-2 | todo | Investor materials refresh (Alchemist)
+TownPlanner-WS-3 | todo | LinkedIn article series (Journalist + Alchemist)
+TownPlanner-WS-4 | todo | Platform investor narrative (Alchemist + Ambassador)

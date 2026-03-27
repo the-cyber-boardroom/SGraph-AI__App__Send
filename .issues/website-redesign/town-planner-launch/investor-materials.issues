@@ -1,0 +1,48 @@
+# Town Planner — Investor Materials Refresh
+# Team: Town Planner — Launch and Investors (Team 4)
+# Lead: Alchemist
+# Source: Vision doc v0.16.62, Alchemist library, Competitive research doc
+# TRIGGER: After Team 3 (Villager) deploys PR 1
+
+Workstream-TP2 | todo | Investor Materials Refresh
+
+	Task-1  | todo | Audit pitch deck for claims that can now link to live pages -> Alchemist
+	# Replace each static screenshot or text claim with a live URL where possible.
+	# Priority claims to upgrade:
+	# - Privacy policy comparison → sgraph.ai#policy (visible on homepage)
+	# - Zero cookies → sgraph.ai (open DevTools to verify)
+	# - Competitive table → sgraph.ai/features/#compare
+	# - Architecture diagram → sgraph.ai/security/
+	# - "See it working" → live demo via <sg-public-viewer>
+
+	Task-2  | todo | Update investor one-pager (2-page max) -> Alchemist
+	# Key additions:
+	# - "Verify it yourself" callout (zero cookies in DevTools)
+	# - QA site as "proof layer" reference (qa.send.sgraph.ai)
+	# - SGit-AI as live second product (pip install sgit-ai)
+	# - Platform stack as "5-year vision" (not a feature list)
+
+	Task-3  | todo | Update competitive positioning in deck -> Alchemist
+	# Source: Librarian competitive research doc (v0.18.2)
+	# Proton Drive correction: they also have client-side E2EE
+	# Our edges: browsing UX, no-account, zero cookies (verifiable), pay-per-use
+	# Link: deck competitive slide → sgraph.ai/features/ for live comparison
+
+	Task-4  | todo | Write platform investment thesis update -> Alchemist
+	# Platform stack is now more credible:
+	# - SG/Send: live, v0.3.0, revenue-ready (£0.01/file)
+	# - SGit-AI: live on PyPI, full CLI, own GitHub org
+	# - SG-Vault, Data Rooms, PKI: architecture and briefs — "18-month roadmap"
+	# - Agentic Plane: long-term vision — "the cryptographic infrastructure for AI"
+	# Frame: SG/Send proves the market exists. SGit proves the tech works.
+	# The platform is the moat.
+
+	Task-5  | todo | Write due diligence reference pack update -> Alchemist
+	# Add: qa.send.sgraph.ai as "live audit trail" (every feature is tested + documented)
+	# Add: GitHub repo as "open source, fully auditable" (link to specific test directories)
+	# Update: test count section — remove raw numbers, replace with "per-repo breakdown
+	# available at qa.send.sgraph.ai"
+
+	Feature-1 | proposed | /investors/ page on sgraph.ai (future sprint)
+	# Not in scope for this redesign. Design brief when Team 1 completes PR 2.
+	# Content: platform thesis + one-pager download + QA site link + GitHub

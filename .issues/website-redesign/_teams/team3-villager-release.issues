@@ -1,0 +1,62 @@
+# Team 3: Villager — Production Release
+# Lead: QA | v0.18.3 | 27 March 2026
+#
+# CENTER OF GRAVITY (defined by QA):
+# "PR 1 is deployed, indexed, and passing every smoke test.
+#  PR 2 fires ONLY when /security/ is confirmed in search results.
+#  Zero SEO regression is non-negotiable. We measure success by:
+#  zero 404s, zero broken redirects, and /architecture/ still resolves
+#  (via 301) for at least 30 days after removal."
+#
+# TEAM COMPOSITION
+# Role         | Scope
+# QA           | Leads — 13-item DoD gate, smoke tests, redirect verification
+# DevOps       | CloudFront deployment, sitemap submission, monitoring
+# Architect    | Schema validation, SEO risk assessment, CORS check
+# AppSec       | Cookie audit (zero cookies claim), CSP headers, security headers
+# CISO         | Sign-off on /security/ page accuracy before publish
+#
+# WARDLEY STAGE: Custom-Built → Product
+#   QA hardens what Explorer built. Villager adds no features.
+#   Bugs go back to Explorer team. Behaviour changes go back to Explorer team.
+#
+# WORKING FILES: .issues/website-redesign/villager-release/
+#   pr1-gate.issues
+#   pr2-gate.issues
+#   deployment.issues
+#
+# DEPENDENCIES
+#   Blocked by: Team 1 (Explorer) completing PR 1 content (Story-5)
+#   Unblocks: Team 4 (Town Planner) launch comms
+
+Team-3 | blocked | Villager — Production Release (QA-led)
+# Blocked by: Team-1 Story-5 (PR 1 content complete)
+
+# STORIES
+
+Story-10 | blocked | PR 1 passes all 13 DoD items
+	# Acceptance: Every item in phase_4__qa/05_definition-of-done.md is checked.
+	# QA signs off before PR 1 is merged to production.
+	# Blocks: Story-11
+
+Story-11 | blocked | /security/ indexed before /architecture/ redirect fires
+	# Acceptance: Google Search Console shows /security/ crawled and indexed.
+	# Minimum wait: 48 hours after PR 1 deployment.
+	# Maximum wait: 2 weeks (check indexing status daily).
+	# Blocks: Story-12 (PR 2 gate)
+
+Story-12 | blocked | PR 2 redirects deployed with zero SEO regression
+	# Acceptance: All redirects return 301. Old URLs still reach correct content.
+	# /architecture/ ranking monitored for 30 days post-redirect.
+	# Blocks: Team-4 launch (Town Planner unblocked when this is done)
+
+Story-13 | blocked | Post-launch monitoring baseline established
+	# Acceptance: CloudFront error rate monitored. Search Console alerts configured.
+	# <sg-public-viewer> fallback rate tracked. Conversion baseline recorded.
+
+# WORKSTREAM OVERVIEW
+Villager-WS-1 | blocked | PR 1 quality gate (13-item DoD checklist)
+Villager-WS-2 | blocked | PR 1 deployment + sitemap submission
+Villager-WS-3 | blocked | Indexing wait + /security/ confirmation (48-72h)
+Villager-WS-4 | blocked | PR 2 gate + redirect deployment
+Villager-WS-5 | blocked | Post-launch monitoring setup

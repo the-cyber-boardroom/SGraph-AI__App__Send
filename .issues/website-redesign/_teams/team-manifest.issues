@@ -1,0 +1,84 @@
+# Website Redesign — Team Manifest
+# v0.18.3 | 27 March 2026
+# Single source of truth for all teams working on the sgraph.ai redesign
+#
+# WARDLEY MAP LOGIC
+# Explorer (Genesis → Custom-Built)  → invents and builds first versions
+# Villager (Custom-Built → Product)   → hardens and deploys to production
+# Town Planner (Product → Commodity)  → transmutes output into investor/business value
+#
+# READING ORDER: Read this file first, then each team's own overview file
+
+# ---------------------------------------------------------------------------
+# TEAM 1: Explorer — Website Redesign
+# Lead agent: Conductor
+# Center of gravity: "Recipients land on sgraph.ai and become senders.
+#   The site must show the product, prove the privacy, and convert curiosity."
+# Focus: All 7 phases of the sgraph.ai redesign
+# Wardley stage: Genesis (new pages, new component, new copy) → Custom-Built
+# Working files: .issues/website-redesign/explorer-website/
+# ---------------------------------------------------------------------------
+
+Team-1 | in-progress | Explorer — Website Redesign (Conductor-led)
+	Story-1 | todo | Recipient converts to sender (journey + design)
+	Story-2 | todo | Evaluator trusts the security (/security/ page)
+	Story-3 | todo | Visitor discovers v0.3.0 features (/features/ page)
+	Story-4 | todo | Every claim is verifiable (QA site integration)
+	Story-5 | todo | PR 1: All new content shipped (no deletions)
+
+# ---------------------------------------------------------------------------
+# TEAM 2: Explorer — Platform Story
+# Lead agent: Ambassador
+# Center of gravity: "SG/Send is the gateway. The website hints at the platform
+#   without overpromising. SGit is live. SG-Vault is coming. One section."
+# Focus: Platform narrative, ecosystem navigation, SGit positioning, demo content
+# Wardley stage: Genesis (platform story is new territory)
+# Working files: .issues/website-redesign/explorer-platform/
+# ---------------------------------------------------------------------------
+
+Team-2 | todo | Explorer — Platform Story (Ambassador-led)
+	Story-6  | todo | "Where we're going" section on homepage (platform stack)
+	Story-7  | todo | SGit positioned as live co-product (ecosystem nav links)
+	Story-8  | todo | Demo vault content (SGraph infographics as demo files)
+	Story-9  | todo | /platform/ or /vision/ page (future — post-launch)
+
+# ---------------------------------------------------------------------------
+# TEAM 3: Villager — Production Release
+# Lead agent: QA
+# Center of gravity: "PR 1 is deployed, indexed, and passing all smoke tests.
+#   PR 2 fires ONLY when /security/ is confirmed indexed. No SEO regression."
+# Focus: Quality gate, deployment, CORS verification, redirect safety
+# Wardley stage: Custom-Built → Product (hardening and deploying Explorer output)
+# Working files: .issues/website-redesign/villager-release/
+# ---------------------------------------------------------------------------
+
+Team-3 | blocked | Villager — Production Release (QA-led)
+	Story-10 | blocked | PR 1 passes all 13 DoD items (depends on Team 1 done)
+	Story-11 | blocked | /security/ indexed before /architecture/ redirect (48-72h)
+	Story-12 | blocked | PR 2 redirects deployed with zero SEO regression
+	Story-13 | blocked | Post-launch monitoring baseline established
+
+# ---------------------------------------------------------------------------
+# TEAM 4: Town Planner — Launch and Investors
+# Lead agent: Alchemist
+# Center of gravity: "The new website IS the pitch deck's homepage. Every investor
+#   claim links to a live page. The 6-sentence policy is our most powerful slide."
+# Focus: Launch comms, investor materials refresh, LinkedIn article series
+# Wardley stage: Product → Commodity (translating technical output to business value)
+# Working files: .issues/website-redesign/town-planner-launch/
+# ---------------------------------------------------------------------------
+
+Team-4 | todo | Town Planner — Launch and Investors (Alchemist-led)
+	Story-14 | todo | Launch announcement leverages all new pages
+	Story-15 | todo | Investor one-pager references live website (not screenshots)
+	Story-16 | todo | Competitive table on-site replaces slide in pitch deck
+	Story-17 | todo | LinkedIn article series (3 posts, timed to launch)
+
+# ---------------------------------------------------------------------------
+# CROSS-TEAM DEPENDENCIES
+# ---------------------------------------------------------------------------
+
+# Team 2 → Team 1: Platform story section must not block or delay homepage PR 1
+# Team 3 → Team 1: Villager unblocks only when Explorer completes PR 1 content
+# Team 4 → Team 3: Town Planner launch comms fire after Villager deploys PR 1
+# Team 4 → Team 2: Investor narrative incorporates platform story (Team 2 output)
