@@ -209,13 +209,7 @@ class UploadStepConfirm extends HTMLElement {
                     '</div>';
         }
 
-        // Big Encrypt & Send button (fallback — inline Next in header is primary)
-        html += '<div class="send-action">' +
-                    '<button class="send-btn" id="send-btn">' +
-                        '<span class="send-btn__icon">&#128274;</span>' +
-                        '<span class="send-btn__text">Encrypt &amp; Send</span>' +
-                    '</button>' +
-                '</div>';
+        // Encrypt action is handled by the inline "Encrypt & Upload →" button in the header
 
         // Back link
         html += '<button class="back-link" id="back-btn">&larr; Back</button>';

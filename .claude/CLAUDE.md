@@ -139,6 +139,7 @@ team/                            # Team structure
     journalist/                  # Communications, content
     librarian/                   # Knowledge base, Issues FS maintenance
     qa/                          # Test strategy, security testing
+  comms/                         # Agent-to-agent communication (changelog, QA briefs, plans)
   villager/roles/                # Villager team roles (mirrored structure)
   town-planner/roles/            # Town Planner team roles
     alchemist/                   # Investment, business strategy, investor relations
@@ -247,11 +248,11 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 
 ---
 
-## Current State (v0.16.26)
+## Current State (v0.17.2)
 
 **See `team/roles/librarian/reality/v0.16.26__what-exists-today.md` for the full code-verified picture.**
 
-**Summary:** 73+ HTTP endpoints (18 User + 55 Admin), 6 User UI pages, 17 Admin components, 393+ passing tests, MCP on both Lambdas, full encryption pipeline, data rooms, personal vaults, PKI, audit trails, token management, analytics. Reality document last code-audited at v0.13.34; PROPOSED items tracked through v0.16.26.
+**Summary:** 73+ HTTP endpoints (18 User + 55 Admin), 6 User UI pages, 17 Admin components, 393+ passing tests, MCP on both Lambdas, full encryption pipeline, data rooms, personal vaults, PKI, audit trails, token management, analytics. v0.3.0 IFD major version complete (113 files, 0 symlinks). S3-cached vault zip download. `team/comms/` agent communication. QA site live at qa.send.sgraph.ai. Browser automation with persistent CDP (121+ tests). v0.3.0 pre-release review: 66 issues, 9 P1 blockers. Reality document last code-audited at v0.13.34; PROPOSED items tracked through v0.17.2.
 
 **Three parallel tracks:**
 1. **Explorer track:** New features (rooms, vaults, PKI, MCP, vault redesign, upload UX), experiments, first versions
@@ -273,9 +274,10 @@ After completing a batch of work, the Librarian creates a **debrief** — a huma
 | Wardley Maps brief | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__briefs__wardley-maps-in-sgraph-project.md` |
 | Explorer role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__explorer.md` |
 | Villager role definition | `team/humans/dinis_cruz/briefs/02/14/v0.3.2__role-definition__villager.md` |
-| Latest debrief | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__debrief__briefs-processing-13-to-18-march.md` |
+| Latest debrief | `team/humans/dinis_cruz/debriefs/03/27/v0.17.2__debrief__briefs-processing-23-to-26-march.md` |
 | Session handoff | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` |
-| Master index (latest) | `team/roles/librarian/reviews/03/18/v0.16.26__master-index__briefs-13-to-18-march.md` |
-| Master index (addendum) | `team/roles/librarian/reviews/03/19/v0.16.21__master-index__briefs-18-march-addendum.md` |
+| Master index (latest) | `team/roles/librarian/reviews/03/27/v0.17.2__master-index__briefs-23-to-26-march.md` |
+| Master index (previous) | `team/roles/librarian/reviews/03/23/v0.16.55__master-index__briefs-22-to-23-march.md` |
+| Comms operating model | `team/comms/README.md` |
 | Issues FS | `.issues/` |
 | IFD guide | `library/guides/development/ifd/v1.2.1__ifd__intro-and-how-to-use.md` |

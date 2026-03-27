@@ -5,10 +5,10 @@
 
 .sg-footer {
     text-align: center;
-    padding: var(--space-8, 2rem) var(--space-6, 1.5rem) var(--space-6, 1.5rem);
+    padding: 0.75rem var(--space-6, 1.5rem);
     font-size: var(--text-small, 0.8rem);
     color: var(--color-text-secondary, #8892A0);
-    opacity: 0.7;
+    opacity: 0.8;
 }
 
 .sg-footer__link {
@@ -22,10 +22,10 @@
 }
 
 .sg-footer__version {
-    display: block;
-    margin-top: 0.25rem;
-    font-size: 0.7rem;
+    display: inline;
+    margin-left: 0.5rem;
+    font-size: 0.75rem;
     letter-spacing: 0.03em;
     color: var(--color-text-secondary, #8892A0);
-    opacity: 0.6;
+    opacity: 0.8;
 }

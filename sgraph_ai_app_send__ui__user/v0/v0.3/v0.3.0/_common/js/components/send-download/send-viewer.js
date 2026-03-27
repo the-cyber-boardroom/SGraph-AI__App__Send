@@ -58,7 +58,7 @@ class SendViewer extends SendComponent {
                     <div class="sv-share__row">
                         <span class="sv-share__label">Download link</span>
                         <div class="sv-share__input-row">
-                            <input type="text" class="sv-share__url" value="${this.escapeHtml(url)}" readonly id="sv-share-url">
+                            <input type="text" class="sv-share__url" value="${this.escapeHtml(url)}" readonly data-qa-mask="transfer-url" id="sv-share-url">
                             <button class="sv-action-btn" id="sv-copy-link">${SendIcons.LINK_SM || '🔗'} Copy</button>
                         </div>
                     </div>
