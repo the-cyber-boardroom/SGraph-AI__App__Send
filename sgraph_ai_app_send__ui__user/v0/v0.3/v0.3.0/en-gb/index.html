@@ -114,6 +114,10 @@
     <script>
         I18n.init();
         document.body.setAttribute('data-ready', 'true');
+
+        // U-006: Prevent browser from opening dropped files outside the drop zone
+        document.addEventListener('dragover', function(e) { e.preventDefault(); });
+        document.addEventListener('drop', function(e) { e.preventDefault(); });
     </script>
 
 </body>
