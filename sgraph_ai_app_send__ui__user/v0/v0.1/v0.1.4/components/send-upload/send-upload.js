@@ -525,8 +525,8 @@ class SendUpload extends HTMLElement {
             // 3. Complete multipart upload
             await ApiClient.completeMultipart(transferId, uploadId, completedParts);
         } catch (err) {
-            // Best-effort abort on failure
-            await ApiClient.abortMultipart(transferId, uploadId);
+            // Best-effort cancel on failure
+            await ApiClient.cancelMultipart(transferId, uploadId);
             throw err;
         }
     }

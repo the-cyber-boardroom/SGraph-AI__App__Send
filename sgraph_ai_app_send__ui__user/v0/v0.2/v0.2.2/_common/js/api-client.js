@@ -17,7 +17,7 @@
      /api/presigned/capabilities              GET   — check upload capabilities
      /api/presigned/initiate                  POST  — start multipart upload
      /api/presigned/complete                  POST  — complete multipart upload
-     /api/presigned/abort/{id}/{upload_id}    POST  — cancel multipart upload
+     /api/presigned/cancel/{id}/{upload_id}   POST  — cancel multipart upload
      /api/presigned/download-url/{id}         GET   — presigned download URL
 
    Auth: Access token sent via x-sgraph-access-token header.
@@ -229,9 +229,9 @@ const ApiClient = {
         return res.json();
     },
 
-    async abortMultipart(transferId, uploadId) {
+    async cancelMultipart(transferId, uploadId) {
         try {
-            await this._fetch(`/api/presigned/abort/${transferId}/${uploadId}`, {
+            await this._fetch(`/api/presigned/cancel/${transferId}/${uploadId}`, {
                 method: 'POST',
                 headers: this._authHeaders()
             });

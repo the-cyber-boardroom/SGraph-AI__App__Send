@@ -61,11 +61,11 @@ class test_Routes__Presigned(TestCase):
         assert response.status_code      == 400
 
     # =========================================================================
-    # POST /presigned/abort/{transfer_id}/{upload_id} — memory mode
+    # POST /presigned/cancel/{transfer_id}/{upload_id} — memory mode
     # =========================================================================
 
-    def test__abort__memory_mode(self):
-        response = self.client.post('/api/presigned/abort/fake123456ab/fake-upload')
+    def test__cancel__memory_mode(self):
+        response = self.client.post('/api/presigned/cancel/fake123456ab/fake-upload')
         assert response.status_code      == 400
 
     # =========================================================================
