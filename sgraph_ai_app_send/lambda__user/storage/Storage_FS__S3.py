@@ -76,6 +76,20 @@ class Storage_FS__S3(Storage_FS):                                               
             return self.s3.file_contents(bucket=self.s3_bucket, key=key)
         return None
 
+    def folder__files__all(self, parent_folder) -> List[Safe_Str__File__Path]:   # List files under a specific prefix (scoped S3 list)
+        s3_prefix = self.s3_key(parent_folder)
+        if not s3_prefix.endswith('/'):
+            s3_prefix += '/'
+        s3_keys = self.s3.find_files(bucket=self.s3_bucket, prefix=s3_prefix)
+        paths   = []
+        for s3_key in s3_keys:
+            if self.s3_prefix:
+                pfx = self.s3_prefix if self.s3_prefix.endswith('/') else f"{self.s3_prefix}/"
+                if s3_key.startswith(pfx):
+                    s3_key = s3_key[len(pfx):]
+            paths.append(Safe_Str__File__Path(s3_key))
+        return sorted(paths)
+
     def files__paths(self) -> List[Safe_Str__File__Path]:                       # List all file paths in bucket
         prefix  = self.s3_prefix if self.s3_prefix else ''
         s3_keys = self.s3.find_files(bucket=self.s3_bucket, prefix=prefix)
