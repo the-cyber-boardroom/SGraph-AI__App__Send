@@ -14,12 +14,15 @@ from   osbot_utils.type_safe.Type_Safe                                          
 
 
 class Service__Vault__Pointer(Type_Safe):                                        # Opaque blob storage with write-key auth
-    storage_fs : Storage_FS = None                                               # Pluggable storage backend (shared with Transfer__Service)
+    storage_fs       : Storage_FS = None                                         # Pluggable storage backend (shared with Transfer__Service)
+    _manifest_cache  : dict       = None                                         # Lambda-lifetime cache: vault_id → manifest dict (or True for "no manifest")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if self.storage_fs is None:                                              # Auto-create in-memory backend
             self.storage_fs = Storage_FS__Memory()
+        if self._manifest_cache is None:
+            self._manifest_cache = {}
 
     def vault_manifest_path(self, vault_id):                                     # Path for vault manifest (ownership record)
         return f'transfers/vault/{vault_id}/manifest.json'
@@ -30,21 +33,31 @@ class Service__Vault__Pointer(Type_Safe):                                       
     def _hash_write_key(self, write_key_hex):                                    # SHA-256 hash of write key
         return hashlib.sha256(write_key_hex.encode()).hexdigest()
 
-    def _check_vault_write_key(self, vault_id, submitted_hash):                  # Check write key against vault manifest
+    def _load_manifest(self, vault_id):                                          # Load manifest with Lambda-lifetime cache
+        if vault_id in self._manifest_cache:                                     # Cache hit
+            return self._manifest_cache[vault_id]
         manifest_path = self.vault_manifest_path(vault_id)
         if not self.storage_fs.file__exists(manifest_path):
-            return True                                                          # No manifest yet — first write creates it
+            return None                                                          # No manifest yet (not cached — will be created on first write)
         manifest = self.storage_fs.file__json(manifest_path)
+        self._manifest_cache[vault_id] = manifest                                # Cache for Lambda lifetime
+        return manifest
+
+    def _check_vault_write_key(self, vault_id, submitted_hash):                  # Check write key against vault manifest
+        manifest = self._load_manifest(vault_id)
+        if manifest is None:
+            return True                                                          # No manifest yet — first write creates it
         return manifest.get('write_key_hash') == submitted_hash
 
     def _ensure_manifest(self, vault_id, submitted_hash):                        # Create manifest on first write to a vault
-        manifest_path = self.vault_manifest_path(vault_id)
-        if self.storage_fs.file__exists(manifest_path):
+        if self._load_manifest(vault_id) is not None:                            # Already exists (cached check — no S3 call)
             return
+        manifest_path = self.vault_manifest_path(vault_id)
         manifest = dict(vault_id       = vault_id                               ,
                         write_key_hash = submitted_hash                         ,
                         created_at     = Timestamp_Now()                        )
         self.storage_fs.file__save(manifest_path, json.dumps(manifest).encode())
+        self._manifest_cache[vault_id] = manifest                                # Cache the newly created manifest
 
     def write(self, vault_id, file_id, write_key_hex, payload_bytes):            # Write or overwrite a vault file
         payload_path   = self.vault_payload_path(vault_id, file_id)
@@ -104,22 +117,22 @@ class Service__Vault__Pointer(Type_Safe):                                       
                         current = current_b64)
 
     def list_files(self, vault_id, prefix=''):                                   # List file_ids in a vault matching prefix
+        vault_folder = f'transfers/vault/{vault_id}/{prefix}' if prefix else f'transfers/vault/{vault_id}/'
+        scoped_paths = self.storage_fs.folder__files__all(vault_folder)          # Scoped S3 list — only this vault's prefix
         vault_prefix = f'transfers/vault/{vault_id}/'
-        all_paths    = self.storage_fs.files__paths()
         result       = []
         seen         = set()
 
-        for path in all_paths:
-            if not path.startswith(vault_prefix):
+        for path in scoped_paths:
+            path_str = str(path)
+            if not path_str.startswith(vault_prefix):
                 continue
-            relative = path[len(vault_prefix):]                                  # Strip vault prefix
+            relative = path_str[len(vault_prefix):]                              # Strip vault prefix
             if relative == 'manifest.json':                                      # Skip manifest
                 continue
             if not relative.endswith('/payload'):                                 # Only payload files
                 continue
             file_id = relative[:-len('/payload')]                                # Extract file_id
-            if prefix and not file_id.startswith(prefix):                        # Apply prefix filter
-                continue
             if file_id not in seen:
                 seen.add(file_id)
                 result.append(file_id)
