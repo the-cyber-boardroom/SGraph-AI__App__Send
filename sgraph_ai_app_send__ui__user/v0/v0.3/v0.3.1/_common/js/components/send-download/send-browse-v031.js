@@ -4,6 +4,7 @@
    Fixes:
      1. File names in folder tree show basename only (not full zip path)
      2. PDF Present mode button in file action bar (opens in new window)
+     3. Auto-open first file uses sorted order (not zip iteration order)
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 1: File names in tree show only basename ────────────────────────────
@@ -92,3 +93,30 @@ SendBrowse.prototype._renderFileContent = (function(original) {
         }
     };
 })(SendBrowse.prototype._renderFileContent);
+
+
+// ─── Fix 3: Auto-open first file respects sort order ─────────────────────────
+//
+// v0.3.0 bug: _autoOpenFirstFile picks files[0] from the unsorted zipTree array.
+// The zip iteration order depends on how the archive was created, so the "first"
+// file is arbitrary — often NOT the alphabetically first file.
+//
+// Fix: sort files alphanumerically before picking. This means numbered files
+// (0.a, 0.b, 1, 2, 3) open in the expected order, and "Start_Here.md" opens
+// before "Zzz_appendix.txt".
+
+SendBrowse.prototype._autoOpenFirstFile = function() {
+    const files = this.zipTree.filter(function(e) { return !e.dir; });
+
+    // Sort all files alphanumerically by path (natural number ordering)
+    files.sort(function(a, b) {
+        return a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    // Prefer first root-level non-metadata file (same heuristic as v0.3.0, but sorted)
+    var root = files.find(function(f) {
+        return !f.path.includes('/') && !f.name.startsWith('_') && !f.name.startsWith('.');
+    });
+    var first = root || files[0];
+    if (first) this._openFileTab(first.path);
+};
