@@ -8,7 +8,40 @@
      4. Markdown internal links open as tabs + images resolved from zip
      5. Markdown view source toggle (rendered ↔ raw source)
      6. Save locally downloads valid zip (correct MIME type + re-generated)
+     7. Gallery folder filter handles both _gallery. and __gallery__ prefixes
    ═══════════════════════════════════════════════════════════════════════════════ */
+
+// ─── Fix 7: Gallery metadata folder detection (both old + new format) ────────
+//
+// v0.3.0: folders named _gallery.{hash} (e.g. _gallery.1d6b94eb07927c1d)
+// v0.3.1: folders named __gallery__{hash} (e.g. __gallery__1d6b94eb)
+// Both should be filtered from the user-visible file tree.
+
+function _isGalleryMetaPath(path) {
+    return path.startsWith('_gallery.') || path.startsWith('__gallery__');
+}
+
+// Patch _buildFolderTree to filter both formats
+var _origBuildFolderTree = SendBrowse.prototype._buildFolderTree;
+SendBrowse.prototype._buildFolderTree = function() {
+    var root = { name: '', children: {}, files: [] };
+    var files = this.zipTree.filter(function(e) { return !e.dir && !_isGalleryMetaPath(e.path); });
+
+    for (var i = 0; i < files.length; i++) {
+        var file  = files[i];
+        var parts = file.path.split('/');
+        var node  = root;
+        for (var j = 0; j < parts.length - 1; j++) {
+            if (!node.children[parts[j]]) {
+                node.children[parts[j]] = { name: parts[j], children: {}, files: [] };
+            }
+            node = node.children[parts[j]];
+        }
+        node.files.push(file);
+    }
+    return root;
+};
+
 
 // ─── Fix 1: File names in tree show only basename ────────────────────────────
 //
