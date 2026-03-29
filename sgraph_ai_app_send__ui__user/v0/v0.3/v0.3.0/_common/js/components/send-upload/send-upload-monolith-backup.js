@@ -749,7 +749,7 @@ class SendUpload extends HTMLElement {
 
             await ApiClient.completeMultipart(transferId, uploadId, completedParts);
         } catch (err) {
-            await ApiClient.abortMultipart(transferId, uploadId);
+            await ApiClient.cancelMultipart(transferId, uploadId);
             throw err;
         }
     }

@@ -1,0 +1,114 @@
+# Phase 1: New Pages — Add Before Removing Anything
+# Team: Explorer — Website Redesign (Team 1)
+# Lead: Conductor | Source: Dev map v0.18.2 Phase 1 + Conductor brief Sections 2, 5
+# Dependency: Phase 0 Task-1 through Task-8 (screenshots must exist)
+# PR 1 content — safe to merge at any time
+
+# ===========================================================================
+# WORKSTREAM: /security/ page
+# P0 — must deploy before /architecture/ redirect is added (Villager gate)
+# ===========================================================================
+
+Workstream-2 | todo | Phase 1: /security/ page (en-gb + en-us)
+
+	Task-1  | todo | Write security page copy — 8 sections -> Sherpa
+	# Sections: guarantee → how it works → 3 evaluator Qs → transparency panel
+	# → zero cookies DevTools instruction → GDPR-by-architecture → 6-sentence policy
+	# → open source GitHub link
+	# Voice rule: "cannot" not "will not" everywhere
+
+	Task-2  | todo | Review all encryption claims against reality doc -> Architect
+	# Must check: AES-256-GCM in browser (confirmed), Web Crypto API (confirmed),
+	# SHA-256+salt for IP hashing (confirm in reality doc), fragment not sent to server (confirm)
+
+	Task-3  | todo | Design /security/ page layout -> Designer
+	# Layout: single-column, trust-first. Use teal accent for callout boxes.
+	# Transparency panel screenshot (Task-6 Phase 0) as an inline image.
+
+	Task-4  | blocked | Build /security/ HTML (en-gb) -> Dev
+	# Blocked by: Task-1 (copy), Task-3 (layout), Phase 0 Task-6 (screenshot)
+
+	Task-5  | blocked | Build /security/ HTML (en-us) -> Dev
+	# Blocked by: Task-4 done
+
+	Task-6  | todo | Add FAQ schema (5 questions) -> Architect
+	# Q1: Does server see files? Q2: What if breached? Q3: Subpoena response?
+	# Q4: How is key shared? Q5: Does SG/Send use cookies?
+
+	Task-7  | todo | Add WebPage schema to /security/ -> Architect
+	# "about": {"@type": "Thing", "name": "Zero-Knowledge Encryption"}
+
+	Task-8  | todo | Add QA site links to /security/ -> Dev
+	# "Architecture documentation" from qa.send.sgraph.ai → source material
+	# "Verify in DevTools" section → link to qa.send.sgraph.ai for screenshots
+
+# ===========================================================================
+# WORKSTREAM: /features/ page
+# ===========================================================================
+
+Workstream-3 | todo | Phase 1: /features/ page (en-gb + en-us)
+
+	Task-9  | todo | Write feature descriptions — 4 groups, alternating layout -> Sherpa
+	# Group 1: Sharing (gallery, folder, lightbox, tokens)
+	# Group 2: Security (ZK, transparency panel, 3 share modes, zero cookies)
+	# Group 3: Creation (SgPrint before/after, upload wizard)
+	# Group 4: Confirmation (receipt confirmation, 17 languages)
+
+	Task-10 | todo | Review feature claims against reality doc -> Architect
+	# Every feature listed must exist in the reality document.
+	# Flag anything not code-verified.
+
+	Task-11 | todo | Design /features/ page — alternating screenshot rows -> Designer
+	# Left/right alternating feature rows. Screenshots fill visual column.
+	# Comparison table at bottom.
+
+	Task-12 | blocked | Build /features/ HTML (en-gb) -> Dev
+	# Blocked by: Task-9, Task-11, Phase 0 screenshots (Task-1 through Task-8)
+
+	Task-13 | blocked | Build /features/ HTML (en-us) -> Dev
+	# Blocked by: Task-12 done
+
+	Task-14 | todo | Add SoftwareApplication schema with featureList -> Architect
+
+	Task-15 | todo | Add comparison table (SG/Send vs WeTransfer vs Proton Drive) -> Dev
+	# Source: Conductor brief Section 8 / Librarian competitive research doc
+	# Note: Proton also has client-side E2EE — table must reflect this accurately
+
+	Task-16 | todo | Add "See it tested →" links to qa.send.sgraph.ai test reports -> Dev
+
+# ===========================================================================
+# WORKSTREAM: Five /why/ workflow pages
+# ===========================================================================
+
+Workstream-4 | todo | Phase 1: /why/ workflow pages (5 pages, en-gb first)
+
+	Task-17 | todo | Write copy: /why/share-a-folder/ -> Sherpa
+	# Pain: zip → download → unzip → scroll
+	# Solution: token → browse folder structure in browser, no download
+
+	Task-18 | todo | Write copy: /why/gallery-preview/ -> Sherpa
+	# Pain: zip download, lost context, no lightbox
+	# Solution: gallery view, thumbnails, type badges, lightbox on click
+
+	Task-19 | todo | Write copy: /why/print-as-pdf/ -> Sherpa
+	# Pain: .md files no one can read, PDF tools needed
+	# Solution: SgPrint renders branded PDF in recipient browser
+
+	Task-20 | todo | Write copy: /why/share-a-video/ -> Sherpa
+	# Pain: upload limits, platform logs, ads, accounts required
+	# Solution: encrypted video in vault, plays in browser, key yours
+
+	Task-21 | todo | Write copy: /why/send-securely/ -> Sherpa
+	# Pain: email (server sees), Dropbox (server sees)
+	# Solution: zero-knowledge means we cannot see what we cannot decrypt
+
+	Task-22 | todo | Design /why/ page template (pain/solution/demo/CTA) -> Designer
+	# Single template for all 5. Breadcrumb: sgraph.ai > Why > [page name]
+	# CTA: "Try it now — no account required"
+
+	Task-23 | blocked | Build 5 /why/ pages HTML (en-gb) -> Dev
+	# Blocked by: Task-17 through Task-22 all done
+
+	Task-24 | todo | Add BreadcrumbList schema to all 5 /why/ pages -> Architect
+
+	Task-25 | todo | Add "See it in action →" links to qa.send.sgraph.ai use cases -> Dev

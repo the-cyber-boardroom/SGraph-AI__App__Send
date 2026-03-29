@@ -1,0 +1,41 @@
+# Open Questions — Explorer Website Team
+# Team: Explorer — Website Redesign (Team 1)
+# For: Dinis Cruz (human) to answer
+# Source: Dev implementation map v0.18.2 + session decisions
+
+Question-1 | open | Who creates the 3 demo vaults at send.sgraph.ai?
+# This is manual work on the live production product.
+# Vaults needed: demo-gallery-001, demo-folder-001, demo-doc-001
+# Keys will be intentionally public — embedded in page HTML.
+# Blocks: Phase 4 (entire <sg-public-viewer> workstream)
+
+Question-2 | open | Who takes the 8 product screenshots? Browser + OS for consistency?
+# Dinis indicated he would do this and share via SG/Send vault.
+# Need: decision on which browser (Chrome recommended for devtools screenshot)
+# and at what viewport (1440px wide recommended for retina @2x)
+# Blocks: Phase 1 (new pages build), Phase 2 (homepage feature showcase)
+
+Question-3 | open | Should Sherpa write full /why/ page copy before Dev builds HTML?
+# Current plan: yes (standard handoff pattern)
+# Alternative: Dev builds template, Sherpa drops in copy iteratively
+# Recommendation: Sherpa first — Dev builds all 5 pages in one pass after copy is done
+# Impacts: sequencing of Phase 1 Workstream-4
+
+Question-4 | open | <sg-public-viewer>: build in this repo or pull from __Tools first?
+# Recommendation: build here first, publish to __Tools after v1 is stable
+# Rationale: unblocks website launch; refactoring to __Tools is separate sprint
+# See: dev pack phase_3__development/04_tools-repo-strategy.md
+
+Question-5 | open | Confirm en-gb and en-us only for new pages at launch?
+# Other locales (fr, de, es, etc.) in follow-up sprint?
+# Current nav: 16 locales in site — new pages would initially be en-only
+# Interim: serve en-gb for all locales via hreflang x-default?
+
+Question-6 | open | Does static.sgraph.ai exist for pinning shared component versions?
+# See: dev pack 04_tools-repo-strategy.md — CI must verify pinned versions
+# If not yet provisioned, this is P0 for the __Tools integration
+
+Question-7 | open | Should the demo vault infographics from NotebookLM repo be used?
+# Vision doc (v0.16.62) suggests 7 specific SGraph infographics as demo files
+# These would make the demo vault much more compelling than generic test files
+# Decision needed: which infographics, who creates the vault, format (PNG/PDF/MD mix?)

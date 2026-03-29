@@ -151,7 +151,7 @@ var UploadEngine = (function() {
             await Promise.all(active);
             await ApiClient.completeMultipart(transferId, uploadId, completedParts);
         } catch (err) {
-            try { await ApiClient.abortMultipart(transferId, uploadId); } catch (e) { /* ignore */ }
+            try { await ApiClient.cancelMultipart(transferId, uploadId); } catch (e) { /* ignore */ }
             throw err;
         }
     }

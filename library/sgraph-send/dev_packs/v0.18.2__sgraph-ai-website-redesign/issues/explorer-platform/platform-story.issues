@@ -1,0 +1,48 @@
+# Explorer Platform — Platform Story and Ecosystem Section
+# Team: Explorer — Platform Story (Team 2)
+# Lead: Ambassador | Source: Vision doc v0.16.62 Section 12
+
+Workstream-P1 | todo | "Where we're going" section — homepage
+
+	Task-1  | todo | Define platform stack one-liners for each layer -> Sherpa
+	# 6 layers, 1-2 sentences each. Only claim what's shipped.
+	#
+	# Layer 1: SG/Send — "Share encrypted files. Recipients browse. Live now."
+	# Layer 2: SGit-AI — "Encrypted, PKI-signed Git. No SSH. pip install sgit-ai."
+	# Layer 3: SG-Vault — "Zero-knowledge version control. Browser UI for SGit. Coming."
+	# Layer 4: Data Rooms — "On-demand encrypted workspaces for teams. On the roadmap."
+	# Layer 5: PKI Infrastructure — "Machine and human identity. Zero central authority."
+	# Layer 6: Agentic Plane — "Signed message plane for AI and human collaboration."
+	#
+	# CONSTRAINT: Only Layer 1 and 2 are LIVE. Layers 3-6 are roadmap/vision.
+
+	Task-2  | todo | Design platform stack visual -> Designer
+	# Vertical layer diagram or horizontal timeline
+	# Live layers: solid, bright teal. Coming layers: dashed, muted.
+	# Links: Layer 1 → send.sgraph.ai, Layer 2 → sgit.ai
+	# Inspired by: vision doc infographics (SGraph platform diagrams)
+
+	Task-3  | blocked | Build "where we're going" section HTML -> Dev
+	# Blocked by: Task-1, Task-2
+
+	Task-4  | todo | Verify all platform claims against shipped products -> Architect
+	# SGit-AI: confirm pip install sgit-ai works, GitHub org exists
+	# SG-Vault: confirm it's not yet shipped (architecture only)
+	# Data Rooms: confirm it's architecture/brief only
+
+Workstream-P2 | todo | SGit as live co-product — ecosystem navigation
+
+	Task-5  | todo | Write SGit ecosystem positioning for footer/nav -> Ambassador
+	# One-liner for each product in ecosystem footer:
+	#   send.sgraph.ai — "Encrypted file sharing"
+	#   sgit.ai — "Encrypted Git"
+	#   tools.sgraph.ai — "Zero-knowledge tools"
+
+	Task-6  | todo | Design ecosystem footer / nav band -> Designer
+	# Options: horizontal product strip above main footer,
+	# or "ecosystem" section in footer columns
+	# All *.sgraph.ai properties share same header/footer eventually
+
+	Task-7  | blocked | Add sgit.ai to ecosystem nav/footer -> Dev
+	# Blocked by: Task-5, Task-6
+	# sgit.ai is live — treat same as send.sgraph.ai (not "coming soon")

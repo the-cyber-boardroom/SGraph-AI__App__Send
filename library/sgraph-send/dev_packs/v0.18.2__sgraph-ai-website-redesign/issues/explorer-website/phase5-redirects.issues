@@ -1,0 +1,33 @@
+# Phase 5: Redirects and Removals (PR 2)
+# Team: Explorer — Website Redesign (Team 1) — hands off to Villager for gate
+# Lead: Conductor | Source: Dev map v0.18.2 Phase 5 + Conductor brief Section 2
+# IMPORTANT: PR 2 ONLY. Must not be merged until Villager confirms /security/ is indexed.
+# Gate: Team 3 (Villager) signs off before any redirect fires.
+
+Workstream-8 | blocked | Phase 5: Redirects and Removals (PR 2 — after indexing)
+# Blocked by: Villager team (Team 3) Story-11 gate
+
+	Task-1  | blocked | Write CloudFront redirect rules -> Dev
+	# Blocked by: /security/ confirmed indexed (Team 3)
+	# File: sgraph_ai__website/cloudfront/redirects.js
+	# Rules:
+	#   /{locale}/architecture/      → /{locale}/security/               (301)
+	#   /{locale}/product/           → /{locale}/                        (301)
+	#   /{locale}/agents/            → https://qa.send.sgraph.ai/team/   (301)
+	#   /{locale}/agents/sherpa/     → https://qa.send.sgraph.ai/team/   (301)
+	#   /{locale}/agents/ambassador/ → https://qa.send.sgraph.ai/team/   (301)
+	#   /{locale}/agents/architect/  → https://qa.send.sgraph.ai/team/   (301)
+
+	Task-2  | blocked | Implement redirects as CloudFront Function (edge, zero-latency) -> Dev
+	# Blocked by: Task-1
+
+	Task-3  | blocked | Remove old page HTML files -> Dev
+	# Blocked by: Task-2 deployed and confirmed working (spot-check 301s)
+	# Files to remove: agents/ pages, architecture/ pages, product/ pages
+
+	Task-4  | blocked | Test all redirect paths return 301 -> Architect
+	# Use curl: curl -I https://sgraph.ai/en-gb/architecture/
+	# Expected: HTTP/2 301 + Location: /en-gb/security/
+
+	Task-5  | blocked | Confirm qa.send.sgraph.ai/team/ handles redirect traffic -> DevOps
+	# The agents pages will send traffic there. Verify the QA site can handle it.

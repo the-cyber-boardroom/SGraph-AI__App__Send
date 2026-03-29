@@ -5,10 +5,12 @@ from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers          
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned             import Routes__Presigned
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Early_Access          import Routes__Early_Access
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Vault__Pointer        import Routes__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Vault__Presigned      import Routes__Vault__Presigned
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                      import Transfer__Service
 from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls               import Service__Presigned_Urls
 from sgraph_ai_app_send.lambda__user.service.Service__Early_Access                 import Service__Early_Access
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer               import Service__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.service.Service__Vault__Presigned             import Service__Vault__Presigned
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Zip                  import Service__Vault__Zip
 from sgraph_ai_app_send.lambda__user.storage.Send__Config                           import Send__Config
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION
@@ -29,6 +31,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
     early_access_service : Service__Early_Access  = None                            # Early Access signup (n8n webhook)
     vault_service        : Service__Vault__Pointer = None                            # Vault pointer service (mutable files)
     vault_zip_service    : Service__Vault__Zip      = None                            # Vault zip builder with content-addressable caching
+    vault_presigned_service : Service__Vault__Presigned = None                       # Vault presigned URL service (S3 mode only)
 
     def app_kwargs(self, **kwargs):                                                   # Override: move docs under /api/ so CloudFront routes them to Lambda
         kwargs = super().app_kwargs(**kwargs)
@@ -81,6 +84,16 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             self.vault_zip_service = Service__Vault__Zip(vault_service = self.vault_service,
                                                           storage_fs    = storage_fs       )
 
+        if self.vault_presigned_service is None:                                 # Auto-create vault presigned URL service
+            from sgraph_ai_app_send.lambda__user.storage.Storage_FS__S3 import Storage_FS__S3
+            vault_presigned_kwargs = dict(vault_service = self.vault_service      ,
+                                          storage_mode  = self.send_config.storage_mode)
+            if isinstance(storage_fs, Storage_FS__S3):                           # Wire S3 client from storage backend
+                vault_presigned_kwargs['s3']        = storage_fs.s3
+                vault_presigned_kwargs['s3_bucket'] = storage_fs.s3_bucket
+                vault_presigned_kwargs['s3_prefix'] = storage_fs.s3_prefix
+            self.vault_presigned_service = Service__Vault__Presigned(**vault_presigned_kwargs)
+
         return super().setup()
 
 
@@ -108,13 +121,16 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                         vault_service        = self.vault_service        ,
                         vault_zip_service    = self.vault_zip_service    ,
                         admin_service_client = self.admin_service_client )
+        self.add_routes(Routes__Vault__Presigned,
+                        vault_presigned_service = self.vault_presigned_service,
+                        admin_service_client    = self.admin_service_client   )
 
         self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
 
     def setup_mcp(self):                                                              # Mount MCP server on /mcp endpoint
         from sgraph_ai_app_send.lambda__user.user__config import HEADER__SGRAPH_SEND__ACCESS_TOKEN
         mcp_setup = MCP__Setup(name            = 'sgraph-send-user'                              ,
-                               include_tags    = ['api/transfers', 'api/presigned', 'api/early-access', 'api/vault'],
+                               include_tags    = ['api/transfers', 'api/presigned', 'api/early-access', 'api/vault', 'api/vault/presigned'],
                                forward_headers = ['authorization', HEADER__SGRAPH_SEND__ACCESS_TOKEN],
                                stateless       = True                                            )  # Lambda-compatible: no session state, authless discovery
         self.mcp = mcp_setup.mount_mcp(self.app())

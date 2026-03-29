@@ -249,13 +249,13 @@ const ApiClient = {
     },
 
     /**
-     * Abort a multipart upload (cleanup on failure).
+     * Cancel a multipart upload (cleanup on failure).
      * @param {string} transferId
      * @param {string} uploadId
      */
-    async abortMultipart(transferId, uploadId) {
+    async cancelMultipart(transferId, uploadId) {
         try {
-            await fetch(`${this.baseUrl}/presigned/abort/${transferId}/${uploadId}`, {
+            await fetch(`${this.baseUrl}/presigned/cancel/${transferId}/${uploadId}`, {
                 method:  'POST',
                 headers: { ...this.authHeaders() }
             });

@@ -48,8 +48,8 @@ class test_Service__Presigned_Urls__Memory_Mode(TestCase):
         )
         assert result['error'] == 'presigned_not_available'
 
-    def test__abort_multipart_upload__memory_mode(self):
-        result = self.presigned_service.abort_multipart_upload(
+    def test__cancel_multipart_upload__memory_mode(self):
+        result = self.presigned_service.cancel_multipart_upload(
             transfer_id = 'test123',
             upload_id   = 'fake-upload-id'
         )

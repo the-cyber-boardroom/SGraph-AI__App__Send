@@ -1,0 +1,40 @@
+# Phase 3: Navigation Update
+# Team: Explorer — Website Redesign (Team 1)
+# Lead: Conductor | Source: Dev map v0.18.2 Phase 3 + Conductor brief Section 7
+# Dependency: /security/ page must exist (Phase 1 Workstream-2)
+# PR 1 content — same PR as Phase 1/2 or follow-up
+
+Workstream-6 | todo | Phase 3: Navigation Update (all locale pages)
+
+# Current nav: Product | Pricing | Architecture | Team
+# New nav:     Features | Security | Pricing | Tools
+# Plus: "Already have a token? →" persistent header link (highest-priority UX)
+
+	Task-1  | todo | Design new header — nav + token link + locale picker layout -> Designer
+	# Desktop: logo | Features Security Pricing Tools | "Already have a token? →" | locale picker
+	# Mobile: logo | hamburger, "Already have a token?" in mobile nav menu
+	# CSS: .nav-token-link — font 0.85rem, accent color, opacity 0.85
+
+	Task-2  | todo | Add i18n keys to all locale JSON files -> Dev
+	# ADD: nav.features, nav.security, nav.tools, nav.have_token
+	# REMOVE: nav.product, nav.architecture, nav.team
+	# Files: sgraph_ai__website/{locale}/strings.json (all 16 locales)
+
+	Task-3  | blocked | Update header HTML across all locale index pages -> Dev
+	# Blocked by: Task-1 (design), Task-2 (i18n keys), Phase 1 Workstream-2 done
+	# Target files: sgraph_ai__website/{locale}/*/index.html (all pages with nav)
+	# Consider: extract to <sg-site-header> Web Component if that's ready
+
+	Task-4  | todo | Update footer links (add tools.sgraph.ai, qa.send.sgraph.ai) -> Dev
+	# Footer should link: send.sgraph.ai | tools.sgraph.ai | qa.send.sgraph.ai
+	# | GitHub | /security/ | /pricing/ | Contact
+
+	Task-5  | todo | Verify "Already have a token? →" routes to send.sgraph.ai correctly -> Architect
+	# This is the highest-volume UX change — test across all entry points
+
+	Task-6  | todo | Verify Tools link opens tools.sgraph.ai in new tab -> Architect
+	# target="_blank" rel="noopener" must be present
+
+	Task-7  | todo | Review updated nav on mobile breakpoint -> Designer
+	# Hamburger menu must include "Already have a token?" entry
+	# Tools external link must be visually distinct (external icon or label)

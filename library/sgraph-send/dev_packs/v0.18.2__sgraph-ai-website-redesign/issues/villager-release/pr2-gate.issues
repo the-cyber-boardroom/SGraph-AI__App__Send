@@ -1,0 +1,47 @@
+# Villager — PR 2 Gate (Redirects and SEO)
+# Team: Villager — Production Release (Team 3)
+# Lead: QA | Source: phase_5__release/06_launch-checklist.md Phase 5
+# BLOCKED until: PR 1 deployed, /security/ indexed, 48h minimum wait
+
+Workstream-V2 | blocked | PR 2 Gate — Redirects and SEO Safety
+# Blocked by: Workstream-V1 done + /security/ indexed
+
+# ---- INDEXING WAIT ----
+
+	Task-1  | blocked | Monitor Search Console: /security/ page crawled -> DevOps
+	# Check daily after PR 1 deployment.
+	# Required: Google has crawled and indexed /security/ before 301 fires.
+	# If not indexed after 72h: investigate (robots.txt, sitemap, noindex tag).
+
+	Task-2  | blocked | Monitor Search Console: /architecture/ current ranking -> DevOps
+	# Record current impressions and position before redirect.
+	# Use as baseline to check for regression after PR 2.
+
+	Task-3  | blocked | Confirm no major errors on PR 1 content (48-72h monitoring) -> QA
+	# Check CloudFront error rate. Check CI alerts. Check component fallback rate.
+
+# ---- PR 2 TASKS (only after gate conditions met) ----
+
+	Task-4  | blocked | Review and approve CloudFront redirect rules -> Architect
+	# Rules: architecture/ → security/ (301), product/ → / (301)
+	# agents/* → qa.send.sgraph.ai/team/ (301)
+	# Verify locale patterns cover all 16 locales.
+
+	Task-5  | blocked | Deploy PR 2 to production -> DevOps
+	# PR 2 contains: CloudFront redirects, sitemap removals, CI updates
+	# No feature changes — Villager adds nothing.
+
+	Task-6  | blocked | Spot-check all redirect paths return 301 -> QA
+	# Test: curl -I https://sgraph.ai/en-gb/architecture/ → 301 → /en-gb/security/
+	# Test: curl -I https://sgraph.ai/en-gb/agents/ → 301 → qa.send.sgraph.ai/team/
+	# Test: curl -I https://sgraph.ai/en-gb/product/ → 301 → /en-gb/
+
+	Task-7  | blocked | Verify removed pages are gone (HTML files deleted) -> QA
+	# Confirm old pages no longer exist as HTML files in S3/CloudFront.
+	# Redirect must still work (CloudFront Function, not file-based).
+
+	Task-8  | blocked | Monitor /architecture/ ranking for 30 days -> DevOps
+	# Set up alert: if /security/ drops in ranking after redirect, investigate.
+	# Expected: /security/ inherits /architecture/ ranking within 4-6 weeks.
+
+# GATE: All tasks done → PR 2 confirmed stable → Team 4 (Town Planner) unblocked

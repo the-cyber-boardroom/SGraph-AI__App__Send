@@ -1,0 +1,122 @@
+# Phase 2: Homepage Redesign
+# Team: Explorer — Website Redesign (Team 1)
+# Lead: Conductor | Source: Dev map v0.18.2 Phase 2 + Conductor brief Sections 6, 10
+# Dependency: Phase 0 screenshots (Tasks 1-8), Phase 1 content patterns
+# PR 1 content — can be in same PR as Phase 1
+
+Workstream-5 | todo | Phase 2: Homepage Redesign (7 sections)
+
+# ---- COPY TASKS (Sherpa — first mover, unblocks Designer and Dev) ----
+
+	Task-1  | todo | Write hero copy (H1 + sub + CTAs) -> Sherpa
+	# H1: "Share files. Browse them. Nobody can read them. Not even us."
+	# Sub: "Files are encrypted in your browser before upload..."
+	# CTA1: "Try Free — No Account Required →"
+	# CTA2: "Buy Credits — £5 →"
+	# Final copy: Conductor brief Section 6 — do not deviate
+
+	Task-2  | todo | Write "How it works" 3-step copy -> Sherpa
+	# Step 1: Drop — Add files. Choose share mode. Pick retention period.
+	# Step 2: Encrypt — AES-256-GCM runs in browser. Key never leaves device.
+	# Step 3: Share — Send a friendly token. Recipients browse, view, interact.
+
+	Task-3  | todo | Write feature showcase captions (gallery, folder, SgPrint) -> Sherpa
+	# 2-3 sentences per feature. "Cannot" not "will not". Precise over vague.
+
+	Task-4  | todo | Write trust section copy (callout + 6-sentence policy) -> Sherpa
+	# Callout: "Zero cookies. Zero tracking. We cannot read your files."
+	# Contrast line: "Privacy policy: 6 sentences. Theirs: 4,000+ words."
+	# Policy: all 6 sentences as written in Conductor brief Section 6
+
+	Task-5  | todo | Write share modes card copy (3 cards) -> Sherpa
+	# Token Only (most private) | Combined (most convenient) | Separate Key (most flexible)
+	# Each card: name + tradeoff tag + 2-sentence description
+
+	Task-6  | todo | Write conversion CTA section copy -> Sherpa
+	# H2: "Try it now. No signup required."
+	# Sub: "No account. No credit card. No email."
+
+	Task-7  | todo | Write repositioned story section copy -> Sherpa
+	# Moves from position 2 to position 7 (below fold, curiosity reward)
+	# "Every line of SG/Send has been written, reviewed, and documented by AI agents..."
+	# NO test count numbers. Stats: 18 AI agents, 1 human architect.
+	# CTAs: "View on GitHub →" + "Meet the team →" (qa.send.sgraph.ai/team/)
+
+# ---- DESIGN TASKS (Designer) ----
+
+	Task-8  | todo | Design hero two-column layout (text left, demo right) -> Designer
+	# Left: H1 + sub + two CTA buttons (stacked on mobile)
+	# Right: <sg-public-viewer> component (or fallback screenshot)
+	# Mobile: demo above headline, single column
+	# ASCII sketch in Designer review: team/roles/designer/reviews/03/27/
+
+	Task-9  | todo | Design "How it works" 3-step section -> Designer
+	# Horizontal on desktop, vertical on mobile
+	# Step number bubble → H3 → paragraph, connected by arrows
+
+	Task-10 | todo | Design feature showcase (3 screenshot rows, alternating) -> Designer
+	# Large screenshot takes 60% width. Text column 40%. Alternates L/R.
+	# "See how it works →" link under each feature
+
+	Task-11 | todo | Design trust / privacy section with visible policy -> Designer
+	# Trust callout: large display text, teal accent
+	# Privacy policy: numbered list (ol), monospace font for contrast
+	# "Verify it yourself →" and DevTools instruction inline
+
+	Task-12 | todo | Design share modes 3-card layout -> Designer
+	# 3-column grid, middle card is "featured" (slightly elevated)
+	# Card: name → tradeoff badge → description
+
+	Task-13 | todo | Design conversion CTA section -> Designer
+	# Full-width, centered, dark background variant (--bg-secondary)
+	# Two buttons side by side (stacked on mobile)
+
+	Task-14 | todo | Design repositioned story section -> Designer
+	# Contained width, below fold. 2 stat boxes. 2 ghost buttons.
+	# De-emphasised — this is the curiosity reward, not the pitch
+
+# ---- BUILD TASKS (Dev — blocked on copy + design) ----
+
+	Task-15 | blocked | Build homepage HTML — hero section -> Dev
+	# Blocked by: Task-1 (copy), Task-8 (design)
+	# HTML sketch: Dev implementation map v0.18.2 Section 2.2
+
+	Task-16 | blocked | Build homepage HTML — How it works section -> Dev
+	# Blocked by: Task-2, Task-9
+
+	Task-17 | blocked | Build homepage HTML — feature showcase section -> Dev
+	# Blocked by: Task-3, Task-10, Phase 0 screenshots Task-1 through Task-4
+
+	Task-18 | blocked | Build homepage HTML — trust / privacy section -> Dev
+	# Blocked by: Task-4, Task-11
+
+	Task-19 | blocked | Build homepage HTML — share modes section -> Dev
+	# Blocked by: Task-5, Task-12, Phase 0 Task-8
+
+	Task-20 | blocked | Build homepage HTML — conversion CTA section -> Dev
+	# Blocked by: Task-6, Task-13
+
+	Task-21 | blocked | Build homepage HTML — story section -> Dev
+	# Blocked by: Task-7, Task-14
+
+# ---- SCHEMA + ARCHITECTURE TASKS (Architect) ----
+
+	Task-22 | todo | Add SoftwareApplication schema to homepage head -> Architect
+	# Type: SoftwareApplication, category: SecurityApplication, OS: Web
+	# Offer: GBP 0.01 per file transfer
+
+	Task-23 | todo | Add HowTo schema (3-step upload) to homepage head -> Architect
+	# Steps: Drop → Encrypt → Share (match copy from Task-2)
+
+	Task-24 | todo | Review all homepage claims against reality doc -> Architect
+	# Flag any claim not code-verified. No unsubstantiated stats. No test counts.
+
+# ---- LAUNCH CONTENT (Ambassador — parallel track, no blockers) ----
+
+	Task-25 | todo | Write launch announcement (long form) -> Ambassador
+	# Reference: Ambassador review v0.17.2 — launch messaging section
+
+	Task-26 | todo | Write 3 social media posts (LinkedIn, Twitter, HN) -> Ambassador
+	# Twitter: 2-tweet thread format (see Conductor brief Section)
+	# HN: "Ask HN: SG/Send v0.3.0 — encrypted file sharing with gallery view"
+	# LinkedIn: expanded version of tweet thread with infographic

@@ -1,0 +1,30 @@
+# Phase 7: CI Updates
+# Team: Explorer — Website Redesign (Team 1)
+# Lead: Conductor | Source: Dev map v0.18.2 Phase 7
+# File: .github/workflows/deploy-website.yml
+# PR 1 content — smoke tests must pass before PR 1 can be merged
+
+Workstream-10 | todo | Phase 7: CI Smoke Tests and Validation
+
+	Task-1  | todo | Add new file existence checks to validate job -> Dev
+	# Check: features/index.html, security/index.html, 5x why/*/index.html
+	# Check: _common/components/sg-public-viewer.js
+	# Check: _common/img/screenshot-*.png (8 files)
+
+	Task-2  | todo | Add CORS check to validate job -> Dev
+	# curl -I -H "Origin: https://sgraph.ai" https://send.sgraph.ai/health
+	# Fail build if Access-Control-Allow-Origin header is missing or wrong
+
+	Task-3  | todo | Add smoke test for all new page paths -> Dev
+	# Paths: /en-gb/ /en-gb/features/ /en-gb/security/ /en-gb/pricing/
+	#        /en-gb/why/share-a-folder/ /en-gb/why/gallery-preview/
+	#        /en-gb/why/print-as-pdf/ /en-gb/why/share-a-video/
+	#        /en-gb/why/send-securely/
+	# Exit 1 if any path returns non-200
+
+	Task-4  | todo | Add schema validation to CI (optional) -> Architect
+	# Use schema.org validator API or offline validator for SoftwareApplication,
+	# FAQ, HowTo schemas. Warn (not fail) if schema is malformed.
+
+	Task-5  | todo | Verify CI pipeline runs clean on feature branch -> Dev
+	# Run against the PR 1 branch before requesting Villager review

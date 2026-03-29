@@ -161,10 +161,10 @@ class Service__Presigned_Urls(Type_Safe):                                       
                     etag        = response.get('ETag', ''))
 
     # =========================================================================
-    # Multipart upload: abort (cleanup on failure)
+    # Multipart upload: cancel (cleanup on failure)
     # =========================================================================
 
-    def abort_multipart_upload(self, transfer_id, upload_id):
+    def cancel_multipart_upload(self, transfer_id, upload_id):
         if not self.is_s3_mode():
             return dict(error='presigned_not_available')
 
@@ -178,13 +178,13 @@ class Service__Presigned_Urls(Type_Safe):                                       
         if self.transfer_service:
             meta = self.transfer_service.load_meta(transfer_id)
             meta['events'].append(dict(
-                action    = 'multipart_aborted',
+                action    = 'multipart_cancelled',
                 timestamp = datetime.now(timezone.utc).isoformat(),
                 upload_id = upload_id
             ))
             self.transfer_service.save_meta(transfer_id, meta)
 
-        return dict(transfer_id = transfer_id, status = 'aborted')
+        return dict(transfer_id = transfer_id, status = 'cancelled')
 
     # =========================================================================
     # Presigned download URL

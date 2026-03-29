@@ -1,0 +1,69 @@
+# Team 2: Explorer — Platform Story
+# Lead: Ambassador | v0.18.3 | 27 March 2026
+#
+# CENTER OF GRAVITY (defined by Ambassador):
+# "SG/Send is the gateway, not the destination. The website must hint at the
+#  platform without overpromising. SGit is live — say so. SG-Vault is coming —
+#  one line. The platform stack diagram is our most powerful investment signal
+#  hidden in plain sight. Every visitor who 'gets it' becomes a champion."
+#
+# TEAM COMPOSITION
+# Role         | Scope
+# Ambassador   | Leads — platform narrative, positioning, launch content
+# Sherpa       | Platform page copy, ecosystem section copy, SGit one-liner
+# Designer     | Platform stack visual, ecosystem nav treatment
+# Architect    | Cross-product architecture accuracy, claim verification
+# Developer    | "Where we're going" section build, ecosystem nav
+#
+# WORKING FILES: .issues/website-redesign/explorer-platform/
+#   platform-story.issues
+#   ecosystem-navigation.issues
+#   demo-content.issues
+#
+# KEY DOCS
+#   Vision brief:  team/humans/dinis_cruz/briefs/03/27/v0.16.62__vision__sgraph-platform-beyond-file-sharing.md
+#   SGit brief:    Section 2 of vision doc (live on PyPI, own GitHub org, full CLI)
+#   SG-Vault:      Section 3 of vision doc (browser UI for SGit vaults)
+#   Demo content:  Section 13 of vision doc (SGraph infographics as demo files)
+#
+# CONSTRAINT: Only claim what's shipped.
+#   SG/Send v0.3.0 → LIVE
+#   SGit-AI       → LIVE (pip install sgit-ai, full CLI, own GitHub org)
+#   SG-Vault      → "coming" (architecture exists, browser UI not yet shipped)
+#   Data Rooms    → "roadmap" (architecture and brief exist, not shipped)
+#   PKI / Agentic → "vision" (deep docs exist, not yet a product)
+#
+# DEPENDENCY: Team 2 must NOT block Team 1.
+#   Platform story section on homepage can be PR 1.5 or PR 2.
+#   Do not delay homepage ship waiting for platform section to be perfect.
+
+Team-2 | todo | Explorer — Platform Story (Ambassador-led)
+
+# STORIES
+
+Story-6 | todo | "Where we're going" section on homepage (platform stack)
+	# Acceptance: Homepage has a below-fold section showing the 6-layer platform stack.
+	# SG/Send and SGit marked "live". SG-Vault "coming". Rest "roadmap".
+	# One line per layer. Visual — not a wall of text.
+	# Scope: This is after Story-5 (PR 1). Can be PR 1.5 or PR 2.
+
+Story-7 | todo | SGit positioned as live co-product (ecosystem nav)
+	# Acceptance: sgraph.ai links to sgit.ai as a live product (not a future one).
+	# Ecosystem footer or header shows: send.sgraph.ai | sgit.ai | tools.sgraph.ai
+	# SGit one-liner: "Encrypted, PKI-signed Git. No SSH. Runs anywhere."
+
+Story-8 | todo | Demo vault content uses real SGraph infographics
+	# Acceptance: The 3 demo vaults at send.sgraph.ai use infographics from the
+	# NotebookLM repo instead of generic test files.
+	# Suggested pack: 7 infographics (see vision doc Section 13)
+	# Impact: Demo vault is now a product story, not a tech test.
+
+Story-9 | todo | /platform/ or /vision/ page (future — post-launch)
+	# Out of scope for PR 1 and PR 2. Design and brief in this sprint.
+	# Source material: vision doc + infographics from NotebookLM repo.
+
+# WORKSTREAM OVERVIEW (see individual files for tasks)
+Platform-WS-1 | todo | "Where we're going" section copy and design
+Platform-WS-2 | todo | Ecosystem navigation (sgit.ai + tools.sgraph.ai links)
+Platform-WS-3 | todo | Demo vault content (infographics pack)
+Platform-WS-4 | todo | /platform/ page brief (future sprint)

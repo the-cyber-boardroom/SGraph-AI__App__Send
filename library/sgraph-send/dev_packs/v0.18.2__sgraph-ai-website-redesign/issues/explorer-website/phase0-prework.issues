@@ -1,0 +1,47 @@
+# Phase 0: Pre-work — Screenshots and Demo Vaults
+# Team: Explorer — Website Redesign (Team 1)
+# Lead: Conductor | Source: Dev map v0.18.2 Phase 0
+# BLOCKER: All subsequent phases depend on Phase 0 completions.
+# Note: Screenshots are a HUMAN task (Dinis). Demo vaults are a DEV task.
+
+Workstream-0 | todo | Phase 0: Pre-work — Screenshots and Demo Vaults
+
+# ---- SCREENSHOTS (8 required) ----
+# Human task: Dinis takes from live send.sgraph.ai
+# Target: sgraph_ai__website/_common/img/screenshot-*.png
+# Format: PNG, max 1200px wide, dark bg. Also @2x for retina.
+# Dinis: share via SG/Send vault to the dev team
+
+	Task-1  | todo | Take screenshot: gallery view — mixed content grid with type badges
+	Task-2  | todo | Take screenshot: folder browser — multi-pane sg-layout
+	Task-3  | todo | Take screenshot: SgPrint before (markdown source view)
+	Task-4  | todo | Take screenshot: SgPrint after (branded PDF render)
+	Task-5  | todo | Take screenshot: friendly token display vs raw opaque URL
+	Task-6  | todo | Take screenshot: transparency panel ("stored" vs "never sent")
+	Task-7  | todo | Take screenshot: upload wizard at step 3 or 4
+	Task-8  | todo | Take screenshot: three share mode cards side by side
+
+# ---- DEMO VAULTS (3 required for <sg-public-viewer>) ----
+# Dev task: Create at send.sgraph.ai via API or manually
+# Keys are intentionally public — embedded in page HTML
+# See: Conductor brief Section 10 for full requirements
+
+	Task-9  | todo | Create demo vault: demo-gallery-001 (image + PDF + markdown + video)
+	Task-10 | todo | Create demo vault: demo-folder-001 (folder with 3 files, different types)
+	Task-11 | todo | Create demo vault: demo-doc-001 (single markdown file for SgPrint demo)
+
+# ---- INFRASTRUCTURE ----
+# Required before <sg-public-viewer> can load vaults from the marketing site
+
+	Task-12 | todo | Configure CORS: send.sgraph.ai must allow sgraph.ai origin
+	Task-13 | todo | Tag demo vaults type=demo (exclude from TTL/expiry logic)
+	Task-14 | todo | Record public keys for all 3 demo vaults (needed for component config)
+
+# ---- CSS TOKENS ----
+# Can be done by Dev independently of screenshots
+
+	Task-15 | todo | Add missing CSS tokens to _common/css/style.css -> Dev
+	# Tokens: --bg-secondary, --bg-card, --border-subtle, --radius-card,
+	# --shadow-card, --transition-base, --max-width-content, --hero-min-height
+
+# PHASE 0 GATE: All 15 tasks done before Phase 1 build tasks become unblocked

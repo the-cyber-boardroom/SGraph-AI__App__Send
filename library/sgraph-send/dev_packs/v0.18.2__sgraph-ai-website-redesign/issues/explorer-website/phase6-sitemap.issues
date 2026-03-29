@@ -1,0 +1,27 @@
+# Phase 6: Sitemap and robots.txt
+# Team: Explorer — Website Redesign (Team 1)
+# Lead: Conductor | Source: Dev map v0.18.2 Phase 6
+# PR 1 content: add new pages to sitemap
+# PR 2 content: remove old pages from sitemap
+
+Workstream-9 | todo | Phase 6: Sitemap and robots.txt
+
+	Task-1  | todo | Add new pages to sitemap.xml (PR 1) -> Dev
+	# Pages: /features/, /security/, 5x /why/* (en-gb + en-us each)
+	# Format: <url> with <xhtml:link> alternates for locale variants
+	# Add: hreflang="en-gb", hreflang="en-us", hreflang="x-default"
+	# lastmod: 2026-03-27 (update date)
+
+	Task-2  | blocked | Remove old pages from sitemap.xml (PR 2) -> Dev
+	# Blocked by: Phase 5 redirects deployed
+	# Remove: /agents/, /architecture/, /product/ (all locales)
+
+	Task-3  | todo | Verify sitemap.xml is valid XML -> Architect
+	# Use: xmllint --noout sitemap.xml
+
+	Task-4  | todo | Submit updated sitemap to Google Search Console -> DevOps
+	# After PR 1 deploy. Signals new pages for indexing.
+	# This starts the 48-72h indexing clock for the Villager gate.
+
+	Task-5  | todo | Verify robots.txt still allows all new pages -> Architect
+	# No new pages should be blocked. Check Disallow rules.

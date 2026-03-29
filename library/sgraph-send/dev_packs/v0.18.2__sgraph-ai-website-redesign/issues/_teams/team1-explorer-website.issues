@@ -1,0 +1,82 @@
+# Team 1: Explorer — Website Redesign
+# Lead: Conductor | v0.18.3 | 27 March 2026
+#
+# CENTER OF GRAVITY (defined by Conductor):
+# "Recipients land on sgraph.ai and become senders.
+#  The site must show the product, prove the privacy, and convert curiosity to action.
+#  We measure success by: a recipient can land, understand, and click Try Free
+#  in under 90 seconds — without reading a word of copy if the screenshots are right."
+#
+# TEAM COMPOSITION
+# Role         | Scope
+# Conductor    | Orchestrates, monitors workstream blockers, owns decisions
+# Sherpa       | All copy — hero, sections, /why/ pages, /security/ depth
+# Designer     | All layouts — two-column hero, screenshot rows, cards, mobile
+# Architect    | Claim verification, schema markup, SEO, migration risk
+# Ambassador   | Competitive table, launch copy, social posts
+# Developer    | HTML/CSS/JS build across all phases
+# Librarian    | Issues-FS maintenance, reality doc updates, devpack updates
+#
+# WORKING FILES: .issues/website-redesign/explorer-website/
+#   phase0-prework.issues
+#   phase1-new-pages.issues
+#   phase2-homepage.issues
+#   phase3-navigation.issues
+#   phase4-public-viewer.issues
+#   phase5-redirects.issues
+#   phase6-sitemap.issues
+#   phase7-ci.issues
+#   questions.issues
+#   bugs.issues
+#
+# KEY DOCS
+#   Brief:       team/humans/dinis_cruz/briefs/03/27/v0.16.62__brief__website-redesign-sgsend-v030.md
+#   Conductor:   team/roles/conductor/reviews/03/27/v0.18.2__conductor-brief__website-redesign-implementation.md
+#   Dev map:     team/roles/dev/reviews/03/27/v0.18.2__dev-review__website-redesign-implementation-map.md
+#   Dev pack:    library/sgraph-send/dev_packs/v0.18.2__sgraph-ai-website-redesign/
+
+Team-1 | in-progress | Explorer — Website Redesign
+
+# STORY MAP
+# Stories define the user-facing value. Tasks inside each phase deliver the story.
+
+Story-1 | todo | Recipient converts to sender
+	# Acceptance: A person who received a token can land on sgraph.ai,
+	# understand what the product does in < 90s, and find a CTA to try it.
+	# Design success: "Already have a token? →" in header. Hero shows gallery.
+	# Tracking: Phase 2 (homepage) + Phase 3 (nav)
+
+Story-2 | todo | Evaluator trusts the security
+	# Acceptance: A CISO-level evaluator can find /security/, read architecture
+	# explanation, see the 3 subpoena/breach/retention Q&As, and leave satisfied.
+	# Design success: 6-sentence policy visible. GDPR-by-architecture explicit.
+	# Tracking: Phase 1 (new pages)
+
+Story-3 | todo | Visitor discovers v0.3.0 features
+	# Acceptance: A new visitor can see gallery, folder browser, SgPrint
+	# demonstrated with real screenshots — on the homepage and /features/.
+	# Design success: No more "zero product screenshots". Every claim has a visual.
+	# Tracking: Phase 1 (/features/) + Phase 2 (homepage feature showcase)
+
+Story-4 | todo | Every claim is verifiable
+	# Acceptance: Every competitive or security claim on sgraph.ai links to
+	# qa.send.sgraph.ai as the proof layer. No unsubstantiated claims.
+	# Design success: "See it tested →" links on /features/. Verify zero cookies
+	# in DevTools instruction on /security/.
+	# Tracking: Phase 1 (claim review tasks) + QA gate
+
+Story-5 | todo | PR 1 shipped — all new content, zero deletions
+	# Acceptance: PR 1 is merged, deployed, and all new pages return 200.
+	# No old pages removed. CI smoke tests pass.
+	# Design success: Villager team can begin their gate (Team 3 unblocked).
+	# Tracking: Phase 7 (CI) + Definition of Done
+
+# PHASE SUMMARY (see individual phase files for full task lists)
+Phase-0 | todo | Pre-work: screenshots + demo vaults (BLOCKER)
+Phase-1 | todo | New pages: /security/ + /features/ + 5x /why/
+Phase-2 | todo | Homepage redesign (7 sections)
+Phase-3 | todo | Navigation update (all locale pages)
+Phase-4 | todo | <sg-public-viewer> Web Component
+Phase-5 | todo | Redirects and removals (PR 2 — after Villager gate)
+Phase-6 | todo | Sitemap and robots.txt update
+Phase-7 | todo | CI smoke tests

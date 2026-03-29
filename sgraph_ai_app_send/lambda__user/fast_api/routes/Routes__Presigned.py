@@ -16,7 +16,7 @@ TAG__ROUTES_PRESIGNED = 'api/presigned'
 ROUTES_PATHS__PRESIGNED = [f'/{TAG__ROUTES_PRESIGNED}/capabilities'                        ,
                            f'/{TAG__ROUTES_PRESIGNED}/initiate'                            ,
                            f'/{TAG__ROUTES_PRESIGNED}/complete'                            ,
-                           f'/{TAG__ROUTES_PRESIGNED}/abort/{{transfer_id}}/{{upload_id}}' ,
+                           f'/{TAG__ROUTES_PRESIGNED}/cancel/{{transfer_id}}/{{upload_id}}',
                            f'/{TAG__ROUTES_PRESIGNED}/upload-url/{{transfer_id}}'          ,
                            f'/{TAG__ROUTES_PRESIGNED}/download-url/{{transfer_id}}'        ]
 
@@ -104,15 +104,15 @@ class Routes__Presigned(Fast_API__Routes):                                      
         return result
 
     # =========================================================================
-    # POST /presigned/abort/{transfer_id}/{upload_id} — cancel multipart upload
+    # POST /presigned/cancel/{transfer_id}/{upload_id} — cancel multipart upload
     # =========================================================================
 
-    def abort__transfer_id__upload_id(self, transfer_id: Safe_Str__Id,               # POST /presigned/abort/{transfer_id}/{upload_id}
-                                            upload_id: str,
-                                            request: Request
-                                     ) -> dict:
+    def cancel__transfer_id__upload_id(self, transfer_id: Safe_Str__Id,              # POST /presigned/cancel/{transfer_id}/{upload_id}
+                                             upload_id: str,
+                                             request: Request
+                                      ) -> dict:
         self.check_access_token(request)
-        result = self.presigned_service.abort_multipart_upload(
+        result = self.presigned_service.cancel_multipart_upload(
             transfer_id = str(transfer_id),
             upload_id   = upload_id
         )
@@ -162,7 +162,7 @@ class Routes__Presigned(Fast_API__Routes):                                      
         self.add_route_get (self.capabilities                    )
         self.add_route_post(self.initiate                        )
         self.add_route_post(self.complete                        )
-        self.add_route_post(self.abort__transfer_id__upload_id   )
+        self.add_route_post(self.cancel__transfer_id__upload_id   )
         self.add_route_get (self.upload_url__transfer_id         )
         self.add_route_get (self.download_url__transfer_id       )
         return self

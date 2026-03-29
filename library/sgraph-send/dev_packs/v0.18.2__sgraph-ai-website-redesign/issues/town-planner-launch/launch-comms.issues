@@ -1,0 +1,47 @@
+# Town Planner — Launch Communications
+# Team: Town Planner — Launch and Investors (Team 4)
+# Lead: Alchemist | Execution: Journalist + Ambassador
+# Source: Ambassador review v0.17.2 Section "Launch Messaging"
+# TRIGGER: After Team 3 (Villager) deploys PR 1
+
+Workstream-TP1 | todo | Launch Communications
+
+	Task-1  | todo | Write launch announcement (long form, 600-800 words) -> Journalist
+	# Audience: existing users, security professionals, developers
+	# Angle: "The product that proves its privacy claim in DevTools"
+	# Must reference: /security/, /features/, live demo (sg-public-viewer)
+	# Include: 6-sentence privacy policy as a pull quote
+	# Distribution: email list, HN, LinkedIn article
+
+	Task-2  | todo | Write HN post: "Show HN: SG/Send v0.3.0..." -> Ambassador
+	# Format: Show HN (not Ask HN — this is a product launch)
+	# Lead with: what's new, what makes it different, link to live demo
+	# Avoid: hype, vague claims, "bank-level encryption"
+	# Specific: "you can verify zero cookies in DevTools right now"
+
+	Task-3  | todo | Write 2-tweet thread -> Ambassador
+	# Source: Conductor brief launch copy / Ambassador review tweet thread draft
+	# Tweet 1: What the product does (browsable encrypted gallery/folder)
+	# Tweet 2: What makes it architecturally different (cannot, not will not)
+	# Add: link to /security/ in tweet 2, link to live demo in tweet 1
+
+	Task-4  | todo | Write LinkedIn article 1: "The privacy policy as product" -> Journalist
+	# Hook: comparison — 6 sentences vs 4,000 words
+	# Body: why short = trust signal, not legal shortcut
+	# CTA: see the policy at sgraph.ai (live on the homepage, not in footer)
+
+	Task-5  | todo | Write LinkedIn article 2: "Cannot vs will not" -> Alchemist
+	# Hook: "Will not is a promise. Cannot is architecture."
+	# Body: what zero-knowledge actually means for subpoenas and breaches
+	# CTA: sgraph.ai/security — "read the 3 evaluator questions"
+	# Tone: investor + security practitioner audience
+
+	Task-6  | todo | Write LinkedIn article 3: "How we built a product that proves itself" -> Journalist
+	# Hook: the QA site is the proof layer
+	# Body: qa.send.sgraph.ai — tests, screenshots, architecture docs, agent team
+	# CTA: "Every claim on sgraph.ai links to a test that verifies it"
+
+	Task-7  | todo | Schedule all launch content against PR 1 deploy date -> Alchemist
+	# Sequence: PR 1 deployed → HN + Twitter Day 1 → LinkedIn Article 1 Day 2
+	# → LinkedIn Article 2 Day 5 → LinkedIn Article 3 Day 10
+	# Do not publish before PR 1 is live and smoke-tested (Team 3 gate)

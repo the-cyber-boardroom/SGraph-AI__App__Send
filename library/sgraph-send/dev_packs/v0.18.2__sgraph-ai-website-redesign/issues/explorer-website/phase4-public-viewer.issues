@@ -1,0 +1,53 @@
+# Phase 4: <sg-public-viewer> Web Component
+# Team: Explorer — Website Redesign (Team 1)
+# Lead: Conductor | Source: Dev map v0.18.2 Phase 4 + Tools Repo Strategy doc
+# Dependency: Phase 0 demo vaults (Tasks 9-14)
+# PR 1 content — included with Phase 1/2 PR
+
+Workstream-7 | todo | Phase 4: <sg-public-viewer> Web Component
+
+# Component renders live encrypted content from send.sgraph.ai demo vaults
+# Key is intentionally public — embedded in component config
+# Graceful fallback: static screenshot if component fails or CORS issue
+
+	Task-1  | todo | Design <sg-public-viewer> visual treatment -> Designer
+	# Must match send.sgraph.ai gallery/folder styles
+	# "Live demo — actually encrypted. Key is intentionally public." caption
+	# Fallback state: screenshot + "Try the live product →" link
+	# Loading state: skeleton animation matching gallery grid
+
+	Task-2  | todo | Spec component API and attributes -> Architect
+	# Attributes: vault-id, locale, fallback-src, fallback-alt
+	# Error handling: network timeout, CORS failure, decryption failure
+	# Rate limiting: must be handled gracefully client-side
+
+	Task-3  | blocked | Build sg-public-viewer.js -> Dev
+	# Blocked by: Phase 0 Task-9 through Task-14 (demo vaults + CORS + keys)
+	# File: sgraph_ai__website/_common/components/sg-public-viewer.js
+	# IFD path: _common/components/v0/v0.1/v0.1.0/sg-public-viewer.js
+	# Implementation sketch: Dev implementation map v0.18.2 Section 4
+
+	Task-4  | blocked | Integrate component into homepage hero -> Dev
+	# Blocked by: Task-3 done
+	# vault-id="demo-gallery-001", fallback-src="/_common/img/screenshot-gallery.png"
+
+	Task-5  | blocked | Integrate component into /features/ page -> Dev
+	# Blocked by: Task-3 done
+	# vault-id="demo-folder-001"
+
+	Task-6  | blocked | Integrate component into /why/print-as-pdf/ -> Dev
+	# Blocked by: Task-3 done
+	# vault-id="demo-doc-001"
+
+	Task-7  | todo | CORS check: verify send.sgraph.ai returns correct header -> Architect
+	# curl -I -H "Origin: https://sgraph.ai" https://send.sgraph.ai/health
+	# Expected: Access-Control-Allow-Origin: https://sgraph.ai
+
+	Task-8  | todo | Test fallback renders correctly when component fails -> QA
+	# Test cases: network offline, CORS blocked, vault not found
+	# Fallback must show screenshot + link — never a broken UI
+
+	Task-9  | todo | Decide: build in this repo or pull from __Tools repo -> Conductor
+	# See dev pack: phase_3__development/04_tools-repo-strategy.md
+	# Recommendation: build here first, publish to __Tools after v1 is stable
+	# Question-4 in questions.issues is related
