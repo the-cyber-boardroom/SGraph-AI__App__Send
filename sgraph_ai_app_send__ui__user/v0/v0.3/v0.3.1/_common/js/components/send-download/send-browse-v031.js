@@ -7,6 +7,7 @@
      3. Auto-open first file uses sorted order (not zip iteration order)
      4. Markdown internal links open as tabs + images resolved from zip
      5. Markdown view source toggle (rendered ↔ raw source)
+     6. Save locally downloads valid zip (correct MIME type + re-generated)
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 1: File names in tree show only basename ────────────────────────────
@@ -270,3 +271,68 @@ SendBrowse.prototype._autoOpenFirstFile = function() {
     var first = root || files[0];
     if (first) this._openFileTab(first.path);
 };
+
+
+// ─── Fix 6: Save locally produces a valid zip ────────────────────────────────
+//
+// BRW-009: The "Save locally" button saves zipOrigBytes (the raw decrypted
+// content) as a Blob with no MIME type. macOS Archive Utility rejects files
+// without a valid zip signature or correct Content-Type.
+//
+// The root issue: zipOrigBytes comes from the SGMETA-unwrapped content, which
+// is the raw bytes that were encrypted. If the original upload was a folder
+// (zipped client-side by JSZip), these bytes should be a valid zip. But the
+// Blob needs the correct MIME type, and as a safety measure we re-generate
+// the zip from the parsed JSZip instance to guarantee a clean archive.
+
+SendBrowse.prototype._setupHeaderListeners = (function(original) {
+    return function() {
+        // Call original for all other header listeners (copy, email, print, etc.)
+        original.call(this);
+
+        // Override the save button handler
+        var saveBtn = this.querySelector('#sb-save-zip');
+        if (saveBtn) {
+            var self = this;
+            // Remove existing listeners by replacing the element
+            var newBtn = saveBtn.cloneNode(true);
+            saveBtn.parentNode.replaceChild(newBtn, saveBtn);
+
+            newBtn.addEventListener('click', async function() {
+                // Re-generate a clean zip from the parsed JSZip instance
+                if (self.zipInstance) {
+                    try {
+                        var zipBlob = await self.zipInstance.generateAsync({
+                            type: 'blob',
+                            mimeType: 'application/zip',
+                            compression: 'DEFLATE',
+                            compressionOptions: { level: 6 }
+                        });
+                        var url = URL.createObjectURL(zipBlob);
+                        var a = document.createElement('a');
+                        a.href = url;
+                        a.download = self.zipOrigName || 'archive.zip';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        return;
+                    } catch (_) { /* fall through to raw bytes */ }
+                }
+
+                // Fallback: save raw bytes with correct MIME type
+                if (self.zipOrigBytes) {
+                    var blob = new Blob([self.zipOrigBytes], { type: 'application/zip' });
+                    var url2 = URL.createObjectURL(blob);
+                    var a2 = document.createElement('a');
+                    a2.href = url2;
+                    a2.download = self.zipOrigName || 'archive.zip';
+                    document.body.appendChild(a2);
+                    a2.click();
+                    document.body.removeChild(a2);
+                    URL.revokeObjectURL(url2);
+                }
+            });
+        }
+    };
+})(SendBrowse.prototype._setupHeaderListeners);
