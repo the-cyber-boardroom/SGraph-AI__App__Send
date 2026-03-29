@@ -13,13 +13,13 @@ A slide deck for SG/Send hallucinated the following workflow:
 
 ```
 > pip install sgit-ai
-> sgit clone vault://coral-equal-1774
+> sgit clone vault://coral-equal-1234
 > sgit status
 > sgit push origin main
 ```
 
 This was wrong about the implementation — but exactly right about the UX.
-`sgit` was already a valid entry point. `coral-equal-1774` was already a valid
+`sgit` was already a valid entry point. `coral-equal-1234` was already a valid
 `Simple_Token` in the codebase. What was missing was the bridge between them.
 
 That bridge is what this sprint built.
@@ -42,7 +42,7 @@ Every Simple Token vault carries two separate tokens with completely different r
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  EDIT TOKEN    coral-equal-1774                                │
+│  EDIT TOKEN    coral-equal-1234                                │
 │  ─────────────────────────────────────────────────────────     │
 │  • vault_id = the token string itself                          │
 │  • Derives all crypto keys (read, write, EC signing)           │
@@ -67,7 +67,7 @@ Every Simple Token vault carries two separate tokens with completely different r
 ### vault_id = edit_token
 
 The vault's cryptographic identity IS the human-readable token string.
-`coral-equal-1774` passes the existing `Safe_Str__Vault_Id` regex
+`coral-equal-1234` passes the existing `Safe_Str__Vault_Id` regex
 (`[a-zA-Z0-9\-]`, max 64 chars) with no changes needed to the schema layer.
 
 This means the token is the only thing a collaborator needs to remember.
@@ -78,7 +78,7 @@ There is no separate UUID, no separate vault key string to exchange.
 All cryptographic keys are derived deterministically from the edit token alone:
 
 ```
-edit_token = "coral-equal-1774"
+edit_token = "coral-equal-1234"
         │
         └── aes_key = PBKDF2-HMAC-SHA256(token, salt='sgraph-send-v1', 600k, 32B)
                 │
@@ -122,14 +122,14 @@ Simple Token detection happens at the entry point, before any crypto or network 
 ```python
 SIMPLE_TOKEN_PATTERN = re.compile(r'^[a-z]+-[a-z]+-\d{4}$')
 
-Simple_Token.is_simple_token('coral-equal-1774')   # True
+Simple_Token.is_simple_token('coral-equal-1234')   # True
 Simple_Token.is_simple_token('vault://coral-...')  # False (strip prefix first)
 Simple_Token.is_simple_token('abc123:def456')      # False → existing vault_key flow
-Simple_Token.is_simple_token('CORAL-EQUAL-1774')   # False (uppercase rejected)
+Simple_Token.is_simple_token('coral-equal-1234')   # False (uppercase rejected)
 ```
 
 The `vault://` prefix is stripped before the pattern match, so both
-`sgit clone coral-equal-1774` and `sgit clone vault://coral-equal-1774` work identically.
+`sgit clone coral-equal-1234` and `sgit clone vault://coral-equal-1234` work identically.
 
 ---
 
@@ -153,10 +153,10 @@ $ sgit clone dawn-haven-6034
     ├─ Download + AES-GCM decrypt transfer archive
     │   (key = PBKDF2('dawn-haven-6034', ...))
     │
-    ├─ Generate new edit token → coral-equal-1774
+    ├─ Generate new edit token → coral-equal-1234
     │
-    ├─ sgit init coral-equal-1774
-    │   (vault_id = 'coral-equal-1774', all keys derived from token)
+    ├─ sgit init coral-equal-1234
+    │   (vault_id = 'coral-equal-1234', all keys derived from token)
     │
     ├─ Write files from archive into working copy
     │
@@ -164,11 +164,11 @@ $ sgit clone dawn-haven-6034
     │
     └─ local/config.json:
        { "mode": "simple_token",
-         "edit_token": "coral-equal-1774",
+         "edit_token": "coral-equal-1234",
          "share_token": "dawn-haven-6034" }
 
-Cloned into coral-equal-1774/
-  Vault ID:    coral-equal-1774
+Cloned into coral-equal-1234/
+  Vault ID:    coral-equal-1234
   Share token: dawn-haven-6034
   Files:       4 committed
 ```
@@ -181,11 +181,11 @@ Run `sgit push` to sync to SGit-AI. Run `sgit share` to refresh the same URL.
 ### Scenario B: Vault first → publish to browser
 
 ```
-$ sgit init coral-equal-1774      # or: sgit init  (auto-generates token)
+$ sgit init coral-equal-1234      # or: sgit init  (auto-generates token)
     │
-    ├─ vault_id = 'coral-equal-1774'
+    ├─ vault_id = 'coral-equal-1234'
     ├─ All keys derived from token (no EC keygen call)
-    └─ local/config.json: { "mode": "simple_token", "edit_token": "coral-equal-1774" }
+    └─ local/config.json: { "mode": "simple_token", "edit_token": "coral-equal-1234" }
 
 $ sgit commit -m "first draft"
 $ sgit push
@@ -212,13 +212,13 @@ $ sgit commit -m "revised" && sgit push && sgit share
 Alice                               Bob
 ─────                               ───
 
-$ sgit init coral-equal-1774
+$ sgit init coral-equal-1234
 $ sgit commit -m "slides v1"
 $ sgit push
 
-  "Edit token: coral-equal-1774"
+  "Edit token: coral-equal-1234"
   ──────────────────────────────────►
-                                    $ sgit clone coral-equal-1774
+                                    $ sgit clone coral-equal-1234
                                         │
                                         ├─ is_simple_token? YES
                                         ├─ Check SGit-AI: vault found ✓
@@ -304,7 +304,7 @@ sgit share --rotate:
 ```json
 {
   "mode":             "simple_token",
-  "edit_token":       "coral-equal-1774",
+  "edit_token":       "coral-equal-1234",
   "share_token":      "dawn-haven-6034",
   "share_transfer_id":"d4e3f2a1b9c8"
 }
@@ -328,8 +328,8 @@ every status/info check.
 | `test_keys_differ` | `read_key ≠ write_key ≠ ec_seed` |
 | `test_deterministic` | Same token always produces same three keys |
 | `test_different_tokens_produce_different_keys` | Different tokens → different key sets |
-| `test_is_simple_token_valid` | Accepts `coral-equal-1774`, `dawn-haven-6034`, `amber-fox-3821` |
-| `test_is_simple_token_invalid` | Rejects `abc123`, `my-project`, `vault://foo`, `CORAL-EQUAL-1774` |
+| `test_is_simple_token_valid` | Accepts `coral-equal-1234`, `dawn-haven-6034`, `amber-fox-3821` |
+| `test_is_simple_token_invalid` | Rejects `abc123`, `my-project`, `vault://foo`, `coral-equal-1234` |
 | `test_vault_id_is_token` | `vault_id()` returns the token string itself |
 | `test_read_key_is_bytes` | Return type is `bytes` |
 | `test_write_key_is_bytes` | Return type is `bytes` |
@@ -345,8 +345,8 @@ every status/info check.
 | `test_init_simple_token_vault_key_file_contains_token` | Stored vault_key is the token |
 | `test_init_non_simple_token_is_unchanged` | Standard init flow untouched |
 | `test_clone_from_transfer_creates_vault` | Scenario A: download → vault → commit |
-| `test_clone_detects_simple_token_pattern` | `clone('coral-equal-1774')` routes correctly |
-| `test_clone_vault_prefix_detected` | `clone('vault://coral-equal-1774')` routes correctly |
+| `test_clone_detects_simple_token_pattern` | `clone('coral-equal-1234')` routes correctly |
+| `test_clone_vault_prefix_detected` | `clone('vault://coral-equal-1234')` routes correctly |
 | `test_clone_simple_token_vault_found` | Scenario B clone: vault found → cloned |
 | `test_clone_simple_token_clone_has_simple_token_config` | Clone config has `mode: simple_token` |
 
@@ -371,8 +371,8 @@ Recipient: sgit clone dawn-haven-6034
 
 ### The Collaboration workflow
 ```
-Alice: sgit init → sgit push → "edit token: coral-equal-1774"
-Bob:   sgit clone coral-equal-1774 → sgit commit → sgit push
+Alice: sgit init → sgit push → "edit token: coral-equal-1234"
+Bob:   sgit clone coral-equal-1234 → sgit commit → sgit push
 Alice: sgit pull → sees Bob's changes
 Both:  sgit share → same read-only browser URL refreshed by either
 ```

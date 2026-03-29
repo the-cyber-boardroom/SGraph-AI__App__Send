@@ -18,7 +18,7 @@ SG/Send is a zero-knowledge encrypted file sharing product. Files are encrypted 
 
 2. **Folder browsing** — drop a folder and the recipient gets a full file explorer (sg-layout) with tree navigation, tabbed multi-pane layout, and inline preview of every file type side by side. Like Finder or VS Code — but zero-knowledge, in the browser.
 
-3. **Friendly tokens** — instead of a 64-character hex URL, users share `oral-equal-1234` — a human-readable token derived via SHA-256 + PBKDF2 that encodes both the transfer ID and decryption key. 320 × 320 × 10,000 = ~1 billion combinations.
+3. **Friendly tokens** — instead of a 64-character hex URL, users share `coral-equal-1234` — a human-readable token derived via SHA-256 + PBKDF2 that encodes both the transfer ID and decryption key. 320 × 320 × 10,000 = ~1 billion combinations.
 
 4. **Verifiable transparency** — recipients can inspect what the server stored vs what it never saw. Zero cookies, zero tracking, verifiable in DevTools.
 
