@@ -6,6 +6,7 @@
      2. PDF Present mode button in file action bar (opens in new window)
      3. Auto-open first file uses sorted order (not zip iteration order)
      4. Markdown internal links open as tabs + images resolved from zip
+     5. Markdown view source toggle (rendered ↔ raw source)
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 1: File names in tree show only basename ────────────────────────────
@@ -95,10 +96,38 @@ SendBrowse.prototype._renderFileContent = (function(original) {
             }
         }
 
-        // ── Markdown: resolve internal links + images from zip ──────────
+        // ── Markdown: view source toggle + resolve links + images ──────
         if (type === 'markdown') {
             var mdContainer = container.querySelector('.sb-file__markdown');
             if (!mdContainer || !this.zipTree) return;
+
+            // ── BRW-006: View Source / Rendered toggle ──────────────────
+            var bar = container.querySelector('.sb-file__actions');
+            if (bar) {
+                var rawText    = new TextDecoder().decode(bytes);
+                var isSource   = false;
+                var renderedEl = mdContainer;
+
+                var sourceBtn = document.createElement('button');
+                sourceBtn.className = 'sb-action-btn sb-file__view-source';
+                sourceBtn.innerHTML = '&lt;/&gt; Source';
+                sourceBtn.title = 'Toggle between rendered markdown and raw source';
+                bar.appendChild(sourceBtn);
+
+                // Create source view (hidden initially)
+                var sourceEl = document.createElement('pre');
+                sourceEl.className = 'sb-file__code sb-file__md-source';
+                sourceEl.textContent = rawText;
+                sourceEl.style.display = 'none';
+                renderedEl.parentNode.insertBefore(sourceEl, renderedEl.nextSibling);
+
+                sourceBtn.addEventListener('click', function() {
+                    isSource = !isSource;
+                    renderedEl.style.display = isSource ? 'none' : '';
+                    sourceEl.style.display   = isSource ? ''     : 'none';
+                    sourceBtn.innerHTML      = isSource ? '&#9998; Rendered' : '&lt;/&gt; Source';
+                });
+            }
 
             // Determine the directory of the current file within the zip
             var currentDir = '';
