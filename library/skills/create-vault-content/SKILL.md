@@ -113,6 +113,7 @@ is opened.
 | `accent` | Any CSS colour | Nav highlight, image border colour |
 | `font` | `"sans"`, `"serif"`, `"mono"`, `"system"` | Font family |
 | `density` | `"compact"`, `"comfortable"`, `"spacious"` | Section padding |
+| `background` | Any CSS colour/gradient | Page container background; defaults to `#ffffff` (safe for print). E.g. `"linear-gradient(135deg,#667eea,#764ba2)"` |
 
 **Theme personality quick guide:**
 - Technical / developer content → `"mono"` + `"compact"`
@@ -433,9 +434,16 @@ All `file` props are relative to the folder containing `_page.json`.
 
 ### 1.7 Source view
 
-Every rendered page tab has a `{ } Source` toggle that shows the syntax-highlighted raw
-JSON. A `⎋ Copy JSON` button copies it to the clipboard. A `⦿ Locate` button highlights
-`_page.json` in the sidebar tree.
+Every rendered page tab has an action bar with four buttons:
+
+| Button | Action |
+|--------|--------|
+| `⦿ Locate` | Highlights `_page.json` in the sidebar file tree |
+| `🖨 Print` | Clones the rendered view into a print overlay and calls `window.print()` |
+| `⎋ Copy JSON` | Copies raw `_page.json` to the clipboard |
+| `{ } Source` | Toggles between rendered layout and syntax-highlighted JSON source |
+
+The source view always uses a light background regardless of the page theme.
 
 Clicking `_page.json` directly in the file tree, clicking the folder header, or the
 auto-open on vault load all open in **rendered view** by default.

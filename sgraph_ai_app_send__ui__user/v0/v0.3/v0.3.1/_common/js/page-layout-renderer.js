@@ -705,6 +705,13 @@ var PageLayoutRenderer = (function () {
         // Apply accent CSS custom property (overrides shell default)
         if (themeAccent) container.style.setProperty('--plr-accent', themeAccent);
 
+        // Background: default white (safe for print + consistent on-screen),
+        // overridden by theme.background if explicitly set.
+        container.style.background =
+            (themeRaw && typeof themeRaw === 'object' && themeRaw.background)
+                ? themeRaw.background
+                : '#ffffff';
+
         // Apply font family custom property
         var fontFamilyMap = {
             mono:   "'SF Mono','Fira Code','Cascadia Code',monospace",
