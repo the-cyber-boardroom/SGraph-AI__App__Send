@@ -842,59 +842,8 @@
     height: auto !important;
 }
 
-/* ── Print from present mode ──────────────────────────────────────────────── */
-
-@media print {
-    /* 1. Hide everything except the present overlay */
-    body:has(.plr-present-overlay) > *:not(.plr-present-overlay) { display: none !important; }
-
-    /* 2. Flatten overlay structure so content flows on the page */
-    .plr-present-overlay {
-        position: static !important;
-        display: block !important;
-        overflow: visible !important;
-    }
-    .plr-present-bar { display: none !important; }
-    .plr-present-content {
-        display: block !important;
-        overflow: visible !important;
-        height: auto !important;
-        flex: none !important;
-    }
-    /* The cloned renderedView carries inline flex/overflow styles — override */
-    .plr-present-content > * {
-        display: block !important;
-        overflow: visible !important;
-        height: auto !important;
-        flex: none !important;
-        width: 100% !important;
-    }
-    .plr-present-content .plr-scroll-wrapper {
-        display: block !important;
-        overflow: visible !important;
-        height: auto !important;
-    }
-
-    /* 3. Strip ALL backgrounds and force dark text.
-          !important beats inline style="background:..." so dark hero,
-          coloured sections etc. all become white paper + black text. */
-    .plr-present-content,
-    .plr-present-content * {
-        background:       #ffffff !important;
-        background-color: #ffffff !important;
-        background-image: none    !important;
-        color:            #111111 !important;
-        box-shadow:       none    !important;
-        text-shadow:      none    !important;
-    }
-
-    /* 4. Restore minimal structure so layout is still legible */
-    .plr-present-content .plr-section  { border-top: 1px solid #ddd !important; }
-    .plr-present-content .plr-card     { border: 1px solid #ccc !important; }
-    .plr-present-content .plr-hero     { border-bottom: 2px solid #1a1a2e !important; padding: 2rem !important; }
-
-    /* 5. Hide UI chrome that should never appear on paper */
-    .plr-nav, .plr-source-bar { display: none !important; }
-    .plr-lightbox              { display: none !important; }
-    .plr-pdf                   { height: auto !important; }
-}
+/* ── Print ────────────────────────────────────────────────────────────────── */
+/* Printing is handled by _plrPrintPage() (PLR-007) which opens a new window  */
+/* with the page-layout CSS loaded via <link> and its own @media print rules. */
+/* The old @media print block that hid/flattened the present overlay is no    */
+/* longer needed.                                                              */
