@@ -19,9 +19,13 @@ PORT=10067
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
-UI_VERSION="v0.1.4"
+UI_VERSION="v0.1.5"
 IFD_PATH="v0/v0.1/$UI_VERSION"
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
+
+# v0.1.5 references v0.1.4 files via ../../v0.1.4/ relative paths (IFD chain).
+# We need the full versioned directory tree available for these references to resolve.
+IFD_CHAIN_ROOT="$STATIC_DIR/v0/v0.1"
 
 # Clean up on exit
 cleanup() {
@@ -52,7 +56,11 @@ for locale_dir in "$CONTENT_DIR"/*/; do
 done
 
 # Copy _common (not symlink) so we can inject build-info.js
-cp -r "$CONTENT_DIR/_common" "$SERVE_DIR/_common"
+if [ -d "$CONTENT_DIR/_common" ]; then
+    cp -r "$CONTENT_DIR/_common" "$SERVE_DIR/_common"
+else
+    mkdir -p "$SERVE_DIR/_common/js"
+fi
 
 # Symlink i18n/
 [ -d "$CONTENT_DIR/i18n" ] && ln -sf "$CONTENT_DIR/i18n" "$SERVE_DIR/i18n"
@@ -61,6 +69,22 @@ cp -r "$CONTENT_DIR/_common" "$SERVE_DIR/_common"
 for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
     [ -f "$f" ] && [ "$(basename "$f")" != "index.html" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
 done
+
+# v0.1.5 IFD chain: HTML uses ../../v0.1.4/ relative paths for shared vault code.
+# Symlink the full IFD version tree so these references resolve correctly.
+if [ -d "$IFD_CHAIN_ROOT" ]; then
+    mkdir -p "$SERVE_DIR/v0/v0.1"
+    for ver_dir in "$IFD_CHAIN_ROOT"/v0.1.*/; do
+        ver_name=$(basename "$ver_dir")
+        ln -sf "$ver_dir" "$SERVE_DIR/v0/v0.1/$ver_name"
+    done
+fi
+
+# Also symlink the SG/Send UI tree (v0.1.5 loads send-browse CSS/JS via relative paths in local dev)
+SEND_UI_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
+if [ -d "$SEND_UI_DIR" ]; then
+    ln -sf "$SEND_UI_DIR" "$SERVE_DIR/sgraph_ai_app_send__ui__user"
+fi
 
 # Inject build-info.js for local dev (CI generates this in production)
 mkdir -p "$SERVE_DIR/_common/js"
