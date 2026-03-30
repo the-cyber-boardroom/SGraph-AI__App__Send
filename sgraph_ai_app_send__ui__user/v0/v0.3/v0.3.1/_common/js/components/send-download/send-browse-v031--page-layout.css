@@ -48,6 +48,21 @@
 .plr-page--light .plr-card__title    { color: #1a1a2e; }
 .plr-page--light .plr-card__desc     { color: #444; }
 
+/* Light-mode markdown sub-element overrides — prevent Browse shell dark       */
+/* variables from bleeding into inline code and blockquotes.                   */
+.plr-page--light .plr-markdown code        { color: #d63384; background: rgba(214,51,132,0.07); border-radius: 3px; padding: 0.1em 0.35em; }
+.plr-page--light .plr-markdown blockquote  { border-left: 3px solid #4ecdc4; padding-left: 0.9em; margin-left: 0; color: #3a3a50; }
+
+/* Light-mode card background — ensure cards are always white in light mode   */
+.plr-page--light .plr-card { background: #ffffff; border-color: #e0e0e0; }
+
+/* Light-mode section divider — explicit override to avoid shell dark border   */
+.plr-page--light .plr-section { border-top-color: #ebebeb; }
+
+/* Light-mode slides controls */
+.plr-page--light .plr-slides__counter { color: #888888; }
+.plr-page--light .plr-slides__btn     { border-color: #d0d0d0; color: #333333; }
+
 /* ── Theme: dark ──────────────────────────────────────────────────────────── */
 /* Agent authors can set "theme": "dark" in _page.json.                       */
 /* Inherits the Browse shell's dark palette so the page blends seamlessly.    */
@@ -528,6 +543,13 @@
     --plr-font:   inherit;
 }
 
+/* Section alt-background: visible alternating shade for light and dark modes.  */
+/* The renderer sets background: var(--plr-section-alt-bg, rgba(0,0,0,0.03))   */
+/* on sections with background="alt". The old fallback was near-invisible;      */
+/* define the custom property here at a level that beats the inline fallback.   */
+.plr-page--light { --plr-section-alt-bg: #f4f6f8; }
+.plr-page--dark  { --plr-section-alt-bg: rgba(255,255,255,0.06); }
+
 /* Use accent colour for nav active indicator */
 .plr-nav__link--active {
     color: var(--plr-accent) !important;
@@ -682,6 +704,71 @@
 /* color-mix() fallback for browsers that don't support it: accent border */
 @supports not (color: color-mix(in srgb, red 50%, transparent)) {
     .plr-image--border img { border-color: rgba(78,205,196,0.45); }
+}
+
+/* ── Edit mode ────────────────────────────────────────────────────────────── */
+/* Split-pane: dark JSON editor left, live rendered preview right.             */
+
+.plr-edit-split {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.plr-edit-left {
+    flex: 0 0 50%;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,0.1);
+    overflow: hidden;
+}
+
+.plr-edit-textarea {
+    flex: 1;
+    width: 100%;
+    resize: none;
+    border: none;
+    outline: none;
+    padding: 1rem;
+    font-family: 'Fira Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    tab-size: 2;
+    background: #1e2228;
+    color: #abb2bf;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* Status bar below textarea */
+.plr-edit-status {
+    flex-shrink: 0;
+    padding: 0.28rem 0.75rem;
+    font-size: 0.72rem;
+    font-family: monospace;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    background: #181c22;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.plr-edit-status--ok  { color: #4ecdc4; }
+.plr-edit-status--err { color: #e06c75; }
+
+/* Right: scrollable rendered preview */
+.plr-edit-right {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+    min-width: 0;
+}
+
+.plr-edit-right .plr-scroll-wrapper {
+    overflow: visible !important;
+    height: auto !important;
 }
 
 /* ── Present mode overlay ─────────────────────────────────────────────────── */
