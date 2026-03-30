@@ -1,8 +1,8 @@
 /* =================================================================================
-   SGraph Vault — Navigation Component
-   v0.2.0 — Left sidebar nav: Files, SGit, Settings
+   SGraph Vault -- Navigation Component
+   v0.2.0 -- Left sidebar nav: Files, SGit, Settings
 
-   Light DOM. Emits 'vault-nav-switch' with { view } detail.
+   Shadow DOM. Emits 'vault-nav-switch' with { view } detail (composed: true).
    ================================================================================= */
 
 (function() {
@@ -10,8 +10,14 @@
 
     class VaultNav extends HTMLElement {
 
+        constructor() {
+            super();
+            this.attachShadow({ mode: 'open' });
+        }
+
         connectedCallback() {
-            this.innerHTML = `
+            this.shadowRoot.innerHTML = `
+                <style>${VaultNav.styles}</style>
                 <nav class="vn-nav">
                     <a class="vn-item vn-item--active" data-view="files" href="#">
                         <span class="vn-icon">&#128194;</span><span class="vn-label">Files</span>
@@ -25,29 +31,31 @@
                 </nav>
             `;
 
-            this.addEventListener('click', (e) => {
+            this.shadowRoot.addEventListener('click', (e) => {
                 const item = e.target.closest('.vn-item[data-view]');
                 if (!item) return;
                 e.preventDefault();
                 this.setActive(item.dataset.view);
                 this.dispatchEvent(new CustomEvent('vault-nav-switch', {
-                    detail: { view: item.dataset.view }, bubbles: true
+                    detail: { view: item.dataset.view }, bubbles: true, composed: true
                 }));
             });
         }
 
         setActive(viewId) {
-            this.querySelectorAll('.vn-item').forEach(item => {
+            this.shadowRoot.querySelectorAll('.vn-item').forEach(item => {
                 item.classList.toggle('vn-item--active', item.dataset.view === viewId);
             });
         }
     }
 
     VaultNav.styles = `
+        :host { display: block; }
         .vn-nav {
             background: var(--bg-surface); border-right: 1px solid var(--color-border);
             display: flex; flex-direction: column; padding: var(--space-2) 0;
-            gap: var(--space-1); overflow: hidden; width: 56px;
+            gap: var(--space-1); overflow: hidden; width: 56px; height: 100%;
+            box-sizing: border-box;
         }
         .vn-item {
             display: flex; flex-direction: column; align-items: center; gap: 0.125rem;

@@ -1,10 +1,10 @@
 /* =================================================================================
-   SGraph Vault — Auth Banner Component
-   v0.2.0 — Inline access key input for write operations
+   SGraph Vault -- Auth Banner Component
+   v0.2.0 -- Inline access key input for write operations
 
-   Light DOM. Shows when write operation needs auth.
-   Emits:
-     'vault-auth-submit'  — { key }
+   Shadow DOM. Shows when write operation needs auth.
+   Emits (composed: true):
+     'vault-auth-submit'  -- { key }
      'vault-auth-cancel'
    ================================================================================= */
 
@@ -13,9 +13,15 @@
 
     class VaultAuth extends HTMLElement {
 
+        constructor() {
+            super();
+            this.attachShadow({ mode: 'open' });
+        }
+
         connectedCallback() {
             this.style.display = 'none';
-            this.innerHTML = `
+            this.shadowRoot.innerHTML = `
+                <style>${VaultAuth.styles}</style>
                 <div class="va-banner">
                     <span class="va-msg">Access key needed for write operations</span>
                     <input class="va-input" type="password" placeholder="Paste access key" autocomplete="off">
@@ -24,9 +30,9 @@
                 </div>
             `;
 
-            this.querySelector('.va-submit').addEventListener('click', () => this._submit());
-            this.querySelector('.va-cancel').addEventListener('click', () => this.hide());
-            this.querySelector('.va-input').addEventListener('keydown', (e) => {
+            this.shadowRoot.querySelector('.va-submit').addEventListener('click', () => this._submit());
+            this.shadowRoot.querySelector('.va-cancel').addEventListener('click', () => this.hide());
+            this.shadowRoot.querySelector('.va-input').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') this._submit();
                 if (e.key === 'Escape') this.hide();
             });
@@ -34,27 +40,28 @@
 
         show() {
             this.style.display = '';
-            const input = this.querySelector('.va-input');
+            const input = this.shadowRoot.querySelector('.va-input');
             if (input) { input.value = ''; input.focus(); }
         }
 
         hide() {
             this.style.display = 'none';
-            this.dispatchEvent(new CustomEvent('vault-auth-cancel', { bubbles: true }));
+            this.dispatchEvent(new CustomEvent('vault-auth-cancel', { bubbles: true, composed: true }));
         }
 
         _submit() {
-            const input = this.querySelector('.va-input');
+            const input = this.shadowRoot.querySelector('.va-input');
             const key = input?.value?.trim();
             if (!key) return;
             this.style.display = 'none';
             this.dispatchEvent(new CustomEvent('vault-auth-submit', {
-                detail: { key }, bubbles: true
+                detail: { key }, bubbles: true, composed: true
             }));
         }
     }
 
     VaultAuth.styles = `
+        :host { display: block; }
         .va-banner {
             display: flex; align-items: center; gap: var(--space-2);
             padding: 0.375rem var(--space-4);
