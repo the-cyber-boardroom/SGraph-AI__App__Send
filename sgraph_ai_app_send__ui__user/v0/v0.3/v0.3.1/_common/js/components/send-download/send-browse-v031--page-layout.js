@@ -128,6 +128,131 @@ function _plrSetHashPath(path) {
 }
 
 
+// ─── PLR-007: Print via new window ───────────────────────────────────────────
+//
+// Opens a clean print-preview window styled the same as the sg-print.js
+// markdown print window (dark toolbar, SG/Send branding, A4-like body).
+// The rendered _page.json content is included with the page-layout CSS applied.
+// Blob URLs (images, hero backgrounds) are converted to data: URLs so they
+// display correctly in the new window (blob: URLs are window-scoped).
+//
+// Usage: _plrPrintPage(title, renderedViewElement)
+
+async function _plrPrintPage(title, renderedView) {
+    // Find the page-layout stylesheet absolute URL (loaded by browse/index.html)
+    var cssHref = '';
+    for (var i = 0; i < document.styleSheets.length; i++) {
+        var sheet = document.styleSheets[i];
+        if (sheet.href && sheet.href.indexOf('page-layout') !== -1) {
+            cssHref = sheet.href;
+            break;
+        }
+    }
+
+    // Clone to avoid mutating the live DOM
+    var clone = renderedView.cloneNode(true);
+
+    // Convert <img src="blob:..."> to data: URLs for cross-window portability
+    var imgs = Array.from(clone.querySelectorAll('img[src^="blob:"]'));
+    for (var ii = 0; ii < imgs.length; ii++) {
+        try {
+            var r = await fetch(imgs[ii].getAttribute('src'));
+            var b = await r.blob();
+            var du = await new Promise(function (res) {
+                var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.readAsDataURL(b);
+            });
+            imgs[ii].src = du;
+        } catch (e) { /* leave as-is if unreadable */ }
+    }
+
+    // Convert inline style background-image blob: URLs
+    var bgEls = Array.from(clone.querySelectorAll('[style*="blob:"]'));
+    for (var bi = 0; bi < bgEls.length; bi++) {
+        var sty = bgEls[bi].getAttribute('style') || '';
+        var m = sty.match(/url\(["']?(blob:[^"')]+)["']?\)/);
+        if (m) {
+            try {
+                var r2 = await fetch(m[1]);
+                var b2 = await r2.blob();
+                var du2 = await new Promise(function (res2) {
+                    var fr2 = new FileReader(); fr2.onload = function () { res2(fr2.result); }; fr2.readAsDataURL(b2);
+                });
+                bgEls[bi].setAttribute('style', sty.replace(m[0], 'url(' + du2 + ')'));
+            } catch (e) { /* leave as-is */ }
+        }
+    }
+
+    var pageTitle = title || 'Page';
+    var safeTitle = pageTitle.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    var logoSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>';
+    var cssLink = cssHref ? '<link rel="stylesheet" href="' + cssHref + '">' : '';
+
+    var toolbarCss = [
+        '@media screen {',
+        '  body { margin:0; padding:0; background:#f0f0f0; }',
+        '  .plr-print-toolbar {',
+        '    position:sticky; top:0; z-index:100;',
+        '    background:#2d2d2d; color:#fff; padding:12px 24px;',
+        '    display:flex; align-items:center; gap:16px;',
+        '    font-family:system-ui,-apple-system,sans-serif; font-size:13px;',
+        '    box-shadow:0 2px 8px rgba(0,0,0,0.2);',
+        '  }',
+        '  .plr-print-brand { display:flex; align-items:center; gap:6px; font-size:14px; }',
+        '  .plr-print-brand b { color:#4ECDC4; }',
+        '  .plr-print-sep { width:1px; height:20px; background:#555; }',
+        '  .plr-print-info { color:#bbb; flex:1; }',
+        '  .plr-print-info strong { color:#fff; }',
+        '  .plr-print-toolbar button { padding:6px 16px; border:none; border-radius:4px; font-size:13px; cursor:pointer; font-weight:500; }',
+        '  .btn-plr-print { background:#4ECDC4; color:#1a1a1a; }',
+        '  .btn-plr-print:hover { background:#3dbdb5; }',
+        '  .btn-plr-close { background:transparent; color:#bbb; border:1px solid #555; }',
+        '  .btn-plr-close:hover { background:#444; color:#fff; }',
+        '  .plr-print-body { max-width:960px; margin:24px auto; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,0.15); border-radius:2px; }',
+        '}',
+        /* The renderedView clone carries inline flex/overflow styles from the browse panel.
+           In the print window there is no fixed-height parent, so normalise them. */
+        '.plr-print-body > .plr-page {',
+        '  overflow:visible !important;',
+        '  height:auto !important;',
+        '  min-height:0 !important;',
+        '  flex:none !important;',
+        '}',
+        '.plr-print-body .plr-scroll-wrapper {',
+        '  overflow:visible !important;',
+        '  height:auto !important;',
+        '  flex:none !important;',
+        '}',
+        '@media print {',
+        '  .plr-print-toolbar { display:none !important; }',
+        '  .plr-print-body { max-width:none; margin:0; box-shadow:none; border-radius:0; }',
+        '}'
+    ].join('\n');
+
+    var printDoc = '<!DOCTYPE html><html><head>' +
+        '<meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>' + safeTitle + '</title>' +
+        cssLink +
+        '<style>' + toolbarCss + '</style>' +
+        '</head><body>' +
+        '<div class="plr-print-toolbar">' +
+            '<div class="plr-print-brand">' + logoSvg + '<span>SG/<b>Send</b></span></div>' +
+            '<div class="plr-print-sep"></div>' +
+            '<div class="plr-print-info">Print preview \u2014 <strong>' + safeTitle + '</strong></div>' +
+            '<button class="btn-plr-print" onclick="window.print()">Print / Save PDF</button>' +
+            '<button class="btn-plr-close" onclick="window.close()">Close</button>' +
+        '</div>' +
+        '<div class="plr-print-body">' + clone.outerHTML + '</div>' +
+        '</body></html>';
+
+    var w = window.open('', '_blank');
+    if (!w) { window.print(); return; }
+    w.document.write(printDoc);
+    w.document.close();
+    setTimeout(function () { w.print(); }, 400);
+}
+
+
 // ─── PLR-002: Auto-open checks root _page.json first ─────────────────────────
 //
 // Wraps the v0.3.1 _autoOpenFirstFile. Priority order:
@@ -310,8 +435,8 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                 var printBtn2 = document.createElement('button');
                 printBtn2.className = 'plr-present-btn';
                 printBtn2.textContent = '\uD83D\uDDA8 Print';
-                printBtn2.title = 'Print / Save as PDF';
-                printBtn2.addEventListener('click', function () { window.print(); });
+                printBtn2.title = 'Open print preview in new window';
+                printBtn2.addEventListener('click', function () { _plrPrintPage(json.title, clone); });
 
                 var closeBtn = document.createElement('button');
                 closeBtn.className = 'plr-present-btn plr-present-close';
@@ -501,7 +626,15 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                 _applyViewState();
             });
 
+            // Print button — opens print preview in a new window (PLR-007)
+            var printBtn = document.createElement('button');
+            printBtn.className = 'plr-source-toggle-btn';
+            printBtn.textContent = '\uD83D\uDDA8 Print';
+            printBtn.title = 'Open print preview in new window';
+            printBtn.addEventListener('click', function () { _plrPrintPage(json.title, renderedView); });
+
             toggleBar.appendChild(locateBtn);
+            toggleBar.appendChild(printBtn);
             toggleBar.appendChild(presentBtn);
             toggleBar.appendChild(copyBtn);
             toggleBar.appendChild(editBtn);
