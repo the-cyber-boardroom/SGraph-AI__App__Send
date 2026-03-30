@@ -17,9 +17,17 @@
     13. Print button moved from header into per-file action bar (markdown only)
         — fixes "first markdown tab" bug where header Print always used DOM's
           first .sb-file__markdown element regardless of which tab was active
-    14. Reveal in tree — ⌖ button in every file action bar; expands parent
-        folders and scrolls to + highlights the file in the sidebar tree
-        (same concept as IDE "Select Opened File")
+    14. "Locate" button (was "Reveal") in every file action bar — expands parent
+        folders and scrolls to + highlights the file in the sidebar tree.
+        Fixed to use getPanelElement('t-tree') (was querySelector('.sb-tree')
+        which returned null — the tree lives inside sg-layout's panel DOM).
+    15. hashchange listener on SendDownload — entering a new token and clicking
+        Go now re-triggers the full download workflow without a page reload
+    16. _navigateToFolder fixed to use getPanelElement('t-tree') (same fix as 14)
+    17. BRW-005 image resolver updated to read data-md-src (BRW-020 — parser no
+        longer emits src attr, so no HTTP 404s before blob URL is ready)
+    18. Markdown Present mode — "Present" button in markdown action bar opens a
+        full-screen white overlay, ESC or "✕ Exit" button to dismiss
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 7: Gallery metadata folder detection (both old + new format) ────────
@@ -303,6 +311,44 @@ SendBrowse.prototype._renderFileContent = (function(original) {
                         }
                     });
                     bar.appendChild(printBtn);
+
+                    // BRW-022: Present mode — full-screen overlay, ESC to exit
+                    var presentBtn = document.createElement('button');
+                    presentBtn.className = 'sb-action-btn sb-file__present-md';
+                    presentBtn.textContent = 'Present';
+                    presentBtn.title = 'Read this document in full-screen presentation mode (ESC to exit)';
+                    presentBtn.addEventListener('click', function() {
+                        var overlay = document.createElement('div');
+                        overlay.className = 'sb-present-overlay';
+                        overlay.setAttribute('role', 'dialog');
+                        overlay.setAttribute('aria-modal', 'true');
+
+                        var closeBtn = document.createElement('button');
+                        closeBtn.className = 'sb-present-close';
+                        closeBtn.textContent = '✕ Exit';
+                        closeBtn.title = 'Exit presentation mode (ESC)';
+
+                        // Clone the live DOM — preserves blob URL img.src values
+                        var cloned = mdEl.cloneNode(true);
+                        cloned.className = 'sb-present-content sb-file__markdown';
+
+                        overlay.appendChild(closeBtn);
+                        overlay.appendChild(cloned);
+                        document.body.appendChild(overlay);
+
+                        var dismiss = function() {
+                            if (document.body.contains(overlay)) {
+                                document.body.removeChild(overlay);
+                            }
+                            document.removeEventListener('keydown', onKey);
+                        };
+                        closeBtn.addEventListener('click', dismiss);
+                        var onKey = function(e) {
+                            if (e.key === 'Escape') dismiss();
+                        };
+                        document.addEventListener('keydown', onKey);
+                    });
+                    bar.appendChild(presentBtn);
                 })(mdContainer, fileName);
 
                 // Create source view (hidden initially)
@@ -356,11 +402,16 @@ SendBrowse.prototype._renderFileContent = (function(original) {
             });
 
             // ── Resolve image src from zip → blob URLs ──────────────────
-            mdContainer.querySelectorAll('img[src]').forEach(function(img) {
-                var src = img.getAttribute('src');
-                // Skip absolute URLs and data/blob URIs
-                if (!src || src.startsWith('http://') || src.startsWith('https://') ||
-                    src.startsWith('data:') || src.startsWith('blob:')) return;
+            // BRW-020: parser now outputs data-md-src (no src attr) to avoid
+            // HTTP 404s. We read data-md-src and set img.src to the blob URL.
+            mdContainer.querySelectorAll('img[data-md-src]').forEach(function(img) {
+                var src = img.getAttribute('data-md-src');
+                if (!src) return;
+                // External URLs: set directly, no zip lookup needed
+                if (src.startsWith('http://') || src.startsWith('https://')) {
+                    img.src = src;
+                    return;
+                }
 
                 var resolved = _resolvePath(currentDir, src);
                 var match    = _findZipEntry(zipTree, resolved);
@@ -635,8 +686,9 @@ function _navigateToFolder(browseInstance, zipTree, folderPath) {
 
     if (folderFiles.length === 0) return;
 
-    // Expand parent folders in the tree by finding and clicking them
-    var treeRoot = browseInstance.querySelector('.sb-tree');
+    // Expand parent folders in the tree.
+    // The tree lives inside sg-layout's panel, not in the component's direct DOM.
+    var treeRoot = browseInstance._sgLayout && browseInstance._sgLayout.getPanelElement('t-tree');
     if (treeRoot) {
         // Build the chain of folder paths to expand
         var parts = folderPath.split('/');
@@ -690,6 +742,54 @@ function _navigateToFolder(browseInstance, zipTree, folderPath) {
     });
     browseInstance._openFileTab(folderFiles[0].path);
 }
+
+
+// ─── BRW-019: hashchange — re-trigger download workflow ───────────────────────
+//
+// When the user enters a new friendly token in the entry form and clicks Go,
+// send-download.js sets window.location.hash = val. The browser fires a
+// hashchange event but no listener exists, so nothing happens.
+//
+// Fix: patch SendDownload's connectedCallback to register a hashchange listener
+// that resets URL-parsing state and re-runs the full download workflow.
+
+(function() {
+    if (typeof SendDownload === 'undefined') return;
+
+    var origConnected    = SendDownload.prototype.connectedCallback;
+    var origDisconnected = SendDownload.prototype.disconnectedCallback;
+
+    SendDownload.prototype.connectedCallback = function() {
+        var self = this;
+        this._v031HashHandler = function() {
+            // Reset parsed-URL fields so _parseUrl reads the new hash cleanly
+            self.transferId     = null;
+            self.hashKey        = null;
+            self.tokenName      = null;
+            self._friendlyToken = null;
+
+            self._parseUrl();
+            if (!self.transferId) {
+                self.state = 'entry';
+                self.render();
+                self._setupEntryListeners();
+            } else {
+                self.state = 'loading';
+                self.render();
+                self._loadTransferInfo();
+            }
+        };
+        window.addEventListener('hashchange', this._v031HashHandler);
+        origConnected.call(this);
+    };
+
+    SendDownload.prototype.disconnectedCallback = function() {
+        if (this._v031HashHandler) {
+            window.removeEventListener('hashchange', this._v031HashHandler);
+        }
+        origDisconnected.call(this);
+    };
+})();
 
 
 // ─── CSV Parser ──────────────────────────────────────────────────────────────
@@ -778,8 +878,8 @@ function _escHtml(s) {
 function _makeRevealButton(browseInstance, filePath) {
     var btn = document.createElement('button');
     btn.className = 'sb-action-btn sb-file__reveal';
-    btn.innerHTML = '&#x2316; Reveal';
-    btn.title = 'Select opened file — reveal and highlight in the file tree';
+    btn.textContent = 'Locate';
+    btn.title = 'Show this file highlighted in the sidebar tree';
     btn.addEventListener('click', function() {
         _revealInTree(browseInstance, filePath);
     });
@@ -787,7 +887,8 @@ function _makeRevealButton(browseInstance, filePath) {
 }
 
 function _revealInTree(browseInstance, filePath) {
-    var treeEl = browseInstance.querySelector('.sb-tree');
+    // The tree is inside sg-layout's panel, not the component's direct DOM.
+    var treeEl = browseInstance._sgLayout && browseInstance._sgLayout.getPanelElement('t-tree');
     if (!treeEl) return;
 
     // Find the file element in the tree — exact path or ends-with (wrapped zips)

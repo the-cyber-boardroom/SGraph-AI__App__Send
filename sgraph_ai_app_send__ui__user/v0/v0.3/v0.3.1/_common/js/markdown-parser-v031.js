@@ -11,6 +11,14 @@
               ![alt](img.png)         → unchanged (max-width: 100%)
               Degrades gracefully in other parsers — image still renders,
               alt text shows "alt|400x300" (slightly verbose, not broken).
+     BRW-020: Images output data-md-src instead of src — prevents HTTP 404s
+              while BRW-005 asynchronously loads the blob URL from the zip.
+              An <img> with no src attribute makes zero network requests.
+     BRW-021: Backtick code spans containing ![ are now correctly handled —
+              the overlay's image scanner skips any ![ found inside ` ... `.
+              Previously, `` `![alt](url)` `` in a markdown bullet would
+              parse the image tag, breaking the code span and rendering a
+              broken image instead of inline code.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 
@@ -65,6 +73,17 @@
         return null;
     };
 
+    // BRW-021: Find the next ![ that is outside any backtick code span.
+    // Without this, `` `![alt](url)` `` would be parsed as an image.
+    function _nextImageOutside(text, from) {
+        var inBt = false;
+        for (var k = from; k < text.length - 1; k++) {
+            if (text[k] === '`') inBt = !inBt;
+            if (!inBt && text[k] === '!' && text[k + 1] === '[') return k;
+        }
+        return text.length;
+    }
+
     // Override _renderInline to render images as <img> instead of [image: ...]
     var origRenderInline = MarkdownParser._renderInline;
     MarkdownParser._renderInline = function(text) {
@@ -102,7 +121,9 @@
                                 // unrecognised dim spec → fall back to default style, use full altText as alt
                                 else displayAlt = altText;
                             }
-                            result += '<img src="' + escapeHtml(safeUrl) + '" alt="' + escapeHtml(displayAlt) + '" style="' + imgStyle + '">';
+                            // BRW-020: use data-md-src (no src attr) — prevents HTTP 404
+                        // before BRW-005 async-replaces with a zip blob URL.
+                        result += '<img data-md-src="' + escapeHtml(safeUrl) + '" alt="' + escapeHtml(displayAlt) + '" style="' + imgStyle + '">';
                         } else {
                             result += '<em>[image: ' + escapeHtml(altText) + ']</em>';
                         }
@@ -112,11 +133,10 @@
                 }
             }
 
-            // For everything else, delegate to the original character-by-character parser
-            // We need to extract one "token" at a time and let original handle it
-            // Simplest: find the next `!` and process the chunk before it with original
-            var nextImg = text.indexOf('![', i + 1);
-            if (nextImg === -1) nextImg = text.length;
+            // For everything else, delegate to original — but use _nextImageOutside
+            // so that ![ inside backtick spans is never mistaken for an image (BRW-021).
+            var nextImg = _nextImageOutside(text, i + 1);
+            // (_nextImageOutside already returns text.length when not found)
 
             // Process the non-image chunk with original _renderInline
             if (nextImg > i) {
