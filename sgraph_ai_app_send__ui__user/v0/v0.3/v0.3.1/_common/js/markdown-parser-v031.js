@@ -4,6 +4,13 @@
    Fixes:
      BRW-007: Images render as <img> tags (not "[image: alt]" placeholder text)
      BRW-008: Relative file links (bare filenames) are allowed by URL sanitizer
+     BRW-018: Discourse-style image dimensions in alt text
+              ![alt|400](img.png)     → width: 400px
+              ![alt|50%](img.png)     → width: 50%
+              ![alt|400x300](img.png) → width: 400px; height: 300px
+              ![alt](img.png)         → unchanged (max-width: 100%)
+              Degrades gracefully in other parsers — image still renders,
+              alt text shows "alt|400x300" (slightly verbose, not broken).
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 
@@ -76,7 +83,26 @@
                         var imgUrl  = text.slice(cb + 2, cp);
                         var safeUrl = this._sanitizeUrl(imgUrl);
                         if (safeUrl) {
-                            result += '<img src="' + escapeHtml(safeUrl) + '" alt="' + escapeHtml(altText) + '" style="max-width: 100%; border-radius: 6px; margin: 0.5em 0;">';
+                            // BRW-018: Discourse-style dimensions in alt text
+                            // Split on first pipe: "caption|400x300" → alt="caption", size spec
+                            var pipeIdx    = altText.indexOf('|');
+                            var displayAlt = pipeIdx === -1 ? altText : altText.slice(0, pipeIdx);
+                            var imgStyle   = 'max-width: 100%; border-radius: 6px; margin: 0.5em 0;';
+                            if (pipeIdx !== -1) {
+                                var dim      = altText.slice(pipeIdx + 1).trim();
+                                var pctMatch = dim.match(/^(\d+)%$/);
+                                var pxhMatch = dim.match(/^(\d+)x(\d+)$/);
+                                var wMatch   = dim.match(/^(\d+)$/);
+                                if (pctMatch)
+                                    imgStyle = 'width:' + pctMatch[1] + '%; border-radius: 6px; margin: 0.5em 0;';
+                                else if (pxhMatch)
+                                    imgStyle = 'width:' + pxhMatch[1] + 'px; height:' + pxhMatch[2] + 'px; border-radius: 6px; margin: 0.5em 0;';
+                                else if (wMatch)
+                                    imgStyle = 'width:' + wMatch[1] + 'px; border-radius: 6px; margin: 0.5em 0;';
+                                // unrecognised dim spec → fall back to default style, use full altText as alt
+                                else displayAlt = altText;
+                            }
+                            result += '<img src="' + escapeHtml(safeUrl) + '" alt="' + escapeHtml(displayAlt) + '" style="' + imgStyle + '">';
                         } else {
                             result += '<em>[image: ' + escapeHtml(altText) + ']</em>';
                         }
