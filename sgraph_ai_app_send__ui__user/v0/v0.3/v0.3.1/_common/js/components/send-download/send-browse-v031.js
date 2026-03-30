@@ -14,6 +14,12 @@
     10. HTML viewer — sandboxed iframe with allow-scripts (no allow-same-origin)
     11. Folder links expand tree, scroll to folder, open first file
     12. Tab bar scrollable when many tabs open + new tab scrolled into view
+    13. Print button moved from header into per-file action bar (markdown only)
+        — fixes "first markdown tab" bug where header Print always used DOM's
+          first .sb-file__markdown element regardless of which tab was active
+    14. Reveal in tree — ⌖ button in every file action bar; expands parent
+        folders and scrolls to + highlights the file in the sidebar tree
+        (same concept as IDE "Select Opened File")
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 7: Gallery metadata folder detection (both old + new format) ────────
@@ -165,6 +171,7 @@ SendBrowse.prototype._renderFileContent = (function(original) {
                 sourceBtn.innerHTML    = isSource ? '&#9998; Table' : '&lt;/&gt; Source';
             });
             bar.appendChild(sourceBtn);
+            bar.appendChild(_makeRevealButton(this, fileName));
             return;  // skip original render
         }
 
@@ -229,11 +236,16 @@ SendBrowse.prototype._renderFileContent = (function(original) {
                 sourceBtn.innerHTML    = isSource ? '&#127912; Rendered' : '&lt;/&gt; Source';
             });
             bar.appendChild(sourceBtn);
+            bar.appendChild(_makeRevealButton(this, fileName));
             return;  // skip original render
         }
 
         // ── All other types: call original ──────────────────────────────
         original.call(this, container, bytes, fileName, type);
+
+        // BRW-017: Reveal in tree button — all file types
+        var _genBar = container.querySelector('.sb-file__actions');
+        if (_genBar) _genBar.appendChild(_makeRevealButton(this, fileName));
 
         // ── PDF Present button ──────────────────────────────────────────
         if (type === 'pdf') {
@@ -275,6 +287,23 @@ SendBrowse.prototype._renderFileContent = (function(original) {
                 sourceBtn.innerHTML = '&lt;/&gt; Source';
                 sourceBtn.title = 'Toggle between rendered markdown and raw source';
                 bar.appendChild(sourceBtn);
+
+                // BRW-016: Per-file Print button — captures mdContainer from
+                // this tab's closure, so it always prints the correct content.
+                (function(mdEl, fName) {
+                    var printBtn = document.createElement('button');
+                    printBtn.className = 'sb-action-btn sb-file__print';
+                    printBtn.innerHTML = (SendIcons.PRINT || '&#128424;') + ' Print';
+                    printBtn.title = 'Print this document';
+                    printBtn.addEventListener('click', function() {
+                        if (typeof SgPrint !== 'undefined') {
+                            SgPrint.printHtml(mdEl.innerHTML, fName);
+                        } else {
+                            window.print();
+                        }
+                    });
+                    bar.appendChild(printBtn);
+                })(mdContainer, fileName);
 
                 // Create source view (hidden initially)
                 var sourceEl = document.createElement('pre');
@@ -504,6 +533,15 @@ SendBrowse.prototype._setupHeaderListeners = (function(original) {
                 }
             });
         }
+
+        // BRW-016: Hide header Print button — per-file Print is now in each
+        // markdown action bar, fixing the "first tab" DOM-querySelector bug.
+        var hdrPrintBtn = this.querySelector('#sb-print');
+        if (hdrPrintBtn) {
+            var newHdrPrint = hdrPrintBtn.cloneNode(true);  // strip old listener
+            hdrPrintBtn.parentNode.replaceChild(newHdrPrint, hdrPrintBtn);
+            newHdrPrint.style.display = 'none';
+        }
     };
 })(SendBrowse.prototype._setupHeaderListeners);
 
@@ -729,4 +767,63 @@ function _parseCsv(text) {
 
 function _escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+
+// ─── BRW-017: Reveal in tree — helpers ───────────────────────────────────────
+//
+// _makeRevealButton: creates the ⌖ Reveal action button for a file action bar.
+// _revealInTree:     expands parent folders, highlights and scrolls to the file.
+
+function _makeRevealButton(browseInstance, filePath) {
+    var btn = document.createElement('button');
+    btn.className = 'sb-action-btn sb-file__reveal';
+    btn.innerHTML = '&#x2316; Reveal';
+    btn.title = 'Select opened file — reveal and highlight in the file tree';
+    btn.addEventListener('click', function() {
+        _revealInTree(browseInstance, filePath);
+    });
+    return btn;
+}
+
+function _revealInTree(browseInstance, filePath) {
+    var treeEl = browseInstance.querySelector('.sb-tree');
+    if (!treeEl) return;
+
+    // Find the file element in the tree — exact path or ends-with (wrapped zips)
+    var fileEl = null;
+    var allFiles = treeEl.querySelectorAll('.sb-tree__file');
+    for (var i = 0; i < allFiles.length; i++) {
+        var dp = allFiles[i].getAttribute('data-path') || '';
+        if (dp === filePath || dp.endsWith('/' + filePath)) {
+            fileEl = allFiles[i];
+            break;
+        }
+    }
+    if (!fileEl) return;
+
+    // Walk up the DOM and expand every ancestor .sb-tree__folder-content
+    var node = fileEl.parentElement;
+    while (node && !node.classList.contains('sb-tree')) {
+        if (node.classList.contains('sb-tree__folder-content') &&
+                node.style.display === 'none') {
+            node.style.display = '';
+            var folder = node.parentElement;  // .sb-tree__folder
+            if (folder) {
+                var toggle = folder.querySelector(':scope > .sb-tree__folder-header > .sb-tree__toggle');
+                if (toggle) toggle.textContent = '\u25BE';  // ▾
+                folder.classList.add('sb-tree__folder--open');
+            }
+        }
+        node = node.parentElement;
+    }
+
+    // Highlight as active (same class the tree click handler uses)
+    for (var j = 0; j < allFiles.length; j++) {
+        allFiles[j].classList.remove('sb-tree__file--active');
+    }
+    fileEl.classList.add('sb-tree__file--active');
+
+    // Scroll the file item into view inside the sidebar
+    fileEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
