@@ -1,0 +1,138 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — _page.json overlay for send-browse-v031.js
+
+   Must be loaded AFTER send-browse-v031.js and page-layout-renderer.js.
+
+   Changes:
+     PLR-001: Folder header click → detect _page.json → render page layout tab
+     PLR-002: Auto-open checks root _page.json first (before first file heuristic)
+     PLR-003: _openFolderPage() — loads _page.json, opens as named tab, renders
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+
+// ─── PLR-001: Folder click → _page.json detection ────────────────────────────
+//
+// Wraps the base _setupTreeListeners. After the original adds expand/collapse and
+// file-click handlers, we add a SECOND click listener on each folder header that
+// checks whether the folder contains a _page.json. If it does, clicking the header
+// also opens the page layout tab (in addition to expanding/collapsing the folder).
+
+SendBrowse.prototype._setupTreeListeners = (function (original) {
+    return function (treeEl) {
+        // Run original first: expand/collapse, file open, expand/collapse all
+        original.call(this, treeEl);
+
+        var self = this;
+        treeEl.querySelectorAll('.sb-tree__folder-header').forEach(function (header) {
+            header.addEventListener('click', function () {
+                if (!self.zipTree) return;
+                var folder = header.closest('.sb-tree__folder');
+                var folderPath = folder ? folder.getAttribute('data-path') : null;
+                if (!folderPath) return;
+
+                // Check exact-path: folderPath/_page.json
+                var pageJsonPath = folderPath + '/_page.json';
+                var hasPage = self.zipTree.some(function (e) {
+                    return !e.dir && (e.path === pageJsonPath || e.path.endsWith('/' + pageJsonPath));
+                });
+                if (hasPage) self._openFolderPage(folderPath, pageJsonPath);
+            });
+        });
+    };
+})(SendBrowse.prototype._setupTreeListeners);
+
+
+// ─── PLR-002: Auto-open checks root _page.json first ─────────────────────────
+//
+// Wraps the v0.3.1 _autoOpenFirstFile. If the zip contains a root-level
+// _page.json, render it instead of running the normal "first file" heuristic.
+
+SendBrowse.prototype._autoOpenFirstFile = (function (original) {
+    return function () {
+        if (this.zipTree) {
+            var rootPage = this.zipTree.find(function (e) {
+                return !e.dir && (e.path === '_page.json' || e.path.endsWith('/_page.json') && e.path.split('/').length === 2);
+            });
+            if (rootPage) {
+                // Determine the folder path of the root _page.json
+                var parts = rootPage.path.split('/');
+                var folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+                this._openFolderPage(folderPath, rootPage.path);
+                return;
+            }
+        }
+        original.call(this);
+    };
+})(SendBrowse.prototype._autoOpenFirstFile);
+
+
+// ─── PLR-003: _openFolderPage — load _page.json and render as tab ─────────────
+
+SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath) {
+    if (!this._sgLayout || !this.zipTree) return;
+
+    // BRW-015: inject scrollable tab bar CSS (once)
+    if (typeof _injectTabBarScrollCSS !== 'undefined') _injectTabBarScrollCSS(this._sgLayout);
+
+    // Deduplicate: if a tab is already open for this folder page, switch to it
+    var tabKey = '__page__' + (folderPath || 'root');
+    var existingId = this._openTabs && this._openTabs.get(tabKey);
+    if (existingId) {
+        var existingTabEl = this._sgLayout.shadowRoot
+            ? this._sgLayout.shadowRoot.querySelector('.sgl-tab[data-tab-id="' + existingId + '"]')
+            : null;
+        if (existingTabEl) { existingTabEl.click(); return; }
+        if (this._openTabs) this._openTabs.delete(tabKey);
+    }
+
+    // Tab title: last segment of folder path, or archive name for root
+    var tabTitle = folderPath
+        ? folderPath.split('/').pop()
+        : (this.fileName || 'Home');
+
+    var newId = this._sgLayout.addTabToStack('s-preview', {
+        tag: 'div',
+        title: '\uD83D\uDCC4 ' + tabTitle,   // 📄 icon
+        state: { pageFolder: folderPath }
+    }, true);
+
+    if (!newId) return;
+    if (this._openTabs) this._openTabs.set(tabKey, newId);
+
+    var self = this;
+    requestAnimationFrame(async function () {
+        var el = self._sgLayout.getPanelElement(newId);
+        if (!el) return;
+        el.style.cssText = 'overflow: auto; height: 100%;';
+        el.innerHTML = '<div style="padding:1rem;color:var(--color-text-secondary,#888);">Loading page\u2026</div>';
+
+        try {
+            // Resolve the _page.json path against the zip tree
+            var pageEntry = self.zipTree.find(function (e) {
+                return !e.dir && (e.path === pageJsonPath || e.path.endsWith('/' + pageJsonPath));
+            });
+            if (!pageEntry) throw new Error('_page.json not found: ' + pageJsonPath);
+
+            var bytes = await pageEntry.entry.async('arraybuffer');
+            var json  = JSON.parse(new TextDecoder().decode(bytes));
+
+            el.innerHTML = '';
+            if (typeof PageLayoutRenderer !== 'undefined') {
+                await PageLayoutRenderer.render(el, json, folderPath, self.zipTree, self);
+            } else {
+                el.innerHTML = '<pre style="padding:1rem;">' +
+                    SendHelpers.escapeHtml(JSON.stringify(json, null, 2)) +
+                    '</pre>';
+            }
+        } catch (err) {
+            el.innerHTML = '<div style="padding:1rem;color:var(--color-error,#e74c3c);">Failed to load page: ' +
+                SendHelpers.escapeHtml(err.message) + '</div>';
+        }
+
+        // BRW-015: scroll new tab into view
+        if (self._sgLayout && self._sgLayout.shadowRoot) {
+            var newTabEl = self._sgLayout.shadowRoot.querySelector('.sgl-tab[data-tab-id="' + newId + '"]');
+            if (newTabEl) newTabEl.scrollIntoView({ inline: 'end', block: 'nearest', behavior: 'smooth' });
+        }
+    });
+};
