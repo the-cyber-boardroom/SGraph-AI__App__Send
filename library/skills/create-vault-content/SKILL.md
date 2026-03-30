@@ -23,26 +23,27 @@ left, tabbed preview on the right.
 You can create two types of rich content in a vault:
 - **`_page.json`** — component-based page layouts (hero, gallery, slides, cards, etc.)
 - **Markdown (`.md`)** — prose documents with images, links, and tables
+- **CSV (`.csv`)** — data files rendered automatically as formatted tables
 
-This skill gives you the complete reference for both. Use the sgit skill to create,
+This skill gives you the complete reference for all three. Use the sgit skill to create,
 commit, and push to the vault.
 
 ---
 
 ## Quick decision: `_page.json` vs Markdown
 
-| Use `_page.json` when | Use Markdown when |
-|-----------------------|-------------------|
-| You want a designed hero banner | You want prose-first documents |
-| Gallery of images / slideshow | Text with inline images |
-| Hub page with clickable cards | Linked document hierarchy |
-| Multiple distinct layout sections | Article, README, report |
-| Investor deck, portfolio page | Working notes, specs |
-| Embedded PDF viewer | Step-by-step guide |
-| Explicit theme and font control | Quick content with minimal setup |
+| Use `_page.json` when | Use Markdown when | Use CSV when |
+|-----------------------|-------------------|--------------|
+| You want a designed hero banner | You want prose-first documents | Tabular data (transactions, ledgers) |
+| Gallery of images / slideshow | Text with inline images | Comparison tables |
+| Hub page with clickable cards | Linked document hierarchy | Structured data to sort/browse |
+| Multiple distinct layout sections | Article, README, report | |
+| Investor deck, portfolio page | Working notes, specs | |
+| Embedded PDF viewer | Step-by-step guide | |
+| Explicit theme and font control | Quick content with minimal setup | |
 
-Both can coexist in the same folder. `_page.json` takes priority in the Browse view;
-markdown files remain as alternatives.
+All three can coexist in the same folder. `_page.json` takes priority for folder
+rendering; markdown and CSV files are opened by clicking them in the file tree.
 
 ---
 
@@ -113,6 +114,12 @@ is opened.
 | `font` | `"sans"`, `"serif"`, `"mono"`, `"system"` | Font family |
 | `density` | `"compact"`, `"comfortable"`, `"spacious"` | Section padding |
 
+**Theme personality quick guide:**
+- Technical / developer content → `"mono"` + `"compact"`
+- Long-form narrative / article → `"serif"` + `"spacious"`
+- Investor deck / marketing → `"sans"` + `"comfortable"`
+- Data-dense dashboard → `"sans"` + `"compact"`
+
 ### 1.4 Navigation bar
 
 Renders a sticky top bar. Add when the page has 3+ sections and meaningful scroll.
@@ -128,6 +135,10 @@ Renders a sticky top bar. Add when the page has 3+ sections and meaningful scrol
 Anchor ids are derived from section titles by kebab-casing:
 `"The Four Archetypes"` → `the-four-archetypes`
 `"Key Numbers & Metrics"` → `key-numbers--metrics`
+
+**Tip:** Avoid `&`, `/`, and special characters in section titles — they produce
+awkward anchor ids (double dashes, dropped characters). Prefer plain words:
+`"Key Numbers and Metrics"` → `key-numbers-and-metrics`.
 
 ### 1.5 Components reference
 
@@ -187,6 +198,14 @@ The only component that has `children`. Wrap all leaf components in sections.
 | `layout` | standard | `"full-bleed"` 100%, `"narrow"` 640px, `"wide"` 1200px |
 | `background` | — | CSS colour or `"alt"` (subtle alternating shade) |
 | `divider` | `"line"` | `"line"`, `"space"` (no line, extra padding), `"none"` |
+
+**Layout patterns:**
+- Use `"background": "alt"` on every other section to create visual separation
+  in long pages (alternating light/dark banding).
+- Use `"layout": "full-bleed"` on sections containing a `gallery` or wide `image`
+  to avoid clipping at the default 960px max-width.
+- Use `"divider": "none"` on the first section after a `hero` — the hero provides
+  enough visual separation.
 
 ---
 
@@ -384,6 +403,18 @@ Each child goes in its own column. Stacks to single column below 768px.
 | `gap` | `"medium"` | `"none"`, `"small"`, `"medium"`, `"large"` |
 | `vertical_align` | `"top"` | `"top"`, `"center"`, `"bottom"` |
 
+**Zigzag pattern:** For multi-section articles with image + text pairs, alternate
+the child order between sections — image-left/text-right, then text-left/image-right.
+Combined with alternating `"background": "alt"`, this creates a professional editorial
+rhythm:
+
+```
+Section 1:  [ image ]  [ text  ]
+Section 2:  [ text  ]  [ image ]   ← background: "alt"
+Section 3:  [ image ]  [ text  ]
+Section 4:  [ text  ]  [ image ]   ← background: "alt"
+```
+
 ---
 
 ### 1.6 File path rules
@@ -410,9 +441,24 @@ Clicking `_page.json` **directly in the file tree** opens in source view by defa
 
 ---
 
-## Part 2: Markdown Authoring Rules
+## Part 2: Markdown and CSV Authoring Rules
 
-### 2.1 Internal links
+### 2.1 CSV files — native table rendering
+
+The Browse view renders `.csv` files as formatted tables automatically — no `_page.json`
+needed. Just place a `.csv` file in the vault and click it in the file tree.
+
+- First row is treated as column headers
+- Columns are auto-sized
+- Large files are paginated
+
+Use CSV files for transaction data, ledgers, comparison tables, or any tabular data
+that should be browsable alongside your documents. They can also be linked from markdown:
+```markdown
+See the [transaction ledger](data/transactions.csv) for details.
+```
+
+### 2.2 Internal links
 
 ```markdown
 [See the report](report.pdf)
@@ -426,7 +472,7 @@ common extension fallbacks (`.md`, `.pdf`, `.txt`, `.html`).
 **Folder links:** link to `folder/README.md`, not `folder/` — which file opens from a
 folder link depends on sort order and is fragile.
 
-### 2.2 Image sizing (Discourse pipe syntax)
+### 2.3 Image sizing (Discourse pipe syntax)
 
 ```markdown
 ![caption](img.png)           // max-width: 100%
@@ -440,7 +486,7 @@ Degrades gracefully in other markdown renderers (shows as `caption|400` alt text
 
 **Do not use HTML** — it is stripped and renders as visible escaped text.
 
-### 2.3 Navigation patterns
+### 2.4 Navigation patterns
 
 **Linear sequence:** put a one-line nav bar at the top of each document:
 ```markdown
@@ -454,13 +500,13 @@ Degrades gracefully in other markdown renderers (shows as `caption|400` alt text
 
 **Root hub (`INDEX.md`):** title + "Start here" link + folder table + quick links.
 
-### 2.4 Auto-open behaviour
+### 2.5 Auto-open behaviour
 
 The Browse view auto-opens the **alphabetically first file** in the vault. To control this:
 - Name your entry point `0-START-HERE.md`, `00-INDEX.md`, or `README.md`
 - Or put a `_page.json` in the root (takes priority)
 
-### 2.5 Supported syntax quick-ref
+### 2.6 Supported syntax quick-ref
 
 | Feature | Supported |
 |---------|-----------|
@@ -626,6 +672,98 @@ sgit share
       "type": "section", "props": { "title": "Slides" },
       "children": [
         { "type": "slides", "props": { "images": ["images/s1.jpg", "images/s2.jpg", "images/s3.jpg", "images/s4.jpg"], "captions": ["Caption 1", "Caption 2", "Caption 3", "Caption 4"] } }
+      ]
+    }
+  ]
+}
+```
+
+### Zigzag article (image + text, alternating sides)
+
+```json
+{
+  "title": "Deep Dive",
+  "theme": { "mode": "dark", "font": "serif", "density": "spacious" },
+  "navigation": [
+    { "label": "Topic A", "anchor": "topic-a" },
+    { "label": "Topic B", "anchor": "topic-b" },
+    { "label": "Topic C", "anchor": "topic-c" }
+  ],
+  "components": [
+    {
+      "type": "hero",
+      "props": { "title": "Deep Dive", "subtitle": "A guided visual walkthrough", "image": "images/hero.jpg", "height": "large", "overlay": "dark" }
+    },
+    {
+      "type": "section",
+      "props": { "title": "Topic A", "divider": "none" },
+      "children": [
+        {
+          "type": "columns",
+          "props": { "ratio": "1:1", "gap": "large", "vertical_align": "center" },
+          "children": [
+            { "type": "image", "props": { "file": "images/topic-a.jpg", "rounded": true, "shadow": true } },
+            { "type": "text",  "props": { "content": "Explanation for topic A." } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "props": { "title": "Topic B", "background": "alt" },
+      "children": [
+        {
+          "type": "columns",
+          "props": { "ratio": "1:1", "gap": "large", "vertical_align": "center" },
+          "children": [
+            { "type": "text",  "props": { "content": "Explanation for topic B." } },
+            { "type": "image", "props": { "file": "images/topic-b.jpg", "rounded": true, "shadow": true } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "props": { "title": "Topic C" },
+      "children": [
+        {
+          "type": "columns",
+          "props": { "ratio": "1:1", "gap": "large", "vertical_align": "center" },
+          "children": [
+            { "type": "image", "props": { "file": "images/topic-c.jpg", "rounded": true, "shadow": true } },
+            { "type": "text",  "props": { "content": "Explanation for topic C." } }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Data page (linked CSV + embedded PDF)
+
+CSV files render as tables natively when clicked in the file tree. Use a `_page.json`
+to provide context and link to them:
+
+```json
+{
+  "title": "Data Report",
+  "theme": { "mode": "dark", "font": "mono", "density": "compact" },
+  "components": [
+    { "type": "hero", "props": { "title": "Q1 Data Report", "height": "small" } },
+    {
+      "type": "section",
+      "props": { "title": "Transaction Data" },
+      "children": [
+        { "type": "text", "props": { "content": "Click a file below to view the formatted table:" } },
+        { "type": "bullet-points", "props": { "items": ["data/summary.csv — monthly totals", "data/transactions.csv — full ledger"] } }
+      ]
+    },
+    {
+      "type": "section",
+      "props": { "title": "Full Report", "background": "alt" },
+      "children": [
+        { "type": "pdf", "props": { "file": "reports/full-report.pdf" } }
       ]
     }
   ]
