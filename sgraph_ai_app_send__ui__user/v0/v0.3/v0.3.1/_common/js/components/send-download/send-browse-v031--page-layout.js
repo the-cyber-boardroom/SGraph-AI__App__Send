@@ -7,6 +7,8 @@
      PLR-001: Folder header click → detect _page.json → render page layout tab
      PLR-002: Auto-open checks root _page.json first (before first file heuristic)
      PLR-003: _openFolderPage() — loads _page.json, opens as named tab, renders
+     PLR-004: _openFileTab intercept — clicking _page.json in tree renders page
+              layout instead of raw JSON
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 
@@ -64,6 +66,25 @@ SendBrowse.prototype._autoOpenFirstFile = (function (original) {
         original.call(this);
     };
 })(SendBrowse.prototype._autoOpenFirstFile);
+
+
+// ─── PLR-004: _openFileTab intercept — _page.json → page layout ──────────────
+//
+// When the user clicks `_page.json` directly in the tree, the base
+// _openFileTab would display raw JSON. We intercept paths that end in
+// `_page.json` and delegate to _openFolderPage instead.
+
+SendBrowse.prototype._openFileTab = (function (original) {
+    return function (path) {
+        if (path && (path === '_page.json' || path.endsWith('/_page.json'))) {
+            var parts = path.split('/');
+            var folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+            this._openFolderPage(folderPath, path);
+            return;
+        }
+        original.call(this, path);
+    };
+})(SendBrowse.prototype._openFileTab);
 
 
 // ─── PLR-003: _openFolderPage — load _page.json and render as tab ─────────────
