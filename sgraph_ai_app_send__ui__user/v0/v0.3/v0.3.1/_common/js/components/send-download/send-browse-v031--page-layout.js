@@ -268,12 +268,10 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                 function closeOverlay() {
                     if (document.body.contains(overlay)) document.body.removeChild(overlay);
                     document.removeEventListener('keydown', escHandler);
-                    window.removeEventListener('afterprint', closeOverlay);
                 }
                 function escHandler(e) { if (e.key === 'Escape') closeOverlay(); }
                 closeBtn.addEventListener('click', closeOverlay);
                 document.addEventListener('keydown', escHandler);
-                window.addEventListener('afterprint', closeOverlay);
 
                 bar.appendChild(titleEl);
                 bar.appendChild(printBtn2);
