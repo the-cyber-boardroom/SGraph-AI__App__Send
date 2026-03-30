@@ -114,6 +114,12 @@ is opened.
 | `density` | `"compact"`, `"comfortable"`, `"spacious"` | Section padding |
 | `background` | Any CSS colour/gradient | Page container background; defaults to `#ffffff` (safe for print). E.g. `"linear-gradient(135deg,#667eea,#764ba2)"` |
 
+**Theme personality quick guide:**
+- Technical / developer content → `"mono"` + `"compact"`
+- Long-form narrative / article → `"serif"` + `"spacious"`
+- Investor deck / marketing → `"sans"` + `"comfortable"`
+- Data-dense dashboard → `"sans"` + `"compact"`
+
 #### Named schemes
 
 Six ready-made theme configurations — copy the JSON snippet for the scheme you want:
@@ -464,7 +470,7 @@ The action bar also includes an `✎ Edit` button that opens a **split-pane edit
 
 ---
 
-## Part 2: Markdown Authoring Rules
+## Part 2: Markdown and CSV Authoring Rules
 
 ### 2.1 Internal links
 
