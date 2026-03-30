@@ -28,6 +28,11 @@
         longer emits src attr, so no HTTP 404s before blob URL is ready)
     18. Markdown Present mode — "Present" button in markdown action bar opens a
         full-screen white overlay, ESC or "✕ Exit" button to dismiss
+    19. BRW-024: Ctrl+P / Cmd+P intercepted while overlay is open — prints only
+        overlay content (CSS @media print hides everything else)
+    20. BRW-025: Links in Present overlay navigable — cloneNode doesn't copy
+        event listeners so overlay links now get their own click handlers that
+        dismiss the overlay then navigate to the target file in browse UI
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 7: Gallery metadata folder detection (both old + new format) ────────
@@ -298,7 +303,8 @@ SendBrowse.prototype._renderFileContent = (function(original) {
 
                 // BRW-016: Per-file Print button — captures mdContainer from
                 // this tab's closure, so it always prints the correct content.
-                (function(mdEl, fName) {
+                // BRW-025: _self + _zipTree captured so Present overlay links work.
+                (function(mdEl, fName, _self, _zipTree) {
                     var printBtn = document.createElement('button');
                     printBtn.className = 'sb-action-btn sb-file__print';
                     printBtn.innerHTML = (SendIcons.PRINT || '&#128424;') + ' Print';
@@ -345,11 +351,38 @@ SendBrowse.prototype._renderFileContent = (function(original) {
                         closeBtn.addEventListener('click', dismiss);
                         var onKey = function(e) {
                             if (e.key === 'Escape') dismiss();
+                            // BRW-024: Ctrl+P / Cmd+P — print overlay content only
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                                e.preventDefault();
+                                window.print();
+                            }
                         };
                         document.addEventListener('keydown', onKey);
+
+                        // BRW-025: Link intercept — cloneNode doesn't copy listeners.
+                        // Close overlay + navigate to the target file in browse UI.
+                        var _currentDir = fName.includes('/')
+                            ? fName.substring(0, fName.lastIndexOf('/') + 1) : '';
+                        cloned.querySelectorAll('a[href]').forEach(function(a) {
+                            var href = a.getAttribute('href');
+                            if (!href || href.startsWith('http://') || href.startsWith('https://') ||
+                                href.startsWith('mailto:') || href.startsWith('#')) return;
+                            a.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                dismiss();
+                                var resolved = _resolvePath(_currentDir, href);
+                                var match = _findZipEntry(_zipTree, resolved);
+                                if (match) {
+                                    _self._openFileTab(match.path);
+                                } else {
+                                    var folderPath = resolved.replace(/\/$/, '');
+                                    _navigateToFolder(_self, _zipTree, folderPath);
+                                }
+                            });
+                        });
                     });
                     bar.appendChild(presentBtn);
-                })(mdContainer, fileName);
+                })(mdContainer, fileName, this, this.zipTree);
 
                 // Create source view (hidden initially)
                 var sourceEl = document.createElement('pre');
