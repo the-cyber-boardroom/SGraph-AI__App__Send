@@ -99,26 +99,75 @@ SendBrowse.prototype._setupTreeListeners = (function (original) {
 })(SendBrowse.prototype._setupTreeListeners);
 
 
+// ─── PLR-006: Deep-link utilities ────────────────────────────────────────────
+//
+// URL format: /en-gb/browse/#<token>/<file-path>
+// The token is everything before the first '/'. The file path is everything
+// after. Examples:
+//   #help-aunt-2780/brief/_page.json   → folder page in brief/
+//   #help-aunt-2780/submission/bio.md  → file tab
+//   #help-aunt-2780                    → default (root _page.json or first file)
+//
+// _plrGetHashPath()  → returns the path portion or null
+// _plrSetHashPath(p) → updates the hash preserving the token (replaceState)
+
+function _plrGetHashPath() {
+    var hash = window.location.hash.slice(1);
+    var idx  = hash.indexOf('/');
+    if (idx === -1) return null;
+    var path = hash.slice(idx + 1);
+    return path || null;
+}
+
+function _plrSetHashPath(path) {
+    var hash  = window.location.hash.slice(1);
+    var idx   = hash.indexOf('/');
+    var token = idx === -1 ? hash : hash.slice(0, idx);
+    var next  = token + (path ? '/' + path : '');
+    if (hash !== next) history.replaceState(null, '', '#' + next);
+}
+
+
 // ─── PLR-002: Auto-open checks root _page.json first ─────────────────────────
 //
-// Wraps the v0.3.1 _autoOpenFirstFile. If the zip contains a root-level
-// _page.json, render it instead of running the normal "first file" heuristic.
+// Wraps the v0.3.1 _autoOpenFirstFile. Priority order:
+//   1. Deep-link path from URL hash  (PLR-006)
+//   2. Root-level _page.json         (original PLR-002 behaviour)
+//   3. Base first-file heuristic
 
 SendBrowse.prototype._autoOpenFirstFile = (function (original) {
     return function () {
-        if (this.zipTree) {
-            var rootPage = this.zipTree.find(function (e) {
-                return !e.dir && (e.path === '_page.json' || e.path.endsWith('/_page.json') && e.path.split('/').length === 2);
+        var self = this;
+        if (self.zipTree) {
+            // 1. Deep-link: check if the hash already encodes a file path
+            var hashPath = _plrGetHashPath();
+            if (hashPath) {
+                var linked = self.zipTree.find(function (e) {
+                    return !e.dir && (e.path === hashPath ||
+                        e.path.endsWith('/' + hashPath));
+                });
+                if (linked) {
+                    // Route through the same intercept so _page.json is handled
+                    self._openFileTab(hashPath);
+                    return;
+                }
+                // Path not found in this vault — clear the stale path
+                _plrSetHashPath('');
+            }
+
+            // 2. Root _page.json
+            var rootPage = self.zipTree.find(function (e) {
+                return !e.dir && (e.path === '_page.json' ||
+                    (e.path.endsWith('/_page.json') && e.path.split('/').length === 2));
             });
             if (rootPage) {
-                // Determine the folder path of the root _page.json
                 var parts = rootPage.path.split('/');
                 var folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-                this._openFolderPage(folderPath, rootPage.path);
+                self._openFolderPage(folderPath, rootPage.path);
                 return;
             }
         }
-        original.call(this);
+        original.call(self);
     };
 })(SendBrowse.prototype._autoOpenFirstFile);
 
@@ -128,9 +177,11 @@ SendBrowse.prototype._autoOpenFirstFile = (function (original) {
 // When the user clicks `_page.json` directly in the tree, the base
 // _openFileTab would display raw JSON. We intercept paths that end in
 // `_page.json` and delegate to _openFolderPage, which renders the page layout.
+// Also updates the URL hash for deep-linking (PLR-006).
 
 SendBrowse.prototype._openFileTab = (function (original) {
     return function (path) {
+        if (path) _plrSetHashPath(path);
         if (path && (path === '_page.json' || path.endsWith('/_page.json'))) {
             var parts = path.split('/');
             var folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
@@ -146,6 +197,8 @@ SendBrowse.prototype._openFileTab = (function (original) {
 
 SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath) {
     if (!this._sgLayout || !this.zipTree) return;
+    // Update URL hash for deep-linking (PLR-006)
+    if (pageJsonPath) _plrSetHashPath(pageJsonPath);
 
     // BRW-015: inject scrollable tab bar CSS (once)
     if (typeof _injectTabBarScrollCSS !== 'undefined') _injectTabBarScrollCSS(this._sgLayout);
