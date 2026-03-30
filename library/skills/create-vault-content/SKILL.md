@@ -112,7 +112,7 @@ is opened.
 | `accent` | Any CSS colour | Nav highlight, image border colour |
 | `font` | `"sans"`, `"serif"`, `"mono"`, `"system"` | Font family |
 | `density` | `"compact"`, `"comfortable"`, `"spacious"` | Section padding |
-| `background` | Any CSS colour/gradient | Page container background (e.g. `"linear-gradient(135deg,#667eea,#764ba2)"`) |
+| `background` | Any CSS colour/gradient | Page container background; defaults to `#ffffff` (safe for print). E.g. `"linear-gradient(135deg,#667eea,#764ba2)"` |
 
 ### 1.4 Navigation bar
 
