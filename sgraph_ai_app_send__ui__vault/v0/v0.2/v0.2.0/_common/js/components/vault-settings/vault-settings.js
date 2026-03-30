@@ -1,11 +1,11 @@
 /* =================================================================================
-   SGraph Vault — Settings View Component
-   v0.2.0 — Vault name, keys, stats, raw JSON
+   SGraph Vault -- Settings View Component
+   v0.2.0 -- Vault name, keys, stats, raw JSON
 
-   Light DOM. Receives vault instance via setVault().
-   Emits:
-     'vault-settings-name-saved'  — { name }
-     'vault-settings-access-key'  — { key }
+   Shadow DOM. Receives vault instance via setVault().
+   Emits (composed: true):
+     'vault-settings-name-saved'  -- { name }
+     'vault-settings-access-key'  -- { key }
    ================================================================================= */
 
 (function() {
@@ -15,14 +15,15 @@
 
         constructor() {
             super();
+            this.attachShadow({ mode: 'open' });
             this._vault    = null;
             this._vaultKey = '';
             this._accessKey = '';
         }
 
         connectedCallback() {
-            VaultSettings._injectStyles();
-            this.innerHTML = `
+            this.shadowRoot.innerHTML = `
+                <style>${VaultSettings.styles}</style>
                 <div class="vset-panel">
                     <h2 class="vset-title">Vault Settings</h2>
 
@@ -81,18 +82,19 @@
 
         refresh() {
             if (!this._vault) return;
+            const root = this.shadowRoot;
 
-            const nameInput = this.querySelector('.vset-name-input');
+            const nameInput = root.querySelector('.vset-name-input');
             if (nameInput) nameInput.value = this._vault.name || '';
 
-            const keyInput = this.querySelector('.vset-key-input');
+            const keyInput = root.querySelector('.vset-key-input');
             if (keyInput) keyInput.value = this._vaultKey;
 
-            const accessInput = this.querySelector('.vset-access-input');
+            const accessInput = root.querySelector('.vset-access-input');
             if (accessInput) accessInput.value = this._accessKey || '';
 
             const stats = this._vault.getStats();
-            const statsEl = this.querySelector('.vset-stats');
+            const statsEl = root.querySelector('.vset-stats');
             if (statsEl) {
                 statsEl.innerHTML = `
                     <div class="vset-stats-grid">
@@ -106,7 +108,7 @@
         }
 
         _setupListeners() {
-            this.addEventListener('click', (e) => {
+            this.shadowRoot.addEventListener('click', (e) => {
                 if (e.target.closest('.vset-save-name'))  return this._saveName();
                 if (e.target.closest('.vset-copy-key'))   return this._copyKey();
                 if (e.target.closest('.vset-save-access')) return this._saveAccess();
@@ -116,17 +118,17 @@
 
         async _saveName() {
             if (!this._vault) return;
-            const input = this.querySelector('.vset-name-input');
+            const input = this.shadowRoot.querySelector('.vset-name-input');
             const name = input?.value?.trim();
             if (!name) return;
 
-            const btn = this.querySelector('.vset-save-name');
+            const btn = this.shadowRoot.querySelector('.vset-save-name');
             if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
             try {
                 await this._vault.setName(name);
                 this.dispatchEvent(new CustomEvent('vault-settings-name-saved', {
-                    detail: { name }, bubbles: true
+                    detail: { name }, bubbles: true, composed: true
                 }));
                 window.sgraphVault.messages.success(`Vault renamed to "${name}"`);
             } catch (err) {
@@ -137,7 +139,7 @@
         }
 
         _copyKey() {
-            const input = this.querySelector('.vset-key-input');
+            const input = this.shadowRoot.querySelector('.vset-key-input');
             if (input) {
                 navigator.clipboard.writeText(input.value).then(() => {
                     window.sgraphVault.messages.success('Vault key copied');
@@ -146,25 +148,25 @@
         }
 
         _saveAccess() {
-            const input = this.querySelector('.vset-access-input');
+            const input = this.shadowRoot.querySelector('.vset-access-input');
             const key = input?.value?.trim();
             if (!key) return;
             this._accessKey = key;
             this.dispatchEvent(new CustomEvent('vault-settings-access-key', {
-                detail: { key }, bubbles: true
+                detail: { key }, bubbles: true, composed: true
             }));
             window.sgraphVault.messages.success('Access key updated');
         }
 
         _toggleJson(e) {
-            const jsonEl = this.querySelector('.vset-json');
+            const jsonEl = this.shadowRoot.querySelector('.vset-json');
             if (!jsonEl) return;
             const hidden = jsonEl.style.display === 'none';
             jsonEl.style.display = hidden ? '' : 'none';
             e.target.closest('.vset-json-toggle').textContent = hidden ? '(hide)' : '(show)';
             if (hidden && this._vault) {
-                const sEl = this.querySelector('.vset-json-settings');
-                const tEl = this.querySelector('.vset-json-tree');
+                const sEl = this.shadowRoot.querySelector('.vset-json-settings');
+                const tEl = this.shadowRoot.querySelector('.vset-json-tree');
                 if (sEl) sEl.textContent = JSON.stringify(this._vault._settings, null, 2);
                 if (tEl) tEl.textContent = JSON.stringify(this._vault._tree, null, 2);
             }
@@ -172,6 +174,7 @@
     }
 
     VaultSettings.styles = `
+        :host { display: block; overflow-y: auto; height: 100%; box-sizing: border-box; }
         .vset-panel { max-width: 640px; padding: var(--space-4); }
         .vset-title { font-size: var(--text-h3); font-weight: 700; color: var(--color-text); margin: 0 0 var(--space-5); }
         .vset-section { margin-bottom: var(--space-5); }
@@ -212,14 +215,6 @@
         .vset-json h4 { font-size: var(--text-sm); font-weight: 600; color: var(--color-text-secondary); margin: var(--space-3) 0 var(--space-1); }
         .vset-json-toggle { font-size: var(--text-small); color: var(--color-primary); background: none; border: none; cursor: pointer; font-family: var(--font-family); }
     `;
-
-    VaultSettings._injectStyles = function() {
-        if (document.querySelector('style[data-vault-settings]')) return;
-        const s = document.createElement('style');
-        s.setAttribute('data-vault-settings', '');
-        s.textContent = VaultSettings.styles;
-        document.head.appendChild(s);
-    };
 
     customElements.define('vault-settings', VaultSettings);
 })();

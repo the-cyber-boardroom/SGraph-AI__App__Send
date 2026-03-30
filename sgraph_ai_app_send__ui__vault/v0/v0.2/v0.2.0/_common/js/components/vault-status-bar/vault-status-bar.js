@@ -1,6 +1,8 @@
 /* =================================================================================
-   SGraph Vault — Status Bar Component
-   v0.2.0 — Footer with stats and message badge
+   SGraph Vault -- Status Bar Component
+   v0.2.0 -- Footer with stats and message badge
+
+   Shadow DOM. Emits 'vault-status-debug' (composed: true).
    ================================================================================= */
 
 (function() {
@@ -8,9 +10,14 @@
 
     class VaultStatusBar extends HTMLElement {
 
+        constructor() {
+            super();
+            this.attachShadow({ mode: 'open' });
+        }
+
         connectedCallback() {
-            VaultStatusBar._injectStyles();
-            this.innerHTML = `
+            this.shadowRoot.innerHTML = `
+                <style>${VaultStatusBar.styles}</style>
                 <footer class="vsb-bar">
                     <span class="vsb-stats"></span>
                     <span class="vsb-spacer"></span>
@@ -18,8 +25,8 @@
                 </footer>
             `;
 
-            this.querySelector('.vsb-msg-badge').addEventListener('click', () => {
-                this.dispatchEvent(new CustomEvent('vault-status-debug', { bubbles: true }));
+            this.shadowRoot.querySelector('.vsb-msg-badge').addEventListener('click', () => {
+                this.dispatchEvent(new CustomEvent('vault-status-debug', { bubbles: true, composed: true }));
             });
 
             this._setupMessageBadge();
@@ -28,7 +35,7 @@
         updateStats(vault) {
             if (!vault) return;
             const stats = vault.getStats();
-            const el = this.querySelector('.vsb-stats');
+            const el = this.shadowRoot.querySelector('.vsb-stats');
             if (el) {
                 el.textContent = VaultI18n.t('vault.stats.summary', {
                     folders: stats.folders, files: stats.files,
@@ -38,7 +45,7 @@
         }
 
         _setupMessageBadge() {
-            const badge = this.querySelector('.vsb-msg-badge');
+            const badge = this.shadowRoot.querySelector('.vsb-msg-badge');
             if (!badge) return;
 
             const update = () => {
@@ -59,6 +66,7 @@
     }
 
     VaultStatusBar.styles = `
+        :host { display: block; }
         .vsb-bar {
             display: flex; align-items: center; gap: var(--space-4);
             padding: 0.25rem var(--space-4); font-size: var(--text-small);
@@ -75,14 +83,6 @@
         }
         .vsb-badge--error { background: var(--color-error); color: #fff; }
     `;
-
-    VaultStatusBar._injectStyles = function() {
-        if (document.querySelector('style[data-vault-status-bar]')) return;
-        const s = document.createElement('style');
-        s.setAttribute('data-vault-status-bar', '');
-        s.textContent = VaultStatusBar.styles;
-        document.head.appendChild(s);
-    };
 
     customElements.define('vault-status-bar', VaultStatusBar);
 })();

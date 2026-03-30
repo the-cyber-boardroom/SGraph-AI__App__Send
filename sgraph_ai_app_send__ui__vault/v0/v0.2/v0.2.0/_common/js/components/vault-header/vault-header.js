@@ -1,12 +1,12 @@
 /* =================================================================================
-   SGraph Vault — Header Bar Component
-   v0.2.0 — brand, vault name, upload button, debug toggle, lock, version display
+   SGraph Vault -- Header Bar Component
+   v0.2.0 -- brand, vault name, upload button, debug toggle, lock, version display
 
-   Light DOM component. Emits events for shell to handle:
-     'vault-header-upload'   — Upload button clicked
-     'vault-header-lock'     — Lock button clicked
-     'vault-header-debug'    — Debug toggle clicked
-     'vault-header-raw'      — Raw vault link clicked
+   Shadow DOM component. Emits events (composed: true) for shell to handle:
+     'vault-header-upload'   -- Upload button clicked
+     'vault-header-lock'     -- Lock button clicked
+     'vault-header-debug'    -- Debug toggle clicked
+     'vault-header-raw'      -- Raw vault link clicked
    ================================================================================= */
 
 (function() {
@@ -14,9 +14,14 @@
 
     class VaultHeader extends HTMLElement {
 
+        constructor() {
+            super();
+            this.attachShadow({ mode: 'open' });
+        }
+
         connectedCallback() {
-            VaultHeader._injectStyles();
-            this.innerHTML = `
+            this.shadowRoot.innerHTML = `
+                <style>${VaultHeader.styles}</style>
                 <header class="vh-header">
                     <div class="vh-title">
                         <span class="vh-brand">SG<span class="vh-slash">/</span>Vault</span>
@@ -34,7 +39,7 @@
                 </header>
             `;
 
-            this.addEventListener('click', (e) => {
+            this.shadowRoot.addEventListener('click', (e) => {
                 if (e.target.closest('.vh-upload-btn')) this._emit('vault-header-upload');
                 if (e.target.closest('.vh-lock-btn'))   this._emit('vault-header-lock');
                 if (e.target.closest('.vh-debug-btn'))  this._emit('vault-header-debug');
@@ -47,34 +52,34 @@
         // --- Public API ---
 
         setVaultName(name) {
-            const el = this.querySelector('.vh-vault-name');
+            const el = this.shadowRoot.querySelector('.vh-vault-name');
             if (el) el.textContent = name || '';
         }
 
         setReadOnly(isReadOnly) {
-            const badge = this.querySelector('.vh-readonly-badge');
+            const badge = this.shadowRoot.querySelector('.vh-readonly-badge');
             if (badge) badge.style.display = isReadOnly ? '' : 'none';
         }
 
         showLockButton(show) {
-            const btn = this.querySelector('.vh-lock-btn');
+            const btn = this.shadowRoot.querySelector('.vh-lock-btn');
             if (btn) btn.style.display = show ? '' : 'none';
         }
 
         showLoading() {
-            const bar = this.querySelector('.vh-loading-bar');
+            const bar = this.shadowRoot.querySelector('.vh-loading-bar');
             if (bar) bar.style.display = '';
         }
 
         hideLoading() {
-            const bar = this.querySelector('.vh-loading-bar');
+            const bar = this.shadowRoot.querySelector('.vh-loading-bar');
             if (bar) bar.style.display = 'none';
         }
 
         // --- Private ---
 
         _emit(name) {
-            this.dispatchEvent(new CustomEvent(name, { bubbles: true }));
+            this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true }));
         }
 
         async _fetchAppVersion() {
@@ -82,10 +87,10 @@
                 const resp = await fetch(`${window.location.origin}/api/health`);
                 if (resp.ok) {
                     const data = await resp.json();
-                    const el = this.querySelector('.vh-version');
+                    const el = this.shadowRoot.querySelector('.vh-version');
                     const build = window.SGRAPH_BUILD;
                     if (el && build) {
-                        el.textContent = `${build.appVersion}  ·  UI ${build.uiVersion} (IFD)`;
+                        el.textContent = `${build.appVersion}  .  UI ${build.uiVersion} (IFD)`;
                     } else if (el && data.version) {
                         el.textContent = `v0.2.0 (IFD) / ${data.version}`;
                     }
@@ -95,6 +100,7 @@
     }
 
     VaultHeader.styles = `
+        :host { display: block; }
         .vh-header {
             display: flex; align-items: center; justify-content: space-between;
             padding: 0 var(--space-4); background: var(--bg-surface);
@@ -138,14 +144,6 @@
         }
         @keyframes vh-slide { 0% { transform: translateX(-100%); } 50% { transform: translateX(230%); } 100% { transform: translateX(-100%); } }
     `;
-
-    VaultHeader._injectStyles = function() {
-        if (document.querySelector('style[data-vault-header]')) return;
-        const s = document.createElement('style');
-        s.setAttribute('data-vault-header', '');
-        s.textContent = VaultHeader.styles;
-        document.head.appendChild(s);
-    };
 
     customElements.define('vault-header', VaultHeader);
 })();
