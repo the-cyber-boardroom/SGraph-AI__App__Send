@@ -13,6 +13,7 @@
      9. CSV viewer — renders as styled table with source toggle
     10. HTML viewer — sandboxed iframe with allow-scripts (no allow-same-origin)
     11. Folder links expand tree, scroll to folder, open first file
+    12. Tab bar scrollable when many tabs open + new tab scrolled into view
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 7: Gallery metadata folder detection (both old + new format) ────────
@@ -505,6 +506,66 @@ SendBrowse.prototype._setupHeaderListeners = (function(original) {
         }
     };
 })(SendBrowse.prototype._setupHeaderListeners);
+
+
+// ─── Fix 12: Scrollable tab bar + auto-scroll to new tab ─────────────────────
+//
+// BRW-015: When many tabs are open, the tab bar overflows and new tabs are
+// off-screen. The user can't see, click, or close them.
+//
+// Fix: Inject CSS into sg-layout's Shadow DOM to make the tab bar scrollable,
+// and after opening a new tab, scroll it into view.
+
+(function() {
+    var origOpenFileTab = SendBrowse.prototype._openFileTab;
+
+    SendBrowse.prototype._openFileTab = async function(path) {
+        // Inject scrollable tab bar CSS (once)
+        _injectTabBarScrollCSS(this._sgLayout);
+
+        // Call original
+        await origOpenFileTab.call(this, path);
+
+        // Scroll the new tab into view
+        var self = this;
+        requestAnimationFrame(function() {
+            if (!self._sgLayout || !self._sgLayout.shadowRoot) return;
+
+            var tabId = self._openTabs.get(path);
+            if (!tabId) return;
+
+            var tabEl = self._sgLayout.shadowRoot.querySelector('.sgl-tab[data-tab-id="' + tabId + '"]');
+            if (tabEl) {
+                tabEl.scrollIntoView({ inline: 'end', block: 'nearest', behavior: 'smooth' });
+            }
+        });
+    };
+})();
+
+var _tabBarCSSInjected = false;
+function _injectTabBarScrollCSS(sgLayout) {
+    if (_tabBarCSSInjected || !sgLayout || !sgLayout.shadowRoot) return;
+
+    var style = document.createElement('style');
+    style.textContent = [
+        '/* v0.3.1: scrollable tab bar */',
+        '.sgl-tab-bar {',
+        '    overflow-x: auto !important;',
+        '    overflow-y: hidden !important;',
+        '    flex-wrap: nowrap !important;',
+        '    scrollbar-width: thin;',
+        '    scrollbar-color: rgba(78,205,196,0.3) transparent;',
+        '}',
+        '.sgl-tab-bar::-webkit-scrollbar { height: 4px; }',
+        '.sgl-tab-bar::-webkit-scrollbar-track { background: transparent; }',
+        '.sgl-tab-bar::-webkit-scrollbar-thumb { background: rgba(78,205,196,0.3); border-radius: 2px; }',
+        '.sgl-tab-bar::-webkit-scrollbar-thumb:hover { background: rgba(78,205,196,0.5); }',
+        '.sgl-tab { flex-shrink: 0 !important; }'
+    ].join('\n');
+
+    sgLayout.shadowRoot.appendChild(style);
+    _tabBarCSSInjected = true;
+}
 
 
 // ─── BRW-014: Navigate to folder ─────────────────────────────────────────────
