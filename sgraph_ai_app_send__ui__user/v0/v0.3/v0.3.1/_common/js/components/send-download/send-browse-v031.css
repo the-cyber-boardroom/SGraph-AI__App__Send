@@ -1,0 +1,48 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — v0.3.1 CSS overlay for send-browse.css
+   Later rules win — loaded after v0.3.0 base CSS.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* BRW-010: Markdown link color — readable on white background */
+.sb-file__markdown a { color: #0969da; text-decoration: none; }
+.sb-file__markdown a:hover { text-decoration: underline; }
+
+/* CSV table viewer */
+.sb-file__csv {
+    background: white;
+    color: #1a1a1a;
+    padding: 1rem;
+    min-height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+}
+.sb-file__csv table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.85rem;
+}
+.sb-file__csv th {
+    background: #f0f4f8;
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #d0d7de;
+    position: sticky;
+    top: 0;
+}
+.sb-file__csv td {
+    padding: 6px 12px;
+    border: 1px solid #d0d7de;
+    white-space: nowrap;
+}
+.sb-file__csv tr:nth-child(even) { background: #f6f8fa; }
+.sb-file__csv tr:hover { background: #e8f0fe; }
+
+/* HTML sandboxed iframe viewer */
+.sb-file__html-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+    border-radius: 4px;
+}

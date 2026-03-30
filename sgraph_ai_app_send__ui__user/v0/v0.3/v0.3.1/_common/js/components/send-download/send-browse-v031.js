@@ -9,6 +9,9 @@
      5. Markdown view source toggle (rendered ↔ raw source)
      6. Save locally downloads valid zip (correct MIME type + re-generated)
      7. Gallery folder filter handles both _gallery. and __gallery__ prefixes
+     8. URL-decoded link matching (%20 → space) for zip entry lookup
+     9. CSV viewer — renders as styled table with source toggle
+    10. HTML viewer — sandboxed iframe render with source toggle
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 7: Gallery metadata folder detection (both old + new format) ────────
@@ -104,7 +107,130 @@ SendBrowse.prototype._renderFolderNode = (function(original) {
 
 SendBrowse.prototype._renderFileContent = (function(original) {
     return function(container, bytes, fileName, type) {
-        // Call original to render the base content
+        var ext = (fileName || '').split('.').pop().toLowerCase();
+
+        // ── BRW-012: CSV viewer — render as styled table ────────────────
+        if (ext === 'csv') {
+            // Render action bar manually (original would render as plain text)
+            container.innerHTML = '';
+            this._currentFileName = fileName;
+
+            var bar = document.createElement('div');
+            bar.className = 'sb-file__actions';
+            bar.innerHTML =
+                '<span class="sb-file__name">' + SendHelpers.escapeHtml(fileName) + '</span>' +
+                '<span class="sb-file__size">' + SendHelpers.formatBytes(bytes.byteLength) + '</span>' +
+                '<button class="sb-action-btn sb-file__save">' + SendIcons.DOWNLOAD_SM + ' Save</button>';
+            container.appendChild(bar);
+
+            bar.querySelector('.sb-file__save').addEventListener('click', function() {
+                var blob = new Blob([bytes]);
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url; a.download = fileName;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            var rawText = new TextDecoder().decode(bytes);
+            var content = document.createElement('div');
+            content.className = 'sb-file__content';
+            container.appendChild(content);
+
+            // Parse CSV and build table
+            var tableHtml = _csvToTable(rawText);
+            var tableEl = document.createElement('div');
+            tableEl.className = 'sb-file__csv';
+            tableEl.innerHTML = tableHtml;
+            content.appendChild(tableEl);
+
+            // Source view (hidden)
+            var sourceEl = document.createElement('pre');
+            sourceEl.className = 'sb-file__code sb-file__csv-source';
+            sourceEl.textContent = rawText;
+            sourceEl.style.display = 'none';
+            content.appendChild(sourceEl);
+
+            // Source toggle button
+            var sourceBtn = document.createElement('button');
+            sourceBtn.className = 'sb-action-btn sb-file__view-source';
+            sourceBtn.innerHTML = '&lt;/&gt; Source';
+            var isSource = false;
+            sourceBtn.addEventListener('click', function() {
+                isSource = !isSource;
+                tableEl.style.display  = isSource ? 'none' : '';
+                sourceEl.style.display = isSource ? ''     : 'none';
+                sourceBtn.innerHTML    = isSource ? '&#9998; Table' : '&lt;/&gt; Source';
+            });
+            bar.appendChild(sourceBtn);
+            return;  // skip original render
+        }
+
+        // ── BRW-013: HTML viewer — sandboxed iframe + source toggle ─────
+        if (ext === 'html' || ext === 'htm') {
+            container.innerHTML = '';
+            this._currentFileName = fileName;
+
+            var bar = document.createElement('div');
+            bar.className = 'sb-file__actions';
+            bar.innerHTML =
+                '<span class="sb-file__name">' + SendHelpers.escapeHtml(fileName) + '</span>' +
+                '<span class="sb-file__size">' + SendHelpers.formatBytes(bytes.byteLength) + '</span>' +
+                '<button class="sb-action-btn sb-file__save">' + SendIcons.DOWNLOAD_SM + ' Save</button>';
+            container.appendChild(bar);
+
+            bar.querySelector('.sb-file__save').addEventListener('click', function() {
+                var blob = new Blob([bytes], { type: 'text/html' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url; a.download = fileName;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            var rawText = new TextDecoder().decode(bytes);
+            var content = document.createElement('div');
+            content.className = 'sb-file__content';
+            content.style.display = 'flex';
+            content.style.flexDirection = 'column';
+            content.style.height = '100%';
+            container.appendChild(content);
+
+            // Sandboxed iframe (no scripts, no external resources by default)
+            var blob = new Blob([rawText], { type: 'text/html' });
+            var blobUrl = URL.createObjectURL(blob);
+            if (this._objectUrls) this._objectUrls.push(blobUrl);
+            var iframeEl = document.createElement('iframe');
+            iframeEl.className = 'sb-file__html-frame';
+            iframeEl.sandbox = 'allow-same-origin';  // no allow-scripts — safe
+            iframeEl.src = blobUrl;
+            iframeEl.style.flex = '1';
+            content.appendChild(iframeEl);
+
+            // Source view (hidden)
+            var sourceEl = document.createElement('pre');
+            sourceEl.className = 'sb-file__code';
+            sourceEl.textContent = rawText;
+            sourceEl.style.display = 'none';
+            sourceEl.style.flex = '1';
+            content.appendChild(sourceEl);
+
+            // Source toggle
+            var isSource = false;
+            var sourceBtn = document.createElement('button');
+            sourceBtn.className = 'sb-action-btn sb-file__view-source';
+            sourceBtn.innerHTML = '&lt;/&gt; Source';
+            sourceBtn.addEventListener('click', function() {
+                isSource = !isSource;
+                iframeEl.style.display = isSource ? 'none' : '';
+                sourceEl.style.display = isSource ? ''     : 'none';
+                sourceBtn.innerHTML    = isSource ? '&#127912; Rendered' : '&lt;/&gt; Source';
+            });
+            bar.appendChild(sourceBtn);
+            return;  // skip original render
+        }
+
+        // ── All other types: call original ──────────────────────────────
         original.call(this, container, bytes, fileName, type);
 
         // ── PDF Present button ──────────────────────────────────────────
@@ -246,6 +372,9 @@ function _resolvePath(base, relative) {
 // Also tries with/without common extensions (.md, .pdf, .jpg, .png).
 
 function _findZipEntry(zipTree, resolved) {
+    // BRW-011: Decode URL-encoded characters (%20 → space, etc.)
+    try { resolved = decodeURIComponent(resolved); } catch (_) {}
+
     // Exact match
     var match = zipTree.find(function(e) { return !e.dir && e.path === resolved; });
     if (match) return match;
@@ -369,3 +498,81 @@ SendBrowse.prototype._setupHeaderListeners = (function(original) {
         }
     };
 })(SendBrowse.prototype._setupHeaderListeners);
+
+
+// ─── CSV Parser ──────────────────────────────────────────────────────────────
+// Handles quoted fields with commas and newlines inside quotes.
+
+function _csvToTable(text) {
+    var rows = _parseCsv(text);
+    if (rows.length === 0) return '<p>Empty CSV</p>';
+
+    var html = '<table><thead><tr>';
+    var headers = rows[0];
+    for (var h = 0; h < headers.length; h++) {
+        html += '<th>' + _escHtml(headers[h]) + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+
+    for (var r = 1; r < rows.length; r++) {
+        html += '<tr>';
+        for (var c = 0; c < headers.length; c++) {
+            var val = (c < rows[r].length) ? rows[r][c] : '';
+            html += '<td>' + _escHtml(val) + '</td>';
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    return html;
+}
+
+function _parseCsv(text) {
+    var rows = [];
+    var row = [];
+    var field = '';
+    var inQuotes = false;
+    var i = 0;
+
+    while (i < text.length) {
+        var ch = text[i];
+        if (inQuotes) {
+            if (ch === '"' && text[i + 1] === '"') {
+                field += '"';
+                i += 2;
+            } else if (ch === '"') {
+                inQuotes = false;
+                i++;
+            } else {
+                field += ch;
+                i++;
+            }
+        } else {
+            if (ch === '"') {
+                inQuotes = true;
+                i++;
+            } else if (ch === ',') {
+                row.push(field.trim());
+                field = '';
+                i++;
+            } else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+                row.push(field.trim());
+                if (row.length > 1 || row[0] !== '') rows.push(row);
+                row = [];
+                field = '';
+                i += (ch === '\r') ? 2 : 1;
+            } else {
+                field += ch;
+                i++;
+            }
+        }
+    }
+    // Last field/row
+    row.push(field.trim());
+    if (row.length > 1 || row[0] !== '') rows.push(row);
+
+    return rows;
+}
+
+function _escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
