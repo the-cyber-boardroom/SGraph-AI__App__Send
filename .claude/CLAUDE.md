@@ -214,6 +214,7 @@ team/                            # Team structure
 24. **Branch naming:** `claude/{description}-{session-id}`
 25. **Always push with:** `git push -u origin {branch-name}`
 26. **Pull from dev before starting work** — always run `git fetch origin dev && git merge origin/dev` at the start of every session before making any changes
+27. **NEVER touch `sgraph_ai_app_send/version`** — it is owned exclusively by the CI pipeline. Do not read it, write it, or reference it in commit messages. CI increments it automatically after tests pass. Manually setting it creates version collisions.
 
 ---
 
