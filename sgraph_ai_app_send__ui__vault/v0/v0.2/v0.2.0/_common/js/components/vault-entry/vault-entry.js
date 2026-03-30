@@ -113,21 +113,25 @@ class VaultEntry extends VaultComponent {
         this._simpleTokenBtn.disabled = true
 
         try {
-            // Derive vault ID from token: SHA-256(token) -> first 8 lowercase alphanumeric chars
+            // Derive vault ID from token: SHA-256(token) -> first 8 hex chars
+            // (hex chars are [0-9a-f] which satisfy the vault_id constraint of 8 lowercase alphanumeric)
             const enc = new TextEncoder()
             const hash = await crypto.subtle.digest('SHA-256', enc.encode(token))
             const bytes = new Uint8Array(hash)
-            const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
             let vaultId = ''
-            for (let i = 0; i < 8; i++) {
-                vaultId += alphabet[bytes[i] % alphabet.length]
+            for (let i = 0; i < 4; i++) {
+                vaultId += bytes[i].toString(16).padStart(2, '0')
             }
 
             // The vault key is token:vaultId (token IS the passphrase)
             const vaultKey = `${token}:${vaultId}`
             await this._openVault(vaultKey, token)
         } catch (err) {
-            this._showError(err.message)
+            if (err.message.includes('not found') || err.message.includes('404')) {
+                this._showError(`No vault found for token "${token}". The vault may not have been created yet, or the token may be incorrect.`)
+            } else {
+                this._showError(err.message)
+            }
         } finally {
             this._simpleTokenBtn.disabled = false
             this._hideStatus()
