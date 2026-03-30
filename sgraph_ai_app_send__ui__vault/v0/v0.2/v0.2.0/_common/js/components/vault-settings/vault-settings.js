@@ -21,6 +21,7 @@
         }
 
         connectedCallback() {
+            VaultSettings._injectStyles();
             this.innerHTML = `
                 <div class="vset-panel">
                     <h2 class="vset-title">Vault Settings</h2>
@@ -211,6 +212,14 @@
         .vset-json h4 { font-size: var(--text-sm); font-weight: 600; color: var(--color-text-secondary); margin: var(--space-3) 0 var(--space-1); }
         .vset-json-toggle { font-size: var(--text-small); color: var(--color-primary); background: none; border: none; cursor: pointer; font-family: var(--font-family); }
     `;
+
+    VaultSettings._injectStyles = function() {
+        if (document.querySelector('style[data-vault-settings]')) return;
+        const s = document.createElement('style');
+        s.setAttribute('data-vault-settings', '');
+        s.textContent = VaultSettings.styles;
+        document.head.appendChild(s);
+    };
 
     customElements.define('vault-settings', VaultSettings);
 })();

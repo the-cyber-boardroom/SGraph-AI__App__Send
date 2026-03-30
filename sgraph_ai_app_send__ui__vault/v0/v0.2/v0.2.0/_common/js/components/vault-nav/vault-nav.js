@@ -11,6 +11,7 @@
     class VaultNav extends HTMLElement {
 
         connectedCallback() {
+            VaultNav._injectStyles();
             this.innerHTML = `
                 <nav class="vn-nav">
                     <a class="vn-item vn-item--active" data-view="files" href="#">
@@ -65,6 +66,14 @@
         .vn-icon { font-size: 1.125rem; line-height: 1; }
         .vn-label { line-height: 1; }
     `;
+
+    VaultNav._injectStyles = function() {
+        if (document.querySelector('style[data-vault-nav]')) return;
+        const s = document.createElement('style');
+        s.setAttribute('data-vault-nav', '');
+        s.textContent = VaultNav.styles;
+        document.head.appendChild(s);
+    };
 
     customElements.define('vault-nav', VaultNav);
 })();

@@ -15,6 +15,7 @@
     class VaultHeader extends HTMLElement {
 
         connectedCallback() {
+            VaultHeader._injectStyles();
             this.innerHTML = `
                 <header class="vh-header">
                     <div class="vh-title">
@@ -137,6 +138,14 @@
         }
         @keyframes vh-slide { 0% { transform: translateX(-100%); } 50% { transform: translateX(230%); } 100% { transform: translateX(-100%); } }
     `;
+
+    VaultHeader._injectStyles = function() {
+        if (document.querySelector('style[data-vault-header]')) return;
+        const s = document.createElement('style');
+        s.setAttribute('data-vault-header', '');
+        s.textContent = VaultHeader.styles;
+        document.head.appendChild(s);
+    };
 
     customElements.define('vault-header', VaultHeader);
 })();

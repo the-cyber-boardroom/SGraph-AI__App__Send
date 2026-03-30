@@ -42,14 +42,7 @@
 
         _render() {
             this.innerHTML = `
-                <style>
-                    ${VaultShell.styles}
-                    ${VaultHeader.styles}
-                    ${VaultAuth.styles}
-                    ${VaultNav.styles}
-                    ${VaultSettings.styles}
-                    ${VaultStatusBar.styles}
-                </style>
+                <style>${VaultShell.styles}</style>
 
                 <!-- Entry View (before vault is opened) -->
                 <div class="vs-entry">

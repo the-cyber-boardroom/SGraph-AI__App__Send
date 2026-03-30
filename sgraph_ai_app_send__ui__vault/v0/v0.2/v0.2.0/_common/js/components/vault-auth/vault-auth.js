@@ -14,6 +14,7 @@
     class VaultAuth extends HTMLElement {
 
         connectedCallback() {
+            VaultAuth._injectStyles();
             this.style.display = 'none';
             this.innerHTML = `
                 <div class="va-banner">
@@ -80,6 +81,14 @@
         }
         .va-cancel:hover { color: var(--color-text); }
     `;
+
+    VaultAuth._injectStyles = function() {
+        if (document.querySelector('style[data-vault-auth]')) return;
+        const s = document.createElement('style');
+        s.setAttribute('data-vault-auth', '');
+        s.textContent = VaultAuth.styles;
+        document.head.appendChild(s);
+    };
 
     customElements.define('vault-auth', VaultAuth);
 })();

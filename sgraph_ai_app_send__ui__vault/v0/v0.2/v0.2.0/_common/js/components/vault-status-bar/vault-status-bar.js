@@ -9,6 +9,7 @@
     class VaultStatusBar extends HTMLElement {
 
         connectedCallback() {
+            VaultStatusBar._injectStyles();
             this.innerHTML = `
                 <footer class="vsb-bar">
                     <span class="vsb-stats"></span>
@@ -74,6 +75,14 @@
         }
         .vsb-badge--error { background: var(--color-error); color: #fff; }
     `;
+
+    VaultStatusBar._injectStyles = function() {
+        if (document.querySelector('style[data-vault-status-bar]')) return;
+        const s = document.createElement('style');
+        s.setAttribute('data-vault-status-bar', '');
+        s.textContent = VaultStatusBar.styles;
+        document.head.appendChild(s);
+    };
 
     customElements.define('vault-status-bar', VaultStatusBar);
 })();
