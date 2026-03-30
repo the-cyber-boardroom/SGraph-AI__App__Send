@@ -340,6 +340,20 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                 overlay.appendChild(bar);
                 overlay.appendChild(content);
                 document.body.appendChild(overlay);
+
+                // Anchor links inside the clone lost their event listeners
+                // (cloneNode copies DOM, not listeners). Without interception
+                // the browser follows href="#section-id", replaces the whole
+                // hash and loses the transfer token. Re-wire them to scroll
+                // the present overlay's content container instead.
+                overlay.querySelectorAll('a[href^="#"]').forEach(function (a) {
+                    a.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        var id = a.getAttribute('href').slice(1);
+                        var target = content.querySelector('#' + id);
+                        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                });
             });
 
             // Copy button: copies raw JSON to clipboard
