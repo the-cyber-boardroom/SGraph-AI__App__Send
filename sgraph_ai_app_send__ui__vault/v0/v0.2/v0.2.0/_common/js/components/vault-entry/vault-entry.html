@@ -7,7 +7,7 @@
         <p class="vault-entry__tagline" data-i18n="app.subtitle">Your files, encrypted in your browser. The server sees nothing.</p>
     </div>
 
-    <!-- Server endpoint -->
+    <!-- Server endpoint (shared between both modes) -->
     <div class="vault-entry__section vault-entry__server" id="server-section">
         <label class="vault-entry__label">Server</label>
         <input class="input vault-entry__input" type="url"
@@ -18,7 +18,7 @@
         <p class="vault-entry__hint">The SGraph Send server to connect to.</p>
     </div>
 
-    <!-- Access key (optional for browsing, required for uploads) -->
+    <!-- Access key (shared between both modes) -->
     <div class="vault-entry__section vault-entry__access" id="access-section">
         <label class="vault-entry__label" data-i18n="vault.entry.access_label">Access Key <span class="vault-entry__optional">(optional for browsing)</span></label>
         <input class="input vault-entry__input" type="password"
@@ -29,36 +29,59 @@
         <p class="vault-entry__hint" data-i18n="vault.entry.access_hint">Only needed for uploading files. Browse and download without it.</p>
     </div>
 
-    <!-- Open existing vault -->
-    <div class="vault-entry__section" id="open-section">
-        <label class="vault-entry__label" data-i18n="vault.entry.label">Enter your Vault Key</label>
-        <input class="input vault-entry__input" type="password"
-               data-i18n-placeholder="vault.entry.placeholder"
-               placeholder="Paste your vault key here"
-               id="vault-key-input"
-               autocomplete="off">
-        <button class="btn btn-primary vault-entry__btn" id="vault-open-btn" data-i18n="vault.entry.open">Open Vault</button>
-    </div>
+    <hr class="vault-entry__hr">
 
-    <div class="vault-entry__divider"><span data-i18n="vault.entry.or">or</span></div>
+    <!-- Two-column layout: vault key (left) | simple token (right, primary) -->
+    <div class="vault-entry__columns">
 
-    <!-- Create new vault -->
-    <button class="btn btn-secondary vault-entry__btn" id="vault-create-toggle" data-i18n="vault.entry.create">Create New Vault</button>
+        <!-- Left column: Full vault key -->
+        <div class="vault-entry__col vault-entry__col--secondary">
+            <h3 class="vault-entry__col-title">Full Vault Key</h3>
+            <p class="vault-entry__col-desc">For vaults with a passphrase and vault ID</p>
+            <div class="vault-entry__section" id="open-section">
+                <input class="input vault-entry__input" type="password"
+                       data-i18n-placeholder="vault.entry.placeholder"
+                       placeholder="passphrase:vault_id"
+                       id="vault-key-input"
+                       autocomplete="off">
+                <button class="btn btn-secondary vault-entry__btn" id="vault-open-btn" data-i18n="vault.entry.open">Open Vault</button>
+            </div>
 
-    <div class="vault-entry__create-form" id="create-form" hidden>
-        <label class="vault-entry__label" data-i18n="vault.create.name_label">Vault name</label>
-        <input class="input" type="text" id="vault-name-input"
-               data-i18n-placeholder="vault.create.name_placeholder"
-               placeholder="My Vault"
-               autocomplete="off">
+            <div class="vault-entry__divider"><span data-i18n="vault.entry.or">or</span></div>
 
-        <label class="vault-entry__label" data-i18n="vault.create.passphrase_label">Vault passphrase</label>
-        <input class="input" type="password" id="vault-passphrase-input"
-               data-i18n-placeholder="vault.create.passphrase_placeholder"
-               placeholder="Choose a strong passphrase"
-               autocomplete="off">
+            <button class="btn btn-secondary vault-entry__btn vault-entry__btn--small" id="vault-create-toggle" data-i18n="vault.entry.create">Create New Vault</button>
 
-        <button class="btn btn-primary vault-entry__btn" id="vault-create-btn" data-i18n="vault.create.create_button">Create Vault</button>
+            <div class="vault-entry__create-form" id="create-form" hidden>
+                <label class="vault-entry__label" data-i18n="vault.create.name_label">Vault name</label>
+                <input class="input" type="text" id="vault-name-input"
+                       data-i18n-placeholder="vault.create.name_placeholder"
+                       placeholder="My Vault"
+                       autocomplete="off">
+
+                <label class="vault-entry__label" data-i18n="vault.create.passphrase_label">Vault passphrase</label>
+                <input class="input" type="password" id="vault-passphrase-input"
+                       data-i18n-placeholder="vault.create.passphrase_placeholder"
+                       placeholder="Choose a strong passphrase"
+                       autocomplete="off">
+
+                <button class="btn btn-primary vault-entry__btn" id="vault-create-btn" data-i18n="vault.create.create_button">Create Vault</button>
+            </div>
+        </div>
+
+        <!-- Right column: Simple token (primary, bigger) -->
+        <div class="vault-entry__col vault-entry__col--primary">
+            <h3 class="vault-entry__col-title">Simple Token</h3>
+            <p class="vault-entry__col-desc">Enter the token you received (e.g. <code>jack-loft-6946</code>)</p>
+            <div class="vault-entry__section">
+                <input class="input vault-entry__input vault-entry__input--large" type="text"
+                       placeholder="word-word-1234"
+                       id="simple-token-input"
+                       autocomplete="off"
+                       spellcheck="false">
+                <button class="btn btn-primary vault-entry__btn vault-entry__btn--large" id="simple-token-btn">Open Vault</button>
+            </div>
+        </div>
+
     </div>
 
     <!-- Status / Error -->
