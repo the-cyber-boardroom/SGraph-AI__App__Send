@@ -669,42 +669,78 @@
     .plr-image--border img { border-color: rgba(78,205,196,0.45); }
 }
 
-/* ── Print overlay ────────────────────────────────────────────────────────── */
-/* Full-screen div appended to body on Print click; removed on afterprint.     */
+/* ── Present mode overlay ─────────────────────────────────────────────────── */
+/* Full-screen overlay opened by the ⛶ Present button.                        */
+/* Forces white background so Print/Save-as-PDF always works cleanly.         */
 
-.plr-print-overlay {
+.plr-present-overlay {
     position: fixed;
     inset: 0;
     z-index: 99999;
-    background: #fff;
-    overflow-y: auto;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
-/* Inside the overlay, let the scroll wrapper expand freely */
-.plr-print-overlay .plr-scroll-wrapper {
+/* Thin top bar: title (left) + Print + Close (right) */
+.plr-present-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    flex-shrink: 0;
+}
+
+.plr-present-title {
+    flex: 1;
+    font-size: 0.8rem;
+    color: #555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.plr-present-btn {
+    padding: 0.25rem 0.65rem;
+    font-size: 0.78rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.plr-present-btn:hover { background: #e8e8e8; }
+.plr-present-close { border-color: #bbb; }
+
+/* Scrollable content area */
+.plr-present-content {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+}
+
+/* Let the scroll wrapper inside the clone expand freely */
+.plr-present-content .plr-scroll-wrapper {
     overflow: visible;
     height: auto;
 }
 
-/* ── Print: page layout content ──────────────────────────────────────────── */
+/* ── Print from present mode ──────────────────────────────────────────────── */
 
 @media print {
-    /* When a print overlay exists, hide everything else in the browser window */
-    body:has(.plr-print-overlay) > *:not(.plr-print-overlay) { display: none !important; }
+    /* Hide everything except the present overlay */
+    body:has(.plr-present-overlay) > *:not(.plr-present-overlay) { display: none !important; }
 
-    .plr-print-overlay {
-        position: static !important;
-        overflow: visible !important;
-        inset: auto !important;
-    }
-    .plr-print-overlay .plr-scroll-wrapper {
-        overflow: visible !important;
-        height: auto !important;
-    }
+    .plr-present-overlay { position: static !important; overflow: visible !important; }
+    .plr-present-bar     { display: none !important; }   /* hide toolbar when printing */
+    .plr-present-content { overflow: visible !important; }
+    .plr-present-content .plr-scroll-wrapper { overflow: visible !important; height: auto !important; }
 
-    /* Always hide UI chrome in any print context */
-    .plr-nav,
-    .plr-source-bar  { display: none !important; }
-    .plr-lightbox    { display: none !important; }
-    .plr-pdf         { height: auto !important; }
+    /* Always hide UI chrome */
+    .plr-nav, .plr-source-bar { display: none !important; }
+    .plr-lightbox              { display: none !important; }
+    .plr-pdf                   { height: auto !important; }
 }
