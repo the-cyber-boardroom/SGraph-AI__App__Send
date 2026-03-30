@@ -11,7 +11,8 @@
      7. Gallery folder filter handles both _gallery. and __gallery__ prefixes
      8. URL-decoded link matching (%20 → space) for zip entry lookup
      9. CSV viewer — renders as styled table with source toggle
-    10. HTML viewer — sandboxed iframe render with source toggle
+    10. HTML viewer — sandboxed iframe with allow-scripts (no allow-same-origin)
+    11. Folder links expand tree, scroll to folder, open first file
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ─── Fix 7: Gallery metadata folder detection (both old + new format) ────────
@@ -202,7 +203,7 @@ SendBrowse.prototype._renderFileContent = (function(original) {
             if (this._objectUrls) this._objectUrls.push(blobUrl);
             var iframeEl = document.createElement('iframe');
             iframeEl.className = 'sb-file__html-frame';
-            iframeEl.sandbox = 'allow-same-origin';  // no allow-scripts — safe
+            iframeEl.sandbox = 'allow-scripts';  // scripts OK, but NO allow-same-origin — cannot access parent DOM/localStorage
             iframeEl.src = blobUrl;
             iframeEl.style.flex = '1';
             content.appendChild(iframeEl);
@@ -298,7 +299,7 @@ SendBrowse.prototype._renderFileContent = (function(original) {
             var self    = this;
             var zipTree = this.zipTree;
 
-            // ── Intercept relative link clicks → open as tab ────────────
+            // ── Intercept relative link clicks → open as tab or folder ──
             mdContainer.querySelectorAll('a[href]').forEach(function(a) {
                 var href = a.getAttribute('href');
                 // Skip external links, anchors, mailto
@@ -308,11 +309,17 @@ SendBrowse.prototype._renderFileContent = (function(original) {
                 a.addEventListener('click', function(e) {
                     e.preventDefault();
                     var resolved = _resolvePath(currentDir, href);
-                    // Try exact match first, then fuzzy (path ending)
+
+                    // Try file match first
                     var match = _findZipEntry(zipTree, resolved);
                     if (match) {
                         self._openFileTab(match.path);
+                        return;
                     }
+
+                    // BRW-014: Try folder match — expand tree + open first file
+                    var folderPath = resolved.replace(/\/$/, '');  // strip trailing slash
+                    _navigateToFolder(self, zipTree, folderPath);
                 });
                 // Visual cue: pointer cursor (link is actionable)
                 a.style.cursor = 'pointer';
@@ -498,6 +505,92 @@ SendBrowse.prototype._setupHeaderListeners = (function(original) {
         }
     };
 })(SendBrowse.prototype._setupHeaderListeners);
+
+
+// ─── BRW-014: Navigate to folder ─────────────────────────────────────────────
+//
+// When a markdown link points to a folder (e.g. "statements/mbna/"):
+// 1. Find the folder in the sidebar tree
+// 2. Expand all parent folders
+// 3. Scroll the folder into view
+// 4. Open the first file in that folder as a tab
+
+function _navigateToFolder(browseInstance, zipTree, folderPath) {
+    try { folderPath = decodeURIComponent(folderPath); } catch (_) {}
+
+    // Find files inside this folder
+    var folderFiles = zipTree.filter(function(e) {
+        if (e.dir) return false;
+        if (_isGalleryMetaPath(e.path)) return false;
+        return e.path.startsWith(folderPath + '/');
+    });
+
+    // Also try ends-with match (zip may have root wrapper)
+    if (folderFiles.length === 0) {
+        folderFiles = zipTree.filter(function(e) {
+            if (e.dir) return false;
+            if (_isGalleryMetaPath(e.path)) return false;
+            return e.path.includes('/' + folderPath + '/');
+        });
+    }
+
+    if (folderFiles.length === 0) return;
+
+    // Expand parent folders in the tree by finding and clicking them
+    var treeRoot = browseInstance.querySelector('.sb-tree');
+    if (treeRoot) {
+        // Build the chain of folder paths to expand
+        var parts = folderPath.split('/');
+        var pathSoFar = '';
+        for (var i = 0; i < parts.length; i++) {
+            pathSoFar = pathSoFar ? pathSoFar + '/' + parts[i] : parts[i];
+            var folderEl = treeRoot.querySelector('.sb-tree__folder[data-path="' + pathSoFar + '"]');
+
+            // Also try ends-with for wrapped zips
+            if (!folderEl) {
+                var allFolders = treeRoot.querySelectorAll('.sb-tree__folder');
+                for (var f = 0; f < allFolders.length; f++) {
+                    var dp = allFolders[f].getAttribute('data-path') || '';
+                    if (dp === pathSoFar || dp.endsWith('/' + pathSoFar)) {
+                        folderEl = allFolders[f];
+                        break;
+                    }
+                }
+            }
+
+            if (folderEl) {
+                // Expand this folder
+                var content = folderEl.querySelector('.sb-tree__folder-content');
+                var toggle  = folderEl.querySelector('.sb-tree__toggle');
+                if (content && content.style.display === 'none') {
+                    content.style.display = '';
+                    if (toggle) toggle.textContent = '\u25BE';  // ▾
+                    folderEl.classList.add('sb-tree__folder--open');
+                }
+            }
+        }
+
+        // Scroll the deepest folder into view
+        var deepest = treeRoot.querySelector('.sb-tree__folder[data-path="' + folderPath + '"]');
+        if (!deepest) {
+            var all = treeRoot.querySelectorAll('.sb-tree__folder');
+            for (var j = 0; j < all.length; j++) {
+                var dp2 = all[j].getAttribute('data-path') || '';
+                if (dp2 === folderPath || dp2.endsWith('/' + folderPath)) {
+                    deepest = all[j];
+                    break;
+                }
+            }
+        }
+        if (deepest) deepest.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    // Open the first file in the folder (sorted)
+    folderFiles.sort(function(a, b) {
+        return a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    browseInstance._openFileTab(folderFiles[0].path);
+}
 
 
 // ─── CSV Parser ──────────────────────────────────────────────────────────────
