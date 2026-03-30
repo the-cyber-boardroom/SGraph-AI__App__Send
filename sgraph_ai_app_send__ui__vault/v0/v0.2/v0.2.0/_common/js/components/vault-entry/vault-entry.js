@@ -1,31 +1,39 @@
 /* =================================================================================
-   SGraph Vault — Entry Component
-   v0.1.0 — Open existing vault or create a new one
+   SGraph Vault -- Entry Component
+   v0.2.0 -- Open vault via full key or simple token, or create a new one
+
+   Simple tokens (e.g. "jack-loft-6946") derive both the vault ID and
+   passphrase deterministically using FriendlyCrypto (SHA-256 + PBKDF2).
+   The token IS the passphrase; the vault ID is SHA-256(token)[:12].
    ================================================================================= */
 
 class VaultEntry extends VaultComponent {
 
     bindElements() {
-        this._endpointInput   = this.$('#server-endpoint-input')
-        this._accessKeyInput  = this.$('#access-key-input')
-        this._keyInput        = this.$('#vault-key-input')
-        this._openBtn         = this.$('#vault-open-btn')
-        this._createToggle    = this.$('#vault-create-toggle')
-        this._createForm      = this.$('#create-form')
-        this._nameInput       = this.$('#vault-name-input')
-        this._passphraseInput = this.$('#vault-passphrase-input')
-        this._createBtn       = this.$('#vault-create-btn')
-        this._status          = this.$('#vault-status')
-        this._error           = this.$('#vault-error')
+        this._endpointInput    = this.$('#server-endpoint-input')
+        this._accessKeyInput   = this.$('#access-key-input')
+        this._keyInput         = this.$('#vault-key-input')
+        this._openBtn          = this.$('#vault-open-btn')
+        this._simpleTokenInput = this.$('#simple-token-input')
+        this._simpleTokenBtn   = this.$('#simple-token-btn')
+        this._createToggle     = this.$('#vault-create-toggle')
+        this._createForm       = this.$('#create-form')
+        this._nameInput        = this.$('#vault-name-input')
+        this._passphraseInput  = this.$('#vault-passphrase-input')
+        this._createBtn        = this.$('#vault-create-btn')
+        this._status           = this.$('#vault-status')
+        this._error            = this.$('#vault-error')
     }
 
     setupEventListeners() {
-        this.addTrackedListener(this._openBtn,        'click',    this._onOpen)
-        this.addTrackedListener(this._createToggle,    'click',    this._onToggleCreate)
-        this.addTrackedListener(this._createBtn,       'click',    this._onCreate)
-        this.addTrackedListener(this._keyInput,        'keydown',  this._onKeyDown)
-        this.addTrackedListener(this._accessKeyInput,  'input',    this._onAccessKeyChange)
-        this.addTrackedListener(this._endpointInput,   'input',    this._onEndpointChange)
+        this.addTrackedListener(this._openBtn,          'click',   this._onOpen)
+        this.addTrackedListener(this._simpleTokenBtn,   'click',   this._onSimpleTokenOpen)
+        this.addTrackedListener(this._createToggle,     'click',   this._onToggleCreate)
+        this.addTrackedListener(this._createBtn,        'click',   this._onCreate)
+        this.addTrackedListener(this._keyInput,         'keydown', this._onKeyDown)
+        this.addTrackedListener(this._simpleTokenInput, 'keydown', this._onSimpleKeyDown)
+        this.addTrackedListener(this._accessKeyInput,   'input',   this._onAccessKeyChange)
+        this.addTrackedListener(this._endpointInput,    'input',   this._onEndpointChange)
     }
 
     onReady() {
@@ -40,16 +48,27 @@ class VaultEntry extends VaultComponent {
         // Show version info
         this._renderVersion()
 
-        // Check URL hash for vault key, then fall back to localStorage
+        // Check URL hash for vault key or simple token
         const hash = window.location.hash.slice(1)
         if (hash) {
-            this._keyInput.value = decodeURIComponent(hash)
-            this._onOpen()
+            const decoded = decodeURIComponent(hash)
+            if (this._isSimpleToken(decoded)) {
+                this._simpleTokenInput.value = decoded
+                this._onSimpleTokenOpen()
+            } else {
+                this._keyInput.value = decoded
+                this._onOpen()
+            }
         } else {
             const savedKey = localStorage.getItem('sg-vault-key')
             if (savedKey) {
-                this._keyInput.value = savedKey
-                this._onOpen()
+                if (this._isSimpleToken(savedKey)) {
+                    this._simpleTokenInput.value = savedKey
+                    this._onSimpleTokenOpen()
+                } else {
+                    this._keyInput.value = savedKey
+                    this._onOpen()
+                }
             }
         }
     }
@@ -57,12 +76,124 @@ class VaultEntry extends VaultComponent {
     _renderVersion() {
         const el = this.$('#vault-entry-version')
         if (!el) return
-        const uiVersion = 'v0.1.3 (IFD)'
+        const uiVersion = 'v0.2.0 (IFD)'
         const build     = window.SGRAPH_BUILD
         el.textContent  = build
-            ? `${build.appVersion}  ·  UI ${build.uiVersion} (IFD)`
+            ? `${build.appVersion}  .  UI ${build.uiVersion} (IFD)`
             : `UI ${uiVersion}`
     }
+
+    // --- Simple token detection ---
+
+    _isSimpleToken(str) {
+        if (!str) return false
+        // word-word-NNNN format (same regex as FriendlyCrypto)
+        return /^[a-z]+-[a-z]+-\d{4}$/.test(str.trim())
+    }
+
+    // --- Simple token open ---
+
+    _onSimpleKeyDown(e) {
+        if (e.key === 'Enter') this._onSimpleTokenOpen()
+    }
+
+    async _onSimpleTokenOpen() {
+        const token = this._simpleTokenInput.value.trim().toLowerCase()
+        if (!token) {
+            this._showError('Please enter a simple token (e.g. jack-loft-6946)')
+            return
+        }
+        if (!this._isSimpleToken(token)) {
+            this._showError('Invalid token format. Expected: word-word-1234')
+            return
+        }
+
+        this._hideError()
+        this._showStatus('Deriving vault key...')
+        this._simpleTokenBtn.disabled = true
+
+        try {
+            // Derive vault ID from token: SHA-256(token) -> first 12 hex chars
+            const enc = new TextEncoder()
+            const hash = await crypto.subtle.digest('SHA-256', enc.encode(token))
+            const bytes = new Uint8Array(hash)
+            let vaultId = ''
+            for (let i = 0; i < 6; i++) {
+                vaultId += bytes[i].toString(16).padStart(2, '0')
+            }
+
+            // The vault key is token:vaultId (token IS the passphrase)
+            const vaultKey = `${token}:${vaultId}`
+            await this._openVault(vaultKey, token)
+        } catch (err) {
+            this._showError(err.message)
+        } finally {
+            this._simpleTokenBtn.disabled = false
+            this._hideStatus()
+        }
+    }
+
+    // --- Full vault key open ---
+
+    _onKeyDown(e) {
+        if (e.key === 'Enter') this._onOpen()
+    }
+
+    async _onOpen() {
+        const vaultKey = this._keyInput.value.trim()
+        if (!vaultKey) {
+            this._showError(this.t('vault.entry.error.wrong_key'))
+            return
+        }
+
+        // If user pasted a simple token into the full key field, redirect
+        if (this._isSimpleToken(vaultKey)) {
+            this._simpleTokenInput.value = vaultKey
+            this._keyInput.value = ''
+            this._onSimpleTokenOpen()
+            return
+        }
+
+        this._hideError()
+        this._showStatus(this.t('vault.entry.open') + '...')
+        this._openBtn.disabled = true
+
+        try {
+            await this._openVault(vaultKey)
+        } catch (err) {
+            if (err.message.includes('Decryption failed')) {
+                this._showError(this.t('vault.entry.error.wrong_key'))
+            } else if (err.message.includes('not found') || err.message.includes('404')) {
+                this._showError(this.t('vault.entry.error.not_found'))
+            } else {
+                this._showError(err.message)
+            }
+        } finally {
+            this._openBtn.disabled = false
+            this._hideStatus()
+        }
+    }
+
+    // --- Shared open logic ---
+
+    async _openVault(vaultKey, hashValue) {
+        this._showStatus('Opening vault...')
+
+        const sgSend = this._getSGSend()
+        const vault  = await SGVault.open(sgSend, vaultKey)
+
+        // Update URL hash (use simple token if available, else vault key)
+        const hashStr = hashValue || vaultKey
+        window.history.replaceState(null, '', '#' + encodeURIComponent(hashStr))
+
+        // Persist for auto-open on next visit
+        try { localStorage.setItem('sg-vault-key', hashStr) } catch (_) {}
+
+        const accessKey = this._accessKeyInput.value.trim()
+        this.emit('vault-opened', { vault, vaultKey, accessKey })
+    }
+
+    // --- Endpoint / Access Key ---
 
     _onEndpointChange() {
         const endpoint = this._endpointInput.value.trim()
@@ -82,48 +213,7 @@ class VaultEntry extends VaultComponent {
         }
     }
 
-    _onKeyDown(e) {
-        if (e.key === 'Enter') this._onOpen()
-    }
-
-    async _onOpen() {
-        // Access key is NOT required for opening/browsing — only for uploads
-        const vaultKey = this._keyInput.value.trim()
-        if (!vaultKey) {
-            this._showError(this.t('vault.entry.error.wrong_key'))
-            return
-        }
-
-        this._hideError()
-        this._showStatus(this.t('vault.entry.open') + '...')
-        this._openBtn.disabled = true
-
-        try {
-            const sgSend = this._getSGSend()
-            const vault  = await SGVault.open(sgSend, vaultKey)
-
-            // Update URL hash (vault key may have changed due to save)
-            window.history.replaceState(null, '', '#' + encodeURIComponent(vaultKey))
-
-            // Persist vault key in localStorage for auto-open on next visit
-            try { localStorage.setItem('sg-vault-key', vaultKey) } catch (_) { /* ignore */ }
-
-            // Pass access key availability so shell knows if uploads are possible
-            const accessKey = this._accessKeyInput.value.trim()
-            this.emit('vault-opened', { vault, vaultKey, accessKey })
-        } catch (err) {
-            if (err.message.includes('Decryption failed')) {
-                this._showError(this.t('vault.entry.error.wrong_key'))
-            } else if (err.message.includes('not found') || err.message.includes('404')) {
-                this._showError(this.t('vault.entry.error.not_found'))
-            } else {
-                this._showError(err.message)
-            }
-        } finally {
-            this._openBtn.disabled = false
-            this._hideStatus()
-        }
-    }
+    // --- Create vault ---
 
     _onToggleCreate() {
         const form = this._createForm
@@ -154,7 +244,6 @@ class VaultEntry extends VaultComponent {
             const vault  = await SGVault.create(sgSend, passphrase, { name })
             const vaultKey = vault.getVaultKey(passphrase)
 
-            // Update URL hash
             window.history.replaceState(null, '', '#' + encodeURIComponent(vaultKey))
 
             this.emit('vault-created', { vault, vaultKey })
