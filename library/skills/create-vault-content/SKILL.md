@@ -114,6 +114,32 @@ is opened.
 | `density` | `"compact"`, `"comfortable"`, `"spacious"` | Section padding |
 | `background` | Any CSS colour/gradient | Page container background; defaults to `#ffffff` (safe for print). E.g. `"linear-gradient(135deg,#667eea,#764ba2)"` |
 
+#### Named schemes
+
+Six ready-made theme configurations — copy the JSON snippet for the scheme you want:
+
+```json
+// default — neutral, professional
+"theme": { "mode": "light", "accent": "#4ecdc4", "font": "sans", "density": "normal", "background": "#ffffff" }
+
+// navy — deep navy, formal reports / investor decks
+"theme": { "mode": "light", "accent": "#1a8fe0", "font": "sans", "density": "normal", "background": "#f7f9fc" }
+
+// slate — warm charcoal, articles / case studies
+"theme": { "mode": "light", "accent": "#a0522d", "font": "serif", "density": "spacious", "background": "#faf9f7" }
+
+// minimal — pure white, no accent colour, print-first
+"theme": { "mode": "light", "accent": "#111111", "font": "serif", "density": "normal", "background": "#ffffff" }
+
+// brand — SG/Send teal accent, internal materials
+"theme": { "mode": "light", "accent": "#4ecdc4", "font": "sans", "density": "normal", "background": "#f6fefe" }
+
+// dark-deck — dark background + indigo-blue accent, presentation-style
+"theme": { "mode": "dark", "accent": "#7b9ef5", "font": "sans", "density": "normal", "background": "#141820" }
+```
+
+Print-safe: `default`, `navy`, `slate`, `minimal`, `brand`. `dark-deck` requires `print-color-adjust: exact` — use `minimal` or `slate` when print is the primary output.
+
 ### 1.4 Navigation bar
 
 Renders a sticky top bar. Add when the page has 3+ sections and meaningful scroll.
@@ -416,6 +442,25 @@ The source view always uses a light background regardless of the page theme.
 
 Clicking `_page.json` directly in the file tree, clicking the folder header, or the
 auto-open on vault load all open in **rendered view** by default.
+
+---
+
+### 1.8 Edit mode
+
+The action bar also includes an `✎ Edit` button that opens a **split-pane editor**:
+
+- **Left pane** — JSON editor with syntax highlighting
+- **Right pane** — live rendered preview
+
+**Auto-refresh:** the preview refreshes automatically 400 ms after each keystroke (debounced), so you see results as you type without waiting for a manual refresh.
+
+**Status bar:** shown below the editor pane. Displays `✓ Valid JSON` when the document parses correctly, or `✗ <parse error message>` in red when it does not. The preview only updates on valid JSON.
+
+**Changes are NOT saved.** Edit mode has no vault write capability. If you arrive at a layout you want to keep, use `⎋ Copy JSON` to copy the final JSON to your clipboard, then paste it into your local vault file and push via sgit.
+
+**Intended uses:**
+- Experiment with component layouts and theme options live, without editing files
+- Paste in JSON suggested by Claude and preview it immediately before committing
 
 ---
 
