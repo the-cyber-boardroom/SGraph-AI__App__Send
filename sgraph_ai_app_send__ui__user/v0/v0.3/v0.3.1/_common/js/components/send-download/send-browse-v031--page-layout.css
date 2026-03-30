@@ -4,19 +4,54 @@
 
 /* ── Page container ───────────────────────────────────────────────────────── */
 
+/* 2px teal top stripe — visual cue that this tab is a rendered _page.json */
 .plr-page {
     display: flex;
     flex-direction: column;
     min-height: 100%;
+    border-top: 2px solid var(--color-primary, #4ecdc4);
 }
 
+/* P1-B fix: wrapper is the actual scroll container */
 .plr-scroll-wrapper {
     flex: 1;
     width: 100%;
+    overflow-y: auto;
+    height: 100%;
+}
+
+/* ── Theme: dark ──────────────────────────────────────────────────────────── */
+/* Agent authors can set "theme": "dark" in _page.json.                       */
+/* Inherits the Browse shell's dark palette so the page blends seamlessly.    */
+
+.plr-page--dark { background: var(--color-bg, #0d1117); }
+.plr-page--dark .plr-section { border-top-color: rgba(255,255,255,0.08); }
+.plr-page--dark .plr-section__title { color: var(--color-text-inverse, #e8e8e8); }
+.plr-page--dark .plr-text { color: var(--color-text-secondary-inverse, #b0b8c4); }
+.plr-page--dark .plr-bullet-points li { color: var(--color-text-secondary-inverse, #b0b8c4); }
+.plr-page--dark .plr-title { color: var(--color-text-inverse, #e8e8e8); }
+.plr-page--dark .plr-image__caption { color: rgba(255,255,255,0.5); }
+.plr-page--dark .plr-slides__caption { color: rgba(255,255,255,0.6); }
+.plr-page--dark .plr-slides__counter { color: rgba(255,255,255,0.4); }
+.plr-page--dark .plr-slides__btn { border-color: rgba(255,255,255,0.2); color: #ccc; }
+.plr-page--dark .plr-markdown { color: var(--color-text-secondary-inverse, #b0b8c4); }
+
+/* Dark nav: matches the Browse shell's dark header palette */
+.plr-page--dark .plr-nav {
+    background: rgba(13, 17, 23, 0.96);
+    border-bottom-color: rgba(255,255,255,0.1);
+}
+.plr-page--dark .plr-nav__link { color: rgba(255,255,255,0.55); }
+.plr-page--dark .plr-nav__link:hover { color: rgba(255,255,255,0.9); }
+.plr-page--dark .plr-nav__link--active {
+    color: var(--color-primary, #4ecdc4);
+    border-bottom-color: var(--color-primary, #4ecdc4);
 }
 
 /* ── Navigation ───────────────────────────────────────────────────────────── */
 
+/* Light nav default */
+.plr-page--light .plr-nav,
 .plr-nav {
     position: sticky;
     top: 0;
@@ -343,10 +378,107 @@
     line-height: 1.7;
 }
 
+/* ── Gallery thumbnail captions (P1-C) ────────────────────────────────────── */
+
+.plr-gallery__thumb__caption {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #888);
+    text-align: center;
+    margin: 0.3rem 0 0;
+    padding: 0 0.25rem 0.25rem;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* When captions exist, drop the 16:9 hard aspect-ratio so caption has room */
+.plr-gallery__thumb:has(.plr-gallery__thumb__caption) {
+    aspect-ratio: auto;
+}
+
+/* ── Source toggle bar ────────────────────────────────────────────────────── */
+/* Thin strip at top of page tab, always visible, outside the scroll area.    */
+
+.plr-source-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0.2rem 0.75rem;
+    border-bottom: 1px solid var(--color-border, #e8e8e8);
+    background: var(--color-surface, #fafafa);
+}
+
+.plr-source-toggle-btn {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--color-border, #d0d0d0);
+    border-radius: 3px;
+    background: none;
+    cursor: pointer;
+    color: var(--color-text-secondary, #666);
+    font-family: monospace;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.plr-source-toggle-btn:hover {
+    color: var(--color-primary, #4ecdc4);
+    border-color: var(--color-primary, #4ecdc4);
+}
+
+/* ── JSON source view ─────────────────────────────────────────────────────── */
+
+.plr-json-source {
+    flex: 1;
+    overflow: auto;
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    background: var(--color-surface, #f8f8f8);
+    color: var(--color-text, #222);
+    white-space: pre;
+    tab-size: 2;
+}
+
+/* JSON syntax colours — designed to work on both light and dark backgrounds */
+.plr-json-key  { color: #0d6eaf; }      /* object keys — blue */
+.plr-json-str  { color: #1a7f37; }      /* string values — green */
+.plr-json-num  { color: #b5460f; }      /* numbers — rust */
+.plr-json-bool { color: #8250df; }      /* true/false — purple */
+.plr-json-null { color: #888; }         /* null — grey */
+
+.plr-page--dark .plr-json-source {
+    background: #0d1117;
+    color: #c9d1d9;
+}
+.plr-page--dark .plr-json-key  { color: #79c0ff; }
+.plr-page--dark .plr-json-str  { color: #a5d6ff; }
+.plr-page--dark .plr-json-num  { color: #ff7b72; }
+.plr-page--dark .plr-json-bool { color: #d2a8ff; }
+.plr-page--dark .plr-json-null { color: #6e7681; }
+
+/* Dark source toggle bar */
+.plr-page--dark .plr-source-bar {
+    background: #161b22;
+    border-bottom-color: rgba(255,255,255,0.08);
+}
+.plr-page--dark .plr-source-toggle-btn {
+    color: rgba(255,255,255,0.5);
+    border-color: rgba(255,255,255,0.15);
+}
+.plr-page--dark .plr-source-toggle-btn:hover {
+    color: var(--color-primary, #4ecdc4);
+    border-color: var(--color-primary, #4ecdc4);
+}
+
 /* ── Print: page layout content ──────────────────────────────────────────── */
 
 @media print {
     .plr-nav { display: none !important; }
+    .plr-source-bar { display: none !important; }
     .plr-lightbox { display: none !important; }
     .plr-pdf { height: auto !important; }
 }

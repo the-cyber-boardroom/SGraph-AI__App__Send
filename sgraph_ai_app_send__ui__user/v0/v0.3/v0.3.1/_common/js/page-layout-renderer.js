@@ -268,8 +268,16 @@ var PageLayoutRenderer = (function () {
             var img = document.createElement('img');
             img.src = url;
             img.alt = captions[i] || '';
-            img.title = captions[i] || '';
             thumb.appendChild(img);
+
+            // P1-C: visible caption below each thumbnail
+            if (captions[i]) {
+                var cap = document.createElement('p');
+                cap.className = 'plr-gallery__thumb__caption';
+                cap.textContent = captions[i];
+                thumb.appendChild(cap);
+            }
+
             el.appendChild(thumb);
 
             thumb.addEventListener('click', function () {
@@ -518,7 +526,6 @@ var PageLayoutRenderer = (function () {
 
     async function render(container, pageJson, folderPath, zipTree, browseInstance) {
         container.innerHTML = '';
-        container.className = 'plr-page';
 
         var page;
         try {
@@ -528,12 +535,18 @@ var PageLayoutRenderer = (function () {
             return;
         }
 
-        // Scroll wrapper (also serves as IntersectionObserver root)
+        // P1-A / Theme: apply dark or light modifier based on page.theme field.
+        // Default is light (white content area). 'dark' matches the Browse shell.
+        var theme = (page.theme === 'dark') ? 'dark' : 'light';
+        container.className = 'plr-page plr-page--' + theme;
+
+        // P1-B: scroll wrapper is the actual scroll container (overflow-y: auto).
+        // The IntersectionObserver uses it as root so active-nav highlighting works.
         var wrapper = document.createElement('div');
         wrapper.className = 'plr-scroll-wrapper';
         container.appendChild(wrapper);
 
-        // Navigation bar (sticky, if nav array provided)
+        // Navigation bar (sticky inside wrapper, since wrapper is scroll container)
         if (page.navigation && page.navigation.length > 0) {
             var navEl = _renderNav(page.navigation, wrapper);
             if (navEl) wrapper.appendChild(navEl);
