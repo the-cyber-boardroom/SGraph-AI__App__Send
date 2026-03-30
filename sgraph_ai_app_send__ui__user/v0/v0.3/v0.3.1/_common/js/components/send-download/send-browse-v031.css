@@ -91,3 +91,10 @@
     max-width: 900px;
     margin: 0 auto;
 }
+
+/* BRW-024: Print — when overlay is open, hide everything else */
+@media print {
+    body > *:not(.sb-present-overlay) { display: none !important; }
+    .sb-present-overlay { position: static !important; overflow: visible !important; }
+    .sb-present-close { display: none !important; }
+}
