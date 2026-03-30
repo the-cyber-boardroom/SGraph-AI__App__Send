@@ -113,13 +113,14 @@ class VaultEntry extends VaultComponent {
         this._simpleTokenBtn.disabled = true
 
         try {
-            // Derive vault ID from token: SHA-256(token) -> first 12 hex chars
+            // Derive vault ID from token: SHA-256(token) -> first 8 lowercase alphanumeric chars
             const enc = new TextEncoder()
             const hash = await crypto.subtle.digest('SHA-256', enc.encode(token))
             const bytes = new Uint8Array(hash)
+            const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
             let vaultId = ''
-            for (let i = 0; i < 6; i++) {
-                vaultId += bytes[i].toString(16).padStart(2, '0')
+            for (let i = 0; i < 8; i++) {
+                vaultId += alphabet[bytes[i] % alphabet.length]
             }
 
             // The vault key is token:vaultId (token IS the passphrase)
