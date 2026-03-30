@@ -194,10 +194,18 @@ team/                            # Team structure
 
 ### Testing
 
-18. **No mocks, no patches** — full stack starts in-memory in ~100ms
-19. **LocalStack** for S3 integration tests (the only acceptable "fake")
-20. **Playwright** for E2E browser tests
-21. **Smoke tests** after every deployment (health, auth, CORS, no-plaintext)
+22. **No mocks, no patches** — full stack starts in-memory in ~100ms
+23. **LocalStack** for S3 integration tests (the only acceptable "fake")
+24. **Playwright** for E2E browser tests
+25. **Smoke tests** after every deployment (health, auth, CORS, no-plaintext)
+
+### Cross-Team Communication (`team/comms/`)
+
+26. **Every code change** that affects UI or API must have a changelog entry in `team/comms/changelog/MM/DD/`
+27. **Changelog entries must classify test impact** — which tests SHOULD break (good failure) vs which should NOT break (bad failure)
+28. **QA briefs** for testing requirements go in `team/comms/qa/briefs/MM/DD/`
+29. **QA team starts every session** by reading `team/comms/QA_START_HERE.md`
+30. **Inter-team briefs** (e.g. Vault→Browse, Architect→Dev) go in `team/comms/briefs/MM/DD/`
 
 ### Git
 

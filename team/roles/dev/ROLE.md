@@ -58,6 +58,8 @@
 3. Fix the code
 4. Confirm the test now passes and no existing tests regress
 5. File a review document
+6. **Write a changelog entry** in `team/comms/changelog/MM/DD/` documenting the fix and expected test impact
+7. **If the fix affects UI behaviour**, write a QA brief in `team/comms/qa/briefs/MM/DD/` with updated test cases
 
 ### 4. Code Review Response
 
@@ -121,6 +123,8 @@
 | `sgraph_ai_app_send__ui__admin/` | Admin console frontend assets |
 | `tests/unit/` | Unit test files |
 | `team/roles/dev/reviews/` | File implementation review documents |
+| `team/comms/changelog/` | Write changelog entries for every UI/API change |
+| `team/comms/qa/briefs/` | Write QA briefs when tests need updating |
 | `team/roles/architect/` | Read API contracts and schemas |
 | `sgraph_ai_app_send/version` | Read current version for review file naming |
 | `pytest` | Run unit tests locally |
