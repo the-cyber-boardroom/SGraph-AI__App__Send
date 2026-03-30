@@ -237,6 +237,26 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                 if (typeof _revealInTree !== 'undefined') _revealInTree(self, pageJsonPath);
             });
 
+            // Print button — clones rendered view into a full-screen print overlay
+            var printBtn = document.createElement('button');
+            printBtn.className = 'plr-source-toggle-btn';
+            printBtn.textContent = '\uD83D\uDDA8 Print';
+            printBtn.title = 'Print this page layout (Ctrl+P)';
+            printBtn.addEventListener('click', function () {
+                var overlay = document.createElement('div');
+                overlay.className = 'plr-print-overlay';
+                var clone = renderedView.cloneNode(true);
+                clone.style.display = '';   // clear any display:none from source toggle
+                overlay.appendChild(clone);
+                document.body.appendChild(overlay);
+                var cleanup = function () {
+                    if (document.body.contains(overlay)) document.body.removeChild(overlay);
+                    window.removeEventListener('afterprint', cleanup);
+                };
+                window.addEventListener('afterprint', cleanup);
+                window.print();
+            });
+
             // Copy button: copies raw JSON to clipboard
             var copyBtn = document.createElement('button');
             copyBtn.className = 'plr-source-toggle-btn';
@@ -283,6 +303,7 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             });
 
             toggleBar.appendChild(locateBtn);
+            toggleBar.appendChild(printBtn);
             toggleBar.appendChild(copyBtn);
             toggleBar.appendChild(toggleBtn);
 

@@ -450,10 +450,29 @@
 .plr-json-bool { color: #8250df; }      /* true/false — purple */
 .plr-json-null { color: #888; }         /* null — grey */
 
+/* Source view is ALWAYS light/white — a distinct context from the rendered page.
+   Override even when the surrounding page is dark-themed.                       */
+.plr-json-source,
 .plr-page--dark .plr-json-source {
-    background: #0d1117;
-    color: #c9d1d9;
+    background: #fdfdfd;
+    color: #1e2228;
 }
+
+/* Syntax colours inside the source view: always use light-mode high-contrast values.
+   These selectors have higher specificity than .plr-page--dark .plr-json-key etc.  */
+.plr-json-source .plr-json-key,
+.plr-page--dark .plr-json-source .plr-json-key  { color: #0d6eaf; }
+.plr-json-source .plr-json-str,
+.plr-page--dark .plr-json-source .plr-json-str  { color: #1a7f37; }
+.plr-json-source .plr-json-num,
+.plr-page--dark .plr-json-source .plr-json-num  { color: #b5460f; }
+.plr-json-source .plr-json-bool,
+.plr-page--dark .plr-json-source .plr-json-bool { color: #8250df; }
+.plr-json-source .plr-json-null,
+.plr-page--dark .plr-json-source .plr-json-null { color: #888; }
+
+/* Keep dark colours for .json files rendered inside the dark Browse shell
+   (these are in .sb-file__code, not .plr-json-source, so no conflict)       */
 .plr-page--dark .plr-json-key  { color: #79c0ff; }
 .plr-page--dark .plr-json-str  { color: #a5d6ff; }
 .plr-page--dark .plr-json-num  { color: #ff7b72; }
@@ -637,11 +656,42 @@
     .plr-image--border img { border-color: rgba(78,205,196,0.45); }
 }
 
+/* ── Print overlay ────────────────────────────────────────────────────────── */
+/* Full-screen div appended to body on Print click; removed on afterprint.     */
+
+.plr-print-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #fff;
+    overflow-y: auto;
+}
+
+/* Inside the overlay, let the scroll wrapper expand freely */
+.plr-print-overlay .plr-scroll-wrapper {
+    overflow: visible;
+    height: auto;
+}
+
 /* ── Print: page layout content ──────────────────────────────────────────── */
 
 @media print {
-    .plr-nav { display: none !important; }
-    .plr-source-bar { display: none !important; }
-    .plr-lightbox { display: none !important; }
-    .plr-pdf { height: auto !important; }
+    /* When a print overlay exists, hide everything else in the browser window */
+    body:has(.plr-print-overlay) > *:not(.plr-print-overlay) { display: none !important; }
+
+    .plr-print-overlay {
+        position: static !important;
+        overflow: visible !important;
+        inset: auto !important;
+    }
+    .plr-print-overlay .plr-scroll-wrapper {
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    /* Always hide UI chrome in any print context */
+    .plr-nav,
+    .plr-source-bar  { display: none !important; }
+    .plr-lightbox    { display: none !important; }
+    .plr-pdf         { height: auto !important; }
 }
