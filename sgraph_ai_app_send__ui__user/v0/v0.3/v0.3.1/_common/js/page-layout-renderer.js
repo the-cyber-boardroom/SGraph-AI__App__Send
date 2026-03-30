@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Page Layout Renderer
+   SGraph Send — Page Layout Renderer  (v2 schema)
 
    Renders _page.json layouts inside the Browse component (v0.3.1+).
 
@@ -17,8 +17,8 @@
    Components (Priority 1 — test vault):
      hero, section, text, bullet-points, image, slides, gallery, pdf, markdown
 
-   Components (Priority 2 — nice to have):
-     title, csv
+   Components (Priority 2):
+     title, columns, cards
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 var PageLayoutRenderer = (function () {
@@ -63,7 +63,10 @@ var PageLayoutRenderer = (function () {
 
     async function _renderHero(props, folderPath, zipTree, browseInstance) {
         var el = document.createElement('div');
-        el.className = 'plr-hero';
+        var classes = ['plr-hero'];
+        if (props.height) classes.push('plr-hero--' + props.height);   // small|medium|large|full
+        if (props.align)  classes.push('plr-hero--align-' + props.align); // left|center|right
+        el.className = classes.join(' ');
 
         if (props.color) el.style.background = props.color;
 
@@ -77,8 +80,10 @@ var PageLayoutRenderer = (function () {
             }
         }
 
+        // overlay: gradient (default with image), dark, light, solid, none
+        var overlay = props.overlay || (props.image ? 'gradient' : 'none');
         el.innerHTML =
-            '<div class="plr-hero__overlay">' +
+            '<div class="plr-hero__overlay plr-hero__overlay--' + _esc(overlay) + '">' +
                 '<h1 class="plr-hero__title">' + _esc(props.title || '') + '</h1>' +
                 (props.subtitle
                     ? '<p class="plr-hero__subtitle">' + _esc(props.subtitle) + '</p>'
@@ -91,7 +96,16 @@ var PageLayoutRenderer = (function () {
 
     async function _renderSection(props, children, folderPath, zipTree, browseInstance) {
         var el = document.createElement('section');
-        el.className = 'plr-section';
+        var classes = ['plr-section'];
+        if (props.layout)  classes.push('plr-section--' + props.layout);   // full-bleed|narrow|wide
+        if (props.divider) classes.push('plr-section--divider-' + props.divider); // line|space|none
+        el.className = classes.join(' ');
+
+        if (props.background) {
+            el.style.background = props.background === 'alt'
+                ? 'var(--plr-section-alt-bg, rgba(0,0,0,0.03))'
+                : props.background;
+        }
 
         var anchor = _kebab(props.title || '');
         if (anchor) el.id = anchor;
@@ -151,7 +165,16 @@ var PageLayoutRenderer = (function () {
 
     async function _renderImage(props, folderPath, zipTree, browseInstance) {
         var el = document.createElement('div');
-        el.className = 'plr-image';
+        var classes = ['plr-image'];
+        if (props.border)  classes.push('plr-image--border');
+        if (props.shadow)  classes.push('plr-image--shadow');
+        if (props.rounded) classes.push('plr-image--rounded');
+        el.className = classes.join(' ');
+
+        // Alignment of the image container
+        var align = props.align || 'center';
+        if (align === 'left')  { el.style.marginLeft = '0'; el.style.marginRight = 'auto'; }
+        if (align === 'right') { el.style.marginLeft = 'auto'; el.style.marginRight = '0'; }
         if (props.width) el.style.width = props.width;
 
         var img = document.createElement('img');
@@ -179,11 +202,14 @@ var PageLayoutRenderer = (function () {
     // ── Component: slides ─────────────────────────────────────────────────────
 
     async function _renderSlides(props, folderPath, zipTree, browseInstance) {
-        var images = props.images || [];
+        var images   = props.images   || [];
         var captions = props.captions || [];
+        var controls   = props.controls   || 'bottom';    // bottom (default) | top
+        var transition = props.transition || 'fade';      // fade | none
+        var autoplay   = props.autoplay   || false;
 
         var el = document.createElement('div');
-        el.className = 'plr-slides';
+        el.className = 'plr-slides' + (transition === 'fade' ? ' plr-slides--fade' : '');
         if (images.length === 0) return el;
 
         var urls = await Promise.all(images.map(function (p) {
@@ -231,15 +257,31 @@ var PageLayoutRenderer = (function () {
         navRow.appendChild(counterEl);
         navRow.appendChild(nextBtn);
 
-        el.appendChild(navRow);
-        el.appendChild(imgEl);
-        el.appendChild(captionEl);
+        // controls: 'bottom' (default) puts nav below image; 'top' puts it above
+        if (controls === 'top') {
+            el.appendChild(navRow);
+            el.appendChild(imgEl);
+            el.appendChild(captionEl);
+        } else {
+            el.appendChild(imgEl);
+            el.appendChild(captionEl);
+            el.appendChild(navRow);
+        }
 
         el.tabIndex = 0;
         el.addEventListener('keydown', function (e) {
             if (e.key === 'ArrowLeft') prevBtn.click();
             else if (e.key === 'ArrowRight') nextBtn.click();
         });
+
+        // Autoplay: auto-advance every 3 s; stop on user interaction
+        if (autoplay) {
+            var timer = setInterval(function () {
+                idx = (idx + 1) % images.length;
+                update();
+            }, 3000);
+            el.addEventListener('click', function () { clearInterval(timer); }, { once: true });
+        }
 
         update();
         return el;
@@ -248,12 +290,22 @@ var PageLayoutRenderer = (function () {
     // ── Component: gallery ────────────────────────────────────────────────────
 
     async function _renderGallery(props, folderPath, zipTree, browseInstance) {
-        var images = props.images || [];
+        var images   = props.images   || [];
         var captions = props.captions || [];
-        var columns = props.columns || 3;
+        var columns  = props.columns  || 3;
+        var gap      = props.gap      || 'small';   // none|small|medium|large
+        var aspect   = props.aspect   || '16:9';    // 16:9|4:3|1:1|auto
+
+        // show_captions: explicit prop; default = show when captions array is non-empty
+        var showCaptions = (props.show_captions !== undefined)
+            ? Boolean(props.show_captions)
+            : (captions.length > 0);
+
+        var aspectMap = { '16:9': '16/9', '4:3': '4/3', '1:1': '1/1', 'auto': null };
+        var aspectRatio = (aspectMap[aspect] !== undefined) ? aspectMap[aspect] : '16/9';
 
         var el = document.createElement('div');
-        el.className = 'plr-gallery';
+        el.className = 'plr-gallery plr-gallery--gap-' + gap;
         el.style.gridTemplateColumns = 'repeat(' + columns + ', 1fr)';
 
         var urls = await Promise.all(images.map(function (p) {
@@ -264,14 +316,14 @@ var PageLayoutRenderer = (function () {
             if (!url) return;
             var thumb = document.createElement('div');
             thumb.className = 'plr-gallery__thumb';
+            if (aspectRatio) thumb.style.aspectRatio = aspectRatio;
 
             var img = document.createElement('img');
             img.src = url;
             img.alt = captions[i] || '';
             thumb.appendChild(img);
 
-            // P1-C: visible caption below each thumbnail
-            if (captions[i]) {
+            if (showCaptions && captions[i]) {
                 var cap = document.createElement('p');
                 cap.className = 'plr-gallery__thumb__caption';
                 cap.textContent = captions[i];
@@ -448,11 +500,104 @@ var PageLayoutRenderer = (function () {
         return el;
     }
 
+    // ── Component: cards ─────────────────────────────────────────────────────
+    // Navigable card grid: image + title + description; whole card is clickable.
+
+    async function _renderCards(props, folderPath, zipTree, browseInstance) {
+        var items   = props.items   || [];
+        var columns = props.columns || 2;
+
+        var el = document.createElement('div');
+        el.className = 'plr-cards';
+        el.style.gridTemplateColumns = 'repeat(' + columns + ', 1fr)';
+
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var card = document.createElement('div');
+            card.className = 'plr-card';
+
+            if (item.image) {
+                var imgEl = document.createElement('img');
+                imgEl.className = 'plr-card__img';
+                imgEl.alt = item.title || '';
+                var imgUrl = await _blobUrl(item.image, folderPath, zipTree, browseInstance);
+                if (imgUrl) imgEl.src = imgUrl;
+                card.appendChild(imgEl);
+            }
+
+            var body = document.createElement('div');
+            body.className = 'plr-card__body';
+
+            if (item.title) {
+                var titleEl = document.createElement('h3');
+                titleEl.className = 'plr-card__title';
+                titleEl.textContent = item.title;
+                body.appendChild(titleEl);
+            }
+
+            if (item.description) {
+                var descEl = document.createElement('p');
+                descEl.className = 'plr-card__desc';
+                descEl.textContent = item.description;
+                body.appendChild(descEl);
+            }
+
+            card.appendChild(body);
+
+            if (item.link) {
+                card.classList.add('plr-card--link');
+                card.addEventListener('click', (function (link) {
+                    return function () {
+                        var resolved = _resolvePath(_folderBase(folderPath), link);
+                        var match = _findZipEntry(zipTree, resolved);
+                        if (match) {
+                            browseInstance._openFileTab(match.path);
+                        } else {
+                            var fp = resolved.replace(/\/$/, '');
+                            _navigateToFolder(browseInstance, zipTree, fp);
+                        }
+                    };
+                })(item.link));
+            }
+
+            el.appendChild(card);
+        }
+
+        return el;
+    }
+
+    // ── Component: columns ────────────────────────────────────────────────────
+    // Side-by-side layout with configurable ratio and gap.
+
+    async function _renderColumns(props, children, folderPath, zipTree, browseInstance) {
+        var ratioMap = {
+            '1:1': '1fr 1fr', '1:2': '1fr 2fr', '2:1': '2fr 1fr',
+            '1:3': '1fr 3fr', '3:1': '3fr 1fr'
+        };
+        var ratio = ratioMap[props.ratio || '1:1'] || '1fr 1fr';
+        var gap   = props.gap || 'medium';     // none|small|medium|large
+        var vAlign = props.vertical_align || 'top'; // top|center|bottom
+
+        var el = document.createElement('div');
+        el.className = 'plr-columns plr-columns--gap-' + gap + ' plr-columns--align-' + vAlign;
+        el.style.gridTemplateColumns = ratio;
+
+        for (var i = 0; i < (children || []).length; i++) {
+            var col = document.createElement('div');
+            col.className = 'plr-columns__col';
+            var child = await _renderComponent(children[i], folderPath, zipTree, browseInstance);
+            if (child) col.appendChild(child);
+            el.appendChild(col);
+        }
+
+        return el;
+    }
+
     // ── Component dispatcher ──────────────────────────────────────────────────
 
     async function _renderComponent(comp, folderPath, zipTree, browseInstance) {
         if (!comp || !comp.type) return null;
-        var props = comp.props || {};
+        var props    = comp.props    || {};
         var children = comp.children || [];
 
         try {
@@ -467,6 +612,8 @@ var PageLayoutRenderer = (function () {
                 case 'gallery':       return await _renderGallery(props, folderPath, zipTree, browseInstance);
                 case 'pdf':           return await _renderPdf(props, folderPath, zipTree, browseInstance);
                 case 'markdown':      return await _renderMarkdown(props, folderPath, zipTree, browseInstance);
+                case 'cards':         return await _renderCards(props, folderPath, zipTree, browseInstance);
+                case 'columns':       return await _renderColumns(props, children, folderPath, zipTree, browseInstance);
                 default:              return null;  // Unknown type: skip silently
             }
         } catch (err) {
@@ -535,11 +682,41 @@ var PageLayoutRenderer = (function () {
             return;
         }
 
-        // P1-A / Theme: apply dark or light modifier based on page.theme field.
-        // Default is light (white content area). 'dark' matches the Browse shell.
-        var theme = (page.theme === 'dark') ? 'dark' : 'light';
-        container.className = 'plr-page plr-page--' + theme;
+        // ── Theme (v2 object or v1 string, both supported) ─────────────────────
+        var themeRaw   = page.theme;
+        var themeMode, themeAccent, themeFont, themeDensity;
+        if (themeRaw && typeof themeRaw === 'object') {
+            themeMode    = themeRaw.mode     || 'light';
+            themeAccent  = themeRaw.accent   || null;
+            themeFont    = themeRaw.font     || null;
+            themeDensity = themeRaw.density  || null;
+        } else {
+            themeMode    = (themeRaw === 'dark') ? 'dark' : 'light';
+            themeAccent  = null; themeFont = null; themeDensity = null;
+        }
+        // 'auto' inherits Browse shell → treat as light (shell default)
+        if (themeMode === 'auto') themeMode = 'light';
 
+        var classes = 'plr-page plr-page--' + themeMode;
+        if (themeDensity) classes += ' plr-density--' + themeDensity;
+        if (themeFont)    classes += ' plr-font--' + themeFont;
+        container.className = classes;
+
+        // Apply accent CSS custom property (overrides shell default)
+        if (themeAccent) container.style.setProperty('--plr-accent', themeAccent);
+
+        // Apply font family custom property
+        var fontFamilyMap = {
+            mono:   "'SF Mono','Fira Code','Cascadia Code',monospace",
+            serif:  "Georgia,'Times New Roman',serif",
+            sans:   "'Inter','Segoe UI',sans-serif",
+            system: 'system-ui,sans-serif'
+        };
+        if (themeFont && fontFamilyMap[themeFont]) {
+            container.style.setProperty('--plr-font', fontFamilyMap[themeFont]);
+        }
+
+        // ── Layout ─────────────────────────────────────────────────────────────
         // P1-B: scroll wrapper is the actual scroll container (overflow-y: auto).
         // The IntersectionObserver uses it as root so active-nav highlighting works.
         var wrapper = document.createElement('div');

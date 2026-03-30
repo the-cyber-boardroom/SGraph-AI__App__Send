@@ -474,6 +474,169 @@
     border-color: var(--color-primary, #4ecdc4);
 }
 
+/* ── CSS custom properties (theme knobs) ──────────────────────────────────── */
+
+.plr-page {
+    --plr-accent: var(--color-primary, #4ecdc4);
+    --plr-font:   inherit;
+}
+
+/* Use accent colour for nav active indicator */
+.plr-nav__link--active {
+    color: var(--plr-accent) !important;
+    border-bottom-color: var(--plr-accent) !important;
+}
+
+/* Use page font family when set */
+.plr-page { font-family: var(--plr-font, inherit); }
+
+/* ── Hero: height variants ─────────────────────────────────────────────────── */
+
+.plr-hero--small  { min-height: 150px; }
+.plr-hero--medium { min-height: 250px; }
+.plr-hero--large  { min-height: 400px; }
+.plr-hero--full   { min-height: 100vh; }
+
+/* ── Hero: text alignment ──────────────────────────────────────────────────── */
+
+.plr-hero--align-center .plr-hero__overlay { text-align: center; }
+.plr-hero--align-right  .plr-hero__overlay { text-align: right; }
+
+/* ── Hero: overlay variants ────────────────────────────────────────────────── */
+/* Default overlay (.plr-hero__overlay) already has gradient; these override.  */
+
+.plr-hero__overlay--none  { background: none; }
+.plr-hero__overlay--dark  { background: rgba(0,0,0,0.6); }
+.plr-hero__overlay--light { background: rgba(255,255,255,0.35); }
+.plr-hero__overlay--solid { background: rgba(0,0,0,0.5); }
+/* gradient = the existing linear-gradient default, no override needed */
+
+/* ── Section: layout variants ──────────────────────────────────────────────── */
+
+.plr-section--full-bleed { max-width: 100%; }
+.plr-section--narrow     { max-width: 640px; }
+.plr-section--wide       { max-width: 1200px; }
+
+/* ── Section: divider variants ─────────────────────────────────────────────── */
+
+.plr-section--divider-none  { border-top: none; }
+.plr-section--divider-space { border-top: none; padding-top: 3.5rem; }
+
+/* ── Image: decoration modifiers ───────────────────────────────────────────── */
+
+.plr-image--border  img { border: 1px solid rgba(78,205,196,0.45); }
+.plr-image--shadow  img { box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+.plr-image--rounded img { border-radius: 8px; }
+
+/* Honour accent colour for image border when --plr-accent is set */
+.plr-image--border  img { border-color: color-mix(in srgb, var(--plr-accent, #4ecdc4) 45%, transparent); }
+
+/* ── Gallery: gap variants ─────────────────────────────────────────────────── */
+
+.plr-gallery--gap-none   { gap: 0; }
+.plr-gallery--gap-small  { gap: 0.4rem; }   /* matches existing default */
+.plr-gallery--gap-medium { gap: 0.8rem; }
+.plr-gallery--gap-large  { gap: 1.5rem; }
+
+/* ── Slides: fade transition ───────────────────────────────────────────────── */
+
+.plr-slides--fade .plr-slides__img {
+    transition: opacity 0.25s ease;
+}
+
+/* ── Cards component ───────────────────────────────────────────────────────── */
+
+.plr-cards {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.plr-card {
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: box-shadow 0.15s, transform 0.15s;
+    background: var(--color-surface, #fff);
+}
+
+.plr-card--link { cursor: pointer; }
+
+.plr-card--link:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+}
+
+.plr-card__img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+}
+
+.plr-card__body {
+    padding: 1rem;
+}
+
+.plr-card__title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    color: var(--color-text, #111);
+    line-height: 1.3;
+}
+
+.plr-card__desc {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary, #666);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Dark cards */
+.plr-page--dark .plr-card {
+    border-color: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+}
+.plr-page--dark .plr-card__title { color: var(--color-text-inverse, #e8e8e8); }
+.plr-page--dark .plr-card__desc  { color: var(--color-text-secondary-inverse, #888); }
+.plr-page--dark .plr-card--link:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+
+/* ── Columns component ─────────────────────────────────────────────────────── */
+
+.plr-columns {
+    display: grid;
+    align-items: start;
+}
+
+.plr-columns--gap-none   { gap: 0; }
+.plr-columns--gap-small  { gap: 0.75rem; }
+.plr-columns--gap-medium { gap: 1.5rem; }
+.plr-columns--gap-large  { gap: 2.5rem; }
+
+.plr-columns--align-center { align-items: center; }
+.plr-columns--align-bottom { align-items: end; }
+
+.plr-columns__col { min-width: 0; }  /* prevent overflow in narrow grid cells */
+
+/* Responsive: stack below 768px */
+@media (max-width: 768px) {
+    .plr-columns { grid-template-columns: 1fr !important; }
+}
+
+/* ── Density variants ──────────────────────────────────────────────────────── */
+
+.plr-density--compact   .plr-section { padding-top: 1.5rem; padding-bottom: 0.75rem; }
+.plr-density--spacious  .plr-section { padding-top: 4rem;   padding-bottom: 2.5rem; }
+
+/* ── Source bar: copy button + gap ────────────────────────────────────────── */
+
+.plr-source-bar { gap: 0.4rem; }
+
+/* color-mix() fallback for browsers that don't support it: accent border */
+@supports not (color: color-mix(in srgb, red 50%, transparent)) {
+    .plr-image--border img { border-color: rgba(78,205,196,0.45); }
+}
+
 /* ── Print: page layout content ──────────────────────────────────────────── */
 
 @media print {

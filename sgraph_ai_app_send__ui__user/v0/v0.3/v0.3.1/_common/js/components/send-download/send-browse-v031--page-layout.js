@@ -127,14 +127,15 @@ SendBrowse.prototype._autoOpenFirstFile = (function (original) {
 //
 // When the user clicks `_page.json` directly in the tree, the base
 // _openFileTab would display raw JSON. We intercept paths that end in
-// `_page.json` and delegate to _openFolderPage instead.
+// `_page.json` and open the page layout tab in SOURCE VIEW by default
+// (since the intent of clicking the file is to inspect the JSON).
 
 SendBrowse.prototype._openFileTab = (function (original) {
     return function (path) {
         if (path && (path === '_page.json' || path.endsWith('/_page.json'))) {
             var parts = path.split('/');
             var folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-            this._openFolderPage(folderPath, path);
+            this._openFolderPage(folderPath, path, { startInSourceView: true });
             return;
         }
         original.call(this, path);
@@ -143,8 +144,11 @@ SendBrowse.prototype._openFileTab = (function (original) {
 
 
 // ─── PLR-003: _openFolderPage — load _page.json and render as tab ─────────────
+//
+// options.startInSourceView — when true (set by PLR-004 for direct _page.json
+//   clicks), the tab opens with the source view visible instead of rendered.
 
-SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath) {
+SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath, options) {
     if (!this._sgLayout || !this.zipTree) return;
 
     // BRW-015: inject scrollable tab bar CSS (once)
@@ -229,22 +233,57 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
 
             var toggleBtn = document.createElement('button');
             toggleBtn.className = 'plr-source-toggle-btn';
-            toggleBtn.textContent = '{ } Source';
             toggleBtn.title = 'View the raw _page.json that generates this layout';
 
-            var isSource = false;
-            toggleBtn.addEventListener('click', function () {
-                isSource = !isSource;
+            // Copy button: copies raw JSON to clipboard
+            var copyBtn = document.createElement('button');
+            copyBtn.className = 'plr-source-toggle-btn';
+            copyBtn.textContent = '\u238B Copy JSON';
+            copyBtn.title = 'Copy raw _page.json to clipboard';
+            copyBtn.addEventListener('click', function () {
+                var reset = function () {
+                    setTimeout(function () { copyBtn.textContent = '\u238B Copy JSON'; }, 1500);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(rawJsonText)
+                        .then(function () { copyBtn.textContent = '\u2713 Copied'; reset(); })
+                        .catch(function () { copyBtn.textContent = '\u2717 Failed'; reset(); });
+                } else {
+                    // Fallback for older browsers
+                    var ta = document.createElement('textarea');
+                    ta.value = rawJsonText;
+                    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); copyBtn.textContent = '\u2713 Copied'; }
+                    catch (_) { copyBtn.textContent = '\u2717 Failed'; }
+                    document.body.removeChild(ta);
+                    reset();
+                }
+            });
+
+            // startInSourceView: true when user clicked _page.json directly (PLR-004)
+            var startInSourceView = (options && options.startInSourceView) || false;
+            var isSource = startInSourceView;
+
+            function _applySourceState() {
                 renderedView.style.display = isSource ? 'none' : '';
                 sourceView.style.display   = isSource ? ''     : 'none';
                 toggleBtn.textContent      = isSource ? '\u229E Rendered' : '{ } Source';
+            }
+
+            toggleBtn.addEventListener('click', function () {
+                isSource = !isSource;
+                _applySourceState();
             });
 
+            toggleBar.appendChild(copyBtn);
             toggleBar.appendChild(toggleBtn);
 
             el.appendChild(toggleBar);
             el.appendChild(renderedView);
             el.appendChild(sourceView);
+            _applySourceState();  // set initial visibility (source or rendered)
 
         } catch (err) {
             el.innerHTML = '<div style="padding:1rem;color:var(--color-error,#e74c3c);">Failed to load page: ' +
