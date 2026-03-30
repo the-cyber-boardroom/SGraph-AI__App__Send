@@ -127,15 +127,14 @@ SendBrowse.prototype._autoOpenFirstFile = (function (original) {
 //
 // When the user clicks `_page.json` directly in the tree, the base
 // _openFileTab would display raw JSON. We intercept paths that end in
-// `_page.json` and open the page layout tab in SOURCE VIEW by default
-// (since the intent of clicking the file is to inspect the JSON).
+// `_page.json` and delegate to _openFolderPage, which renders the page layout.
 
 SendBrowse.prototype._openFileTab = (function (original) {
     return function (path) {
         if (path && (path === '_page.json' || path.endsWith('/_page.json'))) {
             var parts = path.split('/');
             var folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-            this._openFolderPage(folderPath, path, { startInSourceView: true });
+            this._openFolderPage(folderPath, path);
             return;
         }
         original.call(this, path);
@@ -144,11 +143,8 @@ SendBrowse.prototype._openFileTab = (function (original) {
 
 
 // ─── PLR-003: _openFolderPage — load _page.json and render as tab ─────────────
-//
-// options.startInSourceView — when true (set by PLR-004 for direct _page.json
-//   clicks), the tab opens with the source view visible instead of rendered.
 
-SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath, options) {
+SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath) {
     if (!this._sgLayout || !this.zipTree) return;
 
     // BRW-015: inject scrollable tab bar CSS (once)
@@ -226,14 +222,20 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath,
             sourceView.style.display = 'none';
             sourceView.innerHTML = _colorizeJson(rawJsonText);
 
-            // ── Source toggle bar ──────────────────────────────────────────
-            // Shown as a thin strip at top of the panel (outside the scrollable area)
+            // ── Action bar ─────────────────────────────────────────────────
+            // Shown as a thin strip at top of the panel (outside scrollable area).
+            // Contains: Locate | ⎋ Copy JSON | { } Source toggle
             var toggleBar = document.createElement('div');
             toggleBar.className = 'plr-source-bar';
 
-            var toggleBtn = document.createElement('button');
-            toggleBtn.className = 'plr-source-toggle-btn';
-            toggleBtn.title = 'View the raw _page.json that generates this layout';
+            // Locate button — highlights _page.json in the sidebar tree
+            var locateBtn = document.createElement('button');
+            locateBtn.className = 'plr-source-toggle-btn';
+            locateBtn.textContent = '\u29BF Locate';
+            locateBtn.title = 'Show _page.json highlighted in the sidebar tree';
+            locateBtn.addEventListener('click', function () {
+                if (typeof _revealInTree !== 'undefined') _revealInTree(self, pageJsonPath);
+            });
 
             // Copy button: copies raw JSON to clipboard
             var copyBtn = document.createElement('button');
@@ -249,7 +251,6 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath,
                         .then(function () { copyBtn.textContent = '\u2713 Copied'; reset(); })
                         .catch(function () { copyBtn.textContent = '\u2717 Failed'; reset(); });
                 } else {
-                    // Fallback for older browsers
                     var ta = document.createElement('textarea');
                     ta.value = rawJsonText;
                     ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;';
@@ -262,9 +263,13 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath,
                 }
             });
 
-            // startInSourceView: true when user clicked _page.json directly (PLR-004)
-            var startInSourceView = (options && options.startInSourceView) || false;
-            var isSource = startInSourceView;
+            // Source toggle: switches between rendered layout and colorised JSON
+            var toggleBtn = document.createElement('button');
+            toggleBtn.className = 'plr-source-toggle-btn';
+            toggleBtn.textContent = '{ } Source';
+            toggleBtn.title = 'View the raw _page.json that generates this layout';
+
+            var isSource = false;
 
             function _applySourceState() {
                 renderedView.style.display = isSource ? 'none' : '';
@@ -277,13 +282,14 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath,
                 _applySourceState();
             });
 
+            toggleBar.appendChild(locateBtn);
             toggleBar.appendChild(copyBtn);
             toggleBar.appendChild(toggleBtn);
 
             el.appendChild(toggleBar);
             el.appendChild(renderedView);
             el.appendChild(sourceView);
-            _applySourceState();  // set initial visibility (source or rendered)
+            _applySourceState();
 
         } catch (err) {
             el.innerHTML = '<div style="padding:1rem;color:var(--color-error,#e74c3c);">Failed to load page: ' +
