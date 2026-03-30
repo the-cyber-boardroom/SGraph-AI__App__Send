@@ -237,24 +237,58 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                 if (typeof _revealInTree !== 'undefined') _revealInTree(self, pageJsonPath);
             });
 
-            // Print button — clones rendered view into a full-screen print overlay
-            var printBtn = document.createElement('button');
-            printBtn.className = 'plr-source-toggle-btn';
-            printBtn.textContent = '\uD83D\uDDA8 Print';
-            printBtn.title = 'Print this page layout (Ctrl+P)';
-            printBtn.addEventListener('click', function () {
+            // Present button — opens a clean full-screen overlay for reading/printing
+            var presentBtn = document.createElement('button');
+            presentBtn.className = 'plr-source-toggle-btn';
+            presentBtn.textContent = '\u26F6 Present';
+            presentBtn.title = 'Open in full-screen present mode (ESC to exit)';
+            presentBtn.addEventListener('click', function () {
                 var overlay = document.createElement('div');
-                overlay.className = 'plr-print-overlay';
-                var clone = renderedView.cloneNode(true);
-                clone.style.display = '';   // clear any display:none from source toggle
-                overlay.appendChild(clone);
-                document.body.appendChild(overlay);
-                var cleanup = function () {
+                overlay.className = 'plr-present-overlay';
+
+                // Header bar: title + Print + Close
+                var bar = document.createElement('div');
+                bar.className = 'plr-present-bar';
+
+                var titleEl = document.createElement('span');
+                titleEl.className = 'plr-present-title';
+                titleEl.textContent = json.title || '';
+
+                var printBtn2 = document.createElement('button');
+                printBtn2.className = 'plr-present-btn';
+                printBtn2.textContent = '\uD83D\uDDA8 Print';
+                printBtn2.title = 'Print / Save as PDF';
+                printBtn2.addEventListener('click', function () { window.print(); });
+
+                var closeBtn = document.createElement('button');
+                closeBtn.className = 'plr-present-btn plr-present-close';
+                closeBtn.textContent = '\u2715 Close';
+                closeBtn.title = 'Exit present mode (ESC)';
+
+                function closeOverlay() {
                     if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                    window.removeEventListener('afterprint', cleanup);
-                };
-                window.addEventListener('afterprint', cleanup);
-                window.print();
+                    document.removeEventListener('keydown', escHandler);
+                    window.removeEventListener('afterprint', closeOverlay);
+                }
+                function escHandler(e) { if (e.key === 'Escape') closeOverlay(); }
+                closeBtn.addEventListener('click', closeOverlay);
+                document.addEventListener('keydown', escHandler);
+                window.addEventListener('afterprint', closeOverlay);
+
+                bar.appendChild(titleEl);
+                bar.appendChild(printBtn2);
+                bar.appendChild(closeBtn);
+
+                // Content: clone rendered view, force white background
+                var content = document.createElement('div');
+                content.className = 'plr-present-content';
+                var clone = renderedView.cloneNode(true);
+                clone.style.display = '';
+                content.appendChild(clone);
+
+                overlay.appendChild(bar);
+                overlay.appendChild(content);
+                document.body.appendChild(overlay);
             });
 
             // Copy button: copies raw JSON to clipboard
@@ -303,7 +337,7 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             });
 
             toggleBar.appendChild(locateBtn);
-            toggleBar.appendChild(printBtn);
+            toggleBar.appendChild(presentBtn);
             toggleBar.appendChild(copyBtn);
             toggleBar.appendChild(toggleBtn);
 
