@@ -33,6 +33,21 @@
     color: #0d1117;
 }
 
+/* ── Theme: light — explicit colour overrides ─────────────────────────────── */
+/* The Browse shell defines --color-text etc. for its OWN dark palette.       */
+/* Light-mode page layout must override with hard-coded values so text is     */
+/* readable regardless of the surrounding shell theme.                         */
+
+.plr-page--light .plr-section__title,
+.plr-page--light .plr-title          { color: #1a1a2e; }
+.plr-page--light .plr-text           { color: #2c2c3a; }
+.plr-page--light .plr-bullet-points li { color: #2c2c3a; }
+.plr-page--light .plr-markdown       { color: #2c2c3a; }
+.plr-page--light .plr-image__caption { color: #666; }
+.plr-page--light .plr-slides__caption { color: #555; }
+.plr-page--light .plr-card__title    { color: #1a1a2e; }
+.plr-page--light .plr-card__desc     { color: #444; }
+
 /* ── Theme: dark ──────────────────────────────────────────────────────────── */
 /* Agent authors can set "theme": "dark" in _page.json.                       */
 /* Inherits the Browse shell's dark palette so the page blends seamlessly.    */
@@ -722,10 +737,20 @@
     background: #ffffff;
 }
 
+/* Force the cloned rendered view to fill the full width of the overlay.
+   The clone carries inline flex styles from its original context; override
+   them so layout is correct inside the present overlay. */
+.plr-present-content > * {
+    width: 100% !important;
+    overflow: visible !important;
+    flex: none !important;
+    min-height: 0 !important;
+}
+
 /* Let the scroll wrapper inside the clone expand freely */
 .plr-present-content .plr-scroll-wrapper {
-    overflow: visible;
-    height: auto;
+    overflow: visible !important;
+    height: auto !important;
 }
 
 /* ── Print from present mode ──────────────────────────────────────────────── */
@@ -734,10 +759,40 @@
     /* Hide everything except the present overlay */
     body:has(.plr-present-overlay) > *:not(.plr-present-overlay) { display: none !important; }
 
-    .plr-present-overlay { position: static !important; overflow: visible !important; }
-    .plr-present-bar     { display: none !important; }   /* hide toolbar when printing */
-    .plr-present-content { overflow: visible !important; }
-    .plr-present-content .plr-scroll-wrapper { overflow: visible !important; height: auto !important; }
+    /* Flatten overlay and content for print flow */
+    .plr-present-overlay {
+        position: static !important;
+        overflow: visible !important;
+        display: block !important;
+        background: #ffffff !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+    .plr-present-bar     { display: none !important; }
+    .plr-present-content {
+        overflow: visible !important;
+        display: block !important;
+        background: #ffffff !important;
+    }
+    .plr-present-content > * {
+        overflow: visible !important;
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        flex: none !important;
+    }
+    .plr-present-content .plr-scroll-wrapper {
+        overflow: visible !important;
+        height: auto !important;
+        display: block !important;
+    }
+
+    /* Dark hero: invert to light for clean printing */
+    .plr-present-content .plr-hero {
+        background: #1a1a2e !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
 
     /* Always hide UI chrome */
     .plr-nav, .plr-source-bar { display: none !important; }
