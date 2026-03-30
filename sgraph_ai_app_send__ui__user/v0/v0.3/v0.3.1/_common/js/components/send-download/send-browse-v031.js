@@ -556,7 +556,7 @@ function _injectTabBarScrollCSS(sgLayout) {
         '    scrollbar-width: thin;',
         '    scrollbar-color: rgba(78,205,196,0.3) transparent;',
         '}',
-        '.sgl-tab-bar::-webkit-scrollbar { height: 4px; }',
+        '.sgl-tab-bar::-webkit-scrollbar { height: 2px; }',
         '.sgl-tab-bar::-webkit-scrollbar-track { background: transparent; }',
         '.sgl-tab-bar::-webkit-scrollbar-thumb { background: rgba(78,205,196,0.3); border-radius: 2px; }',
         '.sgl-tab-bar::-webkit-scrollbar-thumb:hover { background: rgba(78,205,196,0.5); }',
