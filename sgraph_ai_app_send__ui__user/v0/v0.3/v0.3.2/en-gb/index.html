@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Send — Zero-knowledge encrypted file sharing</title>
+    <meta name="description" content="Share files securely with zero-knowledge encryption. Your files are encrypted in your browser before upload. The server never sees your data.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="../_common/favicon.svg">
+
+    <!-- Fonts -->
+    <link rel="stylesheet" href="../_common/fonts/fonts.css">
+
+    <!-- Design tokens + shared styles (v0.3.0 base) -->
+    <link rel="stylesheet" href="../_common/css/design-tokens.css">
+    <link rel="stylesheet" href="../_common/css/shared-components.css">
+
+    <!-- Component styles (v0.3.0 base) -->
+    <link rel="stylesheet" href="../_common/js/components/send-upload/send-upload.css">
+    <link rel="stylesheet" href="../_common/js/components/send-transparency/send-transparency.css">
+    <link rel="stylesheet" href="../_common/js/components/send-header/send-header.css">
+    <link rel="stylesheet" href="../_common/js/components/send-footer/send-footer.css">
+    <link rel="stylesheet" href="../_common/js/components/send-locale/send-locale.css">
+    <link rel="stylesheet" href="../_common/js/components/send-test-files/send-test-files.css">
+</head>
+<body>
+
+    <send-header></send-header>
+
+    <main data-testid="main-content">
+        <send-access-gate data-testid="access-gate">
+            <send-upload data-testid="upload-component"></send-upload>
+        </send-access-gate>
+
+        <send-test-files data-testid="test-files"></send-test-files>
+
+        <p class="disclaimer" data-testid="disclaimer" data-i18n="app.disclaimer">This is a beta service. Do not upload confidential or illegal content.</p>
+    </main>
+
+    <send-footer></send-footer>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         v0.3.2 — Upload page (same as v0.3.1, carries forward overlays)
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- 0. Build info -->
+    <script src="../_common/js/build-info.js"></script>
+    <script>
+        if (!window.SGRAPH_BUILD) {
+            window.SGRAPH_BUILD = { appVersion: 'dev', uiVersion: 'v0.3.2' };
+        } else {
+            window.SGRAPH_BUILD.uiVersion = 'v0.3.2';
+        }
+    </script>
+
+    <!-- 1. Utilities -->
+    <script src="../_common/js/i18n.js"></script>
+    <script src="../_common/js/crypto.js"></script>
+    <script src="../_common/js/friendly-crypto.js"></script>
+    <script src="../_common/js/api-client.js"></script>
+    <script src="../_common/js/file-type-detect.js"></script>
+    <script src="../_common/js/markdown-parser.js"></script>
+
+    <!-- 2. Base system -->
+    <script src="../_common/js/base/send-helpers.js"></script>
+    <script src="../_common/js/base/send-component-paths.js"></script>
+    <script>
+        SendComponentPaths.init('../_common');
+        SendComponentPaths.alias('upload-step-share',    'send-upload/upload-step-share');
+        SendComponentPaths.alias('upload-step-delivery', 'send-upload/upload-step-delivery');
+    </script>
+    <script src="../_common/js/base/send-component.js"></script>
+
+    <!-- 3. Shared components -->
+    <script src="../_common/js/components/send-locale/send-locale.js"></script>
+    <script src="../_common/js/components/send-header/send-header.js"></script>
+    <script src="../_common/js/components/send-header/send-header-beta.js"></script>
+    <script src="../_common/js/components/send-footer/send-footer.js"></script>
+    <script src="../_common/js/components/send-transparency/send-transparency.js"></script>
+
+    <!-- 4. Upload components (v0.3.0 base) -->
+    <script src="../_common/js/components/send-step-indicator/send-step-indicator.js"></script>
+    <script src="../_common/js/qr-code.js"></script>
+    <script src="../_common/js/components/send-access-gate/send-access-gate.js"></script>
+
+    <script src="../_common/js/components/send-upload/upload-constants.js"></script>
+    <script src="../_common/js/components/send-upload/upload-crypto.js"></script>
+    <script src="../_common/js/components/send-upload/upload-file-utils.js"></script>
+    <script src="../_common/js/components/send-upload/upload-thumbnails.js"></script>
+
+    <script src="../_common/js/components/send-upload/upload-folder.js"></script>
+    <script src="../_common/js/components/send-upload/upload-engine.js"></script>
+
+    <script src="../_common/js/components/send-upload/upload-step-select/upload-step-select.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-delivery/upload-step-delivery.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-share/upload-step-share.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-confirm/upload-step-confirm.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-progress/upload-step-progress.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-done/upload-step-done.js"></script>
+
+    <script src="../_common/js/components/send-upload/send-upload.js"></script>
+    <script src="../_common/js/components/send-test-files/send-test-files.js"></script>
+
+    <!-- ═══ v0.3.1 upload overlays (carried forward to v0.3.2) ═══════════ -->
+    <script src="../_common/js/components/send-upload/upload-folder-v031.js"></script>
+
+    <!-- 5. Init -->
+    <script>
+        I18n.init();
+        document.body.setAttribute('data-ready', 'true');
+
+        // U-006: Prevent browser from opening dropped files outside the drop zone
+        document.addEventListener('dragover', function(e) { e.preventDefault(); });
+        document.addEventListener('drop', function(e) { e.preventDefault(); });
+    </script>
+
+</body>
+</html>
