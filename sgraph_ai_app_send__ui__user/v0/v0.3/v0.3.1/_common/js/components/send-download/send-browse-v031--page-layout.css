@@ -105,7 +105,9 @@
     border-bottom: 1px solid var(--color-border, #e0e0e0);
     backdrop-filter: blur(4px);
     overflow-x: auto;
-    padding: 0 1.5rem;
+    /* Align nav links with section content (max-width:960px, padding:2rem sides).
+       On narrow viewports fall back to 2rem to avoid negative padding. */
+    padding-inline: max(2rem, calc((100% - 960px) / 2 + 2rem));
     scrollbar-width: none;
 }
 
@@ -843,45 +845,55 @@
 /* ── Print from present mode ──────────────────────────────────────────────── */
 
 @media print {
-    /* Hide everything except the present overlay */
+    /* 1. Hide everything except the present overlay */
     body:has(.plr-present-overlay) > *:not(.plr-present-overlay) { display: none !important; }
 
-    /* Flatten overlay and content for print flow */
+    /* 2. Flatten overlay structure so content flows on the page */
     .plr-present-overlay {
         position: static !important;
-        overflow: visible !important;
         display: block !important;
-        background: #ffffff !important;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
+        overflow: visible !important;
     }
-    .plr-present-bar     { display: none !important; }
+    .plr-present-bar { display: none !important; }
     .plr-present-content {
-        overflow: visible !important;
         display: block !important;
-        background: #ffffff !important;
-    }
-    .plr-present-content > * {
         overflow: visible !important;
-        display: block !important;
-        width: 100% !important;
         height: auto !important;
         flex: none !important;
     }
-    .plr-present-content .plr-scroll-wrapper {
+    /* The cloned renderedView carries inline flex/overflow styles — override */
+    .plr-present-content > * {
+        display: block !important;
         overflow: visible !important;
         height: auto !important;
+        flex: none !important;
+        width: 100% !important;
+    }
+    .plr-present-content .plr-scroll-wrapper {
         display: block !important;
+        overflow: visible !important;
+        height: auto !important;
     }
 
-    /* Dark hero: invert to light for clean printing */
-    .plr-present-content .plr-hero {
-        background: #1a1a2e !important;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
+    /* 3. Strip ALL backgrounds and force dark text.
+          !important beats inline style="background:..." so dark hero,
+          coloured sections etc. all become white paper + black text. */
+    .plr-present-content,
+    .plr-present-content * {
+        background:       #ffffff !important;
+        background-color: #ffffff !important;
+        background-image: none    !important;
+        color:            #111111 !important;
+        box-shadow:       none    !important;
+        text-shadow:      none    !important;
     }
 
-    /* Always hide UI chrome */
+    /* 4. Restore minimal structure so layout is still legible */
+    .plr-present-content .plr-section  { border-top: 1px solid #ddd !important; }
+    .plr-present-content .plr-card     { border: 1px solid #ccc !important; }
+    .plr-present-content .plr-hero     { border-bottom: 2px solid #1a1a2e !important; padding: 2rem !important; }
+
+    /* 5. Hide UI chrome that should never appear on paper */
     .plr-nav, .plr-source-bar { display: none !important; }
     .plr-lightbox              { display: none !important; }
     .plr-pdf                   { height: auto !important; }
