@@ -403,10 +403,11 @@ All `file` props are relative to the folder containing `_page.json`.
 ### 1.7 Source view
 
 Every rendered page tab has a `{ } Source` toggle that shows the syntax-highlighted raw
-JSON. A `⎋ Copy JSON` button copies it to the clipboard.
+JSON. A `⎋ Copy JSON` button copies it to the clipboard. A `⦿ Locate` button highlights
+`_page.json` in the sidebar tree.
 
-Clicking `_page.json` **directly in the file tree** opens in source view by default
-(intent: inspect the file). Folder click and auto-open default to rendered view.
+Clicking `_page.json` directly in the file tree, clicking the folder header, or the
+auto-open on vault load all open in **rendered view** by default.
 
 ---
 
