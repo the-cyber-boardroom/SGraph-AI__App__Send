@@ -20,6 +20,19 @@
     height: 100%;
 }
 
+/* ── Text selection ───────────────────────────────────────────────────────── */
+/* Browser default selection on white is nearly invisible; override with a    */
+/* legible mid-blue highlight and white text for dark pages.                  */
+
+.plr-page ::selection {
+    background: #1a73e8;
+    color: #ffffff;
+}
+.plr-page--dark ::selection {
+    background: #4ecdc4;
+    color: #0d1117;
+}
+
 /* ── Theme: dark ──────────────────────────────────────────────────────────── */
 /* Agent authors can set "theme": "dark" in _page.json.                       */
 /* Inherits the Browse shell's dark palette so the page blends seamlessly.    */
