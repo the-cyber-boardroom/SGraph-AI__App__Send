@@ -315,34 +315,136 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                 }
             });
 
+            // ── Edit mode ──────────────────────────────────────────────────
+            // Split-pane: editable JSON textarea (left) + live rendered preview (right)
+            var editSplit = document.createElement('div');
+            editSplit.className = 'plr-edit-split';
+            editSplit.style.display = 'none';
+
+            var editLeft = document.createElement('div');
+            editLeft.className = 'plr-edit-left';
+
+            var editTextarea = document.createElement('textarea');
+            editTextarea.className = 'plr-edit-textarea';
+            editTextarea.spellcheck = false;
+            editTextarea.value = rawJsonText;
+
+            var editStatus = document.createElement('div');
+            editStatus.className = 'plr-edit-status plr-edit-status--ok';
+            editStatus.textContent = '\u2713 Valid JSON';
+
+            editLeft.appendChild(editTextarea);
+            editLeft.appendChild(editStatus);
+
+            var editRight = document.createElement('div');
+            editRight.className = 'plr-edit-right';
+
+            editSplit.appendChild(editLeft);
+            editSplit.appendChild(editRight);
+
+            // Debounced re-render for the edit preview pane.
+            // Blob URLs are tracked separately and revoked before each re-render.
+            var editDebounceTimer = null;
+            var editBlobUrls = [];
+
+            async function _doEditRender(jsonText) {
+                // Revoke previous edit preview blob URLs
+                editBlobUrls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+                editBlobUrls = [];
+
+                var parsed;
+                try {
+                    parsed = JSON.parse(jsonText);
+                    editStatus.textContent = '\u2713 Valid JSON';
+                    editStatus.className = 'plr-edit-status plr-edit-status--ok';
+                } catch (e) {
+                    editStatus.textContent = '\u2717 ' + e.message;
+                    editStatus.className = 'plr-edit-status plr-edit-status--err';
+                    return;
+                }
+
+                editRight.innerHTML = '';
+                var previewContainer = document.createElement('div');
+                previewContainer.style.cssText = 'height:100%;';
+
+                // Temporarily redirect blob URL tracking to the edit array
+                var savedUrls = self._objectUrls;
+                self._objectUrls = editBlobUrls;
+                try {
+                    if (typeof PageLayoutRenderer !== 'undefined') {
+                        await PageLayoutRenderer.render(previewContainer, parsed, folderPath, self.zipTree, self);
+                    }
+                } catch (e) {
+                    previewContainer.innerHTML = '<div style="padding:1rem;color:#e06c75;">Render error: ' +
+                        SendHelpers.escapeHtml(e.message) + '</div>';
+                } finally {
+                    self._objectUrls = savedUrls;
+                }
+                editRight.appendChild(previewContainer);
+            }
+
+            editTextarea.addEventListener('input', function () {
+                clearTimeout(editDebounceTimer);
+                editDebounceTimer = setTimeout(function () { _doEditRender(editTextarea.value); }, 400);
+            });
+
+            // Edit button
+            var editBtn = document.createElement('button');
+            editBtn.className = 'plr-source-toggle-btn';
+            editBtn.textContent = '\u270E Edit';
+            editBtn.title = 'Edit JSON with live preview (changes are not saved)';
+
+            // ── View state machine ─────────────────────────────────────────
+            // Three mutually exclusive states: rendered | source | edit
+            var isSource = false;
+            var isEdit   = false;
+
+            function _applyViewState() {
+                renderedView.style.display = (!isSource && !isEdit) ? '' : 'none';
+                sourceView.style.display   = (isSource && !isEdit) ? '' : 'none';
+                editSplit.style.display    = isEdit ? '' : 'none';
+                toggleBtn.textContent = isSource ? '\u229E Rendered' : '{ } Source';
+                if (isEdit) {
+                    editBtn.textContent = '\u270E Editing';
+                    editBtn.style.color = 'var(--color-primary, #4ecdc4)';
+                } else {
+                    editBtn.textContent = '\u270E Edit';
+                    editBtn.style.color = '';
+                }
+            }
+
             // Source toggle: switches between rendered layout and colorised JSON
             var toggleBtn = document.createElement('button');
             toggleBtn.className = 'plr-source-toggle-btn';
             toggleBtn.textContent = '{ } Source';
             toggleBtn.title = 'View the raw _page.json that generates this layout';
 
-            var isSource = false;
-
-            function _applySourceState() {
-                renderedView.style.display = isSource ? 'none' : '';
-                sourceView.style.display   = isSource ? ''     : 'none';
-                toggleBtn.textContent      = isSource ? '\u229E Rendered' : '{ } Source';
-            }
-
             toggleBtn.addEventListener('click', function () {
+                if (isEdit) { isEdit = false; }   // leave edit before toggling source
                 isSource = !isSource;
-                _applySourceState();
+                _applyViewState();
+            });
+
+            editBtn.addEventListener('click', function () {
+                isEdit = !isEdit;
+                if (isEdit) {
+                    isSource = false;
+                    _doEditRender(editTextarea.value);
+                }
+                _applyViewState();
             });
 
             toggleBar.appendChild(locateBtn);
             toggleBar.appendChild(presentBtn);
             toggleBar.appendChild(copyBtn);
+            toggleBar.appendChild(editBtn);
             toggleBar.appendChild(toggleBtn);
 
             el.appendChild(toggleBar);
             el.appendChild(renderedView);
             el.appendChild(sourceView);
-            _applySourceState();
+            el.appendChild(editSplit);
+            _applyViewState();
 
         } catch (err) {
             el.innerHTML = '<div style="padding:1rem;color:var(--color-error,#e74c3c);">Failed to load page: ' +

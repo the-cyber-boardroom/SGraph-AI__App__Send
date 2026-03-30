@@ -706,6 +706,71 @@
     .plr-image--border img { border-color: rgba(78,205,196,0.45); }
 }
 
+/* ── Edit mode ────────────────────────────────────────────────────────────── */
+/* Split-pane: dark JSON editor left, live rendered preview right.             */
+
+.plr-edit-split {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.plr-edit-left {
+    flex: 0 0 50%;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,0.1);
+    overflow: hidden;
+}
+
+.plr-edit-textarea {
+    flex: 1;
+    width: 100%;
+    resize: none;
+    border: none;
+    outline: none;
+    padding: 1rem;
+    font-family: 'Fira Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    tab-size: 2;
+    background: #1e2228;
+    color: #abb2bf;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* Status bar below textarea */
+.plr-edit-status {
+    flex-shrink: 0;
+    padding: 0.28rem 0.75rem;
+    font-size: 0.72rem;
+    font-family: monospace;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    background: #181c22;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.plr-edit-status--ok  { color: #4ecdc4; }
+.plr-edit-status--err { color: #e06c75; }
+
+/* Right: scrollable rendered preview */
+.plr-edit-right {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+    min-width: 0;
+}
+
+.plr-edit-right .plr-scroll-wrapper {
+    overflow: visible !important;
+    height: auto !important;
+}
+
 /* ── Present mode overlay ─────────────────────────────────────────────────── */
 /* Full-screen overlay opened by the ⛶ Present button.                        */
 /* Forces white background so Print/Save-as-PDF always works cleanly.         */
