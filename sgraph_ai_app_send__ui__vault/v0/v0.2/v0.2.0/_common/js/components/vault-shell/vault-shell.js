@@ -223,8 +223,19 @@
             browse.fileName    = this._vault.name || 'Vault';
             browse.downloadUrl = window.location.href;
 
-            // Compatibility shim: page layout overlay checks this.zipTree
-            browse.zipTree = dataSource.getFileList();
+            // Compatibility shim: page layout overlay uses zipTree with entry.entry.async()
+            // Create fake entries that delegate to dataSource.getFileBytes()
+            browse.zipTree = dataSource.getFileList().map(function(e) {
+                return {
+                    path: e.path,
+                    name: e.name,
+                    dir:  e.dir,
+                    size: e.size,
+                    entry: {
+                        async: function() { return dataSource.getFileBytes(e.path); }
+                    }
+                };
+            });
 
             // Store references
             this._dataSource = dataSource;
