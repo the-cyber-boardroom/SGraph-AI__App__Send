@@ -60,6 +60,32 @@
     <script src="https://dev.send.sgraph.ai/_common/js/page-layout-renderer.js"></script>
     <script src="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031--page-layout.js"></script>
 
+    <!-- 4c. Vault deep-link patch: override page layout hash functions to use | separator -->
+    <script>
+    (function() {
+        // The page layout overlay uses _plrGetHashPath/_plrSetHashPath with / separator.
+        // Vault uses | separator: #token|path/to/file
+        if (typeof _plrGetHashPath === 'function') {
+            _plrGetHashPath = function() {
+                var hash = window.location.hash.slice(1);
+                var idx  = hash.indexOf('|');
+                if (idx === -1) return null;
+                var path = hash.slice(idx + 1);
+                return path || null;
+            };
+        }
+        if (typeof _plrSetHashPath === 'function') {
+            _plrSetHashPath = function(path) {
+                var hash  = window.location.hash.slice(1);
+                var idx   = hash.indexOf('|');
+                var token = idx === -1 ? hash : hash.slice(0, idx);
+                var next  = token + (path ? '|' + path : '');
+                if (hash !== next) history.replaceState(null, '', '#' + next);
+            };
+        }
+    })();
+    </script>
+
     <!-- 5. Vault libraries (local) -->
     <script src="../_common/js/lib/sg-send/sg-send-crypto.js"></script>
     <script src="../_common/js/lib/sg-send/sg-send.js"></script>
