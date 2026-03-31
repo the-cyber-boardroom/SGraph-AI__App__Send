@@ -86,14 +86,29 @@ class SGVault {
     }
 
     static async open(sgSend, fullVaultKey) {
-        const { passphrase, vaultId } = SGVaultCrypto.parseVaultKey(fullVaultKey)
+        const isSimpleToken = /^[a-z]+-[a-z]+-\d{4}$/.test(fullVaultKey)
+
+        let passphrase, vaultId
+
+        if (isSimpleToken) {
+            // Simple token: passphrase = token, vault_id = SHA-256(token)[:12 hex]
+            passphrase = fullVaultKey
+            const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fullVaultKey))
+            vaultId = Array.from(new Uint8Array(hashBuf)).slice(0, 6).map(b => b.toString(16).padStart(2, '0')).join('')
+        } else {
+            // Standard vault key: passphrase:vault_id
+            const parsed = SGVaultCrypto.parseVaultKey(fullVaultKey)
+            passphrase   = parsed.passphrase
+            vaultId      = parsed.vaultId
+        }
+
+        // Standard key derivation for both paths
+        const keys = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
 
         const vault = new SGVault(sgSend)
         vault._passphrase = passphrase
         vault._vaultId    = vaultId
 
-        // Derive all keys
-        const keys = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
         vault._readKey           = keys.readKey
         vault._writeKey          = keys.writeKey
         vault._hmacKey           = keys.hmacKey
