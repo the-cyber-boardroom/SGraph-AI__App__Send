@@ -65,45 +65,46 @@ class SendWelcome extends HTMLElement {
     // ─── SGMETA Envelope ───────────────────────────────────────────────
     //
     // Two wire formats are in the wild (see send-download.js for details):
-    //   New: SGMETA[6] + length[4 big-endian] + json + content
-    //   Old: SGMETA[6] + \x00 + json[scan] + content
+    //   Old: SGMETA[6] + \x00 + {json} + content  (bytes[6]=0x00, bytes[7]='{')
+    //   New: SGMETA[6] + length[4 big-endian] + json + content (everything else)
+    //
+    // Discriminator uses bytes[6] AND bytes[7] — bytes[6] alone is insufficient
+    // because the new-format length also starts with 0x00 for JSON < 16 MB.
 
     static SGMETA_MAGIC = [0x53, 0x47, 0x4D, 0x45, 0x54, 0x41];  // "SGMETA" — 6 bytes
 
     extractMetadata(decryptedBuffer) {
         const bytes = new Uint8Array(decryptedBuffer);
         const magic = SendWelcome.SGMETA_MAGIC;
-        if (bytes.length < magic.length + 1) return { metadata: null, content: decryptedBuffer };
+        if (bytes.length < magic.length + 2) return { metadata: null, content: decryptedBuffer };
         for (let i = 0; i < magic.length; i++) {
             if (bytes[i] !== magic[i]) return { metadata: null, content: decryptedBuffer };
         }
 
-        // ── New format ────────────────────────────────────────────────────
-        if (bytes[magic.length] !== 0x00) {
-            const metaLen      = (bytes[magic.length] << 24) | (bytes[magic.length+1] << 16) |
-                                 (bytes[magic.length+2] << 8) | bytes[magic.length+3];
-            const contentStart = magic.length + 4 + metaLen;
-            if (contentStart <= bytes.length) {
-                try {
-                    const metaStr = new TextDecoder().decode(bytes.slice(magic.length + 4, contentStart));
-                    return { metadata: JSON.parse(metaStr), content: decryptedBuffer.slice(contentStart) };
-                } catch (_) { /* fall through */ }
+        // ── Old format: SGMETA\x00{json} ─────────────────────────────────
+        if (bytes[magic.length] === 0x00 && bytes[magic.length + 1] === 0x7B) {
+            const jsonOffset = magic.length + 1;
+            let depth = 0, jsonEnd = -1;
+            for (let j = jsonOffset; j < bytes.length; j++) {
+                if (bytes[j] === 0x7B) depth++;
+                else if (bytes[j] === 0x7D) { if (--depth === 0) { jsonEnd = j + 1; break; } }
             }
-            return { metadata: null, content: decryptedBuffer };
+            if (jsonEnd < 0) return { metadata: null, content: decryptedBuffer };
+            try {
+                const metaStr = new TextDecoder().decode(bytes.slice(jsonOffset, jsonEnd));
+                return { metadata: JSON.parse(metaStr), content: decryptedBuffer.slice(jsonEnd) };
+            } catch (_) { return { metadata: null, content: decryptedBuffer }; }
         }
 
-        // ── Old format: null-terminated, JSON starts after \x00 ──────────
-        const jsonOffset = magic.length + 1;
-        if (bytes[jsonOffset] !== 0x7B) return { metadata: null, content: decryptedBuffer };
-        let depth = 0, jsonEnd = -1;
-        for (let j = jsonOffset; j < bytes.length; j++) {
-            if (bytes[j] === 0x7B) depth++;
-            else if (bytes[j] === 0x7D) { if (--depth === 0) { jsonEnd = j + 1; break; } }
-        }
-        if (jsonEnd < 0) return { metadata: null, content: decryptedBuffer };
+        // ── New format: SGMETA + length[4] + json ────────────────────────
+        if (bytes.length < magic.length + 4) return { metadata: null, content: decryptedBuffer };
+        const metaLen      = (bytes[magic.length] << 24) | (bytes[magic.length+1] << 16) |
+                             (bytes[magic.length+2] << 8) | bytes[magic.length+3];
+        const contentStart = magic.length + 4 + metaLen;
+        if (contentStart > bytes.length) return { metadata: null, content: decryptedBuffer };
         try {
-            const metaStr = new TextDecoder().decode(bytes.slice(jsonOffset, jsonEnd));
-            return { metadata: JSON.parse(metaStr), content: decryptedBuffer.slice(jsonEnd) };
+            const metaStr = new TextDecoder().decode(bytes.slice(magic.length + 4, contentStart));
+            return { metadata: JSON.parse(metaStr), content: decryptedBuffer.slice(contentStart) };
         } catch (_) { return { metadata: null, content: decryptedBuffer }; }
     }
 

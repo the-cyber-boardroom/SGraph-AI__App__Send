@@ -214,39 +214,52 @@ class SendDownload extends HTMLElement {
     //   New (v0.3.0+): SGMETA[6] + length[4 big-endian] + json[length] + content
     //   Old (v0.1.x):  SGMETA[6] + \x00 + json[scan] + content
     //
-    // The old format used a null byte as a separator and no explicit length.
-    // Old uploads are still in the wild (vault snapshots etc.) so we detect
-    // the null byte as the discriminator and scan for the JSON close brace.
+    // Discriminator: check bytes[6] AND bytes[7] together.
+    //
+    //   Old format: bytes[6]=0x00 (null separator) AND bytes[7]=0x7B ('{' — JSON start)
+    //   New format: everything else
+    //
+    // IMPORTANT: bytes[6] alone is NOT sufficient — in the new format, the 4-byte
+    // big-endian length also starts with 0x00 for any JSON < 16 MB (all real payloads).
+    // bytes[7] breaks the tie: old format always has '{' there; new format has the
+    // second length byte (0x00 for JSON < 65 KB, never 0x7B in practice).
 
     static SGMETA_MAGIC = [0x53, 0x47, 0x4D, 0x45, 0x54, 0x41];  // "SGMETA" — 6 bytes
 
     _extractMetadata(buf) {
         const bytes = new Uint8Array(buf);
         const magic = SendDownload.SGMETA_MAGIC;
-        if (bytes.length < magic.length + 1) return { metadata: null, content: buf };
+        if (bytes.length < magic.length + 2) return { metadata: null, content: buf };
         for (let i = 0; i < magic.length; i++) {
             if (bytes[i] !== magic[i]) return { metadata: null, content: buf };
         }
 
-        // ── New format: 4-byte length header ──────────────────────────────
-        if (bytes[magic.length] !== 0x00) {
-            const metaLen      = (bytes[magic.length] << 24) | (bytes[magic.length+1] << 16) |
-                                 (bytes[magic.length+2] << 8) | bytes[magic.length+3];
-            const contentStart = magic.length + 4 + metaLen;
-            if (contentStart <= bytes.length) {
-                try {
-                    const metaStr = new TextDecoder().decode(bytes.slice(magic.length + 4, contentStart));
-                    return { metadata: JSON.parse(metaStr), content: buf.slice(contentStart) };
-                } catch (_) { /* fall through */ }
+        // ── Old format: SGMETA\x00{json}  (bytes[6]=0x00 AND bytes[7]='{') ──
+        if (bytes[magic.length] === 0x00 && bytes[magic.length + 1] === 0x7B) {
+            const jsonOffset = magic.length + 1;
+            let depth = 0, jsonEnd = -1;
+            for (let j = jsonOffset; j < bytes.length; j++) {
+                if (bytes[j] === 0x7B) depth++;
+                else if (bytes[j] === 0x7D) { if (--depth === 0) { jsonEnd = j + 1; break; } }
             }
-            return { metadata: null, content: buf };
+            if (jsonEnd < 0) return { metadata: null, content: buf };
+            try {
+                const metaStr = new TextDecoder().decode(bytes.slice(jsonOffset, jsonEnd));
+                return { metadata: JSON.parse(metaStr), content: buf.slice(jsonEnd) };
+            } catch (_) { return { metadata: null, content: buf }; }
         }
 
-        // ── Old format: null-terminated, JSON starts immediately after \x00 ──
-        const jsonOffset = magic.length + 1;
-        if (bytes[jsonOffset] !== 0x7B) return { metadata: null, content: buf }; // must start with '{'
-        let depth = 0, jsonEnd = -1;
-        for (let j = jsonOffset; j < bytes.length; j++) {
+        // ── New format: SGMETA + length[4 big-endian] + json ─────────────
+        if (bytes.length < magic.length + 4) return { metadata: null, content: buf };
+        const metaLen      = (bytes[magic.length] << 24) | (bytes[magic.length+1] << 16) |
+                             (bytes[magic.length+2] << 8) | bytes[magic.length+3];
+        const contentStart = magic.length + 4 + metaLen;
+        if (contentStart > bytes.length) return { metadata: null, content: buf };
+        try {
+            const metaStr = new TextDecoder().decode(bytes.slice(magic.length + 4, contentStart));
+            return { metadata: JSON.parse(metaStr), content: buf.slice(contentStart) };
+        } catch (_) { return { metadata: null, content: buf }; }
+    }
             if (bytes[j] === 0x7B) depth++;
             else if (bytes[j] === 0x7D) { if (--depth === 0) { jsonEnd = j + 1; break; } }
         }
