@@ -253,6 +253,48 @@ async function _plrPrintPage(title, renderedView) {
 }
 
 
+// ─── PLR-007b: Intercept Cmd/Ctrl+P to open print preview ────────────────────
+//
+// If a _page.json is being viewed (present mode or regular tab), pressing the
+// native print shortcut opens _plrPrintPage() instead of the browser dialog.
+//
+// State: window._plrPrintState = { title, getView }
+//   - Set when a PLR page is first rendered
+//   - Updated on mousedown so the last-clicked panel is used when Cmd+P fires
+//
+// Priority:
+//   1. Present overlay is open → print the overlay content
+//   2. _plrPrintState.getView() is in the DOM → print that panel
+
+if (!window._plrKeydownRegistered) {
+    window._plrKeydownRegistered = true;
+    document.addEventListener('keydown', function (e) {
+        if (!((e.metaKey || e.ctrlKey) && e.key === 'p')) return;
+
+        // 1. Present mode takes priority
+        var overlay = document.querySelector('.plr-present-overlay');
+        if (overlay) {
+            e.preventDefault();
+            var content  = overlay.querySelector('.plr-present-content');
+            var titleEl  = overlay.querySelector('.plr-present-title');
+            var view     = content ? content.firstElementChild : null;
+            if (view) _plrPrintPage(titleEl ? titleEl.textContent : '', view);
+            return;
+        }
+
+        // 2. Regular panel
+        var state = window._plrPrintState;
+        if (state) {
+            var pv = state.getView();
+            if (pv && document.body.contains(pv)) {
+                e.preventDefault();
+                _plrPrintPage(state.title, pv);
+            }
+        }
+    });
+}
+
+
 // ─── PLR-002: Auto-open checks root _page.json first ─────────────────────────
 //
 // Wraps the v0.3.1 _autoOpenFirstFile. Priority order:
@@ -393,6 +435,12 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                 renderedView.innerHTML = '<pre style="padding:1rem;">' +
                     SendHelpers.escapeHtml(rawJsonText) + '</pre>';
             }
+
+            // Register this page for CMD+P interception (PLR-007b).
+            // Update on mousedown so the last-clicked panel wins.
+            var _plrEntry = { title: json.title || '', getView: function () { return renderedView; } };
+            window._plrPrintState = _plrEntry;
+            el.addEventListener('mousedown', function () { window._plrPrintState = _plrEntry; }, true);
 
             // ── Source view (hidden initially) ─────────────────────────────
             var sourceView = document.createElement('pre');
