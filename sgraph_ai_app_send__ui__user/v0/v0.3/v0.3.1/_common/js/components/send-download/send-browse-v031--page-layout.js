@@ -101,19 +101,25 @@ SendBrowse.prototype._setupTreeListeners = (function (original) {
 
 // ─── PLR-006: Deep-link utilities ────────────────────────────────────────────
 //
-// URL format: /en-gb/browse/#<token>/<file-path>
-// The token is everything before the first '/'. The file path is everything
-// after. Examples:
-//   #help-aunt-2780/brief/_page.json   → folder page in brief/
-//   #help-aunt-2780/submission/bio.md  → file tab
+// URL format: /en-gb/browse/#<token>|<file-path>
+//
+// '|' is the separator between the token and the file path. This avoids
+// ambiguity with regular tokens that contain '/' (e.g. #transferId/key):
+//
+//   #help-aunt-2780|brief/_page.json   → folder page in brief/
+//   #help-aunt-2780|submission/bio.md  → file tab
+//   #abc123/secretKey|submission/bio.md → regular (non-friendly) token
 //   #help-aunt-2780                    → default (root _page.json or first file)
+//
+// '|' never appears in transfer IDs, encryption keys, or file paths, so it
+// is always unambiguous regardless of token format.
 //
 // _plrGetHashPath()  → returns the path portion or null
 // _plrSetHashPath(p) → updates the hash preserving the token (replaceState)
 
 function _plrGetHashPath() {
     var hash = window.location.hash.slice(1);
-    var idx  = hash.indexOf('/');
+    var idx  = hash.indexOf('|');
     if (idx === -1) return null;
     var path = hash.slice(idx + 1);
     return path || null;
@@ -121,9 +127,9 @@ function _plrGetHashPath() {
 
 function _plrSetHashPath(path) {
     var hash  = window.location.hash.slice(1);
-    var idx   = hash.indexOf('/');
+    var idx   = hash.indexOf('|');
     var token = idx === -1 ? hash : hash.slice(0, idx);
-    var next  = token + (path ? '/' + path : '');
+    var next  = token + (path ? '|' + path : '');
     if (hash !== next) history.replaceState(null, '', '#' + next);
 }
 
