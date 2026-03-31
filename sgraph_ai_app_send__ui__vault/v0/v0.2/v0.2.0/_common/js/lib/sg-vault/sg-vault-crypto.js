@@ -39,8 +39,11 @@ class SGVaultCrypto {
         if (!passphrase) {
             throw new Error('Passphrase cannot be empty')
         }
-        if (!/^[a-z0-9]{8}$/.test(vaultId)) {
-            throw new Error('vault_id must be 8 lowercase alphanumeric characters')
+        // Accept standard vault IDs (8 alphanumeric) or simple tokens (word-word-NNNN)
+        const isStandardId   = /^[a-z0-9]{8}$/.test(vaultId)
+        const isSimpleToken  = /^[a-z]+-[a-z]+-\d{4}$/.test(vaultId)
+        if (!isStandardId && !isSimpleToken) {
+            throw new Error('vault_id must be 8 lowercase alphanumeric characters or a simple token (word-word-NNNN)')
         }
         return { passphrase, vaultId }
     }
