@@ -116,6 +116,17 @@ class VaultEntry extends VaultComponent {
             // For simple tokens, the vault_id IS the token string itself (not a hash)
             // The token is also used as the passphrase for key derivation
             const vaultKey = `${token}:${token}`
+
+            // Debug: log the derived keys to verify ref_file_id
+            const debugKeys = await SGVaultCrypto.deriveKeys(token, token)
+            console.log('[vault-entry] simple token debug:', {
+                token, vaultKey,
+                passphrase: token,
+                vaultId: token,
+                refFileId: debugKeys.refFileId,
+                branchIndexFileId: debugKeys.branchIndexFileId
+            })
+
             await this._openVault(vaultKey, token)
         } catch (err) {
             if (err.message.includes('not found') || err.message.includes('404')) {
