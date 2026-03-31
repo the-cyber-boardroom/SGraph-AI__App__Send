@@ -822,6 +822,32 @@ function _navigateToFolder(browseInstance, zipTree, folderPath) {
         }
         origDisconnected.call(this);
     };
+
+    // BRW-019 fix: the <send-download> element is parsed and upgraded BEFORE this
+    // script runs, so connectedCallback already fired on the unpatched prototype.
+    // Back-fill any already-connected instance that missed the patch.
+    document.querySelectorAll('send-download').forEach(function(el) {
+        if (!el._v031HashHandler) {
+            var handler = function() {
+                el.transferId     = null;
+                el.hashKey        = null;
+                el.tokenName      = null;
+                el._friendlyToken = null;
+                el._parseUrl();
+                if (!el.transferId) {
+                    el.state = 'entry';
+                    el.render();
+                    el._setupEntryListeners();
+                } else {
+                    el.state = 'loading';
+                    el.render();
+                    el._loadTransferInfo();
+                }
+            };
+            el._v031HashHandler = handler;
+            window.addEventListener('hashchange', handler);
+        }
+    });
 })();
 
 
