@@ -100,7 +100,14 @@ class SGVault {
             const parsed = SGVaultCrypto.parseVaultKey(fullVaultKey)
             passphrase   = parsed.passphrase
             vaultId      = parsed.vaultId
-            keys         = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
+
+            // If passphrase is a simple token, use HKDF derivation
+            // (vault key may be "word-word-NNNN:c2af2517483e" format from sgit info)
+            if (/^[a-z]+-[a-z]+-\d{4}$/.test(passphrase)) {
+                keys = await SGVaultCrypto.deriveKeysFromSimpleToken(passphrase)
+            } else {
+                keys = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
+            }
         }
 
         const vault = new SGVault(sgSend)
