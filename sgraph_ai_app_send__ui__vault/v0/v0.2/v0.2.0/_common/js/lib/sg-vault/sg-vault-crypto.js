@@ -30,20 +30,22 @@ class SGVaultCrypto {
     // --- Vault Key Parsing ------------------------------------------------------
 
     static parseVaultKey(fullVaultKey) {
+        // Simple token: word-word-NNNN (no colon) — token is both passphrase and vault_id
+        if (/^[a-z]+-[a-z]+-\d{4}$/.test(fullVaultKey)) {
+            return { passphrase: fullVaultKey, vaultId: fullVaultKey }
+        }
+
         const parts = fullVaultKey.split(':')
         if (parts.length < 2) {
-            throw new Error('Invalid vault key format. Expected {passphrase}:{vault_id}')
+            throw new Error('Invalid vault key format. Expected {passphrase}:{vault_id} or a simple token (word-word-NNNN)')
         }
         const vaultId    = parts.pop()                                         // Last segment is vault_id
         const passphrase = parts.join(':')                                     // Everything before (may contain colons)
         if (!passphrase) {
             throw new Error('Passphrase cannot be empty')
         }
-        // Accept standard vault IDs (8 alphanumeric) or simple tokens (word-word-NNNN)
-        const isStandardId   = /^[a-z0-9]{8}$/.test(vaultId)
-        const isSimpleToken  = /^[a-z]+-[a-z]+-\d{4}$/.test(vaultId)
-        if (!isStandardId && !isSimpleToken) {
-            throw new Error('vault_id must be 8 lowercase alphanumeric characters or a simple token (word-word-NNNN)')
+        if (!/^[a-z0-9]{8}$/.test(vaultId)) {
+            throw new Error('vault_id must be 8 lowercase alphanumeric characters')
         }
         return { passphrase, vaultId }
     }
