@@ -113,23 +113,18 @@ class VaultEntry extends VaultComponent {
         this._simpleTokenBtn.disabled = true
 
         try {
-            // Simple token: 4-step derivation (PBKDF2 fixed salt -> HKDF -> SHA-256 vault_id)
-            // Debug: log derivation for CLI alignment
-            const debugKeys = await SGVaultCrypto.deriveKeysFromSimpleToken(token)
-            const readKeyRaw = await crypto.subtle.exportKey('raw', debugKeys.readKey)
-            const readKeyHex = Array.from(new Uint8Array(readKeyRaw)).map(b => b.toString(16).padStart(2, '0')).join('')
-            console.log('[vault-entry] simple token derivation (4-step):', {
-                input_token:       token,
-                derived_vault_id:  debugKeys.vaultId,
-                read_key_hex:      readKeyHex,
-                write_key:         debugKeys.writeKey,
-                ref_file_id:       debugKeys.refFileId,
-                branch_index_id:   debugKeys.branchIndexFileId,
-                step1_salt:        'sgraph-send-v1 (fixed)',
-                step2_hkdf_info:   'vault-read-key',
-                step3_hkdf_info:   'vault-write-key',
-                step4_vault_id:    'sha256(token)[:12]',
-                kdf_iterations:    600000
+            // Simple token: passphrase = token, vault_id = SHA-256(token)[:12 hex]
+            // Standard vault key derivation is used (same as passphrase:vault_id format)
+            const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+            const vaultId = Array.from(new Uint8Array(hashBuf)).slice(0, 6).map(b => b.toString(16).padStart(2, '0')).join('')
+            const vaultKey = `${token}:${vaultId}`
+
+            // Debug: log for CLI alignment
+            console.log('[vault-entry] simple token:', {
+                input_token: token,
+                derived_vault_id: vaultId,
+                constructed_vault_key: vaultKey,
+                derivation: 'standard deriveKeys(passphrase=token, vaultId=sha256(token)[:12])'
             })
 
             await this._openVault(token, token)
