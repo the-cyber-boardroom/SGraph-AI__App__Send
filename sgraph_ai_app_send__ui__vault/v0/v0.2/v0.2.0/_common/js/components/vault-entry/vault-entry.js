@@ -189,10 +189,11 @@ class VaultEntry extends VaultComponent {
         const vault  = await SGVault.open(sgSend, vaultKey)
 
         // Update URL hash — preserve deep link path if present
+        // No encodeURIComponent — hash is never sent to server, and | / are our delimiters
         const hashStr  = hashValue || vaultKey
         const deepPath = this._pendingDeepLink || null
         const fullHash = deepPath ? hashStr + '|' + deepPath : hashStr
-        window.history.replaceState(null, '', '#' + encodeURIComponent(fullHash))
+        window.history.replaceState(null, '', '#' + fullHash)
 
         // Persist vault key (without deep link path) for auto-open
         try { localStorage.setItem('sg-vault-key', hashStr) } catch (_) {}
@@ -253,7 +254,7 @@ class VaultEntry extends VaultComponent {
             const vault  = await SGVault.create(sgSend, passphrase, { name })
             const vaultKey = vault.getVaultKey(passphrase)
 
-            window.history.replaceState(null, '', '#' + encodeURIComponent(vaultKey))
+            window.history.replaceState(null, '', '#' + vaultKey)
 
             this.emit('vault-created', { vault, vaultKey })
         } catch (err) {
