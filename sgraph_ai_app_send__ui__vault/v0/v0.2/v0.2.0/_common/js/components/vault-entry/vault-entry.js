@@ -115,6 +115,25 @@ class VaultEntry extends VaultComponent {
         try {
             // For simple tokens, the token IS the vault key
             // parseVaultKey detects the word-word-NNNN pattern and uses it as both passphrase and vault_id
+
+            // Debug: log derivation inputs and outputs for CLI team alignment
+            const { passphrase, vaultId } = SGVaultCrypto.parseVaultKey(token)
+            const debugKeys = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
+            const readKeyRaw = await crypto.subtle.exportKey('raw', debugKeys.readKey)
+            const readKeyHex = Array.from(new Uint8Array(readKeyRaw)).map(b => b.toString(16).padStart(2, '0')).join('')
+            console.log('[vault-entry] simple token derivation:', {
+                input_token:     token,
+                parsed_passphrase: passphrase,
+                parsed_vaultId:    vaultId,
+                read_key_hex:      readKeyHex,
+                write_key:         debugKeys.writeKey,
+                ref_file_id:       debugKeys.refFileId,
+                branch_index_id:   debugKeys.branchIndexFileId,
+                pbkdf2_read_salt:  'sg-vault-v1:' + vaultId,
+                hmac_ref_domain:   'sg-vault-v1:file-id:ref:' + vaultId,
+                kdf_iterations:    600000
+            })
+
             await this._openVault(token, token)
         } catch (err) {
             if (err.message.includes('not found') || err.message.includes('404')) {
