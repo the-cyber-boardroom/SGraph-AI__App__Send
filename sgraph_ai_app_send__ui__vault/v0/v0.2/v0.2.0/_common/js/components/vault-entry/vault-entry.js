@@ -49,15 +49,27 @@ class VaultEntry extends VaultComponent {
         this._renderVersion()
 
         // Check URL hash for vault key or simple token
+        // Supports deep links: #token|path/to/file.md or #passphrase:vault_id|path
         const hash = window.location.hash.slice(1)
         if (hash) {
             const decoded = decodeURIComponent(hash)
-            if (this._isSimpleToken(decoded)) {
-                this._simpleTokenInput.value = decoded
+            const pipeIdx = decoded.indexOf('|')
+            const vaultPart = pipeIdx >= 0 ? decoded.slice(0, pipeIdx) : decoded
+            const deepPath  = pipeIdx >= 0 ? decoded.slice(pipeIdx + 1) : null
+
+            // Store deep link path for after vault opens
+            if (deepPath) this._pendingDeepLink = deepPath
+
+            if (this._isSimpleToken(vaultPart)) {
+                this._simpleTokenInput.value = vaultPart
                 this._onSimpleTokenOpen()
-            } else {
-                this._keyInput.value = decoded
+            } else if (vaultPart.includes(':')) {
+                this._keyInput.value = vaultPart
                 this._onOpen()
+            } else {
+                // Try as simple token anyway (might be a token without strict format)
+                this._simpleTokenInput.value = vaultPart
+                this._onSimpleTokenOpen()
             }
         } else {
             const savedKey = localStorage.getItem('sg-vault-key')
@@ -176,15 +188,18 @@ class VaultEntry extends VaultComponent {
         const sgSend = this._getSGSend()
         const vault  = await SGVault.open(sgSend, vaultKey)
 
-        // Update URL hash (use simple token if available, else vault key)
-        const hashStr = hashValue || vaultKey
-        window.history.replaceState(null, '', '#' + encodeURIComponent(hashStr))
+        // Update URL hash — preserve deep link path if present
+        const hashStr  = hashValue || vaultKey
+        const deepPath = this._pendingDeepLink || null
+        const fullHash = deepPath ? hashStr + '|' + deepPath : hashStr
+        window.history.replaceState(null, '', '#' + encodeURIComponent(fullHash))
 
-        // Persist for auto-open on next visit
+        // Persist vault key (without deep link path) for auto-open
         try { localStorage.setItem('sg-vault-key', hashStr) } catch (_) {}
 
         const accessKey = this._accessKeyInput.value.trim()
-        this.emit('vault-opened', { vault, vaultKey, accessKey })
+        this.emit('vault-opened', { vault, vaultKey, accessKey, deepLink: deepPath })
+        this._pendingDeepLink = null
     }
 
     // --- Endpoint / Access Key ---

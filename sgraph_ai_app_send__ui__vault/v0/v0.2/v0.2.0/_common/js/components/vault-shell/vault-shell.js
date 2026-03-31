@@ -81,7 +81,7 @@
 
         _setupListeners() {
             // Entry events
-            this.addEventListener('vault-opened',  (e) => this._onVaultOpened(e.detail.vault, e.detail.vaultKey, e.detail.accessKey));
+            this.addEventListener('vault-opened',  (e) => this._onVaultOpened(e.detail.vault, e.detail.vaultKey, e.detail.accessKey, e.detail.deepLink));
             this.addEventListener('vault-created', (e) => this._onVaultOpened(e.detail.vault, e.detail.vaultKey, e.detail.accessKey));
 
             // Header events
@@ -120,7 +120,7 @@
 
         // --- Vault Lifecycle ------------------------------------------------------
 
-        _onVaultOpened(vault, vaultKey, accessKey) {
+        _onVaultOpened(vault, vaultKey, accessKey, deepLink) {
             this._vault     = vault;
             this._vaultKey  = vaultKey;
             this._accessKey = accessKey || '';
@@ -136,7 +136,7 @@
             header?.setReadOnly(!this._accessKey);
 
             // Create VaultDataSource, load all sub-trees, then mount browse
-            this._mountBrowse();
+            this._mountBrowse(deepLink);
 
             // Wire settings
             this.querySelector('vault-settings')?.setVault(vault, vaultKey, this._accessKey);
@@ -205,7 +205,7 @@
             }
         }
 
-        async _mountBrowse() {
+        async _mountBrowse(deepLink) {
             const filesView = this.querySelector('.vs-view-files');
             if (!filesView) return;
             filesView.innerHTML = '<div style="padding:2rem;color:var(--color-text-secondary);">Loading vault files...</div>';
@@ -223,9 +223,25 @@
             browse.fileName    = this._vault.name || 'Vault';
             browse.downloadUrl = window.location.href;
 
+            // Compatibility shim: page layout overlay checks this.zipTree
+            browse.zipTree = dataSource.getFileList();
+
             // Store references
             this._dataSource = dataSource;
             this._browse     = browse;
+
+            // If a deep link path was provided, open that file instead of auto-open first
+            if (deepLink) {
+                const origAutoOpen = browse._autoOpenFirstFile;
+                browse._autoOpenFirstFile = function() {
+                    // Open the deep-linked file, fall back to default if not found
+                    if (this._openFileTab) {
+                        this._openFileTab(deepLink);
+                    } else if (origAutoOpen) {
+                        origAutoOpen.call(this);
+                    }
+                };
+            }
 
             filesView.appendChild(browse);
         }
