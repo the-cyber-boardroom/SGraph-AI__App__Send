@@ -260,15 +260,6 @@ class SendDownload extends HTMLElement {
             return { metadata: JSON.parse(metaStr), content: buf.slice(contentStart) };
         } catch (_) { return { metadata: null, content: buf }; }
     }
-            if (bytes[j] === 0x7B) depth++;
-            else if (bytes[j] === 0x7D) { if (--depth === 0) { jsonEnd = j + 1; break; } }
-        }
-        if (jsonEnd < 0) return { metadata: null, content: buf };
-        try {
-            const metaStr = new TextDecoder().decode(bytes.slice(jsonOffset, jsonEnd));
-            return { metadata: JSON.parse(metaStr), content: buf.slice(jsonEnd) };
-        } catch (_) { return { metadata: null, content: buf }; }
-    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Download + Decrypt Flow
