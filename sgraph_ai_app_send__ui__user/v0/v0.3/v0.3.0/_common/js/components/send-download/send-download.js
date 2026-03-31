@@ -108,9 +108,9 @@ class SendDownload extends HTMLElement {
         const params = new URLSearchParams(window.location.search);
         this.tokenName = params.get('token') || null;
 
-        // Strip any deep-link file path (added by PLR-006) — token is before the first '/'
+        // Strip any deep-link file path (added by PLR-006) — path is after '|', e.g. #tid/key|path
         const _fullHash = window.location.hash.substring(1);
-        const hash = _fullHash.includes('/') ? _fullHash.slice(0, _fullHash.indexOf('/')) : _fullHash;
+        const hash = _fullHash.includes('|') ? _fullHash.slice(0, _fullHash.indexOf('|')) : _fullHash;
         if (!hash) {
             this.transferId = params.get('id') || null;
             return;
