@@ -113,18 +113,22 @@ class VaultEntry extends VaultComponent {
         this._simpleTokenBtn.disabled = true
 
         try {
-            // Simple token: passphrase = token, vault_id = SHA-256(token)[:12 hex]
-            // Standard vault key derivation is used (same as passphrase:vault_id format)
-            const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
-            const vaultId = Array.from(new Uint8Array(hashBuf)).slice(0, 6).map(b => b.toString(16).padStart(2, '0')).join('')
-            const vaultKey = `${token}:${vaultId}`
+            // Simple token: 4-step HKDF derivation (different from standard vault keys)
+            // Step 1: PBKDF2(token, "sgraph-send-v1") -> aes_key
+            // Step 2: HKDF(aes_key, "vault-read-key") -> read_key
+            // Step 3: HKDF(aes_key, "vault-write-key") -> write_key
+            // Step 4: vault_id = SHA-256(token)[:12 hex]
 
-            // Debug: log for CLI alignment
-            console.log('[vault-entry] simple token:', {
-                input_token: token,
-                derived_vault_id: vaultId,
-                constructed_vault_key: vaultKey,
-                derivation: 'standard deriveKeys(passphrase=token, vaultId=sha256(token)[:12])'
+            const debugKeys = await SGVaultCrypto.deriveKeysFromSimpleToken(token)
+            const readKeyRaw = await crypto.subtle.exportKey('raw', debugKeys.readKey)
+            const readKeyHex = Array.from(new Uint8Array(readKeyRaw)).map(b => b.toString(16).padStart(2, '0')).join('')
+            console.log('[vault-entry] simple token (4-step HKDF):', {
+                input_token:      token,
+                derived_vault_id: debugKeys.vaultId,
+                read_key_hex:     readKeyHex,
+                write_key:        debugKeys.writeKey,
+                ref_file_id:      debugKeys.refFileId,
+                branch_index_id:  debugKeys.branchIndexFileId
             })
 
             await this._openVault(token, token)
