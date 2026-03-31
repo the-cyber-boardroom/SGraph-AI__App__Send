@@ -36,6 +36,28 @@ class VaultDataSource {
         return this._convertNode(root, '');
     }
 
+    // Load all lazy sub-trees recursively (call before getTree for full tree)
+    async loadAllSubTrees() {
+        await this._loadSubTreesRecursive(this._vault._tree['/'], '/');
+    }
+
+    async _loadSubTreesRecursive(node, path) {
+        if (!node || node.type !== 'folder') return;
+
+        // Load this folder if it's lazy
+        if (node._loaded === false && node._tree_id) {
+            await this._vault.loadSubTreeOnDemand(path);
+        }
+
+        // Recurse into children
+        for (const [name, child] of Object.entries(node.children || {})) {
+            if (child.type === 'folder') {
+                const childPath = path === '/' ? '/' + name : path + '/' + name;
+                await this._loadSubTreesRecursive(child, childPath);
+            }
+        }
+    }
+
     _convertNode(vaultNode, prefix) {
         const result = { name: vaultNode.name || prefix.split('/').pop() || '', children: {}, files: [] };
 

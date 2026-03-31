@@ -134,7 +134,7 @@
             header?.showLockButton(true);
             header?.setReadOnly(!this._accessKey);
 
-            // Create VaultDataSource and send-browse
+            // Create VaultDataSource, load all sub-trees, then mount browse
             this._mountBrowse();
 
             // Wire settings
@@ -179,13 +179,18 @@
 
         // --- Mount Browse Component -----------------------------------------------
 
-        _mountBrowse() {
+        async _mountBrowse() {
             const filesView = this.querySelector('.vs-view-files');
             if (!filesView) return;
-            filesView.innerHTML = '';
+            filesView.innerHTML = '<div style="padding:2rem;color:var(--color-text-secondary);">Loading vault files...</div>';
 
             const dataSource = new VaultDataSource(this._vault, this._accessKey);
             dataSource.onTreeChanged = () => this._onTreeChanged();
+
+            // Load all lazy sub-trees before building the Browse tree
+            await dataSource.loadAllSubTrees();
+
+            filesView.innerHTML = '';
 
             const browse = document.createElement('send-browse');
             browse.dataSource  = dataSource;
