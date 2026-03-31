@@ -85,6 +85,7 @@
             this.addEventListener('vault-created', (e) => this._onVaultOpened(e.detail.vault, e.detail.vaultKey, e.detail.accessKey));
 
             // Header events
+            this.addEventListener('vault-header-refresh', () => this._onRefresh());
             this.addEventListener('vault-header-upload', () => this._onUploadRequest());
             this.addEventListener('vault-header-lock',   () => this._onLock());
             this.addEventListener('vault-header-debug',  () => this._toggleDebug());
@@ -178,6 +179,31 @@
         }
 
         // --- Mount Browse Component -----------------------------------------------
+
+        async _onRefresh() {
+            if (!this._vaultKey) return;
+            this.querySelector('vault-header')?.showLoading();
+            try {
+                const entry   = this.querySelector('vault-entry');
+                const sgSend  = entry._getSGSend();
+                const vault   = await SGVault.open(sgSend, this._vaultKey);
+                this._vault   = vault;
+
+                // Remount browse with fresh vault data
+                await this._mountBrowse();
+
+                // Refresh other views
+                this.querySelector('vault-settings')?.setVault(vault, this._vaultKey, this._accessKey);
+                this.querySelector('vault-status-bar')?.updateStats(vault);
+                this.querySelector('vault-header')?.setVaultName(vault.name || '');
+
+                window.sgraphVault.messages.success('Vault refreshed');
+            } catch (err) {
+                window.sgraphVault.messages.error(`Refresh failed: ${err.message}`);
+            } finally {
+                this.querySelector('vault-header')?.hideLoading();
+            }
+        }
 
         async _mountBrowse() {
             const filesView = this.querySelector('.vs-view-files');

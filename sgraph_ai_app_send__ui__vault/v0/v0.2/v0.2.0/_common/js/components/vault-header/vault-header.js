@@ -29,6 +29,7 @@
                     </div>
                     <div class="vh-right">
                         <span class="vh-readonly-badge" style="display:none">Read-only</span>
+                        <button class="vh-refresh-btn" title="Refresh vault (load latest commits)">Refresh</button>
                         <button class="vh-upload-btn">Upload</button>
                         <button class="vh-debug-btn">Debug</button>
                         <a class="vh-raw-link" title="View raw vault data" href="#">raw</a>
@@ -40,6 +41,7 @@
             `;
 
             this.shadowRoot.addEventListener('click', (e) => {
+                if (e.target.closest('.vh-refresh-btn')) this._emit('vault-header-refresh');
                 if (e.target.closest('.vh-upload-btn')) this._emit('vault-header-upload');
                 if (e.target.closest('.vh-lock-btn'))   this._emit('vault-header-lock');
                 if (e.target.closest('.vh-debug-btn'))  this._emit('vault-header-debug');
@@ -113,12 +115,12 @@
         .vh-vault-name { font-size: var(--text-sm); color: var(--color-text-secondary); font-family: var(--font-mono); }
         .vh-right { display: flex; align-items: center; gap: var(--space-2); }
         .vh-version { font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono); }
-        .vh-upload-btn, .vh-lock-btn, .vh-debug-btn {
+        .vh-upload-btn, .vh-lock-btn, .vh-debug-btn, .vh-refresh-btn {
             font-size: var(--text-small); padding: 0.25rem 0.625rem; border-radius: var(--radius-sm);
             border: 1px solid var(--color-border); background: transparent;
             color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family);
         }
-        .vh-upload-btn:hover, .vh-lock-btn:hover, .vh-debug-btn:hover {
+        .vh-upload-btn:hover, .vh-lock-btn:hover, .vh-debug-btn:hover, .vh-refresh-btn:hover {
             background: var(--bg-secondary); color: var(--color-text);
         }
         .vh-upload-btn {
