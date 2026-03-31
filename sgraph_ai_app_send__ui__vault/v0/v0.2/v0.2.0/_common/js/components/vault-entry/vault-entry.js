@@ -113,24 +113,22 @@ class VaultEntry extends VaultComponent {
         this._simpleTokenBtn.disabled = true
 
         try {
-            // For simple tokens, the token IS the vault key
-            // parseVaultKey detects the word-word-NNNN pattern and uses it as both passphrase and vault_id
-
-            // Debug: log derivation inputs and outputs for CLI team alignment
-            const { passphrase, vaultId } = SGVaultCrypto.parseVaultKey(token)
-            const debugKeys = await SGVaultCrypto.deriveKeys(passphrase, vaultId)
+            // Simple token: 4-step derivation (PBKDF2 fixed salt -> HKDF -> SHA-256 vault_id)
+            // Debug: log derivation for CLI alignment
+            const debugKeys = await SGVaultCrypto.deriveKeysFromSimpleToken(token)
             const readKeyRaw = await crypto.subtle.exportKey('raw', debugKeys.readKey)
             const readKeyHex = Array.from(new Uint8Array(readKeyRaw)).map(b => b.toString(16).padStart(2, '0')).join('')
-            console.log('[vault-entry] simple token derivation:', {
-                input_token:     token,
-                parsed_passphrase: passphrase,
-                parsed_vaultId:    vaultId,
+            console.log('[vault-entry] simple token derivation (4-step):', {
+                input_token:       token,
+                derived_vault_id:  debugKeys.vaultId,
                 read_key_hex:      readKeyHex,
                 write_key:         debugKeys.writeKey,
                 ref_file_id:       debugKeys.refFileId,
                 branch_index_id:   debugKeys.branchIndexFileId,
-                pbkdf2_read_salt:  'sg-vault-v1:' + vaultId,
-                hmac_ref_domain:   'sg-vault-v1:file-id:ref:' + vaultId,
+                step1_salt:        'sgraph-send-v1 (fixed)',
+                step2_hkdf_info:   'vault-read-key',
+                step3_hkdf_info:   'vault-write-key',
+                step4_vault_id:    'sha256(token)[:12]',
                 kdf_iterations:    600000
             })
 

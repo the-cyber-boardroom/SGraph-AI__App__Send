@@ -107,6 +107,82 @@ class SGVaultCrypto {
         }
     }
 
+    // --- Simple Token Key Derivation (different from standard vault keys) ---------
+    //
+    // Simple tokens use a 4-step derivation that differs from standard vault keys:
+    //   1. PBKDF2 with FIXED salt "sgraph-send-v1" (no vault_id) -> aes_key
+    //   2. HKDF(aes_key, info="vault-read-key") -> read_key
+    //   3. HKDF(aes_key, info="vault-write-key") -> write_key
+    //   4. vault_id = SHA-256(token)[:12 hex chars]
+    // Then ref_file_id is derived via HMAC(read_key, domain) as usual.
+
+    static async deriveKeysFromSimpleToken(token) {
+        if (!crypto?.subtle) {
+            throw new Error('Web Crypto API not available. Requires secure context (HTTPS or localhost).')
+        }
+
+        const encoder = new TextEncoder()
+
+        // Step 1: PBKDF2 with fixed salt "sgraph-send-v1" -> intermediate aes_key
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw', encoder.encode(token), 'PBKDF2', false, ['deriveBits']
+        )
+        const aesKeyBits = await crypto.subtle.deriveBits(
+            { name: 'PBKDF2', salt: encoder.encode('sgraph-send-v1'), iterations: this.KDF_ITERATIONS, hash: 'SHA-256' },
+            keyMaterial, this.KEY_LENGTH
+        )
+
+        // Step 2: HKDF(aes_key, info="vault-read-key") -> read_key
+        const hkdfKey = await crypto.subtle.importKey(
+            'raw', aesKeyBits, 'HKDF', false, ['deriveBits']
+        )
+        const readBits = await crypto.subtle.deriveBits(
+            { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: encoder.encode('vault-read-key') },
+            hkdfKey, this.KEY_LENGTH
+        )
+
+        // Step 3: HKDF(aes_key, info="vault-write-key") -> write_key
+        const writeBits = await crypto.subtle.deriveBits(
+            { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: encoder.encode('vault-write-key') },
+            hkdfKey, this.KEY_LENGTH
+        )
+
+        // Step 4: vault_id = SHA-256(token)[:12 hex chars]
+        const hashBuf = await crypto.subtle.digest('SHA-256', encoder.encode(token))
+        const hashBytes = new Uint8Array(hashBuf)
+        let vaultId = ''
+        for (let i = 0; i < 6; i++) {
+            vaultId += hashBytes[i].toString(16).padStart(2, '0')
+        }
+
+        // read_key as AES-GCM CryptoKey
+        const readKey = await crypto.subtle.importKey(
+            'raw', readBits, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']
+        )
+
+        // write_key as hex string
+        const writeKey = this._bytesToHex(new Uint8Array(writeBits))
+
+        // Derive ref_file_id and branch_index_file_id via HMAC (same as standard path)
+        const hmacKey = await crypto.subtle.importKey(
+            'raw', readBits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+        )
+
+        const [refHex, branchIndexHex] = await Promise.all([
+            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:ref:${vaultId}`),
+            this._deriveFileId(hmacKey, `sg-vault-v1:file-id:branch-index:${vaultId}`)
+        ])
+
+        return {
+            readKey,
+            writeKey,
+            hmacKey,
+            vaultId,
+            refFileId:         'ref-pid-muw-' + refHex,
+            branchIndexFileId: 'idx-pid-muw-' + branchIndexHex
+        }
+    }
+
     // --- Per-Branch Ref Derivation -----------------------------------------------
 
     static async deriveBranchRefFileId(hmacKey, vaultId, branchName) {
