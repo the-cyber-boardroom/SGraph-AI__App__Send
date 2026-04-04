@@ -1,0 +1,38 @@
+# Phase 3: Index Generation
+# Team: Explorer — Library Build (Team 1)
+# Lead: Developer | Dependency: Phase 1 content migration (enough files to test)
+# Source: Rendering and indexing strategy doc
+
+Workstream-3 | todo | Phase 3: Index Generation
+
+	Task-1  | todo | Write generate-index.py script -> Dev
+	# Scans all .md files in library repo
+	# Reads YAML frontmatter (title, version, date, roles, topics, status, team)
+	# Outputs: index.json, catalogue.csv, reading-order.json
+	# Staleness logic: flag if version is 2+ minor versions behind library current version
+
+	Task-2  | todo | Define reading-order.json per role -> Librarian
+	# For each role: what should they read first when they clone the library?
+	# Example: librarian → [shared-conventions, roles/librarian, guides/issues-fs, workflows/briefing]
+	# Output: reading-order.json spec for the generator to use
+
+	Task-3  | blocked | Test generate-index.py against real content -> Dev
+	# Blocked by: Task-1 + Phase 1 Task-28 (some content migrated)
+	# Verify: all files indexed, frontmatter parsed correctly, staleness flags work
+
+	Task-4  | todo | Add generate-index.py to CI pipeline -> Dev
+	# Runs on every push to main in SGraph-AI__Library repo
+	# If index files change: commit the updated indexes automatically
+	# (Only if there are actual changes — idempotent)
+
+	Task-5  | blocked | Verify index.json is valid and complete -> QA
+	# Every .md file in the repo must appear in index.json
+	# All required fields present for each entry
+	# Blocked by: Task-3
+
+	Task-6  | blocked | Verify catalogue.csv is valid and parseable -> QA
+	# Open in spreadsheet tool. All columns present.
+	# Blocked by: Task-3
+
+	Task-7  | blocked | Verify reading-order.json has entries for all 21 roles -> QA
+	# Blocked by: Task-2, Task-3

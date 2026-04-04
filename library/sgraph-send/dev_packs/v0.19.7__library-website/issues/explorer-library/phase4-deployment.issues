@@ -1,0 +1,33 @@
+# Phase 4: Deployment
+# Team: Explorer — Library Build (Team 1)
+# Lead: DevOps | Dependency: Phase 2 website build + Phase 3 index generation
+# Source: Implementation map Phase 4
+
+Workstream-4 | todo | Phase 4: Deployment to library.sgraph.ai
+
+	Task-1  | blocked | Create S3 bucket: library.sgraph.ai (eu-west-2) -> DevOps
+	# Public read. Static website hosting enabled.
+	# Blocked by: Phase 0 all done
+
+	Task-2  | blocked | Create CloudFront distribution -> DevOps
+	# Origin: S3 bucket. HTTPS. Custom domain: library.sgraph.ai
+	# Default root: index.html. 404 → /404.html
+	# Blocked by: Task-1
+
+	Task-3  | todo | Configure DNS: library.sgraph.ai CNAME → CloudFront -> DevOps
+
+	Task-4  | blocked | Write CI deploy pipeline (.github/workflows/deploy-library.yml) -> Dev
+	# On push to main:
+	# 1. Run generate-index.py (regenerate indexes)
+	# 2. Commit indexes if changed
+	# 3. aws s3 sync to library.sgraph.ai bucket
+	# 4. CloudFront invalidation /*
+	# 5. Smoke tests
+	# Blocked by: Phase 3 Task-4
+
+	Task-5  | blocked | Run first manual deploy and smoke test -> DevOps
+	# Verify: homepage loads, one role page loads, index.json accessible, raw markdown URL works
+	# Blocked by: Task-1, Task-2, Task-3, Phase 2 complete
+
+	Task-6  | todo | Verify zero cookies on all pages -> AppSec
+	# Same requirement as all SGraph sites

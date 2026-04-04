@@ -1,0 +1,27 @@
+# Phase 0: New Repo Creation
+# Team: Explorer — Library Build (Team 1)
+# Lead: Librarian | FIRST ACTION — everything else depends on this
+# Source: Implementation map Phase 0
+
+Workstream-0 | todo | Phase 0: Create SGraph-AI__Library repo
+
+	Task-1  | todo | Create GitHub repo: the-cyber-boardroom/SGraph-AI__Library -> Dev
+	# Public repo. Default branch: main. Branch protection (PR required).
+
+	Task-2  | todo | Commit initial folder structure with stub READMEs -> Librarian
+	# Folders: roles/ teams/ skills/ guides/ claude-guidance/ workflows/ project-index/
+	# Each folder gets a README.md stub.
+	# Root: README.md + CLAUDE.md
+
+	Task-3  | todo | Write root README.md -> Librarian
+	# "What this repo is. How to use it. Clone-on-start instruction."
+	# Include: git clone URL, folder overview table, index.json URL
+
+	Task-4  | todo | Write root CLAUDE.md -> Librarian
+	# Bootstrap guidance for agent sessions starting from the library.
+	# Points agents at the relevant folder for their role.
+	# Short — the detail is in each folder's content.
+
+	Task-5  | todo | Add .gitignore (exclude _site/, __pycache__, .DS_Store) -> Dev
+
+	Task-6  | todo | Verify repo is publicly readable (no auth required to clone) -> QA

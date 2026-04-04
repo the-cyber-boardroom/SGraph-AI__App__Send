@@ -1,0 +1,72 @@
+# Phase 2: Website Build
+# Team: Explorer — Library Build (Team 1)
+# Lead: Developer | Dependency: Phase 0 done; can start with stubs before Phase 1 complete
+# Source: Implementation map Phase 2 + rendering strategy doc
+
+Workstream-2 | todo | Phase 2: Website Build
+
+# ---- DESIGN (Designer) ----
+
+	Task-1  | todo | Design homepage layout (search + 6 section cards) -> Designer
+	# Aurora tokens: dark navy #1A1A2E + teal #4ECDC4, DM Sans
+	# Hero: repo clone instruction prominent
+	# Grid: 6 section cards (Roles, Teams, Skills, Guides, Claude Guidance, Workflows)
+	# Footer: index.json, catalogue.csv links
+
+	Task-2  | todo | Design document page template (sidebar + content area) -> Designer
+	# Left sidebar: <sg-library-nav> (section tree)
+	# Main: <sg-markdown-viewer> content area
+	# Header strip: <sg-document-meta> (version, date, status, Raw link)
+	# Mobile: sidebar collapses to hamburger
+
+	Task-3  | todo | Design print CSS -> Designer
+	# Sidebar hidden. Content readable. Code blocks styled. No URL printing.
+
+# ---- WEB COMPONENTS (Developer) ----
+
+	Task-4  | todo | Build <sg-markdown-viewer> Web Component -> Dev
+	# Fetches markdown from /raw/{path}, renders via marked.js + DOMPurify
+	# Syntax highlighting via highlight.js
+	# Fallback: show error message if fetch fails
+	# IFD path: _common/components/v0/v0.1/v0.1.0/sg-markdown-viewer.js
+
+	Task-5  | todo | Build <sg-library-nav> Web Component -> Dev
+	# Loads index.json. Groups documents by top-level section.
+	# Highlights current path. Expandable sections.
+	# External links at bottom: index.json, catalogue.csv
+
+	Task-6  | todo | Build <sg-library-search> Web Component -> Dev
+	# Client-side search over index.json (title, topics, path)
+	# Shows top 5 results as dropdown. Enter navigates.
+
+	Task-7  | todo | Build <sg-document-meta> Web Component -> Dev
+	# Shows: title | version | date | status badge | Raw ↗ link
+
+# ---- PAGES (Developer — blocked on Task-4 through Task-7) ----
+
+	Task-8  | blocked | Build homepage (index.html) -> Dev
+	# Blocked by: Task-1, Task-4 (markdown viewer), Task-6 (search)
+
+	Task-9  | blocked | Build document page template -> Dev
+	# Blocked by: Task-2, Task-4, Task-5, Task-7
+
+	Task-10 | blocked | Generate all section index pages (roles/, teams/, skills/, etc.) -> Dev
+	# One index.html per section. Lists all documents in that section.
+	# Blocked by: Task-9 template
+
+	Task-11 | blocked | Generate document pages for all content files -> Dev
+	# One rendered page per .md file.
+	# Blocked by: Task-9 template, Phase 1 content migration
+
+	Task-12 | todo | Build 404.html page -> Dev
+	# "This document doesn't exist. Browse the index →"
+
+# ---- ACCESSIBILITY AND QUALITY ----
+
+	Task-13 | blocked | Test navigation works without JavaScript -> Dev
+	# Progressive enhancement: if JS fails, raw markdown link still works
+	# Blocked by: Task-9
+
+	Task-14 | blocked | Test print layout on all content types -> Designer
+	# Print at least 1 role page, 1 guide page, 1 skill page
+	# Blocked by: Task-3 (print CSS), Task-11

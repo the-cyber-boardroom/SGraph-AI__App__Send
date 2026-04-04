@@ -1,0 +1,37 @@
+# Villager — Production Release Gate
+# Team: Villager — Production Release (Team 2)
+# Lead: QA | BLOCKED until Team 1 Stories 1-5 complete
+# Source: 05_definition-of-done.md
+
+Workstream-V1 | blocked | Production Release Gate (9-item DoD + technical checks)
+# Blocked by: Team-1 all stories complete
+
+# ---- 9 ACCEPTANCE CRITERIA (from brief) ----
+
+	Task-1  | blocked | Verify: Library repo exists with full folder structure -> QA
+	Task-2  | blocked | Verify: All 21+ role definitions in roles/ with frontmatter -> QA
+	Task-3  | blocked | Verify: Team structure pages (3 files) exist and are complete -> QA
+	Task-4  | blocked | Verify: Skills centralised (minimum 3) -> QA
+	Task-5  | blocked | Verify: Claude guidance (4 files) present -> QA
+	Task-6  | blocked | Verify: Static website deployable to library.sgraph.ai -> DevOps
+	Task-7  | blocked | Verify: Runs locally (python -m http.server, all content renders) -> QA
+	Task-8  | blocked | Run clone-on-start test in CLEAN environment -> QA
+	# New terminal. No SG/Send. Clone library only. Verify all 21 roles readable.
+	# See: 05_definition-of-done.md for exact test procedure.
+	Task-9  | blocked | Verify: Cross-project reuse — non-SG/Send session from library only -> Conductor
+
+# ---- TECHNICAL CHECKS ----
+
+	Task-10 | blocked | All rendered URLs return 200 -> QA
+	Task-11 | blocked | All /raw/*.md URLs return raw markdown -> QA
+	Task-12 | blocked | index.json is valid and indexes all documents -> Architect
+	Task-13 | blocked | catalogue.csv is valid -> Architect
+	Task-14 | blocked | reading-order.json has all 21 role entries -> Architect
+	Task-15 | blocked | <sg-markdown-viewer> renders headings, tables, code blocks correctly -> QA
+	Task-16 | blocked | Search returns results for "librarian", "IFD", "clone-on-start" -> QA
+	Task-17 | blocked | Print layout: sidebar hidden, content readable -> Designer
+	Task-18 | blocked | Zero cookies on all pages -> AppSec
+	Task-19 | blocked | CI deploys on push to main, smoke tests pass -> DevOps
+	Task-20 | blocked | No SG/Send-specific content leaked into library files -> Architect
+
+# GATE: All 20 tasks done → QA signs off → Town Planner adoption begins

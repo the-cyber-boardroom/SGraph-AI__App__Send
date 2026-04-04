@@ -1,0 +1,137 @@
+# Phase 1: Content Migration
+# Team: Explorer — Library Build (Team 1)
+# Lead: Librarian | Dependency: Phase 0 complete
+# Source: Implementation map Phase 1 + site structure plan
+
+Workstream-1 | todo | Phase 1: Content Migration (from SG/Send → Library repo)
+# Dependency: Phase 0 all tasks done
+
+# ===========================================================================
+# ROLE DEFINITIONS (16 existing + 5 new)
+# ===========================================================================
+
+	Task-1  | blocked | Copy 16 existing ROLE.md files to roles/ -> Librarian
+	# Source: team/roles/*/ROLE.md in SG/Send
+	# Action: copy + rename to {role}.md (e.g. librarian.md, architect.md)
+	# Add frontmatter: title, version, date, team, topics, status
+	# Blocked by: Phase 0 Task-2
+
+	Task-2  | blocked | Write roles/ciso.md (new role — does not exist yet) -> Librarian
+	# Source: .claude/CLAUDE.md mentions CISO role in team structure
+
+	Task-3  | blocked | Write roles/alchemist.md (Town Planner lead — does not exist) -> Librarian
+	# Source: alchemist role definitions in library/alchemist/
+
+	Task-4  | blocked | Write roles/explorer.md (meta-role) -> Librarian
+	# Source: .claude/explorer/CLAUDE.md + briefs/02/14/v0.3.2__role-definition__explorer.md
+
+	Task-5  | blocked | Write roles/villager.md (meta-role) -> Librarian
+	# Source: .claude/villager/CLAUDE.md + briefs/02/14/v0.3.2__role-definition__villager.md
+
+	Task-6  | blocked | Write roles/town-planner.md (meta-role) -> Librarian
+	# Source: .claude/town-planner/CLAUDE.md
+
+	Task-7  | blocked | Write roles/README.md (index of all 21 roles) -> Librarian
+	# Table: role name | one-line description | team | Wardley stage
+
+# ===========================================================================
+# TEAM STRUCTURE PAGES (new — do not exist)
+# ===========================================================================
+
+	Task-8  | blocked | Write teams/explorer-team.md -> Librarian
+	# Content: which roles, Wardley stage (Genesis → Custom-Built), focus, rules
+	# Source: .claude/explorer/CLAUDE.md + CLAUDE.md team structure section
+
+	Task-9  | blocked | Write teams/villager-team.md -> Librarian
+	# Source: .claude/villager/CLAUDE.md
+
+	Task-10 | blocked | Write teams/town-planner-team.md -> Librarian
+	# Source: .claude/town-planner/CLAUDE.md + Alchemist role definition
+
+# ===========================================================================
+# SKILLS (copy existing 3)
+# ===========================================================================
+
+	Task-11 | blocked | Copy library/skills/ from SG/Send → skills/ in Library repo -> Librarian
+	# 3 skills: create-vault-content, use_sgit-and-vaults, talk-to-team__send
+	# Review each for SG/Send-specific content — generalise where possible
+	# Rename talk-to-team__send → talk-to-team (remove project-specific suffix)
+
+# ===========================================================================
+# CLAUDE GUIDANCE (extract from SG/Send .claude/ files)
+# ===========================================================================
+
+	Task-12 | blocked | Extract shared conventions → claude-guidance/shared-conventions.md -> Librarian
+	# "Cannot" not "will not", no em dashes, version prefix naming, file naming rules
+	# Source: .claude/CLAUDE.md sections "Key Rules" and "File Naming"
+
+	Task-13 | blocked | Extract Wardley context → claude-guidance/wardley-context.md -> Librarian
+	# Explorer/Villager/Town Planner framing, separation rules
+	# Source: .claude/CLAUDE.md "Team Structure" section
+
+	Task-14 | blocked | Extract memory policy → claude-guidance/memory-policy.md -> Librarian
+	# "Do NOT use MEMORY.md" rule + where persistent knowledge lives
+	# Source: .claude/CLAUDE.md "MEMORY.md Policy" section
+
+	Task-15 | blocked | Extract reality doc rules → claude-guidance/reality-document-rules.md -> Librarian
+	# All 6 non-negotiable rules for reality documents
+	# Source: .claude/CLAUDE.md "Reality Document" section
+
+# ===========================================================================
+# GUIDES (copy stable guides, generalise SG/Send-specific content)
+# ===========================================================================
+
+	Task-16 | blocked | Copy IFD methodology guide → guides/ifd-methodology.md -> Librarian
+	# Source: library/guides/development/ifd/ in SG/Send
+	# Review: remove any SG/Send-specific file paths; keep methodology
+
+	Task-17 | blocked | Copy testing conventions → guides/testing-conventions.md -> Librarian
+	# Source: library/guides/development/ in SG/Send
+	# Key rules: no mocks, no patches, Type_Safe, in-memory stack, LocalStack for S3
+
+	Task-18 | blocked | Copy agentic workflow guide → guides/agentic-workflow.md -> Librarian
+	# Source: library/guides/ in SG/Send
+	# Content: how briefings work, voice memo → brief → agent execution
+
+	Task-19 | blocked | Write guides/issues-fs.md (new) -> Librarian
+	# Content: what Issues-FS is, flat file format, statuses, handoff pattern, CLI
+	# Source: v0.18.3__briefing__issues-fs-for-website-redesign-team.md
+
+	Task-20 | blocked | Write guides/clone-on-start.md (new) -> Librarian
+	# Content: the two-repo pattern, why it exists, how to set it up, example session start
+	# Source: v0.19.7 brief + this dev pack's patterns
+
+# ===========================================================================
+# WORKFLOWS (new — do not exist as standalone docs)
+# ===========================================================================
+
+	Task-21 | blocked | Write workflows/briefing-workflow.md -> Librarian
+	# Content: voice memo → brief → agent execution → debrief cycle
+
+	Task-22 | blocked | Write workflows/dev-qa-handoff.md -> Librarian
+	# Content: when Dev marks done, QA picks up, what QA checks
+
+	Task-23 | blocked | Write workflows/debrief-workflow.md -> Librarian
+	# Content: debrief structure, relative links, when to create, reading order
+
+	Task-24 | blocked | Write workflows/patch-flow.md -> Librarian
+	# Content: how code changes flow from Explorer → Villager → production
+
+# ===========================================================================
+# PROJECT INDEX (new)
+# ===========================================================================
+
+	Task-25 | blocked | Write project-index/repos.md -> Librarian
+	# Table: repo name | description | GitHub URL | status
+
+	Task-26 | blocked | Write project-index/websites.md -> Librarian
+	# Table: URL | description | repo | deploy status
+
+	Task-27 | blocked | Write project-index/vaults.md -> Librarian
+	# Table: vault ID | content | purpose | access
+
+# Quality check
+	Task-28 | blocked | Review all migrated content: zero SG/Send-specific content in library -> Architect
+	# Check: no references to sgraph_ai_app_send/ file paths
+	# Check: no SG/Send version numbers in shared methodology
+	# Check: all frontmatter present on all files
