@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SGraph Library — Agentic Team Knowledge Base</title>
+  <meta name="description" content="Centralised role definitions, skills, guides, and Claude guidance for the SGraph agentic team.">
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/_common/css/style.css">
+  <style>
+    body { background: var(--bg-primary); }
+  </style>
+</head>
+<body>
+
+<header class="lib-header">
+  <a href="/" class="lib-logo"><span>SGraph</span> Library</a>
+  <div class="lib-header-spacer"></div>
+  <nav class="lib-header-links">
+    <a href="/roles/">Roles</a>
+    <a href="/teams/">Teams</a>
+    <a href="/skills/">Skills</a>
+    <a href="/guides/">Guides</a>
+    <a href="/claude-guidance/">Claude Guidance</a>
+    <a href="https://github.com/the-cyber-boardroom/SGraph-AI__App__Send" target="_blank" rel="noopener">GitHub ↗</a>
+  </nav>
+</header>
+
+<main class="lib-home">
+
+  <section class="lib-home-hero">
+    <h1>SGraph Agentic Team Knowledge Base</h1>
+    <p>Role definitions, skills, guides, and Claude guidance — in one place, always cloneable.</p>
+    <div class="lib-clone-box" id="cloneBox" title="Click to copy">
+      <code>git clone https://github.com/the-cyber-boardroom/SGraph-AI__App__Send</code>
+      <button class="lib-clone-copy" id="copyBtn" onclick="copyClone()">copy</button>
+    </div>
+  </section>
+
+  <div class="lib-section-grid">
+    <a href="/roles/" class="lib-section-card">
+      <h2>Roles</h2>
+      <p>16 role definitions — identity, responsibilities, workflows</p>
+    </a>
+    <a href="/teams/" class="lib-section-card">
+      <h2>Teams</h2>
+      <p>Explorer · Villager · Town Planner — Wardley structure</p>
+    </a>
+    <a href="/skills/" class="lib-section-card">
+      <h2>Skills</h2>
+      <p>Claude skill files — vault content, SGit, team talk</p>
+    </a>
+    <a href="/guides/" class="lib-section-card">
+      <h2>Guides</h2>
+      <p>IFD methodology, testing conventions, agentic workflow</p>
+    </a>
+    <a href="/claude-guidance/" class="lib-section-card">
+      <h2>Claude Guidance</h2>
+      <p>Shared conventions, Wardley context, memory policy</p>
+    </a>
+    <a href="/workflows/" class="lib-section-card">
+      <h2>Workflows</h2>
+      <p>Briefing, handoffs, patches, release — how work flows</p>
+    </a>
+  </div>
+
+  <div class="lib-meta-row">
+    <a href="/index.json">index.json</a>
+    <a href="/catalogue.csv">catalogue.csv</a>
+    <a href="https://qa.send.sgraph.ai" target="_blank" rel="noopener">QA site ↗</a>
+    <a href="https://send.sgraph.ai" target="_blank" rel="noopener">SG/Send ↗</a>
+  </div>
+
+</main>
+
+<script>
+function copyClone() {
+  var text = 'git clone https://github.com/the-cyber-boardroom/SGraph-AI__App__Send';
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      document.getElementById('copyBtn').textContent = 'copied!';
+      setTimeout(function(){ document.getElementById('copyBtn').textContent = 'copy'; }, 2000);
+    });
+  }
+}
+</script>
+</body>
+</html>

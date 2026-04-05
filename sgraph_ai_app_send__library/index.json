@@ -1,0 +1,165 @@
+{
+  "generated": "2026-04-05T02:36:10.458524+00:00",
+  "sections": {
+    "roles": [
+      {
+        "slug": "advocate",
+        "title": "Role: Advocate",
+        "description": "1. User representation in design decisions -- Be present in every architectural decision, feature proposal, and UI change to ask \"how does this serve the user?\" based on real data",
+        "url": "/roles/advocate/",
+        "raw": "/roles/advocate.md"
+      },
+      {
+        "slug": "ambassador",
+        "title": "Role: Ambassador",
+        "description": "1. Market research and competitive intelligence -- Maintain a competitive map: products, features, pricing, positioning, user sentiment. Track adjacent markets and regulatory trends.",
+        "url": "/roles/ambassador/",
+        "raw": "/roles/ambassador.md"
+      },
+      {
+        "slug": "appsec",
+        "title": "Role: AppSec",
+        "description": "- Name: AppSec (Application Security)",
+        "url": "/roles/appsec/",
+        "raw": "/roles/appsec.md"
+      },
+      {
+        "slug": "architect",
+        "title": "Role: Architect",
+        "description": "1. Define API contracts -- Specify every endpoint's request/response schema using Type_Safe, including error shapes and status codes",
+        "url": "/roles/architect/",
+        "raw": "/roles/architect.md"
+      },
+      {
+        "slug": "cartographer",
+        "title": "Role: Cartographer",
+        "description": "- Location: team/roles/cartographer/",
+        "url": "/roles/cartographer/",
+        "raw": "/roles/cartographer.md"
+      },
+      {
+        "slug": "conductor",
+        "title": "Role: Conductor",
+        "description": "1. Translate briefs into actionable tasks -- Read Conductor briefs and human stakeholder briefs, decompose into role-specific work items, and route them",
+        "url": "/roles/conductor/",
+        "raw": "/roles/conductor.md"
+      },
+      {
+        "slug": "designer",
+        "title": "Role: Designer",
+        "description": "The Designer role is not a UI role. It is not a UX role. It is not a visual design role, though it includes all of those things when they are needed. The Designer owns something broader and more funda",
+        "url": "/roles/designer/",
+        "raw": "/roles/designer.md"
+      },
+      {
+        "slug": "developer",
+        "title": "Role: Dev",
+        "description": "1. Implement FastAPI routes -- Write route handlers in lambda__admin and lambda__user following the Serverless__Fast_API pattern, with Type_Safe request/response schemas",
+        "url": "/roles/developer/",
+        "raw": "/roles/developer.md"
+      },
+      {
+        "slug": "devops",
+        "title": "Role: DevOps",
+        "description": "1. Maintain CI pipelines -- Own .github/workflows/ci-pipeline__dev.yml, ci-pipeline__main.yml, and the base ci-pipeline.yml. Ensure tests run, tags increment, and artifacts publish on every push.",
+        "url": "/roles/devops/",
+        "raw": "/roles/devops.md"
+      },
+      {
+        "slug": "dpo",
+        "title": "Role: DPO (Data Protection Officer)",
+        "description": "1. Data mapping and processing audit -- Map every personal data processing activity: what data, where it lives, how it flows, on what lawful basis. Cover client-side, server-side, and third-party proc",
+        "url": "/roles/dpo/",
+        "raw": "/roles/dpo.md"
+      },
+      {
+        "slug": "grc",
+        "title": "Role: GRC (Governance, Risk, and Compliance)",
+        "description": "- Name: GRC (Governance, Risk, and Compliance)",
+        "url": "/roles/grc/",
+        "raw": "/roles/grc.md"
+      },
+      {
+        "slug": "historian",
+        "title": "Role: Historian",
+        "description": "- Location: team/roles/historian/",
+        "url": "/roles/historian/",
+        "raw": "/roles/historian.md"
+      },
+      {
+        "slug": "journalist",
+        "title": "Role: Journalist",
+        "description": "- Location: team/roles/journalist/",
+        "url": "/roles/journalist/",
+        "raw": "/roles/journalist.md"
+      },
+      {
+        "slug": "librarian",
+        "title": "Role: Librarian",
+        "description": "- Location: team/roles/librarian/",
+        "url": "/roles/librarian/",
+        "raw": "/roles/librarian.md"
+      },
+      {
+        "slug": "qa",
+        "title": "Role: QA",
+        "description": "1. Own the test matrix -- Maintain the complete matrix of storage modes (memory, disk, S3-LocalStack, S3-real) x deployment targets (in-process, local, Lambda, Docker, Fargate, EC2, AMI, GCP) x test l",
+        "url": "/roles/qa/",
+        "raw": "/roles/qa.md"
+      },
+      {
+        "slug": "sherpa",
+        "title": "Role: Sherpa",
+        "description": "1. Onboarding design and guidance -- Own the first-time user experience from landing page to completed encrypted file transfer",
+        "url": "/roles/sherpa/",
+        "raw": "/roles/sherpa.md"
+      }
+    ],
+    "skills": [
+      {
+        "slug": "create-vault-content",
+        "title": "SKILL: Create Vault Content for SG/Send Browse",
+        "description": "name: create-vault-content",
+        "url": "/skills/create-vault-content/",
+        "raw": "/skills/create-vault-content.md"
+      },
+      {
+        "slug": "talk-to-team",
+        "title": "SKILL: SGraph Send — Talk to the Team",
+        "description": "name: sgraph-send-team",
+        "url": "/skills/talk-to-team/",
+        "raw": "/skills/talk-to-team.md"
+      },
+      {
+        "slug": "use-sgit-and-vaults",
+        "title": "SKILL: sgit — Zero-Knowledge Encrypted Vault Operations",
+        "description": "Use this skill whenever you need to interact with a zero-knowledge encrypted vault",
+        "url": "/skills/use-sgit-and-vaults/",
+        "raw": "/skills/use-sgit-and-vaults.md"
+      }
+    ],
+    "guides": [
+      {
+        "slug": "ifd-intro",
+        "title": "Iterative Flow Development (IFD) - Intro and how to use",
+        "description": "Purpose: Complete reference for LLMs assisting with IFD-based development in air-gapped mode",
+        "url": "/guides/ifd-intro/",
+        "raw": "/guides/ifd-intro.md"
+      },
+      {
+        "slug": "ifd-testing",
+        "title": "IFD Testing Guide - LLM Brief",
+        "description": "Purpose: Quick reference guide for LLMs assisting with testing in IFD-based projects",
+        "url": "/guides/ifd-testing/",
+        "raw": "/guides/ifd-testing.md"
+      },
+      {
+        "slug": "ifd-versioning",
+        "title": "IFD Versioning Guide - LLM Brief",
+        "description": "Purpose: Quick reference for LLMs on IFD version types, dependency rules, and surgical override patterns",
+        "url": "/guides/ifd-versioning/",
+        "raw": "/guides/ifd-versioning.md"
+      }
+    ]
+  }
+}

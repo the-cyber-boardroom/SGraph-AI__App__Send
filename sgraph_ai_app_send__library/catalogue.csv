@@ -1,0 +1,23 @@
+section,slug,title,url,raw
+roles,advocate,Role: Advocate,/roles/advocate/,/roles/advocate.md
+roles,ambassador,Role: Ambassador,/roles/ambassador/,/roles/ambassador.md
+roles,appsec,Role: AppSec,/roles/appsec/,/roles/appsec.md
+roles,architect,Role: Architect,/roles/architect/,/roles/architect.md
+roles,cartographer,Role: Cartographer,/roles/cartographer/,/roles/cartographer.md
+roles,conductor,Role: Conductor,/roles/conductor/,/roles/conductor.md
+roles,designer,Role: Designer,/roles/designer/,/roles/designer.md
+roles,developer,Role: Dev,/roles/developer/,/roles/developer.md
+roles,devops,Role: DevOps,/roles/devops/,/roles/devops.md
+roles,dpo,Role: DPO (Data Protection Officer),/roles/dpo/,/roles/dpo.md
+roles,grc,"Role: GRC (Governance, Risk, and Compliance)",/roles/grc/,/roles/grc.md
+roles,historian,Role: Historian,/roles/historian/,/roles/historian.md
+roles,journalist,Role: Journalist,/roles/journalist/,/roles/journalist.md
+roles,librarian,Role: Librarian,/roles/librarian/,/roles/librarian.md
+roles,qa,Role: QA,/roles/qa/,/roles/qa.md
+roles,sherpa,Role: Sherpa,/roles/sherpa/,/roles/sherpa.md
+skills,create-vault-content,SKILL: Create Vault Content for SG/Send Browse,/skills/create-vault-content/,/skills/create-vault-content.md
+skills,talk-to-team,SKILL: SGraph Send — Talk to the Team,/skills/talk-to-team/,/skills/talk-to-team.md
+skills,use-sgit-and-vaults,SKILL: sgit — Zero-Knowledge Encrypted Vault Operations,/skills/use-sgit-and-vaults/,/skills/use-sgit-and-vaults.md
+guides,ifd-intro,Iterative Flow Development (IFD) - Intro and how to use,/guides/ifd-intro/,/guides/ifd-intro.md
+guides,ifd-testing,IFD Testing Guide - LLM Brief,/guides/ifd-testing/,/guides/ifd-testing.md
+guides,ifd-versioning,IFD Versioning Guide - LLM Brief,/guides/ifd-versioning/,/guides/ifd-versioning.md

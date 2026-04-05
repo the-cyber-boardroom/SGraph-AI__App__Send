@@ -60,6 +60,9 @@ CONTENT_TYPE_MAP = {
     ".woff2": "font/woff2",
     ".woff":  "font/woff",
     ".ttf":   "font/ttf",
+    ".md":    "text/markdown",
+    ".csv":   "text/csv",
+    ".txt":   "text/plain",
 }
 
 CACHE_CONTROL = {
