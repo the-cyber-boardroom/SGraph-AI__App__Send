@@ -8,7 +8,7 @@ from fastapi                                                                    
 from osbot_fast_api.api.decorators.route_path                                    import route_path
 from osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
-from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer, VAULT_ID_PATTERN
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Zip                import Service__Vault__Zip
 from sgraph_ai_app_send.lambda__user.user__config                                import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY
 
@@ -36,6 +36,12 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     vault_service        : Service__Vault__Pointer                               # Auto-initialized by Type_Safe
     vault_zip_service    : Service__Vault__Zip      = None                       # Vault zip builder (optional — injected by app)
     admin_service_client : object = None                                         # Optional Admin__Service__Client
+
+    @staticmethod
+    def _validate_vault_id(vault_id):                                            # Reject non-opaque vault IDs (security: prevents leaking names into S3/logs)
+        if not VAULT_ID_PATTERN.match(str(vault_id)):
+            raise HTTPException(status_code = 400,
+                                detail      = 'vault_id must be an opaque lowercase alphanumeric string (8-24 chars, no hyphens)')
 
     def check_access_token(self, request: Request):                              # Validate access token from header
         from osbot_utils.utils.Env import get_env
@@ -76,6 +82,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                                              file_id  : str,
                                              request  : Request
                                        ) -> dict:
+        self._validate_vault_id(vault_id)
         self.check_access_token(request)
         write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
         if not write_key:
@@ -98,6 +105,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     def read__vault_id__file_id(self, vault_id : Safe_Str__Id,                   # GET /vault/{vault_id}/read/{file_id:path}
                                       file_id  : str
                                ) -> Response:
+        self._validate_vault_id(vault_id)
         payload = self.vault_service.read(vault_id = str(vault_id),
                                           file_id  = str(file_id) )
         if payload is None:
@@ -110,6 +118,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     def read_base64__vault_id__file_id(self, vault_id : Safe_Str__Id,           # GET /vault/{vault_id}/read-base64/{file_id:path} — JSON-safe base64 read
                                              file_id  : str
                                        ) -> dict:
+        self._validate_vault_id(vault_id)
         payload = self.vault_service.read(vault_id = str(vault_id),
                                           file_id  = str(file_id) )
         if payload is None:
@@ -128,6 +137,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                                               file_id  : str,
                                               request  : Request
                                         ) -> dict:
+        self._validate_vault_id(vault_id)
         self.check_access_token(request)
         write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
         if not write_key:
@@ -144,6 +154,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     async def batch__vault_id(self, vault_id : Safe_Str__Id,                     # POST /vault/batch/{vault_id}
                                     request  : Request
                               ) -> dict:
+        self._validate_vault_id(vault_id)
         body = await request.json()
         operations = body.get('operations', [])
         if not operations:
@@ -175,11 +186,13 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     def list__vault_id(self, vault_id : Safe_Str__Id,                            # GET /vault/list/{vault_id}?prefix=bare/data/
                              prefix   : str = ''                                 # Query param: filter by file_id prefix
                        ) -> dict:
+        self._validate_vault_id(vault_id)
         return self.vault_service.list_files(vault_id = str(vault_id) ,
                                              prefix   = prefix        )
 
     @route_path('/health/{vault_id}')
     def health__vault_id(self, vault_id : Safe_Str__Id) -> dict:                # GET /vault/health/{vault_id} — unauthenticated existence check + Lambda warm-up
+        self._validate_vault_id(vault_id)
         manifest_path = self.vault_service.vault_manifest_path(str(vault_id))
         exists        = self.vault_service.storage_fs.file__exists(manifest_path)
         if exists:
@@ -191,6 +204,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     def zip__vault_id(self, vault_id : Safe_Str__Id,                             # GET /vault/zip/{vault_id} — download vault as zip
                             request  : Request
                       ) -> Response:
+        self._validate_vault_id(vault_id)
         self.check_access_token(request)
         write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
         if not write_key:

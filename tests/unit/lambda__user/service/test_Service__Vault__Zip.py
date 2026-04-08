@@ -16,7 +16,7 @@ class test_Service__Vault__Zip(TestCase):
         self.vault_service = Service__Vault__Pointer()
         self.zip_service   = Service__Vault__Zip(vault_service = self.vault_service,
                                                   storage_fs    = self.vault_service.storage_fs)
-        self.vault_id  = 'zip-vault-1'
+        self.vault_id  = 'zipvault0001'
         self.write_key = 'deadbeef1234567890abcdef'
 
     def _write(self, vault_id=None, file_id='file-1', payload=b'data'):

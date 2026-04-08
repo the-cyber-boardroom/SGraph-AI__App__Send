@@ -205,11 +205,11 @@ class test_Routes__Vault__Pointer(TestCase):
 
     def test__vault_isolation(self):
         """Files in different vaults are independent."""
-        self._write(vault_id='vault-aaa', file_id='shared-id', payload=b'vault-a')
-        self._write(vault_id='vault-bbb', file_id='shared-id', payload=b'vault-b')
+        self._write(vault_id='vaultaaaa0001', file_id='shared-id', payload=b'vault-a')
+        self._write(vault_id='vaultbbbb0001', file_id='shared-id', payload=b'vault-b')
 
-        assert self._read(vault_id='vault-aaa', file_id='shared-id').content == b'vault-a'
-        assert self._read(vault_id='vault-bbb', file_id='shared-id').content == b'vault-b'
+        assert self._read(vault_id='vaultaaaa0001', file_id='shared-id').content == b'vault-a'
+        assert self._read(vault_id='vaultbbbb0001', file_id='shared-id').content == b'vault-b'
 
     # --- Multiple files in vault ---
 
@@ -253,7 +253,7 @@ class test_Routes__Vault__Pointer(TestCase):
             dict(op='write', file_id='bare/data/obj-r1', data=base64.b64encode(b'blob-1').decode()),
             dict(op='write', file_id='bare/data/obj-r2', data=base64.b64encode(b'blob-2').decode()),
         ]
-        response = self._batch(vault_id='batch-vault-1', operations=ops)
+        response = self._batch(vault_id='batchvault001', operations=ops)
         assert response.status_code == 200
         data = response.json()
         assert len(data['results']) == 2
@@ -261,7 +261,7 @@ class test_Routes__Vault__Pointer(TestCase):
 
     def test__batch__write_if_match_success(self):
         # Set up initial ref via batch (slashed file_ids require batch, not individual PUT)
-        vault = 'batch-vault-2'
+        vault = 'batchvault002'
         setup_ops = [dict(op='write', file_id='bare/refs/ref-001',
                           data=base64.b64encode(b'commit-aaa').decode())]
         self._batch(vault_id=vault, operations=setup_ops)
@@ -276,7 +276,7 @@ class test_Routes__Vault__Pointer(TestCase):
         assert response.json()['results'][0]['status'] == 'ok'
 
     def test__batch__write_if_match_conflict(self):
-        vault = 'batch-vault-3'
+        vault = 'batchvault003'
         setup_ops = [dict(op='write', file_id='bare/refs/ref-001',
                           data=base64.b64encode(b'commit-aaa').decode())]
         self._batch(vault_id=vault, operations=setup_ops)
@@ -304,14 +304,14 @@ class test_Routes__Vault__Pointer(TestCase):
 
     def test__batch__wrong_key(self):
         # First create the vault with correct key
-        self._write(vault_id='batch-vault-4', file_id='setup', payload=b'setup')
+        self._write(vault_id='batchvault004', file_id='setup', payload=b'setup')
         ops = [dict(op='write', file_id='file-1', data=base64.b64encode(b'data').decode())]
-        response = self._batch(vault_id='batch-vault-4', operations=ops, write_key='wrong-key')
+        response = self._batch(vault_id='batchvault004', operations=ops, write_key='wrong-key')
         assert response.status_code == 403
 
     def test__batch__push_simulation(self):
         """Simulate a full push: write blobs + tree + commit, CAS the ref."""
-        vault = 'push-sim-vault'
+        vault = 'pushsimvault1'
         ops = [
             dict(op='write', file_id='bare/data/obj-blob1',   data=base64.b64encode(b'file-content').decode()),
             dict(op='write', file_id='bare/data/obj-tree1',   data=base64.b64encode(b'tree-json').decode()),
@@ -339,14 +339,14 @@ class test_Routes__Vault__Pointer(TestCase):
     # === List endpoint ===
 
     def test__list__empty_vault(self):
-        response = self._list(vault_id='list-empty-vault')
+        response = self._list(vault_id='listemptyvlt1')
         assert response.status_code == 200
         data = response.json()
-        assert data['vault_id'] == 'list-empty-vault'
+        assert data['vault_id'] == 'listemptyvlt1'
         assert data['files']    == []
 
     def test__list__returns_files(self):
-        vault = 'list-vault-1'
+        vault = 'listvault0001'
         # Write files via batch (slashed file_ids require batch)
         ops = [
             dict(op='write', file_id='bare/data/obj-aaa', data=base64.b64encode(b'a').decode()),
@@ -363,7 +363,7 @@ class test_Routes__Vault__Pointer(TestCase):
         assert 'bare/refs/ref-001' in files
 
     def test__list__with_prefix(self):
-        vault = 'list-vault-2'
+        vault = 'listvault0002'
         ops = [
             dict(op='write', file_id='bare/data/obj-aaa', data=base64.b64encode(b'a').decode()),
             dict(op='write', file_id='bare/refs/ref-001', data=base64.b64encode(b'r').decode()),
@@ -376,7 +376,7 @@ class test_Routes__Vault__Pointer(TestCase):
 
     def test__list__no_auth_required(self):
         """List endpoint is unauthenticated (consistent with read)."""
-        vault = 'list-vault-3'
+        vault = 'listvault0003'
         ops = [dict(op='write', file_id='bare/data/obj-xxx', data=base64.b64encode(b'x').decode())]
         self._batch(vault_id=vault, operations=ops)
 
@@ -390,7 +390,7 @@ class test_Routes__Vault__Pointer(TestCase):
 
     def test__batch_read__no_auth_required(self):
         """Read-only batch does not require write-key or access token."""
-        vault = 'batch-read-vault-1'
+        vault = 'batchrdvault1'
         # Write some files first (with auth)
         ops = [dict(op='write', file_id='bare/refs/ref-main',  data=base64.b64encode(b'commit1').decode()),
                dict(op='write', file_id='bare/data/obj-aaa',   data=base64.b64encode(b'blob-a').decode()),
@@ -417,7 +417,7 @@ class test_Routes__Vault__Pointer(TestCase):
     def test__batch_read__not_found(self):
         """Batch read of nonexistent file returns not_found status."""
         read_ops = [dict(op='read', file_id='bare/data/ghost')]
-        response = self.client.post('/api/vault/batch/batch-read-vault-2',
+        response = self.client.post('/api/vault/batch/batchrdvault2',
                                      content = json.dumps({'operations': read_ops}),
                                      headers = {'content-type': 'application/json'})
         assert response.status_code          == 200
@@ -429,7 +429,7 @@ class test_Routes__Vault__Pointer(TestCase):
         unauthenticated = TestClient(self.client.app)
         ops = [dict(op='read',  file_id='bare/data/obj-aaa'),
                dict(op='write', file_id='bare/data/obj-bbb', data=base64.b64encode(b'x').decode())]
-        response = unauthenticated.post('/api/vault/batch/batch-read-vault-3',
+        response = unauthenticated.post('/api/vault/batch/batchrdvault3',
                                          content = json.dumps({'operations': ops}),
                                          headers = {'content-type': 'application/json'})
         assert response.status_code in (400, 401)                                # Missing write-key or access token
@@ -438,7 +438,7 @@ class test_Routes__Vault__Pointer(TestCase):
 
     def test__health__existing_vault(self):
         """Health check returns ok for a vault that has been written to."""
-        vault = 'health-vault-1'
+        vault = 'healthvault01'
         self._write(vault_id=vault, file_id='setup-file', payload=b'data')       # Creates manifest
         response = self.client.get(f'/api/vault/health/{vault}')
         assert response.status_code == 200
@@ -446,12 +446,12 @@ class test_Routes__Vault__Pointer(TestCase):
 
     def test__health__nonexistent_vault(self):
         """Health check returns 404 for a vault that doesn't exist."""
-        response = self.client.get('/api/vault/health/no-such-vault')
+        response = self.client.get('/api/vault/health/nosuchvault01')
         assert response.status_code == 404
 
     def test__health__no_auth_required(self):
         """Health check is unauthenticated — serves as Lambda warm-up."""
-        vault = 'health-vault-2'
+        vault = 'healthvault02'
         self._write(vault_id=vault, file_id='setup-file', payload=b'data')
         from starlette.testclient import TestClient
         unauthenticated = TestClient(self.client.app)
@@ -462,7 +462,7 @@ class test_Routes__Vault__Pointer(TestCase):
 
     def test__write_read_delete__slashed_file_id(self):
         """Individual PUT/GET/DELETE endpoints support slashed file_ids via :path converter."""
-        vault   = 'slash-vault-1'
+        vault   = 'slashvault001'
         file_id = 'bare/data/obj-abc123'
         payload = b'content-addressed-blob'
 
@@ -508,9 +508,53 @@ class test_Routes__Vault__Pointer(TestCase):
                                       headers = {'x-sgraph-vault-write-key': 'key'})
         assert response.status_code == 400
 
+    # === Vault ID format validation ===
+
+    def test__write__rejects_hyphenated_vault_id(self):
+        """Server rejects vault IDs containing hyphens (prevents leaking project names)."""
+        response = self._write(vault_id='tools-patches', file_id='test', payload=b'data')
+        assert response.status_code == 400
+        assert 'opaque' in response.json()['detail'].lower()
+
+    def test__write__rejects_uppercase_vault_id(self):
+        """Server rejects vault IDs containing uppercase letters."""
+        response = self._write(vault_id='MyVaultABC', file_id='test', payload=b'data')
+        assert response.status_code == 400
+
+    def test__write__rejects_short_vault_id(self):
+        """Server rejects vault IDs shorter than 8 characters."""
+        response = self._write(vault_id='abc1234', file_id='test', payload=b'data')
+        assert response.status_code == 400
+
+    def test__write__rejects_long_vault_id(self):
+        """Server rejects vault IDs longer than 24 characters."""
+        response = self._write(vault_id='a' * 25, file_id='test', payload=b'data')
+        assert response.status_code == 400
+
+    def test__read__rejects_invalid_vault_id(self):
+        """Read endpoint also validates vault_id format."""
+        response = self._read(vault_id='tools-patches', file_id='test')
+        assert response.status_code == 400
+
+    def test__list__rejects_invalid_vault_id(self):
+        """List endpoint also validates vault_id format."""
+        response = self._list(vault_id='my-project-vault')
+        assert response.status_code == 400
+
+    def test__batch__rejects_invalid_vault_id(self):
+        """Batch endpoint also validates vault_id format."""
+        ops = [dict(op='read', file_id='test')]
+        response = self._batch(vault_id='tools-patches', operations=ops)
+        assert response.status_code == 400
+
+    def test__health__rejects_invalid_vault_id(self):
+        """Health endpoint also validates vault_id format."""
+        response = self.client.get('/api/vault/health/tools-patches')
+        assert response.status_code == 400
+
     def test__write_read__deeply_nested_file_id(self):
         """File IDs with multiple slashes (e.g. bare/refs/heads/main) work."""
-        vault   = 'slash-vault-2'
+        vault   = 'slashvault002'
         file_id = 'bare/refs/heads/main'
         payload = b'commit-hash-ref'
 
