@@ -22,6 +22,9 @@
                     <a class="vn-item vn-item--active" data-view="files" href="#">
                         <span class="vn-icon">&#128194;</span><span class="vn-label">Files</span>
                     </a>
+                    <a class="vn-item" data-view="generate" href="#">
+                        <span class="vn-icon">&#9889;</span><span class="vn-label">Gen</span>
+                    </a>
                     <a class="vn-item" data-view="sgit" href="#">
                         <span class="vn-icon">&#128268;</span><span class="vn-label">SGit</span>
                     </a>
