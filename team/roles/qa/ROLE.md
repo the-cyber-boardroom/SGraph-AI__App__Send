@@ -125,6 +125,7 @@
 | `team/comms/qa/briefs/` | Read QA briefs for specific test cases and priorities |
 | `team/comms/qa/questions/` | Write questions for the Explorer/Dev team |
 | `.issues/` | File and track defects |
+| `sgit` (PyPI: `sgit-ai`) | Clone vaults shared by other teams for test data or briefings |
 | `pytest` | Test runner |
 | Playwright | Browser automation for E2E tests |
 | LocalStack | S3 emulation for integration tests |

@@ -177,6 +177,7 @@ team/                            # Team structure
 11. **No decryption keys on server** — key stays with sender, shared out-of-band
 12. **IP addresses hashed** — SHA-256 with daily salt, stored as `ip_hash`
 13. **All backend data is non-sensitive/non-confidential** — by design
+14. **NEVER commit access tokens, vault keys, share tokens, or API keys to Git.** These are secrets. If a vault key or token appears in a commit, it is a security incident. Use environment variables, localStorage, or out-of-band communication only.
 
 ### File Naming
 
@@ -206,6 +207,16 @@ team/                            # Team structure
 28. **QA briefs** for testing requirements go in `team/comms/qa/briefs/MM/DD/`
 29. **QA team starts every session** by reading `team/comms/QA_START_HERE.md`
 30. **Inter-team briefs** (e.g. Vault→Browse, Architect→Dev) go in `team/comms/briefs/MM/DD/`
+
+### Vaults for Communication (`sgit`)
+
+31. **Vaults are used for cross-team communication.** Briefings, handovers, and deliverables can be shared via encrypted vaults in addition to (or instead of) committing to Git.
+32. **Vault key vs share token — know the difference:**
+    - **Vault key** (e.g. `apple-river-1234`) — persistent, writable, the full vault. Used to clone, push, pull, collaborate. Accessed at `dev.vault.sgraph.ai/en-gb/#<vault-key>`.
+    - **Share token** (e.g. `coral-stamp-5678`) — read-only snapshot of the vault at a point in time. Created via `sgit share`. Accessed at `send.sgraph.ai/en-gb/browse/#<share-token>`.
+33. **NEVER commit vault keys, share tokens, or access tokens to Git.** Share them out-of-band (chat, email, voice). If a key appears in a committed file, it is a security incident.
+34. **sgit CLI** (`pip install sgit-ai`) for vault operations: `sgit init`, `sgit commit`, `sgit push`, `sgit share`, `sgit clone`. See `SGit-AI/SGit-AI__CLI` on GitHub.
+35. **sg-send-cli is deprecated.** Use `sgit` (PyPI: `sgit-ai`) for all vault CLI operations. The `sg-send-cli` package is no longer maintained.
 
 ### Git
 

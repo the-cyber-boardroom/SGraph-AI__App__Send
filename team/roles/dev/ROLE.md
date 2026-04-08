@@ -113,6 +113,7 @@
 - No storage call bypasses `Storage_FS` / Memory-FS
 - No frontend component imports external frameworks or libraries
 - The server never processes, reads, or logs plaintext file content
+- No access tokens, vault keys, share tokens, or API keys are committed to Git — these are secrets
 
 ## Tools and Access
 
@@ -128,6 +129,7 @@
 | `team/roles/architect/` | Read API contracts and schemas |
 | `sgraph_ai_app_send/version` | Read current version for review file naming |
 | `pytest` | Run unit tests locally |
+| `sgit` (PyPI: `sgit-ai`) | Create and share vaults for cross-team handovers |
 | `.claude/CLAUDE.md` | Reference for stack rules and patterns |
 
 ## Escalation
