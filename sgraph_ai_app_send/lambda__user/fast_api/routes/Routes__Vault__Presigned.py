@@ -10,6 +10,7 @@ from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id 
 from osbot_utils.utils.Env                                                           import get_env
 from sgraph_ai_app_send.lambda__user.schemas.Schema__Vault__Presigned                import Schema__Vault__Presigned__Initiate, Schema__Vault__Presigned__Complete, Schema__Vault__Presigned__Cancel
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Presigned               import Service__Vault__Presigned
+from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer                import VAULT_ID_PATTERN
 from sgraph_ai_app_send.lambda__user.user__config                                    import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY
 
 TAG__ROUTES_VAULT_PRESIGNED = 'api/vault/presigned'
@@ -24,6 +25,12 @@ class Routes__Vault__Presigned(Fast_API__Routes):                               
     tag                        : str = TAG__ROUTES_VAULT_PRESIGNED
     vault_presigned_service    : Service__Vault__Presigned                            # Auto-initialized by Type_Safe
     admin_service_client       : object = None                                       # Optional Admin__Service__Client
+
+    @staticmethod
+    def _validate_vault_id(vault_id):                                                # Reject non-opaque vault IDs (security: prevents leaking names into S3/logs)
+        if not VAULT_ID_PATTERN.match(str(vault_id)):
+            raise HTTPException(status_code = 400,
+                                detail      = 'vault_id must be an opaque lowercase alphanumeric string (8-24 chars, no hyphens)')
 
     def check_access_token(self, request: Request):                                  # Same token validation as Routes__Vault__Pointer
         provided_token = request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '')
@@ -65,6 +72,7 @@ class Routes__Vault__Presigned(Fast_API__Routes):                               
                                  request_body: Schema__Vault__Presigned__Initiate,
                                  request     : Request
                           ) -> dict:
+        self._validate_vault_id(vault_id)
         self.check_access_token(request)
         write_key = self._get_write_key(request)
         result = self.vault_presigned_service.initiate_upload(
@@ -92,6 +100,7 @@ class Routes__Vault__Presigned(Fast_API__Routes):                               
                                  request_body: Schema__Vault__Presigned__Complete,
                                  request     : Request
                            ) -> dict:
+        self._validate_vault_id(vault_id)
         self.check_access_token(request)
         write_key = self._get_write_key(request)
         result = self.vault_presigned_service.complete_upload(
@@ -117,6 +126,7 @@ class Routes__Vault__Presigned(Fast_API__Routes):                               
                                request_body: Schema__Vault__Presigned__Cancel,
                                request     : Request
                          ) -> dict:
+        self._validate_vault_id(vault_id)
         self.check_access_token(request)
         write_key = self._get_write_key(request)
         result = self.vault_presigned_service.cancel_upload(
@@ -141,6 +151,7 @@ class Routes__Vault__Presigned(Fast_API__Routes):                               
     def read_url__vault_id__file_id(self, vault_id: Safe_Str__Id,                    # GET /vault/presigned/read-url/{vault_id}/{file_id:path}
                                           file_id : str
                                     ) -> dict:                                       # No auth required (same as /api/vault/read/)
+        self._validate_vault_id(vault_id)
         result = self.vault_presigned_service.create_read_url(
             vault_id = str(vault_id),
             file_id  = str(file_id)

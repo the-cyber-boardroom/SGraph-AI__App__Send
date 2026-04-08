@@ -27,13 +27,13 @@ class test_Send__User_Lambda__Test_Client(TestCase):
 
     def test__vault_write_read(self):
         headers  = {HEADER__SGRAPH_VAULT__WRITE_KEY: self.test_objs.write_key}
-        response = self.client.put('/api/vault/write/test-vault/test-file',
+        response = self.client.put('/api/vault/write/testvault001/test-file',
                                    content = b'encrypted-blob',
                                    headers = {**headers, 'content-type': 'application/octet-stream'})
         assert response.status_code == 200
         assert response.json()['status'] == 'completed'
 
-        read = self.client.get('/api/vault/read/test-vault/test-file')
+        read = self.client.get('/api/vault/read/testvault001/test-file')
         assert read.content == b'encrypted-blob'
 
     def test__vault_batch(self):
@@ -43,7 +43,7 @@ class test_Send__User_Lambda__Test_Client(TestCase):
             dict(op='write', file_id='bare/data/obj-tc1', data=base64.b64encode(b'blob-1').decode()),
             dict(op='write', file_id='bare/data/obj-tc2', data=base64.b64encode(b'blob-2').decode()),
         ]
-        response = self.client.post('/api/vault/batch/batch-tc-vault',
+        response = self.client.post('/api/vault/batch/batchtcvault1',
                                     content = json.dumps({'operations': ops}),
                                     headers = headers)
         assert response.status_code == 200
@@ -54,11 +54,11 @@ class test_Send__User_Lambda__Test_Client(TestCase):
         headers = {HEADER__SGRAPH_VAULT__WRITE_KEY : self.test_objs.write_key,
                    'content-type'                  : 'application/json'      }
         ops = [dict(op='write', file_id='bare/data/obj-list-tc', data=base64.b64encode(b'data').decode())]
-        self.client.post('/api/vault/batch/list-tc-vault',
+        self.client.post('/api/vault/batch/listtcvault01',
                          content = json.dumps({'operations': ops}),
                          headers = headers)
 
-        response = self.client.get('/api/vault/list/list-tc-vault', params={'prefix': 'bare/data/'})
+        response = self.client.get('/api/vault/list/listtcvault01', params={'prefix': 'bare/data/'})
         assert response.status_code == 200
         assert 'bare/data/obj-list-tc' in response.json()['files']
 
@@ -86,13 +86,13 @@ class test_Send__User_Lambda__Http_Server(TestCase):
 
     def test__vault_write_read_via_http(self):
         headers = {**self.auth_headers(), 'content-type': 'application/octet-stream'}
-        write = requests.put(f'{self.base_url}/api/vault/write/http-vault/http-file',
+        write = requests.put(f'{self.base_url}/api/vault/write/httpvault001/http-file',
                              data    = b'encrypted-via-http',
                              headers = headers)
         assert write.status_code == 200
         assert write.json()['status'] == 'completed'
 
-        read = requests.get(f'{self.base_url}/api/vault/read/http-vault/http-file')
+        read = requests.get(f'{self.base_url}/api/vault/read/httpvault001/http-file')
         assert read.status_code == 200
         assert read.content     == b'encrypted-via-http'
 
@@ -105,7 +105,7 @@ class test_Send__User_Lambda__Http_Server(TestCase):
                  match=None,
                  data=base64.b64encode(b'obj-commit-1').decode()),
         ]
-        response = requests.post(f'{self.base_url}/api/vault/batch/http-batch-vault',
+        response = requests.post(f'{self.base_url}/api/vault/batch/httpbatchvlt1',
                                  json    = {'operations': ops},
                                  headers = headers)
         assert response.status_code == 200
@@ -120,11 +120,11 @@ class test_Send__User_Lambda__Http_Server(TestCase):
             dict(op='write', file_id='bare/data/obj-list1', data=base64.b64encode(b'd1').decode()),
             dict(op='write', file_id='bare/refs/ref-001',   data=base64.b64encode(b'r1').decode()),
         ]
-        requests.post(f'{self.base_url}/api/vault/batch/http-list-vault',
+        requests.post(f'{self.base_url}/api/vault/batch/httplistvlt01',
                       json=dict(operations=ops), headers=headers)
 
         # List with prefix (no auth required)
-        response = requests.get(f'{self.base_url}/api/vault/list/http-list-vault',
+        response = requests.get(f'{self.base_url}/api/vault/list/httplistvlt01',
                                 params={'prefix': 'bare/data/'})
         assert response.status_code == 200
         assert 'bare/data/obj-list1' in response.json()['files']
@@ -132,7 +132,7 @@ class test_Send__User_Lambda__Http_Server(TestCase):
     def test__vault_push_simulation_via_http(self):
         """Full push simulation: write objects + CAS ref, verify via list."""
         headers = {**self.auth_headers(), 'content-type': 'application/json'}
-        vault   = 'http-push-vault'
+        vault   = 'httppushvlt01'
 
         # Push: write blob + tree + commit + CAS ref
         ops = [
