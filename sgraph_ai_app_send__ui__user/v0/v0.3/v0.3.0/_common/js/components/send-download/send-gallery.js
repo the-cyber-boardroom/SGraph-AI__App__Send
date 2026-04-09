@@ -308,6 +308,12 @@ class SendGallery extends SendComponent {
                 this._thumbUrls.push(url);
                 this._lightboxPdfUrl = url;
                 content.innerHTML = `<iframe src="${url}" class="sg-lightbox__pdf"></iframe>`;
+            } else if (type === 'video') {
+                const mime = FileTypeDetect.getVideoMime(entry.name) || 'video/mp4';
+                const blob = new Blob([bytes], { type: mime });
+                const url = URL.createObjectURL(blob);
+                this._thumbUrls.push(url);
+                content.innerHTML = `<video controls src="${url}" class="sg-lightbox__video"></video>`;
             } else {
                 const text = new TextDecoder().decode(bytes);
                 content.innerHTML = `<pre class="sg-lightbox__code">${this.escapeHtml(text)}</pre>`;
