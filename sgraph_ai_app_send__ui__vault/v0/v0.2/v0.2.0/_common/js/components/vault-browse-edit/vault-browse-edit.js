@@ -75,6 +75,8 @@
                     container.appendChild(textareaEl);
                 }
                 textareaEl.focus();
+                textareaEl.selectionStart = textareaEl.selectionEnd = 0;
+                textareaEl.scrollTop = 0;
                 editBtn.style.display   = 'none';
                 saveBtn.style.display   = '';
                 cancelBtn.style.display = '';
@@ -104,12 +106,11 @@
                 saveBtn.textContent = 'Saving...';
 
                 self.dataSource.saveFile(folder === '/' ? '/' : folder, fName, newBytes.buffer).then(function() {
-                    // Update the pre element with new content
-                    if (preEl) preEl.textContent = newText;
-                    // Update size display
-                    var sizeEl = bar.querySelector('.sb-file__size');
-                    if (sizeEl) sizeEl.textContent = SendHelpers.formatBytes(newBytes.byteLength);
-                    exitEdit();
+                    // Re-render container fully with new bytes (handles markdown, code, text)
+                    // _renderFileContent calls _origRender then re-attaches edit/delete buttons
+                    if (textareaEl) { textareaEl.remove(); textareaEl = null; }
+                    isEditing = false;
+                    self._renderFileContent(container, newBytes.buffer, fileName, type);
                     if (window.sgraphVault && window.sgraphVault.messages) {
                         window.sgraphVault.messages.success('"' + fName + '" saved');
                     }
@@ -134,19 +135,22 @@
         deleteBtn.addEventListener('mouseenter', function() { deleteBtn.style.color = '#ff6b6b'; });
         deleteBtn.addEventListener('mouseleave', function() { deleteBtn.style.color = ''; });
         deleteBtn.addEventListener('click', function() {
-            if (!confirm('Delete "' + fileName.split('/').pop() + '"?')) return;
+            var fName = fileName.split('/').pop();
             var parts = fileName.split('/');
-            var fName = parts.pop();
+            parts.pop();
             var folder = '/' + parts.join('/');
 
-            self.dataSource.deleteFile(folder === '/' ? '/' : folder, fName).then(function() {
-                if (window.sgraphVault && window.sgraphVault.messages) {
-                    window.sgraphVault.messages.success('"' + fName + '" deleted');
-                }
-            }).catch(function(err) {
-                if (window.sgraphVault && window.sgraphVault.messages) {
-                    window.sgraphVault.messages.error('Delete failed: ' + err.message);
-                }
+            _confirm('Delete "' + fName + '"?', function() {
+                self.dataSource.deleteFile(folder === '/' ? '/' : folder, fName).then(function() {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.success('"' + fName + '" deleted');
+                    }
+                    _refreshBrowseTree(self);
+                }).catch(function(err) {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.error('Delete failed: ' + err.message);
+                    }
+                });
             });
         });
         bar.appendChild(deleteBtn);
@@ -215,17 +219,18 @@
     // --- New folder ---
 
     function _showNewFolder(browse) {
-        var name = prompt('Folder name:');
-        if (!name || !name.trim()) return;
-        browse.dataSource.createFolder('/' + name.trim()).then(function() {
-            if (window.sgraphVault && window.sgraphVault.messages) {
-                window.sgraphVault.messages.success('Folder "' + name.trim() + '" created');
-            }
-            _refreshBrowseTree(browse);
-        }).catch(function(err) {
-            if (window.sgraphVault && window.sgraphVault.messages) {
-                window.sgraphVault.messages.error('Create folder failed: ' + err.message);
-            }
+        _prompt('New folder name:', function(name) {
+            if (!name || !name.trim()) return;
+            browse.dataSource.createFolder('/' + name.trim()).then(function() {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.success('Folder "' + name.trim() + '" created');
+                }
+                _refreshBrowseTree(browse);
+            }).catch(function(err) {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.error('Create folder failed: ' + err.message);
+                }
+            });
         });
     }
 
@@ -241,6 +246,71 @@
             };
         });
         browse._populateTree();
+    }
+
+    // --- Inline confirm dialog (no browser confirm()) ---
+
+    function _confirm(message, onOk) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg-secondary,#12122a);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:1.5rem 2rem;min-width:280px;max-width:400px;';
+        box.innerHTML = '<p style="margin:0 0 1.2rem;color:var(--color-text,#e2e8f0);font-size:14px;">' + message + '</p>';
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:0.75rem;justify-content:flex-end;';
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'sb-action-btn';
+        cancelBtn.textContent = 'Cancel';
+        var okBtn = document.createElement('button');
+        okBtn.className = 'sb-action-btn';
+        okBtn.textContent = 'Delete';
+        okBtn.style.cssText = 'color:#ff6b6b;font-weight:700;';
+        cancelBtn.addEventListener('click', function() { overlay.remove(); });
+        okBtn.addEventListener('click', function() { overlay.remove(); onOk(); });
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(okBtn);
+        box.appendChild(btnRow);
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+        okBtn.focus();
+    }
+
+    // --- Inline prompt dialog (no browser prompt()) ---
+
+    function _prompt(message, onOk) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg-secondary,#12122a);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:1.5rem 2rem;min-width:300px;max-width:400px;';
+        box.innerHTML = '<p style="margin:0 0 0.75rem;color:var(--color-text,#e2e8f0);font-size:14px;">' + message + '</p>';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.style.cssText = 'width:100%;padding:0.5rem 0.75rem;background:var(--bg-primary,#0a0a18);border:1px solid var(--accent,#4ECDC4);border-radius:4px;color:var(--color-text,#e2e8f0);font-size:14px;box-sizing:border-box;outline:none;margin-bottom:1rem;';
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:0.75rem;justify-content:flex-end;';
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'sb-action-btn';
+        cancelBtn.textContent = 'Cancel';
+        var okBtn = document.createElement('button');
+        okBtn.className = 'sb-action-btn';
+        okBtn.textContent = 'Create';
+        okBtn.style.cssText = 'color:var(--accent,#4ECDC4);font-weight:700;';
+        var submit = function() { overlay.remove(); onOk(input.value); };
+        cancelBtn.addEventListener('click', function() { overlay.remove(); });
+        okBtn.addEventListener('click', submit);
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submit();
+            if (e.key === 'Escape') overlay.remove();
+        });
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(okBtn);
+        box.appendChild(input);
+        box.appendChild(btnRow);
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+        input.focus();
     }
 
     // --- Helper ---
