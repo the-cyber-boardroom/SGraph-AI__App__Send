@@ -979,8 +979,10 @@ var PageLayoutRenderer = (function () {
         // Auto-banner: render before nav when page doesn't start with a hero.
         // Suppressed when:  page.banner === false  OR  first component is 'hero'.
         // The banner uses page.title and optional page.meta (author, date, tags).
+        // Auto-banner always renders unless explicitly suppressed with "banner": false,
+        // or unless the page author placed an explicit "banner" component first.
         var firstType = (page.components && page.components[0]) ? page.components[0].type : null;
-        if (page.banner !== false && firstType !== 'hero' && firstType !== 'banner') {
+        if (page.banner !== false && firstType !== 'banner') {
             var meta = page.meta || {};
             var bannerEl = _renderBanner({
                 title:       page.title  || '',
