@@ -63,7 +63,6 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
-        vault._branchId          = keys.branchId
 
         // 3. Initialize component managers
         vault._initManagers()
@@ -120,7 +119,6 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
-        vault._branchId          = keys.branchId
 
         // Initialize component managers
         vault._initManagers()
@@ -475,7 +473,7 @@ class SGVault {
             parentIds,
             treeId,
             message,
-            branchId: this._branchId
+            branchId: null   // Web UI has no branch index; null is valid (CLI: allow_empty=True)
         })
 
         // 5. Update HEAD ref

@@ -28,7 +28,7 @@ class SGVaultCommit {
 
     // --- Create a commit object, store it, return its object ID ------------------
 
-    async createCommit({ parentIds = [], treeId, message = '', branchId = 'main' }) {
+    async createCommit({ parentIds = [], treeId, message = '', branchId = null }) {
         // Encrypt commit message
         const msgPlain  = new TextEncoder().encode(message)
         const msgCipher = await SGSendCrypto.encrypt(msgPlain, this._readKey)
