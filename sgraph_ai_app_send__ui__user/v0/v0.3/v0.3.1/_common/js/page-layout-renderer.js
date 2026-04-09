@@ -593,6 +593,158 @@ var PageLayoutRenderer = (function () {
         return el;
     }
 
+    // ── Component: callout ────────────────────────────────────────────────────
+    // Alert/notice box with variants: info | warning | success | tip
+
+    function _renderCallout(props) {
+        var variant = props.variant || 'info';  // info | warning | success | tip
+        var el = document.createElement('div');
+        el.className = 'plr-callout plr-callout--' + _esc(variant);
+
+        var iconMap = { info: 'ℹ', warning: '⚠', success: '✓', tip: '💡' };
+        var icon = iconMap[variant] || iconMap.info;
+
+        var iconEl = document.createElement('span');
+        iconEl.className = 'plr-callout__icon';
+        iconEl.textContent = icon;
+        el.appendChild(iconEl);
+
+        var body = document.createElement('div');
+        body.className = 'plr-callout__body';
+
+        if (props.title) {
+            var titleEl = document.createElement('strong');
+            titleEl.className = 'plr-callout__title';
+            titleEl.textContent = props.title;
+            body.appendChild(titleEl);
+        }
+        if (props.text) {
+            var textEl = document.createElement('p');
+            textEl.className = 'plr-callout__text';
+            textEl.textContent = props.text;
+            body.appendChild(textEl);
+        }
+
+        el.appendChild(body);
+        return el;
+    }
+
+    // ── Component: stats ──────────────────────────────────────────────────────
+    // Horizontal row of metric cards: number + label + optional delta
+
+    function _renderStats(props) {
+        var items = props.items || [];
+        var el = document.createElement('div');
+        el.className = 'plr-stats';
+
+        items.forEach(function (item) {
+            var card = document.createElement('div');
+            card.className = 'plr-stats__card';
+
+            var val = document.createElement('div');
+            val.className = 'plr-stats__value';
+            val.textContent = item.value || '';
+            card.appendChild(val);
+
+            var label = document.createElement('div');
+            label.className = 'plr-stats__label';
+            label.textContent = item.label || '';
+            card.appendChild(label);
+
+            if (item.delta !== undefined) {
+                var deltaEl = document.createElement('div');
+                var isPositive = String(item.delta).charAt(0) !== '-';
+                deltaEl.className = 'plr-stats__delta plr-stats__delta--' + (isPositive ? 'up' : 'down');
+                deltaEl.textContent = item.delta;
+                card.appendChild(deltaEl);
+            }
+
+            el.appendChild(card);
+        });
+
+        return el;
+    }
+
+    // ── Component: quote ──────────────────────────────────────────────────────
+    // Styled pull-quote with optional author attribution
+
+    function _renderQuote(props) {
+        var el = document.createElement('blockquote');
+        el.className = 'plr-quote';
+
+        var textEl = document.createElement('p');
+        textEl.className = 'plr-quote__text';
+        textEl.textContent = props.text || '';
+        el.appendChild(textEl);
+
+        if (props.author) {
+            var footer = document.createElement('footer');
+            footer.className = 'plr-quote__attribution';
+
+            var name = document.createElement('cite');
+            name.className = 'plr-quote__author';
+            name.textContent = props.author;
+            footer.appendChild(name);
+
+            if (props.role) {
+                var roleEl = document.createElement('span');
+                roleEl.className = 'plr-quote__role';
+                roleEl.textContent = ', ' + props.role;
+                footer.appendChild(roleEl);
+            }
+
+            el.appendChild(footer);
+        }
+
+        return el;
+    }
+
+    // ── Component: author ─────────────────────────────────────────────────────
+    // Attribution block: author name, date, optional byline/role
+
+    async function _renderAuthor(props, folderPath, zipTree, browseInstance) {
+        var el = document.createElement('div');
+        el.className = 'plr-author';
+
+        if (props.avatar) {
+            var avatarUrl = await _blobUrl(props.avatar, folderPath, zipTree, browseInstance);
+            if (avatarUrl) {
+                var img = document.createElement('img');
+                img.className = 'plr-author__avatar';
+                img.src = avatarUrl;
+                img.alt = props.name || 'Author';
+                el.appendChild(img);
+            }
+        }
+
+        var meta = document.createElement('div');
+        meta.className = 'plr-author__meta';
+
+        if (props.name) {
+            var nameEl = document.createElement('div');
+            nameEl.className = 'plr-author__name';
+            nameEl.textContent = props.name;
+            meta.appendChild(nameEl);
+        }
+
+        if (props.role) {
+            var roleEl = document.createElement('div');
+            roleEl.className = 'plr-author__role';
+            roleEl.textContent = props.role;
+            meta.appendChild(roleEl);
+        }
+
+        if (props.date) {
+            var dateEl = document.createElement('div');
+            dateEl.className = 'plr-author__date';
+            dateEl.textContent = props.date;
+            meta.appendChild(dateEl);
+        }
+
+        el.appendChild(meta);
+        return el;
+    }
+
     // ── Component dispatcher ──────────────────────────────────────────────────
 
     async function _renderComponent(comp, folderPath, zipTree, browseInstance) {
@@ -614,6 +766,10 @@ var PageLayoutRenderer = (function () {
                 case 'markdown':      return await _renderMarkdown(props, folderPath, zipTree, browseInstance);
                 case 'cards':         return await _renderCards(props, folderPath, zipTree, browseInstance);
                 case 'columns':       return await _renderColumns(props, children, folderPath, zipTree, browseInstance);
+                case 'callout':       return _renderCallout(props);
+                case 'stats':         return _renderStats(props);
+                case 'quote':         return _renderQuote(props);
+                case 'author':        return await _renderAuthor(props, folderPath, zipTree, browseInstance);
                 default:              return null;  // Unknown type: skip silently
             }
         } catch (err) {
