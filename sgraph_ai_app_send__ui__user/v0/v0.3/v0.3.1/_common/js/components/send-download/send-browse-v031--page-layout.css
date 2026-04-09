@@ -113,6 +113,7 @@
     gap: 0;
     align-items: stretch;
     background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid rgba(0,0,0,0.07);   /* separates nav from banner */
     border-bottom: 2px solid var(--color-border, #d4d4d4);
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     backdrop-filter: blur(4px);
@@ -496,26 +497,70 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    padding: 0.2rem 0.75rem;
-    border-bottom: 1px solid var(--color-border, #e8e8e8);
-    background: var(--color-surface, #fafafa);
+    padding: 0.3rem 0.75rem;
+    /* Toolbar always lives in the dark Browse shell — use explicit dark values */
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: #151b28;
+    gap: 0.4rem;
 }
 
 .plr-source-toggle-btn {
     font-size: 0.75rem;
-    padding: 0.2rem 0.6rem;
-    border: 1px solid var(--color-border, #d0d0d0);
-    border-radius: 3px;
-    background: none;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
     cursor: pointer;
-    color: var(--color-text-secondary, #666);
+    color: rgba(255,255,255,0.7);
     font-family: monospace;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    white-space: nowrap;
 }
 
 .plr-source-toggle-btn:hover {
-    color: var(--color-primary, #4ecdc4);
-    border-color: var(--color-primary, #4ecdc4);
+    color: #4ecdc4;
+    border-color: #4ecdc4;
+    background: rgba(78,205,196,0.1);
+}
+
+/* ── Theme selector in toolbar ────────────────────────────────────────────── */
+
+.plr-theme-select {
+    font-size: 0.75rem;
+    padding: 0.22rem 0.5rem;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.65);
+    cursor: pointer;
+    font-family: monospace;
+    transition: border-color 0.15s, color 0.15s;
+    margin-right: auto;   /* push all other buttons to the right */
+}
+
+.plr-theme-select:hover,
+.plr-theme-select:focus {
+    border-color: #4ecdc4;
+    color: #4ecdc4;
+    outline: none;
+}
+
+.plr-theme-select option {
+    background: #1a2030;
+    color: #e0e0e0;
+}
+
+/* ── Content frame (card inside dark panel) ───────────────────────────────── */
+
+.plr-content-frame {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    margin: 0 0.6rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.35);
 }
 
 /* ── JSON source view ─────────────────────────────────────────────────────── */
@@ -570,19 +615,8 @@
 .plr-page--dark .plr-json-bool { color: #d2a8ff; }
 .plr-page--dark .plr-json-null { color: #6e7681; }
 
-/* Dark source toggle bar */
-.plr-page--dark .plr-source-bar {
-    background: #161b22;
-    border-bottom-color: rgba(255,255,255,0.08);
-}
-.plr-page--dark .plr-source-toggle-btn {
-    color: rgba(255,255,255,0.5);
-    border-color: rgba(255,255,255,0.15);
-}
-.plr-page--dark .plr-source-toggle-btn:hover {
-    color: var(--color-primary, #4ecdc4);
-    border-color: var(--color-primary, #4ecdc4);
-}
+/* .plr-source-bar dark styles now live on the base rule (toolbar is always
+   in the dark Browse shell — .plr-page--dark override no longer needed) */
 
 /* ── CSS custom properties (theme knobs) ──────────────────────────────────── */
 
@@ -753,9 +787,28 @@
 
 .plr-columns__col { min-width: 0; }  /* prevent overflow in narrow grid cells */
 
-/* Responsive: stack below 768px */
+/* Subtle vertical separator between adjacent column cells */
+.plr-page--light .plr-columns__col + .plr-columns__col {
+    border-left: 1px solid #e8e8e8;
+    padding-left: 1.5rem;
+}
+.plr-page--dark .plr-columns__col + .plr-columns__col {
+    border-left: 1px solid rgba(255,255,255,0.08);
+    padding-left: 1.5rem;
+}
+
+/* Responsive: stack below 768px — swap vertical border for horizontal */
 @media (max-width: 768px) {
     .plr-columns { grid-template-columns: 1fr !important; }
+    .plr-columns__col + .plr-columns__col {
+        border-left: none !important;
+        padding-left: 0 !important;
+        border-top: 1px solid rgba(0,0,0,0.08);
+        padding-top: 1rem;
+    }
+    .plr-page--dark .plr-columns__col + .plr-columns__col {
+        border-top-color: rgba(255,255,255,0.08);
+    }
 }
 
 /* ── Density variants ──────────────────────────────────────────────────────── */
