@@ -148,40 +148,7 @@ class SGVault {
         }
 
         // Load commit → load tree → build nested structure
-        const commit = await vault._commitManager.loadCommit(commitId)
-        const tree   = await vault._commitManager.loadTree(commit.tree_id)
-
-        // Reconstruct nested tree and settings from flat entries
-        vault._tree     = { '/': { type: 'folder', children: {} } }
-        vault._settings = null
-
-        for (const entry of tree.entries) {
-            if (entry.name === '.vault-settings') {
-                // Settings stored as a special blob in the tree
-                const settingsBlob = await vault._objectStore.load(entry.blob_id)
-                const decrypted    = await SGSendCrypto.decrypt(settingsBlob, vault._readKey)
-                vault._settings    = JSON.parse(new TextDecoder().decode(decrypted))
-            } else if (entry.tree_id) {
-                // Sub-tree: store lazy placeholder (loaded on demand when folder is expanded)
-                vault._tree['/'].children[entry.name] = {
-                    type:     'folder',
-                    children: {},
-                    _tree_id: entry.tree_id,
-                    _loaded:  false
-                }
-            } else {
-                vault._insertEntry(entry)
-            }
-        }
-
-        if (!vault._settings) {
-            vault._settings = {
-                vault_name: 'Untitled Vault',
-                vault_id:   vaultId,
-                created:    new Date().toISOString(),
-                version:    2
-            }
-        }
+        await vault._loadTreeFromCommit(vault._headCommitId)
 
         return vault
     }
@@ -529,6 +496,92 @@ class SGVault {
         if (!this.writable)        throw new Error('Read-only: no write key')
         await this._refManager.writeRef(this._refFileId, this._headCommitId)
         this._namedHeadId = this._headCommitId
+    }
+
+    // --- Behind count: new commits on named branch not yet in clone ---------------
+
+    async getBehindCount() {
+        const serverNamedHead = await this._refManager.readRef(this._refFileId)
+        if (!serverNamedHead || serverNamedHead === this._namedHeadId) return 0
+
+        // Count commits from serverNamedHead back to _namedHeadId
+        let count  = 0
+        let cursor = serverNamedHead
+        const max  = 100
+
+        while (cursor && cursor !== this._namedHeadId && count < max) {
+            count++
+            try {
+                const commit = await this._commitManager.loadCommit(cursor)
+                cursor = commit.parents && commit.parents[0] ? commit.parents[0] : null
+            } catch (_) {
+                break
+            }
+        }
+
+        return count
+    }
+
+    // --- Pull: fast-forward clone to named branch HEAD (no merge) ----------------
+
+    async pull() {
+        if (!this.writable) throw new Error('Read-only: no write key')
+
+        // Reject if clone has unpushed commits — pull would require a merge
+        if (this._headCommitId !== this._namedHeadId) {
+            throw new Error('Cannot pull: you have unpushed local commits. Push first, then pull.')
+        }
+
+        const serverNamedHead = await this._refManager.readRef(this._refFileId)
+        if (!serverNamedHead || serverNamedHead === this._headCommitId) return false  // already up to date
+
+        // Fast-forward: update in-memory pointers
+        this._namedHeadId  = serverNamedHead
+        this._headCommitId = serverNamedHead
+
+        // Update clone ref on server to match
+        await this._refManager.writeRef(this._cloneRefFileId, serverNamedHead)
+
+        // Rebuild in-memory tree from new HEAD
+        await this._loadTreeFromCommit(serverNamedHead)
+
+        return true  // tree changed
+    }
+
+    // --- Load tree from a specific commit ID (used by open() and pull()) ---------
+
+    async _loadTreeFromCommit(commitId) {
+        const commit = await this._commitManager.loadCommit(commitId)
+        const tree   = await this._commitManager.loadTree(commit.tree_id)
+
+        this._tree     = { '/': { type: 'folder', children: {} } }
+        this._settings = null
+
+        for (const entry of tree.entries) {
+            if (entry.name === '.vault-settings') {
+                const settingsBlob = await this._objectStore.load(entry.blob_id)
+                const decrypted    = await SGSendCrypto.decrypt(settingsBlob, this._readKey)
+                this._settings     = JSON.parse(new TextDecoder().decode(decrypted))
+            } else if (entry.tree_id) {
+                this._tree['/'].children[entry.name] = {
+                    type:     'folder',
+                    children: {},
+                    _tree_id: entry.tree_id,
+                    _loaded:  false
+                }
+            } else {
+                this._insertEntry(entry)
+            }
+        }
+
+        if (!this._settings) {
+            this._settings = {
+                vault_name: 'Untitled Vault',
+                vault_id:   this._vaultId,
+                created:    new Date().toISOString(),
+                version:    2
+            }
+        }
     }
 
     get writable() { return !!this._writeKey }
