@@ -35,11 +35,13 @@ class SGVault {
         this._writeKey          = null                                         // Hex string for server auth
         this._hmacKey           = null                                         // For per-branch ref derivation
         this._vaultId           = null
-        this._refFileId         = null                                         // ref-pid-muw-{HMAC[:12]}
+        this._refFileId         = null                                         // ref-pid-muw-{HMAC[:12]}  (named branch)
+        this._cloneRefFileId    = null                                         // ref-pid-snw-{HMAC[:12]}  (clone branch)
         this._branchIndexFileId = null                                         // idx-pid-muw-{HMAC[:12]}
         this._settings          = null                                         // Vault metadata
         this._tree              = null                                         // Nested in-memory tree
-        this._headCommitId      = null                                         // Current HEAD commit
+        this._namedHeadId       = null                                         // Named branch HEAD (last pushed state)
+        this._headCommitId      = null                                         // Clone branch HEAD (working tip)
         this._objectStore       = null                                         // SGVaultObjectStore
         this._refManager        = null                                         // SGVaultRefManager
         this._commitManager     = null                                         // SGVaultCommit
@@ -63,6 +65,7 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
+        vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vault._vaultId, 'web-ui')
 
         // 3. Initialize component managers
         vault._initManagers()
@@ -79,8 +82,11 @@ class SGVault {
         // 5. Create initial empty tree (in-memory)
         vault._tree = { '/': { type: 'folder', children: {} } }
 
-        // 6. Create initial commit with empty tree + settings
+        // 6. Create initial commit — goes to both named and clone refs (they start in sync)
         await vault._commit('Initial vault creation')
+        // Point named ref at the same commit so ahead count starts at 0
+        await vault._refManager.writeRef(vault._refFileId, vault._headCommitId)
+        vault._namedHeadId = vault._headCommitId
 
         return vault
     }
@@ -119,15 +125,27 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
+        vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(keys.hmacKey, vaultId, 'web-ui')
 
         // Initialize component managers
         vault._initManagers()
 
-        // Read HEAD ref to get latest commit
-        const commitId = await vault._refManager.readRef(vault._refFileId)
-        if (!commitId) throw new Error('Vault not found: HEAD ref missing')
+        // Read named HEAD ref
+        const namedCommitId = await vault._refManager.readRef(vault._refFileId)
+        if (!namedCommitId) throw new Error('Vault not found: HEAD ref missing')
+        vault._namedHeadId = namedCommitId
 
-        vault._headCommitId = commitId
+        // Read clone branch ref — if it doesn't exist yet, initialise to named HEAD
+        const cloneCommitId = await vault._refManager.readRef(vault._cloneRefFileId)
+        if (cloneCommitId) {
+            vault._headCommitId = cloneCommitId
+        } else {
+            // First time opening with write access: create clone ref at named HEAD
+            if (vault._writeKey) {
+                await vault._refManager.writeRef(vault._cloneRefFileId, namedCommitId)
+            }
+            vault._headCommitId = namedCommitId
+        }
 
         // Load commit → load tree → build nested structure
         const commit = await vault._commitManager.loadCommit(commitId)
@@ -476,10 +494,45 @@ class SGVault {
             branchId: null   // Web UI has no branch index; null is valid (CLI: allow_empty=True)
         })
 
-        // 5. Update HEAD ref
-        await this._refManager.writeRef(this._refFileId, commitId)
+        // 5. Update clone branch ref (named ref only moves on push)
+        const targetRef = this._cloneRefFileId || this._refFileId
+        await this._refManager.writeRef(targetRef, commitId)
         this._headCommitId = commitId
     }
+
+    // --- Ahead count: commits on clone not yet on named branch ------------------
+
+    async getAheadCount() {
+        if (!this._namedHeadId || this._headCommitId === this._namedHeadId) return 0
+
+        let count  = 0
+        let cursor = this._headCommitId
+        const max  = 100  // safety cap
+
+        while (cursor && cursor !== this._namedHeadId && count < max) {
+            count++
+            try {
+                const commit = await this._commitManager.loadCommit(cursor)
+                cursor = commit.parents && commit.parents[0] ? commit.parents[0] : null
+            } catch (_) {
+                break
+            }
+        }
+
+        return count
+    }
+
+    // --- Push: fast-forward named branch ref to clone HEAD ----------------------
+
+    async push() {
+        if (!this._cloneRefFileId) throw new Error('No clone branch initialised')
+        if (!this.writable)        throw new Error('Read-only: no write key')
+        await this._refManager.writeRef(this._refFileId, this._headCommitId)
+        this._namedHeadId = this._headCommitId
+    }
+
+    get writable() { return !!this._writeKey }
+    get aheadOf()  { return this._namedHeadId }
 
     // --- Build tree entries with sub-tree objects for folders (matches CLI format)
 
