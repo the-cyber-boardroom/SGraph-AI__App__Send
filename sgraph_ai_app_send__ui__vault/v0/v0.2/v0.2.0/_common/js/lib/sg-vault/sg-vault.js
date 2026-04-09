@@ -63,6 +63,7 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
+        vault._branchId          = keys.branchId
 
         // 3. Initialize component managers
         vault._initManagers()
@@ -119,6 +120,7 @@ class SGVault {
         vault._hmacKey           = keys.hmacKey
         vault._refFileId         = keys.refFileId
         vault._branchIndexFileId = keys.branchIndexFileId
+        vault._branchId          = keys.branchId
 
         // Initialize component managers
         vault._initManagers()
@@ -472,7 +474,8 @@ class SGVault {
         const commitId  = await this._commitManager.createCommit({
             parentIds,
             treeId,
-            message
+            message,
+            branchId: this._branchId
         })
 
         // 5. Update HEAD ref
