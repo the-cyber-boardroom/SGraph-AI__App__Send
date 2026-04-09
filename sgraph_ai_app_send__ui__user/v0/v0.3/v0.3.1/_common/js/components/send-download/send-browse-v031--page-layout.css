@@ -1153,6 +1153,113 @@
     border-color: var(--color-primary, #4ecdc4);
 }
 
+/* ── Banner (context identity strip) ─────────────────────────────────────── */
+/* Auto-rendered at the top of every _page.json page that doesn't begin with  */
+/* a hero block. Tells new users what they're looking at and provides          */
+/* dismissible page-identity metadata (title, badge, author, date, tags).      */
+
+.plr-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 1.5rem;
+    background: rgba(78, 205, 196, 0.06);
+    border-bottom: 1px solid rgba(78, 205, 196, 0.18);
+    font-size: 0.8rem;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.plr-banner__left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.plr-banner__icon {
+    font-size: 0.95rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.plr-banner__title {
+    font-weight: 600;
+    color: #1a2e2c;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 320px;
+}
+
+.plr-banner__badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--plr-accent, #4ecdc4);
+    color: #0a2e2c;
+    flex-shrink: 0;
+}
+
+.plr-banner__tag {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(78, 205, 196, 0.12);
+    color: #2a5c58;
+    border: 1px solid rgba(78, 205, 196, 0.25);
+    white-space: nowrap;
+}
+
+.plr-banner__right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.plr-banner__meta {
+    color: #4a8a86;
+    white-space: nowrap;
+}
+
+.plr-banner__meta--date {
+    color: #6a9a96;
+}
+
+.plr-banner__dismiss {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: #7abab6;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0 0 0.5rem;
+    transition: color 0.15s;
+}
+.plr-banner__dismiss:hover { color: #2a5c58; }
+
+/* Dark mode banner */
+.plr-page--dark .plr-banner {
+    background: rgba(78, 205, 196, 0.05);
+    border-bottom-color: rgba(78, 205, 196, 0.12);
+}
+.plr-page--dark .plr-banner__title   { color: #a8f0ec; }
+.plr-page--dark .plr-banner__tag     { background: rgba(78,205,196,0.08); color: #7ecfcc; border-color: rgba(78,205,196,0.15); }
+.plr-page--dark .plr-banner__meta    { color: #5ab8b4; }
+.plr-page--dark .plr-banner__meta--date { color: #4a9894; }
+.plr-page--dark .plr-banner__dismiss { color: #3a8884; }
+.plr-page--dark .plr-banner__dismiss:hover { color: #7ecfcc; }
+
+/* Banner is decorative — hide in print */
+@media print { .plr-banner { display: none !important; } }
+
 /* ── Print ────────────────────────────────────────────────────────────────── */
 /* Printing is handled by _plrPrintPage() (PLR-007) which opens a new window  */
 /* with the page-layout CSS loaded via <link> and its own @media print rules. */

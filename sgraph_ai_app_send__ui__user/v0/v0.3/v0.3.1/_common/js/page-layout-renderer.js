@@ -745,6 +745,95 @@ var PageLayoutRenderer = (function () {
         return el;
     }
 
+    // ── Component: banner ─────────────────────────────────────────────────────
+    // A thin identity strip that tells new users what they're looking at.
+    // Rendered automatically (before nav) when the first component is not a hero,
+    // unless explicitly suppressed via `"banner": false` in the page JSON.
+    // Can also be placed explicitly as `{ "type": "banner", "props": { ... } }`.
+    //
+    // Props:
+    //   title       — overrides the page title (auto-banner uses page.title)
+    //   badge       — label shown in the teal badge (default: "Page Layout")
+    //   author      — optional author name shown on the right
+    //   date        — optional date string shown on the right
+    //   tags        — optional array of tag strings
+    //   dismissible — if true (default), show an × button that hides the banner
+
+    function _renderBanner(props) {
+        var el = document.createElement('div');
+        el.className = 'plr-banner';
+
+        // Left side: icon + title + badge
+        var left = document.createElement('div');
+        left.className = 'plr-banner__left';
+
+        var icon = document.createElement('span');
+        icon.className = 'plr-banner__icon';
+        icon.textContent = '📄';
+        left.appendChild(icon);
+
+        if (props.title) {
+            var titleEl = document.createElement('span');
+            titleEl.className = 'plr-banner__title';
+            titleEl.textContent = props.title;
+            left.appendChild(titleEl);
+        }
+
+        var badge = document.createElement('span');
+        badge.className = 'plr-banner__badge';
+        badge.textContent = props.badge || 'Page Layout';
+        left.appendChild(badge);
+
+        // Optional tags
+        (props.tags || []).forEach(function (tag) {
+            var t = document.createElement('span');
+            t.className = 'plr-banner__tag';
+            t.textContent = tag;
+            left.appendChild(t);
+        });
+
+        el.appendChild(left);
+
+        // Right side: author + date
+        var hasMeta = props.author || props.date;
+        if (hasMeta) {
+            var right = document.createElement('div');
+            right.className = 'plr-banner__right';
+
+            if (props.author) {
+                var authorEl = document.createElement('span');
+                authorEl.className = 'plr-banner__meta';
+                authorEl.textContent = props.author;
+                right.appendChild(authorEl);
+            }
+            if (props.date) {
+                var dateEl = document.createElement('span');
+                dateEl.className = 'plr-banner__meta plr-banner__meta--date';
+                dateEl.textContent = props.date;
+                right.appendChild(dateEl);
+            }
+            el.appendChild(right);
+        }
+
+        // Dismiss button (default: shown)
+        if (props.dismissible !== false) {
+            var closeBtn = document.createElement('button');
+            closeBtn.className = 'plr-banner__dismiss';
+            closeBtn.textContent = '×';
+            closeBtn.setAttribute('title', 'Dismiss');
+            closeBtn.addEventListener('click', function () {
+                el.style.transition = 'opacity 0.2s';
+                el.style.opacity = '0';
+                setTimeout(function () {
+                    if (el.parentNode) el.parentNode.removeChild(el);
+                }, 220);
+            });
+            el.appendChild(closeBtn);
+        }
+
+        return el;
+    }
+
     // ── Component dispatcher ──────────────────────────────────────────────────
 
     async function _renderComponent(comp, folderPath, zipTree, browseInstance) {
@@ -770,6 +859,7 @@ var PageLayoutRenderer = (function () {
                 case 'stats':         return _renderStats(props);
                 case 'quote':         return _renderQuote(props);
                 case 'author':        return await _renderAuthor(props, folderPath, zipTree, browseInstance);
+                case 'banner':        return _renderBanner(props);
                 default:              return null;  // Unknown type: skip silently
             }
         } catch (err) {
@@ -885,6 +975,23 @@ var PageLayoutRenderer = (function () {
         var wrapper = document.createElement('div');
         wrapper.className = 'plr-scroll-wrapper';
         container.appendChild(wrapper);
+
+        // Auto-banner: render before nav when page doesn't start with a hero.
+        // Suppressed when:  page.banner === false  OR  first component is 'hero'.
+        // The banner uses page.title and optional page.meta (author, date, tags).
+        var firstType = (page.components && page.components[0]) ? page.components[0].type : null;
+        if (page.banner !== false && firstType !== 'hero' && firstType !== 'banner') {
+            var meta = page.meta || {};
+            var bannerEl = _renderBanner({
+                title:       page.title  || '',
+                badge:       meta.badge  || 'Page Layout',
+                author:      meta.author || '',
+                date:        meta.date   || '',
+                tags:        meta.tags   || [],
+                dismissible: true
+            });
+            wrapper.appendChild(bannerEl);
+        }
 
         // Navigation bar (sticky inside wrapper, since wrapper is scroll container)
         if (page.navigation && page.navigation.length > 0) {
