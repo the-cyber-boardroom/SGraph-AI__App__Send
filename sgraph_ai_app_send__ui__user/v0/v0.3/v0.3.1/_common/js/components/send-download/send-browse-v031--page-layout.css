@@ -13,11 +13,14 @@
 }
 
 /* P1-B fix: wrapper is the actual scroll container */
+/* P0: bottom padding so last section is not clipped */
 .plr-scroll-wrapper {
     flex: 1;
     width: 100%;
     overflow-y: auto;
     height: 100%;
+    padding-bottom: 3rem;
+    box-sizing: border-box;
 }
 
 /* ── Text selection ───────────────────────────────────────────────────────── */
@@ -67,22 +70,28 @@
 /* Agent authors can set "theme": "dark" in _page.json.                       */
 /* Inherits the Browse shell's dark palette so the page blends seamlessly.    */
 
+/* P0: Dark mode — bumped body text from #b0b8c4 → #c8d0da for legibility */
 .plr-page--dark { background: var(--color-bg, #0d1117); }
 .plr-page--dark .plr-section { border-top-color: rgba(255,255,255,0.08); }
 .plr-page--dark .plr-section__title { color: var(--color-text-inverse, #e8e8e8); }
-.plr-page--dark .plr-text { color: var(--color-text-secondary-inverse, #b0b8c4); }
-.plr-page--dark .plr-bullet-points li { color: var(--color-text-secondary-inverse, #b0b8c4); }
+.plr-page--dark .plr-text { color: #c8d0da; }
+.plr-page--dark .plr-bullet-points li { color: #c8d0da; }
 .plr-page--dark .plr-title { color: var(--color-text-inverse, #e8e8e8); }
-.plr-page--dark .plr-image__caption { color: rgba(255,255,255,0.5); }
-.plr-page--dark .plr-slides__caption { color: rgba(255,255,255,0.6); }
-.plr-page--dark .plr-slides__counter { color: rgba(255,255,255,0.4); }
+.plr-page--dark .plr-image__caption { color: rgba(255,255,255,0.6); }
+.plr-page--dark .plr-slides__caption { color: rgba(255,255,255,0.7); }
+.plr-page--dark .plr-slides__counter { color: rgba(255,255,255,0.5); }
 .plr-page--dark .plr-slides__btn { border-color: rgba(255,255,255,0.2); color: #ccc; }
-.plr-page--dark .plr-markdown { color: var(--color-text-secondary-inverse, #b0b8c4); }
+.plr-page--dark .plr-markdown { color: #c8d0da; }
 
 /* Dark nav: matches the Browse shell's dark header palette */
 .plr-page--dark .plr-nav {
     background: rgba(13, 17, 23, 0.96);
-    border-bottom-color: rgba(255,255,255,0.1);
+    border-bottom-color: rgba(255,255,255,0.15);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+}
+.plr-page--dark .plr-nav::before {
+    color: rgba(255,255,255,0.35);
+    border-right-color: rgba(255,255,255,0.12);
 }
 .plr-page--dark .plr-nav__link { color: rgba(255,255,255,0.55); }
 .plr-page--dark .plr-nav__link:hover { color: rgba(255,255,255,0.9); }
@@ -93,6 +102,7 @@
 
 /* ── Navigation ───────────────────────────────────────────────────────────── */
 
+/* P1: Nav visual separation — stronger bottom border + left "Sections" label */
 /* Light nav default */
 .plr-page--light .plr-nav,
 .plr-nav {
@@ -101,14 +111,33 @@
     z-index: 100;
     display: flex;
     gap: 0;
+    align-items: stretch;
     background: rgba(255, 255, 255, 0.96);
-    border-bottom: 1px solid var(--color-border, #e0e0e0);
+    border-bottom: 2px solid var(--color-border, #d4d4d4);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     backdrop-filter: blur(4px);
     overflow-x: auto;
     /* Align nav links with section content (max-width:960px, padding:2rem sides).
        On narrow viewports fall back to 2rem to avoid negative padding. */
     padding-inline: max(2rem, calc((100% - 960px) / 2 + 2rem));
     scrollbar-width: none;
+}
+
+/* "Sections" label at the left edge of the nav bar */
+.plr-nav::before {
+    content: 'Sections';
+    display: flex;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary, #999);
+    padding: 0 0.9rem 0 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border-right: 1px solid var(--color-border, #e0e0e0);
+    margin-right: 0.25rem;
 }
 
 .plr-nav::-webkit-scrollbar { display: none; }
@@ -153,7 +182,7 @@
 
 .plr-hero__title {
     color: #ffffff;
-    font-size: 1.9rem;
+    font-size: clamp(1.4rem, 2.8vw, 2.2rem);  /* P3: fluid scaling */
     font-weight: 700;
     margin: 0 0 0.4rem;
     line-height: 1.25;
@@ -214,6 +243,11 @@
     line-height: 1.7;
     color: var(--color-text, #222);
     margin-bottom: 0.3rem;
+}
+
+/* P3: accent-colour bullet markers */
+.plr-bullet-points li::marker {
+    color: var(--plr-accent, #4ecdc4);
 }
 
 /* ── Title ────────────────────────────────────────────────────────────────── */
@@ -307,7 +341,7 @@
     aspect-ratio: 16 / 9;
     overflow: hidden;
     border-radius: 3px;
-    cursor: pointer;
+    cursor: zoom-in;    /* P3: signal lightbox affordance */
     background: var(--color-surface, #f0f0f0);
 }
 
@@ -421,6 +455,18 @@
 
 .plr-markdown {
     line-height: 1.7;
+}
+
+/* P0: Link affordance — markdown links must be visibly clickable */
+.plr-markdown a {
+    color: var(--plr-accent, #4ecdc4);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: opacity 0.15s;
+}
+
+.plr-markdown a:hover {
+    opacity: 0.75;
 }
 
 /* ── Gallery thumbnail captions (P1-C) ────────────────────────────────────── */
@@ -630,11 +676,29 @@
     background: var(--color-surface, #fff);
 }
 
+/* P0: Card link affordance — arrow indicator + prominent border highlight */
 .plr-card--link { cursor: pointer; }
+
+.plr-card--link .plr-card__body::after {
+    content: '→';
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 1rem;
+    color: var(--plr-accent, #4ecdc4);
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.15s, transform 0.15s;
+}
+
+.plr-card--link:hover .plr-card__body::after {
+    opacity: 1;
+    transform: translateX(0);
+}
 
 .plr-card--link:hover {
     box-shadow: 0 4px 20px rgba(0,0,0,0.12);
     transform: translateY(-2px);
+    border-color: var(--plr-accent, #4ecdc4);
 }
 
 .plr-card__img {
