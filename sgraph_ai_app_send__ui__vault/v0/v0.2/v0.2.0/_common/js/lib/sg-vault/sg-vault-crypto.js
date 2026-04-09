@@ -103,7 +103,8 @@ class SGVaultCrypto {
             writeKey,
             hmacKey,                                                             // Exposed for per-branch ref derivation
             refFileId:         'ref-pid-muw-' + refHex,                          // Named HEAD: deterministic, multi-writer
-            branchIndexFileId: 'idx-pid-muw-' + branchIndexHex                   // Branch index: deterministic, multi-writer
+            branchIndexFileId: 'idx-pid-muw-' + branchIndexHex,                  // Branch index: deterministic, multi-writer
+            branchId:          'branch-named-' + refHex                          // Named branch ID in commits (matches CLI pattern)
         }
     }
 
@@ -179,7 +180,8 @@ class SGVaultCrypto {
             hmacKey,
             vaultId,
             refFileId:         'ref-pid-muw-' + refHex,
-            branchIndexFileId: 'idx-pid-muw-' + branchIndexHex
+            branchIndexFileId: 'idx-pid-muw-' + branchIndexHex,
+            branchId:          'branch-named-' + refHex                          // Named branch ID in commits (matches CLI pattern)
         }
     }
 

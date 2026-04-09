@@ -17,14 +17,12 @@
     const TOOLS_CDN = 'https://dev.tools.sgraph.ai';
 
     const DEFAULT_MODELS = [
-        'google/gemini-2.0-flash-001',
-        'anthropic/claude-haiku-4-5-20251001',
-        'qwen/qwen-2.5-72b-instruct',
-        'meta-llama/llama-3.3-70b-instruct',
-        'deepseek/deepseek-chat-v3-0324',
+        { id: 'google/gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash Image · ~$0.10/img' },
+        { id: 'google/gemini-2.5-flash-image',         label: 'Gemini 2.5 Flash Image · ~$0.08/img' },
+        { id: 'openai/gpt-5-image-mini',               label: 'GPT-5 Image Mini · ~$0.03/img'       },
     ];
 
-    const DEFAULT_MODEL = 'google/gemini-2.0-flash-001';
+    const DEFAULT_MODEL = 'google/gemini-3.1-flash-image-preview';
 
     class VaultGenerate extends HTMLElement {
 
@@ -66,7 +64,7 @@
                                 <div class="vg-model-row">
                                     <label class="vg-label">Model</label>
                                     <select class="vg-model-select">
-                                        ${DEFAULT_MODELS.map(m => `<option value="${m}"${m === DEFAULT_MODEL ? ' selected' : ''}>${m.split('/').pop()}</option>`).join('')}
+                                        ${DEFAULT_MODELS.map(m => `<option value="${m.id}"${m.id === DEFAULT_MODEL ? ' selected' : ''}>${m.label}</option>`).join('')}
                                     </select>
                                 </div>
 
