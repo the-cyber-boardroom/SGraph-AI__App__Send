@@ -906,6 +906,253 @@
     height: auto !important;
 }
 
+/* ── Callout component ────────────────────────────────────────────────────── */
+/* Alert/notice box with variants: info | warning | success | tip              */
+
+.plr-callout {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.85rem 1rem;
+    border-radius: 6px;
+    border-left: 4px solid currentColor;
+    background: rgba(0,0,0,0.03);
+}
+
+.plr-callout--info    { color: #1a8fe0; background: rgba(26,143,224,0.07); }
+.plr-callout--warning { color: #d97706; background: rgba(217,119,6,0.07); }
+.plr-callout--success { color: #16a34a; background: rgba(22,163,74,0.07); }
+.plr-callout--tip     { color: #7c3aed; background: rgba(124,58,237,0.07); }
+
+.plr-callout__icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    line-height: 1.5;
+}
+
+.plr-callout__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.plr-callout__title {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    color: inherit;
+}
+
+.plr-callout__text {
+    font-size: 0.88rem;
+    line-height: 1.6;
+    margin: 0;
+    color: inherit;
+    opacity: 0.9;
+}
+
+/* Dark mode callouts: slightly brighter backgrounds */
+.plr-page--dark .plr-callout--info    { background: rgba(26,143,224,0.13); }
+.plr-page--dark .plr-callout--warning { background: rgba(217,119,6,0.13); }
+.plr-page--dark .plr-callout--success { background: rgba(22,163,74,0.13); }
+.plr-page--dark .plr-callout--tip     { background: rgba(124,58,237,0.13); }
+
+/* ── Stats component ──────────────────────────────────────────────────────── */
+/* Horizontal row of metric cards: value + label + optional delta              */
+
+.plr-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.plr-stats__card {
+    flex: 1;
+    min-width: 120px;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: 8px;
+    background: var(--color-surface, #fff);
+    text-align: center;
+}
+
+.plr-stats__value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--plr-accent, #4ecdc4);
+}
+
+.plr-stats__label {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary, #666);
+    margin-top: 0.25rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.plr-stats__delta {
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 0.3rem;
+}
+
+.plr-stats__delta--up   { color: #16a34a; }
+.plr-stats__delta--down { color: #dc2626; }
+
+/* Dark mode stats */
+.plr-page--dark .plr-stats__card {
+    border-color: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+}
+.plr-page--dark .plr-stats__label { color: rgba(255,255,255,0.5); }
+
+/* ── Quote component ──────────────────────────────────────────────────────── */
+/* Pull-quote with optional author attribution                                 */
+
+.plr-quote {
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+    border-left: 4px solid var(--plr-accent, #4ecdc4);
+    background: rgba(78,205,196,0.05);
+    border-radius: 0 6px 6px 0;
+}
+
+.plr-quote__text {
+    font-size: 1.1rem;
+    line-height: 1.65;
+    font-style: italic;
+    color: var(--color-text, #111);
+    margin: 0 0 0.6rem;
+}
+
+.plr-quote__attribution {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem;
+}
+
+.plr-quote__author {
+    font-style: normal;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-secondary, #555);
+}
+
+.plr-quote__role {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary, #777);
+}
+
+/* Light mode quote */
+.plr-page--light .plr-quote { background: rgba(78,205,196,0.06); }
+.plr-page--light .plr-quote__text   { color: #2c2c3a; }
+.plr-page--light .plr-quote__author { color: #555; }
+.plr-page--light .plr-quote__role   { color: #777; }
+
+/* Dark mode quote */
+.plr-page--dark .plr-quote {
+    background: rgba(78,205,196,0.08);
+    border-left-color: var(--plr-accent, #4ecdc4);
+}
+.plr-page--dark .plr-quote__text   { color: #c8d0da; }
+.plr-page--dark .plr-quote__author { color: rgba(255,255,255,0.65); }
+.plr-page--dark .plr-quote__role   { color: rgba(255,255,255,0.45); }
+
+/* ── Author component ─────────────────────────────────────────────────────── */
+/* Attribution block at the bottom of a page                                   */
+
+.plr-author {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--color-border, #ebebeb);
+    margin-top: 0.5rem;
+}
+
+.plr-author__avatar {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid var(--plr-accent, #4ecdc4);
+}
+
+.plr-author__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.plr-author__name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text, #111);
+}
+
+.plr-author__role {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary, #666);
+}
+
+.plr-author__date {
+    font-size: 0.78rem;
+    color: var(--color-text-secondary, #999);
+}
+
+/* Light mode author */
+.plr-page--light .plr-author        { border-top-color: #ebebeb; }
+.plr-page--light .plr-author__name  { color: #1a1a2e; }
+.plr-page--light .plr-author__role  { color: #555; }
+.plr-page--light .plr-author__date  { color: #999; }
+
+/* Dark mode author */
+.plr-page--dark .plr-author        { border-top-color: rgba(255,255,255,0.1); }
+.plr-page--dark .plr-author__name  { color: var(--color-text-inverse, #e8e8e8); }
+.plr-page--dark .plr-author__role  { color: rgba(255,255,255,0.55); }
+.plr-page--dark .plr-author__date  { color: rgba(255,255,255,0.38); }
+
+/* ── Edit mode: theme picker ──────────────────────────────────────────────── */
+/* Dropdown above the textarea for selecting named colour schemes              */
+
+.plr-edit-theme-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    background: #181c22;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.plr-edit-theme-label {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.4);
+    font-family: monospace;
+    white-space: nowrap;
+}
+
+.plr-edit-theme-select {
+    flex: 1;
+    font-size: 0.78rem;
+    font-family: monospace;
+    padding: 0.2rem 0.4rem;
+    background: #1e2228;
+    color: #abb2bf;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    cursor: pointer;
+    outline: none;
+}
+
+.plr-edit-theme-select:focus {
+    border-color: var(--color-primary, #4ecdc4);
+}
+
 /* ── Print ────────────────────────────────────────────────────────────────── */
 /* Printing is handled by _plrPrintPage() (PLR-007) which opens a new window  */
 /* with the page-layout CSS loaded via <link> and its own @media print rules. */

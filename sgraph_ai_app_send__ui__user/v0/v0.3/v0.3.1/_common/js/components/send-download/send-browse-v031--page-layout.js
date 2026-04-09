@@ -570,6 +570,52 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             var editLeft = document.createElement('div');
             editLeft.className = 'plr-edit-left';
 
+            // ── Theme picker bar (above textarea) ──────────────────────────
+            // Selecting a named colour scheme inserts/updates "theme" in the JSON.
+            var editThemeBar = document.createElement('div');
+            editThemeBar.className = 'plr-edit-theme-bar';
+
+            var editThemeLabel = document.createElement('span');
+            editThemeLabel.className = 'plr-edit-theme-label';
+            editThemeLabel.textContent = 'Theme:';
+
+            var editThemeSelect = document.createElement('select');
+            editThemeSelect.className = 'plr-edit-theme-select';
+
+            var _themeSchemes = {
+                '— keep current —': null,
+                'default (light, teal)': { mode: 'light', accent: '#4ecdc4', font: 'sans', background: '#ffffff' },
+                'navy (formal report)':  { mode: 'light', accent: '#1a8fe0', font: 'sans', background: '#f7f9fc' },
+                'slate (article)':       { mode: 'light', accent: '#a0522d', font: 'serif', background: '#faf9f7', density: 'spacious' },
+                'minimal (print-first)': { mode: 'light', accent: '#111111', font: 'serif', background: '#ffffff' },
+                'brand (SG/Send teal)':  { mode: 'light', accent: '#4ecdc4', font: 'sans', background: '#f6fefe' },
+                'dark-deck (dark)':      { mode: 'dark',  accent: '#7b9ef5', font: 'sans', background: '#141820' }
+            };
+
+            Object.keys(_themeSchemes).forEach(function (label) {
+                var opt = document.createElement('option');
+                opt.value = label;
+                opt.textContent = label;
+                editThemeSelect.appendChild(opt);
+            });
+
+            editThemeSelect.addEventListener('change', function () {
+                var scheme = _themeSchemes[editThemeSelect.value];
+                if (!scheme) return;
+
+                var parsed;
+                try { parsed = JSON.parse(editTextarea.value); } catch (e) { return; }
+                parsed.theme = scheme;
+                editTextarea.value = JSON.stringify(parsed, null, 2);
+                editThemeSelect.value = '— keep current —';
+                // Trigger re-render
+                clearTimeout(editDebounceTimer);
+                editDebounceTimer = setTimeout(function () { _doEditRender(editTextarea.value); }, 100);
+            });
+
+            editThemeBar.appendChild(editThemeLabel);
+            editThemeBar.appendChild(editThemeSelect);
+
             var editTextarea = document.createElement('textarea');
             editTextarea.className = 'plr-edit-textarea';
             editTextarea.spellcheck = false;
@@ -579,6 +625,7 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             editStatus.className = 'plr-edit-status plr-edit-status--ok';
             editStatus.textContent = '\u2713 Valid JSON';
 
+            editLeft.appendChild(editThemeBar);
             editLeft.appendChild(editTextarea);
             editLeft.appendChild(editStatus);
 
