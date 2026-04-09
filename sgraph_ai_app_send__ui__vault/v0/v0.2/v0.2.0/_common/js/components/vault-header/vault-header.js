@@ -29,6 +29,7 @@
                     </div>
                     <div class="vh-right">
                         <span class="vh-readonly-badge" style="display:none">Read-only</span>
+                        <button class="vh-push-btn" style="display:none" title="Push commits to named branch">Push <span class="vh-ahead-badge"></span></button>
                         <button class="vh-refresh-btn" title="Refresh vault (load latest commits)">Refresh</button>
                         <button class="vh-upload-btn">Upload</button>
                         <button class="vh-debug-btn">Debug</button>
@@ -41,11 +42,12 @@
             `;
 
             this.shadowRoot.addEventListener('click', (e) => {
+                if (e.target.closest('.vh-push-btn'))    this._emit('vault-header-push');
                 if (e.target.closest('.vh-refresh-btn')) this._emit('vault-header-refresh');
-                if (e.target.closest('.vh-upload-btn')) this._emit('vault-header-upload');
-                if (e.target.closest('.vh-lock-btn'))   this._emit('vault-header-lock');
-                if (e.target.closest('.vh-debug-btn'))  this._emit('vault-header-debug');
-                if (e.target.closest('.vh-raw-link'))  { e.preventDefault(); this._emit('vault-header-raw'); }
+                if (e.target.closest('.vh-upload-btn'))  this._emit('vault-header-upload');
+                if (e.target.closest('.vh-lock-btn'))    this._emit('vault-header-lock');
+                if (e.target.closest('.vh-debug-btn'))   this._emit('vault-header-debug');
+                if (e.target.closest('.vh-raw-link'))   { e.preventDefault(); this._emit('vault-header-raw'); }
             });
 
             this._fetchAppVersion();
@@ -66,6 +68,28 @@
         showLockButton(show) {
             const btn = this.shadowRoot.querySelector('.vh-lock-btn');
             if (btn) btn.style.display = show ? '' : 'none';
+        }
+
+        setAheadCount(n) {
+            const btn   = this.shadowRoot.querySelector('.vh-push-btn');
+            const badge = this.shadowRoot.querySelector('.vh-ahead-badge');
+            if (!btn) return;
+            if (n > 0) {
+                btn.style.display = '';
+                if (badge) badge.textContent = '↑' + n;
+                btn.disabled = false;
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        setPushBusy(busy) {
+            const btn = this.shadowRoot.querySelector('.vh-push-btn');
+            if (btn) {
+                btn.disabled = busy;
+                const badge = this.shadowRoot.querySelector('.vh-ahead-badge');
+                if (badge) badge.textContent = busy ? '…' : badge.textContent;
+            }
         }
 
         showLoading() {
@@ -115,6 +139,15 @@
         .vh-vault-name { font-size: var(--text-sm); color: var(--color-text-secondary); font-family: var(--font-mono); }
         .vh-right { display: flex; align-items: center; gap: var(--space-2); }
         .vh-version { font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono); }
+        .vh-push-btn {
+            font-size: var(--text-small); padding: 0.25rem 0.75rem; border-radius: var(--radius-sm);
+            border: 1px solid var(--accent, #4ECDC4); background: transparent;
+            color: var(--accent, #4ECDC4); cursor: pointer; font-family: var(--font-family);
+            font-weight: 600; display: flex; align-items: center; gap: 4px;
+        }
+        .vh-push-btn:hover:not(:disabled) { background: rgba(78,205,196,0.12); }
+        .vh-push-btn:disabled { opacity: 0.5; cursor: default; }
+        .vh-ahead-badge { font-size: 0.65rem; font-family: var(--font-mono); }
         .vh-upload-btn, .vh-lock-btn, .vh-debug-btn, .vh-refresh-btn {
             font-size: var(--text-small); padding: 0.25rem 0.625rem; border-radius: var(--radius-sm);
             border: 1px solid var(--color-border); background: transparent;

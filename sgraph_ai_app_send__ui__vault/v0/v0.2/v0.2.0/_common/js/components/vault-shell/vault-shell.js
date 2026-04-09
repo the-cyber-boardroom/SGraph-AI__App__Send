@@ -90,11 +90,12 @@
             this.addEventListener('vault-created', (e) => this._onVaultOpened(e.detail.vault, e.detail.vaultKey, e.detail.accessKey));
 
             // Header events
+            this.addEventListener('vault-header-push',    () => this._onPush());
             this.addEventListener('vault-header-refresh', () => this._onRefresh());
-            this.addEventListener('vault-header-upload', () => this._onUploadRequest());
-            this.addEventListener('vault-header-lock',   () => this._onLock());
-            this.addEventListener('vault-header-debug',  () => this._toggleDebug());
-            this.addEventListener('vault-header-raw',    () => this._showRawVault());
+            this.addEventListener('vault-header-upload',  () => this._onUploadRequest());
+            this.addEventListener('vault-header-lock',    () => this._onLock());
+            this.addEventListener('vault-header-debug',   () => this._toggleDebug());
+            this.addEventListener('vault-header-raw',     () => this._showRawVault());
 
             // Nav events
             this.addEventListener('vault-nav-switch', (e) => this._switchView(e.detail.view));
@@ -158,6 +159,9 @@
 
             // Update status
             this.querySelector('vault-status-bar')?.updateStats(vault);
+
+            // Show ahead count if writable
+            this._refreshAheadCount();
 
             // Ensure files view is active
             this._switchView('files');
@@ -281,6 +285,7 @@
             // Refresh status bar after file mutations
             this.querySelector('vault-status-bar')?.updateStats(this._vault);
             this._updateVaultKey();
+            this._refreshAheadCount();
 
             // Refresh settings if visible
             if (this._activeView === 'settings') {
@@ -292,6 +297,29 @@
             this._onTreeChanged();
             // Remount browse to pick up new tree state
             if (this._vault) this._mountBrowse();
+        }
+
+        async _refreshAheadCount() {
+            if (!this._vault || !this._accessKey) return;
+            try {
+                const n = await this._vault.getAheadCount();
+                this.querySelector('vault-header')?.setAheadCount(n);
+            } catch (_) {}
+        }
+
+        async _onPush() {
+            if (!this._vault || !this._accessKey) return;
+            const header = this.querySelector('vault-header');
+            header?.setPushBusy(true);
+            try {
+                await this._vault.push();
+                await this._refreshAheadCount();
+                window.sgraphVault.messages.success('Pushed — named branch updated');
+            } catch (err) {
+                window.sgraphVault.messages.error(`Push failed: ${err.message}`);
+            } finally {
+                header?.setPushBusy(false);
+            }
         }
 
         // --- View Switching -------------------------------------------------------
