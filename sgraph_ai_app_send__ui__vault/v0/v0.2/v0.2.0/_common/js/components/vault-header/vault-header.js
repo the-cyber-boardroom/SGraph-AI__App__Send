@@ -30,6 +30,7 @@
                     <div class="vh-right">
                         <span class="vh-readonly-badge" style="display:none">Read-only</span>
                         <button class="vh-push-btn" style="display:none" title="Push commits to named branch">Push <span class="vh-ahead-badge"></span></button>
+                        <button class="vh-pull-btn" style="display:none" title="Pull commits from named branch">Pull <span class="vh-behind-badge"></span></button>
                         <button class="vh-refresh-btn" title="Refresh vault (load latest commits)">Refresh</button>
                         <button class="vh-upload-btn">Upload</button>
                         <button class="vh-debug-btn">Debug</button>
@@ -43,6 +44,7 @@
 
             this.shadowRoot.addEventListener('click', (e) => {
                 if (e.target.closest('.vh-push-btn'))    this._emit('vault-header-push');
+                if (e.target.closest('.vh-pull-btn'))    this._emit('vault-header-pull');
                 if (e.target.closest('.vh-refresh-btn')) this._emit('vault-header-refresh');
                 if (e.target.closest('.vh-upload-btn'))  this._emit('vault-header-upload');
                 if (e.target.closest('.vh-lock-btn'))    this._emit('vault-header-lock');
@@ -88,6 +90,28 @@
             if (btn) {
                 btn.disabled = busy;
                 const badge = this.shadowRoot.querySelector('.vh-ahead-badge');
+                if (badge) badge.textContent = busy ? '…' : badge.textContent;
+            }
+        }
+
+        setBehindCount(n) {
+            const btn   = this.shadowRoot.querySelector('.vh-pull-btn');
+            const badge = this.shadowRoot.querySelector('.vh-behind-badge');
+            if (!btn) return;
+            if (n > 0) {
+                btn.style.display = '';
+                if (badge) badge.textContent = '↓' + n;
+                btn.disabled = false;
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        setPullBusy(busy) {
+            const btn = this.shadowRoot.querySelector('.vh-pull-btn');
+            if (btn) {
+                btn.disabled = busy;
+                const badge = this.shadowRoot.querySelector('.vh-behind-badge');
                 if (badge) badge.textContent = busy ? '…' : badge.textContent;
             }
         }
@@ -148,6 +172,15 @@
         .vh-push-btn:hover:not(:disabled) { background: rgba(78,205,196,0.12); }
         .vh-push-btn:disabled { opacity: 0.5; cursor: default; }
         .vh-ahead-badge { font-size: 0.65rem; font-family: var(--font-mono); }
+        .vh-pull-btn {
+            font-size: var(--text-small); padding: 0.25rem 0.75rem; border-radius: var(--radius-sm);
+            border: 1px solid #45b7d1; background: transparent;
+            color: #45b7d1; cursor: pointer; font-family: var(--font-family);
+            font-weight: 600; display: flex; align-items: center; gap: 4px;
+        }
+        .vh-pull-btn:hover:not(:disabled) { background: rgba(69,183,209,0.12); }
+        .vh-pull-btn:disabled { opacity: 0.5; cursor: default; }
+        .vh-behind-badge { font-size: 0.65rem; font-family: var(--font-mono); }
         .vh-upload-btn, .vh-lock-btn, .vh-debug-btn, .vh-refresh-btn {
             font-size: var(--text-small); padding: 0.25rem 0.625rem; border-radius: var(--radius-sm);
             border: 1px solid var(--color-border); background: transparent;

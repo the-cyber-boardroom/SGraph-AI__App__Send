@@ -91,6 +91,7 @@
 
             // Header events
             this.addEventListener('vault-header-push',    () => this._onPush());
+            this.addEventListener('vault-header-pull',    () => this._onPull());
             this.addEventListener('vault-header-refresh', () => this._onRefresh());
             this.addEventListener('vault-header-upload',  () => this._onUploadRequest());
             this.addEventListener('vault-header-lock',    () => this._onLock());
@@ -160,8 +161,9 @@
             // Update status
             this.querySelector('vault-status-bar')?.updateStats(vault);
 
-            // Show ahead count if writable
+            // Show ahead/behind counts if writable
             this._refreshAheadCount();
+            this._refreshBehindCount();
 
             // Ensure files view is active
             this._switchView('files');
@@ -212,6 +214,8 @@
                 this.querySelector('vault-status-bar')?.updateStats(vault);
                 this.querySelector('vault-header')?.setVaultName(vault.name || '');
 
+                this._refreshAheadCount();
+                this._refreshBehindCount();
                 window.sgraphVault.messages.success('Vault refreshed');
             } catch (err) {
                 window.sgraphVault.messages.error(`Refresh failed: ${err.message}`);
@@ -314,11 +318,42 @@
             try {
                 await this._vault.push();
                 await this._refreshAheadCount();
+                await this._refreshBehindCount();
                 window.sgraphVault.messages.success('Pushed — named branch updated');
             } catch (err) {
                 window.sgraphVault.messages.error(`Push failed: ${err.message}`);
             } finally {
                 header?.setPushBusy(false);
+            }
+        }
+
+        async _refreshBehindCount() {
+            if (!this._vault || !this._accessKey) return;
+            try {
+                const n = await this._vault.getBehindCount();
+                this.querySelector('vault-header')?.setBehindCount(n);
+            } catch (_) {}
+        }
+
+        async _onPull() {
+            if (!this._vault || !this._accessKey) return;
+            const header = this.querySelector('vault-header');
+            header?.setPullBusy(true);
+            try {
+                const changed = await this._vault.pull();
+                if (changed) {
+                    await this._mountBrowse();
+                    this.querySelector('vault-status-bar')?.updateStats(this._vault);
+                    await this._refreshAheadCount();
+                    await this._refreshBehindCount();
+                    window.sgraphVault.messages.success('Pulled — vault updated from named branch');
+                } else {
+                    window.sgraphVault.messages.success('Already up to date');
+                }
+            } catch (err) {
+                window.sgraphVault.messages.error(`Pull failed: ${err.message}`);
+            } finally {
+                header?.setPullBusy(false);
             }
         }
 
