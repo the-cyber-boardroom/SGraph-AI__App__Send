@@ -1,5 +1,12 @@
 {
   "title": "Page Layout — Block Type Demo",
+  "banner": false,
+  "meta": {
+    "author": "SGraph AI",
+    "date":   "2026-04-09",
+    "tags":   ["demo", "reference"],
+    "badge":  "Reference"
+  },
   "theme": {
     "mode": "light",
     "accent": "#4ecdc4",
@@ -13,6 +20,7 @@
     { "label": "Media",        "anchor": "media" },
     { "label": "Layout",       "anchor": "layout" },
     { "label": "New types",    "anchor": "new-block-types" },
+    { "label": "Banner",       "anchor": "banner-block" },
     { "label": "Attribution",  "anchor": "attribution" }
   ],
   "components": [
@@ -271,6 +279,48 @@
             "text":   "Zero-knowledge architecture is not just a feature — it is the only honest answer to the question of who should hold the keys to your data.",
             "author": "Dinis Cruz",
             "role":   "Founder, SGraph AI"
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "section",
+      "props": { "title": "Banner block", "id": "banner-block" },
+      "children": [
+        {
+          "type": "text",
+          "props": {
+            "content": "The 'banner' block renders a thin identity strip — useful when a page doesn't have a hero. It auto-renders on any page whose first component is not a hero, unless suppressed with \"banner\": false at the page level."
+          }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "info",
+            "title": "Auto-banner behaviour",
+            "text": "If the first component of your page is not a hero block, a banner is automatically inserted before the nav bar. Add \"banner\": false to the page root to suppress it."
+          }
+        },
+        {
+          "type": "title",
+          "props": { "text": "Explicit banner example", "level": "3" }
+        },
+        {
+          "type": "banner",
+          "props": {
+            "title":       "My Report Title",
+            "badge":       "Report",
+            "author":      "Dinis Cruz",
+            "date":        "2026-04-09",
+            "tags":        ["encrypted", "ai-generated"],
+            "dismissible": true
+          }
+        },
+        {
+          "type": "text",
+          "props": {
+            "content": "To populate the auto-banner from page metadata, add a \"meta\" object at the page root with author, date, tags, and badge fields."
           }
         }
       ]
