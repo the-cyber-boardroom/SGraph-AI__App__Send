@@ -1008,7 +1008,7 @@ var PageLayoutRenderer = (function () {
         }
     }
 
-    return { render: render };
+    return { render: render, renderBanner: _renderBanner };
 
 })();
 
