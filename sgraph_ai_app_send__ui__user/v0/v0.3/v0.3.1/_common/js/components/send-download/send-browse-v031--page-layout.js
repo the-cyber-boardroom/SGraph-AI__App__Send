@@ -406,7 +406,7 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
 
         // P1-B fix: panel is the outer frame (no overflow); .plr-scroll-wrapper
         // inside is the actual scroll container. Keep height:100% here.
-        el.style.cssText = 'height: 100%; overflow: hidden; display: flex; flex-direction: column;';
+        el.style.cssText = 'height: 100%; overflow: hidden; display: flex; flex-direction: column; background: #0a0e17;';
         el.innerHTML = '<div style="padding:1rem;color:var(--color-text-secondary,#888);">Loading page\u2026</div>';
 
         try {
@@ -734,6 +734,46 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             printBtn.title = 'Open print preview in new window';
             printBtn.addEventListener('click', function () { _plrPrintPage(json.title, renderedView); });
 
+            // ── Theme selector ─────────────────────────────────────────────
+            // Dropdown at the LEFT of the toolbar — switches page theme live.
+            // Selecting a scheme re-renders the page immediately.
+            var themeSelect = document.createElement('select');
+            themeSelect.className = 'plr-theme-select';
+            themeSelect.title = 'Switch page theme';
+
+            var _themeSchemes = {
+                'default':   { mode:'light', accent:'#4ecdc4', font:'sans',   background:'#ffffff' },
+                'navy':      { mode:'light', accent:'#1a8fe0', font:'sans',   background:'#f7f9fc' },
+                'slate':     { mode:'light', accent:'#a0522d', font:'serif',  background:'#faf9f7' },
+                'minimal':   { mode:'light', accent:'#111111', font:'serif',  background:'#ffffff' },
+                'brand':     { mode:'light', accent:'#4ecdc4', font:'sans',   background:'#f6fefe' },
+                'dark-deck': { mode:'dark',  accent:'#7b9ef5', font:'sans',   background:'#141820' }
+            };
+            [['', '⬡ Theme'], ['default','Default'], ['navy','Navy'], ['slate','Slate'],
+             ['minimal','Minimal'], ['brand','Brand'], ['dark-deck','Dark Deck']
+            ].forEach(function(opt) {
+                var o = document.createElement('option');
+                o.value = opt[0]; o.textContent = opt[1];
+                themeSelect.appendChild(o);
+            });
+
+            themeSelect.addEventListener('change', async function () {
+                var scheme = themeSelect.value;
+                themeSelect.value = '';  // reset
+                if (!scheme || !_themeSchemes[scheme]) return;
+                try {
+                    var parsed = JSON.parse(rawJsonText);
+                    parsed.theme = _themeSchemes[scheme];
+                    renderedView.innerHTML = '';
+                    if (typeof PageLayoutRenderer !== 'undefined') {
+                        await PageLayoutRenderer.render(renderedView, parsed, folderPath, self.zipTree, self);
+                    }
+                    isSource = false; isEdit = false;
+                    _applyViewState();
+                } catch (e) { console.warn('[theme-select]', e); }
+            });
+
+            toggleBar.appendChild(themeSelect);
             toggleBar.appendChild(locateBtn);
             toggleBar.appendChild(printBtn);
             toggleBar.appendChild(presentBtn);
@@ -741,10 +781,16 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             toggleBar.appendChild(editBtn);
             toggleBar.appendChild(toggleBtn);
 
+            // ── Content frame (card framing) ───────────────────────────────
+            // Wraps all view states in a rounded card inside the dark panel.
+            var contentFrame = document.createElement('div');
+            contentFrame.className = 'plr-content-frame';
+            contentFrame.appendChild(renderedView);
+            contentFrame.appendChild(sourceView);
+            contentFrame.appendChild(editSplit);
+
             el.appendChild(toggleBar);
-            el.appendChild(renderedView);
-            el.appendChild(sourceView);
-            el.appendChild(editSplit);
+            el.appendChild(contentFrame);
             _applyViewState();
 
         } catch (err) {
