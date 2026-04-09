@@ -109,7 +109,8 @@ class SendDownload extends HTMLElement {
         this.tokenName = params.get('token') || null;
 
         // Strip any deep-link file path (added by PLR-006) — path is after '|', e.g. #tid/key|path
-        const _fullHash = window.location.hash.substring(1);
+        // Also strip stray quotes that can appear when pasting e.g. #hook-list-6944"
+        const _fullHash = window.location.hash.substring(1).replace(/["']/g, '');
         const hash = _fullHash.includes('|') ? _fullHash.slice(0, _fullHash.indexOf('|')) : _fullHash;
         if (!hash) {
             this.transferId = params.get('id') || null;
@@ -488,8 +489,12 @@ class SendDownload extends HTMLElement {
         if (!entryBtn || !entryInp) return;
 
         const submit = () => {
-            const val = entryInp.value.trim();
+            // Strip leading/trailing quotes that can appear when copy-pasting
+            // a token from a chat message, document, or URL bar selection.
+            const val = entryInp.value.trim().replace(/^["']+|["']+$/g, '');
             if (!val) return;
+            // Reflect cleaned value back into the input so the user sees what was used
+            entryInp.value = val;
             // Set as hash and re-navigate (the page will re-parse)
             window.location.hash = val;
             // Re-parse and load
