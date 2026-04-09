@@ -135,17 +135,10 @@ class SGVault {
         if (!namedCommitId) throw new Error('Vault not found: HEAD ref missing')
         vault._namedHeadId = namedCommitId
 
-        // Read clone branch ref — if it doesn't exist yet, initialise to named HEAD
+        // Read clone branch ref — if missing, start from named HEAD.
+        // Clone ref is created lazily on the first commit; no write on read-only open.
         const cloneCommitId = await vault._refManager.readRef(vault._cloneRefFileId)
-        if (cloneCommitId) {
-            vault._headCommitId = cloneCommitId
-        } else {
-            // First time opening with write access: create clone ref at named HEAD
-            if (vault._writeKey) {
-                await vault._refManager.writeRef(vault._cloneRefFileId, namedCommitId)
-            }
-            vault._headCommitId = namedCommitId
-        }
+        vault._headCommitId = cloneCommitId || namedCommitId
 
         // Load commit → load tree → build nested structure
         await vault._loadTreeFromCommit(vault._headCommitId)
