@@ -340,8 +340,25 @@
 
         _onUploadRequest() {
             this._requireAccessKey(() => {
-                // For now, show the upload panel inline (future: integrate into browse)
-                window.sgraphVault.messages.success('Upload: use drag-and-drop or the file manager');
+                // Trigger file picker via the Browse upload button
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.multiple = true;
+                input.addEventListener('change', async () => {
+                    if (!input.files || !input.files.length || !this._dataSource) return;
+                    for (const file of input.files) {
+                        try {
+                            const buffer = await file.arrayBuffer();
+                            await this._dataSource.saveFile('/', file.name, buffer);
+                            window.sgraphVault.messages.success(`Uploaded "${file.name}"`);
+                        } catch (err) {
+                            window.sgraphVault.messages.error(`Upload failed: ${err.message}`);
+                        }
+                    }
+                    // Remount browse to refresh tree
+                    this._mountBrowse();
+                });
+                input.click();
             });
         }
 
