@@ -75,6 +75,8 @@
                     container.appendChild(textareaEl);
                 }
                 textareaEl.focus();
+                textareaEl.selectionStart = textareaEl.selectionEnd = 0;
+                textareaEl.scrollTop = 0;
                 editBtn.style.display   = 'none';
                 saveBtn.style.display   = '';
                 cancelBtn.style.display = '';
@@ -104,12 +106,11 @@
                 saveBtn.textContent = 'Saving...';
 
                 self.dataSource.saveFile(folder === '/' ? '/' : folder, fName, newBytes.buffer).then(function() {
-                    // Update the pre element with new content
-                    if (preEl) preEl.textContent = newText;
-                    // Update size display
-                    var sizeEl = bar.querySelector('.sb-file__size');
-                    if (sizeEl) sizeEl.textContent = SendHelpers.formatBytes(newBytes.byteLength);
-                    exitEdit();
+                    // Re-render container fully with new bytes (handles markdown, code, text)
+                    // _renderFileContent calls _origRender then re-attaches edit/delete buttons
+                    if (textareaEl) { textareaEl.remove(); textareaEl = null; }
+                    isEditing = false;
+                    self._renderFileContent(container, newBytes.buffer, fileName, type);
                     if (window.sgraphVault && window.sgraphVault.messages) {
                         window.sgraphVault.messages.success('"' + fName + '" saved');
                     }
@@ -134,19 +135,22 @@
         deleteBtn.addEventListener('mouseenter', function() { deleteBtn.style.color = '#ff6b6b'; });
         deleteBtn.addEventListener('mouseleave', function() { deleteBtn.style.color = ''; });
         deleteBtn.addEventListener('click', function() {
-            if (!confirm('Delete "' + fileName.split('/').pop() + '"?')) return;
+            var fName = fileName.split('/').pop();
             var parts = fileName.split('/');
-            var fName = parts.pop();
+            parts.pop();
             var folder = '/' + parts.join('/');
 
-            self.dataSource.deleteFile(folder === '/' ? '/' : folder, fName).then(function() {
-                if (window.sgraphVault && window.sgraphVault.messages) {
-                    window.sgraphVault.messages.success('"' + fName + '" deleted');
-                }
-            }).catch(function(err) {
-                if (window.sgraphVault && window.sgraphVault.messages) {
-                    window.sgraphVault.messages.error('Delete failed: ' + err.message);
-                }
+            _confirm('Delete "' + fName + '"?', function() {
+                self.dataSource.deleteFile(folder === '/' ? '/' : folder, fName).then(function() {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.success('"' + fName + '" deleted');
+                    }
+                    _refreshBrowseTree(self);
+                }).catch(function(err) {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.error('Delete failed: ' + err.message);
+                    }
+                });
             });
         });
         bar.appendChild(deleteBtn);
@@ -215,17 +219,18 @@
     // --- New folder ---
 
     function _showNewFolder(browse) {
-        var name = prompt('Folder name:');
-        if (!name || !name.trim()) return;
-        browse.dataSource.createFolder('/' + name.trim()).then(function() {
-            if (window.sgraphVault && window.sgraphVault.messages) {
-                window.sgraphVault.messages.success('Folder "' + name.trim() + '" created');
-            }
-            _refreshBrowseTree(browse);
-        }).catch(function(err) {
-            if (window.sgraphVault && window.sgraphVault.messages) {
-                window.sgraphVault.messages.error('Create folder failed: ' + err.message);
-            }
+        _prompt('New folder name:', function(name) {
+            if (!name || !name.trim()) return;
+            browse.dataSource.createFolder('/' + name.trim()).then(function() {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.success('Folder "' + name.trim() + '" created');
+                }
+                _refreshBrowseTree(browse);
+            }).catch(function(err) {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.error('Create folder failed: ' + err.message);
+                }
+            });
         });
     }
 
@@ -241,6 +246,234 @@
             };
         });
         browse._populateTree();
+    }
+
+    // --- Inline confirm dialog (no browser confirm()) ---
+
+    function _confirm(message, onOk) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg-secondary,#12122a);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:1.5rem 2rem;min-width:280px;max-width:400px;';
+        box.innerHTML = '<p style="margin:0 0 1.2rem;color:var(--color-text,#e2e8f0);font-size:14px;">' + message + '</p>';
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:0.75rem;justify-content:flex-end;';
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'sb-action-btn';
+        cancelBtn.textContent = 'Cancel';
+        var okBtn = document.createElement('button');
+        okBtn.className = 'sb-action-btn';
+        okBtn.textContent = 'Delete';
+        okBtn.style.cssText = 'color:#ff6b6b;font-weight:700;';
+        cancelBtn.addEventListener('click', function() { overlay.remove(); });
+        okBtn.addEventListener('click', function() { overlay.remove(); onOk(); });
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(okBtn);
+        box.appendChild(btnRow);
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+        okBtn.focus();
+    }
+
+    // --- Inline prompt dialog (no browser prompt()) ---
+
+    function _prompt(message, onOk) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg-secondary,#12122a);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:1.5rem 2rem;min-width:300px;max-width:400px;';
+        box.innerHTML = '<p style="margin:0 0 0.75rem;color:var(--color-text,#e2e8f0);font-size:14px;">' + message + '</p>';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.style.cssText = 'width:100%;padding:0.5rem 0.75rem;background:var(--bg-primary,#0a0a18);border:1px solid var(--accent,#4ECDC4);border-radius:4px;color:var(--color-text,#e2e8f0);font-size:14px;box-sizing:border-box;outline:none;margin-bottom:1rem;';
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:0.75rem;justify-content:flex-end;';
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'sb-action-btn';
+        cancelBtn.textContent = 'Cancel';
+        var okBtn = document.createElement('button');
+        okBtn.className = 'sb-action-btn';
+        okBtn.textContent = 'Create';
+        okBtn.style.cssText = 'color:var(--accent,#4ECDC4);font-weight:700;';
+        var submit = function() { overlay.remove(); onOk(input.value); };
+        cancelBtn.addEventListener('click', function() { overlay.remove(); });
+        okBtn.addEventListener('click', submit);
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submit();
+            if (e.key === 'Escape') overlay.remove();
+        });
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(okBtn);
+        box.appendChild(input);
+        box.appendChild(btnRow);
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+        input.focus();
+    }
+
+    // --- Drag-and-drop: patch _setupTreeListeners ---
+
+    var _origSetupTree = SendBrowse.prototype._setupTreeListeners;
+
+    SendBrowse.prototype._setupTreeListeners = function(treeEl) {
+        _origSetupTree.call(this, treeEl);
+        if (!this.dataSource || !this.dataSource.writable) return;
+        _attachDragDrop(this, treeEl);
+    };
+
+    function _attachDragDrop(browse, treeEl) {
+        // ── drag sources ──────────────────────────────────────────────────
+        treeEl.querySelectorAll('.sb-tree__file').forEach(function(el) {
+            el.setAttribute('draggable', 'true');
+            el.style.cursor = 'grab';
+            el.addEventListener('dragstart', function(e) {
+                e.stopPropagation();
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'file', path: el.dataset.path }));
+                el.classList.add('sb-dnd--dragging');
+            });
+            el.addEventListener('dragend', function() {
+                el.classList.remove('sb-dnd--dragging');
+            });
+        });
+
+        treeEl.querySelectorAll('.sb-tree__folder-header').forEach(function(header) {
+            var folderEl = header.closest('.sb-tree__folder');
+            if (!folderEl) return;
+            header.setAttribute('draggable', 'true');
+            header.style.cursor = 'grab';
+            header.addEventListener('dragstart', function(e) {
+                e.stopPropagation();
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'folder', path: folderEl.dataset.path }));
+                folderEl.classList.add('sb-dnd--dragging');
+            });
+            header.addEventListener('dragend', function() {
+                folderEl.classList.remove('sb-dnd--dragging');
+            });
+        });
+
+        // ── drop zones: folder headers + tree root (root = drop to /) ────
+        var dropZones = Array.from(treeEl.querySelectorAll('.sb-tree__folder-header'));
+
+        // Make the tree panel itself a drop zone for the root folder
+        dropZones.push(treeEl);
+
+        dropZones.forEach(function(zone) {
+            var enterCount = 0; // track nested dragenter/dragleave pairs
+
+            zone.addEventListener('dragenter', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                enterCount++;
+                zone.classList.add('sb-dnd--over');
+            });
+
+            zone.addEventListener('dragleave', function(e) {
+                e.stopPropagation();
+                enterCount--;
+                if (enterCount <= 0) {
+                    enterCount = 0;
+                    zone.classList.remove('sb-dnd--over');
+                }
+            });
+
+            zone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            zone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                enterCount = 0;
+                zone.classList.remove('sb-dnd--over');
+
+                var raw = e.dataTransfer.getData('text/plain');
+                if (!raw) return;
+                var drag;
+                try { drag = JSON.parse(raw); } catch (_) { return; }
+
+                // Determine destination folder path
+                var destFolderPath;
+                if (zone === treeEl) {
+                    // Dropped on tree root panel → move to /
+                    destFolderPath = '/';
+                } else {
+                    // Dropped on a folder header → get the folder's data-path
+                    var folderEl = zone.closest('.sb-tree__folder');
+                    destFolderPath = folderEl ? '/' + folderEl.dataset.path : '/';
+                }
+
+                _executeDrop(browse, drag, destFolderPath);
+            });
+        });
+
+        // Inject DnD styles once
+        if (!document.getElementById('sb-dnd-styles')) {
+            var style = document.createElement('style');
+            style.id = 'sb-dnd-styles';
+            style.textContent = [
+                '.sb-dnd--dragging { opacity: 0.4; }',
+                '.sb-dnd--over { background: rgba(78,205,196,0.15) !important;',
+                '  outline: 1px dashed var(--accent,#4ECDC4); border-radius: 3px; }'
+            ].join('\n');
+            document.head.appendChild(style);
+        }
+    }
+
+    function _executeDrop(browse, drag, destFolderPath) {
+        if (drag.type === 'file') {
+            // drag.path = e.g. "images/photo.jpg" or "photo.jpg"
+            var parts      = drag.path.split('/');
+            var fileName   = parts.pop();
+            var srcFolder  = parts.length ? '/' + parts.join('/') : '/';
+
+            if (srcFolder === destFolderPath) return; // no-op
+
+            browse.dataSource.moveFile(srcFolder, fileName, destFolderPath).then(function() {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.success('Moved "' + fileName + '" to ' + destFolderPath);
+                }
+                _refreshBrowseTree(browse);
+            }).catch(function(err) {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.error('Move failed: ' + err.message);
+                }
+            });
+
+        } else if (drag.type === 'folder') {
+            // drag.path = e.g. "images" or "images/subfolder" (no leading slash)
+            var srcPath = '/' + drag.path;
+
+            // Prevent drop into self or own descendant
+            if (destFolderPath === srcPath || destFolderPath.startsWith(srcPath + '/')) {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.error('Cannot move a folder into itself');
+                }
+                return;
+            }
+
+            // Check same parent
+            var srcParts       = drag.path.split('/');
+            var folderName     = srcParts.pop();
+            var srcParentPath  = srcParts.length ? '/' + srcParts.join('/') : '/';
+            if (srcParentPath === destFolderPath) return; // no-op
+
+            browse.dataSource.moveFolder(srcPath, destFolderPath).then(function() {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.success('Moved folder "' + folderName + '" to ' + destFolderPath);
+                }
+                _refreshBrowseTree(browse);
+            }).catch(function(err) {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.error('Move failed: ' + err.message);
+                }
+            });
+        }
     }
 
     // --- Helper ---

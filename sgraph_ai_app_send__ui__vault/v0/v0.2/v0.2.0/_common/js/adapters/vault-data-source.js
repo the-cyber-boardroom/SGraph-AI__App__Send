@@ -204,6 +204,18 @@ class VaultDataSource {
         await this._vault.renameFolder(folderPath, newName);
         if (this.onTreeChanged) this.onTreeChanged();
     }
+
+    async moveFile(srcFolderPath, fileName, destFolderPath) {
+        if (!this.writable) throw new Error('Read-only: no access key');
+        await this._vault.moveFile(srcFolderPath, fileName, destFolderPath);
+        if (this.onTreeChanged) this.onTreeChanged();
+    }
+
+    async moveFolder(srcPath, destParentPath) {
+        if (!this.writable) throw new Error('Read-only: no access key');
+        await this._vault.moveFolder(srcPath, destParentPath);
+        if (this.onTreeChanged) this.onTreeChanged();
+    }
 }
 
 window.VaultDataSource = VaultDataSource;
