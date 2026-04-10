@@ -313,15 +313,38 @@
         input.focus();
     }
 
-    // --- Drag-and-drop: patch _setupTreeListeners ---
+    // --- Patch _setupTreeListeners: inject refresh button + drag-and-drop ---
 
     var _origSetupTree = SendBrowse.prototype._setupTreeListeners;
 
     SendBrowse.prototype._setupTreeListeners = function(treeEl) {
         _origSetupTree.call(this, treeEl);
+        _injectRefreshButton(treeEl);
         if (!this.dataSource || !this.dataSource.writable) return;
         _attachDragDrop(this, treeEl);
     };
+
+    // --- Inject refresh button into sb-tree__controls (next to + / −) ----------
+
+    function _injectRefreshButton(treeEl) {
+        var controls = treeEl.querySelector('.sb-tree__controls');
+        if (!controls || controls.querySelector('.sb-vault-refresh')) return;
+
+        var btn = document.createElement('button');
+        btn.className = 'sb-tree__ctrl-btn sb-vault-refresh';
+        btn.title     = 'Refresh vault (fetch latest from server)';
+        btn.textContent = '↺';
+        btn.style.cssText = 'font-size: 1rem; line-height: 1;';
+
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            treeEl.dispatchEvent(new CustomEvent('vault-header-refresh', {
+                bubbles: true, composed: true
+            }));
+        });
+
+        controls.appendChild(btn);
+    }
 
     function _attachDragDrop(browse, treeEl) {
         // ── drag sources ──────────────────────────────────────────────────
