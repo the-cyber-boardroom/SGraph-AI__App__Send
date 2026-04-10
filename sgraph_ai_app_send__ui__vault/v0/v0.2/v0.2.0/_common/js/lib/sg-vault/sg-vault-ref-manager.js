@@ -41,4 +41,23 @@ class SGVaultRefManager {
         const parsed    = JSON.parse(new TextDecoder().decode(decrypted))
         return parsed.commit_id
     }
+
+    // --- Read branch index: decrypt and return parsed index ----------------------
+    //
+    // Branch index format (decrypted JSON):
+    //   { "schema": "branch_index_v1", "branches": [
+    //     { "branch_id": "branch-named-...", "branch_type": "named",
+    //       "head_ref_id": "ref-pid-muw-...", "name": "...", "created_at": ... }
+    //   ]}
+    //
+    // branch_type values: "named" | "clone"
+    // head_ref_id format: ref-pid-(muw|snw)-[0-9a-f]{12}
+
+    async readBranchIndex(branchIndexFileId) {
+        const filePath  = `bare/idx/${branchIndexFileId}`
+        const encrypted = await this._sgSend.vaultRead(this._vaultId, filePath)
+        if (!encrypted) return null
+        const decrypted = await SGSendCrypto.decrypt(encrypted, this._readKey)
+        return JSON.parse(new TextDecoder().decode(decrypted))
+    }
 }
