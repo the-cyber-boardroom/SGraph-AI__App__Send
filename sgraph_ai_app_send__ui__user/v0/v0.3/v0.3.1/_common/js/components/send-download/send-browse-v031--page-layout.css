@@ -73,10 +73,10 @@
 /* P0: Dark mode — bumped body text from #b0b8c4 → #c8d0da for legibility */
 .plr-page--dark { background: var(--color-bg, #0d1117); }
 .plr-page--dark .plr-section { border-top-color: rgba(255,255,255,0.08); }
-.plr-page--dark .plr-section__title { color: var(--color-text-inverse, #e8e8e8); }
+.plr-page--dark .plr-section__title { color: #e8e8e8; }
 .plr-page--dark .plr-text { color: #c8d0da; }
 .plr-page--dark .plr-bullet-points li { color: #c8d0da; }
-.plr-page--dark .plr-title { color: var(--color-text-inverse, #e8e8e8); }
+.plr-page--dark .plr-title { color: #e8e8e8; }
 .plr-page--dark .plr-image__caption { color: rgba(255,255,255,0.6); }
 .plr-page--dark .plr-slides__caption { color: rgba(255,255,255,0.7); }
 .plr-page--dark .plr-slides__counter { color: rgba(255,255,255,0.5); }
@@ -1309,6 +1309,21 @@
 .plr-page--dark .plr-banner__meta--date { color: #4a9894; }
 .plr-page--dark .plr-banner__dismiss { color: #3a8884; }
 .plr-page--dark .plr-banner__dismiss:hover { color: #7ecfcc; }
+
+/* Banner rendered outside the card frame (on the dark panel background).       */
+/* Same colour palette as .plr-page--dark .plr-banner but without nesting.      */
+.plr-banner--on-dark {
+    background: rgba(78, 205, 196, 0.05);
+    border-bottom-color: rgba(78, 205, 196, 0.12);
+    border-radius: 0;
+}
+.plr-banner--on-dark .plr-banner__title   { color: #a8f0ec; }
+.plr-banner--on-dark .plr-banner__badge   { background: rgba(78,205,196,0.12); color: #7ecfcc; border-color: rgba(78,205,196,0.2); }
+.plr-banner--on-dark .plr-banner__tag     { background: rgba(78,205,196,0.08); color: #7ecfcc; border-color: rgba(78,205,196,0.15); }
+.plr-banner--on-dark .plr-banner__meta    { color: #5ab8b4; }
+.plr-banner--on-dark .plr-banner__meta--date { color: #4a9894; }
+.plr-banner--on-dark .plr-banner__dismiss { color: #3a8884; }
+.plr-banner--on-dark .plr-banner__dismiss:hover { color: #7ecfcc; }
 
 /* Banner is decorative — hide in print */
 @media print { .plr-banner { display: none !important; } }

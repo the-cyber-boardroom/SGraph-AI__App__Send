@@ -436,7 +436,8 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             renderedView.style.cssText = 'flex: 1; overflow: hidden; display: flex; flex-direction: column;';
 
             if (typeof PageLayoutRenderer !== 'undefined') {
-                await PageLayoutRenderer.render(renderedView, json, folderPath, self.zipTree, self);
+                // Pass banner:false — the banner is rendered externally (outside the card frame)
+                await PageLayoutRenderer.render(renderedView, Object.assign({}, json, { banner: false }), folderPath, self.zipTree, self);
             } else {
                 renderedView.innerHTML = '<pre style="padding:1rem;">' +
                     SendHelpers.escapeHtml(rawJsonText) + '</pre>';
@@ -759,16 +760,17 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
 
             themeSelect.addEventListener('change', async function () {
                 var scheme = themeSelect.value;
-                themeSelect.value = '';  // reset
                 if (!scheme || !_themeSchemes[scheme]) return;
                 try {
                     var parsed = JSON.parse(rawJsonText);
                     parsed.theme = _themeSchemes[scheme];
                     renderedView.innerHTML = '';
                     if (typeof PageLayoutRenderer !== 'undefined') {
-                        await PageLayoutRenderer.render(renderedView, parsed, folderPath, self.zipTree, self);
+                        // banner:false — external banner (outside card) is unchanged
+                        await PageLayoutRenderer.render(renderedView, Object.assign({}, parsed, { banner: false }), folderPath, self.zipTree, self);
                     }
                     isSource = false; isEdit = false;
+                    themeSelect.value = scheme;   // remember the selected theme
                     _applyViewState();
                 } catch (e) { console.warn('[theme-select]', e); }
             });
@@ -790,6 +792,23 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             contentFrame.appendChild(editSplit);
 
             el.appendChild(toggleBar);
+
+            // External banner — rendered on the dark panel, above the card frame.
+            // The card (contentFrame) contains only _page.json rendered content.
+            if (typeof PageLayoutRenderer !== 'undefined' && PageLayoutRenderer.renderBanner) {
+                var meta = json.meta || {};
+                var extBanner = PageLayoutRenderer.renderBanner({
+                    title:       json.title  || '',
+                    badge:       meta.badge  || 'Page Layout',
+                    author:      meta.author || '',
+                    date:        meta.date   || '',
+                    tags:        meta.tags   || [],
+                    dismissible: true
+                });
+                extBanner.classList.add('plr-banner--on-dark');
+                el.appendChild(extBanner);
+            }
+
             el.appendChild(contentFrame);
             _applyViewState();
 
