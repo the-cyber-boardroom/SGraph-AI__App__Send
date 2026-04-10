@@ -130,7 +130,21 @@ class SGVault {
         // Initialize component managers
         vault._initManagers()
 
-        // Read named HEAD ref
+        // Step 1: Read branch index live to discover named branch's head_ref_id.
+        //   Falls back to the HMAC-derived refFileId if the index is unavailable.
+        //   This is the authoritative path — the index may list multiple named branches
+        //   and its head_ref_id is the live pointer (never cached by the server).
+        try {
+            const idx = await vault._refManager.readBranchIndex(vault._branchIndexFileId)
+            if (idx?.branches) {
+                const named = idx.branches.find(b => b.branch_type === 'named')
+                if (named?.head_ref_id) {
+                    vault._refFileId = named.head_ref_id  // Override with live ref_id
+                }
+            }
+        } catch (_) { /* branch index unavailable — use derived refFileId */ }
+
+        // Step 2: Read named HEAD ref LIVE (never use a cached commit ID)
         const namedCommitId = await vault._refManager.readRef(vault._refFileId)
         if (!namedCommitId) throw new Error('Vault not found: HEAD ref missing')
         vault._namedHeadId = namedCommitId
