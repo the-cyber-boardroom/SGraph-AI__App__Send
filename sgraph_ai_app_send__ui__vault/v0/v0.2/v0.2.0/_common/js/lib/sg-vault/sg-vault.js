@@ -236,7 +236,12 @@ class SGVault {
         const entry = folder.children[fileName]
         if (!entry || entry.type !== 'file') throw new Error(`File not found: ${fileName}`)
 
-        const encrypted = await this._objectStore.load(entry.blob_id)
+        // Files > 4 MB bypass the Lambda response limit via presigned S3 URL.
+        // loadLarge() falls back to direct read in memory/local-dev mode.
+        const LARGE_FILE_THRESHOLD = 4 * 1024 * 1024
+        const encrypted = (entry.size || 0) > LARGE_FILE_THRESHOLD
+            ? await this._objectStore.loadLarge(entry.blob_id)
+            : await this._objectStore.load(entry.blob_id)
         return SGSendCrypto.decrypt(encrypted, this._readKey)
     }
 

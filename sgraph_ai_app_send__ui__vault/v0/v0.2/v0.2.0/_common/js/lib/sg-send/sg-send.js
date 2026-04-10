@@ -130,6 +130,29 @@ class SGSend {
         return response.arrayBuffer()
     }
 
+    // --- Large file read: uses S3 presigned URL to bypass Lambda response limit ---
+    //     Calls GET /api/vault/presigned/read-url/{vaultId}/{filePath}.
+    //     On success (S3 mode): fetches encrypted blob directly from S3.
+    //     On 400 (memory mode / presigned not available): falls back to vaultRead().
+
+    async vaultReadLarge(vaultId, filePath) {
+        try {
+            const presignResp = await fetch(
+                `${this.endpoint}/api/vault/presigned/read-url/${vaultId}/${filePath}`,
+                { method: 'GET', mode: 'cors' }
+            )
+            if (presignResp.ok) {
+                const { url } = await presignResp.json()
+                if (url) {
+                    const s3Resp = await fetch(url)
+                    if (s3Resp.ok) return s3Resp.arrayBuffer()
+                }
+            }
+        } catch (_) { /* fall through to direct read */ }
+        // Fallback: direct read (works in memory/local-dev mode regardless of size)
+        return this.vaultRead(vaultId, filePath)
+    }
+
     async vaultDelete(vaultId, fileId, writeKey) {
         const response = await this._fetch('DELETE', `/api/vault/delete/${vaultId}/${fileId}`, {
             headers: { 'x-sgraph-vault-write-key': writeKey }
