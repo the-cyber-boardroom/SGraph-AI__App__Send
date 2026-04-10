@@ -10,12 +10,16 @@
      SgPrint.printHtml(htmlContent, filename)
      SgPrint.printMarkdown(markdownText, filename)  // requires MarkdownParser
 
-   Designed for extraction into the __Tools repo.
+   Page breaks in markdown:
+     Add <div class="page-break"></div> in the markdown (raw HTML).
+     On screen: invisible. In print: forces a page break.
 
-   v0.3.1 change: @page margin removed (was 2cm 2.5cm) so the browser's
-   own print-dialog margin setting ("None", "Default", "Custom") is the
-   sole control point. Previously the CSS @page rule persisted even when
-   the user selected "None" in Chrome's print panel.
+   v0.3.1 changes over v0.3.0:
+     - @page margin set to 0 (was 2cm 2.5cm) — browser dialog controls margins
+     - Screen preview padding reduced from 2cm 2.5cm → 0.8cm 1.2cm
+     - Dark inline backgrounds stripped before printing (prevents dark-themed
+       HTML blocks from creating dark pages in the PDF output)
+     - .page-break CSS support added
    ============================================================================= */
 
 var SgPrint = (function() {
@@ -64,13 +68,17 @@ var SgPrint = (function() {
         '    .sg-print-toolbar .btn-close:hover { background: #444; color: #fff; }',
         '    .sg-print-page {',
         '        max-width: 210mm; margin: 24px auto; background: #fff;',
-        '        padding: 2cm 2.5cm; box-shadow: 0 2px 12px rgba(0,0,0,0.15);',
+        '        padding: 0.8cm 1.2cm; box-shadow: 0 2px 12px rgba(0,0,0,0.15);',
         '        border-radius: 2px; min-height: 297mm;',
         '    }',
+        '    /* Page break marker: dashed line on screen so authors can see it */',
+        '    .page-break { display: block; border-top: 2px dashed #ccc; margin: 1.5em 0; }',
         '}',
         '@media print {',
         '    .sg-print-toolbar { display: none !important; }',
         '    .sg-print-page { max-width: none; margin: 0; padding: 0; box-shadow: none; border-radius: 0; min-height: auto; }',
+        '    /* Page break: invisible in print but forces a new page */',
+        '    .page-break { display: block; page-break-after: always; break-after: page; height: 0; border: none; }',
         '}',
         '',
         '/* --- Document styles (both screen and print) --- */',
@@ -123,10 +131,62 @@ var SgPrint = (function() {
     // ─── SG/Send logo SVG (tiny, inline) ─────────────────────────────────────
     var LOGO_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>';
 
+    // ─── Sanitize: strip dark inline backgrounds ──────────────────────────────
+    //
+    // Markdown content may include raw HTML with dark-themed backgrounds
+    // (slide decks, infographics, etc.) that create dark blocks in the PDF.
+    // This strips inline background/background-color styles from non-code
+    // elements where the computed color is very dark (luminance < 60).
+    //
+    function _sanitizeForPrint(htmlStr) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = htmlStr;
+
+        tmp.querySelectorAll('[style]').forEach(function(el) {
+            // Leave code/pre alone — they may legitimately want dark backgrounds
+            var tag = el.tagName.toLowerCase();
+            if (tag === 'pre' || tag === 'code') return;
+
+            var s = el.style;
+            // Check both background and background-color (el.style properties)
+            var bgColor = s.backgroundColor || '';
+            var bg      = s.background || '';
+            var raw     = bgColor || bg;
+
+            if (!raw) return;
+
+            // Parse rgb/rgba or #hex to get luminance
+            var isDark = false;
+            var rgb = raw.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+            if (rgb) {
+                var r = parseInt(rgb[1]), g = parseInt(rgb[2]), b = parseInt(rgb[3]);
+                isDark = (0.299 * r + 0.587 * g + 0.114 * b) < 60;
+            } else {
+                var hex = raw.match(/#([0-9a-f]{3,8})/i);
+                if (hex) {
+                    var h = hex[1];
+                    if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+                    var r2 = parseInt(h.substr(0,2),16), g2 = parseInt(h.substr(2,2),16), b2 = parseInt(h.substr(4,2),16);
+                    isDark = (0.299 * r2 + 0.587 * g2 + 0.114 * b2) < 60;
+                }
+            }
+
+            if (isDark) {
+                s.backgroundColor = 'transparent';
+                s.background      = 'transparent';
+            }
+        });
+
+        return tmp.innerHTML;
+    }
+
     // ─── Core: open print window with HTML content ───────────────────────────
     function printHtml(htmlContent, filename) {
         var displayName = filename || 'Document';
         var dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+        // Strip dark inline backgrounds before writing to the print window
+        var safeContent = _sanitizeForPrint(htmlContent);
 
         var printDoc = '<!DOCTYPE html><html><head>' +
             '<meta charset="utf-8">' +
@@ -150,7 +210,7 @@ var SgPrint = (function() {
                 '<span>SG/<b>Send</b></span>' +
                 '<span class="sg-print-filename">' + escapeHtml(filename || '') + '</span>' +
             '</div>' +
-            htmlContent +
+            safeContent +
             '<div class="sg-print-footer">' +
                 '<span>SG/Send &mdash; sgraph.ai</span>' +
                 '<span>Printed ' + dateStr + '</span>' +
@@ -165,7 +225,10 @@ var SgPrint = (function() {
         }
         w.document.write(printDoc);
         w.document.close();
-        setTimeout(function() { w.print(); }, 300);
+        // Explicitly set title after close so Chrome uses it as the PDF filename.
+        // Without this, Chrome sometimes reads the opener window's title instead.
+        w.document.title = displayName;
+        setTimeout(function() { w.print(); }, 400);
     }
 
     // ─── Convenience: print markdown (requires MarkdownParser) ───────────────
@@ -194,6 +257,6 @@ var SgPrint = (function() {
         printHtml:     printHtml,
         printMarkdown: printMarkdown,
         PRINT_STYLES:  PRINT_STYLES,
-        version:       '1.0.1'
+        version:       '1.0.2'
     };
 })();
