@@ -28,7 +28,7 @@ var SgPrint = (function() {
     // ─── Print styles (A4-ready, screen preview + print media) ───────────────
     var PRINT_STYLES = [
         '*, *::before, *::after { box-sizing: border-box; }',
-        '@page { margin: 0; }',   /* Let browser margin setting win completely */
+        '@page { margin: 1cm 1.25cm; }',  /* Half original 2cm/2.5cm — user can override with "None" */
         'body {',
         '    font-family: "DM Sans", system-ui, -apple-system, sans-serif;',
         '    font-size: 11pt; line-height: 1.6; color: #1a1a1a; background: #fff;',
