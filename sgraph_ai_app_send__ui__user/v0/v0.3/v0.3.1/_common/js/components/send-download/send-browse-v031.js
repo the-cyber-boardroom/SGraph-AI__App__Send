@@ -351,10 +351,15 @@ SendBrowse.prototype._renderFileContent = (function(original) {
                         closeBtn.addEventListener('click', dismiss);
                         var onKey = function(e) {
                             if (e.key === 'Escape') dismiss();
-                            // BRW-024: Ctrl+P / Cmd+P — print overlay content only
+                            // BRW-024: Ctrl+P / Cmd+P — print overlay content via SgPrint
+                            // (window.print() would capture the whole browse shell)
                             if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
                                 e.preventDefault();
-                                window.print();
+                                if (typeof SgPrint !== 'undefined') {
+                                    SgPrint.printHtml(cloned.innerHTML, fName);
+                                } else {
+                                    window.print();
+                                }
                             }
                         };
                         document.addEventListener('keydown', onKey);
