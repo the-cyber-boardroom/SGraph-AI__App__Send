@@ -39,6 +39,16 @@ class SGVaultObjectStore {
         return data
     }
 
+    // --- Load large blob via presigned S3 URL (bypasses Lambda response limit) ---
+    //     Falls back to direct read if presigned URL is not available (memory mode).
+
+    async loadLarge(objectId) {
+        const filePath = `bare/data/${objectId}`
+        const data = await this._sgSend.vaultReadLarge(this._vaultId, filePath)
+        if (!data) throw new Error(`Object not found: ${objectId}`)
+        return data
+    }
+
     // --- Compute content-addressed object ID from ciphertext ---------------------
 
     async computeObjectId(ciphertext) {
