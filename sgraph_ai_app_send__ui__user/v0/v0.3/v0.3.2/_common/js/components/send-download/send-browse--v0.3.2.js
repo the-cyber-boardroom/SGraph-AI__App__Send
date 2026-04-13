@@ -657,9 +657,12 @@ class SendBrowse extends SendComponent {
                     a.style.cursor = 'pointer';
                 });
 
-                // BRW-005: Images from zip
-                mdContainer.querySelectorAll('img[src]').forEach(function(img) {
-                    var src = img.getAttribute('src');
+                // BRW-005: Images from zip/vault.
+                // Also handles data-md-src from markdown-parser-v031 BRW-020:
+                // that overlay outputs <img data-md-src="..."> (no src) to prevent
+                // HTTP 404s while this code asynchronously loads the blob URL.
+                mdContainer.querySelectorAll('img[src], img[data-md-src]').forEach(function(img) {
+                    var src = img.getAttribute('src') || img.getAttribute('data-md-src');
                     if (!src || src.startsWith('http://') || src.startsWith('https://') ||
                         src.startsWith('data:') || src.startsWith('blob:')) return;
 
@@ -672,6 +675,7 @@ class SendBrowse extends SendComponent {
                             var blob = new Blob([imgBytes], { type: mime });
                             var url  = URL.createObjectURL(blob);
                             img.src  = url;
+                            img.removeAttribute('data-md-src');
                             if (self._objectUrls) self._objectUrls.push(url);
                         });
                     }
