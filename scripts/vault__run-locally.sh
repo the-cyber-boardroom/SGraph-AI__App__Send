@@ -10,6 +10,11 @@
 # This script replicates that locally by creating symlinks in a temporary
 # directory that mirrors the production URL structure.
 #
+# LOCAL CDN OVERRIDE: The vault index.html loads shared components from
+# dev.send.sgraph.ai. This script merges the local user UI _common/ on top
+# of the vault _common/ and patches index.html to use local URLs so that
+# local code changes are visible without a CDN deploy.
+#
 # The vault UI uses Web Crypto API (AES-256-GCM) which requires either:
 #   - https:// (production)
 #   - http://localhost (local dev — this script)
@@ -22,6 +27,11 @@ STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
 UI_VERSION="v0.2.0"
 IFD_PATH="v0/v0.2/$UI_VERSION"
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
+
+# User UI version whose _common/ overrides the CDN in local dev
+USER_UI_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
+SEND_BROWSE_VERSION="v0.3.2"
+SEND_BROWSE_COMMON="$USER_UI_DIR/v0/v0.3/$SEND_BROWSE_VERSION/_common"
 
 # Clean up on exit
 cleanup() {
@@ -43,19 +53,29 @@ if [ ! -d "$CONTENT_DIR" ]; then
     exit 1
 fi
 
-# Symlink locale folders (en-gb/, etc.)
+# Copy locale folders (not symlink) so we can patch index.html inside them
 for locale_dir in "$CONTENT_DIR"/*/; do
     dirname=$(basename "$locale_dir")
     if [ "$dirname" != "_common" ] && [ "$dirname" != "i18n" ] && [ -d "$locale_dir" ]; then
-        ln -sf "$locale_dir" "$SERVE_DIR/$dirname"
+        cp -r "$locale_dir" "$SERVE_DIR/$dirname"
     fi
 done
 
-# Copy _common (not symlink) so we can inject build-info.js
+# Copy _common (not symlink) so we can inject build-info.js and CDN overrides
 if [ -d "$CONTENT_DIR/_common" ]; then
     cp -r "$CONTENT_DIR/_common" "$SERVE_DIR/_common"
 else
     mkdir -p "$SERVE_DIR/_common/js"
+fi
+
+# Merge user UI _common/ on top — overrides CDN scripts with local versions.
+# This means send-browse--v0.3.2.js, markdown-parser.js, etc. are all served
+# from local code, so local changes take effect without a CDN deploy.
+if [ -d "$SEND_BROWSE_COMMON" ]; then
+    echo "Merging user UI _common ($SEND_BROWSE_VERSION) → local CDN override..."
+    cp -r "$SEND_BROWSE_COMMON"/. "$SERVE_DIR/_common/"
+else
+    echo "WARNING: user UI _common not found at $SEND_BROWSE_COMMON (CDN will be used)"
 fi
 
 # Symlink i18n/
@@ -78,6 +98,22 @@ window.SGRAPH_BUILD = {
 };
 JSEOF
 
+# Patch index.html files: replace https://dev.send.sgraph.ai/_common/ with
+# local /_common/ so the browser loads our local send-browse, markdown-parser,
+# etc. instead of the deployed CDN versions.
+echo "Patching index.html: CDN URLs → local /_common/ ..."
+for index_html in "$SERVE_DIR"/*/index.html; do
+    [ -f "$index_html" ] || continue
+    python3 -c "
+import sys, re
+path = sys.argv[1]
+with open(path) as f: html = f.read()
+patched = html.replace('https://dev.send.sgraph.ai/_common/', '/_common/')
+with open(path, 'w') as f: f.write(patched)
+print('  Patched:', path)
+" "$index_html"
+done
+
 # Create a root index.html that redirects to /en-gb/
 cat > "$SERVE_DIR/index.html" <<'HTMLEOF'
 <!DOCTYPE html>
@@ -91,6 +127,7 @@ echo ""
 echo "Starting vault.sgraph.ai local server..."
 echo "  Root:       $SERVE_DIR"
 echo "  Content:    $CONTENT_DIR"
+echo "  CDN override: $SEND_BROWSE_COMMON"
 echo ""
 echo "  URLs:"
 echo "    Home:           http://localhost:$PORT/"
