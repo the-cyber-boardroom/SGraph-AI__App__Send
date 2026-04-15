@@ -95,6 +95,14 @@ for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
 done
 
 
+# Inject /api/health for local dev — vault-header.js calls window.location.origin/api/health
+# to display the backend version. Python http.server has no API routes, so this
+# provides a static JSON response that prevents a noisy 404 in DevTools.
+mkdir -p "$SERVE_DIR/api"
+cat > "$SERVE_DIR/api/health" <<HEALTHEOF
+{"status":"ok","version":"local-dev","mode":"local-static"}
+HEALTHEOF
+
 # Inject build-info.js for local dev (CI generates this in production)
 mkdir -p "$SERVE_DIR/_common/js"
 cat > "$SERVE_DIR/_common/js/build-info.js" <<JSEOF
