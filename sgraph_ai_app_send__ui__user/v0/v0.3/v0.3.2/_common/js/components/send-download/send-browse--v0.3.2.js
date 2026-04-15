@@ -16,7 +16,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ── Version stamp — bump this to confirm the local dev server has the latest code ──
-console.log('%c[send-browse v0.3.2-vfs-3] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+console.log('%c[send-browse v0.3.2-vfs-4] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
 
 class SendBrowse extends SendComponent {
 
@@ -604,14 +604,22 @@ class SendBrowse extends SendComponent {
                     'configurable:true,' +
                     'get:_oget,' +
                     'set:function(val){' +
-                      'if(!val||this.__sgVfs||' +
+                      // External/absolute URLs pass straight through.
+                      // __sgVfs is NOT in this check — we must NOT skip relative
+                      // paths even if we already loaded this element once (slide navigation
+                      // reuses the same <img> element with a new src each time).
+                      'if(!val||' +
                          'val.startsWith("http")||val.startsWith("blob:")||' +
                          'val.startsWith("data:")||val.startsWith("//"))' +
                         '{_oset.call(this,val);return;}' +
                       'console.log("[sg-vfs] img.src intercepted:",val);' +
+                      // Set __sgVfs to prevent the MutationObserver backup from
+                      // double-processing while the async VFS fetch is in flight.
+                      // It is cleared once the blob URL is applied (or on error).
                       'this.__sgVfs=true;' +
                       'var el=this;' +
                       '_vfsReq(val,function(d){' +
+                        'el.__sgVfs=false;' +  // clear so future src changes are intercepted
                         'if(d.err){console.warn("[sg-vfs] img not in vault:",val);_oset.call(el,val);return;}' +
                         'var b=new Blob([d.buf],{type:d.mime||"image/png"});' +
                         'var burl=URL.createObjectURL(b);' +
