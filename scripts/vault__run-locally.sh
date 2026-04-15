@@ -11,9 +11,9 @@
 # directory that mirrors the production URL structure.
 #
 # LOCAL CDN OVERRIDE: The vault index.html loads shared components from
-# dev.send.sgraph.ai. This script merges the local user UI _common/ on top
-# of the vault _common/ and patches index.html to use local URLs so that
-# local code changes are visible without a CDN deploy.
+# dev.send.sgraph.ai. This script merges all user UI IFD layers (v0.3.0,
+# v0.3.1, v0.3.2) on top of the vault _common/ and patches index.html to
+# use local URLs so that local code changes are visible without a CDN deploy.
 #
 # The vault UI uses Web Crypto API (AES-256-GCM) which requires either:
 #   - https:// (production)
@@ -28,10 +28,14 @@ UI_VERSION="v0.2.0"
 IFD_PATH="v0/v0.2/$UI_VERSION"
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
 
-# User UI version whose _common/ overrides the CDN in local dev
+# User UI IFD layers — merged in order (base first, latest last) to replicate
+# what the CDN serves. Each version only contains files changed in that version.
 USER_UI_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
-SEND_BROWSE_VERSION="v0.3.2"
-SEND_BROWSE_COMMON="$USER_UI_DIR/v0/v0.3/$SEND_BROWSE_VERSION/_common"
+USER_UI_LAYERS=(
+    "v0/v0.3/v0.3.0/_common"
+    "v0/v0.3/v0.3.1/_common"
+    "v0/v0.3/v0.3.2/_common"
+)
 
 # Clean up on exit
 cleanup() {
@@ -68,15 +72,19 @@ else
     mkdir -p "$SERVE_DIR/_common/js"
 fi
 
-# Merge user UI _common/ on top — overrides CDN scripts with local versions.
-# This means send-browse--v0.3.2.js, markdown-parser.js, etc. are all served
-# from local code, so local changes take effect without a CDN deploy.
-if [ -d "$SEND_BROWSE_COMMON" ]; then
-    echo "Merging user UI _common ($SEND_BROWSE_VERSION) → local CDN override..."
-    cp -r "$SEND_BROWSE_COMMON"/. "$SERVE_DIR/_common/"
-else
-    echo "WARNING: user UI _common not found at $SEND_BROWSE_COMMON (CDN will be used)"
-fi
+# Merge user UI IFD layers in order (v0.3.0 → v0.3.1 → v0.3.2) — replicates
+# the CDN's flattened view. Each layer only contains files changed in that
+# version; later layers override earlier ones. Local changes take effect
+# without a CDN deploy.
+for layer in "${USER_UI_LAYERS[@]}"; do
+    layer_dir="$USER_UI_DIR/$layer"
+    if [ -d "$layer_dir" ]; then
+        echo "Merging user UI layer: $layer ..."
+        cp -r "$layer_dir"/. "$SERVE_DIR/_common/"
+    else
+        echo "WARNING: user UI layer not found: $layer_dir (skipping)"
+    fi
+done
 
 # Symlink i18n/
 [ -d "$CONTENT_DIR/i18n" ] && ln -sf "$CONTENT_DIR/i18n" "$SERVE_DIR/i18n"
@@ -127,7 +135,7 @@ echo ""
 echo "Starting vault.sgraph.ai local server..."
 echo "  Root:       $SERVE_DIR"
 echo "  Content:    $CONTENT_DIR"
-echo "  CDN override: $SEND_BROWSE_COMMON"
+echo "  CDN override: $USER_UI_DIR (v0.3.0 → v0.3.1 → v0.3.2 merged)"
 echo ""
 echo "  URLs:"
 echo "    Home:           http://localhost:$PORT/"
