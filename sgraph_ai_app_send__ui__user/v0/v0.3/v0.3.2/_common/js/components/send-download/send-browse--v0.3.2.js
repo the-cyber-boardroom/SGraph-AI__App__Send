@@ -53,6 +53,10 @@ class SendBrowse extends SendComponent {
         super.disconnectedCallback();
         this._objectUrls.forEach(u => URL.revokeObjectURL(u));
         this._objectUrls = [];
+        if (this._vfsBridges) {
+            this._vfsBridges.forEach(b => window.removeEventListener('message', b));
+            this._vfsBridges = [];
+        }
         if (this._boundKeyHandler) {
             document.removeEventListener('keydown', this._boundKeyHandler);
             this._boundKeyHandler = null;
@@ -544,22 +548,106 @@ class SendBrowse extends SendComponent {
             return;
         }
 
-        // ── BRW-013: HTML viewer (sandboxed iframe) ─────────────────────
+        // ── BRW-013: HTML viewer (sandboxed iframe + vault VFS bridge) ──
         if (ext === 'html' || ext === 'htm') {
             var rawText = new TextDecoder().decode(bytes);
             content.style.display = 'flex';
             content.style.flexDirection = 'column';
             content.style.height = '100%';
 
-            var blob = new Blob([rawText], { type: 'text/html' });
+            // VFS bridge: intercepts fetch() inside the iframe for relative URLs.
+            // The injected script sends a postMessage to the parent; the parent
+            // resolves the path against the vault file list and returns the bytes.
+            // External URLs (http/https/blob/data) pass through to native fetch.
+            var vfsBridgeScript =
+                '<script id="__sg-vfs">' +
+                '(function(){' +
+                  'var _of=window.fetch;' +
+                  'window.fetch=function(u,o){' +
+                    'var us=typeof u==="string"?u:(u&&u.url?u.url:String(u));' +
+                    'if(!us||us.startsWith("http")||us.startsWith("blob:")||us.startsWith("data:")||us.startsWith("#"))' +
+                      'return _of.apply(this,arguments);' +
+                    'return new Promise(function(res,rej){' +
+                      'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                      'function h(e){' +
+                        'if(!e.data||e.data.__sgVfsReply!==id)return;' +
+                        'window.removeEventListener("message",h);' +
+                        'if(e.data.err)return _of.apply(window,[u,o]).then(res).catch(rej);' +
+                        'res(new Response(e.data.buf,{status:200,statusText:"OK",' +
+                          'headers:{"Content-Type":e.data.mime||"application/octet-stream"}}));' +
+                      '}' +
+                      'window.addEventListener("message",h);' +
+                      'window.parent.postMessage({__sgVfsReq:id,url:us},"*");' +
+                    '});' +
+                  '};' +
+                '})();' +
+                '<\/script>';
+
+            // Inject bridge as first child of <head> (or prepend if no <head>)
+            var htmlForIframe = self.dataSource
+                ? rawText.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                : rawText;
+            if (self.dataSource && htmlForIframe === rawText) {
+                htmlForIframe = vfsBridgeScript + rawText;  // no <head> tag
+            }
+
+            var blob    = new Blob([htmlForIframe], { type: 'text/html' });
             var blobUrl = URL.createObjectURL(blob);
             this._objectUrls.push(blobUrl);
+
             var iframeEl = document.createElement('iframe');
             iframeEl.className = 'sb-file__html-frame';
-            iframeEl.sandbox = 'allow-scripts';
-            iframeEl.src = blobUrl;
+            iframeEl.sandbox   = 'allow-scripts';
+            iframeEl.src       = blobUrl;
             iframeEl.style.flex = '1';
             content.appendChild(iframeEl);
+
+            // Set up parent-side VFS request handler
+            if (self.dataSource) {
+                var htmlDir  = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
+                var fileList = self.dataSource.getFileList();
+                var _vfsMime = {
+                    json:'application/json', js:'application/javascript',
+                    mjs:'application/javascript', css:'text/css',
+                    html:'text/html', htm:'text/html',
+                    png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
+                    gif:'image/gif', svg:'image/svg+xml', webp:'image/webp',
+                    pdf:'application/pdf', txt:'text/plain', md:'text/markdown',
+                    woff:'font/woff', woff2:'font/woff2', ttf:'font/ttf', otf:'font/otf'
+                };
+
+                var vfsBridge = function(e) {
+                    if (!e.data || !e.data.__sgVfsReq) return;
+                    if (e.source !== iframeEl.contentWindow) return;
+
+                    var msgId    = e.data.__sgVfsReq;
+                    var reqUrl   = e.data.url;
+                    var resolved = _resolvePath(htmlDir, reqUrl);
+                    var match    = _findEntry(fileList, resolved);
+
+                    if (!match) {
+                        e.source.postMessage({ __sgVfsReply: msgId, err: true }, '*');
+                        return;
+                    }
+
+                    self.dataSource.getFileBytes(match.path).then(function(buf) {
+                        var ext2 = match.path.split('.').pop().toLowerCase();
+                        var mime = _vfsMime[ext2] || 'application/octet-stream';
+                        try {
+                            e.source.postMessage({ __sgVfsReply: msgId, buf: buf, mime: mime }, '*', [buf]);
+                        } catch (_) {
+                            // buf not transferable (already detached) — send without transfer
+                            e.source.postMessage({ __sgVfsReply: msgId, buf: buf, mime: mime }, '*');
+                        }
+                    }).catch(function() {
+                        e.source.postMessage({ __sgVfsReply: msgId, err: true }, '*');
+                    });
+                };
+
+                window.addEventListener('message', vfsBridge);
+                if (!self._vfsBridges) self._vfsBridges = [];
+                self._vfsBridges.push(vfsBridge);
+            }
 
             var sourceEl = document.createElement('pre');
             sourceEl.className = 'sb-file__code';
