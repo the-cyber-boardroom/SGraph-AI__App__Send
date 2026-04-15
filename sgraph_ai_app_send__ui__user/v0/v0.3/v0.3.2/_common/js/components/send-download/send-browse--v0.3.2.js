@@ -15,6 +15,9 @@
    Merged fixes: BRW-001 through BRW-017
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+// ── Version stamp — bump this to confirm the local dev server has the latest code ──
+console.log('%c[send-browse v0.3.2-vfs-3] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+
 class SendBrowse extends SendComponent {
 
     /** Light DOM — CSS goes to document.head. No HTML template — dynamic render. */
@@ -555,23 +558,23 @@ class SendBrowse extends SendComponent {
             content.style.flexDirection = 'column';
             content.style.height = '100%';
 
-            // VFS bridge: intercepts fetch() AND <img src> inside the iframe.
-            // Logs prefixed [sg-vfs] appear in the iframe console context;
-            // logs prefixed [sg-vfs parent] appear in the parent window console.
+            // VFS bridge: intercepts fetch(), img.src setter, and MutationObserver.
+            // [sg-vfs] logs → iframe console (switch context in DevTools top-left dropdown)
+            // [sg-vfs parent] logs → parent window console (visible in "top" context)
             var vfsBridgeScript =
                 '<script id="__sg-vfs">' +
                 '(function(){' +
-                'console.log("[sg-vfs] VFS bridge installing...");' +
+                'console.log("[sg-vfs] installing...");' +
 
                 // ── Shared VFS request helper ──────────────────────────────
                 'function _vfsReq(url,cb){' +
                   'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
-                  'console.log("[sg-vfs] postMessage →",url,"id="+id);' +
                   'function h(e){if(!e.data||e.data.__sgVfsReply!==id)return;' +
                     'window.removeEventListener("message",h);' +
-                    'console.log("[sg-vfs] reply ←",url,e.data.err?"ERR":"OK",e.data.buf&&e.data.buf.byteLength,"bytes",e.data.mime);' +
+                    'console.log("[sg-vfs] ←",url,e.data.err?"ERR":"OK",e.data.buf&&e.data.buf.byteLength,"b");' +
                     'cb(e.data);}' +
                   'window.addEventListener("message",h);' +
+                  'console.log("[sg-vfs] →",url);' +
                   'window.parent.postMessage({__sgVfsReq:id,url:url},"*");' +
                 '}' +
 
@@ -581,50 +584,65 @@ class SendBrowse extends SendComponent {
                   'var us=typeof u==="string"?u:(u&&u.url?u.url:String(u));' +
                   'if(!us||us.startsWith("http")||us.startsWith("blob:")||us.startsWith("data:")||us.startsWith("#"))' +
                     'return _of.apply(this,arguments);' +
-                  'console.log("[sg-vfs] fetch() intercepted:",us);' +
+                  'console.log("[sg-vfs] fetch intercepted:",us);' +
                   'return new Promise(function(res,rej){' +
                     '_vfsReq(us,function(d){' +
-                      'if(d.err){console.warn("[sg-vfs] fetch fallback for:",us);return _of.apply(window,[u,o]).then(res).catch(rej);}' +
-                      'res(new Response(d.buf,{status:200,statusText:"OK",' +
-                        'headers:{"Content-Type":d.mime||"application/octet-stream"}}));' +
+                      'if(d.err)return _of.apply(window,[u,o]).then(res).catch(rej);' +
+                      'res(new Response(d.buf,{status:200,headers:{"Content-Type":d.mime||"application/octet-stream"}}));' +
                     '});' +
                   '});' +
                 '};' +
 
-                // ── img src interceptor ────────────────────────────────────
-                'function _loadImg(img){' +
-                  'if(img.dataset.sgVfs)return;' +
+                // ── HTMLImageElement.prototype.src setter override ─────────
+                // Catches img.src = '...' before the browser fires any request,
+                // even when the img element is not yet in the DOM (e.g. new Image()).
+                '(function(){' +
+                  'var d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");' +
+                  'if(!d||!d.set)return;' +
+                  'var _oset=d.set,_oget=d.get;' +
+                  'Object.defineProperty(HTMLImageElement.prototype,"src",{' +
+                    'configurable:true,' +
+                    'get:_oget,' +
+                    'set:function(val){' +
+                      'if(!val||this.__sgVfs||' +
+                         'val.startsWith("http")||val.startsWith("blob:")||' +
+                         'val.startsWith("data:")||val.startsWith("//"))' +
+                        '{_oset.call(this,val);return;}' +
+                      'console.log("[sg-vfs] img.src intercepted:",val);' +
+                      'this.__sgVfs=true;' +
+                      'var el=this;' +
+                      '_vfsReq(val,function(d){' +
+                        'if(d.err){console.warn("[sg-vfs] img not in vault:",val);_oset.call(el,val);return;}' +
+                        'var b=new Blob([d.buf],{type:d.mime||"image/png"});' +
+                        'var burl=URL.createObjectURL(b);' +
+                        'console.log("[sg-vfs] img.src → blob:",val,"→",burl);' +
+                        '_oset.call(el,burl);' +
+                      '});' +
+                    '}' +
+                  '});' +
+                  'console.log("[sg-vfs] HTMLImageElement.src setter overridden");' +
+                '})();' +
+
+                // ── MutationObserver backup (catches setAttribute calls) ───
+                'function _loadImgAttr(img){' +
+                  'if(img.__sgVfs)return;' +
                   'var src=img.getAttribute("src");' +
                   'if(!src||src.startsWith("http")||src.startsWith("blob:")||src.startsWith("data:"))return;' +
-                  'console.log("[sg-vfs] img intercepted:",src);' +
-                  'img.dataset.sgVfs="1";' +
-                  'img.removeAttribute("src");' +
-                  '_vfsReq(src,function(d){' +
-                    'if(d.err){console.warn("[sg-vfs] img not in vault:",src);return;}' +
-                    'var b=new Blob([d.buf],{type:d.mime||"image/png"});' +
-                    'var burl=URL.createObjectURL(b);' +
-                    'console.log("[sg-vfs] img blob URL set:",src,"→",burl);' +
-                    'img.src=burl;' +
-                  '});' +
+                  'img.src=src;' +  // triggers our overridden setter
                 '}' +
-
-                // ── MutationObserver ───────────────────────────────────────
                 'var _obs=new MutationObserver(function(muts){' +
                   'muts.forEach(function(m){' +
                     'm.addedNodes.forEach(function(n){' +
                       'if(n.nodeType!==1)return;' +
-                      'if(n.tagName==="IMG")_loadImg(n);' +
-                      'n.querySelectorAll&&n.querySelectorAll("img").forEach(_loadImg);' +
+                      'if(n.tagName==="IMG")_loadImgAttr(n);' +
+                      'n.querySelectorAll&&n.querySelectorAll("img").forEach(_loadImgAttr);' +
                     '});' +
-                    'if(m.type==="attributes"&&m.target.tagName==="IMG")_loadImg(m.target);' +
+                    'if(m.type==="attributes"&&m.target.tagName==="IMG")_loadImgAttr(m.target);' +
                   '});' +
                 '});' +
                 '_obs.observe(document.documentElement||document,{childList:true,subtree:true,attributes:true,attributeFilter:["src"]});' +
-                'console.log("[sg-vfs] MutationObserver started");' +
-
-                // ── Scan imgs already in DOM ───────────────────────────────
-                '(document.querySelectorAll("img")||[]).forEach(_loadImg);' +
-                'console.log("[sg-vfs] VFS bridge installed");' +
+                '(document.querySelectorAll("img")||[]).forEach(_loadImgAttr);' +
+                'console.log("[sg-vfs] installed OK");' +
 
                 '})();' +
                 '<\/script>';
@@ -649,11 +667,12 @@ class SendBrowse extends SendComponent {
             content.appendChild(iframeEl);
 
             // Set up parent-side VFS request handler
+            console.log('[sg-vfs parent] HTML file opened:', fileName, '| dataSource:', self.dataSource ? 'YES' : 'NO (null)');
             if (self.dataSource) {
                 var htmlDir  = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
                 var fileList = self.dataSource.getFileList();
-                console.log('[sg-vfs parent] VFS handler ready. htmlDir="' + htmlDir + '" fileList=' + fileList.length + ' entries');
-                console.log('[sg-vfs parent] fileList sample:', fileList.slice(0, 5).map(function(e){return e.path;}));
+                console.log('[sg-vfs parent] htmlDir="' + htmlDir + '" fileList=' + fileList.length + ' entries');
+                console.log('[sg-vfs parent] sample paths:', fileList.slice(0, 8).map(function(e){return e.path;}));
                 var _vfsMime = {
                     json:'application/json', js:'application/javascript',
                     mjs:'application/javascript', css:'text/css',
