@@ -15,6 +15,9 @@
    Merged fixes: BRW-001 through BRW-017
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+// ── Version stamp — bump this to confirm the local dev server has the latest code ──
+console.log('%c[send-browse v0.3.2-vfs-3] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+
 class SendBrowse extends SendComponent {
 
     /** Light DOM — CSS goes to document.head. No HTML template — dynamic render. */
