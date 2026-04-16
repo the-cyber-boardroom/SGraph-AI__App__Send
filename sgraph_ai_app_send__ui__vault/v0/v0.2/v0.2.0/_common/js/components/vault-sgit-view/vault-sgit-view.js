@@ -6,7 +6,8 @@
      vault-sgit-view--history.js   _renderHistory, _renderCommitRow
      vault-sgit-view--refs.js      _renderRefs
      vault-sgit-view--tree.js      _renderTree, _buildTreeDOM
-     vault-sgit-view--branches.js  _renderBranches, _switchBranch  (NEW)
+     vault-sgit-view--branches.js  _renderBranches, _switchBranch
+     vault-sgit-view--status.js    _renderStatus
      vault-sgit-view--object.js    _loadObject, _renderObject, _renderSchema
 
    Light DOM component.
@@ -21,7 +22,7 @@
             super();
             this._vault          = null;
             this._commitCache    = new Map();
-            this._activeTab      = 'history';    // 'history' | 'refs' | 'tree' | 'branches' | 'object'
+            this._activeTab      = 'history';    // 'history' | 'refs' | 'tree' | 'branches' | 'status' | 'object'
             this._objectViewData = null;
         }
 
@@ -39,6 +40,7 @@
                             <button class="sgit-tab" data-tab="refs">Refs</button>
                             <button class="sgit-tab" data-tab="tree">Tree</button>
                             <button class="sgit-tab" data-tab="branches">Branches</button>
+                            <button class="sgit-tab" data-tab="status">Status</button>
                         </div>
                     </div>
                     <div class="sgit-body">
@@ -86,6 +88,7 @@
                 case 'refs':     this._renderRefs(body);     break;
                 case 'tree':     this._renderTree(body);     break;
                 case 'branches': this._renderBranches(body); break;
+                case 'status':   this._renderStatus(body);   break;
                 case 'object':   this._renderObject(body);   break;
             }
         }
@@ -201,6 +204,25 @@
         .sgit-entry-name { font-family: var(--font-mono); color: var(--color-text); flex: 1; }
         .sgit-entry-size { font-family: var(--font-mono); color: var(--color-text-secondary); font-size: var(--text-small); }
         .sgit-entry-link { font-size: var(--text-small); flex-shrink: 0; }
+
+        /* --- Status Tab --- */
+        .sgit-status-view { max-width: 700px; }
+        .sgit-section-header { display: flex; align-items: center; gap: 0.625rem; margin-bottom: 0.5rem; }
+        .sgit-section-header .sgit-section-title { margin: 0; }
+        .sgit-status-badge { font-size: var(--text-small, 0.75rem); padding: 0.125rem 0.5rem; border-radius: 9999px; font-weight: 600; white-space: nowrap; }
+        .sgit-status-badge--ok       { background: rgba(78,205,196,0.15); color: var(--color-primary, #4ECDC4); }
+        .sgit-status-badge--pending  { background: rgba(233,196,69,0.15); color: #E9C445; }
+        .sgit-status-badge--error    { background: rgba(233,69,96,0.15); color: #E94560; }
+        .sgit-status-badge--readonly { background: rgba(255,255,255,0.08); color: var(--color-text-secondary); }
+        .sgit-status-hint { font-size: var(--text-sm, 0.875rem); color: var(--color-text-secondary); margin: 0 0 0.75rem; line-height: 1.5; }
+        .sgit-status-kv { margin-top: 0.25rem; }
+        .sgit-status-kv .sgit-kv-key { min-width: 160px; }
+        .sgit-error-inline { color: var(--color-error, #E94560); }
+        .sgit-status-hr { border: none; border-top: 1px solid var(--color-border, rgba(78,205,196,0.12)); margin: 1rem 0; }
+        .sgit-status-stats { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
+        .sgit-stat-card { padding: 0.75rem 1.25rem; background: var(--bg-secondary); border: 1px solid var(--color-border); border-radius: 6px; text-align: center; min-width: 100px; }
+        .sgit-stat-value { font-size: var(--text-h3, 1.25rem); font-weight: 700; color: var(--color-text); font-family: var(--font-mono); }
+        .sgit-stat-label { font-size: var(--text-small, 0.75rem); color: var(--color-text-secondary); margin-top: 0.25rem; }
 
         /* --- Shared --- */
         .sgit-json { background: var(--bg-secondary); padding: 1rem; border-radius: 6px; font-family: var(--font-mono); font-size: var(--text-small); color: var(--color-text-secondary); overflow-x: auto; max-height: 400px; overflow-y: auto; border: 1px solid var(--color-border); margin: 0; white-space: pre-wrap; word-break: break-all; }
