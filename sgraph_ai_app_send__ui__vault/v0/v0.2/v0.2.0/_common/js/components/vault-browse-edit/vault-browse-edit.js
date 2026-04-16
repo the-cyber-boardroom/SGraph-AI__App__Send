@@ -168,6 +168,34 @@
             });
         });
         bar.appendChild(deleteBtn);
+
+        // --- View Source button (unrecognised file types only) ---
+        if (!isEditable && type !== 'image' && type !== 'pdf') {
+            var sourceBtn = _makeBtn('View Source');
+            var sourceShowing = false;
+            var sourceEl = null;
+            sourceBtn.addEventListener('click', function() {
+                var content = container.querySelector('.sb-file__content');
+                if (!content) return;
+                if (sourceShowing) {
+                    if (sourceEl) { sourceEl.remove(); sourceEl = null; }
+                    content.style.display = '';
+                    sourceBtn.textContent = 'View Source';
+                    sourceShowing = false;
+                    return;
+                }
+                var text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+                sourceEl = document.createElement('pre');
+                sourceEl.style.cssText = 'margin:0;padding:1rem;overflow:auto;flex:1;font-family:var(--font-mono,monospace);' +
+                    'font-size:12px;line-height:1.5;color:var(--color-text,#e2e8f0);white-space:pre-wrap;word-break:break-all;';
+                sourceEl.textContent = text;
+                content.style.display = 'none';
+                container.appendChild(sourceEl);
+                sourceBtn.textContent = 'Hide Source';
+                sourceShowing = true;
+            });
+            bar.appendChild(sourceBtn);
+        }
     };
 
     // --- Patch header: add Upload Files button ---
