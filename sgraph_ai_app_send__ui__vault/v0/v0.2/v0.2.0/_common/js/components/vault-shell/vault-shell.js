@@ -60,11 +60,6 @@
                             <!-- Files view: shared Browse component fills this -->
                             <div class="vs-view vs-view-files"></div>
 
-                            <!-- Generate view: LLM infographic generation -->
-                            <div class="vs-view vs-view-generate" style="display:none">
-                                <vault-generate></vault-generate>
-                            </div>
-
                             <!-- SGit view -->
                             <div class="vs-view vs-view-sgit" style="display:none">
                                 <vault-sgit-view></vault-sgit-view>
@@ -120,8 +115,8 @@
             // Status bar debug click
             this.addEventListener('vault-status-debug', () => this._toggleDebug());
 
-            // Generate save event — refresh tree after saving generated content
-            this.addEventListener('vault-generate-save', () => this._onFileAdded());
+            // Branch switch: remount browse to reflect new branch content
+            this.addEventListener('branch-switched', () => this._mountBrowse());
 
             // Upload component events
             this.addEventListener('vault-file-added', () => this._onFileAdded());
@@ -150,9 +145,6 @@
 
             // Wire settings
             this.querySelector('vault-settings')?.setVault(vault, vaultKey, this._accessKey);
-
-            // Wire generate panel
-            this.querySelector('vault-generate')?.setVault(vault, this._accessKey);
 
             // Wire SGit
             const sgit = this.querySelector('vault-sgit-view');
@@ -272,15 +264,6 @@
                     }
                 };
             }
-
-            // Track file selection for the Generate panel
-            const shell = this;
-            const origOpenFileTab = browse._openFileTab;
-            browse._openFileTab = async function(path) {
-                await origOpenFileTab.call(this, path);
-                const fileName = path.split('/').pop();
-                shell.querySelector('vault-generate')?.setSelectedFile(path, fileName);
-            };
 
             filesView.appendChild(browse);
         }
