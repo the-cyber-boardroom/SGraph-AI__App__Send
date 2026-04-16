@@ -126,8 +126,8 @@ class SendBrowse extends SendComponent {
                     {
                         type: 'stack', id: 's-preview', activeTab: 0,
                         tabs: [
-                            { type: 'tab', id: 't-share', title: 'Share', tag: 'div', state: {} },
-                            { type: 'tab', id: 't-info',  title: 'Info',  tag: 'div', state: {} }
+                            { type: 'tab', id: 't-share', title: 'Share', tag: 'div', state: {}, locked: true },
+                            { type: 'tab', id: 't-info',  title: 'Info',  tag: 'div', state: {}, locked: true }
                         ]
                     }
                 ]
