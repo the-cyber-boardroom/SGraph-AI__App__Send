@@ -749,6 +749,8 @@
         .vs-view-files send-browse {
             display: block; height: 100%;
         }
+        /* Gallery view link doesn't apply in the vault context */
+        .vs-view-files a.sb-action-btn { display: none; }
         .vs-view-sgit {
             padding: var(--space-4); box-sizing: border-box;
         }

@@ -139,8 +139,8 @@
 
         /* --- Commit History --- */
         .sgit-commit-list { font-size: var(--text-small, 0.75rem); }
-        .sgit-commit-header { display: grid; grid-template-columns: 32px 1fr 160px 100px; gap: 0.5rem; padding: 0.375rem 0.5rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--color-border); }
-        .sgit-commit-row { display: grid; grid-template-columns: 32px 1fr 160px 100px; gap: 0.5rem; padding: 0.25rem 0.5rem; align-items: center; border-bottom: 1px solid var(--color-border, rgba(78,205,196,0.06)); }
+        .sgit-commit-header { display: grid; grid-template-columns: 32px 1fr 200px 100px; gap: 0.5rem; padding: 0.375rem 0.5rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--color-border); }
+        .sgit-commit-row { display: grid; grid-template-columns: 32px 1fr 200px 100px; gap: 0.5rem; padding: 0.25rem 0.5rem; align-items: center; border-bottom: 1px solid var(--color-border, rgba(78,205,196,0.06)); }
         .sgit-commit-row:hover { background: var(--bg-secondary); }
         .sgit-commit-row--head { background: rgba(78, 205, 196, 0.04); }
 
@@ -155,9 +155,9 @@
 
         .sgit-ch-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 0.375rem; }
         .sgit-commit-msg { color: var(--color-text); }
-        .sgit-commit-tree-link { font-size: 0.625rem; opacity: 0.5; margin-left: auto; flex-shrink: 0; }
+        .sgit-commit-tree-link { font-size: 0.625rem; opacity: 0.5; flex-shrink: 0; }
         .sgit-commit-tree-link:hover { opacity: 1; }
-        .sgit-ch-id { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; }
+        .sgit-ch-id { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .sgit-ch-date { color: var(--color-text-secondary); text-align: right; }
 
         .sgit-badge { font-size: 0.625rem; padding: 0.0625rem 0.375rem; border-radius: 3px; font-weight: 600; font-family: var(--font-mono); white-space: nowrap; flex-shrink: 0; }
@@ -178,7 +178,7 @@
         .sgit-commit-list--two .sgit-commit-header,
         .sgit-commit-list--two .sgit-commit-row,
         .sgit-commit-header--two,
-        .sgit-commit-row--two { grid-template-columns: 48px 1fr 160px 100px; }
+        .sgit-commit-row--two { grid-template-columns: 48px 1fr 200px 100px; }
         .sgit-ch-graph--two { width: 48px; height: 28px; position: relative; overflow: visible; }
         .sgit-gt { position: absolute; top: 0; bottom: 0; width: 20px; display: flex; flex-direction: column; align-items: center; }
         .sgit-gt--clone { left: 2px; }
