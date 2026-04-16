@@ -121,6 +121,29 @@
             bar.appendChild(cancelBtn);
         }
 
+        // --- Rename button (all file types) ---
+        var renameBtn = _makeBtn('Rename');
+        renameBtn.addEventListener('click', function() {
+            var fName = fileName.split('/').pop();
+            var parts = fileName.split('/');
+            parts.pop();
+            var folder = '/' + parts.join('/');
+            _prompt('Rename to:', function(newName) {
+                if (!newName || !newName.trim() || newName.trim() === fName) return;
+                self.dataSource.renameFile(folder === '/' ? '/' : folder, fName, newName.trim()).then(function() {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.success('"' + fName + '" renamed to "' + newName.trim() + '"');
+                    }
+                    _refreshBrowseTree(self);
+                }).catch(function(err) {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.error('Rename failed: ' + err.message);
+                    }
+                });
+            }, { defaultValue: fName, okLabel: 'Rename' });
+        });
+        bar.appendChild(renameBtn);
+
         // --- Delete button (all file types) ---
         var deleteBtn = _makeBtn('Delete');
         deleteBtn.addEventListener('mouseenter', function() { deleteBtn.style.color = '#ff6b6b'; });
@@ -268,8 +291,10 @@
     }
 
     // --- Inline prompt dialog (no browser prompt()) ---
+    // opts: { defaultValue, okLabel }
 
-    function _prompt(message, onOk) {
+    function _prompt(message, onOk, opts) {
+        opts = opts || {};
         var overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
         var box = document.createElement('div');
@@ -277,6 +302,7 @@
         box.innerHTML = '<p style="margin:0 0 0.75rem;color:var(--color-text,#e2e8f0);font-size:14px;">' + message + '</p>';
         var input = document.createElement('input');
         input.type = 'text';
+        input.value = opts.defaultValue || '';
         input.style.cssText = 'width:100%;padding:0.5rem 0.75rem;background:var(--bg-primary,#0a0a18);border:1px solid var(--accent,#4ECDC4);border-radius:4px;color:var(--color-text,#e2e8f0);font-size:14px;box-sizing:border-box;outline:none;margin-bottom:1rem;';
         var btnRow = document.createElement('div');
         btnRow.style.cssText = 'display:flex;gap:0.75rem;justify-content:flex-end;';
@@ -285,7 +311,7 @@
         cancelBtn.textContent = 'Cancel';
         var okBtn = document.createElement('button');
         okBtn.className = 'sb-action-btn';
-        okBtn.textContent = 'Create';
+        okBtn.textContent = opts.okLabel || 'Create';
         okBtn.style.cssText = 'color:var(--accent,#4ECDC4);font-weight:700;';
         var submit = function() { overlay.remove(); onOk(input.value); };
         cancelBtn.addEventListener('click', function() { overlay.remove(); });
@@ -302,6 +328,7 @@
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
         document.body.appendChild(overlay);
         input.focus();
+        if (opts.defaultValue) { input.select(); }
     }
 
     // --- Patch _setupTreeListeners: inject refresh button + drag-and-drop ---
@@ -311,6 +338,7 @@
     SendBrowse.prototype._setupTreeListeners = function(treeEl) {
         _origSetupTree.call(this, treeEl);
         _injectRefreshButton(treeEl);
+        _attachFolderInteractions(this, treeEl);
         if (!this.dataSource || !this.dataSource.writable) return;
         _attachDragDrop(this, treeEl);
     };
@@ -335,6 +363,115 @@
         });
 
         controls.appendChild(btn);
+    }
+
+    // --- Folder interactions: selection, double-click expand, rename/delete actions ---
+
+    function _attachFolderInteractions(browse, treeEl) {
+        var writable = browse.dataSource && browse.dataSource.writable;
+
+        treeEl.querySelectorAll('.sb-tree__folder-header').forEach(function(header) {
+            var folderEl = header.closest('.sb-tree__folder');
+            if (!folderEl) return;
+            var folderPath = folderEl.dataset.path || '';
+
+            // Click on header → also mark folder as selected
+            header.addEventListener('click', function() {
+                treeEl.querySelectorAll('.sb-tree__folder--selected')
+                    .forEach(function(el) { el.classList.remove('sb-tree__folder--selected'); });
+                folderEl.classList.add('sb-tree__folder--selected');
+                browse._selectedFolderPath = '/' + folderPath;
+            });
+
+            // Double-click on folder name → toggle expand (same as clicking toggle icon)
+            var nameEl = header.querySelector('.sb-tree__folder-name');
+            if (nameEl) {
+                nameEl.addEventListener('dblclick', function(e) {
+                    e.stopPropagation();
+                    var content = folderEl.querySelector('.sb-tree__folder-content');
+                    var toggle  = header.querySelector('.sb-tree__toggle');
+                    if (content) {
+                        var open = content.style.display !== 'none';
+                        content.style.display = open ? 'none' : '';
+                        if (toggle) toggle.textContent = open ? '\u25b8' : '\u25be';
+                    }
+                });
+            }
+
+            // Rename / delete action buttons (writable only)
+            if (writable) _injectFolderActions(browse, header, treeEl, folderPath);
+        });
+
+        _injectFolderStyles();
+    }
+
+    function _injectFolderActions(browse, header, treeEl, folderPath) {
+        if (header.querySelector('.sb-folder-actions')) return;
+        var actions = document.createElement('div');
+        actions.className = 'sb-folder-actions';
+
+        var renameBtn = document.createElement('button');
+        renameBtn.className = 'sb-folder-action-btn';
+        renameBtn.textContent = 'rename';
+        renameBtn.title = 'Rename folder';
+        renameBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var parts = folderPath.split('/');
+            var currentName = parts[parts.length - 1];
+            _prompt('Rename folder:', function(newName) {
+                if (!newName || !newName.trim() || newName.trim() === currentName) return;
+                browse.dataSource.renameFolder('/' + folderPath, newName.trim()).then(function() {
+                    if (window.sgraphVault && window.sgraphVault.messages)
+                        window.sgraphVault.messages.success('Folder renamed to "' + newName.trim() + '"');
+                    _refreshBrowseTree(browse);
+                }).catch(function(err) {
+                    if (window.sgraphVault && window.sgraphVault.messages)
+                        window.sgraphVault.messages.error('Rename failed: ' + err.message);
+                });
+            }, { defaultValue: currentName, okLabel: 'Rename' });
+        });
+
+        var delBtn = document.createElement('button');
+        delBtn.className = 'sb-folder-action-btn sb-folder-action-btn--del';
+        delBtn.textContent = 'del';
+        delBtn.title = 'Delete folder and all its contents';
+        delBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var name = folderPath.split('/').pop();
+            _confirm('Delete folder "' + name + '" and all its contents?', function() {
+                browse.dataSource.deleteFolder('/' + folderPath).then(function() {
+                    if (window.sgraphVault && window.sgraphVault.messages)
+                        window.sgraphVault.messages.success('Folder "' + name + '" deleted');
+                    _refreshBrowseTree(browse);
+                }).catch(function(err) {
+                    if (window.sgraphVault && window.sgraphVault.messages)
+                        window.sgraphVault.messages.error('Delete failed: ' + err.message);
+                });
+            });
+        });
+
+        actions.appendChild(renameBtn);
+        actions.appendChild(delBtn);
+        header.appendChild(actions);
+    }
+
+    function _injectFolderStyles() {
+        if (document.getElementById('sb-folder-interaction-styles')) return;
+        var s = document.createElement('style');
+        s.id = 'sb-folder-interaction-styles';
+        s.textContent = [
+            '.sb-tree__folder--selected > .sb-tree__folder-header {',
+            '  background: rgba(78,205,196,0.12); border-radius: 3px; }',
+            '.sb-folder-actions { display:none; margin-left:auto; gap:2px; flex-shrink:0; }',
+            '.sb-tree__folder-header:hover .sb-folder-actions { display:flex; }',
+            '.sb-folder-action-btn {',
+            '  font-size:10px; padding:1px 6px; cursor:pointer; border-radius:3px;',
+            '  border:1px solid var(--color-border,#2a2a4a); background:transparent;',
+            '  color:var(--color-text-secondary,#8892a4); font-family:inherit; line-height:1.4; }',
+            '.sb-folder-action-btn:hover { color:var(--color-text,#e2e8f0); background:var(--bg-secondary,#12122a); }',
+            '.sb-folder-action-btn--del:hover { color:#ff6b6b; }'
+        ].join('\n');
+        document.head.appendChild(s);
     }
 
     function _attachDragDrop(browse, treeEl) {
