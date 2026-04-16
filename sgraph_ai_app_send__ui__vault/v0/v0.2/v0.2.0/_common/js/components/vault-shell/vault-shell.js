@@ -141,10 +141,7 @@
 
             // Sync notice actions
             this.addEventListener('click', (e) => {
-                if (e.target.closest('.vs-sync-merge-btn')) {
-                    this._switchView('sgit');
-                    setTimeout(() => this.querySelector('vault-sgit-view')?._switchTab('repair'), 50);
-                }
+                if (e.target.closest('.vs-sync-merge-btn')) this._onAutoMerge();
                 if (e.target.closest('.vs-sync-pull-btn')) this._onPull();
                 if (e.target.closest('.vs-sync-notice-close')) {
                     const n = this.querySelector('.vs-sync-notice');
@@ -429,6 +426,40 @@
             }
         }
 
+        async _onAutoMerge() {
+            if (!this._vault || !this._accessKey) return;
+            const namedHead = this._vault._namedHeadId;
+            if (!namedHead) return;
+            const header = this.querySelector('vault-header');
+            header?.setPullBusy(true);
+            window.sgraphVault.messages.info('Merging collaborator changes\u2026');
+            try {
+                const result = await this._vault.merge(namedHead);
+                if (result?.merged) {
+                    await this._mountBrowse();
+                    await this._refreshSyncState();
+                    if (result.conflicts?.length > 0) {
+                        window.sgraphVault.messages.warn(
+                            `Merged \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies. Review in SGit \u2192 Repair.`
+                        );
+                        this._switchView('sgit');
+                        setTimeout(() => this.querySelector('vault-sgit-view')?._switchTab('repair'), 50);
+                    } else {
+                        window.sgraphVault.messages.success('Synced \u2014 collaborator changes merged successfully');
+                    }
+                } else {
+                    await this._refreshSyncState();
+                    window.sgraphVault.messages.success('Already up to date');
+                }
+            } catch (err) {
+                window.sgraphVault.messages.error(`Sync failed: ${err.message} \u2014 use SGit \u2192 Repair for manual merge`);
+                this._switchView('sgit');
+                setTimeout(() => this.querySelector('vault-sgit-view')?._switchTab('repair'), 50);
+            } finally {
+                header?.setPullBusy(false);
+            }
+        }
+
         // --- Auto-sync (activity-triggered, no polling) --------------------------------
 
         _scheduleAutoSyncCheck() {
@@ -642,22 +673,20 @@
                 notice.style.display = '';
                 notice.className = 'vs-sync-notice vs-sync-notice--diverged';
                 notice.innerHTML = `
-                    <span class="vs-sync-notice-icon">⚡</span>
+                    <span class="vs-sync-notice-icon">↕</span>
                     <span class="vs-sync-notice-text">
-                        Vault diverged — ${ahead} local commit${ahead !== 1 ? 's' : ''} ahead,
-                        ${behind} published commit${behind !== 1 ? 's' : ''} behind.
-                        Merge before pushing.
+                        New changes from collaborators — ${ahead} local commit${ahead !== 1 ? 's' : ''}, ${behind} published commit${behind !== 1 ? 's' : ''}.
                     </span>
-                    <button class="vs-sync-notice-btn vs-sync-merge-btn">Repair / Merge →</button>
+                    <button class="vs-sync-notice-btn vs-sync-merge-btn">Sync now →</button>
                     <button class="vs-sync-notice-close" title="Dismiss">✕</button>
                 `;
             } else if (behind > 0) {
                 notice.style.display = '';
                 notice.className = 'vs-sync-notice vs-sync-notice--behind';
                 notice.innerHTML = `
-                    <span class="vs-sync-notice-icon">⬇</span>
+                    <span class="vs-sync-notice-icon">↓</span>
                     <span class="vs-sync-notice-text">
-                        ${behind} new commit${behind !== 1 ? 's' : ''} on published branch.
+                        ${behind} new commit${behind !== 1 ? 's' : ''} from collaborators.
                     </span>
                     <button class="vs-sync-notice-btn vs-sync-pull-btn">Sync now →</button>
                     <button class="vs-sync-notice-close" title="Dismiss">✕</button>
@@ -755,12 +784,12 @@
             flex-shrink: 0; border-bottom: 1px solid var(--color-border);
         }
         .vs-sync-notice--diverged {
-            background: rgba(255,80,80,0.12); color: #ff6b6b;
-            border-bottom-color: rgba(255,80,80,0.3);
+            background: rgba(180,150,80,0.1); color: #b8a060;
+            border-bottom-color: rgba(180,150,80,0.2);
         }
         .vs-sync-notice--behind {
-            background: rgba(78,205,196,0.1); color: #4ecdc4;
-            border-bottom-color: rgba(78,205,196,0.3);
+            background: rgba(78,205,196,0.08); color: var(--color-text-secondary);
+            border-bottom-color: rgba(78,205,196,0.15);
         }
         .vs-sync-notice-icon { font-size: 1rem; flex-shrink: 0; }
         .vs-sync-notice-text { flex: 1; }
