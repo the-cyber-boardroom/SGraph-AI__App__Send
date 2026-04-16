@@ -44,21 +44,41 @@
             return count
         },
 
-        // Helper: true if ancestorId is reachable from headId following ALL parents (BFS)
+        // Helper: batch-decrypt commits from raw ciphertext — returns Map<id, commit>
+        // Uses objectStore.batchLoad() so immutable blocks are served from cache.
+        async _batchLoadCommits(ids) {
+            const result  = new Map()
+            if (!ids || !ids.length) return result
+            const ciphers = await this._objectStore.batchLoad(ids)
+            await Promise.all(ids.map(async (id) => {
+                const cipher = ciphers.get(id)
+                if (!cipher) return
+                try {
+                    const plain  = await SGSendCrypto.decrypt(cipher, this._readKey)
+                    result.set(id, JSON.parse(new TextDecoder().decode(plain)))
+                } catch (_) {}
+            }))
+            return result
+        },
+
+        // Helper: true if ancestorId is reachable from headId following ALL parents.
+        // Wave-BFS: loads an entire frontier in one batch request per level.
         async _isAncestor(ancestorId, headId, max = 200) {
             if (!ancestorId || !headId) return false
             if (ancestorId === headId) return true
-            const seen  = new Set()
-            const queue = [headId]
-            while (queue.length && seen.size < max) {
-                const id = queue.shift()
-                if (seen.has(id)) continue
-                if (id === ancestorId) return true
-                seen.add(id)
-                try {
-                    const c = await this._commitManager.loadCommit(id)
-                    for (const p of (c.parents || [])) queue.push(p)
-                } catch (_) {}
+            const seen = new Set([headId])
+            let wave   = [headId]
+
+            while (wave.length && seen.size < max) {
+                const commits  = await this._batchLoadCommits(wave)
+                const nextWave = []
+                for (const id of wave) {
+                    for (const p of (commits.get(id)?.parents || [])) {
+                        if (p === ancestorId) return true
+                        if (!seen.has(p)) { seen.add(p); nextWave.push(p) }
+                    }
+                }
+                wave = nextWave
             }
             return false
         },
@@ -189,39 +209,48 @@
 
         // --- Find common ancestor (walks both chains, finds first overlap) ------------
 
-        // --- Find common ancestor: BFS over ALL parents (handles merge commits) ------
-        // First-parent-only walk misses the full reachability graph after merges,
-        // causing the LCA to be set too far back → false conflicts on every subsequent sync.
+        // --- Find common ancestor: wave-BFS over ALL parents (handles merge commits) -
+        // Loads an entire BFS frontier per batch request instead of one commit at a time.
 
         async _findCommonAncestor(idA, idB) {
             if (!idA || !idB) return null
             if (idA === idB)  return idA
 
-            // BFS from A — collect every commit reachable via any parent chain
-            const reachableFromA = new Set()
-            const qA = [idA]
-            while (qA.length && reachableFromA.size < 500) {
-                const id = qA.shift()
-                if (reachableFromA.has(id)) continue
-                reachableFromA.add(id)
-                try {
-                    const c = await this._commitManager.loadCommit(id)
-                    for (const p of (c.parents || [])) qA.push(p)
-                } catch (_) {}
+            // Phase 1: BFS from A — collect full reachability set (wave-batched)
+            const reachableFromA = new Set([idA])
+            let waveA = [idA]
+            while (waveA.length && reachableFromA.size < 500) {
+                const commits  = await this._batchLoadCommits(waveA)
+                const nextWave = []
+                for (const id of waveA) {
+                    for (const p of (commits.get(id)?.parents || [])) {
+                        if (!reachableFromA.has(p)) { reachableFromA.add(p); nextWave.push(p) }
+                    }
+                }
+                waveA = nextWave
             }
 
-            // BFS from B — return first commit that A can also reach
-            const visitedB = new Set()
-            const qB = [idB]
-            while (qB.length && visitedB.size < 500) {
-                const id = qB.shift()
-                if (visitedB.has(id)) continue
-                visitedB.add(id)
-                if (reachableFromA.has(id)) return id
-                try {
-                    const c = await this._commitManager.loadCommit(id)
-                    for (const p of (c.parents || [])) qB.push(p)
-                } catch (_) {}
+            // Phase 2: BFS from B — return first commit reachable from A (wave-batched)
+            const seenB = new Set()
+            let waveB   = [idB]
+            while (waveB.length && seenB.size < 500) {
+                const toProcess = [...new Set(waveB)].filter(id => !seenB.has(id))
+                if (!toProcess.length) break
+
+                // Check intersection before loading this wave
+                for (const id of toProcess) {
+                    if (reachableFromA.has(id)) return id
+                }
+
+                const commits  = await this._batchLoadCommits(toProcess)
+                const nextWave = new Set()
+                for (const id of toProcess) {
+                    seenB.add(id)
+                    for (const p of (commits.get(id)?.parents || [])) {
+                        if (!seenB.has(p)) nextWave.add(p)
+                    }
+                }
+                waveB = [...nextWave]
             }
             return null
         },
