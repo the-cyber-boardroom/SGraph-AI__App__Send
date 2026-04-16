@@ -148,6 +148,22 @@
             bar.appendChild(copyBtn);
         }
 
+        // --- Present button (HTML files: fullscreen the sandboxed iframe) ---
+        var _ext = (fileName || '').split('.').pop().toLowerCase();
+        if (_ext === 'html' || _ext === 'htm') {
+            var presentBtn = _makeBtn('\u26f6 Present');
+            presentBtn.title = 'Open in full screen — press Esc to exit';
+            presentBtn.style.fontWeight = '600';
+            presentBtn.addEventListener('click', function() {
+                var iframe = container.querySelector('.sb-file__html-frame');
+                var el = iframe || container;
+                var req = el.requestFullscreen || el.webkitRequestFullscreen ||
+                          el.mozRequestFullScreen || el.msRequestFullscreen;
+                if (req) req.call(el);
+            });
+            bar.appendChild(presentBtn);
+        }
+
         // --- Rename button (all file types) ---
         var renameBtn = _makeBtn('Rename');
         renameBtn.addEventListener('click', function() {
