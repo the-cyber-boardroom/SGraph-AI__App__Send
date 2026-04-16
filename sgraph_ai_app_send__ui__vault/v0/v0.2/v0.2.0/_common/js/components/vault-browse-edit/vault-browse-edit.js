@@ -59,16 +59,7 @@
                     'line-height:1.5;background:var(--bg-primary,#0a0a18);border:1px solid var(--accent,#4ECDC4);' +
                     'border-radius:4px;outline:none;box-sizing:border-box;tab-size:4;flex:1;';
 
-                textareaEl.addEventListener('keydown', function(e) {
-                    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); doSave(); }
-                    if (e.key === 'Escape') { e.preventDefault(); exitEdit(); }
-                    if (e.key === 'Tab') {
-                        e.preventDefault();
-                        var s = textareaEl.selectionStart, end = textareaEl.selectionEnd;
-                        textareaEl.value = textareaEl.value.substring(0, s) + '    ' + textareaEl.value.substring(end);
-                        textareaEl.selectionStart = textareaEl.selectionEnd = s + 4;
-                    }
-                });
+                // No keyboard shortcuts — use Save / Cancel buttons
 
                 if (content) {
                     content.style.display = 'none';
@@ -406,7 +397,8 @@
             zone.addEventListener('dragover', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                e.dataTransfer.dropEffect = 'move';
+                // 'copy' for OS files, 'move' for internal vault items
+                e.dataTransfer.dropEffect = e.dataTransfer.files?.length > 0 ? 'copy' : 'move';
             });
 
             zone.addEventListener('drop', function(e) {
@@ -415,22 +407,26 @@
                 enterCount = 0;
                 zone.classList.remove('sb-dnd--over');
 
-                var raw = e.dataTransfer.getData('text/plain');
-                if (!raw) return;
-                var drag;
-                try { drag = JSON.parse(raw); } catch (_) { return; }
-
                 // Determine destination folder path
                 var destFolderPath;
                 if (zone === treeEl) {
-                    // Dropped on tree root panel → move to /
                     destFolderPath = '/';
                 } else {
-                    // Dropped on a folder header → get the folder's data-path
                     var folderEl = zone.closest('.sb-tree__folder');
                     destFolderPath = folderEl ? '/' + folderEl.dataset.path : '/';
                 }
 
+                // OS file drop (files from the filesystem)
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    _uploadFilesToFolder(browse, e.dataTransfer.files, destFolderPath);
+                    return;
+                }
+
+                // Internal vault item move
+                var raw = e.dataTransfer.getData('text/plain');
+                if (!raw) return;
+                var drag;
+                try { drag = JSON.parse(raw); } catch (_) { return; }
                 _executeDrop(browse, drag, destFolderPath);
             });
         });
@@ -446,6 +442,37 @@
             ].join('\n');
             document.head.appendChild(style);
         }
+    }
+
+    function _uploadFilesToFolder(browse, fileList, destFolderPath) {
+        var files = Array.from(fileList);
+        var done = 0, errors = 0;
+
+        function processNext(i) {
+            if (i >= files.length) {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    var msg = done + ' file' + (done !== 1 ? 's' : '') + ' added to ' + destFolderPath;
+                    errors ? window.sgraphVault.messages.error(msg + ' (' + errors + ' failed)')
+                           : window.sgraphVault.messages.success(msg);
+                }
+                _refreshBrowseTree(browse);
+                return;
+            }
+            var file = files[i];
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                browse.dataSource.addFile(destFolderPath, file.name, new Uint8Array(ev.target.result))
+                    .then(function() { done++; processNext(i + 1); })
+                    .catch(function(err) {
+                        errors++;
+                        console.error('Upload failed:', file.name, err);
+                        processNext(i + 1);
+                    });
+            };
+            reader.onerror = function() { errors++; processNext(i + 1); };
+            reader.readAsArrayBuffer(file);
+        }
+        processNext(0);
     }
 
     function _executeDrop(browse, drag, destFolderPath) {

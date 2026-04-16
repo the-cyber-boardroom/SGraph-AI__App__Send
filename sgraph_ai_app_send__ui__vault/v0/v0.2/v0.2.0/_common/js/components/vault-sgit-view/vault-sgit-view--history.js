@@ -75,30 +75,9 @@
                 return seen;
             };
 
-            // Fast path: no divergence (or post-merge where both heads are the merge commit)
+            // Fast path: no divergence (or post-merge where both heads are the same commit)
             if (!cloneHead || !namedHead || cloneHead === namedHead) {
-                const headId = cloneHead || namedHead;
-                // Peek at HEAD — if it's a merge commit, render two-track pre-merge branches
-                let headCommit = this._commitCache.get(headId);
-                if (!headCommit && headId) {
-                    try {
-                        headCommit = await vault._commitManager.loadCommit(headId);
-                        this._commitCache.set(headId, headCommit);
-                    } catch (_) {}
-                }
-                if (headCommit?.parents?.length >= 2) {
-                    const p0 = headCommit.parents[0];
-                    const p1 = headCommit.parents[1];
-                    const [chain0, chain1] = await Promise.all([walkChain(p0), walkChain(p1)]);
-                    const set0 = new Set(chain0.map(c => c.id));
-                    let forkId = null;
-                    for (const c of chain1) { if (set0.has(c.id)) { forkId = c.id; break; } }
-                    this._renderHistoryDiverged(container, chain0, chain1, p0, p1, forkId,
-                        { mergeHead: { id: headId, ...headCommit }, isMerged: true });
-                    return;
-                }
-                const commits = await walkChain(headId);
-                this._renderHistoryLinear(container, commits, namedHead);
+                await this._renderHistoryFull(container, cloneHead || namedHead, namedHead);
                 return;
             }
 
@@ -108,10 +87,9 @@
                 allAncestors(namedHead)
             ]);
 
-            // Named head reachable from clone → clone is AHEAD (or at same commit via merge parent)
+            // Named head reachable from clone → clone is AHEAD (may have mid-chain merge commits)
             if (cloneAncestors.has(namedHead)) {
-                const commits = await walkChain(cloneHead);
-                this._renderHistoryLinear(container, commits, namedHead);
+                await this._renderHistoryFull(container, cloneHead, namedHead);
                 return;
             }
 
@@ -139,7 +117,169 @@
             this._renderHistoryDiverged(container, cloneChain, namedChain, cloneHead, namedHead, forkId);
         },
 
-        // --- Linear (single-chain) renderer --------------------------------------
+        // --- Full DAG renderer: linear sections + two-track merge sections --------
+        // Used for AHEAD and same-head paths. Detects merge commits anywhere in the
+        // first-parent chain and renders the two-track section at the correct position.
+
+        async _renderHistoryFull(container, headId, namedHead) {
+            const rows = await this._buildHistoryPlan(headId, 100);
+            if (!rows.length) {
+                container.innerHTML = '<div class="sgit-empty">No commits found</div>';
+                return;
+            }
+            const hasMerge = rows.some(r => r._mode === 'two-track');
+            const listCls  = hasMerge ? 'sgit-commit-list sgit-commit-list--two' : 'sgit-commit-list';
+            const hdrCls   = hasMerge ? 'sgit-commit-header sgit-commit-header--two' : 'sgit-commit-header';
+            container.innerHTML = `
+                <div class="${listCls}">
+                    <div class="${hdrCls}">
+                        <span class="${hasMerge ? 'sgit-ch-graph--two' : 'sgit-ch-graph'}"></span>
+                        <span class="sgit-ch-msg">Description</span>
+                        <span class="sgit-ch-id">Commit</span>
+                        <span class="sgit-ch-date">Date</span>
+                    </div>
+                    ${rows.map(row => this._renderPlanRow(row, namedHead, hasMerge)).join('')}
+                </div>
+            `;
+        },
+
+        async _buildHistoryPlan(headId, maxRows) {
+            const vault  = this._vault;
+            const loadC  = async (id) => {
+                let c = this._commitCache.get(id);
+                if (!c) { c = await vault._commitManager.loadCommit(id); this._commitCache.set(id, c); }
+                return c;
+            };
+            const walkFrom = async (startId, stopSet, max) => {
+                const res = []; let cur = startId;
+                while (cur && res.length < max) {
+                    if (stopSet.has(cur)) break;
+                    try { const c = await loadC(cur); res.push({ id: cur, ...c }); cur = c.parents?.[0] || null; }
+                    catch (_) { break; }
+                }
+                return res;
+            };
+
+            const allRows = []; const seenIds = new Set(); let cursor = headId;
+            while (cursor && allRows.length < maxRows) {
+                if (seenIds.has(cursor)) break;
+                seenIds.add(cursor);
+                let commit;
+                try { commit = await loadC(cursor); } catch (_) { break; }
+
+                if (commit.parents?.length >= 2) {
+                    // Merge commit: build two-track section showing the pre-merge branches
+                    const p0 = commit.parents[0], p1 = commit.parents[1];
+                    const stopSet = new Set(seenIds);
+                    const [chain0, chain1] = await Promise.all([
+                        walkFrom(p0, stopSet, 60), walkFrom(p1, stopSet, 60)
+                    ]);
+                    const set0 = new Set(chain0.map(c => c.id)), set1 = new Set(chain1.map(c => c.id));
+                    let forkId = null;
+                    for (const c of chain1) { if (set0.has(c.id)) { forkId = c.id; break; } }
+                    const cloneOnly  = chain0.filter(c => c.id !== forkId && !set1.has(c.id));
+                    const namedOnly  = chain1.filter(c => c.id !== forkId && !set0.has(c.id));
+                    const forkCommit = forkId ? chain0.find(c => c.id === forkId) : null;
+
+                    const tRows = [
+                        { id: cursor, ...commit, _track: 'merge' },
+                        ...[...cloneOnly.map(c => ({ ...c, _track: 'clone' })),
+                            ...namedOnly.map(c => ({ ...c, _track: 'named' }))]
+                            .sort((a, b) => (b.timestamp_ms || 0) - (a.timestamp_ms || 0)),
+                        ...(forkCommit ? [{ ...forkCommit, _track: 'fork' }] : [])
+                    ];
+                    const localForkIdx = tRows.findIndex(r => r._track === 'fork');
+                    const base = allRows.length;
+
+                    for (let i = 0; i < tRows.length; i++) {
+                        const row = tRows[i], isMH = row._track === 'merge';
+                        const inTTZ  = isMH || (localForkIdx >= 0 && i <= localForkIdx);
+                        const isAtFk = row._track === 'fork';
+                        allRows.push({ ...row, _mode: 'two-track', _s: {
+                            cloneDot:        row._track !== 'named',
+                            namedDot:        isMH || row._track === 'named',
+                            cloneLineTop:    (base + i) > 0,
+                            cloneLineBottom: true,  // fixed below
+                            namedVisible:    inTTZ,
+                            namedLineTop:    inTTZ && i > 0 && !isMH,
+                            namedLineBottom: inTTZ && !isAtFk,
+                            namedLineJoin:   isAtFk,
+                            isCloneHead:     row.id === p0,
+                            isNamedHead:     row.id === p1,
+                            isHead:          isMH || row.id === p0 || row.id === p1,
+                            isFork:          isAtFk,
+                            isMergeHead:     isMH,
+                        }});
+                    }
+                    for (const c of [...cloneOnly, ...namedOnly]) seenIds.add(c.id);
+                    if (forkId) seenIds.add(forkId);
+                    cursor = forkCommit?.parents?.[0] || null;
+                } else {
+                    allRows.push({ id: cursor, ...commit, _mode: 'linear',
+                        _isHead: cursor === headId, _lineTop: allRows.length > 0, _lineBot: true });
+                    cursor = commit.parents?.[0] || null;
+                }
+            }
+            // Fix line indicators for last row in each run
+            for (let i = 0; i < allRows.length; i++) {
+                const isLast = i === allRows.length - 1;
+                if (allRows[i]._mode === 'two-track') allRows[i]._s.cloneLineBottom = !isLast;
+                if (allRows[i]._mode === 'linear')    allRows[i]._lineBot = !isLast;
+            }
+            return allRows;
+        },
+
+        _renderPlanRow(row, namedHead, hasMerge) {
+            if (row._mode === 'two-track') return this._renderDivergedRow(row, row._s);
+
+            const isHead      = row._isHead;
+            const isNamedHere = namedHead && row.id === namedHead && !isHead;
+            const msg    = row.message || '(no message)';
+            const date   = row.timestamp_ms
+                ? new Date(row.timestamp_ms).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : '--';
+            const branch = row.branch_id || '';
+            const badges = [
+                isHead      ? '<span class="sgit-badge sgit-badge--head">Working HEAD</span>'         : '',
+                isNamedHere ? '<span class="sgit-badge sgit-badge--named-head">Published HEAD</span>' : '',
+                branch      ? `<span class="sgit-badge sgit-badge--branch">${this._esc(this._shortBranch(branch))}</span>` : '',
+            ].join('');
+            const treeLink = row.tree_id
+                ? `<a class="sgit-obj-link sgit-commit-tree-link" href="#" data-id="${this._esc(row.tree_id)}" title="View tree">tree</a>`
+                : '';
+            const rowCls = `sgit-commit-row${hasMerge ? ' sgit-commit-row--two' : ''}${(isHead || isNamedHere) ? ' sgit-commit-row--head' : ''}`;
+
+            if (!hasMerge) {
+                // Pure linear mode: use single-track cell
+                return `<div class="${rowCls}">
+                    <span class="sgit-ch-graph">
+                        <span class="sgit-graph-line-top${!row._lineTop ? ' sgit-graph-line--hidden' : ''}"></span>
+                        <span class="sgit-graph-dot${isHead ? ' sgit-graph-dot--head' : ''}"></span>
+                        <span class="sgit-graph-line-bottom${!row._lineBot ? ' sgit-graph-line--hidden' : ''}"></span>
+                    </span>
+                    <span class="sgit-ch-msg">${badges}<span class="sgit-commit-msg">${this._esc(msg)}</span>${treeLink}</span>
+                    <span class="sgit-ch-id"><a class="sgit-obj-link" href="#" data-id="${this._esc(row.id)}">${this._esc(this._short(row.id))}</a></span>
+                    <span class="sgit-ch-date">${date}</span>
+                </div>`;
+            }
+            // Mixed mode: use two-track cell builder for consistent 48px graph column
+            const graphCell = this._buildGraphCell2T({
+                cloneDot: true, namedDot: false,
+                cloneLineTop: row._lineTop, cloneLineBottom: row._lineBot,
+                namedVisible: false,
+                namedLineTop: false, namedLineBottom: false, namedLineJoin: false,
+                isCloneHead: isHead, isNamedHead: false,
+                isHead: isHead || isNamedHere, isFork: false, isMergeHead: false,
+            });
+            return `<div class="${rowCls}">
+                ${graphCell}
+                <span class="sgit-ch-msg">${badges}<span class="sgit-commit-msg">${this._esc(msg)}</span>${treeLink}</span>
+                <span class="sgit-ch-id"><a class="sgit-obj-link" href="#" data-id="${this._esc(row.id)}">${this._esc(this._short(row.id))}</a></span>
+                <span class="sgit-ch-date">${date}</span>
+            </div>`;
+        },
+
+        // --- Linear (single-chain) renderer (used for BEHIND path) ---------------
 
         _renderHistoryLinear(container, commits, namedHeadId) {
             if (!commits || commits.length === 0) {
