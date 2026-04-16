@@ -686,7 +686,39 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             var editBtn = document.createElement('button');
             editBtn.className = 'plr-source-toggle-btn';
             editBtn.textContent = '\u270E Edit';
-            editBtn.title = 'Edit JSON with live preview (changes are not saved)';
+            editBtn.title = 'Edit JSON with live preview';
+
+            // Save button — only shown while editing, only when vault is writable
+            var savePageBtn = (self.dataSource && self.dataSource.writable)
+                ? document.createElement('button') : null;
+            if (savePageBtn) {
+                savePageBtn.className = 'plr-source-toggle-btn';
+                savePageBtn.textContent = '\u2193 Save';
+                savePageBtn.title = 'Save changes to vault';
+                savePageBtn.style.display = 'none';
+                savePageBtn.style.color = 'var(--color-primary, #4ecdc4)';
+                savePageBtn.style.fontWeight = '700';
+                savePageBtn.addEventListener('click', async function () {
+                    var jsonText = editTextarea.value;
+                    try { JSON.parse(jsonText); } catch (e) {
+                        if (window.sgraphVault) window.sgraphVault.messages.error('Invalid JSON \u2014 fix errors before saving');
+                        return;
+                    }
+                    var fileFolder = folderPath ? '/' + folderPath : '/';
+                    savePageBtn.disabled = true;
+                    savePageBtn.textContent = 'Saving\u2026';
+                    try {
+                        await self.dataSource.saveFile(fileFolder, '_page.json', new TextEncoder().encode(jsonText).buffer);
+                        rawJsonText = jsonText;
+                        if (window.sgraphVault) window.sgraphVault.messages.success('Saved _page.json');
+                    } catch (e) {
+                        if (window.sgraphVault) window.sgraphVault.messages.error('Save failed: ' + e.message);
+                    } finally {
+                        savePageBtn.disabled = false;
+                        savePageBtn.textContent = '\u2193 Save';
+                    }
+                });
+            }
 
             // ── View state machine ─────────────────────────────────────────
             // Three mutually exclusive states: rendered | source | edit
@@ -705,6 +737,7 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
                     editBtn.textContent = '\u270E Edit';
                     editBtn.style.color = '';
                 }
+                if (savePageBtn) savePageBtn.style.display = isEdit ? '' : 'none';
             }
 
             // Source toggle: switches between rendered layout and colorised JSON
@@ -781,6 +814,7 @@ SendBrowse.prototype._openFolderPage = async function (folderPath, pageJsonPath)
             toggleBar.appendChild(presentBtn);
             toggleBar.appendChild(copyBtn);
             toggleBar.appendChild(editBtn);
+            if (savePageBtn) toggleBar.appendChild(savePageBtn);
             toggleBar.appendChild(toggleBtn);
 
             // ── Content frame (card framing) ───────────────────────────────
