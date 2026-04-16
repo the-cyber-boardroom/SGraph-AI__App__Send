@@ -44,12 +44,43 @@ var PageLayoutRenderer = (function () {
         return folderPath ? folderPath.replace(/\/?$/, '/') : '';
     }
 
+    // ── v0.3.1 / v0.3.2 compatibility helpers ────────────────────────────────
+    // v0.3.1 exposes _findZipEntry(zipTree, resolved) → { entry (JSZip), name, path }
+    // v0.3.2 exposes _findEntry(fileList, resolved) → { path, name, ... } + dataSource.getFileBytes()
+
+    function _findFileCombined(zipTree, resolved, browseInstance) {
+        if (browseInstance && browseInstance.dataSource && typeof _findEntry !== 'undefined') {
+            var fl = browseInstance.dataSource.getFileList();
+            var entry = _findEntry(fl, resolved);
+            if (!entry) return null;
+            var n = entry.path.split('/').pop();
+            return { path: entry.path, name: n,
+                     getBytes: function (bi) { return bi.dataSource.getFileBytes(entry.path); } };
+        }
+        if (typeof _findZipEntry !== 'undefined') {
+            var m = _findZipEntry(zipTree, resolved);
+            if (!m) return null;
+            return { path: m.path, name: m.name,
+                     getBytes: function () { return m.entry.async('arraybuffer'); } };
+        }
+        return null;
+    }
+
+    function _navigateToFolder_compat(browseInstance, zipTree, fp) {
+        if (typeof _navigateToFolder !== 'undefined') {
+            var second = (browseInstance && browseInstance.dataSource)
+                ? browseInstance.dataSource.getFileList()
+                : zipTree;
+            _navigateToFolder(browseInstance, second, fp);
+        }
+    }
+
     // Load a file path → blob URL; returns null if not found.
     async function _blobUrl(relPath, folderPath, zipTree, browseInstance, mimeOverride) {
         var resolved = _resolvePath(_folderBase(folderPath), relPath);
-        var match = _findZipEntry(zipTree, resolved);
+        var match = _findFileCombined(zipTree, resolved, browseInstance);
         if (!match) return null;
-        var bytes = await match.entry.async('arraybuffer');
+        var bytes = await match.getBytes(browseInstance);
         var mime = mimeOverride ||
             (typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.getImageMime(match.name) : null) ||
             'image/png';
@@ -439,9 +470,9 @@ var PageLayoutRenderer = (function () {
             rawText = props.text;
         } else if (props.file) {
             var resolved = _resolvePath(_folderBase(folderPath), props.file);
-            var match = _findZipEntry(zipTree, resolved);
+            var match = _findFileCombined(zipTree, resolved, browseInstance);
             if (match) {
-                var bytes = await match.entry.async('arraybuffer');
+                var bytes = await match.getBytes(browseInstance);
                 rawText = new TextDecoder().decode(bytes);
                 // Markdown dir: same folder as the .md file
                 var parts = resolved.split('/');
@@ -465,9 +496,9 @@ var PageLayoutRenderer = (function () {
                 src.startsWith('data:') || src.startsWith('blob:')) return;
 
             var imgResolved = _resolvePath(mdDir, src);
-            var imgMatch = _findZipEntry(zipTree, imgResolved);
+            var imgMatch = _findFileCombined(zipTree, imgResolved, browseInstance);
             if (imgMatch) {
-                imgMatch.entry.async('arraybuffer').then(function (imgBytes) {
+                imgMatch.getBytes(browseInstance).then(function (imgBytes) {
                     var mime = typeof FileTypeDetect !== 'undefined'
                         ? FileTypeDetect.getImageMime(imgMatch.name) || 'image/png' : 'image/png';
                     var blob = new Blob([imgBytes], { type: mime });
@@ -487,12 +518,12 @@ var PageLayoutRenderer = (function () {
             var linkResolved = _resolvePath(mdDir, href);
             a.addEventListener('click', function (e) {
                 e.preventDefault();
-                var linkMatch = _findZipEntry(zipTree, linkResolved);
+                var linkMatch = _findFileCombined(zipTree, linkResolved, browseInstance);
                 if (linkMatch) {
                     browseInstance._openFileTab(linkMatch.path);
                 } else {
                     var fp = linkResolved.replace(/\/$/, '');
-                    _navigateToFolder(browseInstance, zipTree, fp);
+                    _navigateToFolder_compat(browseInstance, zipTree, fp);
                 }
             });
         });
@@ -549,12 +580,12 @@ var PageLayoutRenderer = (function () {
                 card.addEventListener('click', (function (link) {
                     return function () {
                         var resolved = _resolvePath(_folderBase(folderPath), link);
-                        var match = _findZipEntry(zipTree, resolved);
+                        var match = _findFileCombined(zipTree, resolved, browseInstance);
                         if (match) {
                             browseInstance._openFileTab(match.path);
                         } else {
                             var fp = resolved.replace(/\/$/, '');
-                            _navigateToFolder(browseInstance, zipTree, fp);
+                            _navigateToFolder_compat(browseInstance, zipTree, fp);
                         }
                     };
                 })(item.link));
