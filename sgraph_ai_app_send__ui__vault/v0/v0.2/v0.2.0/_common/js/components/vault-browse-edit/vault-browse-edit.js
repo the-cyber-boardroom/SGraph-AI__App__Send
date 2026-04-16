@@ -116,9 +116,36 @@
             }
 
             saveBtn.addEventListener('click', doSave);
+
+            // --- Copy to clipboard ---
+            var copyBtn = _makeBtn('Copy');
+            copyBtn.addEventListener('click', function() {
+                var text = (isEditing && textareaEl)
+                    ? textareaEl.value
+                    : new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+                var reset = function() {
+                    setTimeout(function() { copyBtn.textContent = 'Copy'; copyBtn.style.color = ''; }, 1500);
+                };
+                var flash = function() {
+                    copyBtn.textContent = 'Copied!';
+                    copyBtn.style.color = 'var(--accent,#4ECDC4)';
+                    reset();
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(flash).catch(function() {
+                        _clipboardFallback(text);
+                        flash();
+                    });
+                } else {
+                    _clipboardFallback(text);
+                    flash();
+                }
+            });
+
             bar.appendChild(editBtn);
             bar.appendChild(saveBtn);
             bar.appendChild(cancelBtn);
+            bar.appendChild(copyBtn);
         }
 
         // --- Rename button (all file types) ---
@@ -757,13 +784,23 @@
             : origPath + '_conflict';
     }
 
-    // --- Helper ---
+    // --- Helpers ---
 
     function _makeBtn(label) {
         var btn = document.createElement('button');
         btn.className = 'sb-action-btn';
         btn.textContent = label;
         return btn;
+    }
+
+    function _clipboardFallback(text) {
+        var tmp = document.createElement('textarea');
+        tmp.value = text;
+        tmp.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        document.body.appendChild(tmp);
+        tmp.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        document.body.removeChild(tmp);
     }
 
 })();
