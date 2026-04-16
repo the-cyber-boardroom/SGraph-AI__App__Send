@@ -63,6 +63,16 @@
 
                 const switchBtn = e.target.closest('.sgit-branch-switch');
                 if (switchBtn) { this._switchBranch(switchBtn.dataset.refId); return; }
+
+                const checkoutBtn = e.target.closest('.sgit-checkout-btn');
+                if (checkoutBtn) {
+                    e.preventDefault();
+                    this.dispatchEvent(new CustomEvent('vault-sgit-checkout', {
+                        bubbles: true, composed: true,
+                        detail: { commitId: checkoutBtn.dataset.commitId }
+                    }));
+                    return;
+                }
             });
         }
 
@@ -287,6 +297,12 @@
         .sgit-repair-result--ok      { background: rgba(78,205,196,0.1); color: #4ECDC4; }
         .sgit-repair-result--error   { background: rgba(233,69,96,0.1); color: #E94560; }
         .sgit-repair-result--running { background: var(--bg-secondary); color: var(--color-text-secondary); }
+
+        /* --- Soft checkout button --- */
+        .sgit-checkout-btn { font-size: 0.6rem; padding: 0.1rem 0.45rem; border-radius: 3px; border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family); font-weight: 600; white-space: nowrap; flex-shrink: 0; margin-left: auto; opacity: 0; transition: opacity 0.15s; }
+        .sgit-commit-row:hover .sgit-checkout-btn,
+        .sgit-commit-row--two:hover .sgit-checkout-btn { opacity: 1; }
+        .sgit-checkout-btn:hover { background: var(--color-primary); color: var(--bg-primary); border-color: var(--color-primary); opacity: 1; }
 
         /* --- Shared --- */
         .sgit-json { background: var(--bg-secondary); padding: 1rem; border-radius: 6px; font-family: var(--font-mono); font-size: var(--text-small); color: var(--color-text-secondary); overflow-x: auto; max-height: 400px; overflow-y: auto; border: 1px solid var(--color-border); margin: 0; white-space: pre-wrap; word-break: break-all; }
