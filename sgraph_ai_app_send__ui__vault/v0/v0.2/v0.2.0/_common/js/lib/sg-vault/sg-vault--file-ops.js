@@ -25,6 +25,7 @@
                 size: data.byteLength || data.length, content_hash: contentHash
             }
 
+            this._markDirty(folderPath)
             await this._commit(`Add ${fileName}`)
             return { blobId, fileName, folderPath }
         },
@@ -46,6 +47,7 @@
                 size: data.byteLength || data.length, content_hash: contentHash
             }
 
+            this._markDirty(folderPath)
             await this._commit(`Edit ${fileName}`)
             return { blobId, fileName, folderPath }
         },
@@ -67,6 +69,7 @@
             const folder = this._findNode(folderPath)
             if (!folder) throw new Error(`Folder not found: ${folderPath}`)
             delete folder.children[fileName]
+            this._markDirty(folderPath)
             await this._commit(`Remove ${fileName}`)
         },
 
@@ -77,6 +80,7 @@
             if (folder.children[newName]) throw new Error(`Already exists: ${newName}`)
             folder.children[newName] = folder.children[oldName]
             delete folder.children[oldName]
+            this._markDirty(folderPath)
             await this._commit(`Rename ${oldName} to ${newName}`)
         },
 
@@ -93,6 +97,8 @@
 
             destFolder.children[fileName] = entry
             delete srcFolder.children[fileName]
+            this._markDirty(srcFolderPath)
+            this._markDirty(destFolderPath)
             await this._commit(`Move ${fileName}`)
         }
 
