@@ -8,7 +8,8 @@
    vault's read/write key access to the server.
 
    Equivalent CLI operations:
-     sgit pull               → Fast-forward clone to named (BEHIND case)
+     sgit pull (merge)       → Three-way file merge into clone (DIVERGED case) ← preferred
+     sgit pull (ff)          → Fast-forward clone to named (BEHIND case)
      sgit push               → Publish clone to named (AHEAD case)
      sgit push --force       → Force-publish when diverged
      sgit reset --hard       → Reset working to published
@@ -265,6 +266,16 @@
                 });
             }
 
+            if (s.type === 'DIVERGED' && w) {
+                actions.push({
+                    id: 'merge-from-published', severity: 'safe',
+                    title: 'Merge from published',
+                    cli:   'sgit pull  (three-way merge)',
+                    desc:  `Runs a file-level three-way merge:\n  base  = fork point  ${s.forkId || '(computing…)'}\n  ours  = clone HEAD  ${s.cloneHead}\n  theirs = named HEAD ${s.namedHead}\n\nFiles added only on one side are kept.\nFiles changed on BOTH sides: your version kept; their version saved as\n  <name>_conflict.<ext>\n\nResult: a new merge commit with both parents. No data is discarded.`,
+                    effect: 'New merge commit on clone branch. Nothing is deleted or orphaned.',
+                });
+            }
+
             if ((s.type === 'AHEAD' || s.type === 'DIVERGED') && w) {
                 const localDesc = s.type === 'DIVERGED'
                     ? `your ${s.cloneOnlyCount} local-only commit(s)`
@@ -360,8 +371,7 @@
                     ${manualInput}
                     <div class="sgit-repair-confirm-zone" hidden>
                         <p class="sgit-repair-confirm-msg">
-                            <strong>Effect:</strong> ${this._esc(a.effect)}<br>
-                            This operation cannot be automatically undone.
+                            <strong>Effect:</strong> ${this._esc(a.effect)}${a.severity === 'destructive' ? '<br><em>This operation cannot be automatically undone.</em>' : ''}
                         </p>
                         <button class="sgit-repair-run-btn">Confirm — Run Now</button>
                         <button class="sgit-repair-cancel-btn">Cancel</button>
@@ -411,6 +421,25 @@
                 let successMsg = '';
 
                 switch (actionId) {
+                    case 'merge-from-published': {
+                        const theirHead = s.namedHead;
+                        if (!theirHead) throw new Error('Named HEAD not found in diagnostics');
+                        const result = await vault.merge(theirHead);
+                        if (result.fastForward) {
+                            successMsg = `Fast-forwarded to ${vault._headCommitId}`;
+                        } else if (result.upToDate) {
+                            successMsg = 'Already up to date — no merge needed';
+                        } else if (result.conflicts?.length > 0) {
+                            successMsg = `Merged with ${result.conflicts.length} conflict(s) — check for _conflict files in your vault`;
+                        } else {
+                            successMsg = `Merge commit created → ${vault._headCommitId}`;
+                        }
+                        // Trigger shell to remount browse with merged tree
+                        const shell = document.querySelector('vault-shell');
+                        if (shell?._mountBrowse) await shell._mountBrowse();
+                        if (shell?._refreshSyncState) await shell._refreshSyncState();
+                        break;
+                    }
                     case 'pull': {
                         await vault.pull();
                         successMsg = `Clone HEAD fast-forwarded to ${vault._headCommitId}`;

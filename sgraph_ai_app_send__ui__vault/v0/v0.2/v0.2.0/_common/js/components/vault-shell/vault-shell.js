@@ -29,12 +29,15 @@
             this._loadingCount  = 0;
             this._pendingAction = null;
             this._syncState     = { ahead: 0, behind: 0, diverged: false };
+            this._autoSyncEnabled = true;   // overridden from localStorage in _initAutoSync()
+            this._autoSyncCheckPending = false;
         }
 
         connectedCallback() {
             this._render();
             this._setupListeners();
             this._setupLoadingHook();
+            this._initAutoSync();
             window.sgraphVault.shell = this;
             window.sgraphVault.events.emit('shell-ready', {});
         }
@@ -100,7 +103,10 @@
             this.addEventListener('vault-header-raw',     () => this._showRawVault());
 
             // Nav events
-            this.addEventListener('vault-nav-switch', (e) => this._switchView(e.detail.view));
+            this.addEventListener('vault-nav-switch', (e) => {
+                this._switchView(e.detail.view);
+                if (e.detail.view === 'files') this._scheduleAutoSyncCheck();
+            });
 
             // Auth events
             this.addEventListener('vault-auth-submit', (e) => this._onAuthSubmit(e.detail.key));
@@ -285,6 +291,9 @@
             if (this._activeView === 'settings') {
                 this.querySelector('vault-settings')?.refresh();
             }
+
+            // After a local write, check if published branch also moved
+            this._scheduleAutoSyncCheck();
         }
 
         _onFileAdded() {
@@ -357,6 +366,70 @@
             } finally {
                 header?.setPullBusy(false);
             }
+        }
+
+        // --- Auto-sync (activity-triggered, no polling) --------------------------------
+
+        _scheduleAutoSyncCheck() {
+            if (this._autoSyncCheckPending) return
+            this._autoSyncCheckPending = true
+            setTimeout(() => {
+                this._autoSyncCheckPending = false
+                this._checkAndAutoSync()
+            }, 800)   // debounce: wait 800ms after nav switch before checking
+        }
+
+        async _checkAndAutoSync() {
+            if (!this._vault || !this._accessKey) return
+            if (!this._autoSyncEnabled) return
+
+            let liveNamedHead
+            try {
+                liveNamedHead = await this._vault._refManager.readRef(this._vault._refFileId)
+            } catch (_) { return }
+
+            if (!liveNamedHead || liveNamedHead === this._vault._namedHeadId) return
+
+            // There are upstream changes
+            const { ahead } = this._syncState || {}
+            if (ahead > 0) {
+                // We have local commits too — diverged or ahead. Don't auto-merge silently.
+                window.sgraphVault.messages.info(
+                    'Published branch has new commits \u2014 vault is diverged. Use SGit \u2192 Repair tab to merge.'
+                )
+                return
+            }
+
+            // We are cleanly behind — safe to auto-pull
+            window.sgraphVault.messages.info('Syncing vault\u2026')
+            try {
+                const result = await this._vault.merge(liveNamedHead)
+                if (result.merged) {
+                    await this._mountBrowse()
+                    await this._refreshSyncState()
+                    if (result.conflicts?.length > 0) {
+                        window.sgraphVault.messages.warn(
+                            `Synced \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
+                        )
+                    } else {
+                        window.sgraphVault.messages.success('Vault synced \u2014 new content from published branch')
+                    }
+                }
+            } catch (err) {
+                window.sgraphVault.messages.error(`Auto-sync failed: ${err.message}`)
+            }
+        }
+
+        setAutoSync(enabled) {
+            this._autoSyncEnabled = enabled
+            try { localStorage.setItem('sg-vault-autosync', String(enabled)) } catch (_) {}
+        }
+
+        _initAutoSync() {
+            try {
+                const stored = localStorage.getItem('sg-vault-autosync')
+                this._autoSyncEnabled = stored === null ? true : stored === 'true'
+            } catch (_) {}
         }
 
         // --- View Switching -------------------------------------------------------
