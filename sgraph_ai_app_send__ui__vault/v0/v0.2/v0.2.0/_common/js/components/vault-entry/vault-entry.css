@@ -224,6 +224,69 @@
     opacity: 0.7;
 }
 
+/* --- Recent Vaults panel --- */
+.vault-recent {
+    text-align: left;
+    margin-bottom: var(--space-6, 24px);
+    padding: var(--space-4, 16px) var(--space-5, 20px);
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius, 8px);
+    background: var(--bg-surface);
+}
+.vault-recent__header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: var(--space-3, 12px);
+}
+.vault-recent__title {
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 700;
+    color: var(--color-text-secondary, #8892A0);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 var(--space-3, 12px);
+}
+.vault-recent__list { display: flex; flex-direction: column; gap: var(--space-2, 8px); }
+.vault-recent__item {
+    display: flex; align-items: center; gap: var(--space-3, 12px);
+    padding: var(--space-3, 12px) var(--space-3, 12px);
+    border-radius: var(--radius-sm, 6px);
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.1));
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.vault-recent__item:hover { border-color: var(--accent, #4ECDC4); }
+.vault-recent__info { flex: 1; min-width: 0; }
+.vault-recent__name {
+    display: block;
+    font-weight: 600; font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text, #E0E0E0);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vault-recent__key {
+    display: block;
+    font-family: var(--font-mono, monospace); font-size: var(--text-xs, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 2px;
+}
+.vault-recent__date {
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-text-secondary, #8892A0);
+    flex-shrink: 0; white-space: nowrap;
+}
+.vault-recent__open {
+    font-size: var(--text-xs, 0.75rem); padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-sm, 6px); border: 1px solid var(--color-border);
+    background: transparent; color: var(--color-text-secondary);
+    cursor: pointer; font-family: var(--font-family); font-weight: 600;
+    flex-shrink: 0; white-space: nowrap;
+}
+.vault-recent__open:hover {
+    background: var(--accent, #4ECDC4); color: var(--bg-primary);
+    border-color: var(--accent, #4ECDC4);
+}
+
 /* Responsive: stack columns on narrow screens */
 @media (max-width: 640px) {
     :host { max-width: 100%; }

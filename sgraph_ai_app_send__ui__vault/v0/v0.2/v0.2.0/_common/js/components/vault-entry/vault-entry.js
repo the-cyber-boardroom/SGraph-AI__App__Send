@@ -48,6 +48,9 @@ class VaultEntry extends VaultComponent {
         // Show version info
         this._renderVersion()
 
+        // Show recent vaults
+        this._renderRecentVaults()
+
         // Check URL hash for vault key or simple token
         // Supports deep links: #token|path/to/file.md or #passphrase:vault_id|path
         const hash = window.location.hash.slice(1)
@@ -198,6 +201,9 @@ class VaultEntry extends VaultComponent {
         // Persist vault key (without deep link path) for auto-open
         try { localStorage.setItem('sg-vault-key', hashStr) } catch (_) {}
 
+        // Save to recent vault history
+        this._saveToHistory(vault, hashStr)
+
         const accessKey = this._accessKeyInput.value.trim()
         this.emit('vault-opened', { vault, vaultKey, accessKey, deepLink: deepPath })
         this._pendingDeepLink = null
@@ -301,6 +307,95 @@ class VaultEntry extends VaultComponent {
 
     _hideError() {
         this._error.hidden = true
+    }
+
+    // --- Called by vault-shell when returning to the entry screen ----------------
+
+    refresh() {
+        this._renderRecentVaults()
+    }
+
+    // --- Vault History (localStorage: sg-vault-history) -------------------------
+
+    _saveToHistory(vault, key) {
+        try {
+            const history  = this._getHistory()
+            const filtered = history.filter(h => h.key !== key)
+            filtered.unshift({ key, name: vault.name || 'Untitled Vault', lastOpened: Date.now() })
+            localStorage.setItem('sg-vault-history', JSON.stringify(filtered.slice(0, 10)))
+        } catch (_) {}
+    }
+
+    _getHistory() {
+        try {
+            return JSON.parse(localStorage.getItem('sg-vault-history') || '[]')
+        } catch { return [] }
+    }
+
+    _renderRecentVaults() {
+        const container = this.$('#recent-vaults')
+        if (!container) return
+        const history = this._getHistory()
+        if (history.length === 0) { container.hidden = true; return }
+
+        container.hidden = false
+        container.innerHTML = `
+            <div class="vault-recent">
+                <div class="vault-recent__title">Recent Vaults</div>
+                <div class="vault-recent__list">
+                    ${history.map(h => `
+                        <div class="vault-recent__item">
+                            <div class="vault-recent__info">
+                                <span class="vault-recent__name">${this.escapeHtml(h.name)}</span>
+                                <span class="vault-recent__key">${this.escapeHtml(this._truncateKey(h.key))}</span>
+                            </div>
+                            <span class="vault-recent__date">${this._formatRelativeDate(h.lastOpened)}</span>
+                            <button class="vault-recent__open" data-vault-key="${this.escapeHtml(h.key)}">Open</button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `
+
+        container.querySelectorAll('.vault-recent__open').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.vaultKey
+                if (this._isSimpleToken(key)) {
+                    this._simpleTokenInput.value = key
+                    this._onSimpleTokenOpen()
+                } else {
+                    this._keyInput.value = key
+                    this._onOpen()
+                }
+            })
+        })
+
+        // Clicking the item row also opens (not just the button)
+        container.querySelectorAll('.vault-recent__item').forEach(row => {
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('.vault-recent__open')) return
+                const btn = row.querySelector('.vault-recent__open')
+                if (btn) btn.click()
+            })
+        })
+    }
+
+    _truncateKey(key) {
+        if (!key || key.length <= 32) return key
+        return key.substring(0, 22) + '…' + key.slice(-8)
+    }
+
+    _formatRelativeDate(ts) {
+        if (!ts) return ''
+        const diff = Date.now() - ts
+        const mins = Math.floor(diff / 60000)
+        if (mins < 2)    return 'just now'
+        if (mins < 60)   return `${mins}m ago`
+        const hrs = Math.floor(mins / 60)
+        if (hrs < 24)    return `${hrs}h ago`
+        const days = Math.floor(hrs / 24)
+        if (days < 7)    return `${days}d ago`
+        return new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
     }
 }
 
