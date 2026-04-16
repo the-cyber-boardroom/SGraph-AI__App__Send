@@ -436,14 +436,21 @@
             try {
                 const result = await this._vault.merge(namedHead);
                 if (result?.merged) {
-                    await this._mountBrowse();
+                    // Refresh whatever view the user is already on — don't navigate away
+                    if (this._activeView === 'sgit') {
+                        const sgit = this.querySelector('vault-sgit-view');
+                        if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                        // Rebuild browse data in background so Files view is ready
+                        this._mountBrowse();
+                    } else {
+                        await this._mountBrowse();
+                    }
                     await this._refreshSyncState();
+
                     if (result.conflicts?.length > 0) {
                         window.sgraphVault.messages.warn(
-                            `Merged \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies. Review in SGit \u2192 Repair.`
+                            `Merged \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
                         );
-                        this._switchView('sgit');
-                        setTimeout(() => this.querySelector('vault-sgit-view')?._switchTab('repair'), 50);
                     } else {
                         window.sgraphVault.messages.success('Synced \u2014 collaborator changes merged successfully');
                     }
@@ -452,9 +459,7 @@
                     window.sgraphVault.messages.success('Already up to date');
                 }
             } catch (err) {
-                window.sgraphVault.messages.error(`Sync failed: ${err.message} \u2014 use SGit \u2192 Repair for manual merge`);
-                this._switchView('sgit');
-                setTimeout(() => this.querySelector('vault-sgit-view')?._switchTab('repair'), 50);
+                window.sgraphVault.messages.error(`Sync failed: ${err.message}`);
             } finally {
                 header?.setPullBusy(false);
             }
