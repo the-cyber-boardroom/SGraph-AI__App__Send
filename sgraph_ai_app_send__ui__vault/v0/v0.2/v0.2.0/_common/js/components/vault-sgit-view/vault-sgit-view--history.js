@@ -233,11 +233,16 @@
 
             let namedTrack = '';
             if (s.namedVisible) {
-                // At the fork row: replace the bottom line with an SVG curve joining named→clone
+                // At the fork row: replace the bottom line with an SVG curve joining named→clone.
+                // The SVG is positioned at the top-left of the named-track span (left:0, top:0).
+                // Named span starts at cell x=26 (= 48 - right:2 - width:20), so:
+                //   named centre in span coords: x = 36-26 = 10
+                //   clone centre in span coords: x = 12-26 = -14  (overflow:visible lets it render)
+                // Path: start at named-track centre (10,14), arc down to (−14,14) at clone centre.
                 const bottomHtml = s.namedLineJoin
-                    ? `<svg style="position:absolute;left:0;bottom:0;width:48px;height:14px;pointer-events:none;overflow:visible"
-                            viewBox="0 0 48 14">
-                           <path d="M 36 0 C 36 9 12 5 12 14"
+                    ? `<svg style="position:absolute;left:0;top:0;width:20px;height:28px;pointer-events:none;overflow:visible"
+                            viewBox="0 0 20 28">
+                           <path d="M 10 14 C 10 22 -14 22 -14 14"
                                  stroke="${C_NAMED}" fill="none" stroke-width="2" opacity="0.5"/>
                        </svg>`
                     : line(s.namedLineBottom, C_NAMED);

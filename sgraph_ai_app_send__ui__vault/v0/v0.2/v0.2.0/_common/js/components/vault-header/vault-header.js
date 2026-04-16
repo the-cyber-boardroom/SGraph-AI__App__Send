@@ -94,6 +94,18 @@
             }
         }
 
+        setDiverged(diverged) {
+            const btn = this.shadowRoot.querySelector('.vh-push-btn');
+            if (!btn) return;
+            if (diverged) {
+                btn.classList.add('vh-push-btn--diverged');
+                btn.title = 'Vault is diverged — pushing will overwrite published commits. Use Repair tab to merge safely.';
+            } else {
+                btn.classList.remove('vh-push-btn--diverged');
+                btn.title = 'Push commits to named branch';
+            }
+        }
+
         setBehindCount(n) {
             const btn   = this.shadowRoot.querySelector('.vh-pull-btn');
             const badge = this.shadowRoot.querySelector('.vh-behind-badge');
@@ -171,6 +183,8 @@
         }
         .vh-push-btn:hover:not(:disabled) { background: rgba(78,205,196,0.12); }
         .vh-push-btn:disabled { opacity: 0.5; cursor: default; }
+        .vh-push-btn--diverged { border-color: #E9C445; color: #E9C445; }
+        .vh-push-btn--diverged:hover:not(:disabled) { background: rgba(233,196,69,0.12); }
         .vh-ahead-badge { font-size: 0.65rem; font-family: var(--font-mono); }
         .vh-pull-btn {
             font-size: var(--text-small); padding: 0.25rem 0.75rem; border-radius: var(--radius-sm);
