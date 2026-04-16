@@ -188,6 +188,20 @@ class SGVault {
         return node
     }
 
+    // --- Dirty-path marking: flags root + every folder along path as modified ---
+    //     Must be called after any in-memory mutation before the next _commit().
+
+    _markDirty(folderPath) {
+        const parts = (folderPath || '/').split('/').filter(Boolean)
+        let node    = this._tree['/']
+        node._dirty = true
+        for (const part of parts) {
+            if (!node.children || !node.children[part]) break
+            node = node.children[part]
+            if (node.type === 'folder') node._dirty = true
+        }
+    }
+
     // --- Component Initialization -----------------------------------------------
 
     _initManagers() {
@@ -226,16 +240,27 @@ class SGVault {
     }
 
     // --- Build tree entries with sub-tree objects for folders -------------------
+    //     Three cases for a folder child:
+    //       1. Lazy (never opened):       _loaded === false && _tree_id  → reuse _tree_id
+    //       2. Loaded, clean:             _loaded === true  && !_dirty && _cleanTreeId → reuse _cleanTreeId
+    //       3. Loaded, dirty (or new):    rebuild recursively, cache result in _cleanTreeId
 
     async _buildTreeEntries(node) {
         const entries = []
         for (const [name, entry] of Object.entries(node.children || {})) {
             if (entry.type === 'folder') {
                 if (entry._loaded === false && entry._tree_id) {
+                    // Lazy sub-tree: never opened by the user, nothing could have changed
                     entries.push({ name, size: 0, content_hash: null, blob_id: null, tree_id: entry._tree_id })
+                } else if (!entry._dirty && entry._cleanTreeId) {
+                    // Loaded but unmodified: reuse the tree object saved when it was loaded
+                    entries.push({ name, size: 0, content_hash: null, blob_id: null, tree_id: entry._cleanTreeId })
                 } else {
-                    const childEntries = await this._buildTreeEntries(entry)
-                    const childTreeId  = await this._commitManager.createTree(childEntries)
+                    // New or dirty: rebuild and cache the resulting tree ID
+                    const childEntries    = await this._buildTreeEntries(entry)
+                    const childTreeId     = await this._commitManager.createTree(childEntries)
+                    entry._cleanTreeId    = childTreeId
+                    entry._dirty         = false
                     entries.push({ name, size: 0, content_hash: null, blob_id: null, tree_id: childTreeId })
                 }
             } else {

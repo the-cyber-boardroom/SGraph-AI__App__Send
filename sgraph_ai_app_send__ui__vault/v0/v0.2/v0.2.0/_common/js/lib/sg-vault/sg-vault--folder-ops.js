@@ -12,14 +12,16 @@
     Object.assign(SGVault.prototype, {
 
         async createFolder(folderPath) {
-            const parts  = folderPath.split('/').filter(Boolean)
-            const name   = parts.pop()
-            const parent = this._findNode('/' + parts.join('/'))
+            const parts      = folderPath.split('/').filter(Boolean)
+            const name       = parts.pop()
+            const parentPath = '/' + parts.join('/')
+            const parent     = this._findNode(parentPath)
             if (!parent || parent.type !== 'folder') {
-                throw new Error(`Parent folder not found: /${parts.join('/')}`)
+                throw new Error(`Parent folder not found: ${parentPath}`)
             }
             if (parent.children[name]) throw new Error(`Already exists: ${name}`)
             parent.children[name] = { type: 'folder', children: {} }
+            this._markDirty(parentPath)
             await this._commit(`Create folder ${name}`)
         },
 
@@ -35,24 +37,28 @@
         },
 
         async removeFolder(folderPath) {
-            const parts  = folderPath.split('/').filter(Boolean)
-            const name   = parts.pop()
-            const parent = this._findNode('/' + parts.join('/'))
+            const parts      = folderPath.split('/').filter(Boolean)
+            const name       = parts.pop()
+            const parentPath = '/' + parts.join('/')
+            const parent     = this._findNode(parentPath)
             if (!parent || parent.type !== 'folder') throw new Error(`Parent folder not found`)
             if (!parent.children[name]) throw new Error(`Folder not found: ${name}`)
             delete parent.children[name]
+            this._markDirty(parentPath)
             await this._commit(`Remove folder ${name}`)
         },
 
         async renameFolder(folderPath, newName) {
-            const parts   = folderPath.split('/').filter(Boolean)
-            const oldName = parts.pop()
-            const parent  = this._findNode('/' + parts.join('/'))
+            const parts      = folderPath.split('/').filter(Boolean)
+            const oldName    = parts.pop()
+            const parentPath = '/' + parts.join('/')
+            const parent     = this._findNode(parentPath)
             if (!parent || parent.type !== 'folder') throw new Error(`Parent folder not found`)
             if (!parent.children[oldName]) throw new Error(`Folder not found: ${oldName}`)
             if (parent.children[newName]) throw new Error(`Already exists: ${newName}`)
             parent.children[newName] = parent.children[oldName]
             delete parent.children[oldName]
+            this._markDirty(parentPath)
             await this._commit(`Rename folder ${oldName} to ${newName}`)
         },
 
@@ -77,6 +83,8 @@
 
             destParent.children[folderName] = folderNode
             delete srcParent.children[folderName]
+            this._markDirty(srcParentPath)
+            this._markDirty(destParentPath)
             await this._commit(`Move folder ${folderName}`)
         },
 
@@ -101,7 +109,9 @@
                 }
             }
 
-            node._loaded = true
+            node._cleanTreeId = node._tree_id   // save for reuse in _buildTreeEntries if unmodified
+            node._loaded      = true
+            node._dirty       = false
             delete node._tree_id
             return true
         },
