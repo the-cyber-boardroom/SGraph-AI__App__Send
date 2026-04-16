@@ -76,16 +76,18 @@
         barsBg.appendChild(inner);
 
         // ── textarea ──
+        // position:absolute;inset:0 fills the position:relative wrapper fully.
+        // (flex:1 alone does nothing here because the wrapper is not a flex container.)
         var ta = document.createElement('textarea');
         ta.value      = text;
         ta.readOnly   = !!readOnly;
         ta.spellcheck = false;
         ta.setAttribute('wrap', 'off');       // no word-wrap → fixed line height
         ta.style.cssText = [
-            'flex:1;margin:0;padding:' + PAD_PX + 'px 1rem;resize:none;',
+            'position:absolute;inset:0;margin:0;padding:' + PAD_PX + 'px 1rem;resize:none;',
             'font-family:inherit;font-size:13px;line-height:' + LINE_PX + 'px;',
             'background:transparent;border:none;outline:none;tab-size:4;overflow:auto;',
-            'white-space:pre;position:relative;z-index:1;',
+            'white-space:pre;z-index:1;',
             'color:' + (readOnly ? '#ff9f43' : 'var(--color-text,#e2e8f0)') + ';'
         ].join('');
 
