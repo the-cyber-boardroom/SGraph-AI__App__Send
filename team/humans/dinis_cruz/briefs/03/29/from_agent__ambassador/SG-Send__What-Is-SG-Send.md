@@ -39,7 +39,7 @@ Drop a folder and the recipient gets a full file explorer — sg-layout provides
 
 ### 3. Friendly Tokens
 
-Instead of sharing a URL with a 64-character hex hash, users can share a human-readable token like `coral-equal-1774`. The token derives both the transfer ID and the decryption key using SHA-256 and PBKDF2. You can say it over the phone, type it from memory, or text it. 320 × 320 × 10,000 = ~1 billion combinations.
+Instead of sharing a URL with a 64-character hex hash, users can share a human-readable token like `coral-equal-1234`. The token derives both the transfer ID and the decryption key using SHA-256 and PBKDF2. You can say it over the phone, type it from memory, or text it. 320 × 320 × 10,000 = ~1 billion combinations.
 
 ### 4. Verifiable Transparency
 

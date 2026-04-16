@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault (v0.2.0) — Zero-knowledge encrypted vault</title>
+    <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
+
+    <!-- Fonts -->
+    <link rel="stylesheet" href="../_common/fonts/fonts.css">
+
+    <!-- Design tokens + shared styles -->
+    <link rel="stylesheet" href="../_common/css/design-tokens.css">
+    <link rel="stylesheet" href="../_common/css/shared-components.css">
+
+    <!-- Browse component styles (from SG/Send CDN) -->
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse.css">
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031.css">
+</head>
+<body>
+
+    <vault-shell></vault-shell>
+
+    <!-- ===================================================================
+         Script Loading Order — v0.2.0 (Browse-unified vault, self-contained)
+
+         All SG/Send shared deps loaded from dev.send.sgraph.ai CDN.
+         All vault-specific code is local (_common/).
+         =================================================================== -->
+
+    <!-- 0. sg-layout (fractal window management — CDN) -->
+    <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
+
+    <!-- 0c. LLM components (from tools.sgraph.ai CDN) -->
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-events/v0/v0.1/v0.1.0/sg-llm-events.js"></script>
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-request/v0/v0.1/v0.1.2/sg-llm-request.js"></script>
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-infographic/v0/v0.1/v0.1.0/sg-llm-infographic.js"></script>
+
+    <!-- 0b. Build info (CI-generated, absent in local dev) -->
+    <script src="../_common/js/build-info.js"></script>
+
+    <!-- 1. Vault services -->
+    <script src="../_common/js/services/event-bus.js"></script>
+    <script src="../_common/js/services/config-manager.js"></script>
+    <script src="../_common/js/services/messages-service.js"></script>
+
+    <!-- 2. i18n -->
+    <script src="../_common/js/vault-i18n.js"></script>
+
+    <!-- 3. SG/Send shared modules (CDN — required by send-browse--v0.3.2.js) -->
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-helpers.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-component-paths.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-component.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/send-icons.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/file-type-detect.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/markdown-parser.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/markdown-parser-v031.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/sg-print.js"></script>
+
+    <!-- 4. Browse component v0.3.2 (CDN — shared with SG/Send) -->
+    <script src="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse--v0.3.2.js"></script>
+
+    <!-- 4b. Page layout renderer (CDN — renders _page.json as rich pages) -->
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031--page-layout.css">
+    <script src="https://dev.send.sgraph.ai/_common/js/page-layout-renderer.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031--page-layout.js"></script>
+
+    <!-- 4c. Vault deep-link patch: override page layout hash functions to use | separator -->
+    <script>
+    (function() {
+        // The page layout overlay uses _plrGetHashPath/_plrSetHashPath with / separator.
+        // Vault uses | separator: #token|path/to/file
+        if (typeof _plrGetHashPath === 'function') {
+            _plrGetHashPath = function() {
+                var hash = window.location.hash.slice(1);
+                var idx  = hash.indexOf('|');
+                if (idx === -1) return null;
+                var path = hash.slice(idx + 1);
+                return path || null;
+            };
+        }
+        if (typeof _plrSetHashPath === 'function') {
+            _plrSetHashPath = function(path) {
+                var hash  = window.location.hash.slice(1);
+                var idx   = hash.indexOf('|');
+                var token = idx === -1 ? hash : hash.slice(0, idx);
+                var next  = token + (path ? '|' + path : '');
+                if (hash !== next) history.replaceState(null, '', '#' + next);
+            };
+        }
+    })();
+    </script>
+
+    <!-- 5. Vault libraries (local) -->
+    <script src="../_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="../_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault--branches.js"></script>
+
+    <!-- 6. Vault base system (local) -->
+    <script src="../_common/js/base/vault-helpers.js"></script>
+    <script src="../_common/js/base/vault-component-paths.js"></script>
+    <script src="../_common/js/base/vault-component.js"></script>
+
+    <!-- 7. VaultDataSource adapter (local) -->
+    <script src="../_common/js/adapters/vault-data-source.js"></script>
+
+    <!-- 7b. Conflict diff view overlay (side-by-side conflict resolution) -->
+    <script src="../_common/js/components/vault-diff-view/vault-diff-view.js"></script>
+
+    <!-- 7c. Browse edit overlay (adds Edit/Save/Delete/Upload when vault is writable) -->
+    <script src="../_common/js/components/vault-browse-edit/vault-browse-edit.js"></script>
+
+    <!-- 8. Debug panels (local) -->
+    <script src="../_common/js/components/messages-panel/messages-panel.js"></script>
+    <script src="../_common/js/components/events-viewer/events-viewer.js"></script>
+    <script src="../_common/js/components/api-logger/api-logger.js"></script>
+    <script src="../_common/js/components/storage-viewer/storage-viewer.js"></script>
+
+    <!-- 9. Vault components (local) -->
+    <script src="../_common/js/components/vault-entry/vault-entry.js"></script>
+    <script src="../_common/js/components/vault-upload/vault-upload.js"></script>
+    <!-- vault-sgit-view: shell + tab modules (load shell first, then extensions) -->
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--history.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--refs.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--tree.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--branches.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--status.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--repair.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--object.js"></script>
+
+    <!-- 10. v0.2.0 shell components (local — new modular architecture) -->
+    <script src="../_common/js/components/vault-header/vault-header.js"></script>
+    <script src="../_common/js/components/vault-auth/vault-auth.js"></script>
+    <script src="../_common/js/components/vault-nav/vault-nav.js"></script>
+    <script src="../_common/js/components/vault-settings/vault-settings.js"></script>
+    <script src="../_common/js/components/vault-status-bar/vault-status-bar.js"></script>
+    <script src="../_common/js/components/vault-shell/vault-shell.js"></script>
+
+    <!-- 11. Init -->
+    <script>
+        VaultComponentPaths.init('../_common');
+        VaultI18n.init();
+        window.sgraphVault.events.emit('app-init', { version: 'v0.2.0' });
+    </script>
+
+</body>
+</html>

@@ -232,7 +232,7 @@
     position: relative;
     width: 100%;
     aspect-ratio: 4 / 3;
-    background-size: cover;
+    background-size: contain;
     background-position: center;
     background-color: rgba(255,255,255,0.02);
     background-repeat: no-repeat;
@@ -407,6 +407,13 @@
     height: 80vh;
     border: none;
     border-radius: 8px;
+}
+
+.sg-lightbox__video {
+    max-width: 90%;
+    max-height: 80vh;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
 .sg-lightbox__code {

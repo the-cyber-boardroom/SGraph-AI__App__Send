@@ -204,8 +204,8 @@ def main():
     print()
 
     if not en_dir.is_dir():
-        print(f"ERROR: English source directory not found: {en_dir}")
-        return 1
+        print(f"  SKIP: No en-gb/ directory — overlay-only version, no locale pages to generate.")
+        return 0
 
     if not i18n_dir.is_dir():
         print(f"ERROR: i18n directory not found: {i18n_dir}")

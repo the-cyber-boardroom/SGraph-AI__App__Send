@@ -32,7 +32,7 @@ on:
       - dev
       - main
     paths:
-      - 'sgraph_ai_app_send__ui__vault/v0/v0.1/**'
+      - 'sgraph_ai_app_send__ui__vault/v0/v0.2/**'
       - 'scripts/generate_vault_i18n_pages.py'
       - '.github/workflows/deploy-ui-vault.yml'
   workflow_dispatch:
@@ -52,8 +52,8 @@ concurrency:
 
 env:
   AWS_REGION  : eu-west-2
-  UI_VERSION  : v0.1.4
-  SOURCE_DIR  : sgraph_ai_app_send__ui__vault/v0/v0.1/v0.1.4
+  UI_VERSION  : v0.2.0
+  SOURCE_DIR  : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.0
 
 jobs:
   deploy:

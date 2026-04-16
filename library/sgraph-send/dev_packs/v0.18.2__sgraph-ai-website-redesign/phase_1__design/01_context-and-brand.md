@@ -27,7 +27,7 @@ That last part is the differentiator. Not encryption alone — Proton Drive also
 | **Gallery view** | Mixed-content grid — images, PDFs, markdown, video — with type-aware thumbnails. Lightbox on click. |
 | **Folder browser** | Multi-pane folder navigation. Recipients explore structure without downloading. |
 | **SgPrint** | Markdown files rendered as branded PDFs in the recipient's browser. |
-| **Friendly tokens** | Human-readable `word-word-number` format (e.g. `coral-equal-1774`). ~1 billion combinations. |
+| **Friendly tokens** | Human-readable `word-word-number` format (e.g. `coral-equal-1234`). ~1 billion combinations. |
 | **Three share modes** | Token Only / Combined / Separate Key — sender chooses the security tradeoff. |
 | **Upload wizard** | 6-step guided flow. Drag-and-drop. Choice of retention period. |
 | **Lightbox viewer** | Individual file open from gallery or folder. |

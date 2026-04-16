@@ -58,6 +58,8 @@
 3. Fix the code
 4. Confirm the test now passes and no existing tests regress
 5. File a review document
+6. **Write a changelog entry** in `team/comms/changelog/MM/DD/` documenting the fix and expected test impact
+7. **If the fix affects UI behaviour**, write a QA brief in `team/comms/qa/briefs/MM/DD/` with updated test cases
 
 ### 4. Code Review Response
 
@@ -111,6 +113,7 @@
 - No storage call bypasses `Storage_FS` / Memory-FS
 - No frontend component imports external frameworks or libraries
 - The server never processes, reads, or logs plaintext file content
+- No access tokens, vault keys, share tokens, or API keys are committed to Git — these are secrets
 
 ## Tools and Access
 
@@ -121,9 +124,12 @@
 | `sgraph_ai_app_send__ui__admin/` | Admin console frontend assets |
 | `tests/unit/` | Unit test files |
 | `team/roles/dev/reviews/` | File implementation review documents |
+| `team/comms/changelog/` | Write changelog entries for every UI/API change |
+| `team/comms/qa/briefs/` | Write QA briefs when tests need updating |
 | `team/roles/architect/` | Read API contracts and schemas |
 | `sgraph_ai_app_send/version` | Read current version for review file naming |
 | `pytest` | Run unit tests locally |
+| `sgit` (PyPI: `sgit-ai`) | Create and share vaults for cross-team handovers |
 | `.claude/CLAUDE.md` | Reference for stack rules and patterns |
 
 ## Escalation

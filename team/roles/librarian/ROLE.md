@@ -138,6 +138,7 @@ Indexes content plans and communications drafts. Ensures the Journalist can find
 - **Version file:** `sgraph_ai_app_send/version` (read-only, for version prefix).
 - **File operations:** Read, Glob, Grep for scanning; Write/Edit for producing indexes.
 - **Git:** For checking file history when assessing staleness.
+- **sgit** (PyPI: `sgit-ai`): Create vaults for cross-team briefing delivery. Use `sgit init`, `sgit commit`, `sgit push`, `sgit share`. **NEVER commit vault keys, share tokens, or access tokens to Git.**
 
 ---
 

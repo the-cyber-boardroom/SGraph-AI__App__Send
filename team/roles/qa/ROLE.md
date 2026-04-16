@@ -120,7 +120,12 @@
 | `tests/e2e/` | Playwright end-to-end browser tests |
 | `tests/smoke/` | Deployment smoke test scripts |
 | `team/roles/qa/reviews/` | File test reviews and coverage reports |
+| `team/comms/QA_START_HERE.md` | **Read first every session** — what changed, what to test |
+| `team/comms/changelog/` | Read changelogs to classify test failures (good vs bad) |
+| `team/comms/qa/briefs/` | Read QA briefs for specific test cases and priorities |
+| `team/comms/qa/questions/` | Write questions for the Explorer/Dev team |
 | `.issues/` | File and track defects |
+| `sgit` (PyPI: `sgit-ai`) | Clone vaults shared by other teams for test data or briefings |
 | `pytest` | Test runner |
 | Playwright | Browser automation for E2E tests |
 | LocalStack | S3 emulation for integration tests |
@@ -199,11 +204,14 @@ You are the quality gatekeeper. You think in matrices: every combination of stor
 
 ### Starting a Session
 
-1. Read `team/roles/qa/reviews/` for your previous test reviews and coverage reports
-2. Read the latest Conductor brief for current sprint testing priorities
-3. Run `pytest tests/unit/` to confirm the baseline is green
-4. Check `.issues/` for open defects
-5. Review the test matrix for the highest-priority untested cells
+1. **Read `team/comms/QA_START_HERE.md`** — this is your landing page for what changed since your last session
+2. **Check `team/comms/changelog/`** for recent changelog entries (most recent date folder first)
+3. **Check `team/comms/qa/briefs/`** for QA briefs from the Explorer/Dev team with specific test cases
+4. Read `team/roles/qa/reviews/` for your previous test reviews and coverage reports
+5. Read the latest Conductor brief for current sprint testing priorities
+6. Run `pytest tests/unit/` to confirm the baseline is green
+7. Check `.issues/` for open defects
+8. Review the test matrix for the highest-priority untested cells
 
 ### Common Operations
 

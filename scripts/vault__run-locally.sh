@@ -10,6 +10,11 @@
 # This script replicates that locally by creating symlinks in a temporary
 # directory that mirrors the production URL structure.
 #
+# LOCAL CDN OVERRIDE: The vault index.html loads shared components from
+# dev.send.sgraph.ai. This script merges all user UI IFD layers (v0.3.0,
+# v0.3.1, v0.3.2) on top of the vault _common/ and patches index.html to
+# use local URLs so that local code changes are visible without a CDN deploy.
+#
 # The vault UI uses Web Crypto API (AES-256-GCM) which requires either:
 #   - https:// (production)
 #   - http://localhost (local dev — this script)
@@ -19,9 +24,18 @@ PORT=10067
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
-UI_VERSION="v0.1.4"
-IFD_PATH="v0/v0.1/$UI_VERSION"
+UI_VERSION="v0.2.0"
+IFD_PATH="v0/v0.2/$UI_VERSION"
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
+
+# User UI IFD layers — merged in order (base first, latest last) to replicate
+# what the CDN serves. Each version only contains files changed in that version.
+USER_UI_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
+USER_UI_LAYERS=(
+    "v0/v0.3/v0.3.0/_common"
+    "v0/v0.3/v0.3.1/_common"
+    "v0/v0.3/v0.3.2/_common"
+)
 
 # Clean up on exit
 cleanup() {
@@ -43,16 +57,34 @@ if [ ! -d "$CONTENT_DIR" ]; then
     exit 1
 fi
 
-# Symlink locale folders (en-gb/, etc.)
+# Copy locale folders (not symlink) so we can patch index.html inside them
 for locale_dir in "$CONTENT_DIR"/*/; do
     dirname=$(basename "$locale_dir")
     if [ "$dirname" != "_common" ] && [ "$dirname" != "i18n" ] && [ -d "$locale_dir" ]; then
-        ln -sf "$locale_dir" "$SERVE_DIR/$dirname"
+        cp -r "$locale_dir" "$SERVE_DIR/$dirname"
     fi
 done
 
-# Copy _common (not symlink) so we can inject build-info.js
-cp -r "$CONTENT_DIR/_common" "$SERVE_DIR/_common"
+# Copy _common (not symlink) so we can inject build-info.js and CDN overrides
+if [ -d "$CONTENT_DIR/_common" ]; then
+    cp -r "$CONTENT_DIR/_common" "$SERVE_DIR/_common"
+else
+    mkdir -p "$SERVE_DIR/_common/js"
+fi
+
+# Merge user UI IFD layers in order (v0.3.0 → v0.3.1 → v0.3.2) — replicates
+# the CDN's flattened view. Each layer only contains files changed in that
+# version; later layers override earlier ones. Local changes take effect
+# without a CDN deploy.
+for layer in "${USER_UI_LAYERS[@]}"; do
+    layer_dir="$USER_UI_DIR/$layer"
+    if [ -d "$layer_dir" ]; then
+        echo "Merging user UI layer: $layer ..."
+        cp -r "$layer_dir"/. "$SERVE_DIR/_common/"
+    else
+        echo "WARNING: user UI layer not found: $layer_dir (skipping)"
+    fi
+done
 
 # Symlink i18n/
 [ -d "$CONTENT_DIR/i18n" ] && ln -sf "$CONTENT_DIR/i18n" "$SERVE_DIR/i18n"
@@ -61,6 +93,15 @@ cp -r "$CONTENT_DIR/_common" "$SERVE_DIR/_common"
 for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
     [ -f "$f" ] && [ "$(basename "$f")" != "index.html" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
 done
+
+
+# Inject /api/health for local dev — vault-header.js calls window.location.origin/api/health
+# to display the backend version. Python http.server has no API routes, so this
+# provides a static JSON response that prevents a noisy 404 in DevTools.
+mkdir -p "$SERVE_DIR/api"
+cat > "$SERVE_DIR/api/health" <<HEALTHEOF
+{"status":"ok","version":"local-dev","mode":"local-static"}
+HEALTHEOF
 
 # Inject build-info.js for local dev (CI generates this in production)
 mkdir -p "$SERVE_DIR/_common/js"
@@ -72,6 +113,22 @@ window.SGRAPH_BUILD = {
     buildTime  : '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
 };
 JSEOF
+
+# Patch index.html files: replace https://dev.send.sgraph.ai/_common/ with
+# local /_common/ so the browser loads our local send-browse, markdown-parser,
+# etc. instead of the deployed CDN versions.
+echo "Patching index.html: CDN URLs → local /_common/ ..."
+for index_html in "$SERVE_DIR"/*/index.html; do
+    [ -f "$index_html" ] || continue
+    python3 -c "
+import sys, re
+path = sys.argv[1]
+with open(path) as f: html = f.read()
+patched = html.replace('https://dev.send.sgraph.ai/_common/', '/_common/')
+with open(path, 'w') as f: f.write(patched)
+print('  Patched:', path)
+" "$index_html"
+done
 
 # Create a root index.html that redirects to /en-gb/
 cat > "$SERVE_DIR/index.html" <<'HTMLEOF'
@@ -86,6 +143,7 @@ echo ""
 echo "Starting vault.sgraph.ai local server..."
 echo "  Root:       $SERVE_DIR"
 echo "  Content:    $CONTENT_DIR"
+echo "  CDN override: $USER_UI_DIR (v0.3.0 → v0.3.1 → v0.3.2 merged)"
 echo ""
 echo "  URLs:"
 echo "    Home:           http://localhost:$PORT/"

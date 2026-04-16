@@ -7,10 +7,13 @@
 import base64
 import hashlib
 import json
+import re
 from   osbot_utils.type_safe.primitives.domains.identifiers.safe_int.Timestamp_Now import Timestamp_Now
 from   memory_fs.storage_fs.Storage_FS                                           import Storage_FS
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
 from   osbot_utils.type_safe.Type_Safe                                           import Type_Safe
+
+VAULT_ID_PATTERN = re.compile(r'^[a-z0-9]{8,24}$')                              # Opaque lowercase alphanumeric, 8–24 chars, no hyphens/uppercase
 
 
 class Service__Vault__Pointer(Type_Safe):                                        # Opaque blob storage with write-key auth
@@ -23,6 +26,12 @@ class Service__Vault__Pointer(Type_Safe):                                       
             self.storage_fs = Storage_FS__Memory()
         if self._manifest_cache is None:
             self._manifest_cache = {}
+
+    @staticmethod
+    def validate_vault_id(vault_id):                                             # Reject non-opaque vault IDs (prevents leaking project names into S3/logs)
+        if not VAULT_ID_PATTERN.match(vault_id):
+            return False
+        return True
 
     def vault_manifest_path(self, vault_id):                                     # Path for vault manifest (ownership record)
         return f'transfers/vault/{vault_id}/manifest.json'

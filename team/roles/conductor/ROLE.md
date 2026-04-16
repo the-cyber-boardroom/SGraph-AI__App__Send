@@ -113,6 +113,8 @@
 | Tool | Purpose |
 |------|---------|
 | `.issues/` directory | File-based issue tracking -- create, update, and query task nodes |
+| `team/comms/` | Cross-team communication — changelogs, QA briefs, inter-team briefs, plans |
+| `team/comms/QA_START_HERE.md` | Verify this is up-to-date after Dev ships changes |
 | `team/roles/*/reviews/` | Read reviews from all roles to track progress |
 | `team/humans/dinis_cruz/briefs/` | Read human stakeholder briefs for direction |
 | `team/roles/conductor/` | Write Conductor briefs and status summaries |

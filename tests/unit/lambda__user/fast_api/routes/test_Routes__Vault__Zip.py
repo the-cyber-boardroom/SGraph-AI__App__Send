@@ -8,7 +8,7 @@ import io
 from   unittest                                                                  import TestCase
 from   tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User      import setup__fast_api__user__test_objs
 
-VAULT_ID  = 'zip-route-vault'
+VAULT_ID  = 'ziproutevlt01'
 WRITE_KEY = 'deadbeef1234567890abcdef'
 
 
@@ -32,7 +32,7 @@ class test_Routes__Vault__Zip(TestCase):
     # --- Happy path ---
 
     def test__zip__single_file(self):
-        vault = 'zip-single'
+        vault = 'zipsingle001'
         self._write(vault_id=vault, file_id='doc.txt', payload=b'hello')
         response = self._zip(vault_id=vault)
         assert response.status_code == 200
@@ -43,7 +43,7 @@ class test_Routes__Vault__Zip(TestCase):
             assert zf.read('doc.txt') == b'hello'
 
     def test__zip__multiple_files(self):
-        vault = 'zip-multi'
+        vault = 'zipmulti0001'
         self._write(vault_id=vault, file_id='a.txt', payload=b'aaa')
         self._write(vault_id=vault, file_id='b.txt', payload=b'bbb')
         self._write(vault_id=vault, file_id='c.txt', payload=b'ccc')
@@ -64,7 +64,7 @@ class test_Routes__Vault__Zip(TestCase):
         assert response.status_code == 400
 
     def test__zip__wrong_write_key(self):
-        vault = 'zip-wrong-key'
+        vault = 'zipwrongkey01'
         self._write(vault_id=vault, file_id='doc.txt', payload=b'data')
         response = self._zip(vault_id=vault, write_key='wrong-key')
         assert response.status_code == 403
@@ -72,13 +72,13 @@ class test_Routes__Vault__Zip(TestCase):
     # --- Vault not found ---
 
     def test__zip__vault_not_found(self):
-        response = self._zip(vault_id='nonexistent-zip-vault')
+        response = self._zip(vault_id='noexistzvlt01')
         assert response.status_code == 404
 
     # --- Cache: second download uses cache ---
 
     def test__zip__cache_hit(self):
-        vault = 'zip-cache'
+        vault = 'zipcache0001'
         self._write(vault_id=vault, file_id='cached.txt', payload=b'cached-data')
 
         response_1 = self._zip(vault_id=vault)

@@ -1,0 +1,1335 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Page Layout Component Styles (v0.3.1+)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Page container ───────────────────────────────────────────────────────── */
+
+/* 2px teal top stripe — visual cue that this tab is a rendered _page.json */
+.plr-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    border-top: 2px solid var(--color-primary, #4ecdc4);
+}
+
+/* P1-B fix: wrapper is the actual scroll container */
+/* P0: bottom padding so last section is not clipped */
+.plr-scroll-wrapper {
+    flex: 1;
+    width: 100%;
+    overflow-y: auto;
+    height: 100%;
+    padding-bottom: 3rem;
+    box-sizing: border-box;
+}
+
+/* ── Text selection ───────────────────────────────────────────────────────── */
+/* Browser default selection on white is nearly invisible; override with a    */
+/* legible mid-blue highlight and white text for dark pages.                  */
+
+.plr-page ::selection {
+    background: #1a73e8;
+    color: #ffffff;
+}
+.plr-page--dark ::selection {
+    background: #4ecdc4;
+    color: #0d1117;
+}
+
+/* ── Theme: light — explicit colour overrides ─────────────────────────────── */
+/* The Browse shell defines --color-text etc. for its OWN dark palette.       */
+/* Light-mode page layout must override with hard-coded values so text is     */
+/* readable regardless of the surrounding shell theme.                         */
+
+.plr-page--light .plr-section__title,
+.plr-page--light .plr-title          { color: #1a1a2e; }
+.plr-page--light .plr-text           { color: #2c2c3a; }
+.plr-page--light .plr-bullet-points li { color: #2c2c3a; }
+.plr-page--light .plr-markdown       { color: #2c2c3a; }
+.plr-page--light .plr-image__caption { color: #666; }
+.plr-page--light .plr-slides__caption { color: #555; }
+.plr-page--light .plr-card__title    { color: #1a1a2e; }
+.plr-page--light .plr-card__desc     { color: #444; }
+
+/* Light-mode markdown sub-element overrides — prevent Browse shell dark       */
+/* variables from bleeding into inline code and blockquotes.                   */
+.plr-page--light .plr-markdown code        { color: #d63384; background: rgba(214,51,132,0.07); border-radius: 3px; padding: 0.1em 0.35em; }
+.plr-page--light .plr-markdown blockquote  { border-left: 3px solid #4ecdc4; padding-left: 0.9em; margin-left: 0; color: #3a3a50; }
+
+/* Light-mode card background — ensure cards are always white in light mode   */
+.plr-page--light .plr-card { background: #ffffff; border-color: #e0e0e0; }
+
+/* Light-mode section divider — explicit override to avoid shell dark border   */
+.plr-page--light .plr-section { border-top-color: #ebebeb; }
+
+/* Light-mode slides controls */
+.plr-page--light .plr-slides__counter { color: #888888; }
+.plr-page--light .plr-slides__btn     { border-color: #d0d0d0; color: #333333; }
+
+/* ── Theme: dark ──────────────────────────────────────────────────────────── */
+/* Agent authors can set "theme": "dark" in _page.json.                       */
+/* Inherits the Browse shell's dark palette so the page blends seamlessly.    */
+
+/* P0: Dark mode — bumped body text from #b0b8c4 → #c8d0da for legibility */
+.plr-page--dark { background: var(--color-bg, #0d1117); }
+.plr-page--dark .plr-section { border-top-color: rgba(255,255,255,0.08); }
+.plr-page--dark .plr-section__title { color: #e8e8e8; }
+.plr-page--dark .plr-text { color: #c8d0da; }
+.plr-page--dark .plr-bullet-points li { color: #c8d0da; }
+.plr-page--dark .plr-title { color: #e8e8e8; }
+.plr-page--dark .plr-image__caption { color: rgba(255,255,255,0.6); }
+.plr-page--dark .plr-slides__caption { color: rgba(255,255,255,0.7); }
+.plr-page--dark .plr-slides__counter { color: rgba(255,255,255,0.5); }
+.plr-page--dark .plr-slides__btn { border-color: rgba(255,255,255,0.2); color: #ccc; }
+.plr-page--dark .plr-markdown { color: #c8d0da; }
+
+/* Dark nav: matches the Browse shell's dark header palette */
+.plr-page--dark .plr-nav {
+    background: rgba(13, 17, 23, 0.96);
+    border-bottom-color: rgba(255,255,255,0.15);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+}
+.plr-page--dark .plr-nav::before {
+    color: rgba(255,255,255,0.35);
+    border-right-color: rgba(255,255,255,0.12);
+}
+.plr-page--dark .plr-nav__link { color: rgba(255,255,255,0.55); }
+.plr-page--dark .plr-nav__link:hover { color: rgba(255,255,255,0.9); }
+.plr-page--dark .plr-nav__link--active {
+    color: var(--color-primary, #4ecdc4);
+    border-bottom-color: var(--color-primary, #4ecdc4);
+}
+
+/* ── Navigation ───────────────────────────────────────────────────────────── */
+
+/* P1: Nav visual separation — stronger bottom border + left "Sections" label */
+/* Light nav default */
+.plr-page--light .plr-nav,
+.plr-nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid rgba(0,0,0,0.07);   /* separates nav from banner */
+    border-bottom: 2px solid var(--color-border, #d4d4d4);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    backdrop-filter: blur(4px);
+    overflow-x: auto;
+    /* Align nav links with section content (max-width:960px, padding:2rem sides).
+       On narrow viewports fall back to 2rem to avoid negative padding. */
+    padding-inline: max(2rem, calc((100% - 960px) / 2 + 2rem));
+    scrollbar-width: none;
+}
+
+/* "Sections" label at the left edge of the nav bar */
+.plr-nav::before {
+    content: 'Sections';
+    display: flex;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary, #999);
+    padding: 0 0.9rem 0 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border-right: 1px solid var(--color-border, #e0e0e0);
+    margin-right: 0.25rem;
+}
+
+.plr-nav::-webkit-scrollbar { display: none; }
+
+.plr-nav__link {
+    display: inline-block;
+    padding: 0.7rem 1rem;
+    color: var(--color-text-secondary, #666);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.plr-nav__link:hover { color: var(--color-text, #111); }
+
+.plr-nav__link--active {
+    color: var(--color-primary, #4ecdc4);
+    border-bottom-color: var(--color-primary, #4ecdc4);
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.plr-hero {
+    width: 100%;
+    min-height: 240px;
+    background: #1a1a2e;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+}
+
+.plr-hero--has-image { min-height: 300px; }
+
+.plr-hero__overlay {
+    width: 100%;
+    padding: 2.5rem 3rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.15) 100%);
+}
+
+.plr-hero__title {
+    color: #ffffff;
+    font-size: clamp(1.4rem, 2.8vw, 2.2rem);  /* P3: fluid scaling */
+    font-weight: 700;
+    margin: 0 0 0.4rem;
+    line-height: 1.25;
+}
+
+.plr-hero__subtitle {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 1rem;
+    font-weight: 400;
+    margin: 0;
+}
+
+/* ── Section ──────────────────────────────────────────────────────────────── */
+
+.plr-section {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
+    border-top: 1px solid var(--color-border, #ebebeb);
+}
+
+.plr-section:first-of-type { border-top: none; }
+
+.plr-section__title {
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--color-text, #111);
+    margin: 0 0 1.2rem;
+}
+
+.plr-section__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* ── Text ─────────────────────────────────────────────────────────────────── */
+
+.plr-text {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--color-text, #222);
+    margin: 0;
+}
+
+/* ── Bullet points ────────────────────────────────────────────────────────── */
+
+.plr-bullet-points {
+    padding-left: 1.5rem;
+    margin: 0;
+    list-style: disc;
+}
+
+.plr-bullet-points li {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--color-text, #222);
+    margin-bottom: 0.3rem;
+}
+
+/* P3: accent-colour bullet markers */
+.plr-bullet-points li::marker {
+    color: var(--plr-accent, #4ecdc4);
+}
+
+/* ── Title ────────────────────────────────────────────────────────────────── */
+
+.plr-title {
+    font-weight: 600;
+    color: var(--color-text, #111);
+    margin: 0;
+}
+
+/* ── Image ────────────────────────────────────────────────────────────────── */
+
+.plr-image {
+    display: block;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.plr-image__caption {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary, #888);
+    margin: 0.4rem 0 0;
+    text-align: center;
+}
+
+/* ── Slides ───────────────────────────────────────────────────────────────── */
+
+.plr-slides {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    outline: none;
+}
+
+.plr-slides__img {
+    max-width: 100%;
+    max-height: 65vh;
+    object-fit: contain;
+    border-radius: 3px;
+}
+
+.plr-slides__nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.plr-slides__btn {
+    background: none;
+    border: 1px solid var(--color-border, #d0d0d0);
+    border-radius: 50%;
+    width: 2.2rem;
+    height: 2.2rem;
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text, #333);
+    padding: 0;
+    line-height: 1;
+    transition: background 0.15s;
+}
+
+.plr-slides__btn:hover { background: var(--color-surface-hover, #f3f3f3); }
+
+.plr-slides__counter {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary, #888);
+    min-width: 3rem;
+    text-align: center;
+}
+
+.plr-slides__caption {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary, #666);
+    text-align: center;
+    margin: 0;
+    min-height: 1.2em;
+}
+
+/* ── Gallery ──────────────────────────────────────────────────────────────── */
+
+.plr-gallery {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.plr-gallery__thumb {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 3px;
+    cursor: zoom-in;    /* P3: signal lightbox affordance */
+    background: var(--color-surface, #f0f0f0);
+}
+
+.plr-gallery__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.2s;
+}
+
+.plr-gallery__thumb:hover img { transform: scale(1.04); }
+
+/* ── Lightbox ─────────────────────────────────────────────────────────────── */
+
+.plr-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plr-lightbox__content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 95vw;
+    max-height: 95vh;
+}
+
+.plr-lightbox__img {
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+}
+
+.plr-lightbox__close {
+    position: fixed;
+    top: 1rem;
+    right: 1.5rem;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    font-size: 1.4rem;
+    cursor: pointer;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.plr-lightbox__btn {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    font-size: 2rem;
+    cursor: pointer;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.plr-lightbox__btn--prev { left: 1rem; }
+.plr-lightbox__btn--next { right: 1rem; }
+
+.plr-lightbox__btn:hover,
+.plr-lightbox__close:hover { background: rgba(255,255,255,0.3); }
+
+.plr-lightbox__caption {
+    color: rgba(255,255,255,0.8);
+    font-size: 0.875rem;
+    margin: 0.5rem 0 0;
+    text-align: center;
+}
+
+.plr-lightbox__counter {
+    color: rgba(255,255,255,0.5);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+/* ── PDF ──────────────────────────────────────────────────────────────────── */
+
+.plr-pdf {
+    height: 80vh;
+    width: 100%;
+}
+
+.plr-pdf .sb-file__pdf {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+/* ── Markdown inside page layout ─────────────────────────────────────────── */
+
+.plr-markdown {
+    line-height: 1.7;
+}
+
+/* P0: Link affordance — markdown links must be visibly clickable */
+.plr-markdown a {
+    color: var(--plr-accent, #4ecdc4);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: opacity 0.15s;
+}
+
+.plr-markdown a:hover {
+    opacity: 0.75;
+}
+
+/* ── Gallery thumbnail captions (P1-C) ────────────────────────────────────── */
+
+.plr-gallery__thumb__caption {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #888);
+    text-align: center;
+    margin: 0.3rem 0 0;
+    padding: 0 0.25rem 0.25rem;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* When captions exist, drop the 16:9 hard aspect-ratio so caption has room */
+.plr-gallery__thumb:has(.plr-gallery__thumb__caption) {
+    aspect-ratio: auto;
+}
+
+/* ── Source toggle bar ────────────────────────────────────────────────────── */
+/* Thin strip at top of page tab, always visible, outside the scroll area.    */
+
+.plr-source-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0.3rem 0.75rem;
+    /* Toolbar always lives in the dark Browse shell — use explicit dark values */
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: #151b28;
+    gap: 0.4rem;
+}
+
+.plr-source-toggle-btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    cursor: pointer;
+    color: rgba(255,255,255,0.7);
+    font-family: monospace;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    white-space: nowrap;
+}
+
+.plr-source-toggle-btn:hover {
+    color: #4ecdc4;
+    border-color: #4ecdc4;
+    background: rgba(78,205,196,0.1);
+}
+
+/* ── Theme selector in toolbar ────────────────────────────────────────────── */
+
+.plr-theme-select {
+    font-size: 0.75rem;
+    padding: 0.22rem 0.5rem;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.65);
+    cursor: pointer;
+    font-family: monospace;
+    transition: border-color 0.15s, color 0.15s;
+    margin-right: auto;   /* push all other buttons to the right */
+}
+
+.plr-theme-select:hover,
+.plr-theme-select:focus {
+    border-color: #4ecdc4;
+    color: #4ecdc4;
+    outline: none;
+}
+
+.plr-theme-select option {
+    background: #1a2030;
+    color: #e0e0e0;
+}
+
+/* ── Content frame (card inside dark panel) ───────────────────────────────── */
+
+.plr-content-frame {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    margin: 0 0.6rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+}
+
+/* ── JSON source view ─────────────────────────────────────────────────────── */
+
+.plr-json-source {
+    flex: 1;
+    overflow: auto;
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    background: var(--color-surface, #f8f8f8);
+    color: var(--color-text, #222);
+    white-space: pre;
+    tab-size: 2;
+}
+
+/* JSON syntax colours — designed to work on both light and dark backgrounds */
+.plr-json-key  { color: #0d6eaf; }      /* object keys — blue */
+.plr-json-str  { color: #1a7f37; }      /* string values — green */
+.plr-json-num  { color: #b5460f; }      /* numbers — rust */
+.plr-json-bool { color: #8250df; }      /* true/false — purple */
+.plr-json-null { color: #888; }         /* null — grey */
+
+/* Source view is ALWAYS light/white — a distinct context from the rendered page.
+   Override even when the surrounding page is dark-themed.                       */
+.plr-json-source,
+.plr-page--dark .plr-json-source {
+    background: #fdfdfd;
+    color: #1e2228;
+}
+
+/* Syntax colours inside the source view: always use light-mode high-contrast values.
+   These selectors have higher specificity than .plr-page--dark .plr-json-key etc.  */
+.plr-json-source .plr-json-key,
+.plr-page--dark .plr-json-source .plr-json-key  { color: #0d6eaf; }
+.plr-json-source .plr-json-str,
+.plr-page--dark .plr-json-source .plr-json-str  { color: #1a7f37; }
+.plr-json-source .plr-json-num,
+.plr-page--dark .plr-json-source .plr-json-num  { color: #b5460f; }
+.plr-json-source .plr-json-bool,
+.plr-page--dark .plr-json-source .plr-json-bool { color: #8250df; }
+.plr-json-source .plr-json-null,
+.plr-page--dark .plr-json-source .plr-json-null { color: #888; }
+
+/* Keep dark colours for .json files rendered inside the dark Browse shell
+   (these are in .sb-file__code, not .plr-json-source, so no conflict)       */
+.plr-page--dark .plr-json-key  { color: #79c0ff; }
+.plr-page--dark .plr-json-str  { color: #a5d6ff; }
+.plr-page--dark .plr-json-num  { color: #ff7b72; }
+.plr-page--dark .plr-json-bool { color: #d2a8ff; }
+.plr-page--dark .plr-json-null { color: #6e7681; }
+
+/* .plr-source-bar dark styles now live on the base rule (toolbar is always
+   in the dark Browse shell — .plr-page--dark override no longer needed) */
+
+/* ── CSS custom properties (theme knobs) ──────────────────────────────────── */
+
+.plr-page {
+    --plr-accent: var(--color-primary, #4ecdc4);
+    --plr-font:   inherit;
+}
+
+/* Section alt-background: visible alternating shade for light and dark modes.  */
+/* The renderer sets background: var(--plr-section-alt-bg, rgba(0,0,0,0.03))   */
+/* on sections with background="alt". The old fallback was near-invisible;      */
+/* define the custom property here at a level that beats the inline fallback.   */
+.plr-page--light { --plr-section-alt-bg: #f4f6f8; }
+.plr-page--dark  { --plr-section-alt-bg: rgba(255,255,255,0.06); }
+
+/* Use accent colour for nav active indicator */
+.plr-nav__link--active {
+    color: var(--plr-accent) !important;
+    border-bottom-color: var(--plr-accent) !important;
+}
+
+/* Use page font family when set */
+.plr-page { font-family: var(--plr-font, inherit); }
+
+/* ── Hero: height variants ─────────────────────────────────────────────────── */
+
+.plr-hero--small  { min-height: 150px; }
+.plr-hero--medium { min-height: 250px; }
+.plr-hero--large  { min-height: 400px; }
+.plr-hero--full   { min-height: 100vh; }
+
+/* ── Hero: text alignment ──────────────────────────────────────────────────── */
+
+.plr-hero--align-center .plr-hero__overlay { text-align: center; }
+.plr-hero--align-right  .plr-hero__overlay { text-align: right; }
+
+/* ── Hero: overlay variants ────────────────────────────────────────────────── */
+/* Default overlay (.plr-hero__overlay) already has gradient; these override.  */
+
+.plr-hero__overlay--none  { background: none; }
+.plr-hero__overlay--dark  { background: rgba(0,0,0,0.6); }
+.plr-hero__overlay--light { background: rgba(255,255,255,0.35); }
+.plr-hero__overlay--solid { background: rgba(0,0,0,0.5); }
+/* gradient = the existing linear-gradient default, no override needed */
+
+/* ── Section: layout variants ──────────────────────────────────────────────── */
+
+.plr-section--full-bleed { max-width: 100%; }
+.plr-section--narrow     { max-width: 640px; }
+.plr-section--wide       { max-width: 1200px; }
+
+/* ── Section: divider variants ─────────────────────────────────────────────── */
+
+.plr-section--divider-none  { border-top: none; }
+.plr-section--divider-space { border-top: none; padding-top: 3.5rem; }
+
+/* ── Image: decoration modifiers ───────────────────────────────────────────── */
+
+.plr-image--border  img { border: 1px solid rgba(78,205,196,0.45); }
+.plr-image--shadow  img { box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+.plr-image--rounded img { border-radius: 8px; }
+
+/* Honour accent colour for image border when --plr-accent is set */
+.plr-image--border  img { border-color: color-mix(in srgb, var(--plr-accent, #4ecdc4) 45%, transparent); }
+
+/* ── Gallery: gap variants ─────────────────────────────────────────────────── */
+
+.plr-gallery--gap-none   { gap: 0; }
+.plr-gallery--gap-small  { gap: 0.4rem; }   /* matches existing default */
+.plr-gallery--gap-medium { gap: 0.8rem; }
+.plr-gallery--gap-large  { gap: 1.5rem; }
+
+/* ── Slides: fade transition ───────────────────────────────────────────────── */
+
+.plr-slides--fade .plr-slides__img {
+    transition: opacity 0.25s ease;
+}
+
+/* ── Cards component ───────────────────────────────────────────────────────── */
+
+.plr-cards {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.plr-card {
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: box-shadow 0.15s, transform 0.15s;
+    background: var(--color-surface, #fff);
+}
+
+/* P0: Card link affordance — arrow indicator + prominent border highlight */
+.plr-card--link { cursor: pointer; }
+
+.plr-card--link .plr-card__body::after {
+    content: '→';
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 1rem;
+    color: var(--plr-accent, #4ecdc4);
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.15s, transform 0.15s;
+}
+
+.plr-card--link:hover .plr-card__body::after {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.plr-card--link:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+    border-color: var(--plr-accent, #4ecdc4);
+}
+
+.plr-card__img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+}
+
+.plr-card__body {
+    padding: 1rem;
+}
+
+.plr-card__title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    color: var(--color-text, #111);
+    line-height: 1.3;
+}
+
+.plr-card__desc {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary, #666);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Dark cards */
+.plr-page--dark .plr-card {
+    border-color: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+}
+.plr-page--dark .plr-card__title { color: var(--color-text-inverse, #e8e8e8); }
+.plr-page--dark .plr-card__desc  { color: var(--color-text-secondary-inverse, #888); }
+.plr-page--dark .plr-card--link:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+
+/* ── Columns component ─────────────────────────────────────────────────────── */
+
+.plr-columns {
+    display: grid;
+    align-items: start;
+}
+
+.plr-columns--gap-none   { gap: 0; }
+.plr-columns--gap-small  { gap: 0.75rem; }
+.plr-columns--gap-medium { gap: 1.5rem; }
+.plr-columns--gap-large  { gap: 2.5rem; }
+
+.plr-columns--align-center { align-items: center; }
+.plr-columns--align-bottom { align-items: end; }
+
+.plr-columns__col { min-width: 0; }  /* prevent overflow in narrow grid cells */
+
+/* Subtle vertical separator between adjacent column cells */
+.plr-page--light .plr-columns__col + .plr-columns__col {
+    border-left: 1px solid #e8e8e8;
+    padding-left: 1.5rem;
+}
+.plr-page--dark .plr-columns__col + .plr-columns__col {
+    border-left: 1px solid rgba(255,255,255,0.08);
+    padding-left: 1.5rem;
+}
+
+/* Responsive: stack below 768px — swap vertical border for horizontal */
+@media (max-width: 768px) {
+    .plr-columns { grid-template-columns: 1fr !important; }
+    .plr-columns__col + .plr-columns__col {
+        border-left: none !important;
+        padding-left: 0 !important;
+        border-top: 1px solid rgba(0,0,0,0.08);
+        padding-top: 1rem;
+    }
+    .plr-page--dark .plr-columns__col + .plr-columns__col {
+        border-top-color: rgba(255,255,255,0.08);
+    }
+}
+
+/* ── Density variants ──────────────────────────────────────────────────────── */
+
+.plr-density--compact   .plr-section { padding-top: 1.5rem; padding-bottom: 0.75rem; }
+.plr-density--spacious  .plr-section { padding-top: 4rem;   padding-bottom: 2.5rem; }
+
+/* ── Source bar: copy button + gap ────────────────────────────────────────── */
+
+.plr-source-bar { gap: 0.4rem; }
+
+/* color-mix() fallback for browsers that don't support it: accent border */
+@supports not (color: color-mix(in srgb, red 50%, transparent)) {
+    .plr-image--border img { border-color: rgba(78,205,196,0.45); }
+}
+
+/* ── Edit mode ────────────────────────────────────────────────────────────── */
+/* Split-pane: dark JSON editor left, live rendered preview right.             */
+
+.plr-edit-split {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.plr-edit-left {
+    flex: 0 0 50%;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,0.1);
+    overflow: hidden;
+}
+
+.plr-edit-textarea {
+    flex: 1;
+    width: 100%;
+    resize: none;
+    border: none;
+    outline: none;
+    padding: 1rem;
+    font-family: 'Fira Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    tab-size: 2;
+    background: #1e2228;
+    color: #abb2bf;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* Status bar below textarea */
+.plr-edit-status {
+    flex-shrink: 0;
+    padding: 0.28rem 0.75rem;
+    font-size: 0.72rem;
+    font-family: monospace;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    background: #181c22;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.plr-edit-status--ok  { color: #4ecdc4; }
+.plr-edit-status--err { color: #e06c75; }
+
+/* Right: scrollable rendered preview */
+.plr-edit-right {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+    min-width: 0;
+}
+
+.plr-edit-right .plr-scroll-wrapper {
+    overflow: visible !important;
+    height: auto !important;
+}
+
+/* ── Present mode overlay ─────────────────────────────────────────────────── */
+/* Full-screen overlay opened by the ⛶ Present button.                        */
+/* Forces white background so Print/Save-as-PDF always works cleanly.         */
+
+.plr-present-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Thin top bar: title (left) + Print + Close (right) */
+.plr-present-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    flex-shrink: 0;
+}
+
+.plr-present-title {
+    flex: 1;
+    font-size: 0.8rem;
+    color: #555;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.plr-present-btn {
+    padding: 0.25rem 0.65rem;
+    font-size: 0.78rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.plr-present-btn:hover { background: #e8e8e8; }
+.plr-present-close { border-color: #bbb; }
+
+/* Scrollable content area */
+.plr-present-content {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+}
+
+/* Force the cloned rendered view to fill the full width of the overlay.
+   The clone carries inline flex styles from its original context; override
+   them so layout is correct inside the present overlay. */
+.plr-present-content > * {
+    width: 100% !important;
+    overflow: visible !important;
+    flex: none !important;
+    min-height: 0 !important;
+}
+
+/* Let the scroll wrapper inside the clone expand freely */
+.plr-present-content .plr-scroll-wrapper {
+    overflow: visible !important;
+    height: auto !important;
+}
+
+/* ── Callout component ────────────────────────────────────────────────────── */
+/* Alert/notice box with variants: info | warning | success | tip              */
+
+.plr-callout {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.85rem 1rem;
+    border-radius: 6px;
+    border-left: 4px solid currentColor;
+    background: rgba(0,0,0,0.03);
+}
+
+.plr-callout--info    { color: #1a8fe0; background: rgba(26,143,224,0.07); }
+.plr-callout--warning { color: #d97706; background: rgba(217,119,6,0.07); }
+.plr-callout--success { color: #16a34a; background: rgba(22,163,74,0.07); }
+.plr-callout--tip     { color: #7c3aed; background: rgba(124,58,237,0.07); }
+
+.plr-callout__icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    line-height: 1.5;
+}
+
+.plr-callout__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.plr-callout__title {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    color: inherit;
+}
+
+.plr-callout__text {
+    font-size: 0.88rem;
+    line-height: 1.6;
+    margin: 0;
+    color: inherit;
+    opacity: 0.9;
+}
+
+/* Dark mode callouts: slightly brighter backgrounds */
+.plr-page--dark .plr-callout--info    { background: rgba(26,143,224,0.13); }
+.plr-page--dark .plr-callout--warning { background: rgba(217,119,6,0.13); }
+.plr-page--dark .plr-callout--success { background: rgba(22,163,74,0.13); }
+.plr-page--dark .plr-callout--tip     { background: rgba(124,58,237,0.13); }
+
+/* ── Stats component ──────────────────────────────────────────────────────── */
+/* Horizontal row of metric cards: value + label + optional delta              */
+
+.plr-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.plr-stats__card {
+    flex: 1;
+    min-width: 120px;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--color-border, #e0e0e0);
+    border-radius: 8px;
+    background: var(--color-surface, #fff);
+    text-align: center;
+}
+
+.plr-stats__value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--plr-accent, #4ecdc4);
+}
+
+.plr-stats__label {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary, #666);
+    margin-top: 0.25rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.plr-stats__delta {
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 0.3rem;
+}
+
+.plr-stats__delta--up   { color: #16a34a; }
+.plr-stats__delta--down { color: #dc2626; }
+
+/* Dark mode stats */
+.plr-page--dark .plr-stats__card {
+    border-color: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+}
+.plr-page--dark .plr-stats__label { color: rgba(255,255,255,0.5); }
+
+/* ── Quote component ──────────────────────────────────────────────────────── */
+/* Pull-quote with optional author attribution                                 */
+
+.plr-quote {
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+    border-left: 4px solid var(--plr-accent, #4ecdc4);
+    background: rgba(78,205,196,0.05);
+    border-radius: 0 6px 6px 0;
+}
+
+.plr-quote__text {
+    font-size: 1.1rem;
+    line-height: 1.65;
+    font-style: italic;
+    color: var(--color-text, #111);
+    margin: 0 0 0.6rem;
+}
+
+.plr-quote__attribution {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem;
+}
+
+.plr-quote__author {
+    font-style: normal;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-secondary, #555);
+}
+
+.plr-quote__role {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary, #777);
+}
+
+/* Light mode quote */
+.plr-page--light .plr-quote { background: rgba(78,205,196,0.06); }
+.plr-page--light .plr-quote__text   { color: #2c2c3a; }
+.plr-page--light .plr-quote__author { color: #555; }
+.plr-page--light .plr-quote__role   { color: #777; }
+
+/* Dark mode quote */
+.plr-page--dark .plr-quote {
+    background: rgba(78,205,196,0.08);
+    border-left-color: var(--plr-accent, #4ecdc4);
+}
+.plr-page--dark .plr-quote__text   { color: #c8d0da; }
+.plr-page--dark .plr-quote__author { color: rgba(255,255,255,0.65); }
+.plr-page--dark .plr-quote__role   { color: rgba(255,255,255,0.45); }
+
+/* ── Author component ─────────────────────────────────────────────────────── */
+/* Attribution block at the bottom of a page                                   */
+
+.plr-author {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--color-border, #ebebeb);
+    margin-top: 0.5rem;
+}
+
+.plr-author__avatar {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid var(--plr-accent, #4ecdc4);
+}
+
+.plr-author__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.plr-author__name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text, #111);
+}
+
+.plr-author__role {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary, #666);
+}
+
+.plr-author__date {
+    font-size: 0.78rem;
+    color: var(--color-text-secondary, #999);
+}
+
+/* Light mode author */
+.plr-page--light .plr-author        { border-top-color: #ebebeb; }
+.plr-page--light .plr-author__name  { color: #1a1a2e; }
+.plr-page--light .plr-author__role  { color: #555; }
+.plr-page--light .plr-author__date  { color: #999; }
+
+/* Dark mode author */
+.plr-page--dark .plr-author        { border-top-color: rgba(255,255,255,0.1); }
+.plr-page--dark .plr-author__name  { color: var(--color-text-inverse, #e8e8e8); }
+.plr-page--dark .plr-author__role  { color: rgba(255,255,255,0.55); }
+.plr-page--dark .plr-author__date  { color: rgba(255,255,255,0.38); }
+
+/* ── Edit mode: theme picker ──────────────────────────────────────────────── */
+/* Dropdown above the textarea for selecting named colour schemes              */
+
+.plr-edit-theme-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    background: #181c22;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.plr-edit-theme-label {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.4);
+    font-family: monospace;
+    white-space: nowrap;
+}
+
+.plr-edit-theme-select {
+    flex: 1;
+    font-size: 0.78rem;
+    font-family: monospace;
+    padding: 0.2rem 0.4rem;
+    background: #1e2228;
+    color: #abb2bf;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    cursor: pointer;
+    outline: none;
+}
+
+.plr-edit-theme-select:focus {
+    border-color: var(--color-primary, #4ecdc4);
+}
+
+/* ── Banner (context identity strip) ─────────────────────────────────────── */
+/* Auto-rendered at the top of every _page.json page that doesn't begin with  */
+/* a hero block. Tells new users what they're looking at and provides          */
+/* dismissible page-identity metadata (title, badge, author, date, tags).      */
+
+.plr-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 1.5rem;
+    background: rgba(78, 205, 196, 0.06);
+    border-bottom: 1px solid rgba(78, 205, 196, 0.18);
+    font-size: 0.8rem;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.plr-banner__left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.plr-banner__icon {
+    font-size: 0.95rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.plr-banner__title {
+    font-weight: 600;
+    color: #1a2e2c;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 320px;
+}
+
+.plr-banner__badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--plr-accent, #4ecdc4);
+    color: #0a2e2c;
+    flex-shrink: 0;
+}
+
+.plr-banner__tag {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(78, 205, 196, 0.12);
+    color: #2a5c58;
+    border: 1px solid rgba(78, 205, 196, 0.25);
+    white-space: nowrap;
+}
+
+.plr-banner__right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.plr-banner__meta {
+    color: #4a8a86;
+    white-space: nowrap;
+}
+
+.plr-banner__meta--date {
+    color: #6a9a96;
+}
+
+.plr-banner__dismiss {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: #7abab6;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0 0 0.5rem;
+    transition: color 0.15s;
+}
+.plr-banner__dismiss:hover { color: #2a5c58; }
+
+/* Dark mode banner */
+.plr-page--dark .plr-banner {
+    background: rgba(78, 205, 196, 0.05);
+    border-bottom-color: rgba(78, 205, 196, 0.12);
+}
+.plr-page--dark .plr-banner__title   { color: #a8f0ec; }
+.plr-page--dark .plr-banner__tag     { background: rgba(78,205,196,0.08); color: #7ecfcc; border-color: rgba(78,205,196,0.15); }
+.plr-page--dark .plr-banner__meta    { color: #5ab8b4; }
+.plr-page--dark .plr-banner__meta--date { color: #4a9894; }
+.plr-page--dark .plr-banner__dismiss { color: #3a8884; }
+.plr-page--dark .plr-banner__dismiss:hover { color: #7ecfcc; }
+
+/* Banner rendered outside the card frame (on the dark panel background).       */
+/* Same colour palette as .plr-page--dark .plr-banner but without nesting.      */
+.plr-banner--on-dark {
+    background: rgba(78, 205, 196, 0.05);
+    border-bottom-color: rgba(78, 205, 196, 0.12);
+    border-radius: 0;
+}
+.plr-banner--on-dark .plr-banner__title   { color: #a8f0ec; }
+.plr-banner--on-dark .plr-banner__badge   { background: rgba(78,205,196,0.12); color: #7ecfcc; border-color: rgba(78,205,196,0.2); }
+.plr-banner--on-dark .plr-banner__tag     { background: rgba(78,205,196,0.08); color: #7ecfcc; border-color: rgba(78,205,196,0.15); }
+.plr-banner--on-dark .plr-banner__meta    { color: #5ab8b4; }
+.plr-banner--on-dark .plr-banner__meta--date { color: #4a9894; }
+.plr-banner--on-dark .plr-banner__dismiss { color: #3a8884; }
+.plr-banner--on-dark .plr-banner__dismiss:hover { color: #7ecfcc; }
+
+/* Banner is decorative — hide in print */
+@media print { .plr-banner { display: none !important; } }
+
+/* ── Print ────────────────────────────────────────────────────────────────── */
+/* Printing is handled by _plrPrintPage() (PLR-007) which opens a new window  */
+/* with the page-layout CSS loaded via <link> and its own @media print rules. */
+/* The old @media print block that hid/flattened the present overlay is no    */
+/* longer needed.                                                              */
