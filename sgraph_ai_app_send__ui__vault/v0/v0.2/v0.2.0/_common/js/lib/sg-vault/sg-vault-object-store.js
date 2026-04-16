@@ -114,10 +114,60 @@ class SGVaultObjectStore {
         return 'obj-cas-imm-' + hex.slice(0, 12)
     }
 
+    // --- Batch-load multiple objects by ID ---------------------------------------
+    //     Checks the immutable block cache first; fetches uncached IDs in one
+    //     or more batch requests (chunked at 50). Returns Map<objectId, ArrayBuffer>.
+    //     Missing objects are omitted from the map (caller must handle).
+
+    async batchLoad(objectIds) {
+        if (!objectIds || !objectIds.length) return new Map()
+
+        const unique  = [...new Set(objectIds)]
+        const result  = new Map()
+        const toFetch = []
+
+        for (const objectId of unique) {
+            const filePath = `bare/data/${objectId}`
+            const cached   = await this._cacheGet(objectId, filePath)
+            if (cached) result.set(objectId, cached)
+            else        toFetch.push({ objectId, filePath })
+        }
+
+        if (!toFetch.length) return result
+
+        const CHUNK = 50
+        for (let i = 0; i < toFetch.length; i += CHUNK) {
+            const chunk = toFetch.slice(i, i + CHUNK)
+            const ops   = chunk.map(({ filePath }) => ({ op: 'read', file_id: filePath }))
+            const raw   = await this._sgSend.vaultBatch(this._vaultId, null, ops)
+
+            for (let j = 0; j < chunk.length; j++) {
+                const r                    = raw[j]
+                const { objectId, filePath } = chunk[j]
+                if (r && r.status === 'ok' && r.data) {
+                    const bytes = SGVaultObjectStore._b64ToAb(r.data)
+                    result.set(objectId, bytes)
+                    await this._cachePut(objectId, filePath, bytes)
+                }
+            }
+        }
+
+        return result
+    }
+
     // --- Delete an object by ID --------------------------------------------------
 
     async delete(objectId) {
         const filePath = `bare/data/${objectId}`
         return this._sgSend.vaultDelete(this._vaultId, filePath, this._writeKey)
+    }
+
+    // --- Base64 → ArrayBuffer (used by batchLoad) --------------------------------
+
+    static _b64ToAb(b64) {
+        const bin   = atob(b64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        return bytes.buffer
     }
 }
