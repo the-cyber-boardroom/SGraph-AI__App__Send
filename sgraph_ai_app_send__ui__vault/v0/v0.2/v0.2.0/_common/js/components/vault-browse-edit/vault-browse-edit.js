@@ -196,6 +196,51 @@
             });
             bar.appendChild(sourceBtn);
         }
+
+        // --- Conflict resolution: "Resolve Conflict" button ---
+        // Shows on the _conflict copy and on the original file when a conflict copy exists.
+        if (self.dataSource && typeof self.dataSource.getFileList === 'function') {
+            var _normPath       = (fileName || '').replace(/^\//, '');
+            var _conflictBtnEl  = null;
+
+            if (_isConflictFile(_normPath)) {
+                // Opened file IS the conflict copy — resolve from here
+                var _origNorm = _originalFromConflict(_normPath);
+                _conflictBtnEl = _makeBtn('\u26a1 Resolve Conflict');
+                _conflictBtnEl.style.color = '#ff9f43';
+                _conflictBtnEl.style.fontWeight = '700';
+                _conflictBtnEl.addEventListener('click', function() {
+                    var fl2 = self.dataSource.getFileList();
+                    var origEntry = fl2.find(function(e) {
+                        return (e.path || '').replace(/^\//, '') === _origNorm;
+                    });
+                    var origPromise = origEntry
+                        ? self.dataSource.getFileBytes(origEntry.path)
+                        : Promise.resolve(new ArrayBuffer(0));
+                    origPromise.then(function(origBytes) {
+                        VaultDiffView.open(self, _origNorm, _normPath, origBytes, bytes);
+                    });
+                });
+            } else {
+                // Opened file is the original — check if a conflict copy exists
+                var _conflictNorm  = _conflictFromOriginal(_normPath);
+                var _conflictEntry = self.dataSource.getFileList().find(function(e) {
+                    return (e.path || '').replace(/^\//, '') === _conflictNorm;
+                });
+                if (_conflictEntry) {
+                    _conflictBtnEl = _makeBtn('\u26a1 Resolve Conflict');
+                    _conflictBtnEl.style.color = '#ff9f43';
+                    _conflictBtnEl.style.fontWeight = '700';
+                    _conflictBtnEl.addEventListener('click', function() {
+                        self.dataSource.getFileBytes(_conflictEntry.path).then(function(conflictBytes) {
+                            VaultDiffView.open(self, _normPath, _conflictNorm, bytes, conflictBytes);
+                        });
+                    });
+                }
+            }
+
+            if (_conflictBtnEl) bar.prepend(_conflictBtnEl);
+        }
     };
 
     // --- Patch header: add Upload Files button ---
@@ -689,6 +734,27 @@
                 }
             });
         }
+    }
+
+    // --- Conflict file detection helpers (used by _renderFileContent) ----------------
+
+    function _isConflictFile(path) {
+        var name = (path || '').split('/').pop();
+        return /_conflict(\.[^.]*)?$/.test(name);
+    }
+
+    function _originalFromConflict(conflictPath) {
+        return conflictPath
+            .replace(/_conflict(\.[^./]*)$/, '$1')
+            .replace(/_conflict$/, '');
+    }
+
+    function _conflictFromOriginal(origPath) {
+        var dot   = origPath.lastIndexOf('.');
+        var slash = origPath.lastIndexOf('/');
+        return (dot > slash && dot > 0)
+            ? origPath.slice(0, dot) + '_conflict' + origPath.slice(dot)
+            : origPath + '_conflict';
     }
 
     // --- Helper ---

@@ -189,16 +189,39 @@
 
         // --- Find common ancestor (walks both chains, finds first overlap) ------------
 
+        // --- Find common ancestor: BFS over ALL parents (handles merge commits) ------
+        // First-parent-only walk misses the full reachability graph after merges,
+        // causing the LCA to be set too far back → false conflicts on every subsequent sync.
+
         async _findCommonAncestor(idA, idB) {
             if (!idA || !idB) return null
             if (idA === idB)  return idA
 
-            const chainA = await this._walkChainIds(idA, 100)
-            const chainB = await this._walkChainIds(idB, 100)
-            const setB   = new Set(chainB)
+            // BFS from A — collect every commit reachable via any parent chain
+            const reachableFromA = new Set()
+            const qA = [idA]
+            while (qA.length && reachableFromA.size < 500) {
+                const id = qA.shift()
+                if (reachableFromA.has(id)) continue
+                reachableFromA.add(id)
+                try {
+                    const c = await this._commitManager.loadCommit(id)
+                    for (const p of (c.parents || [])) qA.push(p)
+                } catch (_) {}
+            }
 
-            for (const id of chainA) {
-                if (setB.has(id)) return id
+            // BFS from B — return first commit that A can also reach
+            const visitedB = new Set()
+            const qB = [idB]
+            while (qB.length && visitedB.size < 500) {
+                const id = qB.shift()
+                if (visitedB.has(id)) continue
+                visitedB.add(id)
+                if (reachableFromA.has(id)) return id
+                try {
+                    const c = await this._commitManager.loadCommit(id)
+                    for (const p of (c.parents || [])) qB.push(p)
+                } catch (_) {}
             }
             return null
         },
