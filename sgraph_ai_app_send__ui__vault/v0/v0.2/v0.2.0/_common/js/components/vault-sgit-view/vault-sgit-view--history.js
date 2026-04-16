@@ -31,7 +31,7 @@
             const cloneHead = vault._headCommitId;
             const namedHead = vault._namedHeadId;
 
-            // Walk a commit chain, return [{id, ...commit}]
+            // Walk the first-parent chain (for graph rendering) → [{id, ...commit}]
             const walkChain = async (headId, max = 60) => {
                 const result = [];
                 let cursor   = headId;
@@ -52,36 +52,87 @@
                 return result;
             };
 
-            // Fast path: no divergence
+            // BFS over ALL parents (for reachability — handles merge commits)
+            // Returns Set<commitId> of every ancestor reachable from headId.
+            const allAncestors = async (headId, max = 200) => {
+                const seen  = new Set();
+                const queue = headId ? [headId] : [];
+                while (queue.length && seen.size < max) {
+                    const id = queue.shift();
+                    if (seen.has(id)) continue;
+                    seen.add(id);
+                    let commit = this._commitCache.get(id);
+                    if (!commit) {
+                        try {
+                            commit = await vault._commitManager.loadCommit(id);
+                            this._commitCache.set(id, commit);
+                        } catch (_) { continue; }
+                    }
+                    for (const p of (commit.parents || [])) {
+                        if (!seen.has(p)) queue.push(p);
+                    }
+                }
+                return seen;
+            };
+
+            // Fast path: no divergence (or post-merge where both heads are the merge commit)
             if (!cloneHead || !namedHead || cloneHead === namedHead) {
-                const commits = await walkChain(cloneHead || namedHead);
+                const headId = cloneHead || namedHead;
+                // Peek at HEAD — if it's a merge commit, render two-track pre-merge branches
+                let headCommit = this._commitCache.get(headId);
+                if (!headCommit && headId) {
+                    try {
+                        headCommit = await vault._commitManager.loadCommit(headId);
+                        this._commitCache.set(headId, headCommit);
+                    } catch (_) {}
+                }
+                if (headCommit?.parents?.length >= 2) {
+                    const p0 = headCommit.parents[0];
+                    const p1 = headCommit.parents[1];
+                    const [chain0, chain1] = await Promise.all([walkChain(p0), walkChain(p1)]);
+                    const set0 = new Set(chain0.map(c => c.id));
+                    let forkId = null;
+                    for (const c of chain1) { if (set0.has(c.id)) { forkId = c.id; break; } }
+                    this._renderHistoryDiverged(container, chain0, chain1, p0, p1, forkId,
+                        { mergeHead: { id: headId, ...headCommit }, isMerged: true });
+                    return;
+                }
+                const commits = await walkChain(headId);
                 this._renderHistoryLinear(container, commits, namedHead);
                 return;
             }
 
-            // Walk both chains concurrently
+            // Use BFS reachability to determine true relationship before rendering
+            const [cloneAncestors, namedAncestors] = await Promise.all([
+                allAncestors(cloneHead),
+                allAncestors(namedHead)
+            ]);
+
+            // Named head reachable from clone → clone is AHEAD (or at same commit via merge parent)
+            if (cloneAncestors.has(namedHead)) {
+                const commits = await walkChain(cloneHead);
+                this._renderHistoryLinear(container, commits, namedHead);
+                return;
+            }
+
+            // Clone head reachable from named → clone is BEHIND
+            if (namedAncestors.has(cloneHead)) {
+                const commits = await walkChain(namedHead);
+                this._renderHistoryLinear(container, commits, namedHead);
+                return;
+            }
+
+            // Neither reachable from the other → truly diverged
+            // Walk first-parent chains for the two-track graph
             const [cloneChain, namedChain] = await Promise.all([
                 walkChain(cloneHead),
                 walkChain(namedHead)
             ]);
 
-            // Find fork point (first commit reachable from both heads)
-            const namedIdSet = new Set(namedChain.map(c => c.id));
-            const cloneIdSet = new Set(cloneChain.map(c => c.id));
+            // Find fork point using the broader ancestor sets
             let forkId = null;
             for (const c of cloneChain) {
-                if (namedIdSet.has(c.id)) { forkId = c.id; break; }
-            }
-
-            // Check if truly diverged (both sides have unique commits)
-            const cloneOnly = cloneChain.filter(c => c.id !== forkId && !namedIdSet.has(c.id));
-            const namedOnly = namedChain.filter(c => c.id !== forkId && !cloneIdSet.has(c.id));
-
-            if (cloneOnly.length === 0 || namedOnly.length === 0) {
-                // One chain contains the other — show primary chain, mark named head
-                const primary = cloneChain.length >= namedChain.length ? cloneChain : namedChain;
-                this._renderHistoryLinear(container, primary, namedHead);
-                return;
+                if (namedAncestors.has(c.id)) { forkId = c.id; break; }
             }
 
             // True fork: render two-track graph
@@ -98,7 +149,7 @@
             container.innerHTML = `
                 <div class="sgit-commit-list">
                     <div class="sgit-commit-header">
-                        <span class="sgit-ch-graph">Graph</span>
+                        <span class="sgit-ch-graph"></span>
                         <span class="sgit-ch-msg">Description</span>
                         <span class="sgit-ch-id">Commit</span>
                         <span class="sgit-ch-date">Date</span>
@@ -108,9 +159,11 @@
             `;
         },
 
-        // --- Two-track (diverged) renderer ---------------------------------------
+        // --- Two-track (diverged or merged) renderer -----------------------------
+        // opts.mergeHead : { id, ...commit } — prepend merge commit at top (post-merge view)
+        // opts.isMerged  : true             — changes banner text and track labels
 
-        _renderHistoryDiverged(container, cloneChain, namedChain, cloneHead, namedHead, forkId) {
+        _renderHistoryDiverged(container, cloneChain, namedChain, cloneHead, namedHead, forkId, opts = {}) {
             const cloneIdSet = new Set(cloneChain.map(c => c.id));
             const namedIdSet = new Set(namedChain.map(c => c.id));
 
@@ -127,6 +180,8 @@
             ].sort((a, b) => (b.timestamp_ms || 0) - (a.timestamp_ms || 0));
 
             const rows = [
+                // Merge commit at top when rendering post-merge history
+                ...(opts.mergeHead ? [{ ...opts.mergeHead, _track: 'merge' }] : []),
                 ...aboveFork,
                 ...(forkCommit ? [{ ...forkCommit, _track: 'fork' }] : []),
                 ...sharedCommits.map(c => ({ ...c, _track: 'shared' }))
@@ -136,36 +191,44 @@
 
             // Pre-compute per-row graph state
             const states = rows.map((row, i) => {
-                const inTwoTrackZone = forkIdx >= 0 && i <= forkIdx;
+                const isMergeHead    = row._track === 'merge';
+                const inTwoTrackZone = isMergeHead || (forkIdx >= 0 && i <= forkIdx);
                 const isAtFork       = row._track === 'fork';
                 return {
                     cloneDot:        row._track !== 'named',
-                    namedDot:        row._track === 'named',
+                    namedDot:        isMergeHead || row._track === 'named',
                     cloneLineTop:    i > 0,
                     cloneLineBottom: i < rows.length - 1,
                     namedVisible:    inTwoTrackZone,
-                    namedLineTop:    inTwoTrackZone && i > 0,
+                    namedLineTop:    inTwoTrackZone && i > 0 && !isMergeHead,
                     namedLineBottom: inTwoTrackZone && !isAtFork,
                     namedLineJoin:   isAtFork,   // curved connector at fork
                     isCloneHead:     row.id === cloneHead,
                     isNamedHead:     row.id === namedHead,
-                    isHead:          row.id === cloneHead || row.id === namedHead,
+                    isHead:          isMergeHead || row.id === cloneHead || row.id === namedHead,
                     isFork:          isAtFork,
+                    isMergeHead,
                 };
             });
+
+            const isMerged   = !!opts.isMerged;
+            const label1     = isMerged ? '● Local (before merge)'     : '● Working (clone)';
+            const label2     = isMerged ? '● Published (before merge)' : '● Published (named)';
+            const bannerDesc = isMerged
+                ? `Merged — ${cloneOnly.length} local · ${namedOnly.length} published · merge commit
+                   <a class="sgit-obj-link" href="#" data-id="${this._esc(opts.mergeHead.id)}">${this._esc(this._short(opts.mergeHead.id))}</a>`
+                : `Diverged — ${cloneOnly.length} local-only · ${namedOnly.length} published-only · fork at
+                   <a class="sgit-obj-link" href="#" data-id="${this._esc(forkId)}">${this._esc(this._short(forkId))}</a>`;
 
             container.innerHTML = `
                 <div class="sgit-commit-list sgit-commit-list--two">
                     <div class="sgit-fork-banner">
-                        <span class="sgit-fork-lane sgit-fork-lane--clone">● Working (clone)</span>
-                        <span class="sgit-fork-lane sgit-fork-lane--named">● Published (named)</span>
-                        <span class="sgit-fork-desc">
-                            Diverged — ${cloneOnly.length} local-only · ${namedOnly.length} published-only · fork at
-                            <a class="sgit-obj-link" href="#" data-id="${this._esc(forkId)}">${this._esc(this._short(forkId))}</a>
-                        </span>
+                        <span class="sgit-fork-lane sgit-fork-lane--clone">${label1}</span>
+                        <span class="sgit-fork-lane sgit-fork-lane--named">${label2}</span>
+                        <span class="sgit-fork-desc">${bannerDesc}</span>
                     </div>
                     <div class="sgit-commit-header sgit-commit-header--two">
-                        <span class="sgit-ch-graph">Graph</span>
+                        <span class="sgit-ch-graph--two"></span>
                         <span class="sgit-ch-msg">Description</span>
                         <span class="sgit-ch-id">Commit</span>
                         <span class="sgit-ch-date">Date</span>
@@ -193,9 +256,10 @@
                 : '--';
 
             const badges = [
-                s.isCloneHead ? '<span class="sgit-badge sgit-badge--head">Working HEAD</span>'     : '',
-                s.isNamedHead ? '<span class="sgit-badge sgit-badge--named-head">Published HEAD</span>' : '',
-                s.isFork      ? '<span class="sgit-badge sgit-badge--fork">fork</span>'              : '',
+                s.isMergeHead ? '<span class="sgit-badge sgit-badge--merge-head">HEAD (Merged)</span>'  : '',
+                s.isCloneHead ? '<span class="sgit-badge sgit-badge--head">Working HEAD</span>'          : '',
+                s.isNamedHead ? '<span class="sgit-badge sgit-badge--named-head">Published HEAD</span>'  : '',
+                s.isFork      ? '<span class="sgit-badge sgit-badge--fork">fork</span>'                  : '',
             ].join('');
 
             return `<div class="sgit-commit-row sgit-commit-row--two${s.isHead ? ' sgit-commit-row--head' : ''}${s.isFork ? ' sgit-commit-row--fork' : ''}">

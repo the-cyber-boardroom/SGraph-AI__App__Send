@@ -16,16 +16,24 @@
 
     Object.assign(SGVault.prototype, {
 
-        // --- Ahead count: commits on clone not yet on named branch ---------------
+        // --- Ahead count: commits on clone's first-parent path not yet on named branch
+        // Uses BFS to check reachability first (handles merge commits where namedHead
+        // appears as a second/merge parent rather than the first-parent chain).
 
         async getAheadCount() {
             if (!this._namedHeadId || this._headCommitId === this._namedHeadId) return 0
 
+            // If namedHead is not reachable from cloneHead at all, we're diverged
+            const named = this._namedHeadId
+            const ahead = await this._isAncestor(named, this._headCommitId, 200)
+            if (!ahead) return 0  // caller should use diverged detection separately
+
+            // Count commits on first-parent path from clone until we reach namedHead
             let count  = 0
             let cursor = this._headCommitId
             const max  = 100
 
-            while (cursor && cursor !== this._namedHeadId && count < max) {
+            while (cursor && cursor !== named && count < max) {
                 count++
                 try {
                     const commit = await this._commitManager.loadCommit(cursor)
@@ -34,6 +42,25 @@
             }
 
             return count
+        },
+
+        // Helper: true if ancestorId is reachable from headId following ALL parents (BFS)
+        async _isAncestor(ancestorId, headId, max = 200) {
+            if (!ancestorId || !headId) return false
+            if (ancestorId === headId) return true
+            const seen  = new Set()
+            const queue = [headId]
+            while (queue.length && seen.size < max) {
+                const id = queue.shift()
+                if (seen.has(id)) continue
+                if (id === ancestorId) return true
+                seen.add(id)
+                try {
+                    const c = await this._commitManager.loadCommit(id)
+                    for (const p of (c.parents || [])) queue.push(p)
+                } catch (_) {}
+            }
+            return false
         },
 
         // --- Push: fast-forward named branch ref to clone HEAD ------------------

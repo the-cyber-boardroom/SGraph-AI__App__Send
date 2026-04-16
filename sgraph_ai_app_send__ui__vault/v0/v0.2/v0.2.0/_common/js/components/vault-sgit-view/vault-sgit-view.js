@@ -134,7 +134,7 @@
         .sgit-commit-row:hover { background: var(--bg-secondary); }
         .sgit-commit-row--head { background: rgba(78, 205, 196, 0.04); }
 
-        .sgit-ch-graph { display: flex; flex-direction: column; align-items: center; position: relative; height: 28px; justify-content: center; }
+        .sgit-ch-graph { display: flex; flex-direction: column; align-items: center; position: relative; height: 28px; justify-content: center; overflow: hidden; }
         .sgit-graph-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary, #4ECDC4); z-index: 1; flex-shrink: 0; }
         .sgit-graph-dot--head { width: 12px; height: 12px; box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 3px var(--color-primary); }
         .sgit-graph-dot--error { background: var(--color-error, #E94560); }
@@ -186,6 +186,7 @@
         .sgit-fork-desc { color: var(--color-text-secondary); flex: 1; }
         .sgit-badge--named-head { background: rgba(69,183,209,0.2); color: #45b7d1; }
         .sgit-badge--fork { background: rgba(233,196,69,0.15); color: #E9C445; }
+        .sgit-badge--merge-head { background: rgba(78,205,196,0.25); color: #4ECDC4; }
 
         /* --- Branches --- */
         .sgit-branch-list { display: flex; flex-direction: column; gap: 0.5rem; }
