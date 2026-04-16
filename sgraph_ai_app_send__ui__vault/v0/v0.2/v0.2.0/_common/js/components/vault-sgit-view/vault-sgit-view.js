@@ -8,6 +8,7 @@
      vault-sgit-view--tree.js      _renderTree, _buildTreeDOM
      vault-sgit-view--branches.js  _renderBranches, _switchBranch
      vault-sgit-view--status.js    _renderStatus
+     vault-sgit-view--repair.js    _renderRepair, _runDiagnostics
      vault-sgit-view--object.js    _loadObject, _renderObject, _renderSchema
 
    Light DOM component.
@@ -22,7 +23,7 @@
             super();
             this._vault          = null;
             this._commitCache    = new Map();
-            this._activeTab      = 'history';    // 'history' | 'refs' | 'tree' | 'branches' | 'status' | 'object'
+            this._activeTab      = 'history';    // 'history' | 'refs' | 'tree' | 'branches' | 'status' | 'repair' | 'object'
             this._objectViewData = null;
         }
 
@@ -41,6 +42,7 @@
                             <button class="sgit-tab" data-tab="tree">Tree</button>
                             <button class="sgit-tab" data-tab="branches">Branches</button>
                             <button class="sgit-tab" data-tab="status">Status</button>
+                            <button class="sgit-tab sgit-tab--repair" data-tab="repair">Repair</button>
                         </div>
                     </div>
                     <div class="sgit-body">
@@ -89,6 +91,7 @@
                 case 'tree':     this._renderTree(body);     break;
                 case 'branches': this._renderBranches(body); break;
                 case 'status':   this._renderStatus(body);   break;
+                case 'repair':   this._renderRepair(body);   break;
                 case 'object':   this._renderObject(body);   break;
             }
         }
@@ -246,6 +249,43 @@
         .sgit-stat-card { padding: 0.75rem 1.25rem; background: var(--bg-secondary); border: 1px solid var(--color-border); border-radius: 6px; text-align: center; min-width: 100px; }
         .sgit-stat-value { font-size: var(--text-h3, 1.25rem); font-weight: 700; color: var(--color-text); font-family: var(--font-mono); }
         .sgit-stat-label { font-size: var(--text-small, 0.75rem); color: var(--color-text-secondary); margin-top: 0.25rem; }
+
+        /* --- Repair Tab --- */
+        .sgit-tab--repair { border-color: rgba(233,69,96,0.4); }
+        .sgit-tab--repair.sgit-tab--active { background: #E94560; border-color: #E94560; }
+        .sgit-repair-view { max-width: 720px; }
+        .sgit-diag-list { display: flex; flex-direction: column; gap: 0.25rem; }
+        .sgit-diag-row { display: grid; grid-template-columns: 1.25rem 10rem 1fr; gap: 0.5rem; align-items: baseline; font-size: var(--text-sm); padding: 0.1875rem 0; }
+        .sgit-diag-icon { font-weight: 700; text-align: center; font-size: 0.8rem; }
+        .sgit-diag-label { font-weight: 600; color: var(--color-text); }
+        .sgit-diag-detail { color: var(--color-text-secondary); font-family: var(--font-mono); font-size: var(--text-small); }
+        .sgit-diag--ok    .sgit-diag-icon { color: #4ECDC4; }
+        .sgit-diag--warn  .sgit-diag-icon { color: #E9C445; }
+        .sgit-diag--error .sgit-diag-icon { color: #E94560; }
+        .sgit-diag--info  .sgit-diag-icon { color: var(--color-text-secondary); }
+        .sgit-repair-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem; }
+        .sgit-repair-card { border: 1px solid var(--color-border); border-radius: 8px; padding: 0.875rem 1rem; background: var(--bg-surface); }
+        .sgit-repair-card--destructive { border-color: rgba(233,69,96,0.35); background: rgba(233,69,96,0.03); }
+        .sgit-repair-card-header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+        .sgit-repair-title { font-weight: 700; font-size: var(--text-sm); color: var(--color-text); }
+        .sgit-repair-badge { font-size: 0.625rem; padding: 0.1rem 0.45rem; border-radius: 9999px; font-weight: 600; flex-shrink: 0; }
+        .sgit-repair-badge--safe   { background: rgba(78,205,196,0.15); color: #4ECDC4; }
+        .sgit-repair-badge--danger { background: rgba(233,69,96,0.15); color: #E94560; }
+        .sgit-repair-cli { font-family: var(--font-mono); font-size: var(--text-small); color: var(--color-text-secondary); background: var(--bg-secondary); padding: 0.1rem 0.45rem; border-radius: 4px; margin-left: auto; flex-shrink: 0; }
+        .sgit-repair-desc { font-family: var(--font-mono); font-size: var(--text-small); color: var(--color-text-secondary); background: var(--bg-secondary); border: 1px solid var(--color-border); border-radius: 4px; padding: 0.5rem 0.75rem; margin: 0 0 0.625rem; white-space: pre-wrap; word-break: break-all; }
+        .sgit-repair-manual { margin-bottom: 0.625rem; }
+        .sgit-repair-input { width: 100%; padding: 0.3rem 0.625rem; background: var(--bg-secondary); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); font-family: var(--font-mono); font-size: var(--text-sm); box-sizing: border-box; }
+        .sgit-repair-confirm-zone { background: rgba(233,69,96,0.07); border: 1px solid rgba(233,69,96,0.3); border-radius: 6px; padding: 0.625rem 0.75rem; margin-bottom: 0.5rem; }
+        .sgit-repair-confirm-msg { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 0.5rem; line-height: 1.5; }
+        .sgit-repair-run-btn { padding: 0.3rem 0.75rem; background: #E94560; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: var(--text-sm); font-weight: 600; margin-right: 0.5rem; font-family: var(--font-family); }
+        .sgit-repair-run-btn:hover { background: #c73650; }
+        .sgit-repair-cancel-btn { padding: 0.3rem 0.75rem; background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; font-size: var(--text-sm); font-family: var(--font-family); }
+        .sgit-repair-show-btn { padding: 0.3rem 0.875rem; background: transparent; border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; font-size: var(--text-sm); font-weight: 600; color: var(--color-text-secondary); font-family: var(--font-family); }
+        .sgit-repair-show-btn:hover { background: var(--bg-secondary); color: var(--color-text); }
+        .sgit-repair-result { font-size: var(--text-sm); padding: 0.4rem 0.625rem; border-radius: 6px; margin-bottom: 0.5rem; font-family: var(--font-mono); }
+        .sgit-repair-result--ok      { background: rgba(78,205,196,0.1); color: #4ECDC4; }
+        .sgit-repair-result--error   { background: rgba(233,69,96,0.1); color: #E94560; }
+        .sgit-repair-result--running { background: var(--bg-secondary); color: var(--color-text-secondary); }
 
         /* --- Shared --- */
         .sgit-json { background: var(--bg-secondary); padding: 1rem; border-radius: 6px; font-family: var(--font-mono); font-size: var(--text-small); color: var(--color-text-secondary); overflow-x: auto; max-height: 400px; overflow-y: auto; border: 1px solid var(--color-border); margin: 0; white-space: pre-wrap; word-break: break-all; }

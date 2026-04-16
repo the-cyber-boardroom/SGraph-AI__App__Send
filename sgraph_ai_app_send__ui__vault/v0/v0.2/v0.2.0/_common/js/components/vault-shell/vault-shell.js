@@ -28,6 +28,7 @@
             this._activeView    = 'files';
             this._loadingCount  = 0;
             this._pendingAction = null;
+            this._syncState     = { ahead: 0, behind: 0, diverged: false };
         }
 
         connectedCallback() {
@@ -56,19 +57,24 @@
 
                     <div class="vs-body">
                         <vault-nav></vault-nav>
+
                         <div class="vs-content">
                             <!-- Files view: shared Browse component fills this -->
                             <div class="vs-view vs-view-files"></div>
-
                             <!-- SGit view -->
                             <div class="vs-view vs-view-sgit" style="display:none">
                                 <vault-sgit-view></vault-sgit-view>
                             </div>
-
                             <!-- Settings view -->
                             <div class="vs-view vs-view-settings" style="display:none">
                                 <vault-settings></vault-settings>
                             </div>
+                        </div>
+
+                        <!-- Debug sidebar (right column, toggled by Debug button) -->
+                        <div class="vs-debug-sidebar" hidden>
+                            <div class="vs-debug-handle" title="Drag to resize"></div>
+                            <sg-layout id="vault-debug-layout"></sg-layout>
                         </div>
                     </div>
 
@@ -153,9 +159,8 @@
             // Update status
             this.querySelector('vault-status-bar')?.updateStats(vault);
 
-            // Show ahead/behind counts if writable
-            this._refreshAheadCount();
-            this._refreshBehindCount();
+            // Show ahead/behind counts + diverged state if writable
+            this._refreshSyncState();
 
             // Ensure files view is active
             this._switchView('files');
@@ -209,8 +214,7 @@
                 this.querySelector('vault-status-bar')?.updateStats(vault);
                 this.querySelector('vault-header')?.setVaultName(vault.name || '');
 
-                this._refreshAheadCount();
-                this._refreshBehindCount();
+                this._refreshSyncState();
                 window.sgraphVault.messages.success('Vault refreshed');
             } catch (err) {
                 window.sgraphVault.messages.error(`Refresh failed: ${err.message}`);
@@ -275,7 +279,7 @@
             // Refresh status bar after file mutations
             this.querySelector('vault-status-bar')?.updateStats(this._vault);
             this._updateVaultKey();
-            this._refreshAheadCount();
+            this._refreshSyncState();
 
             // Refresh settings if visible
             if (this._activeView === 'settings') {
@@ -289,36 +293,49 @@
             if (this._vault) this._mountBrowse();
         }
 
-        async _refreshAheadCount() {
+        async _refreshSyncState() {
             if (!this._vault || !this._accessKey) return;
             try {
-                const n = await this._vault.getAheadCount();
-                this.querySelector('vault-header')?.setAheadCount(n);
+                const [ahead, behind] = await Promise.all([
+                    this._vault.getAheadCount(),
+                    this._vault.getBehindCount()
+                ]);
+                const diverged = ahead > 0 && behind > 0;
+                this._syncState = { ahead, behind, diverged };
+                const header = this.querySelector('vault-header');
+                header?.setAheadCount(ahead);
+                header?.setBehindCount(behind);
+                header?.setDiverged(diverged);
             } catch (_) {}
         }
 
         async _onPush() {
             if (!this._vault || !this._accessKey) return;
+
+            // Guard: diverged vault — pushing silently discards published-only commits
+            const { diverged, behind } = this._syncState || {};
+            if (diverged) {
+                const ok = confirm(
+                    '\u26a0  Diverged vault\n\n' +
+                    `Pushing will overwrite the published branch and permanently discard ` +
+                    `${behind} published commit(s) not in your working branch.\n\n` +
+                    'To safely merge, use SGit \u2192 Repair tab to reconcile changes first.\n\n' +
+                    'Force-push anyway?'
+                );
+                if (!ok) return;
+            }
+
             const header = this.querySelector('vault-header');
             header?.setPushBusy(true);
             try {
                 await this._vault.push();
-                await this._refreshAheadCount();
-                await this._refreshBehindCount();
-                window.sgraphVault.messages.success('Pushed — named branch updated');
+                await this._refreshSyncState();
+                window.sgraphVault.messages.success('Pushed \u2014 named branch updated');
             } catch (err) {
                 window.sgraphVault.messages.error(`Push failed: ${err.message}`);
             } finally {
                 header?.setPushBusy(false);
             }
-        }
-
-        async _refreshBehindCount() {
-            if (!this._vault || !this._accessKey) return;
-            try {
-                const n = await this._vault.getBehindCount();
-                this.querySelector('vault-header')?.setBehindCount(n);
-            } catch (_) {}
         }
 
         async _onPull() {
@@ -330,9 +347,8 @@
                 if (changed) {
                     await this._mountBrowse();
                     this.querySelector('vault-status-bar')?.updateStats(this._vault);
-                    await this._refreshAheadCount();
-                    await this._refreshBehindCount();
-                    window.sgraphVault.messages.success('Pulled — vault updated from named branch');
+                    await this._refreshSyncState();
+                    window.sgraphVault.messages.success('Pulled \u2014 vault updated from named branch');
                 } else {
                     window.sgraphVault.messages.success('Already up to date');
                 }
