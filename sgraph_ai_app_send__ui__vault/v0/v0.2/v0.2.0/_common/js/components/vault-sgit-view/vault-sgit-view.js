@@ -161,6 +161,29 @@
         .sgit-kv-value { color: var(--color-text); }
         .sgit-mono { font-family: var(--font-mono, monospace); font-size: var(--text-small); }
 
+        /* --- Two-track diverged graph --- */
+        .sgit-commit-list--two .sgit-commit-header,
+        .sgit-commit-list--two .sgit-commit-row,
+        .sgit-commit-header--two,
+        .sgit-commit-row--two { grid-template-columns: 48px 1fr 160px 100px; }
+        .sgit-ch-graph--two { width: 48px; height: 28px; position: relative; overflow: visible; }
+        .sgit-gt { position: absolute; top: 0; bottom: 0; width: 20px; display: flex; flex-direction: column; align-items: center; }
+        .sgit-gt--clone { left: 2px; }
+        .sgit-gt--named { right: 2px; }
+        .sgit-gt-line { width: 2px; flex: 1; opacity: 0.4; }
+        .sgit-gt-line--hidden { visibility: hidden; }
+        .sgit-gt-spacer { width: 10px; height: 10px; flex-shrink: 0; }
+        .sgit-gt-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; z-index: 1; }
+        .sgit-gt-dot--head { width: 12px; height: 12px; }
+        .sgit-commit-row--fork { background: rgba(69,183,209,0.04); }
+        .sgit-fork-banner { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: rgba(69,183,209,0.06); border: 1px solid rgba(69,183,209,0.2); border-radius: 6px; margin-bottom: 0.75rem; font-size: var(--text-small); flex-wrap: wrap; }
+        .sgit-fork-lane { font-weight: 700; white-space: nowrap; }
+        .sgit-fork-lane--clone { color: #4ECDC4; }
+        .sgit-fork-lane--named { color: #45b7d1; }
+        .sgit-fork-desc { color: var(--color-text-secondary); flex: 1; }
+        .sgit-badge--named-head { background: rgba(69,183,209,0.2); color: #45b7d1; }
+        .sgit-badge--fork { background: rgba(233,196,69,0.15); color: #E9C445; }
+
         /* --- Branches --- */
         .sgit-branch-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .sgit-branch-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; background: var(--bg-surface); }
