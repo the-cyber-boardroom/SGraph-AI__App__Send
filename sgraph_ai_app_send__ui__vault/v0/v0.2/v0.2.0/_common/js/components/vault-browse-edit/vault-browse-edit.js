@@ -164,6 +164,36 @@
             bar.appendChild(presentBtn);
         }
 
+        // --- SGit Data button: shows vault blob metadata for the current file view ---
+        var sgitDataBtn = _makeBtn('SGit Data');
+        sgitDataBtn.title = 'Show vault object metadata for this file version';
+        sgitDataBtn.addEventListener('click', function() {
+            var vault = self.dataSource && self.dataSource._vault;
+            var normPath = (fileName || '').replace(/^\//, '');
+            var parts    = normPath.split('/');
+            var fName    = parts.pop();
+            var folder   = parts.length ? '/' + parts.join('/') : '/';
+            var entry    = null;
+            if (vault) {
+                var node = vault._findNode(folder);
+                if (node && node.children) entry = node.children[fName] || null;
+            }
+            var lines = [
+                'File:          ' + normPath,
+                'Folder:        ' + folder,
+                '',
+                'blob_id:       ' + (entry ? entry.blob_id || '—' : '(not found in tree)'),
+                'content_hash:  ' + (entry ? (entry.content_hash || '—') : '—'),
+                'stored_size:   ' + (entry ? (entry.size || 0) + ' B' : '—'),
+                '',
+                'Working HEAD:  ' + (vault ? (vault._headCommitId || '—') : '—'),
+                'Named HEAD:    ' + (vault ? (vault._namedHeadId  || '—') : '—'),
+                'vault_id:      ' + (vault ? (vault._vaultId      || '—') : '—'),
+            ];
+            _showTextOverlay('SGit Data — ' + fName, lines.join('\n'));
+        });
+        bar.appendChild(sgitDataBtn);
+
         // --- Rename button (all file types) ---
         var renameBtn = _makeBtn('Rename');
         renameBtn.addEventListener('click', function() {
@@ -807,6 +837,30 @@
         btn.className = 'sb-action-btn';
         btn.textContent = label;
         return btn;
+    }
+
+    function _showTextOverlay(title, text) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg-secondary,#12122a);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:1.5rem;min-width:420px;max-width:680px;max-height:80vh;display:flex;flex-direction:column;gap:1rem;';
+        var hdr = document.createElement('div');
+        hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;';
+        var titleEl = document.createElement('span');
+        titleEl.style.cssText = 'font-size:13px;font-weight:700;color:var(--color-text,#e2e8f0);';
+        titleEl.textContent = title;
+        var closeBtn = _makeBtn('\u00d7');
+        closeBtn.addEventListener('click', function() { overlay.remove(); });
+        hdr.appendChild(titleEl);
+        hdr.appendChild(closeBtn);
+        var pre = document.createElement('pre');
+        pre.style.cssText = 'margin:0;padding:0.75rem 1rem;background:var(--bg-primary,#0a0a18);border:1px solid var(--border,#2a2a4a);border-radius:4px;font-size:12px;line-height:1.6;color:var(--accent,#4ECDC4);overflow:auto;white-space:pre;font-family:var(--font-mono,monospace);';
+        pre.textContent = text;
+        box.appendChild(hdr);
+        box.appendChild(pre);
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
     }
 
     function _clipboardFallback(text) {
