@@ -50,6 +50,7 @@
                 if (e.target.closest('.vh-lock-btn'))    this._emit('vault-header-lock');
                 if (e.target.closest('.vh-debug-btn'))   this._emit('vault-header-debug');
                 if (e.target.closest('.vh-raw-link'))   { e.preventDefault(); this._emit('vault-header-raw'); }
+                if (e.target.closest('.vh-vault-name') && !e.target.closest('input')) this._startNameEdit();
             });
 
             this._fetchAppVersion();
@@ -59,7 +60,34 @@
 
         setVaultName(name) {
             const el = this.shadowRoot.querySelector('.vh-vault-name');
-            if (el) el.textContent = name || '';
+            if (el) { el.textContent = name || ''; this._vaultName = name || ''; }
+        }
+
+        _startNameEdit() {
+            const span = this.shadowRoot.querySelector('.vh-vault-name');
+            if (!span || span.querySelector('input')) return;
+            const current = span.textContent;
+            span.textContent = '';
+            const input = document.createElement('input');
+            input.className = 'vh-vault-name-input';
+            input.value = current;
+            span.appendChild(input);
+            input.focus();
+            input.select();
+
+            const commit = () => {
+                const val = input.value.trim();
+                span.textContent = val || current;
+                this._vaultName = span.textContent;
+                if (val && val !== current) this._emit('vault-header-rename', { name: val });
+            };
+            const cancel = () => { span.textContent = current; };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+                if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            });
+            input.addEventListener('blur', commit);
         }
 
         setReadOnly(isReadOnly) {
@@ -140,8 +168,8 @@
 
         // --- Private ---
 
-        _emit(name) {
-            this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true }));
+        _emit(name, detail) {
+            this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail: detail || null }));
         }
 
         async _fetchAppVersion() {
@@ -172,7 +200,13 @@
         .vh-title { display: flex; align-items: center; gap: var(--space-3); }
         .vh-brand { font-weight: 700; font-size: var(--text-h3); color: var(--color-text); }
         .vh-slash  { color: var(--color-primary); }
-        .vh-vault-name { font-size: var(--text-sm); color: var(--color-text-secondary); font-family: var(--font-mono); }
+        .vh-vault-name { font-size: var(--text-sm); color: var(--color-text-secondary); font-family: var(--font-mono); cursor: pointer; border-radius: 3px; padding: 1px 3px; }
+        .vh-vault-name:hover { background: var(--bg-secondary); color: var(--color-text); }
+        .vh-vault-name-input {
+            font-size: var(--text-sm); color: var(--color-text); font-family: var(--font-mono);
+            background: var(--bg-secondary); border: 1px solid var(--color-primary);
+            border-radius: 3px; padding: 1px 4px; outline: none; min-width: 80px;
+        }
         .vh-right { display: flex; align-items: center; gap: var(--space-2); }
         .vh-version { font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono); }
         .vh-push-btn {

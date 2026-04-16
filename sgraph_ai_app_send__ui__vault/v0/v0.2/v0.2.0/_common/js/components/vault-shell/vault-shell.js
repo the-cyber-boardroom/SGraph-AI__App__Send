@@ -106,6 +106,7 @@
             this.addEventListener('vault-header-lock',    () => this._onLock());
             this.addEventListener('vault-header-debug',   () => this._toggleDebug());
             this.addEventListener('vault-header-raw',     () => this._showRawVault());
+            this.addEventListener('vault-header-rename',  (e) => this._onVaultRename(e.detail?.name));
 
             // Nav events
             this.addEventListener('vault-nav-switch', (e) => {
@@ -398,6 +399,10 @@
                 await this._vault.push();
                 await this._refreshSyncState();
                 window.sgraphVault.messages.success('Pushed \u2014 named branch updated');
+                if (this._activeView === 'sgit') {
+                    const sgit = this.querySelector('vault-sgit-view');
+                    if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                }
             } catch (err) {
                 window.sgraphVault.messages.error(`Push failed: ${err.message}`);
             } finally {
@@ -416,6 +421,10 @@
                     this.querySelector('vault-status-bar')?.updateStats(this._vault);
                     await this._refreshSyncState();
                     window.sgraphVault.messages.success('Pulled \u2014 vault updated from named branch');
+                    if (this._activeView === 'sgit') {
+                        const sgit = this.querySelector('vault-sgit-view');
+                        if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                    }
                 } else {
                     window.sgraphVault.messages.success('Already up to date');
                 }
@@ -432,6 +441,8 @@
             if (!namedHead) return;
             const header = this.querySelector('vault-header');
             header?.setPullBusy(true);
+            const syncBtn = this.querySelector('.vs-sync-merge-btn, .vs-sync-pull-btn');
+            if (syncBtn) { syncBtn.disabled = true; syncBtn.textContent = 'Syncing…'; }
             window.sgraphVault.messages.info('Merging collaborator changes\u2026');
             try {
                 const result = await this._vault.merge(namedHead);
@@ -594,6 +605,19 @@
                 });
                 input.click();
             });
+        }
+
+        async _onVaultRename(name) {
+            if (!name || !this._vault || !this._accessKey) return;
+            try {
+                await this._vault.setName(name);
+                this.querySelector('vault-header')?.setVaultName(name);
+                this._updateVaultKey();
+                window.sgraphVault.messages.success(`Vault renamed to "${name}"`);
+            } catch (err) {
+                window.sgraphVault.messages.error(`Rename failed: ${err.message}`);
+                this.querySelector('vault-header')?.setVaultName(this._vault.name || '');
+            }
         }
 
         // --- Key Management -------------------------------------------------------
