@@ -462,7 +462,9 @@
                     </span>`;
             }
 
-            return `<span class="sgit-ch-graph sgit-ch-graph--two">${cloneTrack}${namedTrack}</span>`;
+            // Merge commit: draw an arc connecting both track dots (symmetric to fork's namedLineJoin)
+            const mergeArc = s.isMergeHead ? `<svg style="position:absolute;top:0;left:0;width:48px;height:28px;pointer-events:none;overflow:visible" viewBox="0 0 48 28"><path d="M 12 14 C 12 21 36 21 36 14" stroke="${C_NAMED}" fill="none" stroke-width="1.5" opacity="0.5"/></svg>` : '';
+            return `<span class="sgit-ch-graph sgit-ch-graph--two">${cloneTrack}${namedTrack}${mergeArc}</span>`;
         },
 
         // --- Single row for linear mode ------------------------------------------
