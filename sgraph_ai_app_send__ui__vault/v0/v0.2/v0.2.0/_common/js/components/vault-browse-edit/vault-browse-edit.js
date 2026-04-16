@@ -461,7 +461,7 @@
             var file = files[i];
             var reader = new FileReader();
             reader.onload = function(ev) {
-                browse.dataSource.addFile(destFolderPath, file.name, new Uint8Array(ev.target.result))
+                browse.dataSource.saveFile(destFolderPath, file.name, new Uint8Array(ev.target.result))
                     .then(function() { done++; processNext(i + 1); })
                     .catch(function(err) {
                         errors++;
