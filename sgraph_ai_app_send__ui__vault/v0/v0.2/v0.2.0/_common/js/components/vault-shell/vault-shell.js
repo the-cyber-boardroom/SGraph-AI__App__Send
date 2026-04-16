@@ -229,6 +229,12 @@
                 const entry   = this.querySelector('vault-entry');
                 const sgSend  = entry._getSGSend();
                 const vault   = await SGVault.open(sgSend, this._vaultKey);
+
+                // Auto-merge if clone ref is behind named ref — Refresh should always
+                // show the latest published content, not just reload from the old clone.
+                if (vault._headCommitId !== vault._namedHeadId) {
+                    try { await vault.merge(vault._namedHeadId); } catch (_) { /* diverged — proceed as-is */ }
+                }
                 this._vault   = vault;
 
                 // Remount browse with fresh vault data
@@ -437,7 +443,14 @@
 
         async _onAutoMerge() {
             if (!this._vault || !this._accessKey) return;
-            const namedHead = this._vault._namedHeadId;
+            // Read LIVE named head — _namedHeadId may be stale if CLI pushed since vault was opened
+            let namedHead;
+            try {
+                namedHead = await this._vault._refManager.readRef(this._vault._refFileId);
+            } catch (err) {
+                window.sgraphVault.messages.error(`Sync failed: ${err.message}`);
+                return;
+            }
             if (!namedHead) return;
             const header = this.querySelector('vault-header');
             header?.setPullBusy(true);
