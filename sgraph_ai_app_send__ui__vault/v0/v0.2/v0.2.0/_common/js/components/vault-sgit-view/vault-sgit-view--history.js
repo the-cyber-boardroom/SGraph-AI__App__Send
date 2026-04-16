@@ -249,6 +249,8 @@
                 : '';
             const rowCls = `sgit-commit-row${hasMerge ? ' sgit-commit-row--two' : ''}${(isHead || isNamedHere) ? ' sgit-commit-row--head' : ''}`;
 
+            const checkoutBtn = `<button class="sgit-checkout-btn" data-commit-id="${this._esc(row.id)}" title="Load this commit as working state">load ↩</button>`;
+
             if (!hasMerge) {
                 // Pure linear mode: use single-track cell
                 return `<div class="${rowCls}">
@@ -257,7 +259,7 @@
                         <span class="sgit-graph-dot${isHead ? ' sgit-graph-dot--head' : ''}"></span>
                         <span class="sgit-graph-line-bottom${!row._lineBot ? ' sgit-graph-line--hidden' : ''}"></span>
                     </span>
-                    <span class="sgit-ch-msg">${badges}<span class="sgit-commit-msg">${this._esc(msg)}</span>${treeLink}</span>
+                    <span class="sgit-ch-msg">${badges}<span class="sgit-commit-msg">${this._esc(msg)}</span>${treeLink}${checkoutBtn}</span>
                     <span class="sgit-ch-id"><a class="sgit-obj-link" href="#" data-id="${this._esc(row.id)}">${this._esc(this._short(row.id))}</a></span>
                     <span class="sgit-ch-date">${date}</span>
                 </div>`;
@@ -273,7 +275,7 @@
             });
             return `<div class="${rowCls}">
                 ${graphCell}
-                <span class="sgit-ch-msg">${badges}<span class="sgit-commit-msg">${this._esc(msg)}</span>${treeLink}</span>
+                <span class="sgit-ch-msg">${badges}<span class="sgit-commit-msg">${this._esc(msg)}</span>${treeLink}${checkoutBtn}</span>
                 <span class="sgit-ch-id"><a class="sgit-obj-link" href="#" data-id="${this._esc(row.id)}">${this._esc(this._short(row.id))}</a></span>
                 <span class="sgit-ch-date">${date}</span>
             </div>`;
@@ -408,6 +410,7 @@
                     ${badges}
                     <span class="sgit-commit-msg">${this._esc(msg)}</span>
                     ${row.tree_id ? `<a class="sgit-obj-link sgit-commit-tree-link" href="#" data-id="${this._esc(row.tree_id)}" title="View tree">tree</a>` : ''}
+                    <button class="sgit-checkout-btn" data-commit-id="${this._esc(row.id)}" title="Load this commit as working state">load ↩</button>
                 </span>
                 <span class="sgit-ch-id"><a class="sgit-obj-link" href="#" data-id="${this._esc(row.id)}">${this._esc(this._short(row.id))}</a></span>
                 <span class="sgit-ch-date">${date}</span>
@@ -495,6 +498,7 @@
                     ${branch      ? `<span class="sgit-badge sgit-badge--branch">${this._esc(this._shortBranch(branch))}</span>` : ''}
                     <span class="sgit-commit-msg">${this._esc(msg)}</span>
                     <a class="sgit-obj-link sgit-commit-tree-link" href="#" data-id="${this._esc(commit.tree_id)}" title="View tree">tree</a>
+                    <button class="sgit-checkout-btn" data-commit-id="${this._esc(commit.id)}" title="Load this commit as working state">load ↩</button>
                 </span>
                 <span class="sgit-ch-id"><a class="sgit-obj-link" href="#" data-id="${this._esc(commit.id)}">${this._esc(this._short(commit.id))}</a></span>
                 <span class="sgit-ch-date">${date}</span>

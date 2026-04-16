@@ -61,16 +61,21 @@
                     <div class="vs-body">
                         <vault-nav></vault-nav>
 
-                        <div class="vs-content">
-                            <!-- Files view: shared Browse component fills this -->
-                            <div class="vs-view vs-view-files"></div>
-                            <!-- SGit view -->
-                            <div class="vs-view vs-view-sgit" style="display:none">
-                                <vault-sgit-view></vault-sgit-view>
-                            </div>
-                            <!-- Settings view -->
-                            <div class="vs-view vs-view-settings" style="display:none">
-                                <vault-settings></vault-settings>
+                        <div class="vs-main">
+                            <!-- Sync notice banner (upstream changes / diverged) -->
+                            <div class="vs-sync-notice" style="display:none"></div>
+
+                            <div class="vs-content">
+                                <!-- Files view: shared Browse component fills this -->
+                                <div class="vs-view vs-view-files"></div>
+                                <!-- SGit view -->
+                                <div class="vs-view vs-view-sgit" style="display:none">
+                                    <vault-sgit-view></vault-sgit-view>
+                                </div>
+                                <!-- Settings view -->
+                                <div class="vs-view vs-view-settings" style="display:none">
+                                    <vault-settings></vault-settings>
+                                </div>
                             </div>
                         </div>
 
@@ -133,6 +138,22 @@
             // Upload component events
             this.addEventListener('vault-file-added', () => this._onFileAdded());
             this.addEventListener('vault-upload-request', () => this._onUploadRequest());
+
+            // Sync notice actions
+            this.addEventListener('click', (e) => {
+                if (e.target.closest('.vs-sync-merge-btn')) {
+                    this._switchView('sgit');
+                    setTimeout(() => this.querySelector('vault-sgit-view')?._switchTab('repair'), 50);
+                }
+                if (e.target.closest('.vs-sync-pull-btn')) this._onPull();
+                if (e.target.closest('.vs-sync-notice-close')) {
+                    const n = this.querySelector('.vs-sync-notice');
+                    if (n) n.style.display = 'none';
+                }
+            });
+
+            // Soft checkout from history
+            this.addEventListener('vault-sgit-checkout', (e) => this._onCheckout(e.detail.commitId));
         }
 
         // --- Vault Lifecycle ------------------------------------------------------
@@ -315,6 +336,7 @@
                 header?.setAheadCount(ahead);
                 header?.setBehindCount(behind);
                 header?.setDiverged(diverged);
+                this._updateSyncNotice();
             } catch (_) {}
         }
 
@@ -394,9 +416,8 @@
             const { ahead } = this._syncState || {}
             if (ahead > 0) {
                 // We have local commits too — diverged or ahead. Don't auto-merge silently.
-                window.sgraphVault.messages.info(
-                    'Published branch has new commits \u2014 vault is diverged. Use SGit \u2192 Repair tab to merge.'
-                )
+                // Refresh sync state so the banner updates (it will show the diverged notice).
+                await this._refreshSyncState()
                 return
             }
 
@@ -571,6 +592,72 @@
             if (body) body.after(debugEl);
         }
 
+        // --- Sync Notice Banner ---------------------------------------------------
+
+        _updateSyncNotice() {
+            const notice = this.querySelector('.vs-sync-notice');
+            if (!notice) return;
+            const { ahead, behind, diverged } = this._syncState || {};
+
+            if (diverged) {
+                notice.style.display = '';
+                notice.className = 'vs-sync-notice vs-sync-notice--diverged';
+                notice.innerHTML = `
+                    <span class="vs-sync-notice-icon">⚡</span>
+                    <span class="vs-sync-notice-text">
+                        Vault diverged — ${ahead} local commit${ahead !== 1 ? 's' : ''} ahead,
+                        ${behind} published commit${behind !== 1 ? 's' : ''} behind.
+                        Merge before pushing.
+                    </span>
+                    <button class="vs-sync-notice-btn vs-sync-merge-btn">Repair / Merge →</button>
+                    <button class="vs-sync-notice-close" title="Dismiss">✕</button>
+                `;
+            } else if (behind > 0) {
+                notice.style.display = '';
+                notice.className = 'vs-sync-notice vs-sync-notice--behind';
+                notice.innerHTML = `
+                    <span class="vs-sync-notice-icon">⬇</span>
+                    <span class="vs-sync-notice-text">
+                        ${behind} new commit${behind !== 1 ? 's' : ''} on published branch.
+                    </span>
+                    <button class="vs-sync-notice-btn vs-sync-pull-btn">Sync now →</button>
+                    <button class="vs-sync-notice-close" title="Dismiss">✕</button>
+                `;
+            } else {
+                notice.style.display = 'none';
+                notice.innerHTML = '';
+            }
+        }
+
+        // --- Soft Checkout --------------------------------------------------------
+
+        async _onCheckout(commitId) {
+            if (!this._vault || !commitId) return;
+            try {
+                // Load the commit object to verify it exists
+                const commit = await this._vault._commitManager.loadCommit(commitId);
+                if (!commit) throw new Error('Commit not found: ' + commitId);
+
+                // Update the clone ref to point to this commit
+                const cloneRefId = this._vault._cloneRefFileId || this._vault._cloneRef;
+                if (cloneRefId) {
+                    await this._vault._refManager.writeRef(cloneRefId, commitId);
+                }
+                // Also update in-memory head
+                this._vault._headCommitId = commitId;
+
+                // Remount browse to reflect the checked-out tree
+                await this._mountBrowse();
+                await this._refreshSyncState();
+
+                const short = commitId.slice(0, 8);
+                window.sgraphVault.messages.success(`Loaded commit ${short} as working state`);
+                this._switchView('files');
+            } catch (err) {
+                window.sgraphVault.messages.error(`Checkout failed: ${err.message}`);
+            }
+        }
+
         // --- Raw Vault View -------------------------------------------------------
 
         _showRawVault() {
@@ -616,6 +703,39 @@
             grid-area: body; display: flex; overflow: hidden;
         }
         .vs-body > vault-nav { flex-shrink: 0; }
+
+        /* Main content column: sync banner + content stacked */
+        .vs-main {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+        }
+
+        /* Sync notice banner */
+        .vs-sync-notice {
+            display: flex; align-items: center; gap: var(--space-2);
+            padding: 0.4rem var(--space-3); font-size: var(--text-small);
+            flex-shrink: 0; border-bottom: 1px solid var(--color-border);
+        }
+        .vs-sync-notice--diverged {
+            background: rgba(255,80,80,0.12); color: #ff6b6b;
+            border-bottom-color: rgba(255,80,80,0.3);
+        }
+        .vs-sync-notice--behind {
+            background: rgba(78,205,196,0.1); color: #4ecdc4;
+            border-bottom-color: rgba(78,205,196,0.3);
+        }
+        .vs-sync-notice-icon { font-size: 1rem; flex-shrink: 0; }
+        .vs-sync-notice-text { flex: 1; }
+        .vs-sync-notice-btn {
+            padding: 0.25rem 0.75rem; border-radius: 4px; border: 1px solid currentColor;
+            background: transparent; color: inherit; cursor: pointer; font-size: var(--text-small);
+            font-weight: 600; white-space: nowrap;
+        }
+        .vs-sync-notice-btn:hover { background: rgba(255,255,255,0.1); }
+        .vs-sync-notice-close {
+            padding: 0.1rem 0.4rem; background: transparent; border: none;
+            color: inherit; opacity: 0.6; cursor: pointer; font-size: 0.9rem; flex-shrink: 0;
+        }
+        .vs-sync-notice-close:hover { opacity: 1; }
 
         .vs-content {
             flex: 1; overflow: hidden; position: relative;
