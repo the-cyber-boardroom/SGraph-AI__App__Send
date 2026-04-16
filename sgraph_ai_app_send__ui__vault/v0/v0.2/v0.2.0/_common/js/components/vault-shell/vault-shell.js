@@ -326,11 +326,30 @@
         async _refreshSyncState() {
             if (!this._vault || !this._accessKey) return;
             try {
-                const [ahead, behind] = await Promise.all([
-                    this._vault.getAheadCount(),
-                    this._vault.getBehindCount()
-                ]);
-                const diverged = ahead > 0 && behind > 0;
+                const cloneHead = this._vault._headCommitId;
+                const namedHead = this._vault._namedHeadId;
+
+                let ahead = 0, behind = 0, diverged = false;
+
+                if (cloneHead && namedHead && cloneHead !== namedHead) {
+                    // Check if namedHead is reachable from cloneHead (clone is AHEAD)
+                    const namedReachable = await this._vault._isAncestor(namedHead, cloneHead);
+                    if (namedReachable) {
+                        ahead = await this._vault.getAheadCount();
+                    } else {
+                        // Check if cloneHead is reachable from namedHead (clone is BEHIND)
+                        const cloneReachable = await this._vault._isAncestor(cloneHead, namedHead);
+                        if (cloneReachable) {
+                            behind = await this._vault.getBehindCount();
+                        } else {
+                            // Neither reachable from the other — truly diverged
+                            diverged = true;
+                            ahead  = await this._countToFork(cloneHead, namedHead);
+                            behind = await this._countToFork(namedHead, cloneHead);
+                        }
+                    }
+                }
+
                 this._syncState = { ahead, behind, diverged };
                 const header = this.querySelector('vault-header');
                 header?.setAheadCount(ahead);
@@ -338,6 +357,26 @@
                 header?.setDiverged(diverged);
                 this._updateSyncNotice();
             } catch (_) {}
+        }
+
+        // Count commits from fromId until we hit any commit in the other head's
+        // first-parent chain (= fork point). Used for diverged branch counts.
+        async _countToFork(fromId, otherHeadId) {
+            const otherChain = new Set();
+            let c = otherHeadId;
+            for (let i = 0; i < 100 && c; i++) {
+                otherChain.add(c);
+                try { const cm = await this._vault._commitManager.loadCommit(c); c = cm.parents?.[0] || null; }
+                catch (_) { break; }
+            }
+            let n = 0, cur = fromId;
+            while (cur && n < 100) {
+                if (otherChain.has(cur)) break;
+                n++;
+                try { const cm = await this._vault._commitManager.loadCommit(cur); cur = cm.parents?.[0] || null; }
+                catch (_) { break; }
+            }
+            return n;
         }
 
         async _onPush() {
