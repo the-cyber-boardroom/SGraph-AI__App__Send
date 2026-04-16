@@ -99,6 +99,10 @@
     <script src="../_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
     <script src="../_common/js/lib/sg-vault/sg-vault-commit.js"></script>
     <script src="../_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="../_common/js/lib/sg-vault/sg-vault--branches.js"></script>
 
     <!-- 6. Vault base system (local) -->
     <script src="../_common/js/base/vault-helpers.js"></script>
@@ -117,10 +121,16 @@
     <script src="../_common/js/components/api-logger/api-logger.js"></script>
     <script src="../_common/js/components/storage-viewer/storage-viewer.js"></script>
 
-    <!-- 9. Vault components (local — reused from v0.1.4) -->
+    <!-- 9. Vault components (local) -->
     <script src="../_common/js/components/vault-entry/vault-entry.js"></script>
     <script src="../_common/js/components/vault-upload/vault-upload.js"></script>
+    <!-- vault-sgit-view: shell + tab modules (load shell first, then extensions) -->
     <script src="../_common/js/components/vault-sgit-view/vault-sgit-view.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--history.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--refs.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--tree.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--branches.js"></script>
+    <script src="../_common/js/components/vault-sgit-view/vault-sgit-view--object.js"></script>
 
     <!-- 10. v0.2.0 shell components (local — new modular architecture) -->
     <script src="../_common/js/components/vault-header/vault-header.js"></script>
@@ -128,7 +138,6 @@
     <script src="../_common/js/components/vault-nav/vault-nav.js"></script>
     <script src="../_common/js/components/vault-settings/vault-settings.js"></script>
     <script src="../_common/js/components/vault-status-bar/vault-status-bar.js"></script>
-    <script src="../_common/js/components/vault-generate/vault-generate.js"></script>
     <script src="../_common/js/components/vault-shell/vault-shell.js"></script>
 
     <!-- 11. Init -->

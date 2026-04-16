@@ -54,7 +54,7 @@ class SGVaultRefManager {
     // head_ref_id format: ref-pid-(muw|snw)-[0-9a-f]{12}
 
     async readBranchIndex(branchIndexFileId) {
-        const filePath  = `bare/idx/${branchIndexFileId}`
+        const filePath  = `bare/indexes/${branchIndexFileId}`
         const encrypted = await this._sgSend.vaultRead(this._vaultId, filePath)
         if (!encrypted) return null
         const decrypted = await SGSendCrypto.decrypt(encrypted, this._readKey)
