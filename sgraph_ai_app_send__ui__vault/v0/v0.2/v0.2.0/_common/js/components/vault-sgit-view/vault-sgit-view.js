@@ -218,5 +218,7 @@
         .sgit-tree-meta { font-family: var(--font-mono); color: var(--color-text-secondary); font-size: 0.625rem; margin-left: 0.5rem; }
     `;
 
+    // Expose globally so companion modules (vault-sgit-view--*.js) can extend the prototype
+    window.VaultSgitView = VaultSgitView;
     customElements.define('vault-sgit-view', VaultSgitView);
 })();

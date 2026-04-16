@@ -35,7 +35,7 @@
                         <button class="vh-upload-btn">Upload</button>
                         <button class="vh-debug-btn">Debug</button>
                         <a class="vh-raw-link" title="View raw vault data" href="#">raw</a>
-                        <button class="vh-lock-btn" style="display:none">Lock</button>
+                        <button class="vh-lock-btn" style="display:none" title="Return to vault list">&#8646; Vaults</button>
                         <span class="vh-version">v0.2.0</span>
                     </div>
                     <div class="vh-loading-bar" style="display:none"><div class="vh-loading-inner"></div></div>

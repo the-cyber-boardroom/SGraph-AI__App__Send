@@ -185,6 +185,9 @@
             window.history.replaceState(null, '', window.location.pathname);
             try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
             window.sgraphVault.events.emit('vault-locked', {});
+
+            // Refresh the entry screen so recent vaults list is up to date
+            this.querySelector('vault-entry')?.refresh?.();
         }
 
         // --- Mount Browse Component -----------------------------------------------
