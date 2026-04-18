@@ -138,7 +138,6 @@ class SendBrowse extends SendComponent {
                 this._populateShareTab();
                 this._populateInfoTab();
                 this._autoOpenFirstFile();
-                this._setupKeyboard();
             });
         });
     }
@@ -374,43 +373,6 @@ class SendBrowse extends SendComponent {
         });
         var first = root || files[0];
         if (first) this._openFileTab(first.path);
-    }
-
-    // ─── Keyboard Navigation (v0.2.1 parity) ────────────────────────────────
-
-    _setupKeyboard() {
-        this._boundKeyHandler = (e) => this._onKeydown(e);
-        document.addEventListener('keydown', this._boundKeyHandler);
-    }
-
-    _onKeydown(e) {
-        // Skip if typing in an input
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-        var treeEl = this._sgLayout ? this._sgLayout.getPanelElement('t-tree') : null;
-        if (!treeEl) return;
-
-        var files = Array.from(treeEl.querySelectorAll('.sb-tree__file'));
-        if (files.length === 0) return;
-
-        var active = treeEl.querySelector('.sb-tree__file--active');
-        var idx = active ? files.indexOf(active) : -1;
-
-        if (e.key === 'j' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            var next = Math.min(idx + 1, files.length - 1);
-            files[next].click();
-            files[next].scrollIntoView({ block: 'nearest' });
-        } else if (e.key === 'k' || e.key === 'ArrowUp') {
-            e.preventDefault();
-            var prev = Math.max(idx - 1, 0);
-            files[prev].click();
-            files[prev].scrollIntoView({ block: 'nearest' });
-        } else if (e.key === 's') {
-            // Save current file
-            var saveBtn = this.querySelector('.sb-file__save');
-            if (saveBtn) saveBtn.click();
-        }
     }
 
     // ─── Open File in Tab ───────────────────────────────────────────────────
