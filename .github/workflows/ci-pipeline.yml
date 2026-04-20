@@ -59,6 +59,7 @@ on:
 
 env:
   PACKAGE_NAME: 'sgraph_ai_app_send'
+  ECR_REPO_NAME: 'sg-send'
 
 jobs:
   run-tests:
@@ -201,8 +202,8 @@ jobs:
 
       - name: Ensure ECR repository exists
         run: |
-          aws ecr describe-repositories --repository-names sg-send 2>/dev/null || \
-          aws ecr create-repository --repository-name sg-send --image-tag-mutability MUTABLE
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPO_NAME }} 2>/dev/null || \
+          aws ecr create-repository --repository-name ${{ env.ECR_REPO_NAME }} --image-tag-mutability MUTABLE
 
       - name: Read version
         id: version
@@ -215,13 +216,13 @@ jobs:
           file: sgraph_ai_app_send__docker/Dockerfile
           push: true
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/sg-send:latest
-            ${{ steps.login-ecr.outputs.registry }}/sg-send:${{ steps.version.outputs.version }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:${{ steps.version.outputs.version }}
 
       - name: Smoke test
         run: |
           docker run -d --name sg-send-test -p 8080:8080 \
-            ${{ steps.login-ecr.outputs.registry }}/sg-send:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:latest
           sleep 5
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/info/health)
           docker stop sg-send-test
