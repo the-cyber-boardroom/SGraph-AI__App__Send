@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY sgraph_ai_app_send/ ./sgraph_ai_app_send/
 COPY sgraph_ai_app_send__docker/ ./sgraph_ai_app_send__docker/
 COPY sgraph_ai_app_send__ui__user/ ./sgraph_ai_app_send__ui__user/
