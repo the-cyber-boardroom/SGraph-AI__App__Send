@@ -71,6 +71,8 @@
             const input = document.createElement('input');
             input.className = 'vh-vault-name-input';
             input.value = current;
+            input.size = Math.max(current.length + 4, 20);
+            input.addEventListener('input', () => { input.size = Math.max(input.value.length + 4, 20); });
             span.appendChild(input);
             input.focus();
             input.select();
@@ -200,12 +202,12 @@
         .vh-title { display: flex; align-items: center; gap: var(--space-3); }
         .vh-brand { font-weight: 700; font-size: var(--text-h3); color: var(--color-text); }
         .vh-slash  { color: var(--color-primary); }
-        .vh-vault-name { font-size: var(--text-sm); color: var(--color-text-secondary); font-family: var(--font-mono); cursor: pointer; border-radius: 3px; padding: 1px 3px; }
-        .vh-vault-name:hover { background: var(--bg-secondary); color: var(--color-text); }
+        .vh-vault-name { font-size: var(--text-h3); font-weight: 700; color: var(--color-text); font-family: var(--font-mono); cursor: pointer; border-radius: 3px; padding: 1px 3px; }
+        .vh-vault-name:hover { background: var(--bg-secondary); }
         .vh-vault-name-input {
-            font-size: var(--text-sm); color: var(--color-text); font-family: var(--font-mono);
+            font-size: var(--text-h3); font-weight: 700; color: var(--color-text); font-family: var(--font-mono);
             background: var(--bg-secondary); border: 1px solid var(--color-primary);
-            border-radius: 3px; padding: 1px 4px; outline: none; min-width: 80px;
+            border-radius: 3px; padding: 1px 4px; outline: none; min-width: 200px; width: auto;
         }
         .vh-right { display: flex; align-items: center; gap: var(--space-2); }
         .vh-version { font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono); }
