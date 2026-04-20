@@ -199,6 +199,11 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names sg-send 2>/dev/null || \
+          aws ecr create-repository --repository-name sg-send --image-tag-mutability MUTABLE
+
       - name: Read version
         id: version
         run: echo "version=$(cat sgraph_ai_app_send/version)" >> "$GITHUB_OUTPUT"
