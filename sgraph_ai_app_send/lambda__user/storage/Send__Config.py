@@ -4,6 +4,7 @@
 # ===============================================================================
 
 from memory_fs.storage_fs.Storage_FS                                            import Storage_FS
+from memory_fs.storage_fs.providers.Storage_FS__Local_Disk                      import Storage_FS__Local_Disk
 from memory_fs.storage_fs.providers.Storage_FS__Memory                          import Storage_FS__Memory
 from osbot_aws.AWS_Config                                                       import aws_config
 from osbot_utils.type_safe.Type_Safe                                            import Type_Safe
@@ -13,12 +14,15 @@ from sgraph_ai_app_send.lambda__user.storage.Storage_FS__S3                     
 
 ENV_VAR__SEND__STORAGE_MODE    = 'SEND__STORAGE_MODE'                           # Explicit mode override
 ENV_VAR__SEND__S3_BUCKET       = 'SEND__S3_BUCKET'                             # S3 bucket name override
+ENV_VAR__SEND__DISK_PATH       = 'SEND__DISK_PATH'                             # Local disk path for DISK mode
 SEND__S3_BUCKET__INFIX         = 'sgraph-send-transfers'                       # Bucket name infix (used between account-id and region)
+SEND__DISK_PATH__DEFAULT       = '/data'                                        # Default disk storage path (Docker volume mount point)
 
 # todo: s3_bucket should not be an str (it should be type safe primitive)
 class Send__Config(Type_Safe):                                                  # Storage configuration for Send
     storage_mode : Enum__Storage__Mode = None                                   # Active storage mode
     s3_bucket    : str                 = None                                   # S3 bucket (for S3 mode)
+    disk_path    : str                 = None                                   # Local disk path (for DISK mode)
 
     # todo: add an issue to have a conversation about this, since we really shouldn't be doing any state actions in __init__
     #       there are multiple ways to achieved this, including the powerful Service Registry that osbot supports
@@ -36,13 +40,18 @@ class Send__Config(Type_Safe):                                                  
                 return values_map[explicit.lower()]
         if self.has_aws_credentials():
             return Enum__Storage__Mode.S3
+        if get_env(ENV_VAR__SEND__DISK_PATH):
+            return Enum__Storage__Mode.DISK
         return Enum__Storage__Mode.MEMORY
 
     def has_aws_credentials(self) -> bool:                                      # Check if AWS credentials available via AWS_Config
         return aws_config.aws_configured()
 
     def configure_for_storage_mode(self):                                       # Set defaults based on mode
-        if self.storage_mode == Enum__Storage__Mode.S3:
+        if self.storage_mode == Enum__Storage__Mode.DISK:
+            if self.disk_path is None:
+                self.disk_path = get_env(ENV_VAR__SEND__DISK_PATH, SEND__DISK_PATH__DEFAULT)
+        elif self.storage_mode == Enum__Storage__Mode.S3:
             if self.s3_bucket is None:
                 self.s3_bucket = self.resolve_s3_bucket_name()
 
@@ -55,6 +64,10 @@ class Send__Config(Type_Safe):                                                  
         return f'{account_id}--{SEND__S3_BUCKET__INFIX}--{region}'
 
     def create_storage_backend(self) -> Storage_FS:                             # Factory: create appropriate backend
+        if self.storage_mode == Enum__Storage__Mode.DISK:
+            from osbot_utils.utils.Files import folder_create
+            folder_create(self.disk_path)
+            return Storage_FS__Local_Disk(root_path=self.disk_path)
         if self.storage_mode == Enum__Storage__Mode.S3:
             if self.s3_bucket is None:
                 raise ValueError("S3 bucket name required for S3 storage mode")

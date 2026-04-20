@@ -1,0 +1,54 @@
+name: Build and Push Docker Image to ECR
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            eu-west-2
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=dev-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/sg-send:latest
+            ${{ steps.login-ecr.outputs.registry }}/sg-send:${{ steps.tag.outputs.tag }}
+
+      - name: Smoke test
+        run: |
+          docker run -d --name sg-send-test -p 8080:8080 \
+            ${{ steps.login-ecr.outputs.registry }}/sg-send:latest
+          sleep 5
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/config/status)
+          docker stop sg-send-test
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed with status $STATUS"
+            exit 1
+          fi
+          echo "Health check passed"
