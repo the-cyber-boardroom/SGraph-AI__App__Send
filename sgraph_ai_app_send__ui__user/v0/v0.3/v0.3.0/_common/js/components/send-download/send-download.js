@@ -108,7 +108,10 @@ class SendDownload extends HTMLElement {
         const params = new URLSearchParams(window.location.search);
         this.tokenName = params.get('token') || null;
 
-        const hash = window.location.hash.substring(1);
+        // Strip any deep-link file path (added by PLR-006) — path is after '|', e.g. #tid/key|path
+        // Also strip stray quotes that can appear when pasting e.g. #hook-list-6944"
+        const _fullHash = window.location.hash.substring(1).replace(/["']/g, '');
+        const hash = _fullHash.includes('|') ? _fullHash.slice(0, _fullHash.indexOf('|')) : _fullHash;
         if (!hash) {
             this.transferId = params.get('id') || null;
             return;
@@ -206,23 +209,55 @@ class SendDownload extends HTMLElement {
     }
 
     // ─── SGMETA Envelope ────────────────────────────────────────────────────
+    //
+    // Two wire formats are in the wild:
+    //
+    //   New (v0.3.0+): SGMETA[6] + length[4 big-endian] + json[length] + content
+    //   Old (v0.1.x):  SGMETA[6] + \x00 + json[scan] + content
+    //
+    // Discriminator: check bytes[6] AND bytes[7] together.
+    //
+    //   Old format: bytes[6]=0x00 (null separator) AND bytes[7]=0x7B ('{' — JSON start)
+    //   New format: everything else
+    //
+    // IMPORTANT: bytes[6] alone is NOT sufficient — in the new format, the 4-byte
+    // big-endian length also starts with 0x00 for any JSON < 16 MB (all real payloads).
+    // bytes[7] breaks the tie: old format always has '{' there; new format has the
+    // second length byte (0x00 for JSON < 65 KB, never 0x7B in practice).
 
-    static SGMETA_MAGIC = [0x53, 0x47, 0x4D, 0x45, 0x54, 0x41];  // "SGMETA" — 6 bytes, matches upload-constants.js
+    static SGMETA_MAGIC = [0x53, 0x47, 0x4D, 0x45, 0x54, 0x41];  // "SGMETA" — 6 bytes
 
     _extractMetadata(buf) {
         const bytes = new Uint8Array(buf);
         const magic = SendDownload.SGMETA_MAGIC;
-        if (bytes.length < magic.length + 4) return { metadata: null, content: buf };
+        if (bytes.length < magic.length + 2) return { metadata: null, content: buf };
         for (let i = 0; i < magic.length; i++) {
             if (bytes[i] !== magic[i]) return { metadata: null, content: buf };
         }
-        const metaLen = (bytes[magic.length] << 24) | (bytes[magic.length+1] << 16) |
-                        (bytes[magic.length+2] << 8) | bytes[magic.length+3];
-        const metaStart = magic.length + 4;
-        const contentStart = metaStart + metaLen;
+
+        // ── Old format: SGMETA\x00{json}  (bytes[6]=0x00 AND bytes[7]='{') ──
+        if (bytes[magic.length] === 0x00 && bytes[magic.length + 1] === 0x7B) {
+            const jsonOffset = magic.length + 1;
+            let depth = 0, jsonEnd = -1;
+            for (let j = jsonOffset; j < bytes.length; j++) {
+                if (bytes[j] === 0x7B) depth++;
+                else if (bytes[j] === 0x7D) { if (--depth === 0) { jsonEnd = j + 1; break; } }
+            }
+            if (jsonEnd < 0) return { metadata: null, content: buf };
+            try {
+                const metaStr = new TextDecoder().decode(bytes.slice(jsonOffset, jsonEnd));
+                return { metadata: JSON.parse(metaStr), content: buf.slice(jsonEnd) };
+            } catch (_) { return { metadata: null, content: buf }; }
+        }
+
+        // ── New format: SGMETA + length[4 big-endian] + json ─────────────
+        if (bytes.length < magic.length + 4) return { metadata: null, content: buf };
+        const metaLen      = (bytes[magic.length] << 24) | (bytes[magic.length+1] << 16) |
+                             (bytes[magic.length+2] << 8) | bytes[magic.length+3];
+        const contentStart = magic.length + 4 + metaLen;
         if (contentStart > bytes.length) return { metadata: null, content: buf };
         try {
-            const metaStr = new TextDecoder().decode(bytes.slice(metaStart, contentStart));
+            const metaStr = new TextDecoder().decode(bytes.slice(magic.length + 4, contentStart));
             return { metadata: JSON.parse(metaStr), content: buf.slice(contentStart) };
         } catch (_) { return { metadata: null, content: buf }; }
     }
@@ -454,8 +489,12 @@ class SendDownload extends HTMLElement {
         if (!entryBtn || !entryInp) return;
 
         const submit = () => {
-            const val = entryInp.value.trim();
+            // Strip leading/trailing quotes that can appear when copy-pasting
+            // a token from a chat message, document, or URL bar selection.
+            const val = entryInp.value.trim().replace(/^["']+|["']+$/g, '');
             if (!val) return;
+            // Reflect cleaned value back into the input so the user sees what was used
+            entryInp.value = val;
             // Set as hash and re-navigate (the page will re-parse)
             window.location.hash = val;
             // Re-parse and load

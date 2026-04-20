@@ -6,6 +6,23 @@
     <title>SG/Send — Zero-knowledge encrypted file sharing</title>
     <meta name="description" content="Share files securely with zero-knowledge encryption. Your files are encrypted in your browser before upload. The server never sees your data.">
 
+    <!-- Short-link redirect: https://send.sgraph.ai#token → /en-gb/browse/#token
+         Runs before any render so there is no flash of the upload page.
+         Matches friendly tokens (word-word-NNNN) and raw #tid/key tokens. -->
+    <script>
+    (function() {
+        var h = window.location.hash.slice(1);
+        if (!h) return;
+        // Friendly token: word-word-NNNN  (letters/digits, two hyphens, ends in digits)
+        var friendly = /^[a-z]+-[a-z]+-\d+$/i.test(h);
+        // Raw token: hex/base64 chars, optionally followed by /key
+        var raw = /^[a-zA-Z0-9+/=_-]{8,}(\/[a-zA-Z0-9+/=_-]+)?$/.test(h);
+        if (friendly || raw) {
+            window.location.replace('browse/' + window.location.hash);
+        }
+    })();
+    </script>
+
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="../_common/favicon.svg">
 
@@ -113,7 +130,7 @@
     <script src="../_common/js/components/send-test-files/send-test-files.js"></script>
 
     <!-- ═══ v0.3.1 surgical overrides (loaded AFTER v0.3.0 base) ═══════ -->
-    <!-- Future patches go here as <script src="../_common/js/...v031.js"> -->
+    <script src="../_common/js/components/send-upload/upload-folder-v031.js"></script>
 
     <!-- 5. Init -->
     <script>

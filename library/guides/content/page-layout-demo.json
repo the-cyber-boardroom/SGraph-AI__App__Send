@@ -1,0 +1,353 @@
+{
+  "title": "Page Layout — Block Type Demo",
+  "banner": false,
+  "meta": {
+    "author": "SGraph AI",
+    "date":   "2026-04-09",
+    "tags":   ["demo", "reference"],
+    "badge":  "Reference"
+  },
+  "theme": {
+    "mode": "light",
+    "accent": "#4ecdc4",
+    "font": "sans",
+    "density": "normal",
+    "background": "#ffffff"
+  },
+  "navigation": [
+    { "label": "Hero",         "anchor": "hero-demo" },
+    { "label": "Text blocks",  "anchor": "text-blocks" },
+    { "label": "Media",        "anchor": "media" },
+    { "label": "Layout",       "anchor": "layout" },
+    { "label": "New types",    "anchor": "new-block-types" },
+    { "label": "Banner",       "anchor": "banner-block" },
+    { "label": "Attribution",  "anchor": "attribution" }
+  ],
+  "components": [
+    {
+      "type": "hero",
+      "props": {
+        "title":    "Page Layout Demo",
+        "subtitle": "A reference document showing every block type supported by _page.json",
+        "color":    "#1a1a2e",
+        "height":   "medium",
+        "align":    "center",
+        "overlay":  "gradient"
+      }
+    },
+
+    {
+      "type": "section",
+      "props": {
+        "title":   "Hero Demo",
+        "layout":  "narrow",
+        "divider": "line"
+      },
+      "children": [
+        {
+          "type": "text",
+          "props": {
+            "content": "The hero component above demonstrates a solid-colour background with the gradient overlay variant. The 'height' prop controls min-height: small (150px), medium (250px), large (400px), or full (100vh). Add 'image' to use a background photo from the vault."
+          }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "tip",
+            "title":   "Tip: Use 'align: center' for presentation decks",
+            "text":    "Left-aligned text (default) works best for document-style pages. Centre-alignment with a large height feels more like a slide."
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "section",
+      "props": {
+        "title":      "Text Blocks",
+        "background": "alt"
+      },
+      "children": [
+        {
+          "type": "title",
+          "props": { "text": "Title component (h3)", "level": "3" }
+        },
+        {
+          "type": "text",
+          "props": {
+            "content": "The 'text' block renders a styled paragraph. For multi-paragraph content, use multiple text blocks or switch to the 'markdown' block for richer formatting including bold, lists, links, and inline code."
+          }
+        },
+        {
+          "type": "bullet-points",
+          "props": {
+            "items": [
+              "Bullet point one — uses accent-coloured disc markers",
+              "Bullet point two — 0.95rem font, 1.7 line-height",
+              "Bullet point three — use for key facts, not prose"
+            ]
+          }
+        },
+        {
+          "type": "markdown",
+          "props": {
+            "text": "### Markdown block\n\nThe `markdown` block supports **bold**, *italic*, `inline code`, [links](#), headings, and blockquotes.\n\n> Blockquotes use the accent colour for the left border.\n\nInternal links (no `http://`) open as tabs in the Browse view."
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "section",
+      "props": {
+        "title":   "Media",
+        "divider": "space"
+      },
+      "children": [
+        {
+          "type": "title",
+          "props": { "text": "Image block", "level": "3" }
+        },
+        {
+          "type": "text",
+          "props": {
+            "content": "The 'image' block renders a single vault image. Props: file, caption, width, align, border, shadow, rounded. Without a real file path the image renders as a broken placeholder — replace 'images/demo.jpg' with an actual file when using in a vault."
+          }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "info",
+            "title":   "Image path note",
+            "text":    "All file paths are relative to the folder containing _page.json. Use '../' to traverse up to parent folders."
+          }
+        },
+        {
+          "type": "title",
+          "props": { "text": "Gallery block", "level": "3" }
+        },
+        {
+          "type": "text",
+          "props": {
+            "content": "The 'gallery' block renders a CSS grid of thumbnails. Clicking any thumbnail opens a full-screen lightbox with keyboard navigation (arrows + ESC). The demo below has no real images — replace the file paths with vault images."
+          }
+        },
+        {
+          "type": "title",
+          "props": { "text": "Slides block", "level": "3" }
+        },
+        {
+          "type": "text",
+          "props": {
+            "content": "The 'slides' block is a single-image carousel with previous/next buttons and a slide counter. Set autoplay: true to auto-advance every 3 seconds (stops on click). Keyboard arrow keys work when the component is focused."
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "section",
+      "props": {
+        "title":      "Layout",
+        "background": "alt"
+      },
+      "children": [
+        {
+          "type": "title",
+          "props": { "text": "Columns block", "level": "3" }
+        },
+        {
+          "type": "columns",
+          "props": {
+            "ratio": "1:2",
+            "gap":   "medium"
+          },
+          "children": [
+            {
+              "type": "text",
+              "props": { "content": "This is the narrow left column (ratio 1:2). Use it for labels, icons, or short callouts." }
+            },
+            {
+              "type": "text",
+              "props": { "content": "This is the wider right column. Use it for the main body text or a larger image. Below 768px viewport width, the columns stack vertically." }
+            }
+          ]
+        },
+        {
+          "type": "title",
+          "props": { "text": "Cards block", "level": "3" }
+        },
+        {
+          "type": "text",
+          "props": {
+            "content": "Cards link to other files or folders in the vault. The whole card is clickable. Cards with a 'link' prop show an animated arrow on hover. Replace the link values with real folder paths."
+          }
+        },
+        {
+          "type": "cards",
+          "props": {
+            "columns": 3,
+            "items": [
+              {
+                "title":       "Example Card One",
+                "description": "Short description. This card would link to a subfolder in a real vault.",
+                "link":        "subfolder-one/"
+              },
+              {
+                "title":       "Example Card Two",
+                "description": "Another card. Add an 'image' prop with a vault file path for a cover photo.",
+                "link":        "subfolder-two/"
+              },
+              {
+                "title":       "Example Card Three",
+                "description": "Cards stack to 1 column on mobile. Use 2–4 columns for desktop layouts.",
+                "link":        "subfolder-three/"
+              }
+            ]
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "section",
+      "props": {
+        "title":   "New Block Types",
+        "divider": "line"
+      },
+      "children": [
+        {
+          "type": "title",
+          "props": { "text": "Callout block (4 variants)", "level": "3" }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "info",
+            "title":   "Info callout",
+            "text":    "Use for supplementary information, notes, or context that supports the main text but isn't critical."
+          }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "warning",
+            "title":   "Warning callout",
+            "text":    "Use when the reader must take care — security notes, destructive actions, prerequisites."
+          }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "success",
+            "title":   "Success callout",
+            "text":    "Use to highlight a positive outcome, confirmation, or 'done' state."
+          }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "tip",
+            "title":   "Tip callout",
+            "text":    "Use for shortcuts, best practices, or non-obvious advice that helps the reader work faster."
+          }
+        },
+
+        {
+          "type": "title",
+          "props": { "text": "Stats block", "level": "3" }
+        },
+        {
+          "type": "stats",
+          "props": {
+            "items": [
+              { "value": "256",  "label": "Bit encryption",     "delta": "AES-GCM" },
+              { "value": "0",    "label": "Server plaintext",    "delta": "by design" },
+              { "value": "99.9%","label": "Uptime SLA",          "delta": "+0.1%" },
+              { "value": "12",   "label": "Char transfer ID",    "delta": "random" }
+            ]
+          }
+        },
+
+        {
+          "type": "title",
+          "props": { "text": "Quote block", "level": "3" }
+        },
+        {
+          "type": "quote",
+          "props": {
+            "text":   "Zero-knowledge architecture is not just a feature — it is the only honest answer to the question of who should hold the keys to your data.",
+            "author": "Dinis Cruz",
+            "role":   "Founder, SGraph AI"
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "section",
+      "props": { "title": "Banner block", "id": "banner-block" },
+      "children": [
+        {
+          "type": "text",
+          "props": {
+            "content": "The 'banner' block renders a thin identity strip — useful when a page doesn't have a hero. It auto-renders on any page whose first component is not a hero, unless suppressed with \"banner\": false at the page level."
+          }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "info",
+            "title": "Auto-banner behaviour",
+            "text": "If the first component of your page is not a hero block, a banner is automatically inserted before the nav bar. Add \"banner\": false to the page root to suppress it."
+          }
+        },
+        {
+          "type": "title",
+          "props": { "text": "Explicit banner example", "level": "3" }
+        },
+        {
+          "type": "banner",
+          "props": {
+            "title":       "My Report Title",
+            "badge":       "Report",
+            "author":      "Dinis Cruz",
+            "date":        "2026-04-09",
+            "tags":        ["encrypted", "ai-generated"],
+            "dismissible": true
+          }
+        },
+        {
+          "type": "text",
+          "props": {
+            "content": "To populate the auto-banner from page metadata, add a \"meta\" object at the page root with author, date, tags, and badge fields."
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "section",
+      "props": {
+        "title":      "Attribution",
+        "background": "alt"
+      },
+      "children": [
+        {
+          "type": "text",
+          "props": {
+            "content": "The 'author' block renders at the bottom of the page content area. It accepts name, role, date, and an optional avatar image path."
+          }
+        },
+        {
+          "type": "author",
+          "props": {
+            "name":   "Claude (Designer role)",
+            "role":   "Page Layout System",
+            "date":   "2026-04-09"
+          }
+        }
+      ]
+    }
+  ]
+}

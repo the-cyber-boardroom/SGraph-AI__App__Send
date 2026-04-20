@@ -1,0 +1,65 @@
+# Library Website — Team Manifest
+# v0.19.7 | 02 April 2026
+#
+# WARDLEY MAP LOGIC
+# Explorer  (Genesis → Custom-Built)  → builds first version of the library
+# Villager  (Custom-Built → Product)  → hardens and deploys to library.sgraph.ai
+# Town Planner (Product → Commodity)  → drives adoption across all projects
+#
+# DEPENDENCY CHAIN: Explorer → Villager → Town Planner
+
+# ---------------------------------------------------------------------------
+# TEAM 1: Explorer — Library Build
+# Lead: Librarian
+# Center of gravity: "Scattered knowledge becomes a browsable, cloneable library.
+#   Every agent session starts with full team context — no hunting, no re-reading.
+#   Success: a new project can bootstrap its agentic team from one git clone."
+# Focus: New repo creation, content migration, website, indexing
+# Working files: explorer-library/
+# ---------------------------------------------------------------------------
+
+Team-1 | todo | Explorer — Library Build (Librarian-led)
+	Story-1 | todo | SGraph-AI__Library repo exists with full folder structure
+	Story-2 | todo | All 21 role definitions accessible in the library repo
+	Story-3 | todo | Clone-on-start works: new session → git clone → full context
+	Story-4 | todo | library.sgraph.ai renders all content for human browsing
+	Story-5 | todo | index.json and raw markdown URLs serve LLM audience
+
+# ---------------------------------------------------------------------------
+# TEAM 2: Villager — Production Release
+# Lead: QA
+# Center of gravity: "All 9 acceptance criteria met. Zero cookies.
+#   Smoke tests green. Clone-on-start tested in a clean environment.
+#   library.sgraph.ai is stable before any project starts depending on it."
+# Focus: DoD verification, deployment hardening, smoke tests
+# Working files: villager-release/
+# ---------------------------------------------------------------------------
+
+Team-2 | blocked | Villager — Production Release (QA-led)
+# Blocked by: Team-1 Stories 1-5 complete
+	Story-6 | blocked | All 9 DoD items verified by QA
+	Story-7 | blocked | CI deploys on push to main; smoke tests pass
+	Story-8 | blocked | Clone-on-start test passes in clean environment
+
+# ---------------------------------------------------------------------------
+# TEAM 3: Town Planner — Cross-Project Adoption
+# Lead: Conductor
+# Center of gravity: "The library is only valuable when used. Every project
+#   repo references it. Every new session starts from it. The SG/Send CLAUDE.md
+#   becomes a thin wrapper around the library.
+#   Success: spinning up a new project takes < 5 minutes using the library."
+# Focus: Updating all project repos, reducing duplication, proving cross-project reuse
+# Working files: town-planner-adoption/
+# ---------------------------------------------------------------------------
+
+Team-3 | blocked | Town Planner — Cross-Project Adoption (Conductor-led)
+# Blocked by: Team-2 Story-7 (library.sgraph.ai stable)
+	Story-9  | blocked | SG/Send CLAUDE.md updated (library reference added, shared content removed)
+	Story-10 | blocked | SGraph-QA and SGraph-Tools updated with library reference
+	Story-11 | blocked | First new project bootstraps using library only (cross-project proof)
+	Story-12 | blocked | Weekly Librarian curation workflow established
+
+# CROSS-TEAM DEPENDENCIES
+# Team 1 → Team 2: Explorer must complete Stories 1-5 before Villager can gate
+# Team 2 → Team 3: Villager must confirm stable deploy before Town Planner updates project repos
+# Team 3 output feeds back: if cross-project test reveals library gaps, new Tasks go back to Team 1

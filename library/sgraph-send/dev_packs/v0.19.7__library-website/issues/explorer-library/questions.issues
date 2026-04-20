@@ -1,0 +1,36 @@
+# Open Questions — Explorer Library Team
+# For: Dinis Cruz (human) to answer
+
+Question-1 | open | Where should <sg-markdown-viewer> ultimately live?
+# Options: (a) build in Library repo, later move to __Tools
+#          (b) build in __Tools first, consume from static.sgraph.ai
+# Recommendation: (a) — build here first, extract to __Tools after v1 stable
+# Same decision as <sg-public-viewer> for the website redesign
+
+Question-2 | open | Should library content be copied or linked from SG/Send?
+# Option A: Copy role definitions into library repo (independent, can diverge)
+# Option B: Library repo submodule or symlink pointing at SG/Send team/roles/
+# Recommendation: Copy — keeps library truly independent. SG/Send role reviews
+# can reference library versions. Library is the canonical source after migration.
+
+Question-3 | open | What is the exact list of 21+ roles?
+# Currently 16 ROLE.md files exist. Brief says "21+".
+# Need to confirm: CISO, Alchemist, Explorer, Villager, Town Planner defined as roles?
+# Or are some of these team names, not individual role definitions?
+
+Question-4 | open | Should library.sgraph.ai have a /search page or just the inline component?
+# v0.13.5 mentions search. Both options work with index.json.
+# Recommendation: inline search component first, /search page if needed later.
+
+Question-5 | open | Which existing library/ guides are stable enough to migrate now?
+# Some guides reference specific SG/Send file paths and versions.
+# Librarian needs to review each guide and flag: copy as-is / generalise / defer.
+
+Question-6 | open | Who creates the SGraph-AI__Library GitHub repo?
+# Requires: GitHub org owner or admin permissions.
+# This is likely a human (Dinis) action.
+
+Question-7 | open | Should the library use the same shared header/footer as sgraph.ai?
+# If yes: consume from static.sgraph.ai once header/footer Web Components are published.
+# If no: library has its own minimal header.
+# Context: library is a dev tool, not a marketing site. Minimal header may be cleaner.

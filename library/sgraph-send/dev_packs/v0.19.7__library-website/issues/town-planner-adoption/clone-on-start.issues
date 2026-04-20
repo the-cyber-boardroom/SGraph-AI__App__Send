@@ -1,0 +1,52 @@
+# Town Planner — Clone-on-Start Adoption
+# Team: Town Planner — Cross-Project Adoption (Team 3)
+# Lead: Conductor | BLOCKED until Villager confirms library stable
+# Source: 06_launch-checklist.md
+
+Workstream-TP1 | blocked | Clone-on-Start Integration Across All Projects
+# Blocked by: Team-2 Task-19 (CI stable)
+
+# ---- UPDATE PROJECT REPOS ----
+
+	Task-1  | blocked | Update SG/Send .claude/CLAUDE.md → add ## Library section -> Conductor
+	# Add: git clone URL, pointer to library/roles/, library/guides/, library/skills/
+	# Remove: content that now lives in library (methodology, Wardley context)
+	# Keep: project-specific config (stack, repo structure, version file, reality doc location)
+
+	Task-2  | blocked | Update SGraph-QA CLAUDE.md → add library reference -> Conductor
+
+	Task-3  | blocked | Update SGraph-Tools CLAUDE.md → add library reference -> Conductor
+
+# ---- TEST CLONE-ON-START IN EACH REPO ----
+
+	Task-4  | blocked | Test: new Claude Code session in SG/Send starts with library -> QA
+	# Start session, clone library, verify roles + skills immediately available
+
+	Task-5  | blocked | Test: new Claude Code session in SGraph-QA starts with library -> QA
+
+	Task-6  | blocked | Test: cross-project — new project (not SG/Send) bootstraps from library only -> Conductor
+	# Story-11 acceptance test: spin up any new project, clone library, begin work
+	# Verify: no SG/Send content needed to understand roles and methodology
+
+# ---- SESSION START HOOKS ----
+
+	Task-7  | blocked | Add library clone to session start hook configuration -> DevOps
+	# ~/.claude/settings.json or equivalent
+	# Only clone if not already present (idempotent)
+
+# ---- BRIEFING PROMPTS ----
+
+	Task-8  | blocked | Update all dev pack 00_briefing-prompt.md files → add clone instruction -> Librarian
+	# All existing dev packs in library/sgraph-send/dev_packs/
+
+Workstream-TP2 | blocked | Weekly Curation Workflow Establishment
+# Blocked by: Workstream-TP1 complete
+
+	Task-9  | blocked | Document the curation workflow -> Librarian
+	# What does the weekly Librarian review look like?
+	# Check: staleness flags in index.json → identify documents 2+ versions stale
+	# Update or mark archived. Commit. Deploy auto-triggers.
+
+	Task-10 | blocked | Run first weekly curation cycle -> Librarian
+	# Review all staleness flags after library goes live.
+	# Update any documents flagged as stale.

@@ -177,6 +177,7 @@ team/                            # Team structure
 11. **No decryption keys on server** — key stays with sender, shared out-of-band
 12. **IP addresses hashed** — SHA-256 with daily salt, stored as `ip_hash`
 13. **All backend data is non-sensitive/non-confidential** — by design
+14. **NEVER commit access tokens, vault keys, share tokens, or API keys to Git.** These are secrets. If a vault key or token appears in a commit, it is a security incident. Use environment variables, localStorage, or out-of-band communication only.
 
 ### File Naming
 
@@ -194,10 +195,28 @@ team/                            # Team structure
 
 ### Testing
 
-18. **No mocks, no patches** — full stack starts in-memory in ~100ms
-19. **LocalStack** for S3 integration tests (the only acceptable "fake")
-20. **Playwright** for E2E browser tests
-21. **Smoke tests** after every deployment (health, auth, CORS, no-plaintext)
+22. **No mocks, no patches** — full stack starts in-memory in ~100ms
+23. **LocalStack** for S3 integration tests (the only acceptable "fake")
+24. **Playwright** for E2E browser tests
+25. **Smoke tests** after every deployment (health, auth, CORS, no-plaintext)
+
+### Cross-Team Communication (`team/comms/`)
+
+26. **Every code change** that affects UI or API must have a changelog entry in `team/comms/changelog/MM/DD/`
+27. **Changelog entries must classify test impact** — which tests SHOULD break (good failure) vs which should NOT break (bad failure)
+28. **QA briefs** for testing requirements go in `team/comms/qa/briefs/MM/DD/`
+29. **QA team starts every session** by reading `team/comms/QA_START_HERE.md`
+30. **Inter-team briefs** (e.g. Vault→Browse, Architect→Dev) go in `team/comms/briefs/MM/DD/`
+
+### Vaults for Communication (`sgit`)
+
+31. **Vaults are used for cross-team communication.** Briefings, handovers, and deliverables can be shared via encrypted vaults in addition to (or instead of) committing to Git.
+32. **Vault key vs share token — know the difference:**
+    - **Vault key** (e.g. `apple-river-1234`) — persistent, writable, the full vault. Used to clone, push, pull, collaborate. Accessed at `dev.vault.sgraph.ai/en-gb/#<vault-key>`.
+    - **Share token** (e.g. `coral-stamp-5678`) — read-only snapshot of the vault at a point in time. Created via `sgit share`. Accessed at `send.sgraph.ai/en-gb/browse/#<share-token>`.
+33. **NEVER commit vault keys, share tokens, or access tokens to Git.** Share them out-of-band (chat, email, voice). If a key appears in a committed file, it is a security incident.
+34. **sgit CLI** (`pip install sgit-ai`) for vault operations: `sgit init`, `sgit commit`, `sgit push`, `sgit share`, `sgit clone`. See `SGit-AI/SGit-AI__CLI` on GitHub.
+35. **sg-send-cli is deprecated.** Use `sgit` (PyPI: `sgit-ai`) for all vault CLI operations. The `sg-send-cli` package is no longer maintained.
 
 ### Git
 
@@ -206,6 +225,7 @@ team/                            # Team structure
 24. **Branch naming:** `claude/{description}-{session-id}`
 25. **Always push with:** `git push -u origin {branch-name}`
 26. **Pull from dev before starting work** — always run `git fetch origin dev && git merge origin/dev` at the start of every session before making any changes
+27. **NEVER touch `sgraph_ai_app_send/version`** — it is owned exclusively by the CI pipeline. Do not read it, write it, or reference it in commit messages. CI increments it automatically after tests pass. Manually setting it creates version collisions.
 
 ---
 
