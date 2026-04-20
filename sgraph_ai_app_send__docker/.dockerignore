@@ -1,0 +1,11 @@
+.git
+.github
+.claude
+.issues
+tests/
+team/
+library/
+__pycache__
+.venv
+.pytest_cache
+sgraph_ai_app_send__ui__admin/
