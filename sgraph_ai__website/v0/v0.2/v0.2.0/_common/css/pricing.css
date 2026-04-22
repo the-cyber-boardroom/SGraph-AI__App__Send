@@ -1,0 +1,143 @@
+/* ============================================================
+   SG/Send v0.2.0 — Pricing page styles
+   ============================================================ */
+
+.pricing-zones {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-6);
+  margin-top: var(--sp-12);
+}
+
+@media (max-width: 1024px) {
+  .pricing-zones {
+    grid-template-columns: 1fr;
+    max-width: 600px;
+    margin-inline: auto;
+  }
+}
+
+/* Featured zone (TODAY) */
+.pricing-zone--featured {
+  border-color: var(--accent);
+  position: relative;
+}
+
+.pricing-zone--featured .pricing-zone__header {
+  background-color: rgba(78, 205, 196, 0.06);
+  border-bottom-color: rgba(78, 205, 196, 0.3);
+}
+
+/* Moat claim strip */
+.moat-claim {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--sp-8);
+  text-align: center;
+  margin-bottom: var(--sp-12);
+}
+
+.moat-claim__headline {
+  font-size: var(--fs-h3);
+  color: var(--text-heading);
+  margin-bottom: var(--sp-3);
+}
+
+.moat-claim__sub {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* Register interest form */
+.register-interest {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-6);
+}
+
+.register-interest__input {
+  flex: 1;
+  min-width: 200px;
+  padding: var(--sp-3) var(--sp-4);
+  background-color: rgba(22, 33, 62, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-btn);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+}
+
+.register-interest__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.15);
+}
+
+.register-interest__input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* FAQ */
+.faq-list {
+  max-width: 700px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.faq-item {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.faq-item__q {
+  width: 100%;
+  padding: var(--sp-5) var(--sp-6);
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--text-heading);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  transition: background var(--transition-fast);
+}
+
+.faq-item__q:hover {
+  background-color: rgba(78, 205, 196, 0.04);
+}
+
+.faq-item__chevron {
+  color: var(--accent);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.faq-item.is-open .faq-item__chevron {
+  transform: rotate(180deg);
+}
+
+.faq-item__a {
+  display: none;
+  padding: 0 var(--sp-6) var(--sp-5);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  border-top: 1px solid var(--border-color);
+  padding-top: var(--sp-4);
+}
+
+.faq-item.is-open .faq-item__a {
+  display: block;
+}
