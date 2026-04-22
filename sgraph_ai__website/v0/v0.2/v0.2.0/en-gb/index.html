@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SG/Send — Version-controlled, client-encrypted vaults. For humans and agents.</title>
+  <meta name="description" content="Version-controlled, client-encrypted vaults built on AWS. Files encrypted in your browser before upload. The server is blind. For humans, for agents, for any cloud.">
+  <meta property="og:title" content="SG/Send — Client-encrypted vaults for humans and agents">
+  <meta property="og:description" content="Version-controlled, client-encrypted vaults. AES-256-GCM in the browser. The server never sees plaintext. Seven deployment targets. One codebase.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="../../../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../_common/css/style.css">
+  <link rel="stylesheet" href="../_common/css/homepage.css">
+</head>
+<body class="i18n-loading">
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+<header class="site-header">
+  <div class="container">
+    <a class="site-logo" href="/en-gb/">
+      <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+    </a>
+
+    <nav class="site-nav" id="main-nav">
+      <a href="how-it-works/">How it Works</a>
+      <a href="security/">Security</a>
+      <a href="https://tools.sgraph.ai" target="_blank" rel="noopener">Tools</a>
+      <a href="pricing/">Pricing</a>
+    </nav>
+
+    <div class="token-inline-bar" id="token-bar">
+      <button class="token-inline-bar__trigger" type="button" aria-label="Open a vault with a token">
+        Paste a token →
+      </button>
+      <div class="token-inline-bar__input-wrap">
+        <input
+          class="token-inline-bar__input"
+          type="text"
+          placeholder="e.g. coral-stamp-5678"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Vault token"
+        >
+        <button class="token-inline-bar__go" type="button">Open →</button>
+        <button class="token-inline-bar__cancel" type="button" aria-label="Cancel">✕</button>
+      </div>
+    </div>
+
+    <div id="locale-picker"></div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">☰</button>
+  </div>
+</header>
+
+<!-- ═══ HERO ══════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="enc-badge">
+      <span class="enc-badge__dot"></span>
+      AES-256-GCM · Client-side only · Server never sees plaintext
+    </div>
+
+    <h1 class="display">
+      <span class="hero__line1">Version-controlled, client-encrypted vaults.</span><br>
+      <span class="hero__line2">For humans and agents.</span>
+    </h1>
+
+    <p class="lead">
+      Every commit, every share, every agent: encrypted in your browser.
+      The server is blind.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-primary btn--lg">
+        Send a file — try it →
+      </a>
+      <button class="btn btn-secondary btn--lg" id="hero-token-btn" type="button">
+        Already have a token? Paste it here →
+      </button>
+    </div>
+
+    <div class="deploy-strip">
+      <span class="deploy-strip__label">Runs on:</span>
+      <span class="deploy-strip__item">Lambda</span>
+      <span class="deploy-strip__item">Fargate</span>
+      <span class="deploy-strip__item">EC2 / AMI</span>
+      <span class="deploy-strip__item">Docker</span>
+      <span class="deploy-strip__item">GCP</span>
+      <span class="deploy-strip__item">CLI</span>
+      <span class="deploy-strip__item">Self-hosted</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ AWS STACK STRIP ═══════════════════════════════════════ -->
+<div class="aws-strip">
+  <div class="aws-strip__inner">
+    <span class="aws-strip__label">Built on AWS</span>
+
+    <div class="aws-strip__node">
+      <div class="aws-strip__icon">λ</div>
+      <div class="aws-strip__name">Lambda</div>
+      <div class="aws-strip__sub">User + Admin</div>
+    </div>
+    <span class="aws-strip__arrow">→</span>
+    <div class="aws-strip__node">
+      <div class="aws-strip__icon">S3</div>
+      <div class="aws-strip__name">S3</div>
+      <div class="aws-strip__sub">Encrypted storage</div>
+    </div>
+    <span class="aws-strip__arrow">→</span>
+    <div class="aws-strip__node">
+      <div class="aws-strip__icon">📦</div>
+      <div class="aws-strip__name">ECR</div>
+      <div class="aws-strip__sub">Container registry</div>
+    </div>
+    <span class="aws-strip__arrow">→</span>
+    <div class="aws-strip__node">
+      <div class="aws-strip__icon">⚡</div>
+      <div class="aws-strip__name">CloudFront</div>
+      <div class="aws-strip__sub">Global CDN</div>
+    </div>
+    <span class="aws-strip__arrow">→</span>
+    <div class="aws-strip__node">
+      <div class="aws-strip__icon">🖥</div>
+      <div class="aws-strip__name">EC2 / AMI</div>
+      <div class="aws-strip__sub">Self-hosted deploy</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ THREE PRIMITIVES ══════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>The missing primitives for agentic development</h2>
+      <p>
+        The infrastructure layer that sits underneath any agentic framework —
+        the capabilities agents need that nobody has packaged cleanly.
+      </p>
+    </div>
+
+    <div class="grid grid--3">
+
+      <div class="primitive-card">
+        <span class="primitive-card__badge">Available now</span>
+        <div class="primitive-card__icon">🌐</div>
+        <h3 class="primitive-card__title">Browser Automation</h3>
+        <p class="primitive-card__desc">
+          Declarative JSON instructions. The agent describes intent; the service executes.
+          Paired with a MITM proxy for 100% traffic observability and secret injection.
+        </p>
+        <ul class="primitive-card__features">
+          <li class="primitive-card__feature">Declarative JSON — navigate, click, fill, screenshot</li>
+          <li class="primitive-card__feature">MITM proxy — full traffic capture, domain restrictions</li>
+          <li class="primitive-card__feature">Secret injection — agent gets capability, not credentials</li>
+          <li class="primitive-card__feature">AWS Marketplace AMI: Playwright Service</li>
+        </ul>
+      </div>
+
+      <div class="primitive-card">
+        <span class="primitive-card__badge">Available now</span>
+        <div class="primitive-card__icon">🔐</div>
+        <h3 class="primitive-card__title">Encrypted Virtual File System</h3>
+        <p class="primitive-card__desc">
+          SG/Send vaults via SGit. Scoped access, version control, zero-knowledge encryption.
+          Multi-agent collaboration without credential sharing.
+        </p>
+        <ul class="primitive-card__features">
+          <li class="primitive-card__feature">Each vault has its own key — not your GitHub credentials</li>
+          <li class="primitive-card__feature">Every file operation is a commit — full audit trail</li>
+          <li class="primitive-card__feature">Two access modes: full clone or tree-only web access</li>
+          <li class="primitive-card__feature">AWS Marketplace AMI: SG/Send Server</li>
+        </ul>
+      </div>
+
+      <div class="primitive-card primitive-card--coming-soon">
+        <span class="primitive-card__badge coming-soon-badge">Coming soon</span>
+        <div class="primitive-card__icon">⚙️</div>
+        <h3 class="primitive-card__title">Code Execution Sandbox</h3>
+        <p class="primitive-card__desc">
+          Isolated container per execution. Code loaded from vault or S3 at runtime.
+          Output captured back to vault. Stateless, disposable, auditable.
+        </p>
+        <ul class="primitive-card__features">
+          <li class="primitive-card__feature">Spin up, execute, capture output, spin down</li>
+          <li class="primitive-card__feature">No persistent state — container destroyed after run</li>
+          <li class="primitive-card__feature">Results written to vault for downstream agents</li>
+          <li class="primitive-card__feature">AWS Marketplace AMI: Tools Suite</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="callout mt-8">
+      Seven deployment targets, one codebase, same encryption everywhere.
+      Lambda → Fargate → EC2 → Docker → GCP → CLI → Self-hosted.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ USE CASES ═════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>What people build with SG/Send</h2>
+      <p>
+        From security research to healthcare workflows to multi-agent pipelines —
+        client-encrypted vaults are the common thread.
+      </p>
+    </div>
+
+    <!-- Use Case 1: Security Research -->
+    <div class="use-case-row">
+      <div class="use-case-row__content">
+        <span class="use-case-row__tag">Security Research</span>
+        <h3 class="use-case-row__title">Share vulnerability research without exposure</h3>
+        <p class="use-case-row__desc">
+          Security teams create encrypted vaults containing OWASP findings, CVE analysis,
+          and remediation guides. Each vault is a versioned, client-encrypted package.
+          The recipient gets a share token — no login, no account, no plaintext on any server.
+        </p>
+        <ul class="use-case-row__bullets">
+          <li class="use-case-row__bullet">Vault encrypted before it leaves the researcher's browser</li>
+          <li class="use-case-row__bullet">Share token gives read-only access to a point-in-time snapshot</li>
+          <li class="use-case-row__bullet">Full version history — every revision auditable</li>
+        </ul>
+      </div>
+      <div class="screenshot-placeholder">
+        <div class="screenshot-placeholder__label">Screenshot coming</div>
+        <div class="screenshot-placeholder__desc">OWASP vault browser view — 8 articles in browse layout</div>
+      </div>
+    </div>
+
+    <!-- Use Case 2: Multi-Agent -->
+    <div class="use-case-row use-case-row--reverse">
+      <div class="use-case-row__content">
+        <span class="use-case-row__tag">Multi-Agent Workflows</span>
+        <h3 class="use-case-row__title">Agents collaborate via encrypted vaults</h3>
+        <p class="use-case-row__desc">
+          Two agents, one vault. Agent A researches and writes findings to the vault.
+          Agent B reads, analyses, and writes back a report — all without sharing credentials
+          or touching a shared file system. The vault is the communication channel.
+        </p>
+        <ul class="use-case-row__bullets">
+          <li class="use-case-row__bullet">Each agent gets a vault key scoped to one vault only</li>
+          <li class="use-case-row__bullet">Push/pull model handles concurrent writes cleanly</li>
+          <li class="use-case-row__bullet">Full commit history — every agent action auditable</li>
+        </ul>
+      </div>
+      <div class="screenshot-placeholder">
+        <div class="screenshot-placeholder__label">Screenshot coming</div>
+        <div class="screenshot-placeholder__desc">Multi-agent vault — two agents, shared vault, separate branches</div>
+      </div>
+    </div>
+
+    <!-- Use Case 3: Healthcare -->
+    <div class="use-case-row">
+      <div class="use-case-row__content">
+        <span class="use-case-row__tag">Healthcare</span>
+        <h3 class="use-case-row__title">Patient intake that never reaches the server</h3>
+        <p class="use-case-row__desc">
+          Encrypted questionnaires collected in the browser, assembled into a vault,
+          and shared with clinicians via token. Deploy your own SG/Send AMI inside your VPC —
+          data never leaves your infrastructure.
+        </p>
+        <ul class="use-case-row__bullets">
+          <li class="use-case-row__bullet">AES-256-GCM in the browser — server sees ciphertext only</li>
+          <li class="use-case-row__bullet">Deploy inside your own AWS account with the SG/Send AMI</li>
+          <li class="use-case-row__bullet">No plaintext patient data on any third-party server</li>
+        </ul>
+      </div>
+      <div class="screenshot-placeholder">
+        <div class="screenshot-placeholder__label">Screenshot coming</div>
+        <div class="screenshot-placeholder__desc">Encrypted healthcare questionnaire — intake form vault</div>
+      </div>
+    </div>
+
+    <!-- Use Case 4: Playwright + vault -->
+    <div class="use-case-row use-case-row--reverse">
+      <div class="use-case-row__content">
+        <span class="use-case-row__tag">Browser Automation</span>
+        <h3 class="use-case-row__title">Automated browsing with a full audit trail</h3>
+        <p class="use-case-row__desc">
+          The Playwright AMI runs browser automation sequences and writes all output —
+          screenshots, PDFs, network dumps — directly to a vault. The MITM proxy
+          captures 100% of traffic. Every session is reproducible and auditable.
+        </p>
+        <ul class="use-case-row__bullets">
+          <li class="use-case-row__bullet">JSON instructions in, screenshots and network dumps out</li>
+          <li class="use-case-row__bullet">MITM proxy — see every HTTP request the agent made</li>
+          <li class="use-case-row__bullet">Results in a vault — share with any downstream agent or human</li>
+        </ul>
+      </div>
+      <div class="screenshot-placeholder">
+        <div class="screenshot-placeholder__label">Screenshot coming</div>
+        <div class="screenshot-placeholder__desc">Playwright automation log + screenshots written to vault</div>
+      </div>
+    </div>
+
+    <!-- Use Case 5: Dev Pack -->
+    <div class="use-case-row">
+      <div class="use-case-row__content">
+        <span class="use-case-row__tag">Developer Workflow</span>
+        <h3 class="use-case-row__title">Pre-primed agent sessions via vault dev packs</h3>
+        <p class="use-case-row__desc">
+          A vault containing specs, guides, API context, and examples is shared with an agent
+          before a session starts. The agent reads the vault, understands the project,
+          and begins work. No copy-pasting. No context injection. One token.
+        </p>
+        <ul class="use-case-row__bullets">
+          <li class="use-case-row__bullet">Vault as a briefing pack — all context in one encrypted place</li>
+          <li class="use-case-row__bullet">SGit CLI: clone the vault, work locally, push back changes</li>
+          <li class="use-case-row__bullet">Share token for read-only handoff to downstream tools</li>
+        </ul>
+      </div>
+      <div class="screenshot-placeholder">
+        <div class="screenshot-placeholder__label">Screenshot coming</div>
+        <div class="screenshot-placeholder__desc">Vault browse view — dev pack with specs, guides, context files</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ TOOLS ══════════════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>AI tools that run in your browser</h2>
+      <p>
+        All tools at <a href="https://tools.sgraph.ai" target="_blank" rel="noopener">tools.sgraph.ai</a>
+        run client-side. No data leaves your browser unless you choose to save to a vault.
+      </p>
+    </div>
+
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="card__icon">📊</div>
+        <h3 class="card__title">Infographic Generator</h3>
+        <p class="card__desc">
+          Turn text or data into a structured infographic. Runs in-browser.
+          Save output to a vault or export as image.
+        </p>
+        <a class="card__link" href="https://tools.sgraph.ai" target="_blank" rel="noopener">Try it →</a>
+      </div>
+      <div class="card">
+        <div class="card__icon">💬</div>
+        <h3 class="card__title">LLM Chat</h3>
+        <p class="card__desc">
+          Chat with OpenRouter-connected models or local Ollama instances.
+          Connect to a vault to give the model context from your files.
+        </p>
+        <a class="card__link" href="https://tools.sgraph.ai" target="_blank" rel="noopener">Try it →</a>
+      </div>
+      <div class="card">
+        <div class="card__icon">📄</div>
+        <h3 class="card__title">Page Layout Renderer</h3>
+        <p class="card__desc">
+          Render structured content as clean page layouts — reports, briefings,
+          presentations. Client-side only. Output to vault.
+        </p>
+        <a class="card__link" href="https://tools.sgraph.ai" target="_blank" rel="noopener">Try it →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRICING TEASER ════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Start for £5</h2>
+      <p>
+        One Starter Pack. Enough credits to send files, create vaults, and run your first
+        agentic workflow. No subscription. No account required for receiving.
+      </p>
+    </div>
+    <div class="pricing-teaser">
+      <a href="https://buy.stripe.com/fZu8wHdv23nN1Z85jn5os02" class="btn btn-primary btn--lg">
+        Buy Starter Pack — £5 →
+      </a>
+      <a href="pricing/" class="text-secondary">
+        See all pricing options, including AWS Marketplace →
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRIVACY INLINE ════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Our privacy model in six sentences</h2>
+    </div>
+    <div class="privacy-inline">
+      <div class="privacy-inline__title">How SG/Send handles your data</div>
+      <div class="privacy-inline__text">
+        <p>Files are encrypted in your browser using AES-256-GCM before they are uploaded.
+           The encryption key is derived from a passphrase you choose and never transmitted to our servers.</p>
+        <p>Our server stores only ciphertext — we cannot read your files, and we cannot
+           give them to anyone else because we do not have the keys.</p>
+        <p>IP addresses are hashed with a daily salt before storage; we cannot reverse the hash
+           to identify you. No file names are stored on the server.</p>
+        <p>Transfers expire automatically; after expiry the ciphertext is deleted.
+           We collect no analytics, no tracking pixels, and no third-party scripts run on this page.</p>
+        <p>The server-side code is open source. You can audit exactly what runs on our infrastructure,
+           or deploy your own instance on your own AWS account using our published AMI.</p>
+        <p>If you have questions about data handling, email
+           <a href="mailto:privacy@sgraph.ai">privacy@sgraph.ai</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ OPEN SOURCE ═══════════════════════════════════════════ -->
+<section class="section oss-section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Open source, open architecture</h2>
+      <p>
+        The server code, the CLI, and the deployment pipeline are all public.
+        Inspect what runs, deploy your own instance, or contribute.
+      </p>
+    </div>
+
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="card__icon">🐙</div>
+        <h3 class="card__title">SG/Send Server</h3>
+        <p class="card__desc">FastAPI server, Memory-FS storage, Lambda + Docker + EC2 targets.</p>
+        <a class="card__link" href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">View on GitHub →</a>
+      </div>
+      <div class="card">
+        <div class="card__icon">⌨️</div>
+        <h3 class="card__title">SGit CLI</h3>
+        <p class="card__desc">Command-line vault operations: init, commit, push, pull, share.</p>
+        <a class="card__link" href="https://github.com/SGit-AI/SGit-AI__CLI" target="_blank" rel="noopener">View on GitHub →</a>
+      </div>
+      <div class="card">
+        <div class="card__icon">🎭</div>
+        <h3 class="card__title">Playwright Service</h3>
+        <p class="card__desc">Declarative browser automation API. MITM proxy included. AWS Marketplace ready.</p>
+        <a class="card__link" href="https://github.com/the-cyber-boardroom" target="_blank" rel="noopener">View on GitHub →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+
+      <div class="footer-brand">
+        <a class="site-logo" href="/en-gb/">
+          <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+        </a>
+        <p>Version-controlled, client-encrypted vaults.<br>For humans and agents.</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="how-it-works/">How it Works</a></li>
+          <li><a href="security/">Security</a></li>
+          <li><a href="pricing/">Pricing</a></li>
+          <li><a href="https://tools.sgraph.ai" target="_blank" rel="noopener">Tools</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="https://github.com/SGit-AI/SGit-AI__CLI" target="_blank" rel="noopener">SGit CLI</a></li>
+          <li><a href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">Open App</a></li>
+          <li><a href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">Source Code</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="mailto:privacy@sgraph.ai">Privacy</a></li>
+          <li><a href="mailto:legal@sgraph.ai">Terms</a></li>
+          <li><a href="mailto:security@sgraph.ai">Security</a></li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>© 2026 SGraph AI Ltd. Released under CC BY 4.0 where applicable.</p>
+      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-primary btn--sm">Open SG/Send →</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../_common/js/i18n.js"></script>
+<script src="../_common/js/token-bar.js"></script>
+<script src="../_common/js/nav.js"></script>
+</body>
+</html>
