@@ -1,0 +1,151 @@
+/* ============================================================
+   SG/Send v0.2.0 — How it Works page styles
+   ============================================================ */
+
+/* Concept flow (send → share → receive) */
+.concept-flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-block: var(--sp-12);
+}
+
+.concept-flow__arrow {
+  color: var(--accent);
+  font-size: 1.5rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.concept-flow__step {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--sp-8);
+  text-align: center;
+  transition: border-color var(--transition-normal);
+}
+
+.concept-flow__step:hover {
+  border-color: var(--accent);
+}
+
+.concept-flow__step-icon {
+  font-size: 2rem;
+  margin-bottom: var(--sp-4);
+}
+
+.concept-flow__step-title {
+  font-size: var(--fs-h3);
+  margin-bottom: var(--sp-3);
+}
+
+.concept-flow__step-desc {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .concept-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .concept-flow__arrow {
+    transform: rotate(90deg);
+    text-align: center;
+  }
+}
+
+/* Vault vs Transfer comparison */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: var(--sp-8);
+}
+
+.comparison-table th {
+  padding: var(--sp-4) var(--sp-6);
+  text-align: left;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.comparison-table th:not(:first-child) {
+  color: var(--accent);
+}
+
+.comparison-table td {
+  padding: var(--sp-4) var(--sp-6);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+
+.comparison-table td:first-child {
+  font-weight: var(--fw-medium);
+  color: var(--text-heading);
+}
+
+.comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* CLI quick-start block */
+.cli-block {
+  background-color: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--sp-6);
+  margin-block: var(--sp-6);
+}
+
+.cli-block__title {
+  font-size: 0.7rem;
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: var(--sp-4);
+}
+
+.cli-block pre {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+}
+
+.cli-block .comment {
+  color: var(--text-secondary);
+}
+
+.cli-block .cmd {
+  color: var(--accent);
+}
+
+/* Agent diagram */
+.agent-flow {
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--sp-8);
+  margin-block: var(--sp-8);
+}
+
+.agent-flow__title {
+  font-size: 0.7rem;
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: var(--sp-4);
+}
