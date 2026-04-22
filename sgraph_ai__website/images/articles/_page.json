@@ -1,0 +1,36 @@
+{
+  "theme": "slate",
+  "components": [
+    {
+      "type": "hero",
+      "title": "Articles & Research",
+      "subtitle": "The thinking behind SG/Send — architecture decisions, security posture, and product philosophy."
+    },
+    {
+      "type": "cards",
+      "columns": 2,
+      "items": [
+        {
+          "title": "Why Zero-Knowledge?",
+          "body": "The case for client-side encryption and why trust us is not a security model.",
+          "badge": "Security"
+        },
+        {
+          "title": "Vaults as Collaboration Primitives",
+          "body": "How encrypted vaults replace shared folders and cloud drives — without privacy tradeoffs.",
+          "badge": "Architecture"
+        },
+        {
+          "title": "The Agentic Workflow",
+          "body": "18+ AI agent roles producing daily briefs, architecture reviews, and security assessments.",
+          "badge": "Process"
+        },
+        {
+          "title": "Open Source as a Moat",
+          "body": "Why Apache 2.0 eliminates procurement friction and builds a stronger competitive position.",
+          "badge": "Strategy"
+        }
+      ]
+    }
+  ]
+}

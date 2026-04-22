@@ -1,0 +1,119 @@
+{
+  "theme": { "mode": "dark", "background": "#0d1117", "accent": "#4ecdc4" },
+  "banner": false,
+  "navigation": [
+    { "label": "Overview",     "anchor": "overview" },
+    { "label": "Use Cases",    "anchor": "use-cases" },
+    { "label": "Architecture", "anchor": "architecture" }
+  ],
+  "components": [
+    {
+      "type": "hero",
+      "props": {
+        "title": "SG/Send — Zero-Knowledge File Sharing",
+        "subtitle": "Your files, encrypted in your browser. The server sees nothing.",
+        "height": "medium"
+      }
+    },
+    {
+      "type": "section",
+      "props": { "id": "overview", "title": "Three Primitives. Infinite Possibilities." },
+      "children": []
+    },
+    {
+      "type": "cards",
+      "props": {
+        "columns": 3,
+        "items": [
+          {
+            "title": "🔐  Encrypted Transfer",
+            "description": "AES-256-GCM in the browser. The server stores only ciphertext — never filenames, never keys, never plaintext."
+          },
+          {
+            "title": "📁  Encrypted Vault",
+            "description": "A versioned, encrypted folder. Push, pull, branch. Share a read-only snapshot via a Simple Token. The server sees nothing."
+          },
+          {
+            "title": "📄  Page Layout Renderer",
+            "description": "Turn any vault folder into a rich web page — hero, cards, gallery, callouts — all rendered from a _page.json file."
+          }
+        ]
+      }
+    },
+    {
+      "type": "section",
+      "props": { "id": "use-cases", "title": "Built for Real Workflows" },
+      "children": []
+    },
+    {
+      "type": "cards",
+      "props": {
+        "columns": 2,
+        "items": [
+          {
+            "title": "Healthcare",
+            "description": "Patient records and imaging reports shared between clinicians without touching a third-party server."
+          },
+          {
+            "title": "Legal",
+            "description": "Client documents, NDAs, and case files — end-to-end encrypted before they leave the office."
+          },
+          {
+            "title": "Journalism",
+            "description": "Source documents and sensitive briefings shared with editors without metadata exposure."
+          },
+          {
+            "title": "Finance",
+            "description": "Deal room materials and term sheets in an encrypted vault the investor browses directly."
+          }
+        ]
+      }
+    },
+    {
+      "type": "stats",
+      "props": {
+        "items": [
+          { "value": "AES-256-GCM", "label": "Encryption" },
+          { "value": "Zero",        "label": "Server knowledge" },
+          { "value": "7",           "label": "Deployment targets" },
+          { "value": "16 days",     "label": "To first launch" }
+        ]
+      }
+    },
+    {
+      "type": "callout",
+      "props": {
+        "variant": "info",
+        "title": "Open Source · Apache 2.0",
+        "text": "The full source is public. No hidden server-side decryption possible — you can verify the encryption yourself at any time."
+      }
+    },
+    {
+      "type": "section",
+      "props": { "id": "architecture", "title": "Zero-Knowledge Architecture" },
+      "children": []
+    },
+    {
+      "type": "columns",
+      "props": { "ratio": "1:1" },
+      "children": [
+        {
+          "type": "callout",
+          "props": {
+            "variant": "success",
+            "title": "Browser — encrypt locally",
+            "text": "Web Crypto API generates AES-256-GCM keys locally. Files encrypted before any network call. Key stays in the URL fragment — never transmitted to the server."
+          }
+        },
+        {
+          "type": "callout",
+          "props": {
+            "variant": "tip",
+            "title": "Server — ciphertext only",
+            "text": "Stores only encrypted ciphertext. No filenames. No keys. No plaintext — ever. Two Lambda functions: Public (transfers) and Admin (tokens). Memory-FS storage abstraction."
+          }
+        }
+      ]
+    }
+  ]
+}
