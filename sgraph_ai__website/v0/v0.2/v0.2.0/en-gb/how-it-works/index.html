@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How it Works — SG/Send</title>
+  <meta name="description" content="How SG/Send works: send encrypted files, receive with a token, create version-controlled vaults, collaborate with agents. All encryption in the browser.">
+  <link rel="icon" href="../../../../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+  <link rel="stylesheet" href="../../_common/css/how-it-works.css">
+</head>
+<body class="i18n-loading">
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+<header class="site-header">
+  <div class="container">
+    <a class="site-logo" href="/en-gb/">
+      <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+    </a>
+
+    <nav class="site-nav" id="main-nav">
+      <a href="../how-it-works/" class="active">How it Works</a>
+      <a href="../security/">Security</a>
+      <a href="https://tools.sgraph.ai" target="_blank" rel="noopener">Tools</a>
+      <a href="../pricing/">Pricing</a>
+    </nav>
+
+    <div class="token-inline-bar" id="token-bar">
+      <button class="token-inline-bar__trigger" type="button" aria-label="Open a vault with a token">
+        Paste a token →
+      </button>
+      <div class="token-inline-bar__input-wrap">
+        <input
+          class="token-inline-bar__input"
+          type="text"
+          placeholder="e.g. coral-stamp-5678"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Vault token"
+        >
+        <button class="token-inline-bar__go" type="button">Open →</button>
+        <button class="token-inline-bar__cancel" type="button" aria-label="Cancel">✕</button>
+      </div>
+    </div>
+
+    <div id="locale-picker"></div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">☰</button>
+  </div>
+</header>
+
+<!-- ═══ HERO ══════════════════════════════════════════════════ -->
+<section class="hero hero--small">
+  <div class="container">
+    <h1 class="display">Two primitives. One encryption model.</h1>
+    <p class="lead">
+      File transfers for one-shot sharing. Vaults for persistent, version-controlled
+      collaboration. Both encrypted in your browser before anything leaves your device.
+    </p>
+  </div>
+</section>
+
+<!-- ═══ CONCEPT FLOW ══════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>The core flow</h2>
+    </div>
+
+    <div class="concept-flow">
+      <div class="concept-flow__step">
+        <div class="concept-flow__step-icon">🔐</div>
+        <h3 class="concept-flow__step-title">Encrypt</h3>
+        <p class="concept-flow__step-desc">
+          Your file is encrypted with AES-256-GCM using a key you choose —
+          in your browser, before upload. The server never sees plaintext.
+        </p>
+      </div>
+
+      <div class="concept-flow__arrow">→</div>
+
+      <div class="concept-flow__step">
+        <div class="concept-flow__step-icon">☁️</div>
+        <h3 class="concept-flow__step-title">Store</h3>
+        <p class="concept-flow__step-desc">
+          The ciphertext is stored on the server (S3-backed). You receive a
+          transfer ID. No file name, no plaintext, no key — just an encrypted blob.
+        </p>
+      </div>
+
+      <div class="concept-flow__arrow">→</div>
+
+      <div class="concept-flow__step">
+        <div class="concept-flow__step-icon">🔓</div>
+        <h3 class="concept-flow__step-title">Decrypt</h3>
+        <p class="concept-flow__step-desc">
+          The recipient pastes the token at send.sgraph.ai, enters the passphrase,
+          and the file decrypts locally. The server is not involved in decryption.
+        </p>
+      </div>
+    </div>
+
+    <div class="callout">
+      The passphrase (and the key derived from it) travels out-of-band — via chat,
+      email, or voice. The server only ever sees encrypted bytes.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ TWO PRIMITIVES ════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>File transfers vs Vaults</h2>
+      <p>Choose the right primitive for your workflow.</p>
+    </div>
+
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>📁 File Transfer</th>
+          <th>🔐 Vault</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Best for</td>
+          <td>One-shot: send a file to someone right now</td>
+          <td>Ongoing: a shared encrypted workspace that persists</td>
+        </tr>
+        <tr>
+          <td>Versioning</td>
+          <td>None — single snapshot</td>
+          <td>Full commit history (like Git) — every change auditable</td>
+        </tr>
+        <tr>
+          <td>Access</td>
+          <td>Share token → one-time download link</td>
+          <td>Vault key (read/write) or share token (read-only snapshot)</td>
+        </tr>
+        <tr>
+          <td>Expiry</td>
+          <td>Automatic TTL — deleted after expiry</td>
+          <td>Persistent until deleted by vault owner</td>
+        </tr>
+        <tr>
+          <td>Multiple files</td>
+          <td>One file per transfer</td>
+          <td>Unlimited files, folders, branches</td>
+        </tr>
+        <tr>
+          <td>Agent use</td>
+          <td>Agents can send/receive via HTTP API</td>
+          <td>Agents use SGit CLI: push, pull, branch, collaborate</td>
+        </tr>
+        <tr>
+          <td>Web UI</td>
+          <td>send.sgraph.ai → upload → share token</td>
+          <td>dev.vault.sgraph.ai → browse vault in browser</td>
+        </tr>
+        <tr>
+          <td>CLI</td>
+          <td><code>sgit send &lt;file&gt;</code></td>
+          <td><code>sgit init / commit / push / pull</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ SEND A FILE ════════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Sending a file</h2>
+      <p>Three ways: web UI, CLI, or HTTP API.</p>
+    </div>
+
+    <div class="grid grid--3">
+
+      <div class="card">
+        <div class="card__icon">🌐</div>
+        <h3 class="card__title">Web UI</h3>
+        <p class="card__desc">
+          Go to <a href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">send.sgraph.ai</a>,
+          choose a file, set a passphrase, upload. You receive a transfer ID.
+          Share the ID and passphrase with your recipient separately.
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="card__icon">⌨️</div>
+        <h3 class="card__title">SGit CLI</h3>
+        <div class="cli-block" style="margin-top: 12px;">
+          <pre><span class="comment"># Install once</span>
+<span class="cmd">pip install sgit-ai</span>
+
+<span class="comment"># Send a file</span>
+<span class="cmd">sgit send report.pdf</span>
+
+<span class="comment"># → Transfer ID: coral-stamp-5678
+# Share ID + passphrase out-of-band</span></pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__icon">🤖</div>
+        <h3 class="card__title">HTTP API</h3>
+        <p class="card__desc">
+          Agents POST encrypted bytes to <code>/api/transfers/upload</code>
+          and receive a transfer ID. Full API docs in the
+          <a href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">source repo</a>.
+          No auth required for public transfers.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ VAULTS ══════════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Working with vaults</h2>
+      <p>
+        A vault is a version-controlled encrypted folder. Think Git, but every object
+        is encrypted before it leaves your machine.
+      </p>
+    </div>
+
+    <div class="grid grid--2">
+
+      <div>
+        <h3 class="h3 mb-4">Create and use a vault</h3>
+        <div class="cli-block">
+          <div class="cli-block__title">SGit CLI</div>
+          <pre><span class="comment"># Create a new vault</span>
+<span class="cmd">sgit init my-project</span>
+<span class="comment"># → Vault key: mypassphrase:vault-abc123
+#   Save this — it's your access key</span>
+
+<span class="comment"># Add files, then commit</span>
+<span class="cmd">cd my-project</span>
+<span class="cmd">echo "hello" > notes.md</span>
+<span class="cmd">sgit commit "first notes"</span>
+<span class="cmd">sgit push</span>
+
+<span class="comment"># Share a read-only snapshot</span>
+<span class="cmd">sgit share</span>
+<span class="comment"># → Token: river-cloud-3847
+#   Recipient browses at send.sgraph.ai/#river-cloud-3847</span></pre>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="h3 mb-4">Clone and collaborate</h3>
+        <div class="cli-block">
+          <div class="cli-block__title">On another machine or in another session</div>
+          <pre><span class="comment"># Clone with vault key</span>
+<span class="cmd">sgit clone mypassphrase:vault-abc123</span>
+
+<span class="comment"># Pull latest changes</span>
+<span class="cmd">sgit pull</span>
+
+<span class="comment"># Check status</span>
+<span class="cmd">sgit status</span>
+
+<span class="comment"># Work on a separate branch</span>
+<span class="cmd">sgit branch new analysis</span>
+<span class="cmd">sgit switch analysis</span>
+<span class="cmd">sgit commit "analysis results"</span>
+<span class="cmd">sgit push</span></pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ AGENT WORKFLOWS ════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Using vaults with AI agents</h2>
+      <p>
+        Vaults are the natural communication channel between agents.
+        Each agent gets a scoped vault key — not your credentials.
+      </p>
+    </div>
+
+    <div class="grid grid--2">
+
+      <div>
+        <h3 class="h3 mb-4">Single agent workflow</h3>
+        <div class="agent-flow">
+          <div class="agent-flow__title">Pattern: brief → work → share</div>
+          <pre class="arch-diagram">Human
+  │ Create vault with briefing + context
+  │ sgit commit "session brief"
+  │ sgit push
+  ↓
+Agent Session
+  │ sgit clone mypassphrase:vault-id
+  │ Read brief, do work, write outputs
+  │ sgit commit "session results"
+  │ sgit push
+  ↓
+Human
+  │ sgit pull
+  └ Review outputs in vault</pre>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="h3 mb-4">Multi-agent collaboration</h3>
+        <div class="agent-flow">
+          <div class="agent-flow__title">Pattern: parallel branches → merge</div>
+          <pre class="arch-diagram">Shared Vault (one vault key)
+  │
+  ├── Agent A (branch: research)
+  │     Browses web, writes findings
+  │     sgit push
+  │
+  ├── Agent B (branch: analysis)
+  │     Reads Agent A's output
+  │     Writes analysis report
+  │     sgit push
+  │
+  └── Human (branch: main)
+        sgit pull (from both branches)
+        Review, merge, share token</pre>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="callout mt-8">
+      Key principle: each agent gets a vault key scoped to one vault only.
+      No shared credentials. No access to your Git account. Full audit trail of every commit.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRIMITIVES LINK ════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>The three agentic infrastructure primitives</h2>
+      <p>
+        Vaults (encrypted VFS) are one of three primitives SG/Send provides for
+        secure agentic development.
+      </p>
+    </div>
+
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="card__icon">🌐</div>
+        <h3 class="card__title">Browser Automation</h3>
+        <p class="card__desc">
+          Declarative JSON instructions. MITM proxy for 100% traffic observability.
+          Secret injection without exposing credentials to the agent.
+        </p>
+        <a class="card__link" href="../security/">Security model →</a>
+      </div>
+      <div class="card" style="border-color: var(--accent);">
+        <div class="card__icon">🔐</div>
+        <h3 class="card__title">Encrypted VFS</h3>
+        <p class="card__desc">
+          This page. Vaults via SGit — scoped keys, version control, multi-agent
+          collaboration, zero-knowledge encryption.
+        </p>
+        <a class="card__link" href="https://github.com/SGit-AI/SGit-AI__CLI" target="_blank" rel="noopener">SGit CLI →</a>
+      </div>
+      <div class="card">
+        <div class="card__icon">⚙️</div>
+        <h3 class="card__title">Code Execution Sandbox</h3>
+        <p class="card__desc">
+          Isolated container per execution. Output written to vault.
+          Stateless, disposable, auditable. Coming soon.
+        </p>
+        <span class="coming-soon-badge" style="margin-top: 8px; display: inline-flex;">Coming soon</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ════════════════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container" style="text-align: center; max-width: 600px;">
+    <h2 class="mb-4">Try it now</h2>
+    <p class="text-secondary mb-8">
+      No account required to send or receive. Start with a £5 credit pack.
+    </p>
+    <div class="hero-ctas">
+      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-primary btn--lg">
+        Open SG/Send →
+      </a>
+      <a href="../pricing/" class="btn btn-secondary btn--lg">
+        See pricing →
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+
+      <div class="footer-brand">
+        <a class="site-logo" href="/en-gb/">
+          <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+        </a>
+        <p>Version-controlled, client-encrypted vaults.<br>For humans and agents.</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../how-it-works/">How it Works</a></li>
+          <li><a href="../security/">Security</a></li>
+          <li><a href="../pricing/">Pricing</a></li>
+          <li><a href="https://tools.sgraph.ai" target="_blank" rel="noopener">Tools</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="https://github.com/SGit-AI/SGit-AI__CLI" target="_blank" rel="noopener">SGit CLI</a></li>
+          <li><a href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">Open App</a></li>
+          <li><a href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">Source Code</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="mailto:privacy@sgraph.ai">Privacy</a></li>
+          <li><a href="mailto:legal@sgraph.ai">Terms</a></li>
+          <li><a href="mailto:security@sgraph.ai">Security</a></li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>© 2026 SGraph AI Ltd. Released under CC BY 4.0 where applicable.</p>
+      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-primary btn--sm">Open SG/Send →</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../../_common/js/i18n.js"></script>
+<script src="../../_common/js/token-bar.js"></script>
+<script src="../../_common/js/nav.js"></script>
+</body>
+</html>
