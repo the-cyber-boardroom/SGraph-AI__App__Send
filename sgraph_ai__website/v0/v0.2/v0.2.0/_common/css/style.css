@@ -1320,7 +1320,8 @@ body.i18n-loading {
 
 @media (max-width: 768px) {
   .token-inline-bar {
-    display: none;
+    display: flex;
+    flex-shrink: 0;
   }
 
   .token-inline-bar.is-open {
@@ -1500,12 +1501,13 @@ body.i18n-loading {
   border-bottom: 1px solid var(--border-color);
 }
 
-.use-case-row--reverse {
-  direction: rtl;
+.use-case-row--reverse .use-case-row__content {
+  order: 2;
 }
 
-.use-case-row--reverse > * {
-  direction: ltr;
+.use-case-row--reverse .use-case-figure,
+.use-case-row--reverse .screenshot-placeholder {
+  order: 1;
 }
 
 .use-case-row__content {
