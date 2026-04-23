@@ -72,15 +72,20 @@
     </p>
 
     <div class="hero-ctas">
-      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-primary btn--lg">
-        Send a file — try it →
+      <a href="https://dev.vault.sgraph.ai/en-gb/" class="btn btn-primary btn--lg" target="_blank" rel="noopener">
+        Open a Vault →
       </a>
-      <button class="btn btn-secondary btn--lg" id="hero-token-btn" type="button">
-        Already have a token? Paste it here →
-      </button>
+      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-secondary btn--lg" target="_blank" rel="noopener">
+        Send a file →
+      </a>
     </div>
 
-    <p class="hero-note">No account needed to receive. Open any vault with a token.</p>
+    <div class="vault-access-hint">
+      <span class="vault-access-hint__icon">🔑</span>
+      <span class="vault-access-hint__label">Have a share token or vault key?</span>
+      <a href="https://dev.vault.sgraph.ai/en-gb/" class="vault-access-hint__link" target="_blank" rel="noopener">dev.vault.sgraph.ai</a>
+      <span class="vault-access-hint__note">— paste it · no account needed</span>
+    </div>
   </div>
 </section>
 
@@ -104,6 +109,11 @@
           Send encrypted files to colleagues, clients, or researchers.
           The recipient opens with a share token — no account required.
         </p>
+        <div class="pattern-detail">
+          <span class="pattern-detail__item">Sender: vault key</span>
+          <span class="pattern-detail__sep">·</span>
+          <span class="pattern-detail__item">Recipient: share token</span>
+        </div>
       </div>
 
       <div class="pattern-card pattern-card--featured">
@@ -117,6 +127,11 @@
           An AI agent writes findings, reports, or briefings to a vault.
           A human opens it with a token — complete audit trail preserved.
         </p>
+        <div class="pattern-detail">
+          <span class="pattern-detail__item">Agent: API + vault key</span>
+          <span class="pattern-detail__sep">·</span>
+          <span class="pattern-detail__item">Human: share token</span>
+        </div>
       </div>
 
       <div class="pattern-card">
@@ -130,46 +145,37 @@
           Agent A researches and writes to a vault. Agent B reads, analyses,
           and writes back. No shared credentials. Every action is a signed commit.
         </p>
+        <div class="pattern-detail">
+          <span class="pattern-detail__item">Each agent: own vault key</span>
+          <span class="pattern-detail__sep">·</span>
+          <span class="pattern-detail__item">No credential sharing</span>
+        </div>
       </div>
 
     </div>
   </div>
 </section>
 
-<!-- ═══ AWS STACK STRIP ═══════════════════════════════════════ -->
-<div class="aws-strip">
-  <div class="aws-strip__inner">
-    <span class="aws-strip__label">Built on AWS</span>
-
-    <div class="aws-strip__node">
-      <div class="aws-strip__icon">λ</div>
-      <div class="aws-strip__name">Lambda</div>
-      <div class="aws-strip__sub">User + Admin</div>
+<!-- ═══ RUNS ANYWHERE STRIP ══════════════════════════════════ -->
+<div class="runs-anywhere-strip">
+  <div class="runs-anywhere-strip__inner">
+    <span class="runs-anywhere-strip__label">Runs anywhere</span>
+    <div class="runs-anywhere-strip__targets">
+      <span class="runs-anywhere-strip__item">λ Lambda</span>
+      <span class="runs-anywhere-strip__sep">·</span>
+      <span class="runs-anywhere-strip__item">Fargate</span>
+      <span class="runs-anywhere-strip__sep">·</span>
+      <span class="runs-anywhere-strip__item">Docker</span>
+      <span class="runs-anywhere-strip__sep">·</span>
+      <span class="runs-anywhere-strip__item">GCP</span>
+      <span class="runs-anywhere-strip__sep">·</span>
+      <span class="runs-anywhere-strip__item">EC2 / AMI</span>
+      <span class="runs-anywhere-strip__sep">·</span>
+      <span class="runs-anywhere-strip__item">CLI</span>
+      <span class="runs-anywhere-strip__sep">·</span>
+      <span class="runs-anywhere-strip__item">Self-hosted</span>
     </div>
-    <span class="aws-strip__arrow">→</span>
-    <div class="aws-strip__node">
-      <div class="aws-strip__icon">S3</div>
-      <div class="aws-strip__name">S3</div>
-      <div class="aws-strip__sub">Encrypted storage</div>
-    </div>
-    <span class="aws-strip__arrow">→</span>
-    <div class="aws-strip__node">
-      <div class="aws-strip__icon">📦</div>
-      <div class="aws-strip__name">ECR</div>
-      <div class="aws-strip__sub">Container registry</div>
-    </div>
-    <span class="aws-strip__arrow">→</span>
-    <div class="aws-strip__node">
-      <div class="aws-strip__icon">⚡</div>
-      <div class="aws-strip__name">CloudFront</div>
-      <div class="aws-strip__sub">Global CDN</div>
-    </div>
-    <span class="aws-strip__arrow">→</span>
-    <div class="aws-strip__node">
-      <div class="aws-strip__icon">🖥</div>
-      <div class="aws-strip__name">EC2 / AMI</div>
-      <div class="aws-strip__sub">Self-hosted deploy</div>
-    </div>
+    <span class="runs-anywhere-strip__note">Seven deployment targets · one codebase · same encryption everywhere</span>
   </div>
 </div>
 
@@ -423,7 +429,7 @@
            give them to anyone else because we do not have the keys.</p>
         <p>IP addresses are hashed with a daily salt before storage; we cannot reverse the hash
            to identify you. No file names are stored on the server.</p>
-        <p>Transfers expire automatically; after expiry the ciphertext is deleted.
+        <p>Transfers have a configurable TTL; after expiry, access to the ciphertext is revoked.
            We collect no analytics, no tracking pixels, and no third-party scripts run on this page.</p>
         <p>The server-side code is open source. You can audit exactly what runs on our infrastructure,
            or deploy your own instance on your own AWS account using our published AMI.</p>

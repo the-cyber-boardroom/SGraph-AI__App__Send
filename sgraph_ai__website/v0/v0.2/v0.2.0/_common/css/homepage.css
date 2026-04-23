@@ -176,3 +176,130 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Pattern card detail row */
+.pattern-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  justify-content: center;
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.pattern-detail__item {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.pattern-detail__sep {
+  color: var(--border-color);
+  font-size: 0.72rem;
+}
+
+/* Vault access hint below hero CTAs */
+.vault-access-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: var(--sp-5);
+  font-size: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.vault-access-hint__icon {
+  font-size: 1rem;
+}
+
+.vault-access-hint__label {
+  color: var(--text-secondary);
+}
+
+.vault-access-hint__link {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 3px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  transition: background-color var(--transition-normal);
+}
+
+.vault-access-hint__link:hover {
+  background-color: rgba(78, 205, 196, 0.12);
+}
+
+.vault-access-hint__note {
+  color: var(--text-secondary);
+}
+
+/* Runs-anywhere deployment targets strip */
+.runs-anywhere-strip {
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--sp-3) 0;
+}
+
+.runs-anywhere-strip__inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--sp-6);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.runs-anywhere-strip__label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.runs-anywhere-strip__targets {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.runs-anywhere-strip__item {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  padding: 2px 7px;
+  background: var(--bg-page);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+}
+
+.runs-anywhere-strip__sep {
+  color: var(--border-color);
+  font-size: 0.78rem;
+}
+
+.runs-anywhere-strip__note {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .vault-access-hint {
+    justify-content: center;
+    text-align: center;
+  }
+  .runs-anywhere-strip__note {
+    display: none;
+  }
+}
