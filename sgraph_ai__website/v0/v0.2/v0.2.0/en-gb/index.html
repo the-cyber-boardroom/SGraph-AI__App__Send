@@ -32,7 +32,7 @@
 
     <div class="token-inline-bar" id="token-bar">
       <button class="token-inline-bar__trigger" type="button" aria-label="Open a vault with a token">
-        Paste a token →
+        Open with token →
       </button>
       <div class="token-inline-bar__input-wrap">
         <input
@@ -56,13 +56,9 @@
 <!-- ═══ HERO ══════════════════════════════════════════════════ -->
 <section class="hero">
   <div class="container">
-    <div class="enc-badge">
-      <span class="enc-badge__dot"></span>
-      AES-256-GCM · Client-side only · Server never sees plaintext
-    </div>
-
     <h1 class="display">
-      <span class="hero__line1">Version-controlled, client-encrypted vaults.</span><br>
+      <span class="hero__line1">Version-controlled,</span><br>
+      <span class="hero__line1">client-encrypted vaults.</span><br>
       <span class="hero__line2">For humans and agents.</span>
     </h1>
 
@@ -80,11 +76,21 @@
       </a>
     </div>
 
-    <div class="vault-access-hint">
-      <span class="vault-access-hint__icon">🔑</span>
-      <span class="vault-access-hint__label">Have a share token or vault key?</span>
-      <a href="https://dev.vault.sgraph.ai/en-gb/" class="vault-access-hint__link" target="_blank" rel="noopener">dev.vault.sgraph.ai</a>
-      <span class="vault-access-hint__note">— paste it · no account needed</span>
+    <div class="hero-token-input">
+      <p class="hero-token-input__label">🔑 Have a share token or vault key?</p>
+      <div class="hero-token-input__row">
+        <input
+          id="hero-token-field"
+          class="hero-token-input__field"
+          type="text"
+          placeholder="e.g. coral-stamp-5678"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Vault token"
+        >
+        <button class="hero-token-input__btn" type="button" id="hero-token-go">Open →</button>
+      </div>
+      <span class="hero-token-input__hint">No account needed · opens instantly</span>
     </div>
   </div>
 </section>

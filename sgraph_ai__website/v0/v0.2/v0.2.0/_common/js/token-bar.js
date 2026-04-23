@@ -1,9 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    SGraph AI Website v0.2.0 — Token Inline Bar
-   Nav-level "Paste a token" expand/submit flow.
+   Nav-level expand/submit flow + hero always-visible token input.
 
    Usage: include this script, then call TokenBar.init() on DOMContentLoaded.
    Requires .token-inline-bar markup in the header.
+   Optionally: #hero-token-field + #hero-token-go for the hero input.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const TokenBar = {
@@ -32,6 +33,18 @@ const TokenBar = {
         // Close on outside click
         document.addEventListener('click', (e) => {
             if (!bar.contains(e.target)) this._close(bar);
+        });
+
+        this._initHero();
+    },
+
+    _initHero() {
+        const input = document.getElementById('hero-token-field');
+        const goBtn = document.getElementById('hero-token-go');
+        if (!input || !goBtn) return;
+        goBtn.addEventListener('click', () => this._go(input));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this._go(input);
         });
     },
 
