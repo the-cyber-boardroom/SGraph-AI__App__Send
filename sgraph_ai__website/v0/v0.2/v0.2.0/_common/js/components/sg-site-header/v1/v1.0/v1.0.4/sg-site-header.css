@@ -1,0 +1,125 @@
+/* =================================================================================
+   sg-site-header v1.0.4 — Shadow DOM styles
+   CSS vars are inherited from the host page's design system (:root tokens).
+   Fallbacks cover the case where vars are absent (e.g. tools.sgraph.ai).
+   ================================================================================= */
+
+:host {
+  display: block;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--bg-primary, #1A1A2E);
+  border-bottom: 1px solid var(--border-color, #2C3E6B);
+  /* Teal accent line */
+  box-shadow: inset 0 -2px 0 rgba(78, 205, 196, 0.3);
+  padding-block: var(--sp-4, 1rem);
+}
+
+.container {
+  width: 100%;
+  max-width: var(--max-width, 1200px);
+  margin-inline: auto;
+  padding-inline: var(--gutter, 1.5rem);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6, 1.5rem);
+}
+
+/* Logo */
+.site-logo {
+  font-size: 1.5rem;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.site-logo:hover { text-decoration: none; }
+
+.brand-prefix {
+  font-family: var(--font-display, 'DM Sans', system-ui, sans-serif);
+  font-weight: var(--fw-bold, 700);
+  color: var(--text-heading, #FFFFFF);
+}
+
+.brand-slash {
+  font-family: var(--font-display, 'DM Sans', system-ui, sans-serif);
+  font-weight: var(--fw-bold, 700);
+  color: var(--accent, #4ECDC4);
+}
+
+.brand-product {
+  font-family: var(--font-display, 'DM Sans', system-ui, sans-serif);
+  font-weight: var(--fw-bold, 700);
+  color: var(--text-heading, #FFFFFF);
+}
+
+/* Nav */
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6, 1.5rem);
+}
+
+.site-nav a {
+  color: var(--text-secondary, #8892A0);
+  font-weight: var(--fw-medium, 500);
+  font-size: 0.95rem;
+  transition: color 150ms ease;
+  text-decoration: none;
+  font-family: var(--font-body, 'DM Sans', system-ui, sans-serif);
+}
+
+.site-nav a:hover,
+.site-nav a.active {
+  color: var(--text-heading, #FFFFFF);
+}
+
+/* Slots — slotted content participates in the flex layout */
+::slotted([slot="cta"]) {
+  margin-left: auto;
+}
+
+/* Mobile toggle */
+.nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-heading, #FFFFFF);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: var(--sp-2, 0.5rem);
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .nav-toggle {
+    display: block;
+    margin-left: auto;
+  }
+
+  .site-nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    background-color: var(--bg-primary, #1A1A2E);
+    border-bottom: 1px solid var(--border-color, #2C3E6B);
+    padding: var(--sp-6, 1.5rem);
+    gap: var(--sp-4, 1rem);
+    z-index: 99;
+  }
+
+  .site-nav.is-open {
+    display: flex;
+  }
+
+  ::slotted([slot="cta"]),
+  ::slotted([slot="locale"]) {
+    display: none;
+  }
+}
