@@ -16,24 +16,8 @@
 <sg-site-header
   site="Send"
   home-url="/en-gb/"
+  token-bar
   nav-items='[{"label":"How it Works","href":"/en-gb/how-it-works/"},{"label":"Security","href":"/en-gb/security/","active":true},{"label":"Tools","href":"https://tools.sgraph.ai","external":true},{"label":"Pricing","href":"/en-gb/pricing/"}]'>
-  <div slot="cta" class="token-inline-bar" id="token-bar">
-    <button class="token-inline-bar__trigger" type="button" aria-label="Open a vault with a token">
-      Open with token →
-    </button>
-    <div class="token-inline-bar__input-wrap">
-      <input
-        class="token-inline-bar__input"
-        type="text"
-        placeholder="e.g. coral-stamp-5678"
-        autocomplete="off"
-        spellcheck="false"
-        aria-label="Vault token"
-      >
-      <button class="token-inline-bar__go" type="button">Open →</button>
-      <button class="token-inline-bar__cancel" type="button" aria-label="Cancel">✕</button>
-    </div>
-  </div>
   <div slot="locale" id="locale-picker"></div>
 </sg-site-header>
 
@@ -321,7 +305,6 @@
 </footer>
 
 <script src="../../_common/js/i18n.js"></script>
-<script src="../../_common/js/token-bar.js"></script>
 <script src="../../_common/js/nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.4/sg-site-header.js"></script>
 </body>
