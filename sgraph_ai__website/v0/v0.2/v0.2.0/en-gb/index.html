@@ -24,6 +24,7 @@
 
     <nav class="site-nav" id="main-nav">
       <a href="how-it-works/">How it Works</a>
+      <a href="vaults/">Vaults</a>
       <a href="security/">Security</a>
       <a href="https://tools.sgraph.ai" target="_blank" rel="noopener">Tools</a>
       <a href="pricing/">Pricing</a>
@@ -79,15 +80,58 @@
       </button>
     </div>
 
-    <div class="deploy-strip">
-      <span class="deploy-strip__label">Runs on:</span>
-      <span class="deploy-strip__item">Lambda</span>
-      <span class="deploy-strip__item">Fargate</span>
-      <span class="deploy-strip__item">EC2 / AMI</span>
-      <span class="deploy-strip__item">Docker</span>
-      <span class="deploy-strip__item">GCP</span>
-      <span class="deploy-strip__item">CLI</span>
-      <span class="deploy-strip__item">Self-hosted</span>
+    <p class="hero-note">No account needed to receive. Open any vault with a token.</p>
+  </div>
+</section>
+
+<!-- ═══ INTERACTION PATTERNS ═══════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Three ways vaults are used</h2>
+      <p>The same encrypted vault. Three interaction patterns. One token to share.</p>
+    </div>
+    <div class="patterns-grid">
+
+      <div class="pattern-card">
+        <div class="pattern-flow">
+          <span class="pattern-actor">👤</span>
+          <span class="pattern-arrow">→ vault →</span>
+          <span class="pattern-actor">👤</span>
+        </div>
+        <h3 class="pattern-title">Human → Human</h3>
+        <p class="pattern-desc">
+          Send encrypted files to colleagues, clients, or researchers.
+          The recipient opens with a share token — no account required.
+        </p>
+      </div>
+
+      <div class="pattern-card pattern-card--featured">
+        <div class="pattern-flow">
+          <span class="pattern-actor">🤖</span>
+          <span class="pattern-arrow">→ vault →</span>
+          <span class="pattern-actor">👤</span>
+        </div>
+        <h3 class="pattern-title">Agent → Human</h3>
+        <p class="pattern-desc">
+          An AI agent writes findings, reports, or briefings to a vault.
+          A human opens it with a token — complete audit trail preserved.
+        </p>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-flow">
+          <span class="pattern-actor">🤖</span>
+          <span class="pattern-arrow">→ vault →</span>
+          <span class="pattern-actor">🤖</span>
+        </div>
+        <h3 class="pattern-title">Agent → Agent</h3>
+        <p class="pattern-desc">
+          Agent A researches and writes to a vault. Agent B reads, analyses,
+          and writes back. No shared credentials. Every action is a signed commit.
+        </p>
+      </div>
+
     </div>
   </div>
 </section>
@@ -169,29 +213,32 @@
         <ul class="primitive-card__features">
           <li class="primitive-card__feature">Each vault has its own key — not your GitHub credentials</li>
           <li class="primitive-card__feature">Every file operation is a commit — full audit trail</li>
-          <li class="primitive-card__feature">Two access modes: full clone or tree-only web access</li>
-          <li class="primitive-card__feature">AWS Marketplace AMI: SG/Send Server</li>
+          <li class="primitive-card__feature">Folder view, gallery view, markdown rendering — in-browser</li>
+          <li class="primitive-card__feature">Three access modes: Online, CLI (sgit), API</li>
         </ul>
       </div>
 
-      <div class="primitive-card primitive-card--coming-soon">
-        <span class="primitive-card__badge coming-soon-badge">Coming soon</span>
-        <div class="primitive-card__icon">⚙️</div>
-        <h3 class="primitive-card__title">Code Execution Sandbox</h3>
+      <div class="primitive-card">
+        <span class="primitive-card__badge">Available now</span>
+        <div class="primitive-card__icon">🔑</div>
+        <h3 class="primitive-card__title">Cryptographic Identity</h3>
         <p class="primitive-card__desc">
-          Isolated container per execution. Code loaded from vault or S3 at runtime.
-          Output captured back to vault. Stateless, disposable, auditable.
+          Every vault has its own key pair. Every commit is signed.
+          Agents and humans have verifiable identities — trust without a central authority.
         </p>
         <ul class="primitive-card__features">
-          <li class="primitive-card__feature">Spin up, execute, capture output, spin down</li>
-          <li class="primitive-card__feature">No persistent state — container destroyed after run</li>
-          <li class="primitive-card__feature">Results written to vault for downstream agents</li>
-          <li class="primitive-card__feature">AWS Marketplace AMI: Tools Suite</li>
+          <li class="primitive-card__feature">Per-vault key — not your GitHub credentials</li>
+          <li class="primitive-card__feature">Commit signing — every action is attributable</li>
+          <li class="primitive-card__feature">Scoped access — agents get a key, not your account</li>
+          <li class="primitive-card__feature">Share tokens — read-only, point-in-time snapshots</li>
         </ul>
       </div>
 
     </div>
 
+    <div class="callout mt-8">
+      <strong>Coming soon:</strong> Code Execution Sandbox — isolated container per execution, code loaded from vault at runtime, output captured back to vault.
+    </div>
     <div class="callout mt-8">
       Seven deployment targets, one codebase, same encryption everywhere.
       Lambda → Fargate → EC2 → Docker → GCP → CLI → Self-hosted.
@@ -226,10 +273,9 @@
           <li class="use-case-row__bullet">Full version history — every revision auditable</li>
         </ul>
       </div>
-      <div class="screenshot-placeholder">
-        <div class="screenshot-placeholder__label">Screenshot coming</div>
-        <div class="screenshot-placeholder__desc">OWASP vault browser view — 8 articles in browse layout</div>
-      </div>
+      <figure class="use-case-figure">
+        <img src="../_common/images/sg-send/use-cases/01-vault-browse.png" alt="Vault browse view showing articles in folder layout" loading="lazy">
+      </figure>
     </div>
 
     <!-- Use Case 2: Multi-Agent -->
@@ -248,10 +294,9 @@
           <li class="use-case-row__bullet">Full commit history — every agent action auditable</li>
         </ul>
       </div>
-      <div class="screenshot-placeholder">
-        <div class="screenshot-placeholder__label">Screenshot coming</div>
-        <div class="screenshot-placeholder__desc">Multi-agent vault — two agents, shared vault, separate branches</div>
-      </div>
+      <figure class="use-case-figure">
+        <img src="../_common/images/sg-send/use-cases/05-push-pull-badge.png" alt="Vault showing push/pull commit model for multi-agent workflows" loading="lazy">
+      </figure>
     </div>
 
     <!-- Use Case 3: Healthcare -->
@@ -270,10 +315,9 @@
           <li class="use-case-row__bullet">No plaintext patient data on any third-party server</li>
         </ul>
       </div>
-      <div class="screenshot-placeholder">
-        <div class="screenshot-placeholder__label">Screenshot coming</div>
-        <div class="screenshot-placeholder__desc">Encrypted healthcare questionnaire — intake form vault</div>
-      </div>
+      <figure class="use-case-figure">
+        <img src="../_common/images/sg-send/use-cases/08-token-receive.png" alt="Opening a vault with a share token — no account required" loading="lazy">
+      </figure>
     </div>
 
     <!-- Use Case 4: Playwright + vault -->
@@ -292,10 +336,9 @@
           <li class="use-case-row__bullet">Results in a vault — share with any downstream agent or human</li>
         </ul>
       </div>
-      <div class="screenshot-placeholder">
-        <div class="screenshot-placeholder__label">Screenshot coming</div>
-        <div class="screenshot-placeholder__desc">Playwright automation log + screenshots written to vault</div>
-      </div>
+      <figure class="use-case-figure">
+        <img src="../_common/images/sg-send/use-cases/04-upload-flow.png" alt="Upload and send flow with automation output written to vault" loading="lazy">
+      </figure>
     </div>
 
     <!-- Use Case 5: Dev Pack -->
@@ -314,10 +357,9 @@
           <li class="use-case-row__bullet">Share token for read-only handoff to downstream tools</li>
         </ul>
       </div>
-      <div class="screenshot-placeholder">
-        <div class="screenshot-placeholder__label">Screenshot coming</div>
-        <div class="screenshot-placeholder__desc">Vault browse view — dev pack with specs, guides, context files</div>
-      </div>
+      <figure class="use-case-figure">
+        <img src="../_common/images/sg-send/use-cases/02-markdown-article.png" alt="Markdown article rendered in vault browser — dev pack context" loading="lazy">
+      </figure>
     </div>
 
   </div>
@@ -366,27 +408,6 @@
   </div>
 </section>
 
-<!-- ═══ PRICING TEASER ════════════════════════════════════════ -->
-<section class="section">
-  <div class="container">
-    <div class="section-header">
-      <h2>Start for £5</h2>
-      <p>
-        One Starter Pack. Enough credits to send files, create vaults, and run your first
-        agentic workflow. No subscription. No account required for receiving.
-      </p>
-    </div>
-    <div class="pricing-teaser">
-      <a href="https://buy.stripe.com/fZu8wHdv23nN1Z85jn5os02" class="btn btn-primary btn--lg">
-        Buy Starter Pack — £5 →
-      </a>
-      <a href="pricing/" class="text-secondary">
-        See all pricing options, including AWS Marketplace →
-      </a>
-    </div>
-  </div>
-</section>
-
 <!-- ═══ PRIVACY INLINE ════════════════════════════════════════ -->
 <section class="section section--alt">
   <div class="container">
@@ -409,6 +430,27 @@
         <p>If you have questions about data handling, email
            <a href="mailto:privacy@sgraph.ai">privacy@sgraph.ai</a>.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRICING TEASER ════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Start for £5</h2>
+      <p>
+        One Starter Pack. Enough credits to send files, create vaults, and run your first
+        agentic workflow. No subscription. No account required for receiving.
+      </p>
+    </div>
+    <div class="pricing-teaser">
+      <a href="https://buy.stripe.com/fZu8wHdv23nN1Z85jn5os02" class="btn btn-primary btn--lg">
+        Buy Starter Pack — £5 →
+      </a>
+      <a href="pricing/" class="text-secondary">
+        See all pricing options, including AWS Marketplace →
+      </a>
     </div>
   </div>
 </section>
@@ -472,6 +514,7 @@
       <div class="footer-col">
         <h4>Developers</h4>
         <ul>
+          <li><a href="vaults/">Vaults &amp; SGit</a></li>
           <li><a href="https://github.com/SGit-AI/SGit-AI__CLI" target="_blank" rel="noopener">SGit CLI</a></li>
           <li><a href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">Open App</a></li>
           <li><a href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">Source Code</a></li>
