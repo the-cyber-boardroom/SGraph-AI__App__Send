@@ -122,21 +122,22 @@
 }
 
 .pattern-card {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  background-color: rgba(44, 62, 107, 0.55);
+  border: 1px solid rgba(78, 205, 196, 0.2);
   border-radius: var(--radius-card);
   padding: var(--sp-6);
   text-align: center;
-  transition: border-color var(--transition-normal);
+  transition: border-color var(--transition-normal), background-color var(--transition-normal);
 }
 
 .pattern-card:hover {
   border-color: var(--accent);
+  background-color: rgba(44, 62, 107, 0.7);
 }
 
 .pattern-card--featured {
-  border-color: var(--accent);
-  background-color: rgba(78, 205, 196, 0.04);
+  border-color: rgba(78, 205, 196, 0.5);
+  background-color: rgba(78, 205, 196, 0.07);
 }
 
 .pattern-flow {
