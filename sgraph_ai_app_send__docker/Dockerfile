@@ -9,6 +9,8 @@ COPY sgraph_ai_app_send__ui__user/ ./sgraph_ai_app_send__ui__user/
 COPY sgraph_ai_app_send__ui__vault/ ./sgraph_ai_app_send__ui__vault/
 COPY sgraph_ai_app_send__ui__workspace/ ./sgraph_ai_app_send__ui__workspace/
 
+RUN mkdir -p sgraph_ai_app_send__ui__admin && touch sgraph_ai_app_send__ui__admin/__init__.py
+
 RUN pip install --no-cache-dir -e . && \
     pip install --no-cache-dir uvicorn
 
