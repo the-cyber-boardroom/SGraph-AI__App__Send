@@ -1,0 +1,32 @@
+{
+  "component": "sg-site-header",
+  "version": "1.0.5",
+  "tag": "sg-site-header",
+  "files": ["sg-site-header.js", "sg-site-header.css", "sg-site-header.html"],
+  "changes": [
+    "SITE_CONFIGS map: built-in nav, homeUrl, tokenBar, tokenBarBase per site (Send, Tools)",
+    "HOST_SITE_MAP: auto-detect site from window.location.hostname",
+    "active-nav attribute: explicitly mark one nav link active by matching href",
+    "Auto active-nav from window.location.pathname when using built-in profile",
+    "tokenBar reflected to attribute from profile in onReady if not explicitly set",
+    "home-url and token-bar-base fall back to profile values",
+    "active-nav added to observedAttributes",
+    "Backward compatible: all v1.0.4 explicit attributes still work as overrides"
+  ],
+  "attributes": {
+    "site":           "Product name after SG/ — used to select built-in profile (Send | Tools)",
+    "home-url":       "Logo href override (default: from profile or /)",
+    "nav-items":      "JSON array override [{label, href, active?, external?}]",
+    "token-bar":      "Boolean — activates built-in token bar (auto-set from profile if not provided)",
+    "token-bar-base": "Base URL override for token navigation",
+    "active-nav":     "Href string — marks matching nav item active (auto-detected from pathname if omitted)"
+  },
+  "slots": {
+    "locale": "Locale picker (light DOM — SgI18n finds it by document.getElementById)",
+    "cta":    "Custom CTA widget (escape hatch when not using built-in token bar)"
+  },
+  "profiles": {
+    "Send":  { "hostname": ["send.sgraph.ai", "dev.sgraph.ai"],  "tokenBar": true  },
+    "Tools": { "hostname": ["tools.sgraph.ai"],                   "tokenBar": false }
+  }
+}
