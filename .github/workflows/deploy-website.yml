@@ -28,7 +28,8 @@ on:
         type: choice
         options:
           - production
-          - staging
+          - main
+          - dev
 
 concurrency:
   group: "website-deploy-${{ inputs.environment || github.ref_name || 'dev' }}"
