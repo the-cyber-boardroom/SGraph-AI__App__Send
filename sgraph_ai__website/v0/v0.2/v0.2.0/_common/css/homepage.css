@@ -218,7 +218,7 @@
 
 .hero-token-input__row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--sp-2);
   width: 100%;
   max-width: 460px;
@@ -248,7 +248,8 @@
 }
 
 .hero-token-input__btn {
-  padding: var(--sp-3) var(--sp-5);
+  padding: 0 var(--sp-5);
+  align-self: stretch;
   background-color: var(--accent);
   color: var(--color-navy);
   border: none;
