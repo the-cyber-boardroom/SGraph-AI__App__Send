@@ -233,6 +233,16 @@ code, .mono {
 /* ------------------------------------------------------------
    5. Site Header
    ------------------------------------------------------------ */
+
+/* Reserve header space before the custom element upgrades, preventing layout shift */
+sg-site-header:not(:defined) {
+  display: block;
+  min-height: 65px;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: inset 0 -2px 0 rgba(78, 205, 196, 0.3);
+}
+
 .site-header {
   position: sticky;
   top: 0;
