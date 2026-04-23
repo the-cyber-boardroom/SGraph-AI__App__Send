@@ -201,41 +201,80 @@
   font-size: 0.72rem;
 }
 
-/* Vault access hint below hero CTAs */
-.vault-access-hint {
+/* Hero inline token input */
+.hero-token-input {
+  margin-top: var(--sp-8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.hero-token-input__label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0;
+}
+
+.hero-token-input__row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: var(--sp-5);
-  font-size: 0.875rem;
-  flex-wrap: wrap;
+  gap: var(--sp-2);
+  width: 100%;
+  max-width: 460px;
 }
 
-.vault-access-hint__icon {
-  font-size: 1rem;
-}
-
-.vault-access-hint__label {
-  color: var(--text-secondary);
-}
-
-.vault-access-hint__link {
+.hero-token-input__field {
+  flex: 1;
+  padding: var(--sp-3) var(--sp-4);
+  background-color: rgba(22, 33, 62, 0.85);
+  border: 1px solid rgba(78, 205, 196, 0.35);
+  border-radius: var(--radius-btn);
+  color: var(--text-primary);
   font-family: var(--font-mono);
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
-  padding: 3px 10px;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  transition: background-color var(--transition-normal);
+  font-size: 0.9rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.vault-access-hint__link:hover {
-  background-color: rgba(78, 205, 196, 0.12);
+.hero-token-input__field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.15);
 }
 
-.vault-access-hint__note {
+.hero-token-input__field::placeholder {
   color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.hero-token-input__btn {
+  padding: var(--sp-3) var(--sp-5);
+  background-color: var(--accent);
+  color: var(--color-navy);
+  border: none;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast);
+}
+
+.hero-token-input__btn:hover {
+  background-color: var(--accent-hover);
+}
+
+.hero-token-input__hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .hero-token-input__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* Runs-anywhere deployment targets strip */
