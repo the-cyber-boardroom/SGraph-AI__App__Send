@@ -157,14 +157,28 @@ const SgI18n = {
         const menu = document.createElement('div');
         menu.className = 'locale-dropdown__menu';
         this.availableLocales.forEach(loc => {
+            const isActive  = loc.code === this.locale;
+            const isEnabled = loc.code === 'en-gb';
             const btn = document.createElement('button');
             btn.className = 'locale-dropdown__item' +
-                (loc.code === this.locale ? ' locale-dropdown__item--active' : '');
+                (isActive  ? ' locale-dropdown__item--active'   : '') +
+                (!isEnabled ? ' locale-dropdown__item--soon'    : '');
             btn.type = 'button';
-            btn.textContent = loc.flag + '  ' + loc.name;
+            btn.disabled = !isEnabled && !isActive;
+
+            const label = document.createTextNode(loc.flag + '  ' + loc.name);
+            btn.appendChild(label);
+
+            if (!isEnabled) {
+                const badge = document.createElement('span');
+                badge.className = 'locale-soon-badge';
+                badge.textContent = 'soon';
+                btn.appendChild(badge);
+            }
+
             btn.addEventListener('click', () => {
                 dropdown.classList.remove('open');
-                if (loc.code !== this.locale) {
+                if (isEnabled && !isActive) {
                     this.navigateToLocale(loc.code);
                 }
             });

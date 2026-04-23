@@ -1052,6 +1052,33 @@ body.i18n-loading {
   font-weight: var(--fw-medium);
 }
 
+.locale-dropdown__item--soon {
+  opacity: 0.45;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.locale-dropdown__item--soon:hover {
+  color: var(--text-secondary);
+  background: none;
+}
+
+.locale-soon-badge {
+  font-size: 0.62rem;
+  font-weight: var(--fw-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  border: 1px solid rgba(78, 205, 196, 0.4);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ------------------------------------------------------------
    18. Utility Classes
    ------------------------------------------------------------ */
