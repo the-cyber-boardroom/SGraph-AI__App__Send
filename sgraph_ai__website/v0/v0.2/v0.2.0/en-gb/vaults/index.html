@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vaults — SG/Send</title>
+  <meta name="description" content="SG/Send vaults: version-controlled, client-encrypted file systems. Access via browser, CLI (sgit), or API. Folder view, gallery view, markdown rendering.">
+  <link rel="icon" href="../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+</head>
+<body class="i18n-loading">
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+<header class="site-header">
+  <div class="container">
+    <a class="site-logo" href="/en-gb/">
+      <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+    </a>
+    <nav class="site-nav" id="main-nav">
+      <a href="../how-it-works/">How it Works</a>
+      <a href="../vaults/" class="active">Vaults</a>
+      <a href="../security/">Security</a>
+      <a href="https://tools.sgraph.ai" target="_blank" rel="noopener">Tools</a>
+      <a href="../pricing/">Pricing</a>
+    </nav>
+    <div class="token-inline-bar" id="token-bar">
+      <button class="token-inline-bar__trigger" type="button" aria-label="Open a vault with a token">
+        Open with token →
+      </button>
+      <div class="token-inline-bar__input-wrap">
+        <input class="token-inline-bar__input" type="text" placeholder="e.g. coral-stamp-5678" autocomplete="off" spellcheck="false" aria-label="Vault token">
+        <button class="token-inline-bar__go" type="button">Open →</button>
+        <button class="token-inline-bar__cancel" type="button" aria-label="Cancel">✕</button>
+      </div>
+    </div>
+    <div id="locale-picker"></div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">☰</button>
+  </div>
+</header>
+
+<main>
+
+<!-- ═══ HERO ══════════════════════════════════════════════════ -->
+<section class="hero hero--small">
+  <div class="container">
+    <h1 class="display">Vaults</h1>
+    <p class="lead">
+      Version-controlled, client-encrypted file systems.<br>
+      Access via browser, CLI, or API. The server never sees plaintext.
+    </p>
+  </div>
+</section>
+
+<!-- ═══ WHAT IS A VAULT ════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>What is a vault?</h2>
+      <p>A vault is an encrypted, version-controlled collection of files with its own key, commit history, and access controls.</p>
+    </div>
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="card__icon">🔐</div>
+        <h3 class="card__title">Client-encrypted</h3>
+        <p class="card__desc">All files are encrypted in your browser using AES-256-GCM before upload. The server stores only ciphertext.</p>
+      </div>
+      <div class="card">
+        <div class="card__icon">📝</div>
+        <h3 class="card__title">Version-controlled</h3>
+        <p class="card__desc">Every file operation is a commit. The full history is preserved. You can share a point-in-time snapshot with a read-only token.</p>
+      </div>
+      <div class="card">
+        <div class="card__icon">🔑</div>
+        <h3 class="card__title">Scoped access</h3>
+        <p class="card__desc">Each vault has its own key. You give an agent or colleague that key — not your account credentials. Revoke access by rotating the key.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ THREE ACCESS MODES ═════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Three ways to access a vault</h2>
+      <p>The same vault, the same encryption, three interfaces. Use whichever fits your workflow.</p>
+    </div>
+    <div class="grid grid--3">
+
+      <div class="card">
+        <div class="card__icon">🌐</div>
+        <h3 class="card__title">Online — Browser UI</h3>
+        <p class="card__desc">Open any vault at <a href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">send.sgraph.ai</a> using a vault key or share token. No install required. Folder view, gallery view, markdown rendering.</p>
+        <a class="card__link" href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">Open the app →</a>
+      </div>
+
+      <div class="card">
+        <div class="card__icon">⌨️</div>
+        <h3 class="card__title">CLI — SGit</h3>
+        <p class="card__desc">The <code>sgit</code> CLI provides git-like vault operations: init, commit, push, pull, share. Runs on any machine with Python.</p>
+        <div class="arch-diagram" style="margin-top:12px;font-size:0.75rem;">pip install sgit-ai
+sgit init my-vault
+sgit commit -m "first files"
+sgit push
+sgit share  # → share token</div>
+        <a class="card__link" href="https://github.com/SGit-AI/SGit-AI__CLI" target="_blank" rel="noopener">SGit on GitHub →</a>
+      </div>
+
+      <div class="card">
+        <div class="card__icon">⚡</div>
+        <h3 class="card__title">API — Programmatic</h3>
+        <p class="card__desc">Agents and pipelines access vaults via the SG/Send HTTP API. Read tree, fetch files, write commits — all over HTTPS with a vault key header.</p>
+        <p class="card__desc" style="margin-top:8px;font-size:0.85rem;color:var(--text-secondary);">API documentation available in the open source repository.</p>
+        <a class="card__link" href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">View source →</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ VIEW MODES ═════════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>View modes</h2>
+      <p>The browser UI renders vault contents in the format that suits the files inside.</p>
+    </div>
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="card__icon">📁</div>
+        <h3 class="card__title">Folder view</h3>
+        <p class="card__desc">Hierarchical file tree. Navigate directories, open files, browse the vault structure. Default view for mixed-content vaults.</p>
+      </div>
+      <div class="card">
+        <div class="card__icon">🖼</div>
+        <h3 class="card__title">Gallery view</h3>
+        <p class="card__desc">Image grid layout for photo and media vaults. Thumbnails rendered in-browser from encrypted files. No server-side processing.</p>
+      </div>
+      <div class="card">
+        <div class="card__icon">📄</div>
+        <h3 class="card__title">Markdown rendering</h3>
+        <p class="card__desc">Markdown files render as formatted articles in-browser. Code blocks, headers, links, images — all rendered client-side from ciphertext.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ KEY TYPES ══════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Two key types</h2>
+      <p>Vault keys and share tokens serve different purposes. Know which to use.</p>
+    </div>
+    <div class="grid grid--2">
+      <div class="card">
+        <div class="card__icon">🔑</div>
+        <h3 class="card__title">Vault key</h3>
+        <p class="card__desc">Persistent read-write access. Use this to clone, push, and pull. Share with agents or collaborators who need to write to the vault. Looks like: <code>apple-river-1234</code></p>
+        <p class="card__desc" style="margin-top:8px;">⚠️ Treat like a password. Never commit to git.</p>
+      </div>
+      <div class="card">
+        <div class="card__icon">🎫</div>
+        <h3 class="card__title">Share token</h3>
+        <p class="card__desc">Read-only snapshot of the vault at a point in time. Created with <code>sgit share</code>. Share with recipients — they can open the vault without an account. Looks like: <code>coral-stamp-5678</code></p>
+        <p class="card__desc" style="margin-top:8px;">✓ Safe to share publicly. Expires. Read-only.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ QUICKSTART ══════════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>SGit quickstart</h2>
+      <p>From install to first share in under five minutes.</p>
+    </div>
+    <div class="arch-diagram">
+# Install
+pip install sgit-ai
+
+# Create a vault
+sgit init my-project
+cd my-project
+
+# Add files and commit
+cp ~/report.md .
+sgit commit -m "initial report"
+
+# Push to SG/Send
+sgit push
+# → vault key: apple-river-1234
+
+# Create a read-only share token
+sgit share
+# → share token: coral-stamp-5678
+# → https://send.sgraph.ai/en-gb/browse/#coral-stamp-5678
+
+# Clone an existing vault (on another machine or agent)
+sgit clone apple-river-1234 my-project-clone</div>
+    <div class="callout mt-8">
+      The recipient opens the share token URL in any browser — no account, no install required.
+      The vault decrypts client-side. The server never sees the content.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ════════════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container" style="text-align:center">
+    <h2>Try it now</h2>
+    <p style="color:var(--text-secondary);margin-bottom:var(--sp-8)">Send your first encrypted vault in 60 seconds.</p>
+    <div style="display:flex;gap:var(--sp-4);justify-content:center;flex-wrap:wrap">
+      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-primary btn--lg">Open the app →</a>
+      <a href="https://github.com/SGit-AI/SGit-AI__CLI" class="btn btn-secondary btn--lg" target="_blank" rel="noopener">Get SGit CLI →</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="site-logo" href="/en-gb/">
+          <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+        </a>
+        <p>Version-controlled, client-encrypted vaults.<br>For humans and agents.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../how-it-works/">How it Works</a></li>
+          <li><a href="../vaults/">Vaults</a></li>
+          <li><a href="../security/">Security</a></li>
+          <li><a href="../pricing/">Pricing</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../vaults/">Vaults &amp; SGit</a></li>
+          <li><a href="https://github.com/SGit-AI/SGit-AI__CLI" target="_blank" rel="noopener">SGit CLI</a></li>
+          <li><a href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">Open App</a></li>
+          <li><a href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">Source Code</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="mailto:privacy@sgraph.ai">Privacy</a></li>
+          <li><a href="mailto:legal@sgraph.ai">Terms</a></li>
+          <li><a href="mailto:security@sgraph.ai">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 SGraph AI Ltd. Released under CC BY 4.0 where applicable.</p>
+      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-primary btn--sm">Open SG/Send →</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../../_common/js/i18n.js"></script>
+<script src="../../_common/js/token-bar.js"></script>
+<script src="../../_common/js/nav.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 [tool.poetry]
 name        = "sgraph_ai_app_send"
-version     = "v0.21.0"
+version     = "v0.21.22"
 description = "SGraph-AI__App__Send"
 authors     = ["Dinis Cruz <dinis.cruz@owasp.org>"]
 license     = "Apache 2.0"
@@ -9,6 +9,7 @@ homepage    = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
 repository  = "https://github.com/the-cyber-boardroom/SGraph-AI__App__Send"
 
 packages    = [ { include = "sgraph_ai_app_send"                 },
+                { include = "sgraph_ai_app_send__docker"         },
                 { include = "sgraph_ai_app_send__ui__admin"      },
                 { include = "sgraph_ai_app_send__ui__user"       },
                 { include = "sgraph_ai_app_send__ui__vault"      },
@@ -22,6 +23,9 @@ osbot-fast-api-serverless      = "*"
 mgraph-ai-service-cache        = "*"
 mgraph-ai-service-cache-client = "*"
 fastapi-mcp                    = "*"
+
+[tool.poetry.scripts]
+sg-send-ec2 = "sgraph_ai_app_send__docker.provision_ec2:app"
 
 [build-system]
 requires = ["poetry-core>=1.9.1"]

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security — SG/Send</title>
+  <meta name="description" content="How SG/Send encrypts your files in the browser before upload. AES-256-GCM, Web Crypto API, zero-knowledge architecture. The server cannot read your files.">
+  <link rel="icon" href="../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+  <link rel="stylesheet" href="../../_common/css/security.css">
+</head>
+<body class="i18n-loading">
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+<header class="site-header">
+  <div class="container">
+    <a class="site-logo" href="/en-gb/">
+      <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+    </a>
+
+    <nav class="site-nav" id="main-nav">
+      <a href="../how-it-works/">How it Works</a>
+      <a href="../security/" class="active">Security</a>
+      <a href="https://tools.sgraph.ai" target="_blank" rel="noopener">Tools</a>
+      <a href="../pricing/">Pricing</a>
+    </nav>
+
+    <div class="token-inline-bar" id="token-bar">
+      <button class="token-inline-bar__trigger" type="button" aria-label="Open a vault with a token">
+        Open with token →
+      </button>
+      <div class="token-inline-bar__input-wrap">
+        <input
+          class="token-inline-bar__input"
+          type="text"
+          placeholder="e.g. coral-stamp-5678"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Vault token"
+        >
+        <button class="token-inline-bar__go" type="button">Open →</button>
+        <button class="token-inline-bar__cancel" type="button" aria-label="Cancel">✕</button>
+      </div>
+    </div>
+
+    <div id="locale-picker"></div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">☰</button>
+  </div>
+</header>
+
+<!-- ═══ HERO ══════════════════════════════════════════════════ -->
+<section class="hero hero--small">
+  <div class="container">
+    <h1 class="display">The server cannot read your files.</h1>
+    <p class="lead">
+      Not "will not." Cannot. The encryption key never reaches the server.
+      Here is exactly how it works.
+    </p>
+  </div>
+</section>
+
+<!-- ═══ STEP-BY-STEP ══════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Encryption in four steps</h2>
+      <p>Every step happens in your browser. The server participates only at step 3 — and only sees ciphertext.</p>
+    </div>
+
+    <div class="encrypt-steps">
+      <div class="encrypt-step">
+        <div class="encrypt-step__num">1</div>
+        <div class="encrypt-step__label">You choose a file</div>
+        <div class="encrypt-step__sub">File stays in browser memory. Nothing is uploaded yet.</div>
+      </div>
+      <div class="encrypt-step">
+        <div class="encrypt-step__num">2</div>
+        <div class="encrypt-step__label">Browser encrypts it</div>
+        <div class="encrypt-step__sub">AES-256-GCM via Web Crypto API. Key derived from your passphrase — never transmitted.</div>
+      </div>
+      <div class="encrypt-step">
+        <div class="encrypt-step__num">3</div>
+        <div class="encrypt-step__label">Ciphertext uploaded</div>
+        <div class="encrypt-step__sub">Only the encrypted blob reaches the server. No plaintext, no file name, no key.</div>
+      </div>
+      <div class="encrypt-step">
+        <div class="encrypt-step__num">4</div>
+        <div class="encrypt-step__label">Recipient decrypts</div>
+        <div class="encrypt-step__sub">The recipient enters the passphrase in their browser. Decryption happens locally. Server not involved.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECURITY GRID ══════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Security properties</h2>
+      <p>Six properties enforced at the architecture level, not by policy.</p>
+    </div>
+
+    <div class="security-grid">
+
+      <div class="security-card">
+        <div class="security-card__icon">🔑</div>
+        <div class="security-card__title">Encryption key never leaves the browser</div>
+        <p class="security-card__desc">
+          The AES-256-GCM key is derived from your passphrase using PBKDF2 inside
+          the Web Crypto API. It exists only in browser memory during the operation.
+          It is never serialised, never logged, never sent to the server.
+        </p>
+      </div>
+
+      <div class="security-card">
+        <div class="security-card__icon">🙈</div>
+        <div class="security-card__title">Server stores only ciphertext</div>
+        <p class="security-card__desc">
+          What reaches the server is an opaque blob of encrypted bytes. No file name.
+          No content type. No metadata that reveals what was shared.
+          The server cannot distinguish a PDF from a spreadsheet.
+        </p>
+      </div>
+
+      <div class="security-card">
+        <div class="security-card__icon">🔒</div>
+        <div class="security-card__title">AES-256-GCM with authentication</div>
+        <p class="security-card__desc">
+          GCM (Galois/Counter Mode) provides both confidentiality and integrity authentication.
+          Tampering with the ciphertext causes decryption to fail with an explicit error —
+          the recipient cannot be given corrupted or forged content.
+        </p>
+      </div>
+
+      <div class="security-card">
+        <div class="security-card__icon">🕵️</div>
+        <div class="security-card__title">IP addresses hashed, not stored</div>
+        <p class="security-card__desc">
+          IP addresses are hashed with SHA-256 and a daily rotating salt before any storage.
+          The plaintext IP is discarded. We cannot reverse the hash to identify a sender,
+          and the hash rotates daily so it cannot be used for long-term tracking.
+        </p>
+      </div>
+
+      <div class="security-card">
+        <div class="security-card__icon">⏱</div>
+        <div class="security-card__title">Automatic expiry</div>
+        <p class="security-card__desc">
+          Every transfer has a configurable TTL. When it expires, access is revoked —
+          the token no longer works and the ciphertext cannot be retrieved.
+          There is no manual retrieval after expiry.
+        </p>
+      </div>
+
+      <div class="security-card">
+        <div class="security-card__icon">📖</div>
+        <div class="security-card__title">Open source — verify what runs</div>
+        <p class="security-card__desc">
+          The complete server-side code is public on GitHub. You can read every endpoint,
+          every storage operation, and every place the server touches data.
+          You can also deploy your own instance and not depend on ours at all.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ARCHITECTURE DIAGRAM ══════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>System architecture</h2>
+      <p>Two Lambda functions, S3 storage, CloudFront CDN. All data in transit encrypted by TLS. All data at rest is already ciphertext.</p>
+    </div>
+
+    <div class="arch-callout">
+      <div class="arch-callout__title">Architecture</div>
+      <pre class="arch-diagram">
+┌─────────────────────────────────────────────────────────────────┐
+│  SENDER'S BROWSER                                               │
+│                                                                 │
+│  File → AES-256-GCM encrypt (Web Crypto API) → Ciphertext blob │
+│                         ↓                                       │
+│                Key (from passphrase) — stays here              │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ HTTPS (TLS 1.3)
+                           │ Ciphertext only — no key
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  AWS INFRASTRUCTURE                                             │
+│                                                                 │
+│  CloudFront CDN → Lambda (User function) → S3 (ciphertext)     │
+│                                                                 │
+│  Lambda (Admin function) → Transfer tokens, stats              │
+│                                                                 │
+│  Server sees: encrypted blob, transfer ID, IP hash, TTL        │
+│  Server cannot see: plaintext, file name, passphrase, key      │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ Share token (out-of-band)
+                           │ e.g. email, chat
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  RECIPIENT'S BROWSER                                            │
+│                                                                 │
+│  Token → fetch ciphertext → enter passphrase → derive key      │
+│       → AES-256-GCM decrypt (Web Crypto API) → Original file   │
+└─────────────────────────────────────────────────────────────────┘
+      </pre>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SELF-HOSTED ════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Deploy your own instance</h2>
+      <p>
+        Don't want to depend on our infrastructure? Run SG/Send in your own AWS account.
+        The encryption model is identical — your server, your VPC, your billing.
+      </p>
+    </div>
+
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="card__icon">λ</div>
+        <h3 class="card__title">Lambda + S3</h3>
+        <p class="card__desc">
+          Serverless deploy. Pay per request. Scales to zero when idle.
+          CI pipeline publishes a zipped Lambda package.
+        </p>
+        <a class="card__link" href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">Deploy guide →</a>
+      </div>
+
+      <div class="card">
+        <div class="card__icon">🖥</div>
+        <h3 class="card__title">EC2 / AMI</h3>
+        <p class="card__desc">
+          Launch an AMI in your VPC. Persistent EBS or S3 storage.
+          Suitable for teams who need always-on infrastructure.
+          <span class="coming-soon-badge coming-soon-badge--teal" style="display:inline-flex; margin-top:8px;">AWS Marketplace soon</span>
+        </p>
+        <a class="card__link" href="mailto:enterprise@sgraph.ai">Contact us →</a>
+      </div>
+
+      <div class="card">
+        <div class="card__icon">🐳</div>
+        <h3 class="card__title">Docker / Fargate / GCP</h3>
+        <p class="card__desc">
+          Container image published to Docker Hub. Runs anywhere Docker runs —
+          Fargate, GCP Cloud Run, on-premises, Kubernetes.
+        </p>
+        <a class="card__link" href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">Docker guide →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ RESPONSIBLE DISCLOSURE ════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container" style="max-width: 760px;">
+    <div class="disclosure-box">
+      <div class="disclosure-box__icon">🔍</div>
+      <div class="disclosure-box__content">
+        <h3>Responsible disclosure</h3>
+        <p>
+          If you find a security vulnerability in SG/Send, please report it to
+          <a href="mailto:security@sgraph.ai">security@sgraph.ai</a>.
+          We will acknowledge your report within 48 hours and work with you on a fix
+          before public disclosure. We do not have a bug bounty programme at this stage,
+          but we will credit researchers who report valid issues.
+        </p>
+        <p class="mt-4">
+          The source code is public —
+          <a href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">
+            review it on GitHub
+          </a>.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+
+      <div class="footer-brand">
+        <a class="site-logo" href="/en-gb/">
+          <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span class="brand-product">Send</span>
+        </a>
+        <p>Version-controlled, client-encrypted vaults.<br>For humans and agents.</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../how-it-works/">How it Works</a></li>
+          <li><a href="../security/">Security</a></li>
+          <li><a href="../pricing/">Pricing</a></li>
+          <li><a href="https://tools.sgraph.ai" target="_blank" rel="noopener">Tools</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="https://github.com/SGit-AI/SGit-AI__CLI" target="_blank" rel="noopener">SGit CLI</a></li>
+          <li><a href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">Open App</a></li>
+          <li><a href="https://github.com/the-cyber-boardroom/sgraph-ai__app__send" target="_blank" rel="noopener">Source Code</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="mailto:privacy@sgraph.ai">Privacy</a></li>
+          <li><a href="mailto:legal@sgraph.ai">Terms</a></li>
+          <li><a href="mailto:security@sgraph.ai">Security</a></li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>© 2026 SGraph AI Ltd. Released under CC BY 4.0 where applicable.</p>
+      <a href="https://send.sgraph.ai/en-gb/" class="btn btn-primary btn--sm">Open SG/Send →</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../../_common/js/i18n.js"></script>
+<script src="../../_common/js/token-bar.js"></script>
+<script src="../../_common/js/nav.js"></script>
+</body>
+</html>
