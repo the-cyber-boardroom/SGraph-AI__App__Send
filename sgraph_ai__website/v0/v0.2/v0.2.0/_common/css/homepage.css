@@ -249,6 +249,7 @@
 
 .hero-token-input__btn {
   padding: 0 var(--sp-5);
+  min-width: 110px;
   align-self: stretch;
   background-color: var(--accent);
   color: var(--color-navy);
