@@ -2,15 +2,18 @@
    SGraph — Site Header Component
    v1.0.6 — environment-aware cross-site links
 
-   Changes from v1.0.5:
-     - ENV_PREFIX detected from hostname (dev. / main. / none for prod)
-     - xsite() resolves cross-site hrefs to the matching environment:
-         dev.sgraph.ai  → dev.tools.sgraph.ai  (and vice-versa)
-         main.sgraph.ai → main.tools.sgraph.ai
-         send.sgraph.ai → tools.sgraph.ai
-     - tokenBarBase follows the same env mapping
-     - HOST_SITE_MAP now covers dev.tools.sgraph.ai and main.* variants
-     - Cross-site links to *.sgraph.ai never open in a new tab
+   Domain convention: {site-prefix.}{env.}sgraph.ai
+     Send prod:  sgraph.ai           Tools prod:  tools.sgraph.ai
+     Send dev:   dev.sgraph.ai       Tools dev:   tools.dev.sgraph.ai
+     Send main:  main.sgraph.ai      Tools main:  tools.main.sgraph.ai
+
+   detectEnv() extracts the env segment by stripping the base domain
+   and any known site prefix — what remains is the env ('dev', 'main', '').
+   Localhost has no env marker → resolves to production cross-site links.
+
+   xsite(sitePrefix, env) builds: https://{sitePrefix.}{env.}sgraph.ai
+
+   Cross-site links to *.sgraph.ai never open in a new tab.
 
    Minimal usage (fully self-configuring):
      <sg-site-header site="Send">
@@ -25,30 +28,44 @@
 
 import { SgComponent } from 'https://tools.sgraph.ai/components/base/v1/v1.0/v1.0.0/sg-component.js'
 
-// Detect environment prefix once at module load.
-// Supported prefixes: 'dev.' | 'main.' | '' (production)
-const ENV_PREFIX = (() => {
-    const host = (typeof window !== 'undefined') ? window.location.hostname : ''
-    if (host.startsWith('dev.'))  return 'dev.'
-    if (host.startsWith('main.')) return 'main.'
-    return ''
-})()
+const BASE_DOMAIN = 'sgraph.ai'
+// Extend this list when new sites launch (longest prefix first)
+const SITE_PREFIXES = ['tools', 'api', 'docs']
 
-// Build a cross-site URL relative to the current environment.
-// e.g. xsite('tools.sgraph.ai') on dev.sgraph.ai → 'https://dev.tools.sgraph.ai'
-const xsite = baseDomain => `https://${ENV_PREFIX}${baseDomain}`
+// Extract env segment from hostname: 'dev', 'main', '' (prod/localhost)
+// Domain pattern: {site-prefix.}{env.}sgraph.ai
+function detectEnv(hostname) {
+    if (!hostname.endsWith(BASE_DOMAIN)) return ''  // localhost → prod
+    const inner = hostname.slice(0, -(BASE_DOMAIN.length)).replace(/\.$/, '')
+    for (const prefix of SITE_PREFIXES) {
+        if (inner === prefix) return ''
+        if (inner.startsWith(prefix + '.')) return inner.slice(prefix.length + 1)
+    }
+    return inner  // bare env segment (e.g. 'dev' for dev.sgraph.ai)
+}
+
+// Build a cross-site URL: https://{sitePrefix.}{env.}sgraph.ai
+function xsite(sitePrefix, env) {
+    const sitePart = sitePrefix ? sitePrefix + '.' : ''
+    const envPart  = env        ? env + '.'         : ''
+    return `https://${sitePart}${envPart}${BASE_DOMAIN}`
+}
+
+const ENV = detectEnv(
+    (typeof window !== 'undefined') ? window.location.hostname : ''
+)
 
 const SITE_CONFIGS = {
     Send: {
-        homeUrl:      '/en-gb/',
-        tokenBar:     true,
-        get tokenBarBase() { return `${xsite('send.sgraph.ai')}/en-gb/browse/` },
+        homeUrl:  '/en-gb/',
+        tokenBar: true,
+        get tokenBarBase() { return xsite('', ENV) + '/en-gb/browse/' },
         get navItems() {
             return [
                 { label: 'How it Works', href: '/en-gb/how-it-works/' },
                 { label: 'Vaults',       href: '/en-gb/vaults/' },
                 { label: 'Security',     href: '/en-gb/security/' },
-                { label: 'Tools',        href: xsite('tools.sgraph.ai') },
+                { label: 'Tools',        href: xsite('tools', ENV) },
                 { label: 'Pricing',      href: '/en-gb/pricing/' },
             ]
         }
@@ -58,7 +75,7 @@ const SITE_CONFIGS = {
         tokenBar: false,
         get navItems() {
             return [
-                { label: 'Send',    href: xsite('send.sgraph.ai') },
+                { label: 'Send',    href: xsite('', ENV) },
                 { label: 'Pricing', href: '/en-gb/pricing/' },
             ]
         }
@@ -66,12 +83,12 @@ const SITE_CONFIGS = {
 }
 
 const HOST_SITE_MAP = {
-    'send.sgraph.ai':       'Send',
-    'dev.sgraph.ai':        'Send',
-    'main.sgraph.ai':       'Send',
-    'tools.sgraph.ai':      'Tools',
-    'dev.tools.sgraph.ai':  'Tools',
-    'main.tools.sgraph.ai': 'Tools',
+    'sgraph.ai':              'Send',
+    'dev.sgraph.ai':          'Send',
+    'main.sgraph.ai':         'Send',
+    'tools.sgraph.ai':        'Tools',
+    'tools.dev.sgraph.ai':    'Tools',
+    'tools.main.sgraph.ai':   'Tools',
 }
 
 class SgSiteHeader extends SgComponent {
