@@ -41,7 +41,7 @@ const SITE_CONFIGS = {
             { label: 'How it Works', href: '/en-gb/how-it-works/' },
             { label: 'Vaults',       href: '/en-gb/vaults/' },
             { label: 'Security',     href: '/en-gb/security/' },
-            { label: 'Tools',        href: 'https://tools.sgraph.ai', external: true },
+            { label: 'Tools',        href: 'https://tools.sgraph.ai' },
             { label: 'Pricing',      href: '/en-gb/pricing/' },
         ]
     },

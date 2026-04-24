@@ -1,0 +1,65 @@
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Three ways vaults are used</h2>
+      <p>The same encrypted vault. Three interaction patterns. One token to share.</p>
+    </div>
+    <div class="patterns-grid">
+
+      <div class="pattern-card">
+        <div class="pattern-flow">
+          <span class="pattern-actor">👤</span>
+          <span class="pattern-arrow">→ vault →</span>
+          <span class="pattern-actor">👤</span>
+        </div>
+        <h3 class="pattern-title">Human → Human</h3>
+        <p class="pattern-desc">
+          Send encrypted files to colleagues, clients, or researchers.
+          The recipient opens with a share token — no account required.
+        </p>
+        <div class="pattern-detail">
+          <span class="pattern-detail__item">Sender: vault key</span>
+          <span class="pattern-detail__sep">·</span>
+          <span class="pattern-detail__item">Recipient: share token</span>
+        </div>
+      </div>
+
+      <div class="pattern-card pattern-card--featured">
+        <div class="pattern-flow">
+          <span class="pattern-actor">🤖</span>
+          <span class="pattern-arrow">→ vault →</span>
+          <span class="pattern-actor">👤</span>
+        </div>
+        <h3 class="pattern-title">Agent → Human</h3>
+        <p class="pattern-desc">
+          An AI agent writes findings, reports, or briefings to a vault.
+          A human opens it with a token — complete audit trail preserved.
+        </p>
+        <div class="pattern-detail">
+          <span class="pattern-detail__item">Agent: API + vault key</span>
+          <span class="pattern-detail__sep">·</span>
+          <span class="pattern-detail__item">Human: share token</span>
+        </div>
+      </div>
+
+      <div class="pattern-card">
+        <div class="pattern-flow">
+          <span class="pattern-actor">🤖</span>
+          <span class="pattern-arrow">→ vault →</span>
+          <span class="pattern-actor">🤖</span>
+        </div>
+        <h3 class="pattern-title">Agent → Agent</h3>
+        <p class="pattern-desc">
+          Agent A researches and writes to a vault. Agent B reads, analyses,
+          and writes back. No shared credentials. Every action is a signed commit.
+        </p>
+        <div class="pattern-detail">
+          <span class="pattern-detail__item">Each agent: own vault key</span>
+          <span class="pattern-detail__sep">·</span>
+          <span class="pattern-detail__item">No credential sharing</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
