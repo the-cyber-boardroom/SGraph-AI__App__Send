@@ -178,10 +178,11 @@ class SgSiteHeader extends SgComponent {
         }
         // Built-in profile — deep copy so we never mutate the config object
         let profileItems = (this._profile()?.navItems || []).map(i => ({ ...i }))
-        // On localhost, make same-site relative links absolute so the full
-        // target URL is visible in DevTools for debugging env-aware routing
+        // On localhost, absolutise same-site relative links using the local
+        // origin (http://localhost:PORT) so navigation stays on the dev server
+        // and DevTools shows the full URL for debugging env-aware routing.
         if (!window.location.hostname.endsWith(BASE_DOMAIN)) {
-            const siteBase = xsite(this._profile()?.sitePrefix ?? '', ENV)
+            const siteBase = window.location.origin
             profileItems = profileItems.map(i =>
                 i.href.startsWith('/') ? { ...i, href: siteBase + i.href } : i
             )
