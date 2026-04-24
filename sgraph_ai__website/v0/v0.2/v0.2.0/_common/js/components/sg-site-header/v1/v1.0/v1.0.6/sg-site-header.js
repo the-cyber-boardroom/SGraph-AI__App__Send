@@ -65,8 +65,9 @@ const ENV = detectEnv(
 
 const SITE_CONFIGS = {
     Send: {
-        homeUrl:  '/en-gb/',
-        tokenBar: true,
+        sitePrefix: '',
+        homeUrl:    '/en-gb/',
+        tokenBar:   true,
         get tokenBarBase() { return xsite('', ENV) + '/en-gb/browse/' },
         get navItems() {
             return [
@@ -79,8 +80,9 @@ const SITE_CONFIGS = {
         }
     },
     Tools: {
-        homeUrl:  '/en-gb/',
-        tokenBar: false,
+        sitePrefix: 'tools',
+        homeUrl:    '/en-gb/',
+        tokenBar:   false,
         get navItems() {
             return [
                 { label: 'Send',    href: xsite('', ENV) },
@@ -175,7 +177,15 @@ class SgSiteHeader extends SgComponent {
             return this._applyActiveNav(items, false)
         }
         // Built-in profile — deep copy so we never mutate the config object
-        const profileItems = (this._profile()?.navItems || []).map(i => ({ ...i }))
+        let profileItems = (this._profile()?.navItems || []).map(i => ({ ...i }))
+        // On localhost, make same-site relative links absolute so the full
+        // target URL is visible in DevTools for debugging env-aware routing
+        if (!window.location.hostname.endsWith(BASE_DOMAIN)) {
+            const siteBase = xsite(this._profile()?.sitePrefix ?? '', ENV)
+            profileItems = profileItems.map(i =>
+                i.href.startsWith('/') ? { ...i, href: siteBase + i.href } : i
+            )
+        }
         return this._applyActiveNav(profileItems, true)
     }
 
