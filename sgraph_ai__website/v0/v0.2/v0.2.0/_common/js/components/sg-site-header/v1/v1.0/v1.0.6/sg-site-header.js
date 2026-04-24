@@ -149,7 +149,10 @@ class SgSiteHeader extends SgComponent {
     // --- Profile resolution --------------------------------------------------
 
     _profile() {
-        const site = this.getAttribute('site') || HOST_SITE_MAP[window.location.hostname]
+        const attrSite = this.getAttribute('site')
+        const hostSite = HOST_SITE_MAP[window.location.hostname]
+        const site = attrSite || hostSite
+        console.log(`[sg-site-header] _profile: attr="${attrSite}" hostMap="${hostSite}" resolved="${site}"`)
         return site ? (SITE_CONFIGS[site] || null) : null
     }
 
@@ -221,12 +224,13 @@ class SgSiteHeader extends SgComponent {
                     console.log(`[sg-site-header] _applyActiveNav: ACTIVE (path match) href="${i.href}"`)
                     return { ...i, active: true }
                 }
-                // Absolute href: match by hostname so cross-site links
-                // (e.g. Tools) highlight correctly when on that site
                 try {
-                    if (new URL(i.href).hostname === host) {
-                        console.log(`[sg-site-header] _applyActiveNav: ACTIVE (hostname match) href="${i.href}"`)
-                        return { ...i, active: true }
+                    const url = new URL(i.href)
+                    if (url.hostname === host) {
+                        // Same site (incl. localhost absolute links) — require pathname match too
+                        const active = url.pathname === path
+                        if (active) console.log(`[sg-site-header] _applyActiveNav: ACTIVE (same-host+path match) href="${i.href}"`)
+                        return { ...i, active }
                     }
                 } catch {}
                 return { ...i, active: i.active || false }
