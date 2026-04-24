@@ -194,17 +194,19 @@ class SgSiteHeader extends SgComponent {
         console.log(`[sg-site-header] _resolveNavItems: profile="${profile ? this.getAttribute('site') || window.location.hostname : 'null'}" sitePrefix="${profile?.sitePrefix ?? '(none)'}"`)
         let profileItems = (profile?.navItems || []).map(i => ({ ...i }))
         console.log('[sg-site-header] _resolveNavItems: raw navItems', profileItems.map(i => i.href))
-        // On localhost, absolutise same-site relative links using the local
-        // origin (http://localhost:PORT) so navigation stays on the dev server
-        // and DevTools shows the full URL for debugging env-aware routing.
-        if (!window.location.hostname.endsWith(BASE_DOMAIN)) {
-            const siteBase = window.location.origin
-            console.log(`[sg-site-header] _resolveNavItems: localhost detected, absolutising relative hrefs with "${siteBase}"`)
-            profileItems = profileItems.map(i =>
-                i.href.startsWith('/') ? { ...i, href: siteBase + i.href } : i
-            )
-            console.log('[sg-site-header] _resolveNavItems: after absolutise', profileItems.map(i => i.href))
-        }
+        // Always absolutise relative hrefs using the profile's canonical origin.
+        // On localhost: use window.location.origin (navigation stays on dev server).
+        // On *.sgraph.ai: use xsite(sitePrefix, ENV) — this fixes cross-site usage
+        // (e.g. Send header loaded on Tools site with site="Send") so relative links
+        // resolve to the correct Send origin, not the Tools origin.
+        const siteBase = window.location.hostname.endsWith(BASE_DOMAIN)
+            ? xsite(profile?.sitePrefix ?? '', ENV)
+            : window.location.origin
+        console.log(`[sg-site-header] _resolveNavItems: absolutising relative hrefs with "${siteBase}"`)
+        profileItems = profileItems.map(i =>
+            i.href.startsWith('/') ? { ...i, href: siteBase + i.href } : i
+        )
+        console.log('[sg-site-header] _resolveNavItems: after absolutise', profileItems.map(i => i.href))
         return this._applyActiveNav(profileItems, true)
     }
 
