@@ -40,16 +40,25 @@ const SITE_PREFIXES = ['tools', 'api', 'docs']
 // Extract env from hostname. Domain pattern: {env.}{site.}sgraph.ai
 // Strip BASE_DOMAIN, then strip any known site prefix from the right.
 function detectEnv(hostname) {
-    if (!hostname.endsWith(BASE_DOMAIN)) return ''  // localhost → prod
+    if (!hostname.endsWith(BASE_DOMAIN)) {
+        console.log(`[sg-site-header] detectEnv: hostname="${hostname}" — not sgraph.ai, env='' (prod)`)
+        return ''
+    }
     const inner = hostname.slice(0, -(BASE_DOMAIN.length)).replace(/\.$/, '')
-    // inner examples: '' | 'dev' | 'tools' | 'dev.tools' | 'main.tools'
+    console.log(`[sg-site-header] detectEnv: hostname="${hostname}" inner="${inner}"`)
     for (const prefix of SITE_PREFIXES) {
-        if (inner === prefix) return ''                          // 'tools'     → env=''
+        if (inner === prefix) {
+            console.log(`[sg-site-header] detectEnv: inner=site prefix "${prefix}", env='' (prod)`)
+            return ''
+        }
         if (inner.endsWith('.' + prefix)) {
-            return inner.slice(0, -(prefix.length + 1))         // 'dev.tools' → env='dev'
+            const env = inner.slice(0, -(prefix.length + 1))
+            console.log(`[sg-site-header] detectEnv: inner ends with ".${prefix}", env="${env}"`)
+            return env
         }
     }
-    return inner  // bare env: 'dev', 'main', '' (Send has no site prefix)
+    console.log(`[sg-site-header] detectEnv: bare env="${inner}"`)
+    return inner
 }
 
 // Build a cross-site URL: https://{env.}{site.}sgraph.ai
@@ -62,6 +71,7 @@ function xsite(sitePrefix, env) {
 const ENV = detectEnv(
     (typeof window !== 'undefined') ? window.location.hostname : ''
 )
+console.log(`[sg-site-header] module loaded — hostname="${(typeof window !== 'undefined') ? window.location.hostname : ''}" ENV="${ENV}"`)
 
 const SITE_CONFIGS = {
     Send: {
@@ -177,14 +187,20 @@ class SgSiteHeader extends SgComponent {
             return this._applyActiveNav(items, false)
         }
         // Built-in profile — deep copy so we never mutate the config object
-        let profileItems = (this._profile()?.navItems || []).map(i => ({ ...i }))
-        // On localhost, make same-site relative links absolute so the full
-        // target URL is visible in DevTools for debugging env-aware routing
+        const profile = this._profile()
+        console.log(`[sg-site-header] _resolveNavItems: profile="${profile ? this.getAttribute('site') || window.location.hostname : 'null'}" sitePrefix="${profile?.sitePrefix ?? '(none)'}"`)
+        let profileItems = (profile?.navItems || []).map(i => ({ ...i }))
+        console.log('[sg-site-header] _resolveNavItems: raw navItems', profileItems.map(i => i.href))
+        // On localhost, absolutise same-site relative links using the local
+        // origin (http://localhost:PORT) so navigation stays on the dev server
+        // and DevTools shows the full URL for debugging env-aware routing.
         if (!window.location.hostname.endsWith(BASE_DOMAIN)) {
-            const siteBase = xsite(this._profile()?.sitePrefix ?? '', ENV)
+            const siteBase = window.location.origin
+            console.log(`[sg-site-header] _resolveNavItems: localhost detected, absolutising relative hrefs with "${siteBase}"`)
             profileItems = profileItems.map(i =>
                 i.href.startsWith('/') ? { ...i, href: siteBase + i.href } : i
             )
+            console.log('[sg-site-header] _resolveNavItems: after absolutise', profileItems.map(i => i.href))
         }
         return this._applyActiveNav(profileItems, true)
     }
@@ -192,18 +208,26 @@ class SgSiteHeader extends SgComponent {
     _applyActiveNav(items, autoDetect) {
         const activeNav = this.getAttribute('active-nav')
         if (activeNav) {
+            console.log(`[sg-site-header] _applyActiveNav: using explicit active-nav="${activeNav}"`)
             return items.map(i => ({ ...i, active: i.href === activeNav }))
         }
         if (autoDetect) {
             const path = window.location.pathname
             const host = window.location.hostname
+            console.log(`[sg-site-header] _applyActiveNav: autoDetect path="${path}" host="${host}"`)
             return items.map(i => {
                 // Relative href: match by pathname
-                if (i.href === path) return { ...i, active: true }
+                if (i.href === path) {
+                    console.log(`[sg-site-header] _applyActiveNav: ACTIVE (path match) href="${i.href}"`)
+                    return { ...i, active: true }
+                }
                 // Absolute href: match by hostname so cross-site links
                 // (e.g. Tools) highlight correctly when on that site
                 try {
-                    if (new URL(i.href).hostname === host) return { ...i, active: true }
+                    if (new URL(i.href).hostname === host) {
+                        console.log(`[sg-site-header] _applyActiveNav: ACTIVE (hostname match) href="${i.href}"`)
+                        return { ...i, active: true }
+                    }
                 } catch {}
                 return { ...i, active: i.active || false }
             })
