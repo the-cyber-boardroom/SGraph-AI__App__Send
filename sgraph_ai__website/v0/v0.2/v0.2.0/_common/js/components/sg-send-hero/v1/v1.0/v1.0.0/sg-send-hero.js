@@ -3,6 +3,8 @@ import { SgComponent } from 'https://tools.sgraph.ai/components/base/v1/v1.0/v1.
 const BROWSE_BASE = 'https://send.sgraph.ai/en-gb/browse/'
 
 class SgSendHero extends SgComponent {
+    static jsUrl = import.meta.url
+
     bindElements() {
         this._field = this.shadowRoot.getElementById('hero-token-field')
         this._goBtn = this.shadowRoot.getElementById('hero-token-go')
