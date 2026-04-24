@@ -234,13 +234,58 @@ code, .mono {
    5. Site Header
    ------------------------------------------------------------ */
 
-/* Reserve header space before the custom element upgrades, preventing layout shift */
+/* Reserve space before custom elements upgrade, preventing layout shift */
 sg-site-header:not(:defined) {
   display: block;
   min-height: 65px;
   background-color: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
   box-shadow: inset 0 -2px 0 rgba(78, 205, 196, 0.3);
+}
+
+sg-send-hero:not(:defined) {
+  display: block;
+  min-height: 520px;
+  background-color: var(--bg-primary);
+}
+
+sg-vault-patterns:not(:defined),
+sg-vault-primitives:not(:defined),
+sg-tools-section:not(:defined),
+sg-privacy-statement:not(:defined) {
+  display: block;
+  min-height: 420px;
+  background-color: var(--bg-secondary, #111);
+}
+
+sg-runs-anywhere:not(:defined) {
+  display: block;
+  min-height: 160px;
+  background-color: var(--bg-primary);
+}
+
+sg-use-cases:not(:defined) {
+  display: block;
+  min-height: 800px;
+  background-color: var(--bg-primary);
+}
+
+sg-pricing-teaser:not(:defined) {
+  display: block;
+  min-height: 200px;
+  background-color: var(--bg-primary);
+}
+
+sg-oss-section:not(:defined) {
+  display: block;
+  min-height: 360px;
+  background-color: var(--bg-primary);
+}
+
+sg-site-footer:not(:defined) {
+  display: block;
+  min-height: 240px;
+  background-color: var(--bg-secondary, #111);
 }
 
 .site-header {

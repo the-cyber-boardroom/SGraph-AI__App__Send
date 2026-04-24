@@ -1,0 +1,52 @@
+/* sg-privacy-statement — Shadow DOM stylesheet */
+
+/* ── Base reset ── */
+:host { display: block; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+img { display: block; max-width: 100%; }
+ul, ol { list-style: none; }
+a { color: var(--accent, #4ECDC4); text-decoration: none; transition: color 150ms ease; }
+a:hover { color: var(--accent-hover, #3DB8B0); text-decoration: underline; }
+p { margin-bottom: var(--sp-4, 16px); }
+p:last-child { margin-bottom: 0; }
+code { font-family: var(--font-mono, 'JetBrains Mono', monospace); }
+h2 { font-family: var(--font-display, 'DM Sans', system-ui); font-weight: var(--fw-bold, 700); font-size: var(--fs-h2, 1.6rem); color: var(--text-heading, #FFFFFF); line-height: var(--lh-heading, 1.3); }
+h3 { font-family: var(--font-display, 'DM Sans', system-ui); font-weight: var(--fw-bold, 700); font-size: var(--fs-h3, 1.25rem); color: var(--text-heading, #FFFFFF); line-height: var(--lh-heading, 1.3); }
+.container { width: 100%; max-width: var(--max-width, 1200px); margin-inline: auto; padding-inline: var(--gutter, 1.5rem); }
+.section { padding-block: var(--sp-16, 64px); }
+.section--alt { background-color: var(--bg-secondary, #16213E); }
+.section-header { text-align: center; margin-bottom: var(--sp-12, 48px); }
+.section-header h2 { margin-bottom: var(--sp-4, 16px); }
+.section-header p { color: var(--text-secondary, #8892A0); max-width: 600px; margin-inline: auto; font-size: 1.05rem; margin-bottom: 0; }
+@media (max-width: 768px) { .section { padding-block: var(--sp-12, 48px); } }
+@media (max-width: 480px) { .container { padding-inline: var(--sp-4, 16px); } }
+
+/* ── Component styles ── */
+.privacy-inline {
+  background-color: rgba(22, 33, 62, 0.6);
+  border: 1px solid var(--border-color, #2C3E6B);
+  border-left: 4px solid var(--accent, #4ECDC4);
+  border-radius: 0 var(--radius-card, 12px) var(--radius-card, 12px) 0;
+  padding: var(--sp-8, 32px);
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.privacy-inline__title {
+  font-size: 0.75rem;
+  font-weight: var(--fw-bold, 700);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent, #4ECDC4);
+  margin-bottom: var(--sp-4, 16px);
+}
+
+.privacy-inline__text {
+  font-size: 1rem;
+  color: var(--text-secondary, #8892A0);
+  line-height: 1.9;
+}
+
+.privacy-inline__text p {
+  margin-bottom: var(--sp-3, 12px);
+}
