@@ -229,9 +229,14 @@ class SgSiteHeader extends SgComponent {
                 try {
                     const url = new URL(i.href)
                     if (url.hostname === host) {
-                        // Same site (incl. localhost absolute links) — require pathname match too
+                        // Site-root link (no path) — active anywhere on that site
+                        if (url.pathname === '/') {
+                            console.log(`[sg-site-header] _applyActiveNav: ACTIVE (site-root hostname match) href="${i.href}"`)
+                            return { ...i, active: true }
+                        }
+                        // Page-specific link — require exact pathname match
                         const active = url.pathname === path
-                        if (active) console.log(`[sg-site-header] _applyActiveNav: ACTIVE (same-host+path match) href="${i.href}"`)
+                        if (active) console.log(`[sg-site-header] _applyActiveNav: ACTIVE (pathname match) href="${i.href}"`)
                         return { ...i, active }
                     }
                 } catch {}
@@ -242,7 +247,12 @@ class SgSiteHeader extends SgComponent {
     }
 
     _renderHomeUrl() {
-        this._logo.href = this.getAttribute('home-url') || this._profile()?.homeUrl || '/'
+        const raw = this.getAttribute('home-url') || this._profile()?.homeUrl || '/'
+        if (!raw.startsWith('/')) { this._logo.href = raw; return }
+        const siteBase = window.location.hostname.endsWith(BASE_DOMAIN)
+            ? xsite(this._profile()?.sitePrefix ?? '', ENV)
+            : window.location.origin
+        this._logo.href = siteBase + raw
     }
 
     // --- Mobile Nav Toggle ---------------------------------------------------
