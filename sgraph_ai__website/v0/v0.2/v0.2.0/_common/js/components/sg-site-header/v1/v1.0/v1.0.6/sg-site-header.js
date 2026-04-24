@@ -2,16 +2,21 @@
    SGraph — Site Header Component
    v1.0.6 — environment-aware cross-site links
 
-   Domain convention: {site-prefix.}{env.}sgraph.ai
+   Domain convention: {env.}{site.}sgraph.ai  (env BEFORE site in subdomain)
      Send prod:  sgraph.ai           Tools prod:  tools.sgraph.ai
-     Send dev:   dev.sgraph.ai       Tools dev:   tools.dev.sgraph.ai
-     Send main:  main.sgraph.ai      Tools main:  tools.main.sgraph.ai
+     Send dev:   dev.sgraph.ai       Tools dev:   dev.tools.sgraph.ai
+     Send main:  main.sgraph.ai      Tools main:  main.tools.sgraph.ai
 
-   detectEnv() extracts the env segment by stripping the base domain
-   and any known site prefix — what remains is the env ('dev', 'main', '').
-   Localhost has no env marker → resolves to production cross-site links.
+   detectEnv() strips the base domain, then strips any known site prefix
+   from the RIGHT of the remaining subdomain — what's left is the env.
+     dev.tools.sgraph.ai → inner='dev.tools' → strip '.tools' → env='dev'
+     tools.sgraph.ai     → inner='tools'     → strip 'tools'  → env=''
+     dev.sgraph.ai       → inner='dev'       → no site prefix → env='dev'
 
-   xsite(sitePrefix, env) builds: https://{sitePrefix.}{env.}sgraph.ai
+   xsite(sitePrefix, env) builds: https://{env.}{site.}sgraph.ai
+
+   Active nav: relative hrefs matched by pathname; absolute hrefs matched
+   by hostname so the Tools link highlights when on dev.tools.sgraph.ai.
 
    Cross-site links to *.sgraph.ai never open in a new tab.
 
@@ -29,26 +34,29 @@
 import { SgComponent } from 'https://tools.sgraph.ai/components/base/v1/v1.0/v1.0.0/sg-component.js'
 
 const BASE_DOMAIN = 'sgraph.ai'
-// Extend this list when new sites launch (longest prefix first)
+// Extend when new sites launch — strip from the RIGHT of the subdomain
 const SITE_PREFIXES = ['tools', 'api', 'docs']
 
-// Extract env segment from hostname: 'dev', 'main', '' (prod/localhost)
-// Domain pattern: {site-prefix.}{env.}sgraph.ai
+// Extract env from hostname. Domain pattern: {env.}{site.}sgraph.ai
+// Strip BASE_DOMAIN, then strip any known site prefix from the right.
 function detectEnv(hostname) {
     if (!hostname.endsWith(BASE_DOMAIN)) return ''  // localhost → prod
     const inner = hostname.slice(0, -(BASE_DOMAIN.length)).replace(/\.$/, '')
+    // inner examples: '' | 'dev' | 'tools' | 'dev.tools' | 'main.tools'
     for (const prefix of SITE_PREFIXES) {
-        if (inner === prefix) return ''
-        if (inner.startsWith(prefix + '.')) return inner.slice(prefix.length + 1)
+        if (inner === prefix) return ''                          // 'tools'     → env=''
+        if (inner.endsWith('.' + prefix)) {
+            return inner.slice(0, -(prefix.length + 1))         // 'dev.tools' → env='dev'
+        }
     }
-    return inner  // bare env segment (e.g. 'dev' for dev.sgraph.ai)
+    return inner  // bare env: 'dev', 'main', '' (Send has no site prefix)
 }
 
-// Build a cross-site URL: https://{sitePrefix.}{env.}sgraph.ai
+// Build a cross-site URL: https://{env.}{site.}sgraph.ai
 function xsite(sitePrefix, env) {
+    const envPart  = env        ? env + '.'        : ''
     const sitePart = sitePrefix ? sitePrefix + '.' : ''
-    const envPart  = env        ? env + '.'         : ''
-    return `https://${sitePart}${envPart}${BASE_DOMAIN}`
+    return `https://${envPart}${sitePart}${BASE_DOMAIN}`
 }
 
 const ENV = detectEnv(
@@ -83,12 +91,12 @@ const SITE_CONFIGS = {
 }
 
 const HOST_SITE_MAP = {
-    'sgraph.ai':              'Send',
-    'dev.sgraph.ai':          'Send',
-    'main.sgraph.ai':         'Send',
-    'tools.sgraph.ai':        'Tools',
-    'tools.dev.sgraph.ai':    'Tools',
-    'tools.main.sgraph.ai':   'Tools',
+    'sgraph.ai':             'Send',
+    'dev.sgraph.ai':         'Send',
+    'main.sgraph.ai':        'Send',
+    'tools.sgraph.ai':       'Tools',
+    'dev.tools.sgraph.ai':   'Tools',
+    'main.tools.sgraph.ai':  'Tools',
 }
 
 class SgSiteHeader extends SgComponent {
@@ -178,7 +186,17 @@ class SgSiteHeader extends SgComponent {
         }
         if (autoDetect) {
             const path = window.location.pathname
-            return items.map(i => ({ ...i, active: i.href === path || i.active }))
+            const host = window.location.hostname
+            return items.map(i => {
+                // Relative href: match by pathname
+                if (i.href === path) return { ...i, active: true }
+                // Absolute href: match by hostname so cross-site links
+                // (e.g. Tools) highlight correctly when on that site
+                try {
+                    if (new URL(i.href).hostname === host) return { ...i, active: true }
+                } catch {}
+                return { ...i, active: i.active || false }
+            })
         }
         return items
     }

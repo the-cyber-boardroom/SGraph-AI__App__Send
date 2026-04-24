@@ -7,18 +7,18 @@
 
 ## 1. The Domain Convention
 
-All SGraph sites share the base domain `sgraph.ai`. Each site has a **site prefix**
-(a fixed subdomain label) and each environment has an **env segment** that sits
-*between* the site prefix and the base domain.
+All SGraph sites share the base domain `sgraph.ai`. Each site has a **site label**
+(a fixed subdomain segment) and each environment has an **env segment** that sits
+*before* the site label.
 
 ```
-{site-prefix.}{env.}sgraph.ai
+{env.}{site.}sgraph.ai
 ```
 
 | Part | What it is | Examples |
 |------|-----------|---------|
-| `site-prefix.` | Fixed label identifying the site. Empty for Send. | `tools.`, `api.`, `docs.`, `` |
 | `env.` | Optional environment marker. Empty means production. | `dev.`, `main.`, `staging.`, `` |
+| `site.` | Fixed label identifying the site. Empty for Send. | `tools.`, `api.`, `docs.`, `` |
 | `sgraph.ai` | Base domain. Always fixed. | — |
 
 ### The full matrix
@@ -26,11 +26,11 @@ All SGraph sites share the base domain `sgraph.ai`. Each site has a **site prefi
 | Site | Production | Dev | Main |
 |------|-----------|-----|------|
 | **Send** | `sgraph.ai` | `dev.sgraph.ai` | `main.sgraph.ai` |
-| **Tools** | `tools.sgraph.ai` | `tools.dev.sgraph.ai` | `tools.main.sgraph.ai` |
-| **API** *(future)* | `api.sgraph.ai` | `api.dev.sgraph.ai` | `api.main.sgraph.ai` |
-| **Docs** *(future)* | `docs.sgraph.ai` | `docs.dev.sgraph.ai` | `docs.main.sgraph.ai` |
+| **Tools** | `tools.sgraph.ai` | `dev.tools.sgraph.ai` | `main.tools.sgraph.ai` |
+| **API** *(future)* | `api.sgraph.ai` | `dev.api.sgraph.ai` | `main.api.sgraph.ai` |
+| **Docs** *(future)* | `docs.sgraph.ai` | `dev.docs.sgraph.ai` | `main.docs.sgraph.ai` |
 
-Key observation: **the env segment always comes after the site prefix, not before it.**
+Key observation: **the env segment always comes BEFORE the site label.**
 
 ### Localhost
 
