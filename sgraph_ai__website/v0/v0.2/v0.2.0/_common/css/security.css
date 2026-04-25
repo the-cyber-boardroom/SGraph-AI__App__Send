@@ -1,0 +1,122 @@
+/* ============================================================
+   SG/Send v0.2.0 — Security page styles
+   ============================================================ */
+
+/* Step-by-step encryption flow */
+.encrypt-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin-block: var(--sp-12);
+  position: relative;
+}
+
+.encrypt-steps::before {
+  content: '';
+  position: absolute;
+  top: 28px;
+  left: 12%;
+  right: 12%;
+  height: 2px;
+  background: linear-gradient(to right, var(--accent), rgba(78, 205, 196, 0.3));
+  z-index: 0;
+}
+
+.encrypt-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.encrypt-step__num {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--bg-secondary);
+  border: 2px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: var(--fw-bold);
+  color: var(--accent);
+}
+
+.encrypt-step__label {
+  font-size: 0.85rem;
+  font-weight: var(--fw-medium);
+  color: var(--text-heading);
+}
+
+.encrypt-step__sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  max-width: 120px;
+}
+
+@media (max-width: 768px) {
+  .encrypt-steps {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-6);
+  }
+
+  .encrypt-steps::before {
+    display: none;
+  }
+}
+
+/* Architecture diagram callout */
+.arch-callout {
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--sp-8);
+  margin-block: var(--sp-8);
+}
+
+.arch-callout__title {
+  font-size: 0.75rem;
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: var(--sp-4);
+}
+
+/* Disclosure section */
+.disclosure-box {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: var(--sp-8);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-6);
+}
+
+.disclosure-box__icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.disclosure-box__content h3 {
+  margin-bottom: var(--sp-3);
+}
+
+.disclosure-box__content p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 600px) {
+  .disclosure-box {
+    flex-direction: column;
+  }
+}

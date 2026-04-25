@@ -1,0 +1,170 @@
+/* sg-vault-patterns — Shadow DOM stylesheet
+   All styles are self-contained. CSS custom properties are inherited from :root.
+   Use var(--token, fallback) everywhere — no external class styles bleed in. */
+
+/* ─── Host ─────────────────────────────────────────────────────────────────── */
+:host {
+  display: block;
+}
+
+/* ─── Reset ─────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+ul {
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+p {
+  margin: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* ─── Container ─────────────────────────────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: var(--max-width, 1200px);
+  margin-inline: auto;
+  padding-inline: var(--gutter, 1.5rem);
+}
+
+/* ─── Section ────────────────────────────────────────────────────────────────── */
+.section {
+  padding-block: var(--sp-16, 64px);
+  background-color: var(--bg-primary, #1A1A2E);
+}
+
+.section--alt {
+  background-color: var(--bg-secondary, #16213E);
+}
+
+/* ─── Section Header ─────────────────────────────────────────────────────────── */
+.section-header {
+  text-align: center;
+  margin-bottom: var(--sp-10, 40px);
+}
+
+.section-header h2 {
+  font-family: var(--font-display, 'DM Sans', system-ui);
+  font-size: var(--fs-h2, 2rem);
+  font-weight: var(--fw-bold, 700);
+  color: var(--text-heading, #fff);
+  letter-spacing: -0.02em;
+  margin-bottom: var(--sp-4, 16px);
+}
+
+.section-header p {
+  font-size: 1.05rem;
+  color: var(--text-secondary, #8892A0);
+  max-width: 640px;
+  margin-inline: auto;
+  line-height: 1.7;
+}
+
+/* ─── Patterns Grid ──────────────────────────────────────────────────────────── */
+.patterns-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-6, 24px);
+}
+
+/* ─── Pattern Card ───────────────────────────────────────────────────────────── */
+.pattern-card {
+  background-color: rgba(44, 62, 107, 0.55);
+  border: 1px solid rgba(78, 205, 196, 0.2);
+  border-radius: var(--radius-card, 12px);
+  padding: var(--sp-6, 24px);
+  text-align: center;
+  transition: border-color 250ms ease, background-color 250ms ease;
+}
+
+.pattern-card:hover {
+  border-color: var(--accent, #4ECDC4);
+  background-color: rgba(44, 62, 107, 0.7);
+}
+
+.pattern-card--featured {
+  border-color: rgba(78, 205, 196, 0.5);
+  background-color: rgba(78, 205, 196, 0.07);
+}
+
+/* ─── Pattern Flow ───────────────────────────────────────────────────────────── */
+.pattern-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3, 12px);
+  margin-bottom: var(--sp-4, 16px);
+}
+
+.pattern-actor {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.pattern-arrow {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.75rem;
+  color: var(--accent, #4ECDC4);
+  white-space: nowrap;
+}
+
+/* ─── Pattern Text ───────────────────────────────────────────────────────────── */
+.pattern-title {
+  font-family: var(--font-display, 'DM Sans', system-ui);
+  font-weight: var(--fw-bold, 700);
+  font-size: var(--fs-h3, 1.25rem);
+  color: var(--text-heading, #fff);
+  margin-bottom: var(--sp-3, 12px);
+}
+
+.pattern-desc {
+  color: var(--text-secondary, #8892A0);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+
+/* ─── Pattern Detail ─────────────────────────────────────────────────────────── */
+.pattern-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  justify-content: center;
+  margin-top: var(--sp-4, 16px);
+  padding-top: var(--sp-4, 16px);
+  border-top: 1px solid var(--border-color, #2C3E6B);
+  flex-wrap: wrap;
+}
+
+.pattern-detail__item {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #8892A0);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.pattern-detail__sep {
+  color: var(--border-color, #2C3E6B);
+  font-size: 0.72rem;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .patterns-grid {
+    grid-template-columns: 1fr;
+  }
+}

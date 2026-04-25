@@ -28,12 +28,16 @@
             this._activeView    = 'files';
             this._loadingCount  = 0;
             this._pendingAction = null;
+            this._syncState     = { ahead: 0, behind: 0, diverged: false };
+            this._autoSyncEnabled = true;   // overridden from localStorage in _initAutoSync()
+            this._autoSyncCheckPending = false;
         }
 
         connectedCallback() {
             this._render();
             this._setupListeners();
             this._setupLoadingHook();
+            this._initAutoSync();
             window.sgraphVault.shell = this;
             window.sgraphVault.events.emit('shell-ready', {});
         }
@@ -56,24 +60,29 @@
 
                     <div class="vs-body">
                         <vault-nav></vault-nav>
-                        <div class="vs-content">
-                            <!-- Files view: shared Browse component fills this -->
-                            <div class="vs-view vs-view-files"></div>
 
-                            <!-- Generate view: LLM infographic generation -->
-                            <div class="vs-view vs-view-generate" style="display:none">
-                                <vault-generate></vault-generate>
-                            </div>
+                        <div class="vs-main">
+                            <!-- Sync notice banner (upstream changes / diverged) -->
+                            <div class="vs-sync-notice" style="display:none"></div>
 
-                            <!-- SGit view -->
-                            <div class="vs-view vs-view-sgit" style="display:none">
-                                <vault-sgit-view></vault-sgit-view>
+                            <div class="vs-content">
+                                <!-- Files view: shared Browse component fills this -->
+                                <div class="vs-view vs-view-files"></div>
+                                <!-- SGit view -->
+                                <div class="vs-view vs-view-sgit" style="display:none">
+                                    <vault-sgit-view></vault-sgit-view>
+                                </div>
+                                <!-- Settings view -->
+                                <div class="vs-view vs-view-settings" style="display:none">
+                                    <vault-settings></vault-settings>
+                                </div>
                             </div>
+                        </div>
 
-                            <!-- Settings view -->
-                            <div class="vs-view vs-view-settings" style="display:none">
-                                <vault-settings></vault-settings>
-                            </div>
+                        <!-- Debug sidebar (right column, toggled by Debug button) -->
+                        <div class="vs-debug-sidebar" hidden>
+                            <div class="vs-debug-handle" title="Drag to resize"></div>
+                            <sg-layout id="vault-debug-layout"></sg-layout>
                         </div>
                     </div>
 
@@ -97,9 +106,13 @@
             this.addEventListener('vault-header-lock',    () => this._onLock());
             this.addEventListener('vault-header-debug',   () => this._toggleDebug());
             this.addEventListener('vault-header-raw',     () => this._showRawVault());
+            this.addEventListener('vault-header-rename',  (e) => this._onVaultRename(e.detail?.name));
 
             // Nav events
-            this.addEventListener('vault-nav-switch', (e) => this._switchView(e.detail.view));
+            this.addEventListener('vault-nav-switch', (e) => {
+                this._switchView(e.detail.view);
+                if (e.detail.view === 'files') this._scheduleAutoSyncCheck();
+            });
 
             // Auth events
             this.addEventListener('vault-auth-submit', (e) => this._onAuthSubmit(e.detail.key));
@@ -120,12 +133,25 @@
             // Status bar debug click
             this.addEventListener('vault-status-debug', () => this._toggleDebug());
 
-            // Generate save event — refresh tree after saving generated content
-            this.addEventListener('vault-generate-save', () => this._onFileAdded());
+            // Branch switch: remount browse to reflect new branch content
+            this.addEventListener('branch-switched', () => this._mountBrowse());
 
             // Upload component events
             this.addEventListener('vault-file-added', () => this._onFileAdded());
             this.addEventListener('vault-upload-request', () => this._onUploadRequest());
+
+            // Sync notice actions
+            this.addEventListener('click', (e) => {
+                if (e.target.closest('.vs-sync-merge-btn')) this._onAutoMerge();
+                if (e.target.closest('.vs-sync-pull-btn')) this._onPull();
+                if (e.target.closest('.vs-sync-notice-close')) {
+                    const n = this.querySelector('.vs-sync-notice');
+                    if (n) n.style.display = 'none';
+                }
+            });
+
+            // Soft checkout from history
+            this.addEventListener('vault-sgit-checkout', (e) => this._onCheckout(e.detail.commitId));
         }
 
         // --- Vault Lifecycle ------------------------------------------------------
@@ -151,9 +177,6 @@
             // Wire settings
             this.querySelector('vault-settings')?.setVault(vault, vaultKey, this._accessKey);
 
-            // Wire generate panel
-            this.querySelector('vault-generate')?.setVault(vault, this._accessKey);
-
             // Wire SGit
             const sgit = this.querySelector('vault-sgit-view');
             if (sgit) { sgit.vault = vault; sgit.refresh(); }
@@ -161,9 +184,8 @@
             // Update status
             this.querySelector('vault-status-bar')?.updateStats(vault);
 
-            // Show ahead/behind counts if writable
-            this._refreshAheadCount();
-            this._refreshBehindCount();
+            // Show ahead/behind counts + diverged state if writable
+            this._refreshSyncState();
 
             // Ensure files view is active
             this._switchView('files');
@@ -193,6 +215,9 @@
             window.history.replaceState(null, '', window.location.pathname);
             try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
             window.sgraphVault.events.emit('vault-locked', {});
+
+            // Refresh the entry screen so recent vaults list is up to date
+            this.querySelector('vault-entry')?.refresh?.();
         }
 
         // --- Mount Browse Component -----------------------------------------------
@@ -204,6 +229,12 @@
                 const entry   = this.querySelector('vault-entry');
                 const sgSend  = entry._getSGSend();
                 const vault   = await SGVault.open(sgSend, this._vaultKey);
+
+                // Auto-merge if clone ref is behind named ref — Refresh should always
+                // show the latest published content, not just reload from the old clone.
+                if (vault._headCommitId !== vault._namedHeadId) {
+                    try { await vault.merge(vault._namedHeadId); } catch (_) { /* diverged — proceed as-is */ }
+                }
                 this._vault   = vault;
 
                 // Remount browse with fresh vault data
@@ -214,8 +245,7 @@
                 this.querySelector('vault-status-bar')?.updateStats(vault);
                 this.querySelector('vault-header')?.setVaultName(vault.name || '');
 
-                this._refreshAheadCount();
-                this._refreshBehindCount();
+                this._refreshSyncState();
                 window.sgraphVault.messages.success('Vault refreshed');
             } catch (err) {
                 window.sgraphVault.messages.error(`Refresh failed: ${err.message}`);
@@ -273,15 +303,6 @@
                 };
             }
 
-            // Track file selection for the Generate panel
-            const shell = this;
-            const origOpenFileTab = browse._openFileTab;
-            browse._openFileTab = async function(path) {
-                await origOpenFileTab.call(this, path);
-                const fileName = path.split('/').pop();
-                shell.querySelector('vault-generate')?.setSelectedFile(path, fileName);
-            };
-
             filesView.appendChild(browse);
         }
 
@@ -289,12 +310,15 @@
             // Refresh status bar after file mutations
             this.querySelector('vault-status-bar')?.updateStats(this._vault);
             this._updateVaultKey();
-            this._refreshAheadCount();
+            this._refreshSyncState();
 
             // Refresh settings if visible
             if (this._activeView === 'settings') {
                 this.querySelector('vault-settings')?.refresh();
             }
+
+            // After a local write, check if published branch also moved
+            this._scheduleAutoSyncCheck();
         }
 
         _onFileAdded() {
@@ -303,36 +327,93 @@
             if (this._vault) this._mountBrowse();
         }
 
-        async _refreshAheadCount() {
+        async _refreshSyncState() {
             if (!this._vault || !this._accessKey) return;
             try {
-                const n = await this._vault.getAheadCount();
-                this.querySelector('vault-header')?.setAheadCount(n);
+                const cloneHead = this._vault._headCommitId;
+                const namedHead = this._vault._namedHeadId;
+
+                let ahead = 0, behind = 0, diverged = false;
+
+                if (cloneHead && namedHead && cloneHead !== namedHead) {
+                    // Check if namedHead is reachable from cloneHead (clone is AHEAD)
+                    const namedReachable = await this._vault._isAncestor(namedHead, cloneHead);
+                    if (namedReachable) {
+                        ahead = await this._vault.getAheadCount();
+                    } else {
+                        // Check if cloneHead is reachable from namedHead (clone is BEHIND)
+                        const cloneReachable = await this._vault._isAncestor(cloneHead, namedHead);
+                        if (cloneReachable) {
+                            behind = await this._vault.getBehindCount();
+                        } else {
+                            // Neither reachable from the other — truly diverged
+                            diverged = true;
+                            ahead  = await this._countToFork(cloneHead, namedHead);
+                            behind = await this._countToFork(namedHead, cloneHead);
+                        }
+                    }
+                }
+
+                this._syncState = { ahead, behind, diverged };
+                const header = this.querySelector('vault-header');
+                header?.setAheadCount(ahead);
+                header?.setBehindCount(behind);
+                header?.setDiverged(diverged);
+                this._updateSyncNotice();
             } catch (_) {}
+        }
+
+        // Count commits from fromId until we hit any commit in the other head's
+        // first-parent chain (= fork point). Used for diverged branch counts.
+        async _countToFork(fromId, otherHeadId) {
+            const otherChain = new Set();
+            let c = otherHeadId;
+            for (let i = 0; i < 100 && c; i++) {
+                otherChain.add(c);
+                try { const cm = await this._vault._commitManager.loadCommit(c); c = cm.parents?.[0] || null; }
+                catch (_) { break; }
+            }
+            let n = 0, cur = fromId;
+            while (cur && n < 100) {
+                if (otherChain.has(cur)) break;
+                n++;
+                try { const cm = await this._vault._commitManager.loadCommit(cur); cur = cm.parents?.[0] || null; }
+                catch (_) { break; }
+            }
+            return n;
         }
 
         async _onPush() {
             if (!this._vault || !this._accessKey) return;
+
+            // Guard: diverged vault — pushing silently discards published-only commits
+            const { diverged, behind } = this._syncState || {};
+            if (diverged) {
+                const ok = confirm(
+                    '\u26a0  Diverged vault\n\n' +
+                    `Pushing will overwrite the published branch and permanently discard ` +
+                    `${behind} published commit(s) not in your working branch.\n\n` +
+                    'To safely merge, use SGit \u2192 Repair tab to reconcile changes first.\n\n' +
+                    'Force-push anyway?'
+                );
+                if (!ok) return;
+            }
+
             const header = this.querySelector('vault-header');
             header?.setPushBusy(true);
             try {
                 await this._vault.push();
-                await this._refreshAheadCount();
-                await this._refreshBehindCount();
-                window.sgraphVault.messages.success('Pushed — named branch updated');
+                await this._refreshSyncState();
+                window.sgraphVault.messages.success('Pushed \u2014 named branch updated');
+                if (this._activeView === 'sgit') {
+                    const sgit = this.querySelector('vault-sgit-view');
+                    if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                }
             } catch (err) {
                 window.sgraphVault.messages.error(`Push failed: ${err.message}`);
             } finally {
                 header?.setPushBusy(false);
             }
-        }
-
-        async _refreshBehindCount() {
-            if (!this._vault || !this._accessKey) return;
-            try {
-                const n = await this._vault.getBehindCount();
-                this.querySelector('vault-header')?.setBehindCount(n);
-            } catch (_) {}
         }
 
         async _onPull() {
@@ -344,9 +425,12 @@
                 if (changed) {
                     await this._mountBrowse();
                     this.querySelector('vault-status-bar')?.updateStats(this._vault);
-                    await this._refreshAheadCount();
-                    await this._refreshBehindCount();
-                    window.sgraphVault.messages.success('Pulled — vault updated from named branch');
+                    await this._refreshSyncState();
+                    window.sgraphVault.messages.success('Pulled \u2014 vault updated from named branch');
+                    if (this._activeView === 'sgit') {
+                        const sgit = this.querySelector('vault-sgit-view');
+                        if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                    }
                 } else {
                     window.sgraphVault.messages.success('Already up to date');
                 }
@@ -355,6 +439,117 @@
             } finally {
                 header?.setPullBusy(false);
             }
+        }
+
+        async _onAutoMerge() {
+            if (!this._vault || !this._accessKey) return;
+            // Read LIVE named head — _namedHeadId may be stale if CLI pushed since vault was opened
+            let namedHead;
+            try {
+                namedHead = await this._vault._refManager.readRef(this._vault._refFileId);
+            } catch (err) {
+                window.sgraphVault.messages.error(`Sync failed: ${err.message}`);
+                return;
+            }
+            if (!namedHead) return;
+            const header = this.querySelector('vault-header');
+            header?.setPullBusy(true);
+            const syncBtn = this.querySelector('.vs-sync-merge-btn, .vs-sync-pull-btn');
+            if (syncBtn) { syncBtn.disabled = true; syncBtn.textContent = 'Syncing…'; }
+            window.sgraphVault.messages.info('Merging collaborator changes\u2026');
+            try {
+                const result = await this._vault.merge(namedHead);
+                if (result?.merged) {
+                    // Refresh whatever view the user is already on — don't navigate away
+                    if (this._activeView === 'sgit') {
+                        const sgit = this.querySelector('vault-sgit-view');
+                        if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                        // Rebuild browse data in background so Files view is ready
+                        this._mountBrowse();
+                    } else {
+                        await this._mountBrowse();
+                    }
+                    await this._refreshSyncState();
+
+                    if (result.conflicts?.length > 0) {
+                        window.sgraphVault.messages.warn(
+                            `Merged \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
+                        );
+                    } else {
+                        window.sgraphVault.messages.success('Synced \u2014 collaborator changes merged successfully');
+                    }
+                } else {
+                    await this._refreshSyncState();
+                    window.sgraphVault.messages.success('Already up to date');
+                }
+            } catch (err) {
+                window.sgraphVault.messages.error(`Sync failed: ${err.message}`);
+            } finally {
+                header?.setPullBusy(false);
+            }
+        }
+
+        // --- Auto-sync (activity-triggered, no polling) --------------------------------
+
+        _scheduleAutoSyncCheck() {
+            if (this._autoSyncCheckPending) return
+            this._autoSyncCheckPending = true
+            setTimeout(() => {
+                this._autoSyncCheckPending = false
+                this._checkAndAutoSync()
+            }, 800)   // debounce: wait 800ms after nav switch before checking
+        }
+
+        async _checkAndAutoSync() {
+            if (!this._vault || !this._accessKey) return
+            if (!this._autoSyncEnabled) return
+
+            let liveNamedHead
+            try {
+                liveNamedHead = await this._vault._refManager.readRef(this._vault._refFileId)
+            } catch (_) { return }
+
+            if (!liveNamedHead || liveNamedHead === this._vault._namedHeadId) return
+
+            // There are upstream changes
+            const { ahead } = this._syncState || {}
+            if (ahead > 0) {
+                // We have local commits too — diverged or ahead. Don't auto-merge silently.
+                // Refresh sync state so the banner updates (it will show the diverged notice).
+                await this._refreshSyncState()
+                return
+            }
+
+            // We are cleanly behind — safe to auto-pull
+            window.sgraphVault.messages.info('Syncing vault\u2026')
+            try {
+                const result = await this._vault.merge(liveNamedHead)
+                if (result.merged) {
+                    await this._mountBrowse()
+                    await this._refreshSyncState()
+                    if (result.conflicts?.length > 0) {
+                        window.sgraphVault.messages.warn(
+                            `Synced \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
+                        )
+                    } else {
+                        window.sgraphVault.messages.success('Vault synced \u2014 new content from published branch')
+                    }
+                }
+            } catch (err) {
+                window.sgraphVault.messages.error(`Auto-sync failed: ${err.message}`)
+            }
+        }
+
+        setAutoSync(enabled) {
+            this._autoSyncEnabled = enabled
+            try { localStorage.setItem('sg-vault-autosync', String(enabled)) } catch (_) {}
+        }
+
+        _initAutoSync() {
+            try {
+                const stored = localStorage.getItem('sg-vault-autosync')
+                this._autoSyncEnabled = stored === null ? true : stored === 'true'
+            } catch (_) {}
         }
 
         // --- View Switching -------------------------------------------------------
@@ -423,6 +618,19 @@
                 });
                 input.click();
             });
+        }
+
+        async _onVaultRename(name) {
+            if (!name || !this._vault || !this._accessKey) return;
+            try {
+                await this._vault.setName(name);
+                this.querySelector('vault-header')?.setVaultName(name);
+                this._updateVaultKey();
+                window.sgraphVault.messages.success(`Vault renamed to "${name}"`);
+            } catch (err) {
+                window.sgraphVault.messages.error(`Rename failed: ${err.message}`);
+                this.querySelector('vault-header')?.setVaultName(this._vault.name || '');
+            }
         }
 
         // --- Key Management -------------------------------------------------------
@@ -496,6 +704,70 @@
             if (body) body.after(debugEl);
         }
 
+        // --- Sync Notice Banner ---------------------------------------------------
+
+        _updateSyncNotice() {
+            const notice = this.querySelector('.vs-sync-notice');
+            if (!notice) return;
+            const { ahead, behind, diverged } = this._syncState || {};
+
+            if (diverged) {
+                notice.style.display = '';
+                notice.className = 'vs-sync-notice vs-sync-notice--diverged';
+                notice.innerHTML = `
+                    <span class="vs-sync-notice-icon">↕</span>
+                    <span class="vs-sync-notice-text">
+                        New changes from collaborators — ${ahead} local commit${ahead !== 1 ? 's' : ''}, ${behind} published commit${behind !== 1 ? 's' : ''}.
+                    </span>
+                    <button class="vs-sync-notice-btn vs-sync-merge-btn">Sync now →</button>
+                    <button class="vs-sync-notice-close" title="Dismiss">✕</button>
+                `;
+            } else if (behind > 0) {
+                notice.style.display = '';
+                notice.className = 'vs-sync-notice vs-sync-notice--behind';
+                notice.innerHTML = `
+                    <span class="vs-sync-notice-icon">↓</span>
+                    <span class="vs-sync-notice-text">
+                        ${behind} new commit${behind !== 1 ? 's' : ''} from collaborators.
+                    </span>
+                    <button class="vs-sync-notice-btn vs-sync-pull-btn">Sync now →</button>
+                    <button class="vs-sync-notice-close" title="Dismiss">✕</button>
+                `;
+            } else {
+                notice.style.display = 'none';
+                notice.innerHTML = '';
+            }
+        }
+
+        // --- Soft Checkout --------------------------------------------------------
+
+        async _onCheckout(commitId) {
+            if (!this._vault || !commitId) return;
+            try {
+                // Load the commit object to verify it exists
+                const commit = await this._vault._commitManager.loadCommit(commitId);
+                if (!commit) throw new Error('Commit not found: ' + commitId);
+
+                // Update the clone ref to point to this commit
+                const cloneRefId = this._vault._cloneRefFileId || this._vault._cloneRef;
+                if (cloneRefId) {
+                    await this._vault._refManager.writeRef(cloneRefId, commitId);
+                }
+                // Also update in-memory head
+                this._vault._headCommitId = commitId;
+
+                // Remount browse to reflect the checked-out tree
+                await this._mountBrowse();
+                await this._refreshSyncState();
+
+                const short = commitId.slice(0, 8);
+                window.sgraphVault.messages.success(`Loaded commit ${short} as working state`);
+                this._switchView('files');
+            } catch (err) {
+                window.sgraphVault.messages.error(`Checkout failed: ${err.message}`);
+            }
+        }
+
         // --- Raw Vault View -------------------------------------------------------
 
         _showRawVault() {
@@ -542,6 +814,39 @@
         }
         .vs-body > vault-nav { flex-shrink: 0; }
 
+        /* Main content column: sync banner + content stacked */
+        .vs-main {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+        }
+
+        /* Sync notice banner */
+        .vs-sync-notice {
+            display: flex; align-items: center; gap: var(--space-2);
+            padding: 0.4rem var(--space-3); font-size: var(--text-small);
+            flex-shrink: 0; border-bottom: 1px solid var(--color-border);
+        }
+        .vs-sync-notice--diverged {
+            background: rgba(180,150,80,0.1); color: #b8a060;
+            border-bottom-color: rgba(180,150,80,0.2);
+        }
+        .vs-sync-notice--behind {
+            background: rgba(78,205,196,0.08); color: var(--color-text-secondary);
+            border-bottom-color: rgba(78,205,196,0.15);
+        }
+        .vs-sync-notice-icon { font-size: 1rem; flex-shrink: 0; }
+        .vs-sync-notice-text { flex: 1; }
+        .vs-sync-notice-btn {
+            padding: 0.25rem 0.75rem; border-radius: 4px; border: 1px solid currentColor;
+            background: transparent; color: inherit; cursor: pointer; font-size: var(--text-small);
+            font-weight: 600; white-space: nowrap;
+        }
+        .vs-sync-notice-btn:hover { background: rgba(255,255,255,0.1); }
+        .vs-sync-notice-close {
+            padding: 0.1rem 0.4rem; background: transparent; border: none;
+            color: inherit; opacity: 0.6; cursor: pointer; font-size: 0.9rem; flex-shrink: 0;
+        }
+        .vs-sync-notice-close:hover { opacity: 1; }
+
         .vs-content {
             flex: 1; overflow: hidden; position: relative;
         }
@@ -554,6 +859,8 @@
         .vs-view-files send-browse {
             display: block; height: 100%;
         }
+        /* Gallery view link doesn't apply in the vault context */
+        .vs-view-files a.sb-action-btn { display: none; }
         .vs-view-sgit {
             padding: var(--space-4); box-sizing: border-box;
         }

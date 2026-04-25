@@ -1,0 +1,199 @@
+/* sg-site-footer — Shadow DOM stylesheet
+   All styles are self-contained. CSS custom properties are inherited from :root.
+   Use var(--token, fallback) everywhere — no external class styles bleed in. */
+
+/* ─── Host ─────────────────────────────────────────────────────────────────── */
+:host {
+  display: block;
+}
+
+/* ─── Reset ─────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+ul {
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+p {
+  margin: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* ─── Site Logo ─────────────────────────────────────────────────────────────── */
+.site-logo {
+  font-size: 1.5rem;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.brand-prefix,
+.brand-product {
+  font-family: var(--font-display, 'DM Sans', system-ui);
+  font-weight: var(--fw-bold, 700);
+  color: var(--text-heading, #fff);
+}
+
+.brand-slash {
+  font-family: var(--font-display, 'DM Sans', system-ui);
+  font-weight: var(--fw-bold, 700);
+  color: var(--accent, #4ECDC4);
+}
+
+/* ─── Container ─────────────────────────────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: var(--max-width, 1200px);
+  margin-inline: auto;
+  padding-inline: var(--gutter, 1.5rem);
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────────── */
+.site-footer {
+  background-color: var(--bg-secondary, #16213E);
+  border-top: 1px solid var(--border-color, #2C3E6B);
+  padding-block: var(--sp-12, 48px);
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: var(--sp-8, 32px);
+}
+
+/* ─── Footer Brand ───────────────────────────────────────────────────────────── */
+.footer-brand .site-logo {
+  margin-bottom: var(--sp-4, 16px);
+}
+
+.footer-brand p {
+  color: var(--text-secondary, #8892A0);
+  font-size: 0.9rem;
+  max-width: 300px;
+}
+
+/* ─── Footer Columns ─────────────────────────────────────────────────────────── */
+.footer-col h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary, #8892A0);
+  margin-bottom: var(--sp-4, 16px);
+  font-family: var(--font-display, 'DM Sans', system-ui);
+  font-weight: var(--fw-bold, 700);
+}
+
+.footer-col ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3, 12px);
+}
+
+.footer-col a {
+  color: var(--text-secondary, #8892A0);
+  font-size: 0.9rem;
+  transition: color 150ms ease;
+}
+
+.footer-col a:hover {
+  color: var(--accent, #4ECDC4);
+  text-decoration: none;
+}
+
+/* ─── Footer Bottom ──────────────────────────────────────────────────────────── */
+.footer-bottom {
+  margin-top: var(--sp-8, 32px);
+  padding-top: var(--sp-6, 24px);
+  border-top: 1px solid var(--border-color, #2C3E6B);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-4, 16px);
+}
+
+.footer-bottom p {
+  color: var(--text-secondary, #8892A0);
+  font-size: 0.8rem;
+  margin-bottom: 0;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2, 8px);
+  padding: var(--sp-3, 12px) var(--sp-5, 20px);
+  font-family: var(--font-body, 'DM Sans', system-ui);
+  font-size: 0.95rem;
+  font-weight: var(--fw-bold, 700);
+  line-height: 1;
+  border-radius: var(--radius-btn, 6px);
+  border: 2px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background-color: var(--accent, #4ECDC4);
+  color: var(--color-navy, #1A1A2E);
+  border-color: var(--accent, #4ECDC4);
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover, #3DB8B0);
+  border-color: var(--accent-hover, #3DB8B0);
+  color: var(--color-navy, #1A1A2E);
+  text-decoration: none;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--text-primary, #E0E0E0);
+  border-color: var(--border-color, #2C3E6B);
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent, #4ECDC4);
+  color: var(--accent, #4ECDC4);
+  text-decoration: none;
+}
+
+.btn--sm {
+  padding: var(--sp-2, 8px) var(--sp-4, 16px);
+  font-size: 0.85rem;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+}

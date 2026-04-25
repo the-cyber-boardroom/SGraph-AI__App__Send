@@ -59,6 +59,17 @@
                     </div>
 
                     <div class="vset-section">
+                        <label class="vset-label">Sync</label>
+                        <div class="vset-sync-row">
+                            <label class="vset-toggle-label">
+                                <input class="vset-autosync-cb" type="checkbox" checked>
+                                Auto-sync
+                            </label>
+                            <p class="vset-hint">When enabled, vault silently pulls new commits from the published branch whenever you switch to the Files view. Only applies when there are no local unpushed commits. No background polling.</p>
+                        </div>
+                    </div>
+
+                    <div class="vset-section">
                         <label class="vset-label">Raw JSON <button class="vset-json-toggle">(show)</button></label>
                         <div class="vset-json" style="display:none">
                             <h4>vault-settings.json</h4>

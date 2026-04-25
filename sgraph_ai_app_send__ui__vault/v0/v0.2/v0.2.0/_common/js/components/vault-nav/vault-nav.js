@@ -1,6 +1,6 @@
 /* =================================================================================
    SGraph Vault -- Navigation Component
-   v0.2.0 -- Left sidebar nav: Files, SGit, Settings
+   v0.2.0 -- Left sidebar nav: Files, SGit, Settings (GEN removed)
 
    Shadow DOM. Emits 'vault-nav-switch' with { view } detail (composed: true).
    ================================================================================= */
@@ -21,9 +21,6 @@
                 <nav class="vn-nav">
                     <a class="vn-item vn-item--active" data-view="files" href="#">
                         <span class="vn-icon">&#128194;</span><span class="vn-label">Files</span>
-                    </a>
-                    <a class="vn-item" data-view="generate" href="#">
-                        <span class="vn-icon">&#9889;</span><span class="vn-label">Gen</span>
                     </a>
                     <a class="vn-item" data-view="sgit" href="#">
                         <span class="vn-icon">&#128268;</span><span class="vn-label">SGit</span>

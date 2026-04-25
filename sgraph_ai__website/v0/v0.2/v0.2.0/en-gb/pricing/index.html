@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing — SG/Send</title>
+  <meta name="description" content="Start for £5. Deploy your own SG/Send server on AWS. Three AMIs coming to the AWS Marketplace: Playwright Service, SG/Send Server, Tools Suite.">
+  <link rel="icon" href="../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+  <link rel="stylesheet" href="../../_common/css/pricing.css">
+</head>
+<body class="i18n-loading">
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+<sg-site-header site="Send">
+  <div slot="locale" id="locale-picker"></div>
+</sg-site-header>
+
+<!-- ═══ HERO ══════════════════════════════════════════════════ -->
+<section class="hero hero--small">
+  <div class="container">
+    <h1 class="display">The price of encrypted infrastructure.</h1>
+    <p class="lead">
+      On any cloud, at any scale. Start with a £5 credit pack.
+      Deploy your own server on AWS for full control.
+    </p>
+  </div>
+</section>
+
+<!-- ═══ MOAT CLAIM ═══════════════════════════════════════════ -->
+<div class="section section--alt" style="padding-block: var(--sp-8);">
+  <div class="container">
+    <div class="moat-claim">
+      <div class="moat-claim__headline">
+        Seven deployment targets, one codebase, same encryption everywhere.
+      </div>
+      <div class="moat-claim__sub">
+        Lambda → Fargate → EC2 → Docker → GCP → CLI → Self-hosted.
+        Client-side AES-256-GCM in every target. The server is always blind.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ THREE ZONES ═══════════════════════════════════════════ -->
+<section class="section">
+  <div class="container">
+
+    <div class="pricing-zones">
+
+      <!-- ZONE 1: TODAY -->
+      <div class="pricing-zone pricing-zone--featured">
+        <div class="pricing-zone__header">
+          <div class="pricing-zone__eyebrow">Available today</div>
+          <h2 class="pricing-zone__title">Starter Pack</h2>
+          <p class="pricing-zone__subtitle">
+            Everything you need to start sending encrypted files and running your first
+            agentic vault workflow.
+          </p>
+        </div>
+        <div class="pricing-zone__body">
+          <div class="pricing-zone__price">
+            <span class="pricing-zone__amount">£5</span>
+            <span class="pricing-zone__period">one-time credit pack</span>
+          </div>
+          <ul class="pricing-zone__items">
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Credits for encrypted file transfers
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Vault create, push, pull operations
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Agent API calls (send/receive endpoints)
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              No account required to receive files
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              AES-256-GCM encryption — server never sees plaintext
+            </li>
+          </ul>
+          <a href="https://buy.stripe.com/fZu8wHdv23nN1Z85jn5os02" class="btn btn-primary w-full">
+            Buy Starter Pack — £5 →
+          </a>
+        </div>
+      </div>
+
+      <!-- ZONE 2: AWS MARKETPLACE -->
+      <div class="pricing-zone">
+        <div class="pricing-zone__header">
+          <div class="pricing-zone__eyebrow">
+            <span class="coming-soon-badge coming-soon-badge--teal">Coming soon</span>
+          </div>
+          <h2 class="pricing-zone__title">AWS Marketplace AMIs</h2>
+          <p class="pricing-zone__subtitle">
+            Three one-click-deployable AMIs. Spin up the agentic infrastructure stack
+            inside your own AWS account.
+          </p>
+        </div>
+        <div class="pricing-zone__body">
+          <ul class="pricing-zone__items">
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">🎭</span>
+              <strong>Playwright Service</strong> — Declarative browser automation API,
+              MITM proxy, full traffic observability
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">🔐</span>
+              <strong>SG/Send Server</strong> — Self-hosted encrypted vault server,
+              in-memory / EBS / S3 backends
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">🛠</span>
+              <strong>Tools Suite</strong> — AI tools portal, client-side execution,
+              Ollama support for air-gapped operation
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Pricing on the Marketplace listing page
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Free tier available; paid tiers per instance or per API call
+            </li>
+          </ul>
+
+          <p class="text-secondary" style="font-size:0.85rem; margin-bottom: var(--sp-4);">
+            Register your interest and we'll notify you when each AMI goes live.
+          </p>
+
+          <form class="register-interest" id="register-interest-form" novalidate>
+            <input
+              class="register-interest__input"
+              type="email"
+              placeholder="your@email.com"
+              autocomplete="email"
+              aria-label="Email for AWS Marketplace notification"
+              required
+            >
+            <button class="btn btn-secondary" type="submit">Register Interest →</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ZONE 3: ENTERPRISE / SELF-HOSTED -->
+      <div class="pricing-zone">
+        <div class="pricing-zone__header">
+          <div class="pricing-zone__eyebrow">Full control</div>
+          <h2 class="pricing-zone__title">Enterprise / Self-hosted</h2>
+          <p class="pricing-zone__subtitle">
+            Deploy SG/Send inside your own AWS account, your own VPC,
+            under your own security controls and billing.
+          </p>
+        </div>
+        <div class="pricing-zone__body">
+          <ul class="pricing-zone__items">
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Full source code — audit, extend, or fork
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Data never leaves your infrastructure
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Lambda, Fargate, EC2, Docker, or GCP — your choice
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Storage backends: in-memory, EBS disk, or S3
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Connect to your own Ollama or OpenRouter instance
+            </li>
+            <li class="pricing-zone__item">
+              <span class="pricing-zone__item-check">✓</span>
+              Pricing: your AWS compute costs only (open source)
+            </li>
+          </ul>
+          <a href="mailto:enterprise@sgraph.ai" class="btn btn-secondary w-full">
+            Talk to us about deployment →
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FAQ ════════════════════════════════════════════════════ -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Common questions</h2>
+    </div>
+
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          Can I receive files without an account?
+          <span class="faq-item__chevron">▼</span>
+        </button>
+        <div class="faq-item__a">
+          Yes. Receiving requires only the share token — no account, no login.
+          You paste the token at <a href="https://send.sgraph.ai/en-gb/" target="_blank" rel="noopener">send.sgraph.ai</a>,
+          enter the passphrase, and the file decrypts in your browser.
+          Only the sender needs credits.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          Does SG/Send see my files?
+          <span class="faq-item__chevron">▼</span>
+        </button>
+        <div class="faq-item__a">
+          No. Files are encrypted with AES-256-GCM in your browser before upload.
+          The encryption key is derived from your passphrase and never sent to the server.
+          We store only ciphertext. Cryptographically, we cannot read your files.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          What is a vault? How is it different from a file transfer?
+          <span class="faq-item__chevron">▼</span>
+        </button>
+        <div class="faq-item__a">
+          A file transfer is a one-shot encrypted upload with a share token for download.
+          A vault is a persistent, version-controlled encrypted file system — think Git for encrypted files.
+          Vaults support push, pull, branches, and multi-agent collaboration via the SGit CLI.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          Can I deploy this on my own infrastructure?
+          <span class="faq-item__chevron">▼</span>
+        </button>
+        <div class="faq-item__a">
+          Yes. The server is open source. You can deploy it on Lambda, Fargate, EC2, Docker,
+          GCP, or any environment that runs Python. The AWS Marketplace AMIs make this
+          one-click — coming soon. For enterprise deployments, contact
+          <a href="mailto:enterprise@sgraph.ai">enterprise@sgraph.ai</a>.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-item__q" type="button">
+          What are agents? Can non-human agents use SG/Send?
+          <span class="faq-item__chevron">▼</span>
+        </button>
+        <div class="faq-item__a">
+          Yes. The send/receive API and vault operations are available via the SGit CLI and
+          the HTTP API. AI agents can create vaults, push files, and share tokens with humans
+          or other agents. Vaults are the natural communication channel between agents —
+          versioned, encrypted, scoped to one key per vault.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<sg-site-footer></sg-site-footer>
+
+<script src="../../_common/js/i18n.js"></script>
+<script src="../../_common/js/nav.js"></script>
+<script src="../../_common/js/pricing.js"></script>
+<script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
+<script type="module" src="../../_common/js/components/sg-site-footer/v1/v1.0/v1.0.0/sg-site-footer.js"></script>
+</body>
+</html>

@@ -159,4 +159,28 @@ class SGSend {
         })
         return response.json()
     }
+
+    // --- Vault Batch API ----------------------------------------------------------
+    // POST /api/vault/batch/{vaultId}
+    // ops: [{op:'read',file_id}, {op:'write',file_id,data}, {op:'write-if-match',file_id,data,match}, ...]
+    // Returns flat array of result objects from all chunks.
+    // Read-only batches need no write key. Write batches need writeKey + access token.
+    // Auto-chunks at 50 ops (server hard limit is 100).
+
+    async vaultBatch(vaultId, writeKey, ops) {
+        const CHUNK      = 50
+        const allResults = []
+        for (let i = 0; i < ops.length; i += CHUNK) {
+            const chunk   = ops.slice(i, i + CHUNK)
+            const headers = { 'Content-Type': 'application/json' }
+            if (writeKey) headers['x-sgraph-vault-write-key'] = writeKey
+            const resp = await this._fetch('POST', `/api/vault/batch/${vaultId}`, {
+                headers,
+                body: JSON.stringify({ operations: chunk })
+            })
+            const data = await resp.json()
+            allResults.push(...(data.results || []))
+        }
+        return allResults
+    }
 }
