@@ -47,14 +47,12 @@
     border-radius: 4px;
 }
 
-/* BRW-023: Selection colour — softer teal on light background */
-.sb-file__markdown ::selection {
-    background: rgba(78, 205, 196, 0.25);
-    color: inherit;
-}
+/* BRW-023: Selection colour — solid blue so teal-coloured text (links, code)
+   remains legible. 25% opacity teal + color:inherit was invisible on teal text. */
+.sb-file__markdown ::selection,
 .sb-file__markdown *::selection {
-    background: rgba(78, 205, 196, 0.25);
-    color: inherit;
+    background: #1a73e8;
+    color: #ffffff;
 }
 
 /* BRW-022: Markdown Present mode overlay */
