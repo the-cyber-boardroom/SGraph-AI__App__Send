@@ -982,12 +982,17 @@ var PageLayoutRenderer = (function () {
         // Apply accent CSS custom property (overrides shell default)
         if (themeAccent) container.style.setProperty('--plr-accent', themeAccent);
 
-        // Background: default white (safe for print + consistent on-screen),
-        // overridden by theme.background if explicitly set.
-        container.style.background =
-            (themeRaw && typeof themeRaw === 'object' && themeRaw.background)
-                ? themeRaw.background
-                : '#ffffff';
+        // Background: explicit theme.background always wins.
+        // Light mode defaults to white so the Browse shell's dark palette doesn't bleed in.
+        // Dark mode must NOT set an inline style — it would override the .plr-page--dark CSS
+        // class rule (inline specificity beats class), leaving white bg with light-coloured text.
+        if (themeRaw && typeof themeRaw === 'object' && themeRaw.background) {
+            container.style.background = themeRaw.background;
+        } else if (themeMode === 'dark') {
+            container.style.removeProperty('background');
+        } else {
+            container.style.background = '#ffffff';
+        }
 
         // Apply font family custom property
         var fontFamilyMap = {
