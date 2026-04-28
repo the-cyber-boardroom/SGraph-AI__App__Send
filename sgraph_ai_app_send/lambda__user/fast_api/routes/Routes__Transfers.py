@@ -13,7 +13,8 @@ from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id 
 from osbot_utils.utils.Env                                                       import get_env
 from sgraph_ai_app_send.lambda__user.schemas.Schema__Transfer                    import Schema__Transfer__Create
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                   import Transfer__Service
-from sgraph_ai_app_send.lambda__user.user__config                                import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_SEND__ACCESS_TOKEN
+from sgraph_ai_app_send.lambda__user.user__config                                import (ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_SEND__ACCESS_TOKEN,
+                                                                                        HEADER__SGRAPH_TRANSFER__DELETE_AUTH)
 
 TAG__ROUTES_TRANSFERS = 'api/transfers'
 
@@ -23,6 +24,7 @@ ROUTES_PATHS__TRANSFERS = [f'/{TAG__ROUTES_TRANSFERS}/create'                   
                            f'/{TAG__ROUTES_TRANSFERS}/info/{{transfer_id}}'                  ,
                            f'/{TAG__ROUTES_TRANSFERS}/download/{{transfer_id}}'              ,
                            f'/{TAG__ROUTES_TRANSFERS}/download-base64/{{transfer_id}}'      ,
+                           f'/{TAG__ROUTES_TRANSFERS}/delete/{{transfer_id}}'                ,
                            f'/{TAG__ROUTES_TRANSFERS}/check-token/{{token_name}}'            ,
                            f'/{TAG__ROUTES_TRANSFERS}/validate-token/{{token_name}}'         ]
 
@@ -89,8 +91,12 @@ class Routes__Transfers(Fast_API__Routes):                                      
         self.check_access_token(raw_request, access_token)
         result = self.transfer_service.create_transfer(file_size_bytes   = request.file_size_bytes  ,
                                                        content_type_hint = request.content_type_hint,
-                                                       sender_ip        = ''                        ,
-                                                       transfer_id      = request.transfer_id       )
+                                                       sender_ip         = ''                       ,
+                                                       transfer_id       = request.transfer_id      ,
+                                                       max_downloads     = int(request.max_downloads)   ,
+                                                       auto_delete       = request.auto_delete          ,
+                                                       expires_at        = str(request.expires_at)      ,
+                                                       delete_auth_hash  = str(request.delete_auth_hash))
         if 'error' in result:
             if result['error'] == 'transfer_id_exists':
                 raise HTTPException(status_code = 409, detail = 'Transfer ID already exists')
@@ -174,6 +180,9 @@ class Routes__Transfers(Fast_API__Routes):                                      
         payload = self.transfer_service.get_download_payload(transfer_id  = transfer_id                    ,
                                                              downloader_ip = request.client.host if request.client else '',
                                                              user_agent    = request.headers.get('user-agent', ''))
+        if isinstance(payload, dict):
+            raise HTTPException(status_code = payload.get('status', 410),
+                                detail      = payload.get('error', 'gone'))
         if payload is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Transfer not found or not available for download')
@@ -196,6 +205,9 @@ class Routes__Transfers(Fast_API__Routes):                                      
         payload = self.transfer_service.get_download_payload(transfer_id  = transfer_id                    ,
                                                               downloader_ip = request.client.host if request.client else '',
                                                               user_agent    = request.headers.get('user-agent', ''))
+        if isinstance(payload, dict):
+            raise HTTPException(status_code = payload.get('status', 410),
+                                detail      = payload.get('error', 'gone'))
         if payload is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Transfer not found or not available for download')
@@ -234,13 +246,27 @@ class Routes__Transfers(Fast_API__Routes):                                      
             raise HTTPException(status_code = 503,
                                 detail      = 'Token validation service unavailable')
 
+    async def delete__transfer_id(self, transfer_id: Safe_Str__Id,                # DELETE /transfers/delete/{transfer_id}
+                                        request     : Request
+                                  ) -> dict:
+        delete_auth = request.headers.get(HEADER__SGRAPH_TRANSFER__DELETE_AUTH, '')
+        if not delete_auth:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Missing x-sgraph-transfer-delete-auth header')
+        result = self.transfer_service.delete_transfer(str(transfer_id), delete_auth)
+        if 'error' in result:
+            raise HTTPException(status_code = result.get('status', 400),
+                                detail      = result['error'])
+        return result
+
     def setup_routes(self):                                                      # Register all endpoints
-        self.add_route_post(self.create                         )
-        self.add_route_post(self.upload__transfer_id            )
-        self.add_route_post(self.complete__transfer_id          )
-        self.add_route_get (self.info__transfer_id              )
-        self.add_route_get (self.download__transfer_id          )
-        self.add_route_get (self.download_base64__transfer_id   )
-        self.add_route_get (self.check_token__token_name        )
-        self.add_route_post(self.validate_token__token_name     )
+        self.add_route_post  (self.create                         )
+        self.add_route_post  (self.upload__transfer_id            )
+        self.add_route_post  (self.complete__transfer_id          )
+        self.add_route_get   (self.info__transfer_id              )
+        self.add_route_get   (self.download__transfer_id          )
+        self.add_route_get   (self.download_base64__transfer_id   )
+        self.add_route_delete(self.delete__transfer_id            )
+        self.add_route_get   (self.check_token__token_name        )
+        self.add_route_post  (self.validate_token__token_name     )
         return self
