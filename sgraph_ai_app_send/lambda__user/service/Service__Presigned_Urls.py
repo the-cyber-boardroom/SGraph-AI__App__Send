@@ -20,6 +20,7 @@ from   osbot_aws.aws.s3.S3                                                      
 from   osbot_utils.type_safe.Type_Safe                                               import Type_Safe
 from   sgraph_ai_app_send.lambda__user.service.Transfer__Service                     import Transfer__Service
 from   sgraph_ai_app_send.lambda__user.storage.Enum__Storage__Mode                   import Enum__Storage__Mode
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                        import path__transfer_payload
 
 DEFAULT_PART_SIZE         = 10 * 1024 * 1024                                         # 10 MB per part
 PRESIGNED_UPLOAD_EXPIRY   = 3600                                                     # 1 hour for upload URLs
@@ -31,18 +32,13 @@ class Service__Presigned_Urls(Type_Safe):                                       
     transfer_service  : Transfer__Service  = None                                    # Shared transfer service (for metadata)
     s3                : S3                 = None                                     # S3 client (from osbot-aws)
     s3_bucket         : str                = ''                                      # S3 bucket name
-    s3_prefix         : str                = ''                                      # Optional key prefix
     storage_mode      : Enum__Storage__Mode = None                                   # Storage mode (S3 or MEMORY)
 
     def is_s3_mode(self):                                                            # Check if S3 presigned URLs are available
         return self.storage_mode == Enum__Storage__Mode.S3 and self.s3 is not None
 
     def s3_key(self, transfer_id):                                                   # Build S3 key for transfer payload
-        key = f'transfers/{transfer_id}/payload'
-        if self.s3_prefix:
-            prefix = self.s3_prefix if self.s3_prefix.endswith('/') else f'{self.s3_prefix}/'
-            key    = f'{prefix}{key}'
-        return key
+        return path__transfer_payload(transfer_id)
 
     # =========================================================================
     # Multipart upload: initiate
