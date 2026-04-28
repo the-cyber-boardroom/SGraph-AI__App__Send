@@ -194,6 +194,25 @@ class Service__Vault__Pointer(Type_Safe):                                       
         return dict(vault_id = vault_id ,
                     results  = results  )
 
+    def delete_vault(self, vault_id, write_key_hex):                              # Delete all files belonging to a vault (hard delete, no recovery)
+        submitted_hash = self._hash_write_key(write_key_hex)
+        if not self._check_vault_write_key(vault_id, submitted_hash):
+            return None                                                          # Auth failure
+
+        vault_prefix = f'transfers/vault/{vault_id}/'
+        paths        = self.storage_fs.folder__files__all(vault_prefix)
+
+        files_deleted = 0
+        for path in paths:
+            self.storage_fs.file__delete(str(path))
+            files_deleted += 1
+
+        self._manifest_cache.pop(vault_id, None)                                 # Clear cache so vault_id can be reused in same Lambda instance
+
+        return dict(status        = 'deleted' ,
+                    vault_id      = vault_id   ,
+                    files_deleted = files_deleted)
+
     def batch_read(self, vault_id, operations):                                  # Read-only batch (no auth required — data is encrypted)
         results = []
         for op in operations:
