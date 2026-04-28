@@ -19,6 +19,7 @@ from   osbot_aws.aws.s3.S3                                                      
 from   osbot_utils.type_safe.Type_Safe                                               import Type_Safe
 from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer               import Service__Vault__Pointer
 from   sgraph_ai_app_send.lambda__user.storage.Enum__Storage__Mode                   import Enum__Storage__Mode
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                        import path__vault_payload
 
 DEFAULT_PART_SIZE         = 10 * 1024 * 1024                                         # 10 MB per part
 PRESIGNED_UPLOAD_EXPIRY   = 3600                                                     # 1 hour for upload URLs
@@ -30,18 +31,13 @@ class Service__Vault__Presigned(Type_Safe):                                     
     vault_service  : Service__Vault__Pointer = None                                  # For write-key validation and path resolution
     s3             : S3                      = None                                  # S3 client (from osbot-aws)
     s3_bucket      : str                     = ''                                    # S3 bucket name
-    s3_prefix      : str                     = ''                                    # Optional key prefix
     storage_mode   : Enum__Storage__Mode     = None                                  # Storage mode (S3 or MEMORY)
 
     def is_s3_mode(self):                                                            # Check if S3 presigned URLs are available
         return self.storage_mode == Enum__Storage__Mode.S3 and self.s3 is not None
 
-    def s3_key(self, vault_id, file_id):                                             # Build S3 key matching Storage_FS__S3.s3_key()
-        path = f'transfers/vault/{vault_id}/{file_id}/payload'                       # Must match Service__Vault__Pointer.vault_payload_path()
-        if self.s3_prefix:
-            prefix = self.s3_prefix if self.s3_prefix.endswith('/') else f'{self.s3_prefix}/'
-            path   = f'{prefix}{path}'
-        return path
+    def s3_key(self, vault_id, file_id):                                             # Build S3 key matching vault_payload_path()
+        return path__vault_payload(vault_id, file_id)
 
     # =========================================================================
     # Write-key validation (delegates to vault service)

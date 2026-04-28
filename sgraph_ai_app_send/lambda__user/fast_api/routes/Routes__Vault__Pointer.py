@@ -10,6 +10,7 @@ from osbot_fast_api.api.routes.Fast_API__Routes                                 
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer, VAULT_ID_PATTERN
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Zip                import Service__Vault__Zip
+from sgraph_ai_app_send.lambda__user.storage.Storage__Paths                     import path__vault_zip_prefix
 from sgraph_ai_app_send.lambda__user.user__config                                import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY
 
 TAG__ROUTES_VAULT = 'api/vault'
@@ -260,7 +261,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
             raise HTTPException(status_code = 403,
                                 detail      = 'Write key mismatch')
         if self.vault_zip_service is not None:                                   # Clean up any cached zip archives for this vault
-            zip_prefix = f'vault-zips/{str(vault_id)}/'
+            zip_prefix = path__vault_zip_prefix(str(vault_id))
             zip_paths  = self.vault_zip_service.storage_fs.folder__files__all(zip_prefix)
             for path in zip_paths:
                 self.vault_zip_service.storage_fs.file__delete(str(path))

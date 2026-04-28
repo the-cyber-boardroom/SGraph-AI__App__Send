@@ -129,8 +129,9 @@ class test_Service__Vault__Zip(TestCase):
     # --- Zip storage path ---
 
     def test__zip_storage_path(self):
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_zip
         path = self.zip_service.zip_storage_path('v1', 'abc123')
-        assert path == 'vault-zips/v1/abc123.zip'
+        assert path == path__vault_zip('v1', 'abc123')
 
     # --- Zip contents match vault ---
 

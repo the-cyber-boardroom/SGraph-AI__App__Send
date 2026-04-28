@@ -11,6 +11,7 @@ from   datetime                                                                 
 from   memory_fs.storage_fs.Storage_FS                                           import Storage_FS
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
 from   osbot_utils.type_safe.Type_Safe                                           import Type_Safe
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                    import path__transfer_meta, path__transfer_payload
 
 
 class Transfer__Service(Type_Safe):                                              # Core transfer management service
@@ -22,10 +23,10 @@ class Transfer__Service(Type_Safe):                                             
             self.storage_fs = Storage_FS__Memory()
 
     def meta_path(self, transfer_id):                                            # Path for transfer metadata JSON
-        return f'transfers/{transfer_id}/meta.json'
+        return path__transfer_meta(transfer_id)
 
     def payload_path(self, transfer_id):                                         # Path for encrypted payload bytes
-        return f'transfers/{transfer_id}/payload'
+        return path__transfer_payload(transfer_id)
 
     def save_meta(self, transfer_id, meta):                                      # Persist metadata as JSON bytes
         self.storage_fs.file__save(self.meta_path(transfer_id),

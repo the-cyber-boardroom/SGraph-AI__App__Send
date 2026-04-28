@@ -71,7 +71,8 @@ class test_Service__Vault__Pointer(TestCase):
                            file_id       = self.file_id   ,
                            write_key_hex = self.write_key ,
                            payload_bytes = self.payload   )
-        meta_path = f'transfers/vault/{self.vault_id}/{self.file_id}/meta.json'
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import _ROOT
+        meta_path = f'{_ROOT}/vault/{self.vault_id[:2]}/{self.vault_id}/{self.file_id}/meta.json'
         assert not self.service.storage_fs.file__exists(meta_path)
 
     # --- Read ---
@@ -152,8 +153,9 @@ class test_Service__Vault__Pointer(TestCase):
     # --- Storage paths ---
 
     def test__storage_paths(self):
-        assert self.service.vault_payload_path('v1', 'f1')   == 'transfers/vault/v1/f1/payload'
-        assert self.service.vault_manifest_path('v1')        == 'transfers/vault/v1/manifest.json'
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_payload, path__vault_manifest
+        assert self.service.vault_payload_path('v1', 'f1') == path__vault_payload('v1', 'f1')
+        assert self.service.vault_manifest_path('v1')      == path__vault_manifest('v1')
 
     # --- Full lifecycle ---
 
