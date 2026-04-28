@@ -36,6 +36,16 @@
     color: #0d1117;
 }
 
+/* .plr-content-frame sits OUTSIDE .plr-page (it's the card wrapper rendered on
+   the dark Browse panel), so the rules above don't reach the JSON source view
+   or the edit split pane. Apply the same light-mode blue selection here so
+   the { } Source and ✎ Edit panes get a visible highlight. */
+.plr-content-frame ::selection,
+.plr-content-frame *::selection {
+    background: #1a73e8;
+    color: #ffffff;
+}
+
 /* ── Theme: light — explicit colour overrides ─────────────────────────────── */
 /* The Browse shell defines --color-text etc. for its OWN dark palette.       */
 /* Light-mode page layout must override with hard-coded values so text is     */

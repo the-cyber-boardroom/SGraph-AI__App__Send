@@ -564,3 +564,90 @@ class test_Routes__Vault__Pointer(TestCase):
         response = self._read(vault_id=vault, file_id=file_id)
         assert response.status_code == 200
         assert response.content == payload
+
+    # === Vault destroy endpoint ===
+
+    def _destroy(self, vault_id=VAULT_ID, write_key=WRITE_KEY, body_vault_id=None):
+        payload = {'vault_id': body_vault_id if body_vault_id is not None else vault_id}
+        return self.client.request('DELETE', f'/api/vault/destroy/{vault_id}',
+                                   content = json.dumps(payload),
+                                   headers = {'content-type'             : 'application/json',
+                                              'x-sgraph-vault-write-key' : write_key         })
+
+    def test__destroy__success(self):
+        vault = 'destroyvlt01'
+        self._write(vault_id=vault, file_id='bare/data/obj-a', payload=b'blob-a')
+        self._write(vault_id=vault, file_id='bare/refs/ref-1', payload=b'ref')
+        response = self._destroy(vault_id=vault)
+        assert response.status_code          == 200
+        data = response.json()
+        assert data['status']        == 'deleted'
+        assert data['vault_id']      == vault
+        assert data['files_deleted'] > 0
+        assert self._read(vault_id=vault, file_id='bare/data/obj-a').status_code == 404
+        assert self._read(vault_id=vault, file_id='bare/refs/ref-1').status_code == 404
+
+    def test__destroy__already_deleted_returns_success(self):
+        vault = 'destroyvlt02'
+        self._write(vault_id=vault, file_id='bare/data/obj-a', payload=b'blob')
+        self._destroy(vault_id=vault)
+        response = self._destroy(vault_id=vault)
+        assert response.status_code              == 200
+        assert response.json()['files_deleted']  == 0
+
+    def test__destroy__never_existed_returns_success(self):
+        response = self._destroy(vault_id='destroyvlt03')
+        assert response.status_code              == 200
+        assert response.json()['status']         == 'deleted'
+        assert response.json()['files_deleted']  == 0
+
+    def test__destroy__wrong_key_rejected(self):
+        vault = 'destroyvlt04'
+        self._write(vault_id=vault, file_id='bare/data/obj-a', payload=b'blob')
+        response = self._destroy(vault_id=vault, write_key='wrongkey')
+        assert response.status_code == 403
+        assert self._read(vault_id=vault, file_id='bare/data/obj-a').status_code == 200
+
+    def test__destroy__missing_write_key(self):
+        vault = 'destroyvlt05'
+        self._write(vault_id=vault, file_id='file', payload=b'data')
+        response = self.client.request('DELETE', f'/api/vault/destroy/{vault}',
+                                       content = json.dumps({'vault_id': vault}),
+                                       headers = {'content-type': 'application/json'})
+        assert response.status_code == 400
+
+    def test__destroy__body_vault_id_mismatch(self):
+        vault = 'destroyvlt06'
+        self._write(vault_id=vault, file_id='file', payload=b'data')
+        response = self._destroy(vault_id=vault, body_vault_id='destroyvlt07')
+        assert response.status_code == 409
+        assert self._read(vault_id=vault, file_id='file').status_code == 200
+
+    def test__destroy__missing_body(self):
+        response = self.client.request('DELETE', f'/api/vault/destroy/{VAULT_ID}',
+                                       headers = {'x-sgraph-vault-write-key': WRITE_KEY})
+        assert response.status_code in (400, 422)
+
+    def test__destroy__invalid_vault_id(self):
+        response = self.client.request('DELETE', '/api/vault/destroy/tools-patches',
+                                       content = json.dumps({'vault_id': 'tools-patches'}),
+                                       headers = {'content-type'             : 'application/json',
+                                                  'x-sgraph-vault-write-key' : WRITE_KEY         })
+        assert response.status_code == 400
+
+    def test__destroy__files_gone_after_delete(self):
+        vault = 'destroyvlt08'
+        file_ids = ['bare/data/obj-1', 'bare/refs/ref-main', 'bare/keys/key-001']
+        for fid in file_ids:
+            self._write(vault_id=vault, file_id=fid, payload=b'data')
+        self._destroy(vault_id=vault)
+        for fid in file_ids:
+            assert self._read(vault_id=vault, file_id=fid).status_code == 404
+
+    def test__destroy__vault_reusable_after_delete(self):
+        vault = 'destroyvlt09'
+        self._write(vault_id=vault, file_id='old-file', payload=b'old')
+        self._destroy(vault_id=vault)
+        response = self._write(vault_id=vault, file_id='new-file', write_key='newkey456789', payload=b'new')
+        assert response.status_code == 200
+        assert self._read(vault_id=vault, file_id='new-file').content == b'new'

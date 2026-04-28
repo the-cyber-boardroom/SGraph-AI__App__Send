@@ -71,7 +71,8 @@ class test_Service__Vault__Pointer(TestCase):
                            file_id       = self.file_id   ,
                            write_key_hex = self.write_key ,
                            payload_bytes = self.payload   )
-        meta_path = f'transfers/vault/{self.vault_id}/{self.file_id}/meta.json'
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import _ROOT
+        meta_path = f'{_ROOT}/vault/{self.vault_id[:2]}/{self.vault_id}/{self.file_id}/meta.json'
         assert not self.service.storage_fs.file__exists(meta_path)
 
     # --- Read ---
@@ -152,8 +153,9 @@ class test_Service__Vault__Pointer(TestCase):
     # --- Storage paths ---
 
     def test__storage_paths(self):
-        assert self.service.vault_payload_path('v1', 'f1')   == 'transfers/vault/v1/f1/payload'
-        assert self.service.vault_manifest_path('v1')        == 'transfers/vault/v1/manifest.json'
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_payload, path__vault_manifest
+        assert self.service.vault_payload_path('v1', 'f1') == path__vault_payload('v1', 'f1')
+        assert self.service.vault_manifest_path('v1')      == path__vault_manifest('v1')
 
     # --- Full lifecycle ---
 
@@ -493,3 +495,48 @@ class test_Service__Vault__Pointer(TestCase):
         assert result['results'][0]['status'] == 'ok'
         assert result['results'][0]['data']   == base64.b64encode(b'hello').decode('ascii')
         assert result['results'][1]['status'] == 'ok'
+
+    # === delete_vault ===
+
+    def test__delete_vault__success(self):
+        self.service.write(self.vault_id, 'bare/data/obj-a', self.write_key, b'blob-a')
+        self.service.write(self.vault_id, 'bare/refs/ref-1', self.write_key, b'ref')
+        result = self.service.delete_vault(self.vault_id, self.write_key)
+        assert result is not None
+        assert result['status']        == 'deleted'
+        assert result['vault_id']      == self.vault_id
+        assert result['files_deleted'] > 0
+        assert self.service.read(self.vault_id, 'bare/data/obj-a') is None
+        assert self.service.read(self.vault_id, 'bare/refs/ref-1') is None
+
+    def test__delete_vault__wrong_key_rejected(self):
+        self.service.write(self.vault_id, 'bare/data/obj-a', self.write_key, b'blob-a')
+        result = self.service.delete_vault(self.vault_id, 'wrong-key')
+        assert result is None
+        assert self.service.read(self.vault_id, 'bare/data/obj-a') == b'blob-a'  # Untouched
+
+    def test__delete_vault__never_existed_returns_success(self):
+        result = self.service.delete_vault(self.vault_id, self.write_key)
+        assert result is not None
+        assert result['status']        == 'deleted'
+        assert result['files_deleted'] == 0
+
+    def test__delete_vault__clears_manifest_cache(self):
+        self.service.write(self.vault_id, 'file-1', self.write_key, b'data')
+        assert self.vault_id in self.service._manifest_cache              # Cache populated after write
+        self.service.delete_vault(self.vault_id, self.write_key)
+        assert self.vault_id not in self.service._manifest_cache          # Cache cleared after delete
+
+    def test__delete_vault__vault_reusable_after_delete(self):
+        self.service.write(self.vault_id, 'old-file', self.write_key, b'old')
+        self.service.delete_vault(self.vault_id, self.write_key)
+        result = self.service.write(self.vault_id, 'new-file', 'new-key', b'new')
+        assert result is not None
+        assert result['status'] == 'completed'
+        assert self.service.read(self.vault_id, 'new-file') == b'new'
+
+    def test__delete_vault__files_deleted_count(self):
+        for i in range(5):
+            self.service.write(self.vault_id, f'file-{i}', self.write_key, f'data-{i}'.encode())
+        result = self.service.delete_vault(self.vault_id, self.write_key)
+        assert result['files_deleted'] == 6                               # 5 payload files + manifest

@@ -1,0 +1,189 @@
+/* sg-vault-primitives — Shadow DOM stylesheet
+   All styles are self-contained. CSS custom properties are inherited from :root.
+   Use var(--token, fallback) everywhere — no external class styles bleed in. */
+
+/* ─── Host ─────────────────────────────────────────────────────────────────── */
+:host {
+  display: block;
+}
+
+/* ─── Reset ─────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+ul {
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+p {
+  margin: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* ─── Container ─────────────────────────────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: var(--max-width, 1200px);
+  margin-inline: auto;
+  padding-inline: var(--gutter, 1.5rem);
+}
+
+/* ─── Section ────────────────────────────────────────────────────────────────── */
+.section {
+  padding-block: var(--sp-16, 64px);
+  background-color: var(--bg-primary, #1A1A2E);
+}
+
+.section--alt {
+  background-color: var(--bg-secondary, #16213E);
+}
+
+/* ─── Section Header ─────────────────────────────────────────────────────────── */
+.section-header {
+  text-align: center;
+  margin-bottom: var(--sp-10, 40px);
+}
+
+.section-header h2 {
+  font-family: var(--font-display, 'DM Sans', system-ui);
+  font-size: var(--fs-h2, 2rem);
+  font-weight: var(--fw-bold, 700);
+  color: var(--text-heading, #fff);
+  letter-spacing: -0.02em;
+  margin-bottom: var(--sp-4, 16px);
+}
+
+.section-header p {
+  font-size: 1.05rem;
+  color: var(--text-secondary, #8892A0);
+  max-width: 640px;
+  margin-inline: auto;
+  line-height: 1.7;
+}
+
+/* ─── Grid ───────────────────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  gap: var(--sp-6, 24px);
+}
+
+.grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 900px) {
+  .grid--3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .grid--3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Primitive Card ─────────────────────────────────────────────────────────── */
+.primitive-card {
+  background-color: var(--bg-surface, rgba(44, 62, 107, 0.35));
+  border: 1px solid var(--border-color, #2C3E6B);
+  border-radius: var(--radius-card, 12px);
+  padding: var(--sp-8, 32px);
+  transition: border-color 250ms ease, transform 250ms ease;
+  position: relative;
+}
+
+.primitive-card:hover {
+  border-color: var(--accent, #4ECDC4);
+  transform: translateY(-3px);
+}
+
+/* ─── Card Badge ─────────────────────────────────────────────────────────────── */
+.primitive-card__badge {
+  display: inline-block;
+  padding: var(--sp-1, 4px) var(--sp-3, 12px);
+  font-size: 0.65rem;
+  font-weight: var(--fw-bold, 700);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 100px;
+  background-color: rgba(78, 205, 196, 0.12);
+  color: var(--accent, #4ECDC4);
+  margin-bottom: var(--sp-4, 16px);
+}
+
+/* ─── Card Icon ──────────────────────────────────────────────────────────────── */
+.primitive-card__icon {
+  font-size: 2rem;
+  margin-bottom: var(--sp-4, 16px);
+}
+
+/* ─── Card Title ─────────────────────────────────────────────────────────────── */
+.primitive-card__title {
+  font-family: var(--font-display, 'DM Sans', system-ui);
+  font-weight: var(--fw-bold, 700);
+  font-size: var(--fs-h3, 1.25rem);
+  color: var(--text-heading, #fff);
+  margin-bottom: var(--sp-3, 12px);
+}
+
+/* ─── Card Description ───────────────────────────────────────────────────────── */
+.primitive-card__desc {
+  color: var(--text-secondary, #8892A0);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  margin-bottom: var(--sp-4, 16px);
+}
+
+/* ─── Card Features ──────────────────────────────────────────────────────────── */
+.primitive-card__features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 8px);
+}
+
+.primitive-card__feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2, 8px);
+  font-size: 0.85rem;
+  color: var(--text-secondary, #8892A0);
+}
+
+.primitive-card__feature::before {
+  content: '→';
+  color: var(--accent, #4ECDC4);
+  flex-shrink: 0;
+  font-weight: var(--fw-bold, 700);
+}
+
+/* ─── Callout ────────────────────────────────────────────────────────────────── */
+.callout {
+  border-left: 3px solid var(--accent, #4ECDC4);
+  padding: var(--sp-4, 16px) var(--sp-6, 24px);
+  margin-block: var(--sp-6, 24px);
+  background-color: rgba(78, 205, 196, 0.05);
+  border-radius: 0 var(--radius-btn, 6px) var(--radius-btn, 6px) 0;
+  font-size: 1.05rem;
+  color: var(--text-primary, #E0E0E0);
+  font-style: italic;
+}
+
+/* ─── Utilities ──────────────────────────────────────────────────────────────── */
+.mt-8 {
+  margin-top: var(--sp-8, 32px);
+}

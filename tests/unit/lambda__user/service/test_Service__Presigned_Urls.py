@@ -67,17 +67,20 @@ class test_Service__Presigned_Urls__Memory_Mode(TestCase):
 class test_Service__Presigned_Urls__S3_Key_Logic(TestCase):
     """Tests S3 key generation logic (doesn't require S3 connection)."""
 
-    def test__s3_key__no_prefix(self):
-        service = Service__Presigned_Urls(s3_prefix='')
-        assert service.s3_key('abc123') == 'transfers/abc123/payload'
+    def test__s3_key__matches_storage_paths(self):
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__transfer_payload
+        service = Service__Presigned_Urls()
+        assert service.s3_key('abc123') == path__transfer_payload('abc123')
 
-    def test__s3_key__with_prefix(self):
-        service = Service__Presigned_Urls(s3_prefix='prod')
-        assert service.s3_key('abc123') == 'prod/transfers/abc123/payload'
+    def test__s3_key__includes_shard_prefix(self):
+        service = Service__Presigned_Urls()
+        key = service.s3_key('abc123')
+        assert '/transfers/ab/abc123/payload' in key
 
-    def test__s3_key__with_trailing_slash(self):
-        service = Service__Presigned_Urls(s3_prefix='prod/')
-        assert service.s3_key('abc123') == 'prod/transfers/abc123/payload'
+    def test__s3_key__includes_storage_version(self):
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import STORAGE__VERSION
+        service = Service__Presigned_Urls()
+        assert STORAGE__VERSION in service.s3_key('abc123')
 
 
 class test_Service__Presigned_Urls__Transfer_Validation(TestCase):

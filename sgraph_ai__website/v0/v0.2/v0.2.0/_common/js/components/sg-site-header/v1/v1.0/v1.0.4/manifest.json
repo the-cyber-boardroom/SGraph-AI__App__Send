@@ -1,0 +1,21 @@
+{
+    "version": "1.0.4",
+    "name": "sg-site-header",
+    "description": "Shared sticky header for all sgraph.ai domains. Aurora dark theme, plain text SG/Product logo, nav links, teal accent line, slotted CTA and locale picker.",
+    "type": "component",
+    "exports": ["SgSiteHeader"],
+    "custom_element": "sg-site-header",
+    "attributes": ["site", "home-url", "nav-items"],
+    "slots": ["cta", "locale"],
+    "dependencies": ["sg-component"],
+    "changes_from": "1.0.3",
+    "changes": [
+        "HTML/CSS derived from sgraph.ai Aurora dark theme (sgraph_ai__website v0.2.0)",
+        "Added slot='cta' for optional token bar or CTA widget",
+        "Teal accent line via box-shadow on .site-header",
+        "external: true per nav item controls target=_blank (no longer auto-detected from href)",
+        "active: true per nav item adds class=active",
+        "Outside-click handler closes mobile nav",
+        "_logo bound to #logo-link to match new HTML template"
+    ]
+}
