@@ -106,6 +106,164 @@ class test_Transfer__Service(TestCase):
         assert hash_1 != hash_3                                                  # Different IPs differ
         assert len(hash_1) == 64                                                 # SHA-256 hex length
 
+    def test__user_agent_hashing(self):
+        ua      = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+        hash_1  = self.service.hash_user_agent(ua)
+        hash_2  = self.service.hash_user_agent(ua)
+        hash_ua = self.service.hash_user_agent('curl/7.88.0')
+        assert hash_1 == hash_2                                                  # Deterministic
+        assert hash_1 != hash_ua                                                 # Different agents differ
+        assert len(hash_1) == 64                                                 # SHA-256 hex length
+
+    def test__download_event_hashes_user_agent(self):
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '', sender_ip = '')
+        tid     = result['transfer_id']
+        self.service.upload_payload(transfer_id = tid, payload_bytes = b'data')
+        self.service.complete_transfer(tid)
+        self.service.get_download_payload(transfer_id = tid, downloader_ip = '', user_agent = 'raw-agent-string')
+        meta = self.service.load_meta(tid)
+        download_event = next(e for e in meta['events'] if e['action'] == 'download')
+        assert download_event['user_agent'] != 'raw-agent-string'                # Raw string never stored
+        assert len(download_event['user_agent']) == 64                           # SHA-256 hex
+
+    # --- max_downloads enforcement ---
+
+    def test__create__with_max_downloads(self):
+        result = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                               sender_ip = '', max_downloads = 2)
+        meta = self.service.load_meta(result['transfer_id'])
+        assert meta['max_downloads'] == 2
+
+    def test__download__respects_max_downloads(self):
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', max_downloads = 1)
+        tid     = result['transfer_id']
+        self.service.upload_payload(transfer_id = tid, payload_bytes = b'data')
+        self.service.complete_transfer(tid)
+        assert self.service.get_download_payload(tid, '', '') == b'data'         # First download succeeds
+        second = self.service.get_download_payload(tid, '', '')
+        assert isinstance(second, dict)
+        assert second['status'] == 410
+        assert second['error']  == 'exhausted'
+
+    def test__download__unlimited_when_max_downloads_zero(self):
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', max_downloads = 0)
+        tid     = result['transfer_id']
+        self.service.upload_payload(transfer_id = tid, payload_bytes = b'data')
+        self.service.complete_transfer(tid)
+        for _ in range(5):
+            assert self.service.get_download_payload(tid, '', '') == b'data'
+
+    def test__download__auto_delete_after_last_download(self):
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', max_downloads = 1, auto_delete = True)
+        tid     = result['transfer_id']
+        self.service.upload_payload(transfer_id = tid, payload_bytes = b'data')
+        self.service.complete_transfer(tid)
+        assert self.service.get_download_payload(tid, '', '') == b'data'         # Last download succeeds
+        assert not self.service.has_payload(tid)                                 # Payload wiped
+        info = self.service.get_transfer_info(tid)
+        assert info['status'] == 'exhausted'
+
+    # --- expiry enforcement ---
+
+    def test__create__with_expires_at(self):
+        from datetime import datetime, timezone, timedelta
+        future  = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', expires_at = future)
+        meta    = self.service.load_meta(result['transfer_id'])
+        assert meta['expires_at'] == future
+
+    def test__download__not_yet_expired(self):
+        from datetime import datetime, timezone, timedelta
+        future  = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', expires_at = future)
+        tid     = result['transfer_id']
+        self.service.upload_payload(transfer_id = tid, payload_bytes = b'data')
+        self.service.complete_transfer(tid)
+        assert self.service.get_download_payload(tid, '', '') == b'data'
+
+    def test__download__expired_transfer_returns_410(self):
+        from datetime import datetime, timezone, timedelta
+        past    = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', expires_at = past)
+        tid     = result['transfer_id']
+        self.service.upload_payload(transfer_id = tid, payload_bytes = b'data')
+        self.service.complete_transfer(tid)
+        resp = self.service.get_download_payload(tid, '', '')
+        assert isinstance(resp, dict)
+        assert resp['status'] == 410
+        assert resp['error']  == 'expired'
+
+    # --- delete_transfer ---
+
+    def test__delete_transfer__success(self):
+        import hashlib
+        delete_auth = 'abc123deletekey'
+        stored_hash = hashlib.sha256(delete_auth.encode()).hexdigest()
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', delete_auth_hash = stored_hash)
+        tid     = result['transfer_id']
+        self.service.upload_payload(transfer_id = tid, payload_bytes = b'data')
+        self.service.complete_transfer(tid)
+        resp = self.service.delete_transfer(tid, delete_auth)
+        assert resp['status']      == 'deleted'
+        assert resp['transfer_id'] == tid
+        assert not self.service.has_payload(tid)
+
+    def test__delete_transfer__wrong_auth(self):
+        import hashlib
+        delete_auth = 'correct_auth'
+        stored_hash = hashlib.sha256(delete_auth.encode()).hexdigest()
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', delete_auth_hash = stored_hash)
+        tid     = result['transfer_id']
+        resp = self.service.delete_transfer(tid, 'wrong_auth')
+        assert resp['error']  == 'auth_mismatch'
+        assert resp['status'] == 403
+
+    def test__delete_transfer__not_found(self):
+        resp = self.service.delete_transfer('nonexistent', 'any_auth')
+        assert resp['error']  == 'not_found'
+        assert resp['status'] == 404
+
+    def test__delete_transfer__delete_not_enabled(self):
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '')                  # No delete_auth_hash
+        resp = self.service.delete_transfer(result['transfer_id'], 'any_auth')
+        assert resp['error']  == 'delete_not_enabled'
+        assert resp['status'] == 409
+
+    def test__delete_transfer__already_deleted_is_idempotent(self):
+        import hashlib
+        delete_auth = 'idempotent_key'
+        stored_hash = hashlib.sha256(delete_auth.encode()).hexdigest()
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', delete_auth_hash = stored_hash)
+        tid     = result['transfer_id']
+        self.service.upload_payload(transfer_id = tid, payload_bytes = b'data')
+        self.service.complete_transfer(tid)
+        self.service.delete_transfer(tid, delete_auth)
+        resp = self.service.delete_transfer(tid, delete_auth)                    # Second delete
+        assert resp['status'] == 'already_deleted'
+
+    # --- transfer_info new fields ---
+
+    def test__transfer_info__includes_new_fields(self):
+        from datetime import datetime, timezone, timedelta
+        future  = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
+                                                sender_ip = '', max_downloads = 3, expires_at = future)
+        info    = self.service.get_transfer_info(result['transfer_id'])
+        assert info['max_downloads']       == 3
+        assert info['expires_at']          == future
+        assert info['downloads_remaining'] == 3
+        assert info['is_expired']          is False
+
     def test__full_flow(self):
         # Create
         create = self.service.create_transfer(file_size_bytes   = 1024 ,
