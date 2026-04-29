@@ -859,29 +859,62 @@ class SendBrowse extends SendComponent {
             var parsed  = _parseEml(rawText);
 
             var emailWrap = document.createElement('div');
-            emailWrap.style.cssText = 'height:100%;display:flex;flex-direction:column;overflow:hidden;';
+            emailWrap.style.cssText = 'height:100%;display:flex;flex-direction:column;overflow:hidden;background:var(--color-bg,#0d1117);border-top:2px solid #4ecdc4;';
 
-            // Header card
-            var hdrEl = document.createElement('div');
-            hdrEl.style.cssText = 'padding:0.85rem 1.25rem;border-bottom:1px solid var(--color-border,rgba(255,255,255,0.08));flex-shrink:0;';
-            var headerFields = [
-                { label: 'From',    value: parsed.headers['from']    },
-                { label: 'To',      value: parsed.headers['to']      },
-                { label: 'CC',      value: parsed.headers['cc']      },
-                { label: 'Subject', value: parsed.headers['subject'] || '(no subject)' },
-                { label: 'Date',    value: parsed.headers['date']    },
+            // ── 1. Type badge strip ──────────────────────────────────────
+            var badgeStrip = document.createElement('div');
+            badgeStrip.style.cssText = 'display:flex;align-items:center;gap:0.6rem;padding:0.45rem 1rem;background:rgba(78,205,196,0.06);border-bottom:1px solid rgba(78,205,196,0.15);flex-shrink:0;';
+            badgeStrip.innerHTML =
+                '<span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;padding:2px 7px;border-radius:3px;background:#4ecdc4;color:#0a2e2c;flex-shrink:0;">EMAIL</span>' +
+                '<span style="font-size:0.75rem;color:#5ab8b4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+                    SendHelpers.escapeHtml(fileName) +
+                '</span>';
+            emailWrap.appendChild(badgeStrip);
+
+            // ── 2. Subject section ───────────────────────────────────────
+            var subjectEl = document.createElement('div');
+            subjectEl.style.cssText = 'padding:0.9rem 1.25rem 0.85rem;background:#111823;border-bottom:1px solid rgba(78,205,196,0.12);flex-shrink:0;';
+            var subjectText = parsed.headers['subject'] || '(no subject)';
+            subjectEl.innerHTML =
+                '<div style="font-size:1.05rem;font-weight:600;color:#a8f0ec;line-height:1.35;overflow-wrap:break-word;">' +
+                    SendHelpers.escapeHtml(subjectText) +
+                '</div>';
+            emailWrap.appendChild(subjectEl);
+
+            // ── 3. Metadata section (avatar + From / To / CC / Date) ─────
+            var metaEl = document.createElement('div');
+            metaEl.style.cssText = 'display:flex;gap:0.85rem;padding:0.75rem 1.25rem;background:#0d1117;border-bottom:2px solid rgba(0,0,0,0.35);flex-shrink:0;';
+
+            // Avatar: initials from From field
+            var fromRaw = parsed.headers['from'] || '';
+            var fromName = fromRaw.replace(/<[^>]*>/, '').trim().replace(/^["']|["']$/g, '').trim() || fromRaw.split('@')[0] || '?';
+            var initials = fromName.split(/\s+/).slice(0,2).map(function(w){ return w[0] || ''; }).join('').toUpperCase() || '?';
+            var avatarEl = document.createElement('div');
+            avatarEl.style.cssText = 'width:38px;height:38px;border-radius:50%;background:rgba(78,205,196,0.12);border:1.5px solid rgba(78,205,196,0.3);display:flex;align-items:center;justify-content:center;font-size:0.82rem;font-weight:700;color:#4ecdc4;flex-shrink:0;letter-spacing:0.02em;';
+            avatarEl.textContent = initials;
+
+            var metaFields = document.createElement('div');
+            metaFields.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:0.22rem;justify-content:center;';
+            var emlMetaRows = [
+                { label: 'From', value: fromRaw },
+                { label: 'To',   value: parsed.headers['to']   },
+                { label: 'CC',   value: parsed.headers['cc']   },
+                { label: 'Date', value: parsed.headers['date'] },
             ];
-            hdrEl.innerHTML = headerFields.filter(function(f) { return f.value; }).map(function(f) {
-                return '<div style="display:flex;gap:0.5rem;margin-bottom:0.3rem;font-size:0.82rem;line-height:1.4;">' +
-                    '<span style="color:var(--color-text-secondary,#8b949e);min-width:4.5rem;flex-shrink:0;">' + SendHelpers.escapeHtml(f.label) + '</span>' +
-                    '<span style="color:var(--color-text,#e2e8f0);overflow-wrap:anywhere;">' + SendHelpers.escapeHtml(f.value) + '</span>' +
+            metaFields.innerHTML = emlMetaRows.filter(function(r){ return r.value; }).map(function(r) {
+                return '<div style="display:flex;gap:0.45rem;font-size:0.78rem;line-height:1.45;overflow:hidden;">' +
+                    '<span style="color:#4ecdc4;font-weight:600;min-width:2.8rem;flex-shrink:0;">' + SendHelpers.escapeHtml(r.label) + '</span>' +
+                    '<span style="color:#c9d1d9;overflow-wrap:anywhere;">' + SendHelpers.escapeHtml(r.value) + '</span>' +
                     '</div>';
             }).join('');
-            emailWrap.appendChild(hdrEl);
 
-            // Body
+            metaEl.appendChild(avatarEl);
+            metaEl.appendChild(metaFields);
+            emailWrap.appendChild(metaEl);
+
+            // ── 4. Body ──────────────────────────────────────────────────
             var bodyEl = document.createElement('div');
-            bodyEl.style.cssText = 'flex:1;overflow-y:auto;padding:1.25rem;';
+            bodyEl.style.cssText = 'flex:1;overflow-y:auto;background:#111823;';
 
             if (parsed.html) {
                 var htmlBlob = new Blob([parsed.html], { type: 'text/html' });
@@ -890,21 +923,21 @@ class SendBrowse extends SendComponent {
                 var htmlFrame = document.createElement('iframe');
                 htmlFrame.src = htmlUrl;
                 htmlFrame.sandbox = 'allow-same-origin';
-                htmlFrame.style.cssText = 'width:100%;height:100%;border:none;background:white;border-radius:4px;';
+                htmlFrame.style.cssText = 'width:100%;height:100%;border:none;background:white;display:block;';
                 bodyEl.style.cssText += 'display:flex;flex-direction:column;';
                 htmlFrame.style.flex = '1';
                 bodyEl.appendChild(htmlFrame);
             } else {
                 var bodyPre = document.createElement('pre');
-                bodyPre.style.cssText = 'white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono,monospace);font-size:0.82rem;color:var(--color-text,#e2e8f0);margin:0;line-height:1.6;';
+                bodyPre.style.cssText = 'white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:0.875rem;color:#c9d1d9;margin:0;line-height:1.7;padding:1.25rem;';
                 bodyPre.textContent = parsed.text || rawText;
                 bodyEl.appendChild(bodyPre);
             }
             emailWrap.appendChild(bodyEl);
 
-            // Raw source (hidden by default)
+            // ── 5. Raw source (hidden by default) ────────────────────────
             var rawPre = document.createElement('pre');
-            rawPre.style.cssText = 'white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono,monospace);font-size:0.78rem;color:var(--color-text-secondary,#8b949e);padding:1rem;flex:1;overflow-y:auto;margin:0;display:none;';
+            rawPre.style.cssText = 'white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono,monospace);font-size:0.78rem;color:#8b949e;padding:1rem;flex:1;overflow-y:auto;margin:0;display:none;background:#0a0e14;';
             rawPre.textContent = rawText;
             emailWrap.appendChild(rawPre);
 
@@ -917,10 +950,12 @@ class SendBrowse extends SendComponent {
             sourceBtn.innerHTML = '&lt;/&gt; Source';
             sourceBtn.addEventListener('click', function() {
                 isSource = !isSource;
-                hdrEl.style.display    = isSource ? 'none' : '';
-                bodyEl.style.display   = isSource ? 'none' : '';
-                rawPre.style.display   = isSource ? ''     : 'none';
-                sourceBtn.innerHTML    = isSource ? '&#9998; Rendered' : '&lt;/&gt; Source';
+                badgeStrip.style.display = isSource ? 'none' : '';
+                subjectEl.style.display  = isSource ? 'none' : '';
+                metaEl.style.display     = isSource ? 'none' : '';
+                bodyEl.style.display     = isSource ? 'none' : '';
+                rawPre.style.display     = isSource ? ''     : 'none';
+                sourceBtn.innerHTML      = isSource ? '&#9998; Rendered' : '&lt;/&gt; Source';
             });
             bar.appendChild(sourceBtn);
 
