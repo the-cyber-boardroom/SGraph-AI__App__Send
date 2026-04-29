@@ -3,6 +3,7 @@ from mgraph_ai_service_cache_client.schemas.consts.const__Fast_API import ENV_VA
 import sgraph_ai_app_send__ui__user
 from osbot_fast_api_serverless.deploy.Deploy__Serverless__Fast_API          import Deploy__Serverless__Fast_API
 from osbot_utils.utils.Env                                                  import get_env
+from sgraph_ai_app_send._for_osbot_aws.Lambda__Dependencies__Builder        import Lambda__Dependencies__Builder
 from sgraph_ai_app_send.lambda__user.user__config                           import APP__SEND__USER__LAMBDA_DEPENDENCIES, APP__SEND__USER__SERVICE_NAME
 from sgraph_ai_app_send.lambda__user.user__config                           import ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL
 from sgraph_ai_app_send.lambda__user.user__config                           import ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME
@@ -19,15 +20,18 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME  ))
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE, get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE ))
             _.set_env_variable(ENV_VAR__CACHE__SERVICE__BUCKET_NAME       , get_env(ENV_VAR__CACHE__SERVICE__BUCKET_NAME        ))
-
-
             return _
 
     def handler(self):
         return run
 
-    def lambda_dependencies(self):
+    def lambda_dependencies(self):                                               # Kept for base class compatibility — combined zip supersedes individual uploads
         return APP__SEND__USER__LAMBDA_DEPENDENCIES
 
     def lambda_name(self):
         return APP__SEND__USER__SERVICE_NAME
+
+    def upload_combined_dependencies_to_s3(self, force=False):                   # Phase 1: single combined zip — replaces per-package upload_lambda_dependencies_to_s3()
+        builder = Lambda__Dependencies__Builder('sgraph-send-user'               ,
+                                                APP__SEND__USER__LAMBDA_DEPENDENCIES)
+        return builder.upload(force=force)
