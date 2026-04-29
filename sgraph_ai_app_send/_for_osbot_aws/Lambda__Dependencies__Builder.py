@@ -30,7 +30,7 @@ class Lambda__Dependencies__Builder:
     """
 
     BASE_BUCKET_INFIX   = 'osbot-lambdas'                                        # Matches osbot_aws bucket naming convention
-    LAMBDA_PLATFORM     = 'manylinux2014_aarch64'                                # Lambda arm64
+    LAMBDA_PLATFORM     = 'manylinux2014_x86_64'                                 # Lambda default is x86_64; manylinux2014 = glibc 2.17 (needed for pydantic-core)
     LAMBDA_PYTHON       = '3.13'                                                 # Must match Lambda runtime
     LAMBDA_ABI          = 'cp313'                                                # cpython 3.13
 
