@@ -1,19 +1,14 @@
 import os
 
-if os.getenv('AWS_REGION'):  # only execute if we are not running inside an AWS Lambda function
+if os.getenv('AWS_REGION'):                                                      # Only runs inside Lambda (AWS_REGION is set by the runtime)
 
-    from osbot_aws.aws.lambda_.boto3__lambda           import load_dependencies       # using the lightweight file (which only has the boto3 calls required to load_dependencies)
-    from sgraph_ai_app_send.lambda__user.user__config  import APP__SEND__USER__LAMBDA_DEPENDENCIES
+    from sgraph_ai_app_send._for_osbot_aws.Lambda__Dependencies__Loader  import load_combined_dependency
+    from sgraph_ai_app_send.lambda__user.user__config                     import APP__SEND__USER__LAMBDA_DEPENDENCIES
 
-    load_dependencies(APP__SEND__USER__LAMBDA_DEPENDENCIES)
-
-    def clear_osbot_modules():                            # todo: add this to load_dependencies method, since after it runs we don't need the osbot_aws.aws.lambda_.boto3__lambda
-        import sys
-        for module in list(sys.modules):
-            if module.startswith('osbot_aws'):
-                del sys.modules[module]
-
-    clear_osbot_modules()
+    load_combined_dependency('sgraph-send-user', APP__SEND__USER__LAMBDA_DEPENDENCIES)
+                                                                                 # Replaces load_dependencies() from osbot_aws:
+                                                                                 #   - Was: 1 STS call + 1 S3 download per package (6× each)
+                                                                                 #   - Now: 1 STS call + 1 S3 download total
 
 error   = None          # pin these variables
 handler = None

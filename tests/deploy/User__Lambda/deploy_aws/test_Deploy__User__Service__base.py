@@ -25,9 +25,16 @@ class test_Deploy__User__Service__base():     # Base class for deployment tests 
     def test_1__check_stages(self):
         assert self.deploy_fast_api.stage == self.stage
 
-    def test_2__upload_dependencies(self):
+    def test_2__upload_dependencies(self):                                       # Legacy: individual per-package zips (kept until combined zip is validated)
         upload_results = self.deploy_fast_api.upload_lambda_dependencies_to_s3()
         assert list_set(upload_results) == APP__SEND__USER__LAMBDA_DEPENDENCIES
+
+    def test_2b__upload_combined_dependencies(self):                             # Phase 1: single combined zip replaces 6 individual downloads
+        result = self.deploy_fast_api.upload_combined_dependencies_to_s3()
+        assert result['status']  in ('uploaded', 'skipped')
+        assert 'combined_name'    in result
+        assert 'sgraph-send-user' in result['combined_name']
+        assert result['s3_key'].startswith('lambdas-dependencies-combined/')
 
     # def test_3__create_lambda_iam_user(self):
     #     aws_config      = AWS_Config()
