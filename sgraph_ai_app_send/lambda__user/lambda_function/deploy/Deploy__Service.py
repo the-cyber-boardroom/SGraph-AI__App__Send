@@ -9,6 +9,7 @@ from sgraph_ai_app_send.lambda__user.user__config                           impo
 from sgraph_ai_app_send.lambda__user.user__config                           import ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME
 from sgraph_ai_app_send.lambda__user.user__config                           import ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE
 from sgraph_ai_app_send.lambda__user.lambda_function.lambda_handler__user   import run
+from sgraph_ai_app_send.lambda__user.storage.Send__Config                   import ENV_VAR__SEND__STORAGE_MODE
 
 
 class Deploy__Service(Deploy__Serverless__Fast_API):
@@ -20,6 +21,7 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME  ))
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE, get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE ))
             _.set_env_variable(ENV_VAR__CACHE__SERVICE__BUCKET_NAME       , get_env(ENV_VAR__CACHE__SERVICE__BUCKET_NAME        ))
+            _.set_env_variable(ENV_VAR__SEND__STORAGE_MODE                , 's3'                                                )  # Explicit S3 mode — bypasses aws_configured() check which fails during SnapStart snapshot creation
             return _
 
     def handler(self):
