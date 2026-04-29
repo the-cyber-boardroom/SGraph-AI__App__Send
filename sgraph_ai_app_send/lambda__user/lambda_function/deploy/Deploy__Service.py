@@ -57,27 +57,36 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
         else:
             lf.alias_create(fn_name, version, alias, 'SnapStart alias — points to latest published version')
 
-        if not lf.function_url_exists(alias):                                    # 4. Ensure Function URL exists for the alias
-            lf.function_url_create_with_public_access.__func__                   # check it exists on parent
+        if not lf.function_url_exists(alias):                                    # 4. Create Function URL for alias (once only)
             lf.client().create_function_url_config(
                 FunctionName    = fn_name            ,
                 Qualifier       = alias              ,
                 AuthType        = 'NONE'             ,
                 InvokeMode      = 'BUFFERED'         ,
             )
-            lf.client().add_permission(
-                FunctionName  = fn_name                    ,
-                Qualifier     = alias                      ,
-                StatementId   = f'public-access-{alias}'  ,
-                Action        = 'lambda:InvokeFunctionUrl' ,
-                Principal     = '*'                        ,
-                FunctionUrlAuthType = 'NONE'               ,
-            )
+
+        self._ensure_alias_url_permissions(lf, fn_name, alias)                  # 5. Always ensure both permissions exist (idempotent)
 
         alias_url = lf.function_url(alias)
         return dict(version    = version  ,
                     alias      = alias    ,
                     alias_url  = alias_url)
+
+    def _ensure_alias_url_permissions(self, lf, fn_name, alias):                  # Both permissions required for public Function URL access
+        permissions = [
+            (f'public-access-{alias}', 'lambda:InvokeFunctionUrl', {'FunctionUrlAuthType': 'NONE'}),
+            (f'public-invoke-{alias}',  'lambda:InvokeFunction',   {}                             ),
+        ]
+        for stmt_id, action, extra in permissions:
+            try:
+                lf.client().add_permission(FunctionName = fn_name  ,
+                                           Qualifier    = alias     ,
+                                           StatementId  = stmt_id  ,
+                                           Action       = action    ,
+                                           Principal    = '*'       ,
+                                           **extra)
+            except Exception:
+                pass                                                              # Statement already exists — idempotent
 
     def invoke__snapstart_url(self, path=''):                                     # Invoke via the SnapStart alias Function URL
         from osbot_utils.utils.Http import GET_json
