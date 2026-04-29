@@ -35,3 +35,52 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
         builder = Lambda__Dependencies__Builder('sgraph-send-user'               ,
                                                 APP__SEND__USER__LAMBDA_DEPENDENCIES)
         return builder.upload(force=force)
+
+    SNAPSTART_ALIAS = 'snapstart'
+
+    def enable_snapstart(self):                                                   # Enable SnapStart: configure → wait → publish version → alias → alias Function URL
+        lf = self.lambda_function()
+
+        lf.configuration_update(SnapStart={'ApplyOn': 'PublishedVersions'})      # 1. Enable SnapStart on the function
+        lf.wait_for_function_update_to_complete()
+
+        result   = lf.client().publish_version(FunctionName=lf.name)             # 2. Publish a version (creates the snapshot)
+        version  = result['Version']
+
+        fn_name  = lf.name
+        alias    = self.SNAPSTART_ALIAS
+        existing = lf.aliases(fn_name)
+        alias_names = [a['Name'] for a in (existing or [])]
+
+        if alias in alias_names:                                                  # 3. Create or update alias pointing to the published version
+            lf.client().update_alias(FunctionName=fn_name, Name=alias, FunctionVersion=version)
+        else:
+            lf.alias_create(fn_name, version, alias, 'SnapStart alias — points to latest published version')
+
+        if not lf.function_url_exists(alias):                                    # 4. Ensure Function URL exists for the alias
+            lf.function_url_create_with_public_access.__func__                   # check it exists on parent
+            lf.client().create_function_url_config(
+                FunctionName    = fn_name            ,
+                Qualifier       = alias              ,
+                AuthType        = 'NONE'             ,
+                InvokeMode      = 'BUFFERED'         ,
+            )
+            lf.client().add_permission(
+                FunctionName  = fn_name                    ,
+                Qualifier     = alias                      ,
+                StatementId   = f'public-access-{alias}'  ,
+                Action        = 'lambda:InvokeFunctionUrl' ,
+                Principal     = '*'                        ,
+                FunctionUrlAuthType = 'NONE'               ,
+            )
+
+        alias_url = lf.function_url(alias)
+        return dict(version    = version  ,
+                    alias      = alias    ,
+                    alias_url  = alias_url)
+
+    def invoke__snapstart_url(self, path=''):                                     # Invoke via the SnapStart alias Function URL
+        from osbot_utils.utils.Http import GET_json
+        url     = self.lambda_function().function_url(self.SNAPSTART_ALIAS) + path
+        headers = {self.api_key__name(): self.api_key__value()}
+        return GET_json(url, headers=headers)

@@ -49,11 +49,20 @@ class test_Deploy__User__Service__base():     # Base class for deployment tests 
         self.deploy_fast_api.lambda_function().configuration_update(Runtime='python3.13')
         self.deploy_fast_api.lambda_function().wait_for_function_update_to_complete()
 
+    def test_5b__enable_snapstart(self):                                          # Publish version + create 'snapstart' alias + alias Function URL
+        result = self.deploy_fast_api.enable_snapstart()
+        assert result['version']   != '$LATEST'
+        assert result['alias']     == 'snapstart'
+        assert result['alias_url'].startswith('https://')
+
     def test_6__invoke(self):
         assert self.deploy_fast_api.invoke().get('errorMessage') == DEFAULT__ERROR_MESSAGE__WHEN_FAST_API_IS_OK
 
     def test_7__invoke__function_url(self):
         assert self.deploy_fast_api.invoke__function_url('/info/health') == {'status': 'ok'}
+
+    def test_7b__invoke__snapstart_url(self):                                     # Validate SnapStart alias Function URL responds correctly
+        assert self.deploy_fast_api.invoke__snapstart_url('/info/health') == {'status': 'ok'}
 
     # def test_8__delete(self):
     #     assert self.deploy_fast_api.delete() is True
