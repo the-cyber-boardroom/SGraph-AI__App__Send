@@ -55,6 +55,15 @@
     color: #ffffff;
 }
 
+/* BRW-025: Folder name truncation — match .sb-tree__file-name which already
+   has these properties. Without them long names wrap to a second line. */
+.sb-tree__folder-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;   /* flex child must be 0 not auto for ellipsis to fire */
+}
+
 /* BRW-022: Markdown Present mode overlay */
 .sb-present-overlay {
     position: fixed;

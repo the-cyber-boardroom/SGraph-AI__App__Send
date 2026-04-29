@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — Encrypted vaults, opened in your browser</title>
+    <meta name="description" content="Open an encrypted vault. Decryption happens in your browser — the server never sees a key.">
+    <style>
+    /* ── Reset + base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --bg:        #0d1117;
+        --bg2:       #111820;
+        --bg3:       #161d27;
+        --border:    rgba(255,255,255,0.08);
+        --text:      #e0e6f0;
+        --muted:     #6e7a8a;
+        --teal:      #4ecdc4;
+        --teal-dim:  rgba(78,205,196,0.12);
+        --teal-glow: rgba(78,205,196,0.08);
+        --font-sans: 'Inter','Segoe UI',system-ui,sans-serif;
+        --font-mono: 'SF Mono','Fira Code',monospace;
+    }
+
+    html { font-size: 16px; }
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        line-height: 1.6;
+        min-height: 100vh;
+    }
+
+    /* ── Navbar ────────────────────────────────────────────────────────── */
+    .vp-nav {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 2rem;
+        background: rgba(13,17,23,0.92);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .vp-nav__brand {
+        font-size: 1rem;
+        font-weight: 400;
+        color: var(--muted);
+        letter-spacing: -0.01em;
+        flex: 1;
+    }
+    .vp-nav__brand strong { color: var(--teal); font-weight: 700; }
+
+    .vp-nav__cta {
+        padding: 0.4rem 1rem;
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-size: 0.82rem;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: border-color 0.15s, color 0.15s;
+        white-space: nowrap;
+    }
+    .vp-nav__cta:hover { border-color: var(--teal); color: var(--teal); }
+
+    /* ── Hero ──────────────────────────────────────────────────────────── */
+    .vp-hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 4.5rem 1.5rem 3.5rem;
+        max-width: 720px;
+        margin: 0 auto;
+    }
+
+    .vp-trust-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--muted);
+        background: var(--teal-glow);
+        border: 1px solid rgba(78,205,196,0.15);
+        border-radius: 99px;
+        padding: 0.3rem 0.9rem;
+        margin-bottom: 2rem;
+    }
+    .vp-trust-badge__dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--teal);
+        flex-shrink: 0;
+    }
+    .vp-trust-badge__sep { opacity: 0.35; margin: 0 0.1rem; }
+
+    .vp-hero__title {
+        font-size: clamp(2.8rem, 7vw, 4.5rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        color: #ffffff;
+        margin-bottom: 0.6rem;
+    }
+
+    /* Steal from Design 01 — the differentiator line in teal */
+    .vp-hero__tagline {
+        font-size: clamp(1rem, 2.5vw, 1.2rem);
+        color: var(--teal);
+        font-weight: 500;
+        margin-bottom: 2.5rem;
+        letter-spacing: -0.01em;
+    }
+
+    /* ── Unified input ─────────────────────────────────────────────────── */
+    .vp-input-card {
+        width: 100%;
+        max-width: 560px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.25rem 1.25rem 1rem;
+    }
+
+    .vp-input-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-bottom: 0.75rem;
+    }
+    .vp-input-label__key {
+        width: 14px; height: 14px;
+        opacity: 0.5;
+    }
+    .vp-input-label__auto {
+        margin-left: auto;
+        font-style: italic;
+        font-size: 0.68rem;
+        opacity: 0.6;
+    }
+
+    .vp-input-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .vp-input-field {
+        flex: 1;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        color: var(--text);
+        font-size: 0.95rem;
+        font-family: var(--font-mono);
+        outline: none;
+        transition: border-color 0.15s;
+        min-width: 0;
+    }
+    .vp-input-field::placeholder { color: var(--muted); opacity: 0.6; }
+    .vp-input-field:focus { border-color: var(--teal); }
+
+    .vp-open-btn {
+        padding: 0.75rem 1.25rem;
+        background: var(--teal);
+        color: #0a1a18;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s, transform 0.1s;
+        flex-shrink: 0;
+    }
+    .vp-open-btn:hover { background: #3dbdb5; }
+    .vp-open-btn:active { transform: scale(0.97); }
+
+    .vp-input-hint {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.6rem;
+    }
+    .vp-input-error {
+        font-size: 0.75rem;
+        color: #e06c75;
+        margin-top: 0.4rem;
+        min-height: 1em;
+    }
+
+    .vp-create-link {
+        display: inline-block;
+        margin-top: 1.1rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        text-decoration: none;
+        cursor: pointer;
+        transition: color 0.15s;
+    }
+    .vp-create-link:hover { color: var(--teal); }
+
+    /* ── Security cards ────────────────────────────────────────────────── */
+    .vp-security {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--bg2);
+    }
+    .vp-security__grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        max-width: 1040px;
+        margin: 0 auto;
+    }
+    .vp-sec-card {
+        padding: 1.5rem 1.75rem;
+        border-right: 1px solid var(--border);
+    }
+    .vp-sec-card:last-child { border-right: none; }
+    .vp-sec-card__label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--teal);
+        margin-bottom: 0.4rem;
+    }
+    .vp-sec-card__title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 0.35rem;
+        line-height: 1.3;
+    }
+    .vp-sec-card__desc {
+        font-size: 0.8rem;
+        color: var(--muted);
+        line-height: 1.5;
+    }
+
+    /* ── Recent vaults ─────────────────────────────────────────────────── */
+    .vp-recent {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 3rem 1.5rem;
+    }
+    .vp-recent__header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 1.25rem;
+    }
+    .vp-recent__label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--teal);
+        margin-bottom: 0.25rem;
+    }
+    .vp-recent__title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .vp-recent__meta {
+        font-size: 0.78rem;
+        color: var(--muted);
+        cursor: pointer;
+        text-decoration: none;
+        transition: color 0.15s;
+    }
+    .vp-recent__meta:hover { color: var(--teal); }
+
+    .vp-vault-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .vp-vault-card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1rem 1rem 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        transition: border-color 0.15s, background 0.15s;
+        cursor: pointer;
+        position: relative;
+    }
+    .vp-vault-card:hover { border-color: rgba(78,205,196,0.3); background: var(--bg3); }
+
+    .vp-vault-card__name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 1.5rem;
+    }
+    .vp-vault-card__id {
+        font-size: 0.7rem;
+        font-family: var(--font-mono);
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .vp-vault-card__footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--border);
+    }
+    .vp-vault-card__time {
+        font-size: 0.72rem;
+        color: var(--muted);
+    }
+    .vp-vault-card__open {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--teal);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .vp-vault-card__del {
+        position: absolute;
+        top: 0.6rem;
+        right: 0.7rem;
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 0.8rem;
+        opacity: 0;
+        transition: opacity 0.15s, color 0.15s;
+        padding: 0.15rem 0.3rem;
+        border-radius: 4px;
+        line-height: 1;
+    }
+    .vp-vault-card:hover .vp-vault-card__del { opacity: 1; }
+    .vp-vault-card__del:hover { color: #e06c75; background: rgba(224,108,117,0.1); }
+
+    /* ── Create CTA ────────────────────────────────────────────────────── */
+    .vp-create-cta {
+        border-top: 1px solid var(--border);
+        background: var(--bg2);
+    }
+    .vp-create-cta__inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+    }
+    .vp-create-cta__text { flex: 1; min-width: 200px; }
+    .vp-create-cta__label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--teal);
+        margin-bottom: 0.3rem;
+    }
+    .vp-create-cta__title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.2;
+    }
+    .vp-create-cta__btn {
+        padding: 0.75rem 1.5rem;
+        background: var(--teal-dim);
+        border: 1px solid rgba(78,205,196,0.3);
+        border-radius: 8px;
+        color: var(--teal);
+        font-size: 0.9rem;
+        font-weight: 700;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        white-space: nowrap;
+    }
+    .vp-create-cta__btn:hover { background: rgba(78,205,196,0.2); border-color: rgba(78,205,196,0.5); }
+
+    /* ── Recovery modal ────────────────────────────────────────────────── */
+    .vp-recovery {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+    .vp-recovery__box {
+        background: #161d27;
+        border: 1px solid rgba(78,205,196,0.3);
+        border-radius: 12px;
+        padding: 2rem;
+        max-width: 460px;
+        width: 100%;
+        text-align: center;
+    }
+    .vp-recovery__icon { font-size: 2rem; margin-bottom: 0.75rem; }
+    .vp-recovery__title { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+    .vp-recovery__body { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.6; }
+    .vp-recovery__key {
+        font-family: var(--font-mono);
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--teal);
+        background: var(--teal-glow);
+        border: 1px solid rgba(78,205,196,0.2);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        margin: 0.75rem 0 1.25rem;
+        word-break: break-all;
+        letter-spacing: 0.04em;
+    }
+    .vp-recovery__actions {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+    .vp-recovery__btn {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .vp-recovery__btn--copy {
+        background: var(--teal-dim);
+        border: 1px solid rgba(78,205,196,0.3);
+        color: var(--teal);
+    }
+    .vp-recovery__btn--copy:hover { background: rgba(78,205,196,0.2); }
+    .vp-recovery__btn--dl {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        color: var(--muted);
+    }
+    .vp-recovery__btn--dl:hover { background: rgba(255,255,255,0.1); }
+    .vp-recovery__confirm {
+        width: 100%;
+        padding: 0.7rem;
+        background: var(--teal);
+        border: none;
+        border-radius: 8px;
+        color: #0a1a18;
+        font-size: 0.92rem;
+        font-weight: 700;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .vp-recovery__confirm:hover { background: #3dbdb5; }
+
+    /* ── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+        .vp-security__grid { grid-template-columns: repeat(2, 1fr); }
+        .vp-sec-card:nth-child(2) { border-right: none; }
+        .vp-sec-card:nth-child(3) { border-top: 1px solid var(--border); border-right: 1px solid var(--border); }
+        .vp-sec-card:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
+        .vp-nav { padding: 0.65rem 1rem; }
+        .vp-hero { padding: 3rem 1rem 2.5rem; }
+    }
+    @media (max-width: 480px) {
+        .vp-security__grid { grid-template-columns: 1fr; }
+        .vp-sec-card { border-right: none; border-top: 1px solid var(--border); }
+        .vp-sec-card:first-child { border-top: none; }
+        .vp-input-row { flex-direction: column; }
+        .vp-trust-badge { font-size: 0.6rem; }
+    }
+    </style>
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────────────────────────── -->
+<nav class="vp-nav">
+    <span class="vp-nav__brand">SG/<strong>Vault</strong></span>
+    <button class="vp-nav__cta" id="navOpenBtn">Open with token →</button>
+</nav>
+
+<!-- ── Hero ────────────────────────────────────────────────────────────── -->
+<section class="vp-hero">
+    <div class="vp-trust-badge">
+        <span class="vp-trust-badge__dot"></span>
+        BROWSER · AES-256-GCM · ZERO-KNOWLEDGE
+        <span class="vp-trust-badge__sep">/</span>
+        server holds ciphertext only
+    </div>
+
+    <h1 class="vp-hero__title">Open a vault.</h1>
+
+    <!-- Steal from Design 01 -->
+    <p class="vp-hero__tagline">The server never sees a key.</p>
+
+    <div class="vp-input-card">
+        <div class="vp-input-label">
+            <svg class="vp-input-label__key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6M15.5 7.5l3 3"/>
+            </svg>
+            Have a share token or full key?
+            <span class="vp-input-label__auto">auto-detected on paste</span>
+        </div>
+        <div class="vp-input-row">
+            <input class="vp-input-field" id="vaultKeyInput"
+                   type="text"
+                   placeholder="word-word-1234  or  passphrase + vault-id"
+                   autocomplete="off"
+                   spellcheck="false">
+            <button class="vp-open-btn" id="openVaultBtn">Decrypt &amp; open →</button>
+        </div>
+        <div class="vp-input-error" id="inputError"></div>
+        <div class="vp-input-hint">No account needed · opens instantly</div>
+    </div>
+
+    <a class="vp-create-link" id="createLink">+ Create a new vault instead</a>
+</section>
+
+<!-- ── Security cards ──────────────────────────────────────────────────── -->
+<div class="vp-security">
+    <div class="vp-security__grid">
+        <div class="vp-sec-card">
+            <div class="vp-sec-card__label">In-browser</div>
+            <div class="vp-sec-card__title">AES-256-GCM</div>
+            <div class="vp-sec-card__desc">Files encrypted before they leave your device.</div>
+        </div>
+        <div class="vp-sec-card">
+            <div class="vp-sec-card__label">Keys</div>
+            <div class="vp-sec-card__title">Never transmitted</div>
+            <div class="vp-sec-card__desc">Derived from your passphrase, held only in this tab.</div>
+        </div>
+        <div class="vp-sec-card">
+            <div class="vp-sec-card__label">Server stores</div>
+            <div class="vp-sec-card__title">Ciphertext only</div>
+            <div class="vp-sec-card__desc">No filenames, no plaintext, no recovery path.</div>
+        </div>
+        <div class="vp-sec-card">
+            <div class="vp-sec-card__label">Identifiers</div>
+            <div class="vp-sec-card__title">Daily-salted hash</div>
+            <div class="vp-sec-card__desc">IPs are hashed; we cannot reverse them.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Recent vaults ───────────────────────────────────────────────────── -->
+<section class="vp-recent" id="recentSection" style="display:none">
+    <div class="vp-recent__header">
+        <div>
+            <div class="vp-recent__label">Stored locally · never synced</div>
+            <h2 class="vp-recent__title">Pick up where you left off</h2>
+        </div>
+        <a class="vp-recent__meta" id="manageLink">manage ›</a>
+    </div>
+    <div class="vp-vault-grid" id="vaultGrid"></div>
+</section>
+
+<!-- ── Create CTA ──────────────────────────────────────────────────────── -->
+<div class="vp-create-cta">
+    <div class="vp-create-cta__inner">
+        <div class="vp-create-cta__text">
+            <div class="vp-create-cta__label">New here?</div>
+            <div class="vp-create-cta__title">Create a vault.<br>Share a token. That's it.</div>
+        </div>
+        <button class="vp-create-cta__btn" id="createCtaBtn">Create a new vault →</button>
+    </div>
+</div>
+
+<!-- ── Recovery modal (shown after vault creation) ─────────────────────── -->
+<div class="vp-recovery" id="recoveryModal" style="display:none">
+    <div class="vp-recovery__box">
+        <div class="vp-recovery__icon">🔐</div>
+        <div class="vp-recovery__title">Vault created</div>
+        <div class="vp-recovery__body">
+            This is your vault key. It is the only way to open your vault on any device.
+            <strong>If you lose it, the vault cannot be recovered</strong> — there is no reset link, by design.
+        </div>
+        <div class="vp-recovery__key" id="recoveryKey"></div>
+        <div class="vp-recovery__actions">
+            <button class="vp-recovery__btn vp-recovery__btn--copy" id="recoveryCopyBtn">📋 Copy key</button>
+            <button class="vp-recovery__btn vp-recovery__btn--dl"   id="recoveryDlBtn">📥 Download .txt</button>
+        </div>
+        <button class="vp-recovery__confirm" id="recoveryConfirmBtn">Got it, open my vault →</button>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ── Word lists (same as sg-vault-picker.js) ─────────────────────── */
+    var ADJ  = ['apple','amber','azure','brass','cedar','cobalt','coral','crimson',
+                'dusk','ember','fern','gold','jade','lapis','maple','mint',
+                'ocean','pearl','pine','rose','ruby','sage','sand','stone'];
+    var NOUN = ['arch','bank','bay','brook','cliff','cove','creek','dale',
+                'dell','dune','fell','ford','glen','hill','lake','moor',
+                'peak','plain','reef','ridge','river','shore','vale','wood'];
+
+    var STORAGE_KEY = 'sg-vault-picker:credentials';
+
+    function _generateKey() {
+        var buf = new Uint32Array(3);
+        crypto.getRandomValues(buf);
+        return ADJ[buf[0] % ADJ.length] + '-' + NOUN[buf[1] % NOUN.length] + '-' + ((buf[2] % 9000) + 1000);
+    }
+
+    function _loadVaults() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+        catch (_) { return []; }
+    }
+
+    function _saveVaults(list) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
+
+    function _storeVault(key, name) {
+        var list = _loadVaults().filter(function (c) { return c.vaultKey !== key; });
+        list.unshift({ vaultKey: key, vaultName: name || key, savedAt: Date.now() });
+        _saveVaults(list);
+    }
+
+    function _removeVault(key) {
+        _saveVaults(_loadVaults().filter(function (c) { return c.vaultKey !== key; }));
+    }
+
+    function _timeAgo(ts) {
+        var s = Math.floor((Date.now() - ts) / 1000);
+        if (s < 60)   return s + 's ago';
+        if (s < 3600) return Math.floor(s / 60)  + 'm ago';
+        if (s < 86400)return Math.floor(s / 3600) + 'h ago';
+        return Math.floor(s / 86400) + 'd ago';
+    }
+
+    function _esc(str) {
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function _truncateKey(key) {
+        if (!key) return '';
+        var parts = key.split('-');
+        return parts.length >= 3 ? parts[0] + '-' + parts[1] + '-···' : key.slice(0, 12) + '···';
+    }
+
+    /* ── Navigation ──────────────────────────────────────────────────── */
+    function _navigateToBrowse(key) {
+        window.location.href = './browse/#' + encodeURIComponent(key);
+    }
+
+    /* ── Open vault from input ────────────────────────────────────────── */
+    function _openVaultFromInput() {
+        var input = document.getElementById('vaultKeyInput');
+        var errorEl = document.getElementById('inputError');
+        var key = input.value.trim().replace(/^["']|["']$/g, '');
+        errorEl.textContent = '';
+        if (!key) {
+            errorEl.textContent = 'Paste your vault key or share token above.';
+            input.focus();
+            return;
+        }
+        _storeVault(key, key);
+        _navigateToBrowse(key);
+    }
+
+    /* ── Recent vaults ────────────────────────────────────────────────── */
+    function _renderRecentVaults() {
+        var list = _loadVaults();
+        var section = document.getElementById('recentSection');
+        var grid    = document.getElementById('vaultGrid');
+        var mgr     = document.getElementById('manageLink');
+
+        if (list.length === 0) { section.style.display = 'none'; return; }
+        section.style.display = '';
+        if (mgr) mgr.textContent = list.length + ' vault' + (list.length !== 1 ? 's' : '') + ' · manage ›';
+
+        grid.innerHTML = list.slice(0, 12).map(function (v) {
+            return '<div class="vp-vault-card" data-key="' + _esc(v.vaultKey) + '">' +
+                '<div class="vp-vault-card__name">' + _esc(v.vaultName || v.vaultKey) + '</div>' +
+                '<div class="vp-vault-card__id">' + _esc(_truncateKey(v.vaultKey)) + '</div>' +
+                '<div class="vp-vault-card__footer">' +
+                    '<span class="vp-vault-card__time">' + _timeAgo(v.savedAt) + '</span>' +
+                    '<span class="vp-vault-card__open">Open →</span>' +
+                '</div>' +
+                '<button class="vp-vault-card__del" data-del="' + _esc(v.vaultKey) + '" title="Remove from list">×</button>' +
+            '</div>';
+        }).join('');
+
+        grid.querySelectorAll('.vp-vault-card').forEach(function (card) {
+            card.addEventListener('click', function (e) {
+                if (e.target.dataset.del) return;
+                var key = card.getAttribute('data-key');
+                _storeVault(key, card.querySelector('.vp-vault-card__name').textContent);
+                _navigateToBrowse(key);
+            });
+        });
+
+        grid.querySelectorAll('[data-del]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                _removeVault(btn.getAttribute('data-del'));
+                _renderRecentVaults();
+            });
+        });
+    }
+
+    /* ── Create vault flow ────────────────────────────────────────────── */
+    var _pendingKey = null;
+
+    function _startCreate() {
+        _pendingKey = _generateKey();
+        document.getElementById('recoveryKey').textContent = _pendingKey;
+        document.getElementById('recoveryModal').style.display = 'flex';
+    }
+
+    document.getElementById('recoveryCopyBtn').addEventListener('click', function () {
+        var btn = document.getElementById('recoveryCopyBtn');
+        navigator.clipboard && navigator.clipboard.writeText(_pendingKey).catch(function () {});
+        btn.textContent = '✓ Copied!';
+        setTimeout(function () { btn.textContent = '📋 Copy key'; }, 2000);
+    });
+
+    document.getElementById('recoveryDlBtn').addEventListener('click', function () {
+        if (!_pendingKey) return;
+        var blob = new Blob(
+            ['SG/Vault key\n\n' + _pendingKey + '\n\nCreated: ' + new Date().toISOString() + '\n\nKeep this file safe. There is no recovery path.\n'],
+            { type: 'text/plain' }
+        );
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'sg-vault-key.txt'; a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('recoveryConfirmBtn').addEventListener('click', function () {
+        if (!_pendingKey) return;
+        _storeVault(_pendingKey, 'My vault');
+        document.getElementById('recoveryModal').style.display = 'none';
+        _navigateToBrowse(_pendingKey);
+    });
+
+    /* ── Wire up events ──────────────────────────────────────────────── */
+    document.getElementById('openVaultBtn').addEventListener('click', _openVaultFromInput);
+    document.getElementById('vaultKeyInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') _openVaultFromInput();
+    });
+
+    document.getElementById('navOpenBtn').addEventListener('click', function () {
+        document.getElementById('vaultKeyInput').focus();
+        document.getElementById('vaultKeyInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    document.getElementById('createLink').addEventListener('click', _startCreate);
+    document.getElementById('createCtaBtn').addEventListener('click', _startCreate);
+    document.getElementById('manageLink').addEventListener('click', function () {
+        _saveVaults([]);
+        _renderRecentVaults();
+    });
+
+    /* ── Init ─────────────────────────────────────────────────────────── */
+    _renderRecentVaults();
+
+    // Focus input on load if no recent vaults
+    if (_loadVaults().length === 0) {
+        document.getElementById('vaultKeyInput').focus();
+    }
+})();
+</script>
+</body>
+</html>
