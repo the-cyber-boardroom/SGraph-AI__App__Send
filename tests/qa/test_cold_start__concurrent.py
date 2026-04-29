@@ -159,12 +159,19 @@ def main():
         print(f'COMPARISON  dev (SnapStart) vs main (classic cold start){RESET}')
         for env in envs:
             times, cold = all_results[env]
-            flat = [t for burst in times for t in burst]
-            p99  = sorted(flat)[int(len(flat)*0.99)]
-            coldc = sum(cold)
-            bar  = RED if coldc > 0 else GREEN
-            print(f'  {env:<6} p99={sorted(flat)[len(flat)//2]:.0f}ms  '
-                  f'cold={bar}{coldc}/{len(flat)}{RESET}')
+            flat       = [t for burst in times for t in burst]
+            cold_times = [t for burst_t, burst_c in zip(times, cold)
+                          for t in burst_t if t > THRESHOLD_SNAPSTART * 1000]
+            warm_times = [t for t in flat if t <= THRESHOLD_SNAPSTART * 1000]
+            coldc      = sum(cold)
+            bar        = RED if coldc > 0 else GREEN
+            cold_avg   = f'{sum(cold_times)/len(cold_times):.0f}ms avg' if cold_times else 'none'
+            warm_p50   = f'{sorted(warm_times)[len(warm_times)//2]:.0f}ms' if warm_times else 'n/a'
+            print(f'  {BOLD}{env:<6}{RESET}  '
+                  f'cold={bar}{coldc}/{len(flat)}{RESET}  '
+                  f'cold-start-avg={RED if coldc else GREEN}{cold_avg}{RESET}  '
+                  f'warm-p50={GREEN}{warm_p50}{RESET}  '
+                  f'worst={RED if max(flat)>THRESHOLD_SNAPSTART*1000 else GREEN}{max(flat):.0f}ms{RESET}')
 
     print()
 
