@@ -84,8 +84,14 @@ class Lambda__Dependencies__Builder:
         for root, dirs, files in os.walk(directory, topdown=True):
             to_delete = []
             for d in dirs:
-                if d.endswith('.dist-info') or d == '__pycache__':               # metadata and bytecode cache — never needed at runtime
+                if d == '__pycache__':                                           # bytecode cache — never needed at runtime
                     to_delete.append(d)
+                elif d.endswith('.dist-info'):                                   # keep METADATA (needed by importlib.metadata), delete the rest
+                    dist_dir = os.path.join(root, d)
+                    for f in os.listdir(dist_dir):
+                        if f != 'METADATA':
+                            fp = os.path.join(dist_dir, f)
+                            (shutil.rmtree if os.path.isdir(fp) else os.remove)(fp)
                 elif root == directory and d in self.LAMBDA_RUNTIME_PACKAGES:    # already provided by Lambda runtime
                     to_delete.append(d)
             for d in to_delete:
