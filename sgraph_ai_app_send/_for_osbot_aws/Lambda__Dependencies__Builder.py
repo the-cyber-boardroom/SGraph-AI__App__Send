@@ -29,7 +29,10 @@ class Lambda__Dependencies__Builder:
     Called from Deploy__Service.upload_combined_dependencies_to_s3().
     """
 
-    BASE_BUCKET_INFIX = 'osbot-lambdas'                                          # Matches osbot_aws bucket naming convention
+    BASE_BUCKET_INFIX   = 'osbot-lambdas'                                        # Matches osbot_aws bucket naming convention
+    LAMBDA_PLATFORM     = 'manylinux2014_aarch64'                                # Lambda arm64
+    LAMBDA_PYTHON       = '3.13'                                                 # Must match Lambda runtime
+    LAMBDA_ABI          = 'cp313'                                                # cpython 3.13
 
     def __init__(self, base_name, packages):
         self.base_name      = base_name                                          # e.g. 'sgraph-send-user'
@@ -54,15 +57,22 @@ class Lambda__Dependencies__Builder:
         except Exception:
             return False
 
-    def _build(self):                                                            # pip install all packages into one directory
-        import boto3
+    def _build(self):                                                            # pip install targeting Lambda arm64/Python 3.13 platform
         target_dir = f'/tmp/combined-deps-build/{self.combined_name()}'
         if os.path.exists(target_dir):
             shutil.rmtree(target_dir)
         os.makedirs(target_dir)
 
         subprocess.run(
-            ['pip', 'install', '--target', target_dir, '--quiet'] + self.packages,
+            ['pip', 'install',
+             '--target'        , target_dir            ,
+             '--platform'      , self.LAMBDA_PLATFORM  ,
+             '--python-version', self.LAMBDA_PYTHON    ,
+             '--implementation', 'cp'                  ,
+             '--abi'           , self.LAMBDA_ABI       ,
+             '--only-binary=:all:'                     ,
+             '--quiet'                                 ,
+             ] + self.packages,
             check=True
         )
         return target_dir
