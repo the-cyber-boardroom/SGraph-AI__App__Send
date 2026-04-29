@@ -90,8 +90,17 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
             except Exception:
                 pass                                                              # Statement already exists — idempotent
 
-    def invoke__snapstart_url(self, path=''):                                     # Invoke via the SnapStart alias Function URL
+    def invoke__snapstart_url(self, path='', retries=5, retry_delay=5):            # Invoke via SnapStart alias URL — retries because snapshot init takes a few seconds after publish
+        import time
         from osbot_utils.utils.Http import GET_json
         url     = self.lambda_function().function_url(self.SNAPSTART_ALIAS) + path
         headers = {self.api_key__name(): self.api_key__value()}
-        return GET_json(url, headers=headers)
+        last_exc = None
+        for attempt in range(retries):
+            try:
+                return GET_json(url, headers=headers)
+            except Exception as exc:
+                last_exc = exc
+                if attempt < retries - 1:
+                    time.sleep(retry_delay)
+        raise last_exc
