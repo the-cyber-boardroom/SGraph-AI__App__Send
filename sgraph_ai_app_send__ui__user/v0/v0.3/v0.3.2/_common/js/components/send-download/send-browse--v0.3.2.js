@@ -853,6 +853,77 @@ class SendBrowse extends SendComponent {
             this._objectUrls.push(url);
             content.innerHTML = '<video controls src="' + url + '" style="max-width: 100%; max-height: 80vh;"></video>';
 
+        // ── Email (.eml) ────────────────────────────────────────────────
+        } else if (type === 'email') {
+            var rawText = new TextDecoder().decode(bytes);
+            var parsed  = _parseEml(rawText);
+
+            var emailWrap = document.createElement('div');
+            emailWrap.style.cssText = 'height:100%;display:flex;flex-direction:column;overflow:hidden;';
+
+            // Header card
+            var hdrEl = document.createElement('div');
+            hdrEl.style.cssText = 'padding:0.85rem 1.25rem;border-bottom:1px solid var(--color-border,rgba(255,255,255,0.08));flex-shrink:0;';
+            var headerFields = [
+                { label: 'From',    value: parsed.headers['from']    },
+                { label: 'To',      value: parsed.headers['to']      },
+                { label: 'CC',      value: parsed.headers['cc']      },
+                { label: 'Subject', value: parsed.headers['subject'] || '(no subject)' },
+                { label: 'Date',    value: parsed.headers['date']    },
+            ];
+            hdrEl.innerHTML = headerFields.filter(function(f) { return f.value; }).map(function(f) {
+                return '<div style="display:flex;gap:0.5rem;margin-bottom:0.3rem;font-size:0.82rem;line-height:1.4;">' +
+                    '<span style="color:var(--color-text-secondary,#8b949e);min-width:4.5rem;flex-shrink:0;">' + SendHelpers.escapeHtml(f.label) + '</span>' +
+                    '<span style="color:var(--color-text,#e2e8f0);overflow-wrap:anywhere;">' + SendHelpers.escapeHtml(f.value) + '</span>' +
+                    '</div>';
+            }).join('');
+            emailWrap.appendChild(hdrEl);
+
+            // Body
+            var bodyEl = document.createElement('div');
+            bodyEl.style.cssText = 'flex:1;overflow-y:auto;padding:1.25rem;';
+
+            if (parsed.html) {
+                var htmlBlob = new Blob([parsed.html], { type: 'text/html' });
+                var htmlUrl  = URL.createObjectURL(htmlBlob);
+                self._objectUrls.push(htmlUrl);
+                var htmlFrame = document.createElement('iframe');
+                htmlFrame.src = htmlUrl;
+                htmlFrame.sandbox = 'allow-same-origin';
+                htmlFrame.style.cssText = 'width:100%;height:100%;border:none;background:white;border-radius:4px;';
+                bodyEl.style.cssText += 'display:flex;flex-direction:column;';
+                htmlFrame.style.flex = '1';
+                bodyEl.appendChild(htmlFrame);
+            } else {
+                var bodyPre = document.createElement('pre');
+                bodyPre.style.cssText = 'white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono,monospace);font-size:0.82rem;color:var(--color-text,#e2e8f0);margin:0;line-height:1.6;';
+                bodyPre.textContent = parsed.text || rawText;
+                bodyEl.appendChild(bodyPre);
+            }
+            emailWrap.appendChild(bodyEl);
+
+            // Raw source (hidden by default)
+            var rawPre = document.createElement('pre');
+            rawPre.style.cssText = 'white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono,monospace);font-size:0.78rem;color:var(--color-text-secondary,#8b949e);padding:1rem;flex:1;overflow-y:auto;margin:0;display:none;';
+            rawPre.textContent = rawText;
+            emailWrap.appendChild(rawPre);
+
+            content.appendChild(emailWrap);
+
+            // Source toggle
+            var isSource = false;
+            var sourceBtn = document.createElement('button');
+            sourceBtn.className = 'sb-action-btn sb-file__view-source';
+            sourceBtn.innerHTML = '&lt;/&gt; Source';
+            sourceBtn.addEventListener('click', function() {
+                isSource = !isSource;
+                hdrEl.style.display    = isSource ? 'none' : '';
+                bodyEl.style.display   = isSource ? 'none' : '';
+                rawPre.style.display   = isSource ? ''     : 'none';
+                sourceBtn.innerHTML    = isSource ? '&#9998; Rendered' : '&lt;/&gt; Source';
+            });
+            bar.appendChild(sourceBtn);
+
         // ── Unknown ─────────────────────────────────────────────────────
         } else {
             content.innerHTML =
@@ -1111,6 +1182,85 @@ function _parseCsv(text) {
 
 function _escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ─── EML parser ──────────────────────────────────────────────────────────────
+
+function _parseEml(raw) {
+    var lines     = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    var headers   = {};
+    var headerEnd = lines.length;
+    var lastKey   = null;
+
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (line === '') { headerEnd = i + 1; break; }
+        if (/^\s/.test(line) && lastKey) {
+            headers[lastKey] = (headers[lastKey] || '') + ' ' + line.trim();
+        } else {
+            var colon = line.indexOf(':');
+            if (colon > 0) {
+                lastKey = line.slice(0, colon).toLowerCase().trim();
+                headers[lastKey] = line.slice(colon + 1).trim();
+            }
+        }
+    }
+
+    var body = lines.slice(headerEnd).join('\n');
+    var ct   = (headers['content-type'] || '').toLowerCase();
+    var text = '', html = '';
+
+    if (ct.startsWith('text/plain')) {
+        text = _emlDecode(body, headers['content-transfer-encoding']);
+    } else if (ct.startsWith('text/html')) {
+        html = _emlDecode(body, headers['content-transfer-encoding']);
+    } else if (ct.startsWith('multipart/')) {
+        var bm = ct.match(/boundary\s*=\s*"?([^";\s\r\n]+)"?/);
+        if (bm) {
+            var parts = _emlSplitMultipart(body, bm[1]);
+            for (var p = 0; p < parts.length; p++) {
+                var sub = _parseEml(parts[p]);
+                if (!html && sub.html) html = sub.html;
+                if (!text && sub.text) text = sub.text;
+            }
+        } else {
+            text = body;
+        }
+    } else {
+        text = body;
+    }
+
+    return { headers: headers, text: text, html: html };
+}
+
+function _emlDecode(body, encoding) {
+    var enc = (encoding || '').toLowerCase().trim();
+    if (enc === 'quoted-printable') {
+        return body.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, function(_, h) {
+            return String.fromCharCode(parseInt(h, 16));
+        });
+    }
+    if (enc === 'base64') {
+        try { return atob(body.replace(/[\s]/g, '')); } catch (_) { return body; }
+    }
+    return body;
+}
+
+function _emlSplitMultipart(body, boundary) {
+    var parts = [];
+    var sep   = '--' + boundary;
+    var lines = body.split('\n');
+    var cur   = null;
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].replace(/\r$/, '');
+        if (line === sep || line === sep + '--') {
+            if (cur !== null) parts.push(cur.join('\n'));
+            cur = (line === sep + '--') ? null : [];
+        } else if (cur !== null) {
+            cur.push(line);
+        }
+    }
+    return parts;
 }
 
 // ─── BRW-015: Inject scrollable tab bar CSS into sg-layout Shadow DOM ────────

@@ -24,8 +24,9 @@ PORT=10067
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
-UI_VERSION="v0.2.0"
+UI_VERSION="v0.2.1"
 IFD_PATH="v0/v0.2/$UI_VERSION"
+VAULT_BASE_VERSION="v0.2.0"   # IFD base layer — provides vault-shell, vault-browse-edit, etc.
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
 
 # User UI IFD layers — merged in order (base first, latest last) to replicate
@@ -65,11 +66,19 @@ for locale_dir in "$CONTENT_DIR"/*/; do
     fi
 done
 
-# Copy _common (not symlink) so we can inject build-info.js and CDN overrides
-if [ -d "$CONTENT_DIR/_common" ]; then
-    cp -r "$CONTENT_DIR/_common" "$SERVE_DIR/_common"
+# Build _common: start with vault IFD base layer (vault-shell, vault-browse-edit, etc.)
+# then apply the current version's overlay (IFD delta — only changed files).
+BASE_COMMON_DIR="$STATIC_DIR/v0/v0.2/$VAULT_BASE_VERSION/_common"
+if [ -d "$BASE_COMMON_DIR" ]; then
+    echo "Merging vault base layer: $VAULT_BASE_VERSION ..."
+    cp -r "$BASE_COMMON_DIR" "$SERVE_DIR/_common"
 else
     mkdir -p "$SERVE_DIR/_common/js"
+fi
+
+if [ -d "$CONTENT_DIR/_common" ]; then
+    echo "Merging vault overlay layer: $UI_VERSION ..."
+    cp -r "$CONTENT_DIR/_common"/. "$SERVE_DIR/_common/"
 fi
 
 # Merge user UI IFD layers in order (v0.3.0 → v0.3.1 → v0.3.2) — replicates
@@ -118,7 +127,7 @@ JSEOF
 # local /_common/ so the browser loads our local send-browse, markdown-parser,
 # etc. instead of the deployed CDN versions.
 echo "Patching index.html: CDN URLs → local /_common/ ..."
-for index_html in "$SERVE_DIR"/*/index.html; do
+for index_html in "$SERVE_DIR"/*/index.html "$SERVE_DIR"/*/*/index.html; do
     [ -f "$index_html" ] || continue
     python3 -c "
 import sys, re

@@ -14,6 +14,7 @@
      'code'      — .js, .ts, .py, .json, .yaml, .yml, .xml, .html, .css, .sh, etc.
      'zip'       — .zip (browsable archive viewer)
      'text'      — text/* content type (existing behaviour)
+     'email'     — .eml (RFC 5322 email message)
      null        — binary/unknown (auto-download), includes .docx, .xlsx, .pptx
    ═══════════════════════════════════════════════════════════════════════════════ */
 
@@ -28,6 +29,7 @@ const FileTypeDetect = {
         '.aac': 'audio', '.m4a': 'audio', '.wma': 'audio',
         '.mp4': 'video', '.webm': 'video', '.ogv': 'video', '.mov': 'video',
         '.avi': 'video', '.mkv': 'video',
+        '.eml': 'email',
         '.txt': 'text', '.log': 'text', '.csv': 'text',
         '.zip': 'zip',
         '.js': 'code', '.mjs': 'code', '.cjs': 'code', '.ts': 'code',
@@ -49,6 +51,7 @@ const FileTypeDetect = {
         'application/x-zip-compressed': 'zip',
         'text/markdown': 'markdown',
         'text/x-markdown': 'markdown',
+        'message/rfc822': 'email',
     },
 
     _audioMimeMap: {
