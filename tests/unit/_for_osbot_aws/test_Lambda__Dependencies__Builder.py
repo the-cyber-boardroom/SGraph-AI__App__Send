@@ -40,13 +40,20 @@ class test_Lambda__Dependencies__Builder(TestCase):
         b2 = Lambda__Dependencies__Builder('sgraph-send-admin', self.PACKAGES)
         assert b1.s3_key() != b2.s3_key()
 
-    def test__strip__removes_dist_info(self):
+    def test__strip__slims_dist_info(self):
         with tempfile.TemporaryDirectory() as d:
-            os.makedirs(os.path.join(d, 'requests-2.31.0.dist-info'))
+            dist = os.path.join(d, 'requests-2.31.0.dist-info')
+            os.makedirs(dist)
+            for f in ('METADATA', 'RECORD', 'WHEEL', 'INSTALLER', 'entry_points.txt'):
+                open(os.path.join(dist, f), 'w').close()
             os.makedirs(os.path.join(d, 'requests'))
             self.builder._strip(d)
-            assert not os.path.exists(os.path.join(d, 'requests-2.31.0.dist-info'))
-            assert     os.path.exists(os.path.join(d, 'requests'))              # package folder kept
+            assert     os.path.exists(os.path.join(dist, 'METADATA'))          # kept — needed by importlib.metadata
+            assert not os.path.exists(os.path.join(dist, 'RECORD'))            # deleted — large file listing, not needed
+            assert not os.path.exists(os.path.join(dist, 'WHEEL'))
+            assert not os.path.exists(os.path.join(dist, 'INSTALLER'))
+            assert not os.path.exists(os.path.join(dist, 'entry_points.txt'))
+            assert     os.path.exists(os.path.join(d, 'requests'))             # package folder kept
 
     def test__strip__removes_pycache_and_pyc(self):
         with tempfile.TemporaryDirectory() as d:
