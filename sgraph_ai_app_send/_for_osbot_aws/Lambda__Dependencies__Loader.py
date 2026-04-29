@@ -19,6 +19,7 @@ import hashlib
 import io
 import os
 import sys
+import time
 import zipfile
 
 
@@ -29,6 +30,10 @@ def _deps_hash(packages):                                                       
 
 def versioned_name(base_name, packages):                                         # Combined zip name: base + hash of package list
     return f'{base_name}-{_deps_hash(packages)}'
+
+
+def _ms(start):                                                                  # Milliseconds since start (for cold-start profiling)
+    return f'{(time.time() - start) * 1000:.0f}ms'
 
 
 class Lambda__Dependencies__Loader:
@@ -61,6 +66,7 @@ class Lambda__Dependencies__Loader:
         if os.getenv('AWS_REGION') is None:                                      # Not inside Lambda — skip
             return None
 
+        t0          = time.time()
         temp_folder = self._temp_folder()
 
         if temp_folder in sys.path:                                              # Already loaded in this container
@@ -68,23 +74,30 @@ class Lambda__Dependencies__Loader:
 
         if os.path.exists(temp_folder):                                          # Extracted in /tmp — warm container reuse
             sys.path.insert(0, temp_folder)
+            print(f'[deps] /tmp cache hit — {_ms(t0)}')
             return f'{self.combined_name} (loaded from /tmp cache)'
 
         import boto3                                                             # Single STS call — not per package
+        t_sts      = time.time()
         account_id = boto3.client('sts').get_caller_identity()['Account']
         region     = boto3.session.Session().region_name
         bucket     = f'{account_id}--osbot-lambdas--{region}'
-        s3_key     = self._s3_key()
+        print(f'[deps] STS get_caller_identity — {_ms(t_sts)}')
 
+        t_s3      = time.time()
         s3        = boto3.client('s3')
-        response  = s3.get_object(Bucket=bucket, Key=s3_key)                     # Single S3 download
+        response  = s3.get_object(Bucket=bucket, Key=self._s3_key())             # Single S3 download
         zip_bytes = response['Body'].read()
+        print(f'[deps] S3 download ({len(zip_bytes)//1024}KB) — {_ms(t_s3)}')
 
+        t_unzip = time.time()
         os.makedirs(temp_folder, exist_ok=True)
         with zipfile.ZipFile(io.BytesIO(zip_bytes), 'r') as zip_ref:            # Single extraction
             zip_ref.extractall(temp_folder)
+        print(f'[deps] zip extraction — {_ms(t_unzip)}')
 
         sys.path.insert(0, temp_folder)
+        print(f'[deps] total load — {_ms(t0)}')
         return f'{self.combined_name} (loaded from S3)'
 
 
