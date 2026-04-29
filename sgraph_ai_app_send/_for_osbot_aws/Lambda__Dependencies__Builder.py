@@ -34,6 +34,9 @@ class Lambda__Dependencies__Builder:
     LAMBDA_PYTHON       = '3.13'                                                 # Must match Lambda runtime
     LAMBDA_ABI          = 'cp313'                                                # cpython 3.13
 
+    # Top-level package dirs provided by the Lambda Python 3.13 runtime — safe to exclude from the zip
+    LAMBDA_RUNTIME_PACKAGES = {'boto3', 'botocore', 's3transfer', 'jmespath', 'dateutil', 'six', 'urllib3'}
+
     def __init__(self, base_name, packages):
         self.base_name      = base_name                                          # e.g. 'sgraph-send-user'
         self.packages       = list(packages)                                     # full package list from user__config.py
@@ -77,6 +80,26 @@ class Lambda__Dependencies__Builder:
         )
         return target_dir
 
+    def _strip(self, directory):                                                  # Remove clutter and runtime-provided packages before zipping
+        for root, dirs, files in os.walk(directory, topdown=True):
+            to_delete = []
+            for d in dirs:
+                if d.endswith('.dist-info') or d == '__pycache__':               # metadata and bytecode cache — never needed at runtime
+                    to_delete.append(d)
+                elif root == directory and d in self.LAMBDA_RUNTIME_PACKAGES:    # already provided by Lambda runtime
+                    to_delete.append(d)
+            for d in to_delete:
+                shutil.rmtree(os.path.join(root, d), ignore_errors=True)
+            dirs[:] = [d for d in dirs if d not in to_delete]                   # don't descend into deleted dirs
+
+            for f in files:
+                if f.endswith(('.pyc', '.pyo', '.pyi')):                         # compiled bytecode and type stubs
+                    os.remove(os.path.join(root, f))
+
+        bin_dir = os.path.join(directory, 'bin')                                 # CLI entry-point scripts, not useful in Lambda
+        if os.path.isdir(bin_dir):
+            shutil.rmtree(bin_dir)
+
     def _zip_dir(self, directory):                                               # Zip directory contents into bytes
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -99,6 +122,7 @@ class Lambda__Dependencies__Builder:
                         reason        = 'already exists in S3')
 
         target_dir = self._build()
+        self._strip(target_dir)
         zip_bytes  = self._zip_dir(target_dir)
         shutil.rmtree(target_dir, ignore_errors=True)
 

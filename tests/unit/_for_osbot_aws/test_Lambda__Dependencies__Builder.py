@@ -1,3 +1,6 @@
+import os
+import shutil
+import tempfile
 from unittest                                                                    import TestCase
 from sgraph_ai_app_send._for_osbot_aws.Lambda__Dependencies__Builder             import Lambda__Dependencies__Builder
 from sgraph_ai_app_send._for_osbot_aws.Lambda__Dependencies__Loader              import versioned_name
@@ -36,3 +39,42 @@ class test_Lambda__Dependencies__Builder(TestCase):
         b1 = Lambda__Dependencies__Builder('sgraph-send-user' , self.PACKAGES)
         b2 = Lambda__Dependencies__Builder('sgraph-send-admin', self.PACKAGES)
         assert b1.s3_key() != b2.s3_key()
+
+    def test__strip__removes_dist_info(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, 'requests-2.31.0.dist-info'))
+            os.makedirs(os.path.join(d, 'requests'))
+            self.builder._strip(d)
+            assert not os.path.exists(os.path.join(d, 'requests-2.31.0.dist-info'))
+            assert     os.path.exists(os.path.join(d, 'requests'))              # package folder kept
+
+    def test__strip__removes_pycache_and_pyc(self):
+        with tempfile.TemporaryDirectory() as d:
+            pkg = os.path.join(d, 'mypkg')
+            cache = os.path.join(pkg, '__pycache__')
+            os.makedirs(cache)
+            open(os.path.join(pkg, 'mod.py' ), 'w').close()
+            open(os.path.join(pkg, 'mod.pyc'), 'w').close()
+            open(os.path.join(pkg, 'mod.pyi'), 'w').close()
+            self.builder._strip(d)
+            assert not os.path.exists(cache)
+            assert not os.path.exists(os.path.join(pkg, 'mod.pyc'))
+            assert not os.path.exists(os.path.join(pkg, 'mod.pyi'))
+            assert     os.path.exists(os.path.join(pkg, 'mod.py'))              # source kept
+
+    def test__strip__removes_lambda_runtime_packages(self):
+        with tempfile.TemporaryDirectory() as d:
+            for pkg in ('boto3', 'botocore', 's3transfer', 'jmespath', 'dateutil', 'six', 'urllib3'):
+                os.makedirs(os.path.join(d, pkg))
+            os.makedirs(os.path.join(d, 'fastapi'))                             # non-runtime package — must survive
+            self.builder._strip(d)
+            for pkg in ('boto3', 'botocore', 's3transfer', 'jmespath', 'dateutil', 'six', 'urllib3'):
+                assert not os.path.exists(os.path.join(d, pkg)), f'{pkg} should have been removed'
+            assert os.path.exists(os.path.join(d, 'fastapi'))
+
+    def test__strip__removes_bin_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, 'bin'))
+            open(os.path.join(d, 'bin', 'uvicorn'), 'w').close()
+            self.builder._strip(d)
+            assert not os.path.exists(os.path.join(d, 'bin'))
