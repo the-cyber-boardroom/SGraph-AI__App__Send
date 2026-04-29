@@ -22,6 +22,8 @@ Options:
 Run with:
 
  python tests/qa/test_cold_start__concurrent.py --env dev --concurrency 20 --bursts 3
+ python tests/qa/test_cold_start__concurrent.py --env main --concurrency 20 --bursts 3
+ python tests/qa/test_cold_start__concurrent.py --env prod --concurrency 20 --bursts 3
 
  python tests/qa/test_cold_start__concurrent.py --env both --concurrency 20 --bursts 3
 """
@@ -120,12 +122,13 @@ def summarise(label, all_times, all_cold):
 ENDPOINTS = {
     'dev' : 'https://dev.send.sgraph.ai',
     'main': 'https://main.send.sgraph.ai',
+    'prod': 'https://send.sgraph.ai',
 }
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--env'        , default='dev' , choices=['dev','main','both'])
+    ap.add_argument('--env'        , default='dev' , choices=['dev','main','both', 'prod'])
     ap.add_argument('--concurrency', default=10    , type=int)
     ap.add_argument('--bursts'     , default=3     , type=int)
     ap.add_argument('--delay'      , default=2     , type=float)
