@@ -17,6 +17,13 @@ Options:
     --bursts        number of bursts   (default: 3)
     --delay         seconds between bursts (default: 2)
     --path          API path to hit (default: /api/presigned/capabilities)
+
+
+Run with:
+
+ python tests/qa/test_cold_start__concurrent.py --env dev --concurrency 20 --bursts 3
+
+ python tests/qa/test_cold_start__concurrent.py --env both --concurrency 20 --bursts 3
 """
 
 import argparse
