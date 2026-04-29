@@ -468,6 +468,41 @@
     line-height: 1.7;
 }
 
+/* The renderer applies sb-file__markdown (for typography) alongside plr-markdown.
+   The base Browse CSS sets background:white on sb-file__markdown. Override it here
+   so markdown inherits the section/page background in both light and dark modes. */
+.plr-page .plr-markdown { background: transparent; }
+
+/* Dark mode: code blocks — base CSS uses #f4f4f4 (light) */
+.plr-page--dark .plr-markdown code {
+    background: rgba(255,255,255,0.08);
+    color: #c8d0da;
+}
+.plr-page--dark .plr-markdown pre {
+    background: rgba(255,255,255,0.05);
+}
+.plr-page--dark .plr-markdown pre code { background: none; color: inherit; }
+
+/* Dark mode: headings — base CSS has #eee border */
+.plr-page--dark .plr-markdown h1,
+.plr-page--dark .plr-markdown h2 {
+    border-bottom-color: rgba(255,255,255,0.1);
+    color: #e8e8e8;
+}
+.plr-page--dark .plr-markdown h3,
+.plr-page--dark .plr-markdown h4 { color: #d8d8d8; }
+
+/* Dark mode: blockquote — base CSS has #ddd border + #555 text */
+.plr-page--dark .plr-markdown blockquote {
+    border-left-color: var(--plr-accent, #4ecdc4);
+    color: #8b949e;
+}
+
+/* Dark mode: tables — base CSS has #ddd borders + #f4f4f4 header */
+.plr-page--dark .plr-markdown th,
+.plr-page--dark .plr-markdown td { border-color: rgba(255,255,255,0.1); }
+.plr-page--dark .plr-markdown th { background: rgba(255,255,255,0.05); color: #e8e8e8; }
+
 /* P0: Link affordance — markdown links must be visibly clickable */
 .plr-markdown a {
     color: var(--plr-accent, #4ecdc4);
