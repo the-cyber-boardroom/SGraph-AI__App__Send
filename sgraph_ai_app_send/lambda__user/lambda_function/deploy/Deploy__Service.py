@@ -1,6 +1,7 @@
 from mgraph_ai_service_cache_client.schemas.consts.const__Fast_API import ENV_VAR__CACHE__SERVICE__BUCKET_NAME
 
 import sgraph_ai_app_send__ui__user
+from osbot_aws.AWS_Config                                                    import aws_config
 from osbot_fast_api_serverless.deploy.Deploy__Serverless__Fast_API          import Deploy__Serverless__Fast_API
 from osbot_utils.utils.Env                                                  import get_env
 from sgraph_ai_app_send._for_osbot_aws.Lambda__Dependencies__Builder        import Lambda__Dependencies__Builder
@@ -9,19 +10,21 @@ from sgraph_ai_app_send.lambda__user.user__config                           impo
 from sgraph_ai_app_send.lambda__user.user__config                           import ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME
 from sgraph_ai_app_send.lambda__user.user__config                           import ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE
 from sgraph_ai_app_send.lambda__user.lambda_function.lambda_handler__user   import run
-from sgraph_ai_app_send.lambda__user.storage.Send__Config                   import ENV_VAR__SEND__STORAGE_MODE
+from sgraph_ai_app_send.lambda__user.storage.Send__Config                   import ENV_VAR__SEND__STORAGE_MODE, ENV_VAR__SEND__S3_BUCKET, SEND__S3_BUCKET__INFIX
 
 
 class Deploy__Service(Deploy__Serverless__Fast_API):
 
     def deploy_lambda(self):
+        s3_bucket = f'{aws_config.account_id()}--{SEND__S3_BUCKET__INFIX}--{aws_config.region_name()}'
         with super().deploy_lambda() as _:
             _.add_folder(sgraph_ai_app_send__ui__user.path)
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL      , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL      ))
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME  ))
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE, get_env(ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE ))
             _.set_env_variable(ENV_VAR__CACHE__SERVICE__BUCKET_NAME       , get_env(ENV_VAR__CACHE__SERVICE__BUCKET_NAME        ))
-            _.set_env_variable(ENV_VAR__SEND__STORAGE_MODE                , 's3'                                                )  # Explicit S3 mode — bypasses aws_configured() check which fails during SnapStart snapshot creation
+            _.set_env_variable(ENV_VAR__SEND__STORAGE_MODE                , 's3'                                                )  # Explicit — bypasses aws_configured() which has no credentials during SnapStart snapshot creation
+            _.set_env_variable(ENV_VAR__SEND__S3_BUCKET                   , s3_bucket                                          )  # Explicit — bypasses aws_config.account_id() STS call which also has no credentials during SnapStart snapshot creation
             return _
 
     def handler(self):
@@ -90,8 +93,17 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
             except Exception:
                 pass                                                              # Statement already exists — idempotent
 
-    def invoke__snapstart_url(self, path=''):                                     # Invoke via the SnapStart alias Function URL
+    def invoke__snapstart_url(self, path='', retries=5, retry_delay=5):            # Invoke via SnapStart alias URL — retries because snapshot init takes a few seconds after publish
+        import time
         from osbot_utils.utils.Http import GET_json
         url     = self.lambda_function().function_url(self.SNAPSTART_ALIAS) + path
         headers = {self.api_key__name(): self.api_key__value()}
-        return GET_json(url, headers=headers)
+        last_exc = None
+        for attempt in range(retries):
+            try:
+                return GET_json(url, headers=headers)
+            except Exception as exc:
+                last_exc = exc
+                if attempt < retries - 1:
+                    time.sleep(retry_delay)
+        raise last_exc
