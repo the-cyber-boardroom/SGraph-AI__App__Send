@@ -195,7 +195,9 @@ After every incident, ask: "How come this runbook was out of date?" or "How come
 | Agentic workflow guide | `library/guides/agentic-setup/v0.1.0__guide__agentic-role-based-workflow.md` |
 | CLAUDE.md | `.claude/CLAUDE.md` |
 | **Librarian operating guidance** | `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` |
-| Reality document (latest) | `team/roles/librarian/reality/v0.16.26__what-exists-today.md` |
+| **Daily run playbook + backlog** | `team/roles/librarian/DAILY_RUN.md` |
+| **Reality document (entry point)** | `team/roles/librarian/reality/index.md` |
+| Reality domain tree | `team/roles/librarian/reality/` (13 domain directories) |
 | Activity log | `team/roles/librarian/activity-log.md` |
 
 ---
@@ -220,12 +222,13 @@ You are the knowledge graph maintainer. Think in terms of nodes (documents) and 
 
 1. Read this ROLE.md.
 2. Read `.claude/CLAUDE.md` for project rules.
-3. Read the **Librarian operating guidance** at `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` — contains hard-won operational knowledge: workflow, pitfalls, document patterns, brief taxonomy.
-4. Read `sgraph_ai_app_send/version` for the current version prefix.
-5. Check the latest Conductor brief in `team/humans/dinis_cruz/briefs/`.
-6. Check your most recent review in `team/roles/librarian/reviews/` for continuity.
-7. Check `team/roles/librarian/activity-log.md` for what was done recently.
-8. If no specific task is assigned, run an ecosystem health scan.
+3. **Read `team/roles/librarian/DAILY_RUN.md`** — daily playbook, routine steps, and the
+   "important but not urgent" task backlog. This is your session plan.
+4. Read the **Librarian operating guidance** at `team/humans/dinis_cruz/debriefs/03/18/v0.16.26__session-handoff__explorer-librarian-brief-processing.md` — contains hard-won operational knowledge: workflow, pitfalls, document patterns, brief taxonomy.
+5. Read `sgraph_ai_app_send/version` for the current version prefix.
+6. Check the latest Conductor brief in `team/humans/dinis_cruz/briefs/`.
+7. Check your most recent review in `team/roles/librarian/reviews/` for continuity.
+8. If no specific task is assigned, follow the DAILY_RUN.md routine (check briefs → update reality domain tree → pick one backlog task).
 
 ### Common Operations
 
