@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-05-02 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -10,12 +10,20 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 
 ## Ephemeral Infrastructure
 
-| Feature | One-Line Description | Monolith Section |
-|---------|---------------------|-----------------|
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
 | Ephemeral EC2 Deploy Service | Infrastructure control plane with Router Lambda and SSH provisioning | Section 16 |
 | Ephemeral vault infrastructure | Per-session vault infrastructure with automatic teardown | Section 31 |
 | VNC streaming desktop | Browser-accessible VNC for desktop app testing and demos | Sections 31, 23 |
 | Ephemeral observability (Elastic + Kibana) | Per-session log aggregation and visualisation stack | Section 31 |
+| Infra UI: split Creation / Live Instances panels | Two distinct UI sections — provisioning vs. operational controls | 04/29 brief |
+| AMI management UI (list, bake, delete, set default) | AMI catalogue per instance type — "simulated AWS Marketplace" | 04/29 brief |
+| SG/Send vault server as instance type | Ephemeral storage primitive — completes compute + browser + storage triangle | 04/29 brief |
+| Docker container management inside instances | List/start/stop containers, view logs, expose ports from instance FastAPI | 04/29 brief |
+| Remote shell via API-based FastAPI endpoint (Option A) | `POST /shell/execute` and `POST /shell/stream` — no SSH or SSM required for MVP | 04/29 brief |
+| Prometheus metrics endpoints on instances (`GET /metrics`) | CPU, memory, disk, uptime, containers — standard Prometheus exposition format | 04/29 brief |
+| Stacks — multi-instance JSON-defined bundles | One-click launch of bundled environments (e.g. Elastic + Playwright + Vault) | 04/29 brief |
+| Firefox browser plugin (`plugins/firefox/`) | Interactive Firefox + MITM proxy — stateful browsing vs. Playwright's programmatic model | 04/29 brief |
 
 ## CI/CD Improvements
 
