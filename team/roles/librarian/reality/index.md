@@ -45,7 +45,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
 | Open PROPOSED items (across all domains) | 115+ |
-| Total documents catalogued | 336 (master indexes through 05/03) |
+| Total documents catalogued | 336 (master indexes 04/25–05/03) |
 
 ---
 

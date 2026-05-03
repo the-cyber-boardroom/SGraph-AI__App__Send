@@ -1,6 +1,6 @@
 # cli/proposed — Index
 
-**Domain:** `cli/` | **Last updated:** 2026-04-28
+**Domain:** `cli/` | **Last updated:** 2026-05-03
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Section 17 (lines 1556–1596), Section 6 (lines 817–903)
 
 ---
@@ -51,11 +51,13 @@ PROPOSED — see also `vault/proposed/multi-remote.md`.
 Architecture simulated but no code. Vault branch merges with conflict detection and
 three-way merge. PROPOSED.
 
+*Full source: `../v0.16.26__what-exists-today.md` Section 6 (lines 817–903), Section 17 (lines 1556–1596)*
+
 ---
 
 ## SGit Four-Layer Refactoring (04/29 Villager brief, doc 336)
 
-All items below are PROPOSED — does not exist yet. Source: `briefs/04/29/v0.22.19__villager-brief__sgit-code-refactoring-four-layers.md`
+All items below are PROPOSED — does not exist yet. **Scope:** SGit-AI/SGit-AI__CLI repo (not this repo). Villager brief — hardening, not new features.
 
 **Why:** PKI is the next major SGit feature. Clean layer separation makes PKI additions surgical (Crypto for signing/verification, Core for sign/verify steps, Network for key exchange). Without this refactoring, PKI will touch everything and regression risk is high.
 
