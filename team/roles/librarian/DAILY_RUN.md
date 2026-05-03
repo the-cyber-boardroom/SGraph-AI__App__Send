@@ -155,6 +155,7 @@ None currently active.
 |------|------|---------|
 | 2026-04-28 | Create DAILY_RUN.md | This file — daily playbook + backlog established |
 | 2026-04-28 | Reality document refactoring plan | 13-domain fractal tree designed; domain index files created |
+| 2026-05-03 | Process 04/29 late batch (4 briefs) | Docs 333–336 catalogued; infra/proposed + cli/proposed updated; master index, architect review, dev review, debrief produced |
 
 ---
 

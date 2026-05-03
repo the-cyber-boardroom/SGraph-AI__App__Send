@@ -7,6 +7,18 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-03
+
+- `index.md` — Updated: version v0.22.18 → v0.27.2, date, doc count (336), PROPOSED count (115+)
+- `infra/index.md` — Added: CI note — admin lambda deploy skipped on main/prod (commits `c792383`, `a06a112`)
+- `infra/proposed/index.md` — Added: 7 ephemeral infra next-phase features (AMI management, vault server, Docker containers, remote shell, Prometheus, stacks) + Firefox browser plugin (7 sub-features) — all PROPOSED
+- `cli/proposed/index.md` — Added: SGit four-layer refactoring (Crypto/Core/Network/Plugins), transaction logging, step-based decomposition, feature flags for plugins — all PROPOSED; two open decisions (#29, #30) catalogued
+
+Master index: `team/roles/librarian/reviews/05/03/v0.27.2__master-index__briefs-29-apr-late-batch.md`
+Processes: docs 333–336 (04/29 late batch committed to repo on 01 May)
+
+---
+
 ## 2026-04-28
 
 - `index.md` — NEW: master domain index created (reality document refactored from monolith into domain tree)

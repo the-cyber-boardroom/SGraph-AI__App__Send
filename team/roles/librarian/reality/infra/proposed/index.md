@@ -10,12 +10,40 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 
 ## Ephemeral Infrastructure
 
-| Feature | One-Line Description | Monolith Section |
-|---------|---------------------|-----------------|
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
 | Ephemeral EC2 Deploy Service | Infrastructure control plane with Router Lambda and SSH provisioning | Section 16 |
 | Ephemeral vault infrastructure | Per-session vault infrastructure with automatic teardown | Section 31 |
 | VNC streaming desktop | Browser-accessible VNC for desktop app testing and demos | Sections 31, 23 |
 | Ephemeral observability (Elastic + Kibana) | Per-session log aggregation and visualisation stack | Section 31 |
+
+### Ephemeral Infra Next Phase (04/29 brief, doc 334)
+
+All items below are PROPOSED — does not exist yet. Source: `briefs/04/29/v0.22.19__dev-brief__ephemeral-infra-next-phase.md`
+
+| Feature | One-Line Description |
+|---------|---------------------|
+| Split creation from live instances | Separate UI panels: provisioning (instance type, creation mode, AMI) vs live management (running instances, status, controls) |
+| AMI management UI | List, bake, delete, set-default AMIs per instance type; progress indicator for bake operation |
+| SG/Send vault server instance type | New plugin `plugins/vault-server/` — launches SG/Send Docker container as an ephemeral EC2 instance; storage primitive for the platform |
+| Docker container management inside instances | List, start, stop, restart, view logs, expose ports for Docker containers running inside an EC2 instance (via instance FastAPI with Docker socket access) |
+| Remote shell — Option A (API-based) | `POST /shell/execute` + `POST /shell/stream` (WebSocket) on instance FastAPI; terminal UI; no SSH/SSM required; no interactive terminal (limitation documented) |
+| Prometheus endpoints on instances | `GET /metrics` on instance FastAPI returning Prometheus text format: CPU, memory, disk, uptime, container count, request count |
+| Stacks (multi-instance bundles) | JSON config triggers sequential launch of multiple instances; Phase 1 = launch shortcut only (no VPC coordination); Phase 2 = same-VPC networking |
+
+### Firefox Browser Plugin (04/29 brief, doc 335)
+
+All items below are PROPOSED — does not exist yet. Source: `briefs/04/29/v0.22.19__dev-brief__firefox-browser-plugin.md`
+
+| Feature | One-Line Description |
+|---------|---------------------|
+| Firefox plugin (`plugins/firefox/`) | Firefox + MITM proxy as a dedicated plugin; interactive browsing vs Playwright's programmatic model |
+| Firefox detail panel UI | sg-layout detail view: credentials (username/password), MITM proxy controls (script upload, intercept toggle, proxy UI link), security settings (self-signed certs, SSL intercept), Firefox settings (start page, profile load), instance controls (bake AMI, stop) |
+| MITM intercept script management | Upload Python mitmproxy scripts via UI; stored in vault per session; executed on all proxied traffic |
+| Browser view inline | Firefox session rendered in iframe (preferred) or VNC/noVNC fallback if X-Frame-Options headers cannot be removed |
+| Health checks (five dimensions) | Container running / Firefox alive / MITM proxy connected / network reachability / login page accessible — displayed as green/amber/red in panel |
+| Firefox vault storage per session | Credentials, MITM scripts, proxy logs, Firefox profile (if saved), screenshots, instance metadata — all stored in vault per session |
+| Firefox AMI bake | Saves configured Firefox profile (MITM scripts, bookmarks, extensions, security settings) in AMI; restores on launch-from-AMI |
 
 ## CI/CD Improvements
 

@@ -60,6 +60,10 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 - **Target:** S3 bucket (`WEBSITE_S3_BUCKET` secret) + CloudFront distribution (`WEBSITE_CF_DIST` secret)
 - **Region:** eu-west-2
 
+### CI Configuration Notes
+
+- **Admin Lambda deploy skipped on `main` and `prod`** — Admin Lambda is not active on main/prod targets. CI steps for admin lambda deploy are bypassed on both (commits `c792383`, `a06a112`, 01 May 2026). Admin Lambda still deploys to `dev`.
+
 ### CI Python Scripts
 
 | Script | What It Does |
