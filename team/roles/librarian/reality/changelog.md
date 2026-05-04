@@ -7,6 +7,16 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-04
+
+- No domain files updated — no new briefs or code changes
+- `activity-log.md` — Backlog task B-010 complete: 33 entries added covering 04/01–05/04
+
+Master index: `team/roles/librarian/reviews/05/04/v0.27.2__master-index__no-new-briefs-04-may.md`
+Processes: no new docs (brief scan came up empty)
+
+---
+
 ## 2026-05-03
 
 - `index.md` — Updated: version v0.22.18 → v0.27.2, date, doc count (336), PROPOSED count (115+)

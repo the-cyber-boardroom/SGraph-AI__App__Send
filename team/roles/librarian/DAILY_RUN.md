@@ -133,7 +133,7 @@ point to `reality/index.md` instead.
 Compare against actual files in `library/docs/specs/`. Update any missing or renamed entries.
 
 ### B-010 · Activity log — Bring activity-log.md current
-**Status:** QUEUED
+**Status:** DONE (2026-05-04)
 **What:** `team/roles/librarian/activity-log.md` was last updated 2026-03-18. Add entries for
 all sessions since then (04/01 through 04/28). Each entry: date, version, review link,
 one-line description.
@@ -155,6 +155,7 @@ None currently active.
 |------|------|---------|
 | 2026-04-28 | Create DAILY_RUN.md | This file — daily playbook + backlog established |
 | 2026-04-28 | Reality document refactoring plan | 13-domain fractal tree designed; domain index files created |
+| 2026-05-04 | No new briefs; backlog B-010 | Activity log updated: 33 entries added covering 04/01–05/04 |
 | 2026-05-03 | Process 04/29 late batch (4 briefs) | Docs 333–336 catalogued; infra/proposed + cli/proposed updated; master index, architect review, dev review, debrief produced |
 
 ---
