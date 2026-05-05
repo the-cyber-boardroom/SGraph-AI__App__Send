@@ -1,6 +1,6 @@
 # send-api — Reality Index
 
-**Domain:** `send-api/` | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** `send-api/` | **Last updated:** 2026-05-05 | **Maintained by:** Librarian (daily run)
 
 The User Lambda: the public-facing API at `send.sgraph.ai`. Handles encrypted file transfers,
 multipart uploads, vault blob storage (pointer model), room joins, early access signups, and
@@ -111,6 +111,9 @@ Selected key proposals for this domain. Full list: [proposed/index.md](proposed/
 - **WhatsApp share mode** — share-via-WhatsApp integration (doc 259)
 - **Four collaborative upload modes** — individual, room, vault-push, vault-merge (doc 231)
 - **`/api/vault/zip` read-only access** — accept structure_key for vault snapshot pull (OQ-2)
+- **Clone Pack endpoints** — `GET /vaults/{vault_id}/packs/{commit_id}/{flavour}` + `POST /vaults/{vault_id}/objects/missing` (doc 348 / brief 08b). Binary `SGPK` pack format. 40–100× clone speedup. PackBuilder + PackCache + pre-warming hook on push. Zero-knowledge preserved (ciphertext only). Requires 5 architect decisions before implementation.
+- **PackBuilder** — server-side binary pack assembler. Walks commit graph for `full`/`head`/`bare-full`/`bare-head` flavours, assembles sorted ciphertext into `SGPK` format. (doc 348)
+- **PackCache** — LRU on-disk cache under `packs/` storage namespace. Configurable budget: 100 packs OR 5 GB per vault. Eviction protects latest-3 packs per commit. (doc 348)
 
 ---
 
