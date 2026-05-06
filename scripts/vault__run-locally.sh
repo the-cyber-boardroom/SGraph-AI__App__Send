@@ -98,9 +98,9 @@ done
 # Symlink i18n/
 [ -d "$CONTENT_DIR/i18n" ] && ln -sf "$CONTENT_DIR/i18n" "$SERVE_DIR/i18n"
 
-# Copy root files (index.html, etc.)
+# Copy root files (index.html, etc.) — index.html is the vault shell, not a redirect
 for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
-    [ -f "$f" ] && [ "$(basename "$f")" != "index.html" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
+    [ -f "$f" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
 done
 
 
@@ -123,30 +123,21 @@ window.SGRAPH_BUILD = {
 };
 JSEOF
 
-# Patch index.html files: replace https://dev.send.sgraph.ai/_common/ with
-# local /_common/ so the browser loads our local send-browse, markdown-parser,
-# etc. instead of the deployed CDN versions.
+# Patch index.html files: replace CDN URLs with local /_common/ so the browser
+# loads local copies of send-browse, sg-site-header, etc. without a CDN deploy.
 echo "Patching index.html: CDN URLs → local /_common/ ..."
-for index_html in "$SERVE_DIR"/*/index.html "$SERVE_DIR"/*/*/index.html; do
+for index_html in "$SERVE_DIR/index.html" "$SERVE_DIR"/*/index.html "$SERVE_DIR"/*/*/index.html; do
     [ -f "$index_html" ] || continue
     python3 -c "
-import sys, re
+import sys
 path = sys.argv[1]
 with open(path) as f: html = f.read()
 patched = html.replace('https://dev.send.sgraph.ai/_common/', '/_common/')
+patched = patched.replace('https://dev.sgraph.ai/_common/', '/_common/')
 with open(path, 'w') as f: f.write(patched)
 print('  Patched:', path)
 " "$index_html"
 done
-
-# Create a root index.html that redirects to /en-gb/
-cat > "$SERVE_DIR/index.html" <<'HTMLEOF'
-<!DOCTYPE html>
-<html>
-<head><meta http-equiv="refresh" content="0;url=/en-gb/"></head>
-<body><a href="/en-gb/">Redirecting to /en-gb/...</a></body>
-</html>
-HTMLEOF
 
 echo ""
 echo "Starting vault.sgraph.ai local server..."
@@ -155,8 +146,9 @@ echo "  Content:    $CONTENT_DIR"
 echo "  CDN override: $USER_UI_DIR (v0.3.0 → v0.3.1 → v0.3.2 merged)"
 echo ""
 echo "  URLs:"
-echo "    Home:           http://localhost:$PORT/"
-echo "    Vault:          http://localhost:$PORT/en-gb/"
+echo "    Landing page:   http://localhost:$PORT/en-gb/"
+echo "    Open vault:     http://localhost:$PORT/#your-token"
+echo "    (en-gb/browse/ redirects to /#hash automatically)"
 echo ""
 echo "  IMPORTANT: Use 'localhost' not '127.0.0.1' (Web Crypto requires secure context)"
 echo ""

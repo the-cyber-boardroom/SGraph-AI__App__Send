@@ -19,6 +19,18 @@
 </head>
 <body>
 
+    <!-- Vault URLs are now at the root: /#token. Redirect any direct visits here. -->
+    <script>
+    (function () {
+        var hash = window.location.hash;
+        if (hash && hash !== '#') {
+            window.location.replace('/' + hash);
+        } else {
+            window.location.replace('/en-gb/');
+        }
+    }());
+    </script>
+
     <vault-shell></vault-shell>
 
     <!-- ===================================================================
