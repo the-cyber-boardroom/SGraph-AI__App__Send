@@ -19,6 +19,9 @@ def path__transfer_prefix(transfer_id: str) -> str:
 def path__vault_manifest(vault_id: str) -> str:
     return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/manifest.json'
 
+def path__vault_tombstone(vault_id: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/deleted.json'
+
 def path__vault_payload(vault_id: str, file_id: str) -> str:
     return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/{file_id}/payload'
 
