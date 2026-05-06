@@ -104,6 +104,8 @@
     <!-- 6. Vault base system (local) -->
     <script src="../../_common/js/base/vault-helpers.js"></script>
     <script src="../../_common/js/base/vault-component-paths.js"></script>
+    <!-- Set basePath BEFORE component scripts — connectedCallback runs immediately on define() -->
+    <script>VaultComponentPaths.init('../../_common');</script>
     <script src="../../_common/js/base/vault-component.js"></script>
 
     <!-- 7. VaultDataSource adapter (local) -->
@@ -146,6 +148,83 @@
         VaultComponentPaths.init('../../_common');
         VaultI18n.init();
         window.sgraphVault.events.emit('app-init', { version: 'v0.2.1' });
+    </script>
+
+    <!-- 12. v0.2.1 patch: create vault from simple token (new vault flow from landing page)
+         SGVault.createFromToken uses the same key derivation as SGVault.open for simple tokens,
+         so the resulting vault can be opened with just the token. -->
+    <script>
+    (function () {
+        'use strict';
+
+        // Extend SGVault with createFromToken static method
+        SGVault.createFromToken = async function (sgSend, token, options) {
+            options = options || {};
+            var keys = await SGVaultCrypto.deriveKeysFromSimpleToken(token);
+            var vault = new SGVault(sgSend);
+            vault._passphrase            = token;
+            vault._vaultId               = keys.vaultId;
+            vault._readKey               = keys.readKey;
+            vault._writeKey              = keys.writeKey;
+            vault._hmacKey               = keys.hmacKey;
+            vault._refFileId             = keys.refFileId;
+            vault._branchIndexFileId     = keys.branchIndexFileId;
+            vault._cloneRefFileId        = await SGVaultCrypto.deriveBranchRefFileId(
+                keys.hmacKey, keys.vaultId, 'web-ui'
+            );
+            vault._initManagers();
+            vault._settings = {
+                vault_name:  options.name || token,
+                vault_id:    keys.vaultId,
+                created:     new Date().toISOString(),
+                version:     3,
+                description: options.description || ''
+            };
+            vault._tree = { '/': { type: 'folder', children: {} } };
+            await vault._commit('Initial vault creation');
+            await vault._refManager.writeRef(vault._refFileId, vault._namedHeadId);
+            return vault;
+        };
+
+        // Patch VaultEntry._onSimpleTokenOpen to detect the "create new vault" flow.
+        // When the landing page sets sg-vault-creating in sessionStorage, we create
+        // the vault instead of opening it (which would 404 on a brand-new vault).
+        var _orig = VaultEntry.prototype._onSimpleTokenOpen;
+        VaultEntry.prototype._onSimpleTokenOpen = async function () {
+            var token       = this._simpleTokenInput.value.trim().toLowerCase();
+            var createToken = sessionStorage.getItem('sg-vault-creating');
+
+            if (!createToken || createToken !== token) {
+                return _orig.call(this);
+            }
+
+            sessionStorage.removeItem('sg-vault-creating');
+
+            var accessKey = this._accessKeyInput.value.trim();
+            if (!accessKey) {
+                this._showError('An access key is required to create a new vault.');
+                this._accessKeyInput.focus();
+                return;
+            }
+
+            this._hideError();
+            this._showStatus('Creating vault…');
+
+            try {
+                var sgSend = this._getSGSend();
+                var vault  = await SGVault.createFromToken(sgSend, token, { name: token });
+                window.history.replaceState(null, '', '#' + token);
+                try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
+                this._saveToHistory(vault, token);
+                this.emit('vault-created', { vault, vaultKey: token });
+            } catch (err) {
+                sessionStorage.setItem('sg-vault-creating', token); // restore so retry works
+                this._showError('Failed to create vault: ' + err.message);
+            } finally {
+                this._hideStatus();
+            }
+        };
+    })();
     </script>
 
 </body>
