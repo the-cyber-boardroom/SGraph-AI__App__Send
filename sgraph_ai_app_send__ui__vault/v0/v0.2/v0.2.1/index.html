@@ -192,32 +192,49 @@
             return vault;
         };
 
-        // Full-page vault-not-found error — replaces the page body
+        // Full-page error when auto-open fails — replaces the page body entirely
         function _escHtml(s) {
             return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
-        function _showVaultNotFoundPage(token) {
+        function _showAutoOpenErrorPage(token, err) {
+            var msg = err ? err.message : '';
+            var isNotFound = msg.includes('not found') || msg.includes('404');
+            var title    = isNotFound ? 'Vault not found' : 'Cannot open vault';
+            var subtitle = isNotFound
+                ? 'This vault does not exist on this server:'
+                : 'The token may be invalid or in the wrong format:';
+
             document.body.innerHTML =
                 '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
-                'flex-direction:column;gap:1.5rem;padding:2rem;background:#0d1117;' +
+                'flex-direction:column;gap:1.25rem;padding:2rem;background:#0d1117;' +
                 'font-family:system-ui,sans-serif;text-align:center">' +
                 '<div style="font-size:3rem">🔐</div>' +
-                '<h1 style="color:#fff;font-size:1.5rem;font-weight:700;margin:0">Vault not found</h1>' +
-                '<p style="color:#6e7a8a;font-size:0.95rem;max-width:420px;line-height:1.6;margin:0">' +
-                'This vault does not exist on this server:</p>' +
-                '<code style="color:#4ecdc4;font-family:monospace;font-size:1rem;' +
-                'background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.2);' +
-                'border-radius:6px;padding:0.5rem 1rem">' + _escHtml(token) + '</code>' +
-                '<a href="/en-gb/" style="color:#4ecdc4;font-size:0.9rem;text-decoration:none;' +
-                'border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:0.5rem 1rem;' +
-                'background:rgba(78,205,196,0.08)">← Back to vault home</a>' +
+                '<h1 style="color:#fff;font-size:1.5rem;font-weight:700;margin:0">' + _escHtml(title) + '</h1>' +
+                '<p style="color:#6e7a8a;font-size:0.875rem;max-width:420px;line-height:1.6;margin:0">' + _escHtml(subtitle) + '</p>' +
+                '<div style="display:flex;flex-direction:column;gap:0.3rem;align-items:center">' +
+                '<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#6e7a8a">Vault token</div>' +
+                '<code style="display:block;color:#4ecdc4;font-family:monospace;font-size:1.05rem;' +
+                'letter-spacing:0.02em;background:rgba(78,205,196,0.06);' +
+                'border:1px solid rgba(78,205,196,0.15);border-radius:6px;padding:0.5rem 1.25rem">' +
+                _escHtml(token) + '</code>' +
+                '</div>' +
+                '<a href="/en-gb/" style="display:inline-block;background:#4ecdc4;color:#0a1a18;' +
+                'font-weight:700;text-decoration:none;border-radius:8px;padding:0.65rem 1.5rem;' +
+                'font-size:0.9rem;margin-top:0.25rem">← Back to vault home</a>' +
                 '</div>';
         }
 
+        // Reload when the user manually changes the URL hash (e.g. typing a new vault token
+        // in the address bar and pressing Enter). history.replaceState/pushState does NOT
+        // fire hashchange, so internal navigation within a vault is unaffected.
+        window.addEventListener('hashchange', function () {
+            window.location.reload();
+        });
+
         // Patch VaultEntry._onSimpleTokenOpen:
         //   - When sg-vault-creating is set (new vault from landing page), create instead of open
-        //   - When auto-opening from the URL hash and vault is not found, show full-page error
+        //   - When auto-opening from the URL hash and any error occurs, show full-page error
         //   - When the user manually typed a token and clicked, show the usual inline error
         var _orig = VaultEntry.prototype._onSimpleTokenOpen;
         VaultEntry.prototype._onSimpleTokenOpen = async function () {
@@ -261,18 +278,14 @@
                 return _orig.call(this);
             }
 
-            // Auto-open from URL hash: bypass _orig so we can intercept the error
+            // Auto-open from URL hash: any failure shows the full-page error
             this._hideError();
             this._showStatus('Opening vault…');
             this._simpleTokenBtn.disabled = true;
             try {
                 await this._openVault(token, token);
             } catch (err) {
-                if (err && (err.message.includes('not found') || err.message.includes('404'))) {
-                    _showVaultNotFoundPage(token);
-                } else {
-                    this._showError(err ? err.message : 'Failed to open vault.');
-                }
+                _showAutoOpenErrorPage(token, err);
             } finally {
                 this._simpleTokenBtn.disabled = false;
                 this._hideStatus();
