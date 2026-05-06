@@ -32,43 +32,6 @@
         min-height: 100vh;
     }
 
-    /* ── Navbar ────────────────────────────────────────────────────────── */
-    .vp-nav {
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem 2rem;
-        background: rgba(13,17,23,0.92);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid var(--border);
-    }
-
-    .vp-nav__brand {
-        font-size: 1rem;
-        font-weight: 400;
-        color: var(--muted);
-        letter-spacing: -0.01em;
-        flex: 1;
-    }
-    .vp-nav__brand strong { color: var(--teal); font-weight: 700; }
-
-    .vp-nav__cta {
-        padding: 0.4rem 1rem;
-        background: none;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        color: var(--text);
-        font-size: 0.82rem;
-        font-family: var(--font-sans);
-        cursor: pointer;
-        transition: border-color 0.15s, color 0.15s;
-        white-space: nowrap;
-    }
-    .vp-nav__cta:hover { border-color: var(--teal); color: var(--teal); }
-
     /* ── Hero ──────────────────────────────────────────────────────────── */
     .vp-hero {
         display: flex;
@@ -558,7 +521,6 @@
         .vp-sec-card:nth-child(2) { border-right: none; }
         .vp-sec-card:nth-child(3) { border-top: 1px solid var(--border); border-right: 1px solid var(--border); }
         .vp-sec-card:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
-        .vp-nav { padding: 0.65rem 1rem; }
         .vp-hero { padding: 3rem 1rem 2.5rem; }
     }
     @media (max-width: 480px) {
@@ -572,11 +534,8 @@
 </head>
 <body>
 
-<!-- ── Navbar ──────────────────────────────────────────────────────────── -->
-<nav class="vp-nav">
-    <span class="vp-nav__brand">SG/<strong>Vault</strong></span>
-    <button class="vp-nav__cta" id="navOpenBtn">Open with token →</button>
-</nav>
+<script type="module" src="https://dev.sgraph.ai/_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
+<sg-site-header site="Send"></sg-site-header>
 
 <!-- ── Hero ────────────────────────────────────────────────────────────── -->
 <section class="vp-hero">
@@ -751,7 +710,7 @@
 
     /* ── Navigation ──────────────────────────────────────────────────── */
     function _navigateToBrowse(key) {
-        window.location.href = './browse/#' + encodeURIComponent(key);
+        window.location.href = '/#' + encodeURIComponent(key);
     }
 
     /* ── Open vault from input ────────────────────────────────────────── */
@@ -884,11 +843,6 @@
     document.getElementById('openVaultBtn').addEventListener('click', _openVaultFromInput);
     document.getElementById('vaultKeyInput').addEventListener('keydown', function (e) {
         if (e.key === 'Enter') _openVaultFromInput();
-    });
-
-    document.getElementById('navOpenBtn').addEventListener('click', function () {
-        document.getElementById('vaultKeyInput').focus();
-        document.getElementById('vaultKeyInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
     document.getElementById('createLink').addEventListener('click', _startCreate);

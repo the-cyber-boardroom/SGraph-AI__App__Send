@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault (v0.2.1) — Zero-knowledge encrypted vault</title>
+    <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
+
+    <!-- Redirect to landing page when no vault key is in the hash -->
+    <script>
+    (function () {
+        if (!window.location.hash || window.location.hash === '#') {
+            window.location.replace('/en-gb/');
+        }
+    }());
+    </script>
+
+    <!-- Fonts (root-relative: _common/ not ../../_common/) -->
+    <link rel="stylesheet" href="_common/fonts/fonts.css">
+
+    <!-- Design tokens + shared styles -->
+    <link rel="stylesheet" href="_common/css/design-tokens.css">
+    <link rel="stylesheet" href="_common/css/shared-components.css">
+
+    <!-- Browse component styles (from SG/Send CDN — patched to /_common/ locally) -->
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse.css">
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031.css">
+</head>
+<body>
+
+    <vault-shell></vault-shell>
+
+    <!-- ===================================================================
+         Script Loading Order — v0.2.1 root shell
+         Served at / so all paths are relative to root: _common/ (no ../)
+         =================================================================== -->
+
+    <!-- 0. sg-layout (fractal window management — CDN) -->
+    <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
+
+    <!-- 0c. LLM components (from tools.sgraph.ai CDN) -->
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-events/v0/v0.1/v0.1.0/sg-llm-events.js"></script>
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-request/v0/v0.1/v0.1.2/sg-llm-request.js"></script>
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-infographic/v0/v0.1/v0.1.0/sg-llm-infographic.js"></script>
+
+    <!-- 0b. Build info (CI-generated, absent in local dev) -->
+    <script src="_common/js/build-info.js"></script>
+
+    <!-- 1. Vault services -->
+    <script src="_common/js/services/event-bus.js"></script>
+    <script src="_common/js/services/config-manager.js"></script>
+    <script src="_common/js/services/messages-service.js"></script>
+
+    <!-- 2. i18n -->
+    <script src="_common/js/vault-i18n.js"></script>
+
+    <!-- 3. SG/Send shared modules (CDN — patched to /_common/ locally) -->
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-helpers.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-component-paths.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-component.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/send-icons.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/file-type-detect.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/markdown-parser.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/markdown-parser-v031.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/sg-print.js"></script>
+
+    <!-- 4. Browse component v0.3.2 (CDN — patched locally) -->
+    <script src="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse--v0.3.2.js"></script>
+
+    <!-- 4b. Page layout renderer (CDN) -->
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031--page-layout.css">
+    <script src="https://dev.send.sgraph.ai/_common/js/page-layout-renderer.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031--page-layout.js"></script>
+
+    <!-- 4c. Vault deep-link patch: use | separator (vault URL format) -->
+    <script>
+    (function() {
+        if (typeof _plrGetHashPath === 'function') {
+            _plrGetHashPath = function() {
+                var hash = window.location.hash.slice(1);
+                var idx  = hash.indexOf('|');
+                if (idx === -1) return null;
+                return hash.slice(idx + 1) || null;
+            };
+        }
+        if (typeof _plrSetHashPath === 'function') {
+            _plrSetHashPath = function(path) {
+                var hash  = window.location.hash.slice(1);
+                var idx   = hash.indexOf('|');
+                var token = idx === -1 ? hash : hash.slice(0, idx);
+                var next  = token + (path ? '|' + path : '');
+                if (hash !== next) history.replaceState(null, '', '#' + next);
+            };
+        }
+    })();
+    </script>
+
+    <!-- 5. Vault libraries (local) -->
+    <script src="_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--branches.js"></script>
+
+    <!-- 6. Vault base system (local) -->
+    <script src="_common/js/base/vault-helpers.js"></script>
+    <script src="_common/js/base/vault-component-paths.js"></script>
+    <!-- Set basePath BEFORE component scripts — connectedCallback fires immediately on define() -->
+    <script>VaultComponentPaths.init('_common');</script>
+    <script src="_common/js/base/vault-component.js"></script>
+
+    <!-- 7. VaultDataSource adapter -->
+    <script src="_common/js/adapters/vault-data-source.js"></script>
+
+    <!-- 7b. Conflict diff view overlay -->
+    <script src="_common/js/components/vault-diff-view/vault-diff-view.js"></script>
+
+    <!-- 7c. Browse edit overlay -->
+    <script src="_common/js/components/vault-browse-edit/vault-browse-edit.js"></script>
+
+    <!-- 8. Debug panels -->
+    <script src="_common/js/components/messages-panel/messages-panel.js"></script>
+    <script src="_common/js/components/events-viewer/events-viewer.js"></script>
+    <script src="_common/js/components/api-logger/api-logger.js"></script>
+    <script src="_common/js/components/storage-viewer/storage-viewer.js"></script>
+
+    <!-- 9. Vault components -->
+    <script src="_common/js/components/vault-entry/vault-entry.js"></script>
+    <script src="_common/js/components/vault-upload/vault-upload.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--history.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--refs.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--tree.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--branches.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--status.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--repair.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--object.js"></script>
+
+    <!-- 10. Shell components -->
+    <script src="_common/js/components/vault-header/vault-header.js"></script>
+    <script src="_common/js/components/vault-auth/vault-auth.js"></script>
+    <script src="_common/js/components/vault-nav/vault-nav.js"></script>
+    <script src="_common/js/components/vault-settings/vault-settings.js"></script>
+    <script src="_common/js/components/vault-status-bar/vault-status-bar.js"></script>
+    <script src="_common/js/components/vault-shell/vault-shell.js"></script>
+
+    <!-- 11. Init -->
+    <script>
+        VaultComponentPaths.init('_common');
+        VaultI18n.init();
+        window.sgraphVault.events.emit('app-init', { version: 'v0.2.1' });
+    </script>
+
+    <!-- 12. v0.2.1 patch: create vault from simple token + vault-not-found error page -->
+    <script>
+    (function () {
+        'use strict';
+
+        // Extend SGVault with createFromToken — same key derivation as open(),
+        // so the vault can always be re-opened with just the simple token.
+        SGVault.createFromToken = async function (sgSend, token, options) {
+            options = options || {};
+            var keys = await SGVaultCrypto.deriveKeysFromSimpleToken(token);
+            var vault = new SGVault(sgSend);
+            vault._passphrase        = token;
+            vault._vaultId           = keys.vaultId;
+            vault._readKey           = keys.readKey;
+            vault._writeKey          = keys.writeKey;
+            vault._hmacKey           = keys.hmacKey;
+            vault._refFileId         = keys.refFileId;
+            vault._branchIndexFileId = keys.branchIndexFileId;
+            vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(
+                keys.hmacKey, keys.vaultId, 'web-ui'
+            );
+            vault._initManagers();
+            vault._settings = {
+                vault_name:  options.name || token,
+                vault_id:    keys.vaultId,
+                created:     new Date().toISOString(),
+                version:     3,
+                description: options.description || ''
+            };
+            vault._tree = { '/': { type: 'folder', children: {} } };
+            await vault._commit('Initial vault creation');
+            await vault._refManager.writeRef(vault._refFileId, vault._namedHeadId);
+            return vault;
+        };
+
+        // Patch VaultEntry._onSimpleTokenOpen:
+        //   - When sg-vault-creating is set (new vault from landing page), create instead of open
+        //   - When vault is not found (404), show a full-page error instead of inline message
+        var _orig = VaultEntry.prototype._onSimpleTokenOpen;
+        VaultEntry.prototype._onSimpleTokenOpen = async function () {
+            var token       = this._simpleTokenInput.value.trim().toLowerCase();
+            var createToken = sessionStorage.getItem('sg-vault-creating');
+
+            if (createToken && createToken === token) {
+                sessionStorage.removeItem('sg-vault-creating');
+                var accessKey = this._accessKeyInput.value.trim();
+                if (!accessKey) {
+                    this._showError('An access key is required to create a new vault.');
+                    this._accessKeyInput.focus();
+                    return;
+                }
+                this._hideError();
+                this._showStatus('Creating vault…');
+                try {
+                    var sgSend = this._getSGSend();
+                    var vault  = await SGVault.createFromToken(sgSend, token, { name: token });
+                    window.history.replaceState(null, '', '#' + token);
+                    try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
+                    this._saveToHistory(vault, token);
+                    this.emit('vault-created', { vault, vaultKey: token });
+                } catch (err) {
+                    sessionStorage.setItem('sg-vault-creating', token);
+                    this._showError('Failed to create vault: ' + err.message);
+                } finally {
+                    this._hideStatus();
+                }
+                return;
+            }
+
+            // Standard open — but intercept 404 and show a prominent error page
+            try {
+                await _orig.call(this);
+            } catch (_) {
+                // _orig already showed inline error; vault-not-found gets full-page treatment
+            }
+        };
+    })();
+    </script>
+
+</body>
+</html>
