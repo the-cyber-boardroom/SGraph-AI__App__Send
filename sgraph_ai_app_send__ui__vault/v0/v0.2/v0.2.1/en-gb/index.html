@@ -403,7 +403,7 @@
     }
     .vp-create-cta__btn:hover { background: rgba(78,205,196,0.2); border-color: rgba(78,205,196,0.5); }
 
-    /* ── Recovery modal ────────────────────────────────────────────────── */
+    /* ── Create vault modal ────────────────────────────────────────────── */
     .vp-recovery {
         position: fixed;
         inset: 0;
@@ -419,37 +419,90 @@
         border: 1px solid rgba(78,205,196,0.3);
         border-radius: 12px;
         padding: 2rem;
-        max-width: 460px;
+        max-width: 480px;
         width: 100%;
-        text-align: center;
     }
-    .vp-recovery__icon { font-size: 2rem; margin-bottom: 0.75rem; }
-    .vp-recovery__title { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
-    .vp-recovery__body { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.6; }
-    .vp-recovery__key {
-        font-family: var(--font-mono);
+    .vp-recovery__header {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.5rem;
+    }
+    .vp-recovery__badge {
+        font-size: 0.6rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 2px 7px;
+        border-radius: 3px;
+        background: var(--teal);
+        color: #0a2e2c;
+    }
+    .vp-recovery__title {
         font-size: 1.1rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .vp-recovery__body {
+        font-size: 0.83rem;
+        color: var(--muted);
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+
+    /* Token field + regenerate row */
+    .vp-recovery__token-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        align-items: stretch;
+    }
+    .vp-recovery__key {
+        flex: 1;
+        font-family: var(--font-mono);
+        font-size: 1.05rem;
         font-weight: 700;
         color: var(--teal);
         background: var(--teal-glow);
-        border: 1px solid rgba(78,205,196,0.2);
+        border: 1px solid rgba(78,205,196,0.25);
         border-radius: 8px;
-        padding: 0.75rem 1rem;
-        margin: 0.75rem 0 1.25rem;
-        word-break: break-all;
-        letter-spacing: 0.04em;
+        padding: 0.7rem 0.85rem;
+        outline: none;
+        min-width: 0;
+        transition: border-color 0.15s;
     }
+    .vp-recovery__key:focus { border-color: var(--teal); }
+    .vp-recovery__regen {
+        padding: 0 0.85rem;
+        background: rgba(78,205,196,0.08);
+        border: 1px solid rgba(78,205,196,0.25);
+        border-radius: 8px;
+        color: var(--teal);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        line-height: 1;
+    }
+    .vp-recovery__regen:hover { background: rgba(78,205,196,0.15); }
+    .vp-recovery__token-hint {
+        font-size: 0.73rem;
+        color: var(--muted);
+        margin-bottom: 1.25rem;
+    }
+    .vp-recovery__token-hint strong { color: #e06c75; }
+
     .vp-recovery__actions {
         display: flex;
         gap: 0.5rem;
-        justify-content: center;
-        flex-wrap: wrap;
         margin-bottom: 1rem;
     }
     .vp-recovery__btn {
-        padding: 0.5rem 1rem;
+        padding: 0.45rem 0.9rem;
         border-radius: 6px;
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         font-family: var(--font-sans);
         cursor: pointer;
         transition: background 0.15s;
@@ -593,21 +646,30 @@
     </div>
 </div>
 
-<!-- ── Recovery modal (shown after vault creation) ─────────────────────── -->
+<!-- ── Create vault modal ───────────────────────────────────────────────── -->
 <div class="vp-recovery" id="recoveryModal" style="display:none">
     <div class="vp-recovery__box">
-        <div class="vp-recovery__icon">🔐</div>
-        <div class="vp-recovery__title">Vault created</div>
-        <div class="vp-recovery__body">
-            This is your vault key. It is the only way to open your vault on any device.
-            <strong>If you lose it, the vault cannot be recovered</strong> — there is no reset link, by design.
+        <div class="vp-recovery__header">
+            <span class="vp-recovery__badge">New vault</span>
+            <span class="vp-recovery__title">Your vault key</span>
         </div>
-        <div class="vp-recovery__key" id="recoveryKey"></div>
+        <p class="vp-recovery__body">
+            This token is your vault key — the only way to open it on any device.
+            Save it before continuing. <strong style="color:#e06c75;">There is no reset link, by design.</strong>
+        </p>
+        <div class="vp-recovery__token-row">
+            <input class="vp-recovery__key" id="recoveryKey" type="text"
+                   autocomplete="off" spellcheck="false" readonly>
+            <button class="vp-recovery__regen" id="recoveryRegenBtn" title="Generate a different token">↻</button>
+        </div>
+        <p class="vp-recovery__token-hint">
+            You can edit the token or click ↻ to get a new one.
+        </p>
         <div class="vp-recovery__actions">
-            <button class="vp-recovery__btn vp-recovery__btn--copy" id="recoveryCopyBtn">📋 Copy key</button>
-            <button class="vp-recovery__btn vp-recovery__btn--dl"   id="recoveryDlBtn">📥 Download .txt</button>
+            <button class="vp-recovery__btn vp-recovery__btn--copy" id="recoveryCopyBtn">📋 Copy</button>
+            <button class="vp-recovery__btn vp-recovery__btn--dl"   id="recoveryDlBtn">📥 Save .txt</button>
         </div>
-        <button class="vp-recovery__confirm" id="recoveryConfirmBtn">Got it, open my vault →</button>
+        <button class="vp-recovery__confirm" id="recoveryConfirmBtn">Create vault &amp; open →</button>
     </div>
 </div>
 
@@ -732,25 +794,41 @@
     }
 
     /* ── Create vault flow ────────────────────────────────────────────── */
-    var _pendingKey = null;
-
     function _startCreate() {
-        _pendingKey = _generateKey();
-        document.getElementById('recoveryKey').textContent = _pendingKey;
+        var keyInput = document.getElementById('recoveryKey');
+        keyInput.value = _generateKey();
+        keyInput.readOnly = false;
         document.getElementById('recoveryModal').style.display = 'flex';
+        keyInput.focus();
+        keyInput.select();
     }
+
+    function _currentKey() {
+        var v = document.getElementById('recoveryKey').value.trim();
+        return v || null;
+    }
+
+    document.getElementById('recoveryRegenBtn').addEventListener('click', function () {
+        var keyInput = document.getElementById('recoveryKey');
+        keyInput.value = _generateKey();
+        keyInput.focus();
+        keyInput.select();
+    });
 
     document.getElementById('recoveryCopyBtn').addEventListener('click', function () {
         var btn = document.getElementById('recoveryCopyBtn');
-        navigator.clipboard && navigator.clipboard.writeText(_pendingKey).catch(function () {});
+        var key = _currentKey();
+        if (!key) return;
+        navigator.clipboard && navigator.clipboard.writeText(key).catch(function () {});
         btn.textContent = '✓ Copied!';
-        setTimeout(function () { btn.textContent = '📋 Copy key'; }, 2000);
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
     });
 
     document.getElementById('recoveryDlBtn').addEventListener('click', function () {
-        if (!_pendingKey) return;
+        var key = _currentKey();
+        if (!key) return;
         var blob = new Blob(
-            ['SG/Vault key\n\n' + _pendingKey + '\n\nCreated: ' + new Date().toISOString() + '\n\nKeep this file safe. There is no recovery path.\n'],
+            ['SG/Vault key\n\n' + key + '\n\nCreated: ' + new Date().toISOString() + '\n\nKeep this file safe. There is no recovery path.\n'],
             { type: 'text/plain' }
         );
         var url = URL.createObjectURL(blob);
@@ -760,10 +838,11 @@
     });
 
     document.getElementById('recoveryConfirmBtn').addEventListener('click', function () {
-        if (!_pendingKey) return;
-        _storeVault(_pendingKey, 'My vault');
+        var key = _currentKey();
+        if (!key) return;
+        _storeVault(key, key);
         document.getElementById('recoveryModal').style.display = 'none';
-        _navigateToBrowse(_pendingKey);
+        _navigateToBrowse(key);
     });
 
     /* ── Wire up events ──────────────────────────────────────────────── */
