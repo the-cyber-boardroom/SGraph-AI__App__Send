@@ -81,9 +81,14 @@ Route: `PUT /api/transfers/upload/{id}` or `POST /api/vault/write/{id}/{file_id}
 - Current limit: ~5MB (Lambda 6MB response body limit)
 
 ### Tier 2: Medium files (~5MB–40MB) — new, agent-safe
+
+> **See also:** `presigned-url-cloudfront-put-oac.md` for a potentially better approach
+> (CloudFront OAC PUT via `static.sgraph.ai`) that avoids Lambda chunking entirely.
+> **Recommended: run the CloudFront PUT POC first before implementing this tier.**
+
 Route: `POST /api/transfers/upload-chunk/{id}` (NEW — adapt from admin Lambda pattern)
 
-Upload in up to **10 × 4MB chunks** through Lambda:
+Upload in up to **10 × 3.5MB chunks** through Lambda (4MB raw → ~5.3MB base64 → too close to 6MB Lambda limit; use 3.5MB raw):
 ```
 Client                    Lambda                     S3
   │                          │                        │
@@ -141,6 +146,11 @@ required agent allow-list entirely.
 ---
 
 ## Implementation Plan
+
+### Phase 0 — CloudFront PUT POC (do this first)
+Before implementing Lambda chunking, validate that CloudFront OAC PUT works end-to-end.
+See `presigned-url-cloudfront-put-oac.md` for full POC scope.
+If successful, Tier 2B replaces Tier 2 entirely — no chunked Lambda needed.
 
 ### Phase 1 — Downloads (CloudFront signed URLs)
 1. Create CloudFront distribution at `static.sgraph.ai` with OAC pointing to S3 bucket + prefix
