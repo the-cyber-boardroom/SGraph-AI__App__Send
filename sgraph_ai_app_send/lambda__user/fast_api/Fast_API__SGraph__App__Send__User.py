@@ -62,7 +62,6 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             if isinstance(storage_fs, Storage_FS__S3):                               # Wire S3 client from storage backend
                 presigned_kwargs['s3']        = storage_fs.s3
                 presigned_kwargs['s3_bucket'] = storage_fs.s3_bucket
-                presigned_kwargs['s3_prefix'] = storage_fs.s3_prefix
             self.presigned_service = Service__Presigned_Urls(**presigned_kwargs)
 
         if self.admin_service_client is None:                                      # Auto-create admin client (REMOTE mode via env vars)
@@ -91,7 +90,6 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
             if isinstance(storage_fs, Storage_FS__S3):                           # Wire S3 client from storage backend
                 vault_presigned_kwargs['s3']        = storage_fs.s3
                 vault_presigned_kwargs['s3_bucket'] = storage_fs.s3_bucket
-                vault_presigned_kwargs['s3_prefix'] = storage_fs.s3_prefix
             self.vault_presigned_service = Service__Vault__Presigned(**vault_presigned_kwargs)
 
         return super().setup()

@@ -17,6 +17,10 @@ class Schema__Transfer__Create(Type_Safe):                                      
     file_size_bytes   : Safe_UInt__FileSize                                      # File size in bytes
     content_type_hint : Safe_Str__Http__Content_Type                             # MIME type hint
     transfer_id       : Safe_Str__Id                                             # Optional client-provided transfer ID (PBKDF2 simple-token mode)
+    max_downloads     : Safe_UInt                                                # Max downloads before exhausted (0 = unlimited)
+    auto_delete       : bool                                                     # Wipe payload after last allowed download
+    expires_at        : str                                                      # ISO-8601 UTC expiry timestamp, empty = no expiry
+    delete_auth_hash  : Safe_Str__Id                                             # SHA-256(delete_auth), empty = delete disabled
 
 
 class Schema__Transfer__Initiated(Type_Safe):                                    # Response: transfer created
@@ -31,11 +35,15 @@ class Schema__Transfer__Complete_Response(Type_Safe):                           
 
 
 class Schema__Transfer__Info(Type_Safe):                                         # Response: transfer metadata
-    transfer_id       : Safe_Str__Id                                             # Transfer identifier (todo: should be Transfer_Id)
-    status            : Safe_Str__Id                                             # Transfer status (todo: should be Enum__Transfer__Status)
-    file_size_bytes   : Safe_UInt__FileSize                                      # File size in bytes
-    created_at        : str                                                      # Creation timestamp (todo: needs Safe_Str__Iso_Timestamp — Timestamp_Now is int, ISO string has ':')
-    download_count    : Safe_UInt                                                # Number of downloads
+    transfer_id         : Safe_Str__Id                                           # Transfer identifier (todo: should be Transfer_Id)
+    status              : Safe_Str__Id                                           # Transfer status (todo: should be Enum__Transfer__Status)
+    file_size_bytes     : Safe_UInt__FileSize                                    # File size in bytes
+    created_at          : str                                                    # Creation timestamp
+    download_count      : Safe_UInt                                              # Number of downloads
+    max_downloads       : Safe_UInt                                              # Limit (0 = unlimited)
+    expires_at          : str                                                    # ISO-8601 UTC expiry, empty = none
+    downloads_remaining : Safe_UInt                                              # Remaining downloads (0 = unlimited)
+    is_expired          : bool                                                   # Computed: True if expires_at is set and passed
 
 
 class Schema__Transfer__Download_Response(Type_Safe):                            # Response: download metadata

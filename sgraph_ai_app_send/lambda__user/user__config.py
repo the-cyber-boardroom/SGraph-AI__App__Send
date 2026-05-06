@@ -20,6 +20,7 @@ APP_SEND__UI__USER__LOCALE                  = "en-gb"
 ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN          = 'SGRAPH_SEND__ACCESS_TOKEN'
 HEADER__SGRAPH_SEND__ACCESS_TOKEN           = 'x-sgraph-access-token'
 HEADER__SGRAPH_VAULT__WRITE_KEY             = 'x-sgraph-vault-write-key'
+HEADER__SGRAPH_TRANSFER__DELETE_AUTH        = 'x-sgraph-transfer-delete-auth'
 
 ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL       = 'SGRAPH_SEND__ADMIN__BASE_URL'
 ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME  = 'SGRAPH_SEND__ADMIN__API_KEY__NAME'

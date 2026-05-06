@@ -12,6 +12,9 @@ from   osbot_utils.type_safe.primitives.domains.identifiers.safe_int.Timestamp_N
 from   memory_fs.storage_fs.Storage_FS                                           import Storage_FS
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
 from   osbot_utils.type_safe.Type_Safe                                           import Type_Safe
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                    import (path__vault_manifest,
+                                                                                         path__vault_payload,
+                                                                                         path__vault_prefix  )
 
 VAULT_ID_PATTERN = re.compile(r'^[a-z0-9]{8,24}$')                              # Opaque lowercase alphanumeric, 8–24 chars, no hyphens/uppercase
 
@@ -34,10 +37,10 @@ class Service__Vault__Pointer(Type_Safe):                                       
         return True
 
     def vault_manifest_path(self, vault_id):                                     # Path for vault manifest (ownership record)
-        return f'transfers/vault/{vault_id}/manifest.json'
+        return path__vault_manifest(vault_id)
 
     def vault_payload_path(self, vault_id, file_id):                             # Path for vault file payload bytes
-        return f'transfers/vault/{vault_id}/{file_id}/payload'
+        return path__vault_payload(vault_id, file_id)
 
     def _hash_write_key(self, write_key_hex):                                    # SHA-256 hash of write key
         return hashlib.sha256(write_key_hex.encode()).hexdigest()
@@ -126,9 +129,9 @@ class Service__Vault__Pointer(Type_Safe):                                       
                         current = current_b64)
 
     def list_files(self, vault_id, prefix=''):                                   # List file_ids in a vault matching prefix
-        vault_folder = f'transfers/vault/{vault_id}/{prefix}' if prefix else f'transfers/vault/{vault_id}/'
+        vault_folder = path__vault_prefix(vault_id) + prefix if prefix else path__vault_prefix(vault_id)
         scoped_paths = self.storage_fs.folder__files__all(vault_folder)          # Scoped S3 list — only this vault's prefix
-        vault_prefix = f'transfers/vault/{vault_id}/'
+        vault_prefix = path__vault_prefix(vault_id)
         result       = []
         seen         = set()
 
@@ -193,6 +196,25 @@ class Service__Vault__Pointer(Type_Safe):                                       
 
         return dict(vault_id = vault_id ,
                     results  = results  )
+
+    def delete_vault(self, vault_id, write_key_hex):                              # Delete all files belonging to a vault (hard delete, no recovery)
+        submitted_hash = self._hash_write_key(write_key_hex)
+        if not self._check_vault_write_key(vault_id, submitted_hash):
+            return None                                                          # Auth failure
+
+        vault_prefix = path__vault_prefix(vault_id)
+        paths        = self.storage_fs.folder__files__all(vault_prefix)
+
+        files_deleted = 0
+        for path in paths:
+            self.storage_fs.file__delete(str(path))
+            files_deleted += 1
+
+        self._manifest_cache.pop(vault_id, None)                                 # Clear cache so vault_id can be reused in same Lambda instance
+
+        return dict(status        = 'deleted' ,
+                    vault_id      = vault_id   ,
+                    files_deleted = files_deleted)
 
     def batch_read(self, vault_id, operations):                                  # Read-only batch (no auth required — data is encrypted)
         results = []

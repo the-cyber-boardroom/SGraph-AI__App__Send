@@ -285,7 +285,7 @@ To find the **latest** file in any directory below, list the directory and pick 
 
 | Document | Location | Notes |
 |---|---|---|
-| **Reality document** | `team/roles/librarian/reality/` | Single file, updated in-place |
+| **Reality document** | `team/roles/librarian/reality/` | Domain tree — entry point: `reality/index.md`. 13 domain directories each with `index.md` + `proposed/`. No file exceeds ~300 lines. |
 | **Master indexes** | `team/roles/librarian/reviews/` | Latest is the highest-dated subfolder |
 | **Debriefs** | `team/humans/dinis_cruz/debriefs/` | Latest is the highest-dated subfolder |
 | **Briefs** | `team/humans/dinis_cruz/briefs/` | Human input, read-only for agents |

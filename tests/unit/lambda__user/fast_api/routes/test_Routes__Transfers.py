@@ -345,6 +345,82 @@ class test_Routes__Transfers(TestCase):
                                      json=dict(file_size_bytes = 1024)).json()
         assert len(response['transfer_id']) == 12                                # Server-generated random hex
 
+    # --- max_downloads / expiry / delete ---
+
+    def _full_transfer(self, payload=b'data', **create_kwargs):
+        create_kwargs.setdefault('file_size_bytes', len(payload))
+        create = self.client.post('/api/transfers/create', json=create_kwargs).json()
+        tid = create['transfer_id']
+        self.client.post(f'/api/transfers/upload/{tid}',
+                         content = payload,
+                         headers = {'content-type': 'application/octet-stream'})
+        self.client.post(f'/api/transfers/complete/{tid}')
+        return tid
+
+    def test__download__max_downloads_enforced(self):
+        tid  = self._full_transfer(max_downloads=1)
+        r1   = self.client.get(f'/api/transfers/download/{tid}')
+        assert r1.status_code == 200
+        r2   = self.client.get(f'/api/transfers/download/{tid}')
+        assert r2.status_code == 410
+
+    def test__download__expired_returns_410(self):
+        from datetime import datetime, timezone, timedelta
+        past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        tid  = self._full_transfer(expires_at=past)
+        resp = self.client.get(f'/api/transfers/download/{tid}')
+        assert resp.status_code == 410
+
+    def test__download__not_yet_expired_succeeds(self):
+        from datetime import datetime, timezone, timedelta
+        future = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        tid    = self._full_transfer(expires_at=future)
+        resp   = self.client.get(f'/api/transfers/download/{tid}')
+        assert resp.status_code == 200
+
+    def test__delete__success(self):
+        import hashlib
+        delete_auth = 'test_delete_key'
+        stored_hash = hashlib.sha256(delete_auth.encode()).hexdigest()
+        tid  = self._full_transfer(delete_auth_hash=stored_hash)
+        resp = self.client.request('DELETE', f'/api/transfers/delete/{tid}',
+                                   headers={'x-sgraph-transfer-delete-auth': delete_auth})
+        assert resp.status_code      == 200
+        data = resp.json()
+        assert data['status']        == 'deleted'
+        assert data['transfer_id']   == tid
+        # Second download returns 410 (payload gone)
+        dl = self.client.get(f'/api/transfers/download/{tid}')
+        assert dl.status_code        == 404
+
+    def test__delete__missing_header_returns_400(self):
+        tid  = self._full_transfer()
+        resp = self.client.request('DELETE', f'/api/transfers/delete/{tid}')
+        assert resp.status_code == 400
+
+    def test__delete__wrong_auth_returns_403(self):
+        import hashlib
+        stored_hash = hashlib.sha256('correct'.encode()).hexdigest()
+        tid  = self._full_transfer(delete_auth_hash=stored_hash)
+        resp = self.client.request('DELETE', f'/api/transfers/delete/{tid}',
+                                   headers={'x-sgraph-transfer-delete-auth': 'wrong'})
+        assert resp.status_code == 403
+
+    def test__delete__no_delete_auth_hash_returns_409(self):
+        tid  = self._full_transfer()                                              # Created without delete_auth_hash
+        resp = self.client.request('DELETE', f'/api/transfers/delete/{tid}',
+                                   headers={'x-sgraph-transfer-delete-auth': 'anything'})
+        assert resp.status_code == 409
+
+    def test__transfer_info__includes_new_fields(self):
+        create = self.client.post('/api/transfers/create',
+                                  json=dict(file_size_bytes=512, max_downloads=5)).json()
+        info   = self.client.get(f'/api/transfers/info/{create["transfer_id"]}').json()
+        assert 'max_downloads'       in info
+        assert 'downloads_remaining' in info
+        assert 'is_expired'          in info
+        assert info['max_downloads'] == 5
+
     # --- Security: complete response must not leak sensitive data ---
 
     def test__complete__does_not_leak_token(self):

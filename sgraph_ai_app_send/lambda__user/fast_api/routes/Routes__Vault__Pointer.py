@@ -10,6 +10,7 @@ from osbot_fast_api.api.routes.Fast_API__Routes                                 
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer, VAULT_ID_PATTERN
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Zip                import Service__Vault__Zip
+from sgraph_ai_app_send.lambda__user.storage.Storage__Paths                     import path__vault_zip_prefix
 from sgraph_ai_app_send.lambda__user.user__config                                import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY
 
 TAG__ROUTES_VAULT = 'api/vault'
@@ -22,6 +23,7 @@ ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id:path}
                        f'/{TAG__ROUTES_VAULT}/list/{{vault_id}}'                          ,
                        f'/{TAG__ROUTES_VAULT}/health/{{vault_id}}'                        ,
                        f'/{TAG__ROUTES_VAULT}/zip/{{vault_id}}'                           ,
+                       f'/{TAG__ROUTES_VAULT}/destroy/{{vault_id}}'                       ,
                        f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}'                         ,
                        f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}'                          ,
                        f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}'                   ,
@@ -235,6 +237,36 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                         media_type = 'application/zip'        ,
                         headers    = {'content-disposition': f'attachment; filename="{vault_id}.zip"'})
 
+    @route_path('/destroy/{vault_id}')
+    async def destroy__vault_id(self, vault_id : Safe_Str__Id,                    # DELETE /api/vault/destroy/{vault_id} — hard-delete all vault files
+                                      request  : Request
+                                ) -> dict:
+        self._validate_vault_id(vault_id)
+        self.check_access_token(request)
+        write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
+        if not write_key:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Missing write key')
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code = 400,
+                                detail      = 'Request body must be JSON with vault_id field')
+        if body.get('vault_id', '') != str(vault_id):
+            raise HTTPException(status_code = 409,
+                                detail      = 'vault_id in body does not match vault_id in URL')
+        result = self.vault_service.delete_vault(vault_id      = str(vault_id),
+                                                  write_key_hex = write_key    )
+        if result is None:
+            raise HTTPException(status_code = 403,
+                                detail      = 'Write key mismatch')
+        if self.vault_zip_service is not None:                                   # Clean up any cached zip archives for this vault
+            zip_prefix = path__vault_zip_prefix(str(vault_id))
+            zip_paths  = self.vault_zip_service.storage_fs.folder__files__all(zip_prefix)
+            for path in zip_paths:
+                self.vault_zip_service.storage_fs.file__delete(str(path))
+        return result
+
     # --- Catch routes: prevent redirect loops when file_id is missing ----------
 
     @route_path('/write/{vault_id}')
@@ -262,6 +294,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         self.add_route_get   (self.list__vault_id                 )
         self.add_route_get   (self.health__vault_id               )
         self.add_route_get   (self.zip__vault_id                  )
+        self.add_route_delete(self.destroy__vault_id              )
         self.add_route_put   (self.write__vault_id                )              # Catch: missing file_id
         self.add_route_get   (self.read__vault_id                 )              # Catch: missing file_id
         self.add_route_get   (self.read_base64__vault_id          )              # Catch: missing file_id

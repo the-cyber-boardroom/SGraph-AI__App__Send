@@ -11,6 +11,7 @@ from   memory_fs.storage_fs.Storage_FS                                          
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
 from   osbot_utils.type_safe.Type_Safe                                           import Type_Safe
 from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer           import Service__Vault__Pointer
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                    import path__vault_zip
 
 
 class Service__Vault__Zip(Type_Safe):                                            # Vault zip builder with content-addressable caching
@@ -37,7 +38,7 @@ class Service__Vault__Zip(Type_Safe):                                           
         return hashlib.sha256('|'.join(parts).encode()).hexdigest()
 
     def zip_storage_path(self, vault_id, content_hash):                          # Storage path for cached zip
-        return f'vault-zips/{vault_id}/{content_hash}.zip'
+        return path__vault_zip(vault_id, content_hash)
 
     def zip_exists(self, vault_id, content_hash):                                # Check if cached zip exists
         return self.storage_fs.file__exists(self.zip_storage_path(vault_id, content_hash))
