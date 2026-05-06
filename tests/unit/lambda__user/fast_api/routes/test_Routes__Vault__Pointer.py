@@ -587,13 +587,12 @@ class test_Routes__Vault__Pointer(TestCase):
         assert self._read(vault_id=vault, file_id='bare/data/obj-a').status_code == 404
         assert self._read(vault_id=vault, file_id='bare/refs/ref-1').status_code == 404
 
-    def test__destroy__already_deleted_returns_success(self):
+    def test__destroy__already_deleted_blocked_by_tombstone(self):
         vault = 'destroyvlt02'
         self._write(vault_id=vault, file_id='bare/data/obj-a', payload=b'blob')
         self._destroy(vault_id=vault)
         response = self._destroy(vault_id=vault)
-        assert response.status_code              == 200
-        assert response.json()['files_deleted']  == 0
+        assert response.status_code == 403                               # Tombstone blocks second delete
 
     def test__destroy__never_existed_returns_success(self):
         response = self._destroy(vault_id='destroyvlt03')
@@ -644,10 +643,9 @@ class test_Routes__Vault__Pointer(TestCase):
         for fid in file_ids:
             assert self._read(vault_id=vault, file_id=fid).status_code == 404
 
-    def test__destroy__vault_reusable_after_delete(self):
+    def test__destroy__vault_not_reusable_after_delete(self):
         vault = 'destroyvlt09'
         self._write(vault_id=vault, file_id='old-file', payload=b'old')
         self._destroy(vault_id=vault)
         response = self._write(vault_id=vault, file_id='new-file', write_key='newkey456789', payload=b'new')
-        assert response.status_code == 200
-        assert self._read(vault_id=vault, file_id='new-file').content == b'new'
+        assert response.status_code == 403                               # Tombstone blocks re-creation with any key

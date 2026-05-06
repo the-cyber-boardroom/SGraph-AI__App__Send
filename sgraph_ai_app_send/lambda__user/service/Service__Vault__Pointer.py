@@ -13,8 +13,9 @@ from   memory_fs.storage_fs.Storage_FS                                          
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
 from   osbot_utils.type_safe.Type_Safe                                           import Type_Safe
 from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                    import (path__vault_manifest,
-                                                                                         path__vault_payload,
-                                                                                         path__vault_prefix  )
+                                                                                         path__vault_payload  ,
+                                                                                         path__vault_prefix   ,
+                                                                                         path__vault_tombstone)
 
 VAULT_ID_PATTERN = re.compile(r'^[a-z0-9]{8,24}$')                              # Opaque lowercase alphanumeric, 8–24 chars, no hyphens/uppercase
 
@@ -50,7 +51,12 @@ class Service__Vault__Pointer(Type_Safe):                                       
             return self._manifest_cache[vault_id]
         manifest_path = self.vault_manifest_path(vault_id)
         if not self.storage_fs.file__exists(manifest_path):
-            return None                                                          # No manifest yet (not cached — will be created on first write)
+            tombstone_path = path__vault_tombstone(vault_id)                    # Check for tombstone before declaring vault absent
+            if self.storage_fs.file__exists(tombstone_path):
+                tombstone = self.storage_fs.file__json(tombstone_path)
+                self._manifest_cache[vault_id] = tombstone                      # Cache so subsequent writes in same instance also fail fast
+                return tombstone
+            return None                                                          # No manifest, no tombstone — vault can be created
         manifest = self.storage_fs.file__json(manifest_path)
         self._manifest_cache[vault_id] = manifest                                # Cache for Lambda lifetime
         return manifest
@@ -59,6 +65,8 @@ class Service__Vault__Pointer(Type_Safe):                                       
         manifest = self._load_manifest(vault_id)
         if manifest is None:
             return True                                                          # No manifest yet — first write creates it
+        if manifest.get('status') == 'deleted':
+            return False                                                         # Vault was deleted — re-creation blocked by tombstone
         return manifest.get('write_key_hash') == submitted_hash
 
     def _ensure_manifest(self, vault_id, submitted_hash):                        # Create manifest on first write to a vault
@@ -140,7 +148,7 @@ class Service__Vault__Pointer(Type_Safe):                                       
             if not path_str.startswith(vault_prefix):
                 continue
             relative = path_str[len(vault_prefix):]                              # Strip vault prefix
-            if relative == 'manifest.json':                                      # Skip manifest
+            if relative in ('manifest.json', 'deleted.json'):                    # Skip internal metadata files
                 continue
             if not relative.endswith('/payload'):                                 # Only payload files
                 continue
@@ -197,10 +205,10 @@ class Service__Vault__Pointer(Type_Safe):                                       
         return dict(vault_id = vault_id ,
                     results  = results  )
 
-    def delete_vault(self, vault_id, write_key_hex):                              # Delete all files belonging to a vault (hard delete, no recovery)
+    def delete_vault(self, vault_id, write_key_hex):                              # Delete all files belonging to a vault — leaves tombstone to block re-creation
         submitted_hash = self._hash_write_key(write_key_hex)
         if not self._check_vault_write_key(vault_id, submitted_hash):
-            return None                                                          # Auth failure
+            return None                                                          # Auth failure (also catches already-deleted vaults)
 
         vault_prefix = path__vault_prefix(vault_id)
         paths        = self.storage_fs.folder__files__all(vault_prefix)
@@ -210,11 +218,16 @@ class Service__Vault__Pointer(Type_Safe):                                       
             self.storage_fs.file__delete(str(path))
             files_deleted += 1
 
-        self._manifest_cache.pop(vault_id, None)                                 # Clear cache so vault_id can be reused in same Lambda instance
+        tombstone = dict(vault_id   = vault_id       ,                          # Non-sensitive, non-encrypted metadata only
+                         status     = 'deleted'      ,
+                         deleted_at = Timestamp_Now() )
+        self.storage_fs.file__save(path__vault_tombstone(vault_id),
+                                   json.dumps(tombstone).encode())
+        self._manifest_cache[vault_id] = tombstone                              # Cache tombstone — any further writes in this instance fail fast
 
-        return dict(status        = 'deleted' ,
-                    vault_id      = vault_id   ,
-                    files_deleted = files_deleted)
+        return dict(status        = 'deleted'     ,
+                    vault_id      = vault_id       ,
+                    files_deleted = files_deleted  )
 
     def batch_read(self, vault_id, operations):                                  # Read-only batch (no auth required — data is encrypted)
         results = []
