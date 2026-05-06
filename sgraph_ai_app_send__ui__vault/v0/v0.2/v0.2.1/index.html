@@ -192,14 +192,39 @@
             return vault;
         };
 
+        // Full-page vault-not-found error — replaces the page body
+        function _escHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function _showVaultNotFoundPage(token) {
+            document.body.innerHTML =
+                '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+                'flex-direction:column;gap:1.5rem;padding:2rem;background:#0d1117;' +
+                'font-family:system-ui,sans-serif;text-align:center">' +
+                '<div style="font-size:3rem">🔐</div>' +
+                '<h1 style="color:#fff;font-size:1.5rem;font-weight:700;margin:0">Vault not found</h1>' +
+                '<p style="color:#6e7a8a;font-size:0.95rem;max-width:420px;line-height:1.6;margin:0">' +
+                'This vault does not exist on this server:</p>' +
+                '<code style="color:#4ecdc4;font-family:monospace;font-size:1rem;' +
+                'background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.2);' +
+                'border-radius:6px;padding:0.5rem 1rem">' + _escHtml(token) + '</code>' +
+                '<a href="/en-gb/" style="color:#4ecdc4;font-size:0.9rem;text-decoration:none;' +
+                'border:1px solid rgba(78,205,196,0.3);border-radius:6px;padding:0.5rem 1rem;' +
+                'background:rgba(78,205,196,0.08)">← Back to vault home</a>' +
+                '</div>';
+        }
+
         // Patch VaultEntry._onSimpleTokenOpen:
         //   - When sg-vault-creating is set (new vault from landing page), create instead of open
-        //   - When vault is not found (404), show a full-page error instead of inline message
+        //   - When auto-opening from the URL hash and vault is not found, show full-page error
+        //   - When the user manually typed a token and clicked, show the usual inline error
         var _orig = VaultEntry.prototype._onSimpleTokenOpen;
         VaultEntry.prototype._onSimpleTokenOpen = async function () {
             var token       = this._simpleTokenInput.value.trim().toLowerCase();
             var createToken = sessionStorage.getItem('sg-vault-creating');
 
+            // Create-vault flow (redirected from landing page)
             if (createToken && createToken === token) {
                 sessionStorage.removeItem('sg-vault-creating');
                 var accessKey = this._accessKeyInput.value.trim();
@@ -218,7 +243,7 @@
                     this._saveToHistory(vault, token);
                     this.emit('vault-created', { vault, vaultKey: token });
                 } catch (err) {
-                    sessionStorage.setItem('sg-vault-creating', token);
+                    sessionStorage.setItem('sg-vault-creating', token); // restore for retry
                     this._showError('Failed to create vault: ' + err.message);
                 } finally {
                     this._hideStatus();
@@ -226,11 +251,31 @@
                 return;
             }
 
-            // Standard open — but intercept 404 and show a prominent error page
+            // Detect whether this is an auto-open triggered by the URL hash (vault-entry onReady)
+            // vs a manual open triggered by the user clicking "Open Vault".
+            var hashToken = decodeURIComponent(window.location.hash.slice(1)).split('|')[0].toLowerCase();
+            var isAutoOpen = !!hashToken && hashToken === token;
+
+            if (!isAutoOpen) {
+                // Manual open — delegate to original for standard inline error handling
+                return _orig.call(this);
+            }
+
+            // Auto-open from URL hash: bypass _orig so we can intercept the error
+            this._hideError();
+            this._showStatus('Opening vault…');
+            this._simpleTokenBtn.disabled = true;
             try {
-                await _orig.call(this);
-            } catch (_) {
-                // _orig already showed inline error; vault-not-found gets full-page treatment
+                await this._openVault(token, token);
+            } catch (err) {
+                if (err && (err.message.includes('not found') || err.message.includes('404'))) {
+                    _showVaultNotFoundPage(token);
+                } else {
+                    this._showError(err ? err.message : 'Failed to open vault.');
+                }
+            } finally {
+                this._simpleTokenBtn.disabled = false;
+                this._hideStatus();
             }
         };
     })();
