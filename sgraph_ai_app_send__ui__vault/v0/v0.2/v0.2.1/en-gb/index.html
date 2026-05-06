@@ -75,49 +75,25 @@
         flex-direction: column;
         align-items: center;
         text-align: center;
-        padding: 4.5rem 1.5rem 3.5rem;
+        padding: 2.25rem 1.5rem 1.75rem;
         max-width: 720px;
         margin: 0 auto;
     }
 
-    .vp-trust-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        font-size: 0.7rem;
-        font-weight: 600;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
-        color: var(--muted);
-        background: var(--teal-glow);
-        border: 1px solid rgba(78,205,196,0.15);
-        border-radius: 99px;
-        padding: 0.3rem 0.9rem;
-        margin-bottom: 2rem;
-    }
-    .vp-trust-badge__dot {
-        width: 6px; height: 6px;
-        border-radius: 50%;
-        background: var(--teal);
-        flex-shrink: 0;
-    }
-    .vp-trust-badge__sep { opacity: 0.35; margin: 0 0.1rem; }
-
     .vp-hero__title {
-        font-size: clamp(2.8rem, 7vw, 4.5rem);
+        font-size: clamp(2.2rem, 6vw, 3.8rem);
         font-weight: 800;
         line-height: 1.05;
         letter-spacing: -0.03em;
         color: #ffffff;
-        margin-bottom: 0.6rem;
+        margin-bottom: 0.5rem;
     }
 
-    /* Steal from Design 01 — the differentiator line in teal */
     .vp-hero__tagline {
-        font-size: clamp(1rem, 2.5vw, 1.2rem);
+        font-size: clamp(0.95rem, 2.2vw, 1.1rem);
         color: var(--teal);
         font-weight: 500;
-        margin-bottom: 2.5rem;
+        margin-bottom: 1.75rem;
         letter-spacing: -0.01em;
     }
 
@@ -427,7 +403,49 @@
         align-items: center;
         gap: 0.6rem;
         margin-bottom: 0.5rem;
+        position: relative;
     }
+    .vp-recovery__close {
+        position: absolute;
+        top: -1rem;
+        right: -1rem;
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 1.1rem;
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        line-height: 1;
+        transition: color 0.15s;
+    }
+    .vp-recovery__close:hover { color: var(--text); }
+
+    /* Access token row inside create modal */
+    .vp-recovery__access {
+        margin-bottom: 1rem;
+    }
+    .vp-recovery__access-label {
+        display: block;
+        font-size: 0.73rem;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+    }
+    .vp-recovery__access-input {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.6rem 0.85rem;
+        color: var(--text);
+        font-size: 0.85rem;
+        font-family: var(--font-mono);
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.15s;
+    }
+    .vp-recovery__access-input:focus { border-color: var(--teal); }
+    .vp-recovery__access-input::placeholder { color: var(--muted); opacity: 0.6; }
     .vp-recovery__badge {
         font-size: 0.6rem;
         font-weight: 700;
@@ -562,13 +580,6 @@
 
 <!-- ── Hero ────────────────────────────────────────────────────────────── -->
 <section class="vp-hero">
-    <div class="vp-trust-badge">
-        <span class="vp-trust-badge__dot"></span>
-        BROWSER · AES-256-GCM · ZERO-KNOWLEDGE
-        <span class="vp-trust-badge__sep">/</span>
-        server holds ciphertext only
-    </div>
-
     <h1 class="vp-hero__title">Open a vault.</h1>
 
     <!-- Steal from Design 01 -->
@@ -652,6 +663,7 @@
         <div class="vp-recovery__header">
             <span class="vp-recovery__badge">New vault</span>
             <span class="vp-recovery__title">Your vault key</span>
+            <button class="vp-recovery__close" id="recoveryCloseBtn" title="Close">✕</button>
         </div>
         <p class="vp-recovery__body">
             This token is your vault key — the only way to open it on any device.
@@ -665,6 +677,11 @@
         <p class="vp-recovery__token-hint">
             You can edit the token or click ↻ to get a new one.
         </p>
+        <div class="vp-recovery__access">
+            <label class="vp-recovery__access-label">Access key (required to create a vault)</label>
+            <input class="vp-recovery__access-input" id="recoveryAccessKey" type="password"
+                   placeholder="Paste your access key" autocomplete="off" spellcheck="false">
+        </div>
         <div class="vp-recovery__actions">
             <button class="vp-recovery__btn vp-recovery__btn--copy" id="recoveryCopyBtn">📋 Copy</button>
             <button class="vp-recovery__btn vp-recovery__btn--dl"   id="recoveryDlBtn">📥 Save .txt</button>
@@ -794,6 +811,11 @@
     }
 
     /* ── Create vault flow ────────────────────────────────────────────── */
+    function _closeModal() {
+        document.getElementById('recoveryModal').style.display = 'none';
+        document.getElementById('recoveryAccessKey').value = '';
+    }
+
     function _startCreate() {
         var keyInput = document.getElementById('recoveryKey');
         keyInput.value = _generateKey();
@@ -807,6 +829,14 @@
         var v = document.getElementById('recoveryKey').value.trim();
         return v || null;
     }
+
+    document.getElementById('recoveryCloseBtn').addEventListener('click', _closeModal);
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && document.getElementById('recoveryModal').style.display !== 'none') {
+            _closeModal();
+        }
+    });
 
     document.getElementById('recoveryRegenBtn').addEventListener('click', function () {
         var keyInput = document.getElementById('recoveryKey');
@@ -840,8 +870,13 @@
     document.getElementById('recoveryConfirmBtn').addEventListener('click', function () {
         var key = _currentKey();
         if (!key) return;
+        var accessKey = document.getElementById('recoveryAccessKey').value.trim();
+        if (accessKey) {
+            sessionStorage.setItem('sg-vault-access-key', accessKey);
+            sessionStorage.setItem('sg-vault-creating', key);
+        }
         _storeVault(key, key);
-        document.getElementById('recoveryModal').style.display = 'none';
+        _closeModal();
         _navigateToBrowse(key);
     });
 
