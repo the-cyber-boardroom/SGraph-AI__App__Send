@@ -136,7 +136,7 @@
     <script src="_common/js/base/vault-helpers.js"></script>
     <script src="_common/js/base/vault-component-paths.js"></script>
     <!-- Set basePath BEFORE component scripts — connectedCallback fires immediately on define() -->
-    <script>VaultComponentPaths.init('_common');</script>
+    <script>VaultComponentPaths.init('/_common');</script>
     <script src="_common/js/base/vault-component.js"></script>
 
     <!-- 7. VaultDataSource adapter -->
@@ -176,7 +176,7 @@
 
     <!-- 11. Init -->
     <script>
-        VaultComponentPaths.init('_common');
+        VaultComponentPaths.init('/_common');
         VaultI18n.init();
         window.sgraphVault.events.emit('app-init', { version: 'v0.2.1' });
     </script>
