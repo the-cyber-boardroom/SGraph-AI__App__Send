@@ -23,6 +23,7 @@ The "Share a Secret" feature is **a frontend-only task**. The backend has suppor
 | 04 | [Implementation Plan](./04-implementation-plan.md) | Exact IFD v0.3.2 surgical changes; new files; API wiring; test plan; session handoff notes |
 | 05 | [Consolidate Delivery + Share Step](./05-consolidate-delivery-share-step.md) | 6→5 step wizard: merge delivery+share into single Options step; full gotcha map; new component spec |
 | 06 | [Code Review — v0.3.2](./06-code-review-v032.md) | Review of dev agent implementation: 3 bugs + 2 minor issues + fix checklist |
+| 07 | [Backend Fix — expires_at type](./07-backend-fix-expires-at.md) | `str` → `Timestamp_Now` (int ms) in Schema__Transfer + Transfer__Service; exact diffs + test updates |
 
 ---
 
