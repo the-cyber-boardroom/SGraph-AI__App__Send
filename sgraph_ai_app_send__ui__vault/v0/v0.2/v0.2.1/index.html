@@ -20,8 +20,10 @@
             var savedKey = sessionStorage.getItem('sg-vault-session');
             if (savedKey) {
                 window.location.replace(window.location.origin + '/en-gb/vault#' + savedKey);
+            } else {
+                // No active session → back to landing page (never show vault-shell on direct load)
+                window.location.replace('/en-gb/');
             }
-            // No saved key → fall through, show entry form (no redirect)
         } else if (noHash && !onVaultPath) {
             window.location.replace('/en-gb/');
         }
