@@ -137,23 +137,24 @@ Cache-Control policy:
 
 ## What SGit Needs to Do (Client Side)
 
-**Public vaults start public.** The owner decides at creation time — there is no
-conversion from private to public. This avoids the entire class of problems around
-migration, dual-state vaults, and "which copy is canonical".
+**Public vaults start public.** The owner decides at creation time:
 
 ```
 sgit init --public          # creates vault in public bucket from the start
                             # includes X-Vault-Public: true + X-Vault-Read-Key on init
 ```
 
+**Converting a private vault to public is technically possible** — by changing the
+SGit-side remote config so subsequent pushes carry `X-Vault-Public: true`. The server will
+accept this and create the vault in the public bucket. However, this should be a
+deliberate, manual operation, not a convenience command. No `sgit publish` shortcut.
+The friction is intentional: making something public is a one-way door with permanent
+consequences (CDN caches, external links, read key exposure), and the user should have to
+mean it.
+
 **Destroying a public vault** is a vault delete (same as private):
 - Push a `deleted.json` tombstone to the public remote, or
 - Call the destroy endpoint — the server writes the tombstone and removes objects
-
-No `sgit publish` command. No `sgit unpublish` command. The multi-remote model (pushing the
-same content to both a private and a public remote) remains available as a power-user
-pattern, but it is not a first-class workflow — and it is not what `sgit publish` would
-have been.
 
 ---
 
