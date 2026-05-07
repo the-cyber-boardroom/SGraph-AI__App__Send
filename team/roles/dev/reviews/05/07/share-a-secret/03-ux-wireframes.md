@@ -182,6 +182,10 @@ The share link is displayed. This is the most important screen for the sender.
 
 This is a new lightweight page. Clean, focused, unmistakably "this is sensitive".
 
+The backend info endpoint returns `downloads_remaining` and `expires_at` — both are shown to the recipient so they understand exactly how ephemeral this secret is.
+
+### D1 — Auto-deleted after this view (`max_downloads=1, auto_delete=true`)
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │  SG/Send  🔒                                               sgraph.ai            │
@@ -218,14 +222,61 @@ This is a new lightweight page. Clean, focused, unmistakably "this is sensitive"
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### D2 — Views remaining + expiry visible (`max_downloads=5, expires_at set`)
+
+When `downloads_remaining > 0` after this view, the recipient sees the remaining budget and expiry instead of the "deleted" notice. Data comes from `GET /api/transfers/info/{id}` fetched after decrypt.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  SG/Send  🔒                                               sgraph.ai            │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│                       ┌─────────────────────────────────────┐                  │
+│                       │                                     │                  │
+│                       │  🔒  Secret Message                 │                  │
+│                       │                                     │                  │
+│                       │  ──────────────────────────────     │                  │
+│                       │                                     │                  │
+│                       │  Shared Zoom: user@co / P@ss123     │                  │
+│                       │                                     │                  │
+│                       │  ──────────────────────────────     │                  │
+│                       │                                     │                  │
+│                       │           [ 📋 Copy ]               │                  │
+│                       │                                     │                  │
+│                       │  ┌─────────────────────────────┐   │                  │
+│                       │  │ ℹ  3 views remaining         │   │                  │
+│                       │  │    Expires 14 May 2026,      │   │                  │
+│                       │  │    09:41                     │   │                  │
+│                       │  └─────────────────────────────┘   │                  │
+│                       │                                     │                  │
+│                       │  Decrypted in your browser ·        │                  │
+│                       │  Server never saw this text         │                  │
+│                       │                                     │                  │
+│                       │  ─────────────────────────────      │                  │
+│                       │  Want to share your own secret?     │                  │
+│                       │  [ → Try SG/Send ]                  │                  │
+│                       │                                     │                  │
+│                       └─────────────────────────────────────┘                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Logic (both variants):**
+- Fetch `GET /api/transfers/info/{id}` **after** decryption succeeds (not before — avoid leaking whether the download even worked)
+- `downloads_remaining === 0 && auto_delete` → show D1 ("deleted from server")
+- `downloads_remaining > 0` → show D2 ("N views remaining · Expires [date]")
+- `downloads_remaining === 0 && !auto_delete` → show "no views remaining" without the deletion claim
+- `expires_at === 0` → omit the expiry line entirely (no time limit was set)
+- `expires_at > 0` → format as localised date+time (`new Date(expires_at).toLocaleString()`)
+
 **Design notes:**
 - Header is minimal — just the SG/Send logo and lock icon. No navigation. No distractions.
-- The secret text is displayed in a card with a monospace font (`JetBrains Mono`) — it looks like what it is (a credential/code/key)
+- The secret text is displayed in a card with monospace font (`JetBrains Mono`) — looks like what it is (a credential/code/key)
 - "Copy" button is prominent — the most common action after reading
-- The ephemerality notice is shown **after** the text, not before. Reading comes first.
+- The status notice is shown **after** the text — reading comes first
+- D1 notice: amber `#E07C4F` (warning — gone forever); D2 notice: teal `#4ECDC4` (info — still live)
 - "Decrypted in your browser" is a one-line trust signal, not a wall of text
 - The "Try SG/Send" CTA is the only marketing element — soft and at the bottom
-- For N-view mode (not already exhausted): instead of "deleted" notice, show "X views remaining"
 
 ---
 
