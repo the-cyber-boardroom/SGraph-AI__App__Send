@@ -16,6 +16,7 @@ ENV_VAR__SEND__STORAGE_MODE    = 'SEND__STORAGE_MODE'                           
 ENV_VAR__SEND__S3_BUCKET       = 'SEND__S3_BUCKET'                             # S3 bucket name override
 ENV_VAR__SEND__DISK_PATH       = 'SEND__DISK_PATH'                             # Local disk path for DISK mode
 SEND__S3_BUCKET__INFIX         = 'sgraph-send-transfers'                       # Bucket name infix (used between account-id and region)
+SEND__PUBLIC_VAULT__S3_BUCKET__INFIX = 'sgraph-send-public'                    # Public vault bucket infix
 SEND__DISK_PATH__DEFAULT       = '/data'                                        # Default disk storage path (Docker volume mount point)
 ENV_VAR__SEND__PUBLIC_VAULT__S3_BUCKET = 'SEND__PUBLIC_VAULT__S3_BUCKET'       # Public vault S3 bucket (optional; enables public vault routing)
 
