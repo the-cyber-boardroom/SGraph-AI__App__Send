@@ -204,6 +204,45 @@
             if (entryDiv) entryDiv.style.display = 'none';
         }());
 
+        // Show a "Creating your vault…" splash immediately when the landing page redirected
+        // here with sg-vault-creating set. The splash fills the blank screen while the async
+        // crypto key derivation and initial commit network call complete.
+        (function () {
+            var hash     = window.location.hash;
+            if (!hash || hash === '#') return;
+            var token    = decodeURIComponent(hash.slice(1)).split('|')[0].toLowerCase();
+            var creating = sessionStorage.getItem('sg-vault-creating');
+            if (!creating || creating !== token) return;
+
+            var splash = document.createElement('div');
+            splash.id  = 'sg-creating-splash';
+            splash.setAttribute('style',
+                'position:fixed;inset:0;z-index:9999;background:#0d1117;' +
+                'display:flex;align-items:center;justify-content:center;' +
+                'flex-direction:column;gap:1.25rem;font-family:system-ui,sans-serif;' +
+                'text-align:center;padding:2rem');
+            splash.innerHTML =
+                '<div style="font-size:3rem">🔐</div>' +
+                '<div style="color:#4ecdc4;font-size:1.2rem;font-weight:700">Creating your vault…</div>' +
+                '<div style="color:#6e7a8a;font-size:0.85rem;max-width:360px;line-height:1.6">' +
+                'Deriving encryption keys and writing the initial commit.<br>This takes a moment.' +
+                '</div>';
+            document.body.appendChild(splash);
+        }());
+
+        // Helper: remove the creating splash (safe to call even if it was never shown).
+        function _removeSplash() {
+            var el = document.getElementById('sg-creating-splash');
+            if (el) el.remove();
+        }
+
+        // Helper: reveal the vault-entry form (used when create fails so the error is visible).
+        function _revealEntry() {
+            var shell    = document.querySelector('vault-shell');
+            var entryDiv = shell && shell.querySelector('.vs-entry');
+            if (entryDiv) entryDiv.style.display = '';
+        }
+
         // Full-page error when auto-open fails — replaces the page body entirely
         function _escHtml(s) {
             return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -258,24 +297,48 @@
                 sessionStorage.removeItem('sg-vault-creating');
                 var accessKey = this._accessKeyInput.value.trim();
                 if (!accessKey) {
+                    _removeSplash();
+                    _revealEntry();
                     this._showError('An access key is required to create a new vault.');
                     this._accessKeyInput.focus();
                     return;
                 }
                 this._hideError();
-                this._showStatus('Creating vault…');
                 try {
                     var sgSend = this._getSGSend();
-                    var vault  = await SGVault.createFromToken(sgSend, token, { name: token });
-                    window.history.replaceState(null, '', '#' + token);
+                    // Name uses a friendly date/time — NOT the token. Token stays in localStorage/settings.
+                    var now     = new Date();
+                    var dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                    var timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    var vaultName = 'New Vault (' + dateStr + ' · ' + timeStr + ')';
+                    var vault = await SGVault.createFromToken(sgSend, token, { name: vaultName });
+
+                    // Clear hash — vault key is NOT exposed in the address bar.
+                    // Key is persisted in localStorage and accessible via vault Settings.
+                    window.history.replaceState(null, '', '/');
                     try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
+
+                    // Patch landing page history entry to use the proper name
+                    try {
+                        var pickerKey  = 'sg-vault-picker:credentials';
+                        var pickerList = JSON.parse(localStorage.getItem(pickerKey) || '[]');
+                        for (var i = 0; i < pickerList.length; i++) {
+                            if (pickerList[i].vaultKey === token) {
+                                pickerList[i].vaultName = vaultName;
+                                break;
+                            }
+                        }
+                        localStorage.setItem(pickerKey, JSON.stringify(pickerList));
+                    } catch (_) {}
+
+                    _removeSplash();
                     this._saveToHistory(vault, token);
                     this.emit('vault-created', { vault, vaultKey: token });
                 } catch (err) {
                     sessionStorage.setItem('sg-vault-creating', token); // restore for retry
+                    _removeSplash();
+                    _revealEntry();
                     this._showError('Failed to create vault: ' + err.message);
-                } finally {
-                    this._hideStatus();
                 }
                 return;
             }
