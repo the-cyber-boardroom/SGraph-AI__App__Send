@@ -15,18 +15,13 @@ bucket instead of a private one.
 This is already how git works. Multiple remotes, each holding a different version of the
 same repository, is a first-class git concept. SGit inherits this for free.
 
-```
-sgit remote add origin   https://vault.sgraph.ai   # private remote → private bucket
-sgit remote add public   https://vault.sgraph.ai   # public remote  → public bucket
+**Public vaults start public** — the owner decides at creation time. There is no
+conversion from private to public. A public vault is initialised directly in the public
+bucket; a private vault is initialised in the private bucket. The server distinguishes them
+by the `X-Vault-Public: true` header.
 
-sgit push origin   main   # → private bucket, no header
-sgit push public   main   # → public bucket,  X-Vault-Public: true header
-```
-
-Branches, commits, pulls, merges — all the normal git mechanics handle sync, divergence,
-and selective publishing between remotes. No server-side publish or unpublish workflow
-is needed. The same vault ID can exist in both buckets simultaneously, which is expected
-and normal: it simply means the owner has pushed to both remotes.
+Branches, commits, pulls, merges — all the normal git mechanics handle sync and divergence.
+No server-side publish or unpublish workflow is needed.
 
 ---
 
@@ -142,19 +137,23 @@ Cache-Control policy:
 
 ## What SGit Needs to Do (Client Side)
 
-### `sgit publish` (new convenience command)
-1. Add `public` remote pointing at same server if not present
-2. Push current branch to public remote (`X-Vault-Public: true`)
-3. On first push, include `X-Vault-Read-Key: <base64 read key>` header so the server can
-   write `public-vault.json`
-4. Print the public vault URL for sharing
+**Public vaults start public.** The owner decides at creation time — there is no
+conversion from private to public. This avoids the entire class of problems around
+migration, dual-state vaults, and "which copy is canonical".
 
-### `sgit unpublish` (new convenience command)
-1. Push a `deleted.json` tombstone to the public remote
-2. Remove `public` remote from local SGit config
+```
+sgit init --public          # creates vault in public bucket from the start
+                            # includes X-Vault-Public: true + X-Vault-Read-Key on init
+```
 
-The owner continues using the private remote as normal after unpublishing. No server
-state changes on the private side — the two remotes are fully independent.
+**Destroying a public vault** is a vault delete (same as private):
+- Push a `deleted.json` tombstone to the public remote, or
+- Call the destroy endpoint — the server writes the tombstone and removes objects
+
+No `sgit publish` command. No `sgit unpublish` command. The multi-remote model (pushing the
+same content to both a private and a public remote) remains available as a power-user
+pattern, but it is not a first-class workflow — and it is not what `sgit publish` would
+have been.
 
 ---
 
