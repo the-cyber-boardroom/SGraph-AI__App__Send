@@ -15,7 +15,7 @@ All wireframes use the existing Aurora dark theme:
 
 ## Screen A — Secret Creation (within main upload page)
 
-The "Secret" tab is added alongside existing "File" and "Text" tabs.  
+The "Text" tab is **removed**. The "Secret" tab replaces it — typed text now lives here with ephemerality built in. Users who need to share a plain text file use the File tab (drag-and-drop a `.txt`).  
 This is a surgical overlay — no changes to the surrounding card structure.
 
 ```
@@ -27,9 +27,9 @@ This is a surgical overlay — no changes to the surrounding card structure.
 │  │  ● Upload ────── ○ Deliver ────── ○ Share ────── ○ Confirm ─── ○ Done   │   │
 │  │  Step 1 of 6                                                             │   │
 │  │                                                                          │   │
-│  │  ┌─────────┐  ┌─────────┐  ┌══════════════════╗                         │   │
-│  │  │  File   │  │  Text   │  ║  🔒 Secret  NEW  ║                         │   │
-│  │  └─────────┘  └─────────┘  ╚══════════════════╝                         │   │
+│  │  ┌─────────┐  ╔══════════════════╗                                       │   │
+│  │  │  File   │  ║  🔒 Secret  NEW  ║                                       │   │
+│  │  └─────────┘  ╚══════════════════╝                                       │   │
 │  │                                                                          │   │
 │  │  ┌────────────────────────────────────────────────────────────────────┐  │   │
 │  │  │                                                                    │  │   │
@@ -66,13 +66,14 @@ This is a surgical overlay — no changes to the surrounding card structure.
 ```
 
 **Design notes:**
+- "Text" tab **removed** — [File] [🔒 Secret] only
 - "Secret" tab uses the teal `#4ECDC4` border when active (consistent with active mode-toggle style)
 - "NEW" badge is a small teal chip — removed after first use / after a version
 - The expiry options use radio buttons, not a dropdown — more scannable and mobile-friendly
 - Default: 1 view + 24 hours — shown first, no action required for most use cases
 - "Create →" button uses the `upload-next-btn` style (teal, 54px height)
 - The step indicator remains visible but steps 2–4 are skipped internally
-- Character count shown below textarea (same as Text mode)
+- Character count shown below textarea
 - No max_downloads=0 option in Phase 1 (unlimited views defeats the purpose of a "secret")
 
 ---

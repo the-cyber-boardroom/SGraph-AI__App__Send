@@ -32,7 +32,7 @@
 | # | What | Where | Size |
 |---|---|---|---|
 | A | `ApiClient.createTransfer()` — wire `max_downloads`, `auto_delete`, `expires_at`, `delete_auth_hash` | `api-client.js` (surgical patch in v0.3.2) | ~15 lines |
-| B | "Secret" tab in `upload-step-select` — new render mode `_renderSecretInput()` | `upload-step-select.js` (surgical patch in v0.3.2) | ~80 lines |
+| B | Replace "Text" tab with "Secret" tab in `upload-step-select` — remove `_inputMode='text'` path, add `_renderSecretInput()` | `upload-step-select.js` (surgical patch in v0.3.2) | ~80 lines |
 | C | Secret config propagation through orchestrator — new state hint `_secretConfig` | `send-upload.js` (surgical patch in v0.3.2) | ~30 lines |
 | D | Upload engine passes secret params when config set | `upload-engine.js` (surgical patch in v0.3.2) | ~20 lines |
 | E | Done state: show share link + kill link for secret mode | `upload-step-done` (surgical patch in v0.3.2) | ~60 lines |
@@ -84,27 +84,26 @@ ApiClient.createTransfer = async function(fileSize, contentType, secretConfig) {
 };
 ```
 
-### Change B — `upload-step-select.js` patch (new Secret tab)
+### Change B — `upload-step-select.js` patch (replace Text tab with Secret tab)
+
+Removes the "Text" tab and replaces it with the "Secret" tab. Users who need to share plain text can drop a `.txt` file — no functionality is lost.
 
 Adds `_renderSecretInput()` and wires the "Secret" tab button.  
 Fires a new event `step-secret-submit` with `{ text, config }` where config = `{ maxDownloads, expiresInHours }`.
 
 ```javascript
-// v0.3.2/upload-step-select-secret.js  (surgical — adds secret mode)
+// v0.3.2/upload-step-select-secret.js  (surgical — replaces Text with Secret)
 
-// New input mode value
-// this._inputMode can now be 'file' | 'text' | 'secret'
+// Input mode is now 'file' | 'secret' only (Text removed)
 
 UploadStepSelect.prototype._renderIdle = function() {
     var maxSize = this._fmt(this._maxFileSize);
     var isFile   = this._inputMode === 'file';
-    var isText   = this._inputMode === 'text';
     var isSecret = this._inputMode === 'secret';
 
     var modeToggle = `
         <div class="mode-toggle">
             <button class="mode-toggle__btn ${isFile   ? 'mode-toggle__btn--active' : ''}" id="mode-file">File</button>
-            <button class="mode-toggle__btn ${isText   ? 'mode-toggle__btn--active' : ''}" id="mode-text">Text</button>
             <button class="mode-toggle__btn mode-toggle__btn--secret ${isSecret ? 'mode-toggle__btn--active' : ''}" id="mode-secret">🔒 Secret</button>
         </div>
     `;

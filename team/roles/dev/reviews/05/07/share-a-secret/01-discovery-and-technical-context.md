@@ -103,14 +103,16 @@ This was originally added for MCP compatibility (Claude.ai cannot handle binary 
 
 No binary blob handling. No file download. No `<a href="blob:...">` links. Just text in the DOM.
 
-### 1.6 The Existing Text Mode — What Changes
+### 1.6 The Existing Text Mode — Replaced, Not Extended
 
-Current "Text" tab flow:
+The "Text" tab is **removed** and replaced by the "Secret" tab. The Text tab sent text through the full 6-step wizard and created a `.txt` file download — a poor experience for sensitive text and an unnecessary middle ground between File and Secret modes. Users who genuinely want to share a plain text file can drop a `.txt` into the File tab.
+
+Current "Text" tab flow (removed):
 ```
 Type text → "Encrypt & Send" → 6-step wizard → .txt file download link
 ```
 
-Target "Secret" flow:
+Replacement "Secret" tab flow:
 ```
 Type secret → set expiry (optional) → "Create Secret Link" → copy link → done
 Recipient: click link → see text inline → auto-deleted
@@ -123,7 +125,7 @@ The **existing infrastructure** is reused:
 - Complete: same `ApiClient.completeTransfer()`
 
 The **new pieces** are:
-- A "Secret" tab / focused UI in `upload-step-select` (or a new focused-use-case page)
+- "Secret" tab replacing "Text" in `upload-step-select` — two tabs: [File] [🔒 Secret]
 - Wiring `max_downloads`, `auto_delete`, `expires_at` in `ApiClient.createTransfer()`
 - A new `/en-gb/s/` receive page with inline text display
 
