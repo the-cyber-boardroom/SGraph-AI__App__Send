@@ -320,9 +320,13 @@
         //      after create-then-clear-hash).
         //   2. Store the browse element reference so _plrSetHashPath can update it when
         //      a file tab is opened (deep-link copy button mechanism).
+        // VaultShell and VaultSettings are defined inside IIFEs in their source files,
+        // so they are NOT global variables. Use customElements.get() to access their class.
         (function () {
-            var _origMount = VaultShell.prototype._mountBrowse;
-            VaultShell.prototype._mountBrowse = async function (deepLink) {
+            var VaultShellClass = customElements.get('vault-shell');
+            if (!VaultShellClass) return;
+            var _origMount = VaultShellClass.prototype._mountBrowse;
+            VaultShellClass.prototype._mountBrowse = async function (deepLink) {
                 await _origMount.call(this, deepLink);
                 var browse = this.querySelector('.vs-view-files send-browse');
                 var token  = this._vaultKey;
@@ -340,8 +344,10 @@
         // The URL is constructed from window.location.origin + '/#' + vaultKey so it always
         // reflects the current host (localhost, dev.vault.sgraph.ai, vault.sgraph.ai, etc.)
         (function () {
-            var _origRefresh = VaultSettings.prototype.refresh;
-            VaultSettings.prototype.refresh = function () {
+            var VaultSettingsClass = customElements.get('vault-settings');
+            if (!VaultSettingsClass) return;
+            var _origRefresh = VaultSettingsClass.prototype.refresh;
+            VaultSettingsClass.prototype.refresh = function () {
                 _origRefresh.call(this);
                 if (!this._vault || !this._vaultKey) return;
                 var root     = this.shadowRoot;
@@ -468,6 +474,8 @@
             this._simpleTokenBtn.disabled = true;
             try {
                 await this._openVault(token, token);
+                // Remove token from URL once vault is open (security hygiene)
+                window.history.replaceState(null, '', '/');
             } catch (err) {
                 _showAutoOpenErrorPage(token, err);
             } finally {
