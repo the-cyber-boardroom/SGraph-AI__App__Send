@@ -34,9 +34,10 @@ vault visibility state. It needs three things:
 
 1. **A second bucket** — `745506449035--sgraph-send-public--eu-west-2`
 2. **Header routing** — `X-Vault-Public: true` selects the public `Storage_FS__S3` instance
-3. **`_read_key/payload` written on first push** — when the public vault is initialised
+3. **`public-vault.json` written on first push** — when the public vault is initialised
    (i.e. `manifest.json` does not yet exist in the public bucket for that vault ID), the
-   server writes `_read_key/payload` alongside the manifest
+   server writes `public-vault.json` alongside the manifest. This file contains the read
+   key and is the discovery entry point for any client that knows only the vault ID.
 
 That is the complete Phase 1 server-side change.
 
@@ -81,17 +82,68 @@ No cross-bucket tombstone checking. No cross-bucket coupling of any kind.
 
 ---
 
-## The Only New Security Property
+## Reads Are Already Anonymous — No New Auth Model Needed
 
-The read key is embedded in the public vault at `_read_key/payload`. This is the
-decryption entry point: the **vault ID alone** is sufficient for any client to read all
-content.
+This is code-verified. The existing read endpoints have **no authentication**:
+
+```python
+# Routes__Vault__Pointer.py — read path
+def read__vault_id__file_id(self, vault_id, file_id) -> Response:
+    self._validate_vault_id(vault_id)          # format check only
+    payload = self.vault_service.read(...)     # no token, no write key
+    return Response(content=payload, ...)
+```
+
+`check_access_token` is only called on writes, deletes, and zip downloads. Read-only batch
+explicitly notes: `# Read-only batch — no auth required (data is encrypted)`.
+
+This is the zero-knowledge design: the server only holds ciphertext, so protecting reads is
+pointless. Anyone who knows the vault ID and file path can fetch the encrypted bytes.
+
+This is already how `qa.sgraph.ai/en-gb/library` works — it reads directly from a private
+vault using the Lambda URL, with the vault ID and read key embedded in the site's config.
+
+### Phase 1: same Lambda URL, caller needs vault_id + read_key
 
 ```
-vault_id  →  GET data.send.sgraph.ai/public-vaults/.../vault_id/_read_key/payload
-          →  read key bytes
-          →  decrypt all subsequent object fetches
+# Works today — no new infrastructure needed
+GET /api/vault/read/{vault_id}/bare/refs/<ref-id>    →  encrypted bytes
+GET /api/vault/read/{vault_id}/bare/data/<hash>      →  encrypted bytes
+GET /api/vault/read/{vault_id}/public-vault.json     →  { read_key, vault_id, ... }
 ```
+
+Adding `X-Vault-Public: true` to a write routes it to the public bucket. Reads from the
+public bucket work identically — same endpoint, same anonymous access.
+
+### Phase 2: CloudFront + public bucket → vault_id alone is sufficient
+
+```
+# Phase 2: caller only needs the vault ID
+GET data.send.sgraph.ai/public-vaults/shared/{id[:2]}/{id}/public-vault.json
+    → { "read_key": "...", "cdn_base": "https://data.send.sgraph.ai/...", ... }
+    → use read_key to decrypt; fetch all objects directly from cdn_base
+```
+
+`public-vault.json` is the discovery entry point. It lives at the vault root (not inside
+`bare/`) and is a plain JSON file — not an encrypted vault object, not using the
+`/payload` suffix convention.
+
+### `public-vault.json` format
+
+```json
+{
+  "schema":      "sgit-public-vault/1",
+  "vault_id":    "abc123de",
+  "created_at":  1746662400000,
+  "read_key":    "<base64-encoded read key bytes>",
+  "cdn_base":    "https://data.send.sgraph.ai/public-vaults/shared/ab/abc123de",
+  "description": "optional owner-provided label"
+}
+```
+
+`cdn_base` is the Phase 2 field — omit or set to the Lambda URL in Phase 1.
+In Phase 2, SGit reads `cdn_base` from this file and constructs all object URLs from it,
+so a CDN URL change is a server-side update to this file, not a protocol change.
 
 This is intentional. Public vaults are opt-in. The owner is explicitly making the content
 world-readable. The UX should make this unmistakably clear.
@@ -105,7 +157,7 @@ world-readable. The UX should make this unmistakably clear.
 | New env var `SEND__PUBLIC_VAULT__S3_BUCKET` | 30 min |
 | `Send__Config.public_vault_storage_fs()` returning `Storage_FS__S3` for public bucket | 30 min |
 | Route layer: select storage backend from `X-Vault-Public: true` header | 1 hr |
-| On first push to public vault: write `_read_key/payload` (from `X-Vault-Read-Key` header) and `_public/payload` | 1 hr |
+| On first push to public vault: write `public-vault.json` (read_key from `X-Vault-Read-Key` header, plus metadata) | 1 hr |
 | Tests | 2 hr |
 | **Total** | **~5 hrs** |
 
@@ -127,7 +179,7 @@ Add a CloudFront behaviour on `data.send.sgraph.ai` pointing at the public bucke
 Cache-Control:
 - `bare/data/obj-cas-imm-*/payload` → `immutable, max-age=31536000`
 - `bare/refs/*/payload` → `no-store` (mutable HEAD pointer)
-- `_read_key/payload` → `no-store` (must be purgeable on unpublish)
+- `public-vault.json` → `no-store` (contains read_key; must be purgeable on unpublish)
 - `manifest.json` → blocked (CF behaviour returns 403; defence in depth)
 
 From Phase 2, sgit fetches public vault objects directly from CloudFront. Writes continue
