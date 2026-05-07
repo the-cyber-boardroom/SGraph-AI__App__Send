@@ -224,6 +224,52 @@
             await vault._refManager.writeRef(vault._refFileId, vault._headCommitId);
             vault._namedHeadId = vault._headCommitId;
 
+            // Write the branch index — required for `sgit clone` to discover refs.
+            // Without this, sgit has no way to find head_ref_id for the named branch
+            // (the web client gets away without it because it caches ref IDs in memory,
+            // but sgit starts from scratch on every clone).
+            //
+            // Derive deterministic branch IDs from the HMAC key (same approach as ref IDs).
+            var _hmac = function (hmacKey, domain) {
+                return crypto.subtle.sign('HMAC', hmacKey, new TextEncoder().encode(domain))
+                    .then(function (buf) {
+                        return Array.from(new Uint8Array(buf))
+                            .map(function (b) { return b.toString(16).padStart(2, '0'); })
+                            .join('').slice(0, 12);
+                    });
+            };
+            var namedHex = await _hmac(vault._hmacKey, 'sg-vault-v1:file-id:branch-id:named:' + vault._vaultId);
+            var cloneHex = await _hmac(vault._hmacKey, 'sg-vault-v1:file-id:branch-id:clone:web-ui:' + vault._vaultId);
+
+            var branchIndex = {
+                schema:   'branch_index_v1',
+                branches: [
+                    {
+                        branch_id:   'branch-named-' + namedHex,
+                        branch_type: 'named',
+                        head_ref_id: vault._refFileId,
+                        name:        'current',
+                        created_at:  vault._settings.created
+                    },
+                    {
+                        branch_id:   'branch-clone-' + cloneHex,
+                        branch_type: 'clone',
+                        head_ref_id: vault._cloneRefFileId,
+                        name:        'web-ui',
+                        created_at:  vault._settings.created
+                    }
+                ]
+            };
+            var indexPayload   = new TextEncoder().encode(JSON.stringify(branchIndex));
+            var indexEncrypted = await SGSendCrypto.encrypt(indexPayload, vault._readKey);
+            await vault._sgSend.vaultWrite(
+                vault._vaultId,
+                'bare/indexes/' + vault._branchIndexFileId,
+                vault._writeKey,
+                new Uint8Array(indexEncrypted)
+            );
+            vault._branchIndex = branchIndex;
+
             return vault;
         };
 
