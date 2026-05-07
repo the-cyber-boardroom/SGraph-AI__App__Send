@@ -132,16 +132,16 @@ GET data.send.sgraph.ai/public-vaults/shared/{id[:2]}/{id}/public-vault.json
 
 ```json
 {
-  "schema":      "sgit-public-vault/1",
-  "vault_id":    "abc123de",
-  "created_at":  1746662400000,
-  "read_key":    "<base64-encoded read key bytes>",
-  "cdn_base":    "https://data.send.sgraph.ai/public-vaults/shared/ab/abc123de",
-  "description": "optional owner-provided label"
+  "schema":     "sgit-public-vault/1",
+  "vault_id":   "abc123de",
+  "created_at": 1746662400000,
+  "read_key":   "<base64-encoded read key bytes>",
+  "cdn_base":   "https://data.send.sgraph.ai/public-vaults/shared/ab/abc123de"
 }
 ```
 
 `cdn_base` is the Phase 2 field — omit or set to the Lambda URL in Phase 1.
+Any vault description lives inside the encrypted vault content, not here.
 In Phase 2, SGit reads `cdn_base` from this file and constructs all object URLs from it,
 so a CDN URL change is a server-side update to this file, not a protocol change.
 
