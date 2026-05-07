@@ -62,12 +62,20 @@ using the `/payload` suffix convention. It is the only new file the server write
 ```
 
 - **`read_key`** — the decryption key for all vault objects. Provided by the SGit client
-  at vault initialisation (via `X-Vault-Read-Key` header). Stored verbatim by the server.
+  at vault initialisation (via `X-Vault-Read-Key: <base64>` header). The server stores it
+  verbatim. Format: base64-encoded 32 bytes (standard HKDF output length). Clients
+  base64-decode on fetch; no further transformation needed.
 - **`cdn_base`** — Phase 2 field. In Phase 1 this will be the Lambda URL. In Phase 2 it
   becomes the CloudFront URL so SGit can fetch objects directly from CDN without
   constructing paths independently.
 - **`description`** is intentionally absent — vault description lives inside the
   encrypted vault content, not in the access record.
+
+**Storage and content-type:** `public-vault.json` is a UTF-8 text file, not a binary
+blob. It must be written and served as `Content-Type: application/json`. This is the
+explicit exception to the vault's binary `/payload` convention — everything else in
+`bare/` is encrypted ciphertext stored as `application/octet-stream`. Clients fetch
+this file with a standard `fetch(url).then(r => r.json())` — no binary decode step.
 
 ---
 
@@ -193,15 +201,55 @@ hash directly cannot authenticate a write. A CloudFront rule blocking `manifest.
 
 ---
 
-## Open Question for SGit Team (Blocker)
+## Confirmed: Blocker Resolved (07 May 2026)
 
-**Is `read_key → write_key` derivation computationally infeasible?**
+**`read_key → write_key` derivation is computationally infeasible. Phase 1 can proceed.**
 
-If a reader can derive the write key from the read key, then anyone who fetches
-`public-vault.json` from a public vault can escalate to write access. This would
-fundamentally change the threat model.
+Both keys are HKDF-derived from the same master `vault_key` with different `info` contexts:
 
-If the two keys are fully independent, the design is clean and Phase 1 can proceed.
+```
+vault_key                                          (master secret, never leaves client)
+  ├─ HKDF(vault_key, info="read")  → read_key
+  └─ HKDF(vault_key, info="write") → write_key
+```
 
-The SG/Send API cannot answer this — it is a SGit-internal key derivation question.
-Please confirm before Phase 1 implementation begins.
+HKDF-Expand is a one-way function (HMAC-based; output is computationally indistinguishable
+from random). Given `read_key` alone:
+
+- You cannot compute `vault_key` — HKDF is non-invertible.
+- Without `vault_key`, you cannot compute `write_key` — both keys are siblings of an
+  unrecoverable parent.
+
+Possession of `read_key` gives exactly the read access the design intends. No path to
+write escalation exists.
+
+---
+
+## Three Implementation Details to Confirm (From SGit Review)
+
+### 1. Clone semantics across buckets
+
+`sgit clone <key>` without `--public` against a vault that exists only in the public
+bucket will return 404 from the private bucket. The server does not cross-bucket lookup —
+bucket independence is a hard property. SGit should surface this clearly:
+
+```
+error: vault not found in private bucket.
+       If this is a public vault, retry with: sgit clone --public <key>
+```
+
+### 2. `read_key` round-trip format
+
+- SGit generates a 32-byte `read_key` via HKDF
+- SGit sends `X-Vault-Read-Key: <base64(32 bytes)>` on vault init
+- Server stores verbatim in `public-vault.json` as the `read_key` field
+- Readers fetch `public-vault.json`, base64-decode `read_key` → 32 bytes → use for decryption
+
+Standard base64 (not URL-safe) to match the existing key encoding conventions.
+Documenting this once to avoid a hex-vs-base64 mismatch at integration time.
+
+### 3. `description` absent from `public-vault.json`
+
+Confirmed and intentional. Vault name and description live inside the encrypted tree
+(aligns with the `.vault-settings` brief). The access record contains only what is
+needed to establish a read session — nothing more.
