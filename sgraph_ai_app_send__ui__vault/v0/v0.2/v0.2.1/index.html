@@ -6,13 +6,23 @@
     <title>SG/Vault (v0.2.1) — Zero-knowledge encrypted vault</title>
     <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
 
-    <!-- Redirect to landing page when no vault key in hash AND not already on /en-gb/vault -->
-    <!-- /en-gb/vault without a hash shows the vault entry form (type-your-key screen) -->
+    <!-- Redirect to landing page when no vault key in hash AND not already on /en-gb/vault.
+         If sessionStorage has the last-open vault key, inject it as the hash so the page
+         auto-reopens the same vault on refresh (instead of showing the entry form). -->
     <script>
     (function () {
-        var noHash = !window.location.hash || window.location.hash === '#';
-        var onVaultPath = window.location.pathname === '/en-gb/vault';
-        if (noHash && !onVaultPath) {
+        var noHash      = !window.location.hash || window.location.hash === '#';
+        var pathName    = window.location.pathname.replace(/\/$/, ''); // strip trailing slash
+        var onVaultPath = pathName === '/en-gb/vault';
+
+        if (noHash && onVaultPath) {
+            // Refresh of /en-gb/vault — restore last open vault from session if available
+            var savedKey = sessionStorage.getItem('sg-vault-session');
+            if (savedKey) {
+                window.location.replace(window.location.origin + '/en-gb/vault#' + savedKey);
+            }
+            // No saved key → fall through, show entry form (no redirect)
+        } else if (noHash && !onVaultPath) {
             window.location.replace('/en-gb/');
         }
     }());
@@ -421,6 +431,12 @@
             window.location.reload();
         });
 
+        // Clear session key when vault is locked so a refresh after locking
+        // shows the entry form rather than re-opening the previous vault.
+        window.sgraphVault.events.on('vault-locked', function () {
+            try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
+        });
+
         // Patch VaultShell._mountBrowse:
         //   1. Fix downloadUrl — use vault key, not window.location.href (which may be '/'
         //      after create-then-clear-hash).
@@ -446,70 +462,6 @@
             };
         }());
 
-        // Patch VaultSettings.refresh: inject a VAULT URL row below the Vault Key section.
-        // The URL is constructed from window.location.origin + '/#' + vaultKey so it always
-        // reflects the current host (localhost, dev.vault.sgraph.ai, vault.sgraph.ai, etc.)
-        (function () {
-            var VaultSettingsClass = customElements.get('vault-settings');
-            if (!VaultSettingsClass) return;
-            var _origRefresh = VaultSettingsClass.prototype.refresh;
-            VaultSettingsClass.prototype.refresh = function () {
-                _origRefresh.call(this);
-                if (!this._vault || !this._vaultKey) return;
-                var root     = this.shadowRoot;
-                if (!root) return;
-                var vaultUrl = window.location.origin + '/#' + this._vaultKey;
-
-                // Update if already injected
-                var existing = root.querySelector('.vset-url-input');
-                if (existing) { existing.value = vaultUrl; return; }
-
-                // Find the vault key section to insert after it
-                var keySection = null;
-                root.querySelectorAll('.vset-section').forEach(function (s) {
-                    if (s.querySelector('.vset-key-input')) keySection = s;
-                });
-                if (!keySection) return;
-
-                var urlSection = document.createElement('div');
-                urlSection.className = 'vset-section';
-                urlSection.innerHTML =
-                    '<label class="vset-label">Vault URL</label>' +
-                    '<div class="vset-row">' +
-                    '<input class="vset-input vset-url-input" type="text" readonly>' +
-                    '<button class="vset-btn vset-copy-url">Copy</button>' +
-                    '</div>' +
-                    '<p class="vset-hint">Direct browser link to this vault. Treat it like the vault key — anyone with it can read all files.</p>';
-                keySection.after(urlSection);
-                root.querySelector('.vset-url-input').value = vaultUrl;
-
-                root.querySelector('.vset-copy-url').addEventListener('click', function () {
-                    var btn = this;
-                    var url = root.querySelector('.vset-url-input').value;
-                    navigator.clipboard.writeText(url).then(function () {
-                        btn.textContent = 'Copied ✓';
-                        btn.style.color = '#4ecdc4';
-                        setTimeout(function () { btn.textContent = 'Copy'; btn.style.color = ''; }, 2000);
-                    });
-                });
-            };
-        }());
-
-        // Patch VaultSettings._copyKey: flash "Copied ✓" on the Vault Key copy button.
-        (function () {
-            var VaultSettingsClass = customElements.get('vault-settings');
-            if (!VaultSettingsClass) return;
-            VaultSettingsClass.prototype._copyKey = function () {
-                var input = this.shadowRoot.querySelector('.vset-key-input');
-                var btn   = this.shadowRoot.querySelector('.vset-copy-key');
-                if (!input || !btn) return;
-                navigator.clipboard.writeText(input.value).then(function () {
-                    btn.textContent = 'Copied ✓';
-                    btn.style.color = '#4ecdc4';
-                    setTimeout(function () { btn.textContent = 'Copy'; btn.style.color = ''; }, 2000);
-                });
-            };
-        }());
 
         // Rename "⇌ Vaults" → "Open or Create Vault" and style as a teal navigation button.
         // Placed first in .vh-right (order:-1) so it reads as navigation rather than an action.
@@ -563,6 +515,7 @@
                     // Key is persisted in localStorage and accessible via vault Settings.
                     window.history.replaceState(null, '', '/en-gb/vault');
                     try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
+                    try { sessionStorage.setItem('sg-vault-session', token); } catch (_) {}
 
                     // Patch landing page history entry to use the proper name
                     try {
@@ -607,6 +560,7 @@
                 await this._openVault(token, token);
                 // Remove token from URL once vault is open (security hygiene)
                 window.history.replaceState(null, '', '/en-gb/vault');
+                try { sessionStorage.setItem('sg-vault-session', token); } catch (_) {}
             } catch (err) {
                 _showAutoOpenErrorPage(token, err);
             } finally {
