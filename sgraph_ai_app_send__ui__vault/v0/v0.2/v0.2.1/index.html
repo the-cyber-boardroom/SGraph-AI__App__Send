@@ -6,10 +6,13 @@
     <title>SG/Vault (v0.2.1) — Zero-knowledge encrypted vault</title>
     <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
 
-    <!-- Redirect to landing page when no vault key is in the hash -->
+    <!-- Redirect to landing page when no vault key in hash AND not already on /en-gb/vault -->
+    <!-- /en-gb/vault without a hash shows the vault entry form (type-your-key screen) -->
     <script>
     (function () {
-        if (!window.location.hash || window.location.hash === '#') {
+        var noHash = !window.location.hash || window.location.hash === '#';
+        var onVaultPath = window.location.pathname === '/en-gb/vault';
+        if (noHash && !onVaultPath) {
             window.location.replace('/en-gb/');
         }
     }());
@@ -221,6 +224,52 @@
             await vault._refManager.writeRef(vault._refFileId, vault._headCommitId);
             vault._namedHeadId = vault._headCommitId;
 
+            // Write the branch index — required for `sgit clone` to discover refs.
+            // Without this, sgit has no way to find head_ref_id for the named branch
+            // (the web client gets away without it because it caches ref IDs in memory,
+            // but sgit starts from scratch on every clone).
+            //
+            // Derive deterministic branch IDs from the HMAC key (same approach as ref IDs).
+            var _hmac = function (hmacKey, domain) {
+                return crypto.subtle.sign('HMAC', hmacKey, new TextEncoder().encode(domain))
+                    .then(function (buf) {
+                        return Array.from(new Uint8Array(buf))
+                            .map(function (b) { return b.toString(16).padStart(2, '0'); })
+                            .join('').slice(0, 12);
+                    });
+            };
+            var namedHex = await _hmac(vault._hmacKey, 'sg-vault-v1:file-id:branch-id:named:' + vault._vaultId);
+            var cloneHex = await _hmac(vault._hmacKey, 'sg-vault-v1:file-id:branch-id:clone:web-ui:' + vault._vaultId);
+
+            var branchIndex = {
+                schema:   'branch_index_v1',
+                branches: [
+                    {
+                        branch_id:   'branch-named-' + namedHex,
+                        branch_type: 'named',
+                        head_ref_id: vault._refFileId,
+                        name:        'current',
+                        created_at:  vault._settings.created
+                    },
+                    {
+                        branch_id:   'branch-clone-' + cloneHex,
+                        branch_type: 'clone',
+                        head_ref_id: vault._cloneRefFileId,
+                        name:        'web-ui',
+                        created_at:  vault._settings.created
+                    }
+                ]
+            };
+            var indexPayload   = new TextEncoder().encode(JSON.stringify(branchIndex));
+            var indexEncrypted = await SGSendCrypto.encrypt(indexPayload, vault._readKey);
+            await vault._sgSend.vaultWrite(
+                vault._vaultId,
+                'bare/indexes/' + vault._branchIndexFileId,
+                vault._writeKey,
+                new Uint8Array(indexEncrypted)
+            );
+            vault._branchIndex = branchIndex;
+
             return vault;
         };
 
@@ -320,9 +369,13 @@
         //      after create-then-clear-hash).
         //   2. Store the browse element reference so _plrSetHashPath can update it when
         //      a file tab is opened (deep-link copy button mechanism).
+        // VaultShell and VaultSettings are defined inside IIFEs in their source files,
+        // so they are NOT global variables. Use customElements.get() to access their class.
         (function () {
-            var _origMount = VaultShell.prototype._mountBrowse;
-            VaultShell.prototype._mountBrowse = async function (deepLink) {
+            var VaultShellClass = customElements.get('vault-shell');
+            if (!VaultShellClass) return;
+            var _origMount = VaultShellClass.prototype._mountBrowse;
+            VaultShellClass.prototype._mountBrowse = async function (deepLink) {
                 await _origMount.call(this, deepLink);
                 var browse = this.querySelector('.vs-view-files send-browse');
                 var token  = this._vaultKey;
@@ -340,8 +393,10 @@
         // The URL is constructed from window.location.origin + '/#' + vaultKey so it always
         // reflects the current host (localhost, dev.vault.sgraph.ai, vault.sgraph.ai, etc.)
         (function () {
-            var _origRefresh = VaultSettings.prototype.refresh;
-            VaultSettings.prototype.refresh = function () {
+            var VaultSettingsClass = customElements.get('vault-settings');
+            if (!VaultSettingsClass) return;
+            var _origRefresh = VaultSettingsClass.prototype.refresh;
+            VaultSettingsClass.prototype.refresh = function () {
                 _origRefresh.call(this);
                 if (!this._vault || !this._vaultKey) return;
                 var root     = this.shadowRoot;
@@ -424,7 +479,7 @@
 
                     // Clear hash — vault key is NOT exposed in the address bar.
                     // Key is persisted in localStorage and accessible via vault Settings.
-                    window.history.replaceState(null, '', '/');
+                    window.history.replaceState(null, '', '/en-gb/vault');
                     try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
 
                     // Patch landing page history entry to use the proper name
@@ -468,6 +523,8 @@
             this._simpleTokenBtn.disabled = true;
             try {
                 await this._openVault(token, token);
+                // Remove token from URL once vault is open (security hygiene)
+                window.history.replaceState(null, '', '/en-gb/vault');
             } catch (err) {
                 _showAutoOpenErrorPage(token, err);
             } finally {
