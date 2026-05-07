@@ -281,11 +281,15 @@
             var proto = window.VaultDataSource && window.VaultDataSource.prototype;
             if (!proto) return;
 
+            // Exposed as .vault-settings.json so the browse component's extension-based
+            // preview recognises it as JSON and renders the content inline.
+            var VSFILE = '.vault-settings.json';
+
             var _origGetTree = proto.getTree;
             proto.getTree = function () {
                 var tree = _origGetTree.call(this);
                 var json = JSON.stringify(this._vault._settings || {}, null, 2);
-                tree.files.push({ path: '.vault-settings', name: '.vault-settings',
+                tree.files.push({ path: VSFILE, name: VSFILE,
                                   size: new TextEncoder().encode(json).length });
                 return tree;
             };
@@ -294,14 +298,14 @@
             proto.getFileList = function () {
                 var list = _origGetFileList.call(this);
                 var json = JSON.stringify(this._vault._settings || {}, null, 2);
-                list.push({ path: '.vault-settings', name: '.vault-settings',
+                list.push({ path: VSFILE, name: VSFILE,
                             dir: false, size: new TextEncoder().encode(json).length });
                 return list;
             };
 
             var _origGetFileBytes = proto.getFileBytes;
             proto.getFileBytes = async function (path) {
-                if (path === '.vault-settings') {
+                if (path === VSFILE) {
                     var json = JSON.stringify(this._vault._settings || {}, null, 2);
                     return new TextEncoder().encode(json).buffer;
                 }
@@ -310,7 +314,7 @@
 
             var _origSaveFile = proto.saveFile;
             proto.saveFile = async function (folderPath, fileName, bytes) {
-                if (fileName === '.vault-settings') {
+                if (fileName === VSFILE) {
                     if (!this.writable) throw new Error('Read-only: no access key');
                     var buf  = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes).buffer;
                     var text = new TextDecoder().decode(buf);
@@ -477,23 +481,48 @@
                 root.querySelector('.vset-url-input').value = vaultUrl;
 
                 root.querySelector('.vset-copy-url').addEventListener('click', function () {
+                    var btn = this;
                     var url = root.querySelector('.vset-url-input').value;
                     navigator.clipboard.writeText(url).then(function () {
-                        window.sgraphVault.messages.success('Vault URL copied');
+                        btn.textContent = 'Copied ✓';
+                        btn.style.color = '#4ecdc4';
+                        setTimeout(function () { btn.textContent = 'Copy'; btn.style.color = ''; }, 2000);
                     });
                 });
             };
         }());
 
-        // Rename the "⇌ Vaults" header button to "← New vault".
-        // vault-header renders synchronously in connectedCallback (called by vault-shell._render),
-        // so the shadowRoot is already populated by the time this script runs.
+        // Patch VaultSettings._copyKey: flash "Copied ✓" on the Vault Key copy button.
+        (function () {
+            var VaultSettingsClass = customElements.get('vault-settings');
+            if (!VaultSettingsClass) return;
+            VaultSettingsClass.prototype._copyKey = function () {
+                var input = this.shadowRoot.querySelector('.vset-key-input');
+                var btn   = this.shadowRoot.querySelector('.vset-copy-key');
+                if (!input || !btn) return;
+                navigator.clipboard.writeText(input.value).then(function () {
+                    btn.textContent = 'Copied ✓';
+                    btn.style.color = '#4ecdc4';
+                    setTimeout(function () { btn.textContent = 'Copy'; btn.style.color = ''; }, 2000);
+                });
+            };
+        }());
+
+        // Rename "⇌ Vaults" → "Open or Create Vault" and style as a teal navigation button.
+        // Placed first in .vh-right (order:-1) so it reads as navigation rather than an action.
         (function () {
             var header  = document.querySelector('vault-shell vault-header');
             var lockBtn = header && header.shadowRoot && header.shadowRoot.querySelector('.vh-lock-btn');
             if (lockBtn) {
-                lockBtn.textContent = '← New vault';
+                lockBtn.textContent = 'Open or Create Vault';
                 lockBtn.title       = 'Lock this vault and return to the entry screen';
+                lockBtn.style.cssText = [
+                    'order:-1',
+                    'color:#4ecdc4',
+                    'border-color:rgba(78,205,196,0.4)',
+                    'margin-right:0.75rem',
+                    'font-weight:600'
+                ].join(';');
             }
         }());
 
