@@ -394,12 +394,18 @@
         color: var(--muted);
         margin-bottom: 0.35rem;
     }
+    .vp-recovery__access-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
     .vp-recovery__access-input {
+        flex: 1;
         width: 100%;
         background: var(--bg);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 0.6rem 0.85rem;
+        padding: 0.6rem 2.4rem 0.6rem 0.85rem;
         color: var(--text);
         font-size: 0.85rem;
         font-family: var(--font-mono);
@@ -409,6 +415,20 @@
     }
     .vp-recovery__access-input:focus { border-color: var(--teal); }
     .vp-recovery__access-input::placeholder { color: var(--muted); opacity: 0.6; }
+    .vp-recovery__access-toggle {
+        position: absolute;
+        right: 0.6rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--muted);
+        padding: 0.2rem;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        transition: color 0.15s;
+    }
+    .vp-recovery__access-toggle:hover { color: var(--text); }
     .vp-recovery__badge {
         font-size: 0.6rem;
         font-weight: 700;
@@ -513,7 +533,12 @@
         cursor: pointer;
         transition: background 0.15s;
     }
-    .vp-recovery__confirm:hover { background: #3dbdb5; }
+    .vp-recovery__confirm:hover:not(:disabled) { background: #3dbdb5; }
+    .vp-recovery__confirm:disabled {
+        background: rgba(78,205,196,0.25);
+        color: rgba(10,26,24,0.5);
+        cursor: not-allowed;
+    }
 
     /* ── Responsive ────────────────────────────────────────────────────── */
     @media (max-width: 768px) {
@@ -625,8 +650,8 @@
             <button class="vp-recovery__close" id="recoveryCloseBtn" title="Close">✕</button>
         </div>
         <p class="vp-recovery__body">
-            This token is your vault key — the only way to open it on any device.
-            Save it before continuing. <strong style="color:#e06c75;">There is no reset link, by design.</strong>
+            This token opens your vault on any device. Your browser stores it locally and you can always find it in vault Settings.
+            <strong style="color:#e06c75;">Save a copy somewhere safe — the server has no way to recover it for you.</strong>
         </p>
         <div class="vp-recovery__token-row">
             <input class="vp-recovery__key" id="recoveryKey" type="text"
@@ -638,14 +663,21 @@
         </p>
         <div class="vp-recovery__access">
             <label class="vp-recovery__access-label">Access key (required to create a vault)</label>
-            <input class="vp-recovery__access-input" id="recoveryAccessKey" type="password"
-                   placeholder="Paste your access key" autocomplete="off" spellcheck="false">
+            <div class="vp-recovery__access-row">
+                <input class="vp-recovery__access-input" id="recoveryAccessKey" type="password"
+                       placeholder="Paste your access key" autocomplete="off" spellcheck="false">
+                <button class="vp-recovery__access-toggle" id="recoveryAccessToggle" type="button" title="Show / hide">
+                    <svg id="recoveryAccessEyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         <div class="vp-recovery__actions">
             <button class="vp-recovery__btn vp-recovery__btn--copy" id="recoveryCopyBtn">📋 Copy</button>
             <button class="vp-recovery__btn vp-recovery__btn--dl"   id="recoveryDlBtn">📥 Save .txt</button>
         </div>
-        <button class="vp-recovery__confirm" id="recoveryConfirmBtn">Create vault &amp; open →</button>
+        <button class="vp-recovery__confirm" id="recoveryConfirmBtn" disabled>Create vault &amp; open →</button>
     </div>
 </div>
 
@@ -770,18 +802,34 @@
     }
 
     /* ── Create vault flow ────────────────────────────────────────────── */
+    var ACCESS_KEY_STORAGE = 'sg-vault-access-key-saved';
+
+    function _updateConfirmBtn() {
+        var hasKey = document.getElementById('recoveryAccessKey').value.trim().length > 0;
+        document.getElementById('recoveryConfirmBtn').disabled = !hasKey;
+    }
+
     function _closeModal() {
         document.getElementById('recoveryModal').style.display = 'none';
         document.getElementById('recoveryAccessKey').value = '';
+        _updateConfirmBtn();
     }
 
     function _startCreate() {
         var keyInput = document.getElementById('recoveryKey');
         keyInput.value = _generateKey();
         keyInput.readOnly = false;
+        // Pre-fill access key from localStorage if previously saved
+        var savedKey = localStorage.getItem(ACCESS_KEY_STORAGE) || '';
+        document.getElementById('recoveryAccessKey').value = savedKey;
+        _updateConfirmBtn();
         document.getElementById('recoveryModal').style.display = 'flex';
-        keyInput.focus();
-        keyInput.select();
+        if (savedKey) {
+            keyInput.focus();
+            keyInput.select();
+        } else {
+            document.getElementById('recoveryAccessKey').focus();
+        }
     }
 
     function _currentKey() {
@@ -795,6 +843,21 @@
         if (e.key === 'Escape' && document.getElementById('recoveryModal').style.display !== 'none') {
             _closeModal();
         }
+    });
+
+    document.getElementById('recoveryAccessKey').addEventListener('input', _updateConfirmBtn);
+
+    document.getElementById('recoveryAccessToggle').addEventListener('click', function () {
+        var input = document.getElementById('recoveryAccessKey');
+        var icon  = document.getElementById('recoveryAccessEyeIcon');
+        var show  = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        // eye-off SVG when showing, eye SVG when hidden
+        icon.innerHTML = show
+            ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>' +
+              '<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>' +
+              '<line x1="1" y1="1" x2="23" y2="23"/>'
+            : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
     });
 
     document.getElementById('recoveryRegenBtn').addEventListener('click', function () {
@@ -830,10 +893,10 @@
         var key = _currentKey();
         if (!key) return;
         var accessKey = document.getElementById('recoveryAccessKey').value.trim();
-        if (accessKey) {
-            sessionStorage.setItem('sg-vault-access-key', accessKey);
-            sessionStorage.setItem('sg-vault-creating', key);
-        }
+        if (!accessKey) return; // button should be disabled, belt-and-suspenders
+        sessionStorage.setItem('sg-vault-access-key', accessKey);
+        sessionStorage.setItem('sg-vault-creating', key);
+        try { localStorage.setItem(ACCESS_KEY_STORAGE, accessKey); } catch (_) {}
         _storeVault(key, key);
         _closeModal();
         _navigateToBrowse(key);
