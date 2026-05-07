@@ -187,8 +187,29 @@
                 description: options.description || ''
             };
             vault._tree = { '/': { type: 'folder', children: {} } };
+
+            // Initial commit (empty tree + settings)
             await vault._commit('Initial vault creation');
-            await vault._refManager.writeRef(vault._refFileId, vault._namedHeadId);
+
+            // Add README.md — gives sgit clone immediate content and orients new users
+            var readmeDate  = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            var readmeBytes = new TextEncoder().encode(
+                '# New Vault\n\n' +
+                'Created at vault.sgraph.ai on ' + readmeDate + '.\n\n' +
+                'Zero-knowledge encrypted — files are encrypted in your browser. The server never sees a key.\n\n' +
+                '## Working with sgit\n\n' +
+                '    sgit clone ' + token + '\n' +
+                '    sgit push\n' +
+                '    sgit pull\n'
+            );
+            await vault.addFile('/', 'README.md', readmeBytes);
+
+            // Write the named ref (published branch HEAD) to the post-README commit.
+            // _headCommitId is set by _commit() / addFile(); _namedHeadId is set here.
+            // (Mirrors what SGVault.create() does — must NOT use _namedHeadId before this line.)
+            await vault._refManager.writeRef(vault._refFileId, vault._headCommitId);
+            vault._namedHeadId = vault._headCommitId;
+
             return vault;
         };
 
