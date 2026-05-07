@@ -6,10 +6,13 @@
     <title>SG/Vault (v0.2.1) — Zero-knowledge encrypted vault</title>
     <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
 
-    <!-- Redirect to landing page when no vault key is in the hash -->
+    <!-- Redirect to landing page when no vault key in hash AND not already on /en-gb/vault -->
+    <!-- /en-gb/vault without a hash shows the vault entry form (type-your-key screen) -->
     <script>
     (function () {
-        if (!window.location.hash || window.location.hash === '#') {
+        var noHash = !window.location.hash || window.location.hash === '#';
+        var onVaultPath = window.location.pathname === '/en-gb/vault';
+        if (noHash && !onVaultPath) {
             window.location.replace('/en-gb/');
         }
     }());
@@ -430,7 +433,7 @@
 
                     // Clear hash — vault key is NOT exposed in the address bar.
                     // Key is persisted in localStorage and accessible via vault Settings.
-                    window.history.replaceState(null, '', '/');
+                    window.history.replaceState(null, '', '/en-gb/vault');
                     try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
 
                     // Patch landing page history entry to use the proper name
@@ -475,7 +478,7 @@
             try {
                 await this._openVault(token, token);
                 // Remove token from URL once vault is open (security hygiene)
-                window.history.replaceState(null, '', '/');
+                window.history.replaceState(null, '', '/en-gb/vault');
             } catch (err) {
                 _showAutoOpenErrorPage(token, err);
             } finally {
