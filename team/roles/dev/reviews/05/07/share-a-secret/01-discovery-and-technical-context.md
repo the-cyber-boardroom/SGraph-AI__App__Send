@@ -27,7 +27,7 @@ The transfer creation endpoint (`POST /api/transfers/create`) accepts the follow
 |---|---|---|---|
 | `max_downloads` | `Safe_UInt` | Max downloads before transfer is blocked (0 = unlimited) | `0` |
 | `auto_delete` | `bool` | Wipe encrypted payload after the last allowed download | `False` |
-| `expires_at` | `str` | ISO-8601 UTC timestamp — hard expiry regardless of downloads | `""` (never) |
+| `expires_at` | `Timestamp_Now` (int, ms) | Milliseconds-since-epoch hard expiry (currently declared `str` in schema — **type fix needed**) | `0` (never) |
 | `delete_auth_hash` | `Safe_Str__Id` | SHA-256 of a delete token — enables sender-controlled hard delete | `""` (disabled) |
 
 The transfer info endpoint (`GET /api/transfers/info/{id}`) returns:
@@ -37,7 +37,7 @@ The transfer info endpoint (`GET /api/transfers/info/{id}`) returns:
 | `max_downloads` | `Safe_UInt` | The configured limit |
 | `download_count` | `Safe_UInt` | How many downloads have occurred |
 | `downloads_remaining` | `Safe_UInt` | Computed remaining (0 = unlimited) |
-| `expires_at` | `str` | The expiry timestamp |
+| `expires_at` | `Timestamp_Now` (int, ms) | The expiry timestamp (milliseconds since epoch) |
 | `is_expired` | `bool` | Computed: has it passed the expiry timestamp |
 
 The download endpoint (`GET /api/transfers/download/{id}` and the MCP-safe `GET /api/transfers/download-base64/{id}`) enforces these constraints server-side:
@@ -54,6 +54,8 @@ if auto_delete and max_dl > 0 and download_count >= max_dl:
 ```
 
 The delete endpoint (`DELETE /api/transfers/delete/{id}` with `x-sgraph-transfer-delete-auth` header) allows sender-controlled deletion at any time if `delete_auth_hash` was set at creation.
+
+> **Schema type fix required before wiring:** `Schema__Transfer.py` currently declares `expires_at: str` (ISO-8601 string). The project-wide timestamp convention is `Timestamp_Now` — int milliseconds since epoch (13 digits, matching `Date.now()` in JS). The `_is_expired()` method in `Transfer__Service.py` currently uses `datetime.fromisoformat(exp)`. Both must be updated to use int comparison (`time.time() * 1000 > expires_at`) before the frontend sends `expires_at`. This is a small, safe, additive backend fix — not a behaviour change for existing transfers (they all have `expires_at = ''`/`0`).
 
 ### 1.3 The Gap — Frontend Never Wires These Fields
 

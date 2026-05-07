@@ -175,12 +175,13 @@ SendUpload.prototype._wireEventsSecret = function() {
         self.selectedFile = file;
 
         // Store secret config for upload engine
+        // expires_at uses Timestamp_Now format: int milliseconds since epoch (matches Date.now())
         self._secretConfig = {
             max_downloads: config.maxDownloads,
             auto_delete:   config.maxDownloads > 0,
             expires_at:    config.expiresInHours > 0
-                           ? new Date(Date.now() + config.expiresInHours * 3600000).toISOString()
-                           : ''
+                           ? Date.now() + (config.expiresInHours * 3600000)
+                           : 0
         };
         self._shareMode        = 'combined';    // Key always in URL
         self._selectedDelivery = 'download';    // Not gallery, not browse
@@ -273,6 +274,7 @@ UploadStepDone.prototype._buildConfigMessage = function() {
     if (cfg.max_downloads === 1) parts.push('1 view');
     else if (cfg.max_downloads > 1) parts.push(cfg.max_downloads + ' views');
     if (cfg.expires_at) {
+        // expires_at is int ms — Date constructor accepts this directly
         var exp = new Date(cfg.expires_at);
         parts.push('expires ' + exp.toLocaleString());
     }
@@ -527,9 +529,11 @@ New upload engine (secret mode):
 
 ---
 
-## 9. No Backend Changes Needed
+## 9. Backend Changes Required — `expires_at` Type Fix
 
-This is confirmed. Every server-side capability used by this feature is already live:
+The backend endpoints and enforcement logic are fully live. One schema change is needed before wiring the frontend:
+
+### 9.1 What's live and ready
 
 | Used by | Backend endpoint | Status |
 |---|---|---|
@@ -537,6 +541,37 @@ This is confirmed. Every server-side capability used by this feature is already 
 | Secret fetch | `GET /api/transfers/download-base64/{id}` | **Live** |
 | Status check | `GET /api/transfers/info/{id}` returns `downloads_remaining`, `is_expired` | **Live** |
 | Kill secret | `DELETE /api/transfers/delete/{id}` with `x-sgraph-transfer-delete-auth` header | **Live** |
+
+### 9.2 Schema type mismatch — must fix before wiring
+
+`Schema__Transfer.py` currently declares `expires_at: str` (ISO-8601). The project-wide timestamp convention is `Timestamp_Now` — an int representing **milliseconds since epoch** (13 digits, matching `Date.now()` in JS). This inconsistency must be resolved before the frontend can safely send `expires_at`.
+
+**Required backend changes:**
+
+1. **`Schema__Transfer__Create.expires_at`** — change `str` → `Timestamp_Now`
+2. **`Schema__Transfer__Create.expires_at` in response schema** — change `str` → `Timestamp_Now`
+3. **`Transfer__Service._is_expired()`** — replace `datetime.fromisoformat(exp)` with integer comparison:
+
+```python
+# Current (string):
+@staticmethod
+def _is_expired(meta):
+    exp = meta.get('expires_at', '')
+    if not exp:
+        return False
+    return datetime.now(timezone.utc) > datetime.fromisoformat(exp)
+
+# Required (Timestamp_Now int, milliseconds):
+@staticmethod
+def _is_expired(meta):
+    exp = meta.get('expires_at', 0)
+    if not exp:
+        return False
+    import time
+    return (time.time() * 1000) > exp
+```
+
+The JS frontend sends `expires_at = Date.now() + (hours * 3600_000)` — integer milliseconds. The Python side should compare `time.time() * 1000 > expires_at` (both in ms).
 
 ---
 
