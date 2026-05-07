@@ -176,13 +176,6 @@ class SendSecretView extends SendComponent {
                    '</div>';
         }
 
-        // remaining === 0 && !auto_delete
-        if (remaining === 0 && maxDl > 0) {
-            return '<div class="secret-view__notice secret-view__notice--warn">' +
-                   '⚠ No views remaining on this link.' +
-                   '</div>';
-        }
-
         return '';
     }
 

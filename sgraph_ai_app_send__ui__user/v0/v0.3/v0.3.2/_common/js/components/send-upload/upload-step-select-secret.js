@@ -133,7 +133,7 @@ UploadStepSelect.prototype._setupListeners = function() {
             var maxDownloads    = maxDlEl   ? parseInt(maxDlEl.value,   10) : 1;
             var expiresInHours  = expiryEl  ? parseInt(expiryEl.value,  10) : 24;
 
-            self._emit('step-secret-submit', {
+            self.emit('step-secret-submit', {
                 text:   ta.value,
                 config: { maxDownloads: maxDownloads, expiresInHours: expiresInHours }
             });

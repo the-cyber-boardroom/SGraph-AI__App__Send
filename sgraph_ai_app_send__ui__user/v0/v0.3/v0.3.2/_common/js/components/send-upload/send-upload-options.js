@@ -107,12 +107,11 @@ SendUpload.prototype._syncComponent = function(key) {
         return; // Don't fall through to original
     }
 
-    // Sync done-secret element
+    // Sync done-secret element — secretConfig must be set before result (result triggers render)
     if (key === 'done-secret' && this._els['done-secret'] && this.result) {
-        this._els['done-secret'].result = this.result;
-        if (this._secretConfig) {
-            this._els['done-secret'].secretConfig = this._secretConfig;
-        }
+        var doneEl = this._els['done-secret'];
+        if (this._secretConfig) doneEl.secretConfig = this._secretConfig;
+        doneEl.result = this.result;
         return;
     }
 

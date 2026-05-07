@@ -34,7 +34,8 @@ UploadEngine.run = async function(opts) {
 
     if (secretConfig) {
         // Override combinedUrl with the secret receive URL: /en-gb/s/{id}#{key}
-        var locale             = UploadEngine.detectLocalePrefix();
+        var pathParts          = window.location.pathname.split('/').filter(Boolean);
+        var locale             = pathParts[0] || 'en-gb';
         result.combinedUrl     = window.location.origin + '/' + locale +
                                  '/s/' + result.transferId + '#' + result.keyString;
         result.deleteAuth      = deleteAuth;
