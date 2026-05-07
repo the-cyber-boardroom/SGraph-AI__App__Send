@@ -51,9 +51,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION  : eu-west-2
-  UI_VERSION  : v0.2.0
-  SOURCE_DIR  : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.0
+  AWS_REGION        : eu-west-2
+  UI_VERSION        : v0.2.1
+  SOURCE_DIR        : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.1
+  BASE_SOURCE_DIR   : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.0
 
 jobs:
   deploy:
@@ -73,6 +74,24 @@ jobs:
 
       - name: Generate i18n locale pages
         run: python scripts/generate_vault_i18n_pages.py --version ${{ env.UI_VERSION }}
+
+      - name: Generate en-gb/vault/index.html (vault shell at clean /en-gb/vault URL)
+        # history.replaceState sets the URL to /en-gb/vault after a vault opens.
+        # S3 needs a real file there so a page refresh doesn't 404.
+        # Generated from root index.html with _common/ paths made root-absolute
+        # so assets resolve correctly from two directories deep.
+        run: |
+          mkdir -p ${{ env.SOURCE_DIR }}/en-gb/vault
+          python3 -c "
+          import re, sys
+          with open('${{ env.SOURCE_DIR }}/index.html') as f:
+              html = f.read()
+          html = html.replace('href=\"_common/', 'href=\"/_common/')
+          html = html.replace('src=\"_common/',  'src=\"/_common/')
+          with open('${{ env.SOURCE_DIR }}/en-gb/vault/index.html', 'w') as f:
+              f.write(html)
+          print('Generated en-gb/vault/index.html')
+          "
 
       - name: Check AWS credentials
         id: check-creds
