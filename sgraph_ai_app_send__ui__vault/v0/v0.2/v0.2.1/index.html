@@ -29,9 +29,6 @@
 <body>
 
     <vault-shell></vault-shell>
-    <!-- Covers the vault-entry form while the async vault open is in progress.
-         Removed by the v0.2.1 patch once the vault is ready or an error is shown. -->
-    <div id="sg-loading-screen" style="position:fixed;inset:0;background:#0d1117;z-index:99999"></div>
 
     <!-- ===================================================================
          Script Loading Order — v0.2.1 root shell
@@ -195,20 +192,17 @@
             return vault;
         };
 
-        // Remove the loading screen that covers the vault-entry form during async open
-        function _hideLoadingScreen() {
-            var el = document.getElementById('sg-loading-screen');
-            if (el) el.remove();
-        }
-
-        // Hide when vault successfully opens or is created
-        if (window.sgraphVault && window.sgraphVault.events) {
-            window.sgraphVault.events.on('vault-opened',  _hideLoadingScreen);
-            window.sgraphVault.events.on('vault-created', _hideLoadingScreen);
-        }
-
-        // Failsafe: remove after 20 s so a hang never leaves a blank page
-        setTimeout(_hideLoadingScreen, 20000);
+        // Hide .vs-entry immediately when a vault token is present in the URL hash.
+        // This script runs after vault-shell has rendered (connectedCallback is sync) but
+        // before vault-entry's async template fetch completes, so the form is never visible.
+        // vault-entry.onReady() still handles the open/create logic in the background.
+        (function () {
+            var hash = window.location.hash;
+            if (!hash || hash === '#') return;
+            var shell    = document.querySelector('vault-shell');
+            var entryDiv = shell && shell.querySelector('.vs-entry');
+            if (entryDiv) entryDiv.style.display = 'none';
+        }());
 
         // Full-page error when auto-open fails — replaces the page body entirely
         function _escHtml(s) {
@@ -216,7 +210,6 @@
         }
 
         function _showAutoOpenErrorPage(token, err) {
-            _hideLoadingScreen();
             var msg = err ? err.message : '';
             var isNotFound = msg.includes('not found') || msg.includes('404');
             var title    = isNotFound ? 'Vault not found' : 'Cannot open vault';
