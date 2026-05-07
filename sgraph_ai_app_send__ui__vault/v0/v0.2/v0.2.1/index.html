@@ -241,9 +241,9 @@
             var namedHex = await _hmac(vault._hmacKey, 'sg-vault-v1:file-id:branch-id:named:' + vault._vaultId);
             var cloneHex = await _hmac(vault._hmacKey, 'sg-vault-v1:file-id:branch-id:clone:web-ui:' + vault._vaultId);
 
-            // created_at must be an integer (Unix seconds) — sgit's Type_Safe schema
-            // rejects ISO 8601 strings with "Cannot convert ... to integer".
-            var createdAtInt = Math.floor(new Date(vault._settings.created).getTime() / 1000);
+            // created_at must be epoch milliseconds integer — sgit's Safe_UInt__Timestamp
+            // rejects ISO strings and epoch-seconds (too small for its range check).
+            var createdAtInt = new Date(vault._settings.created).getTime();
             var branchIndex = {
                 schema:   'branch_index_v1',
                 branches: [
