@@ -21,6 +21,7 @@ The "Share a Secret" feature is **a frontend-only task**. The backend has suppor
 | 02 | [User Journeys & Use Cases](./02-user-journeys-and-use-cases.md) | 6 use cases with step-by-step flows; edge cases; error states; sender/recipient journeys |
 | 03 | [UX Wireframes](./03-ux-wireframes.md) | 9 screen wireframes: creation, encrypting, done, receive, already-viewed, expired, deleted, kill confirm, standalone page |
 | 04 | [Implementation Plan](./04-implementation-plan.md) | Exact IFD v0.3.2 surgical changes; new files; API wiring; test plan; session handoff notes |
+| 05 | [Consolidate Delivery + Share Step](./05-consolidate-delivery-share-step.md) | 6→5 step wizard: merge delivery+share into single Options step; full gotcha map; new component spec |
 
 ---
 
@@ -39,12 +40,13 @@ The "Share a Secret" feature is **a frontend-only task**. The backend has suppor
 
 ## What Gets Built (Phase 1)
 
-1. **"Secret" tab** added to `upload-step-select` alongside File and Text
+1. **[File] [🔒 Secret] tabs** — Text tab removed; Secret tab replaces it
 2. **Expiry config UI** — radio buttons: views (1/5/10) + time (1h/24h/7d)
 3. **API client patch** — `createTransfer()` now sends secret params
 4. **Done state for secrets** — shows share link + kill link, ephemerality notice
 5. **New receive page** — `/en-gb/s/{transferId}#{keyHex}` — inline text display, no file download
 6. **Error states** — already viewed, expired, deleted by sender
+7. **6→5 step wizard** — Delivery + Share mode merged into single "Options" step (`upload-step-options`)
 
 ## What Gets Built (Phase 2)
 
