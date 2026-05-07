@@ -33,3 +33,6 @@ def path__vault_zip(vault_id: str, content_hash: str) -> str:
 
 def path__vault_zip_prefix(vault_id: str) -> str:
     return f'{_ROOT}/cache/vault-zips/{vault_id}/'
+
+def path__vault_public_vault_json(vault_id: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/public-vault.json'

@@ -10,8 +10,11 @@ from osbot_fast_api.api.routes.Fast_API__Routes                                 
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import Service__Vault__Pointer, VAULT_ID_PATTERN
 from sgraph_ai_app_send.lambda__user.service.Service__Vault__Zip                import Service__Vault__Zip
-from sgraph_ai_app_send.lambda__user.storage.Storage__Paths                     import path__vault_zip_prefix
-from sgraph_ai_app_send.lambda__user.user__config                                import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY
+from sgraph_ai_app_send.lambda__user.storage.Storage__Paths                     import path__vault_zip_prefix, path__vault_public_vault_json
+from sgraph_ai_app_send.lambda__user.user__config                                import (HEADER__SGRAPH_SEND__ACCESS_TOKEN ,
+                                                                                         HEADER__SGRAPH_VAULT__WRITE_KEY  ,
+                                                                                         HEADER__SGRAPH_VAULT__PUBLIC     ,
+                                                                                         HEADER__SGRAPH_VAULT__READ_KEY   )
 
 TAG__ROUTES_VAULT = 'api/vault'
 
@@ -24,6 +27,7 @@ ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id:path}
                        f'/{TAG__ROUTES_VAULT}/health/{{vault_id}}'                        ,
                        f'/{TAG__ROUTES_VAULT}/zip/{{vault_id}}'                           ,
                        f'/{TAG__ROUTES_VAULT}/destroy/{{vault_id}}'                       ,
+                       f'/{TAG__ROUTES_VAULT}/public-info/{{vault_id}}'                   ,
                        f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}'                         ,
                        f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}'                          ,
                        f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}'                   ,
@@ -35,7 +39,8 @@ BATCH_MAX_OPERATIONS = 100                                                      
 
 class Routes__Vault__Pointer(Fast_API__Routes):                                  # Vault file endpoints (write, read, delete, batch, list, zip)
     tag                  : str = TAG__ROUTES_VAULT
-    vault_service        : Service__Vault__Pointer                               # Auto-initialized by Type_Safe
+    vault_service        : Service__Vault__Pointer                               # Private vault service (auto-initialized by Type_Safe)
+    public_vault_service : Service__Vault__Pointer = None                        # Public vault service (optional — None if public bucket not configured)
     vault_zip_service    : Service__Vault__Zip      = None                       # Vault zip builder (optional — injected by app)
     admin_service_client : object = None                                         # Optional Admin__Service__Client
 
@@ -79,6 +84,11 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                                 detail      = 'Access token required')
         return provided_token
 
+    def _get_vault_service(self, request: Request) -> Service__Vault__Pointer:     # Route to public bucket when X-Vault-Public: true header present
+        if self.public_vault_service and request.headers.get(HEADER__SGRAPH_VAULT__PUBLIC) == 'true':
+            return self.public_vault_service
+        return self.vault_service
+
     @route_path('/write/{vault_id}/{file_id:path}')
     async def write__vault_id__file_id(self, vault_id : Safe_Str__Id,            # PUT /vault/{vault_id}/write/{file_id:path}
                                              file_id  : str,
@@ -94,22 +104,29 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if not payload:
             raise HTTPException(status_code = 400,
                                 detail      = 'Empty payload')
-        result = self.vault_service.write(vault_id      = str(vault_id)  ,
-                                          file_id       = str(file_id)   ,
-                                          write_key_hex = write_key      ,
-                                          payload_bytes = payload        )
+        service = self._get_vault_service(request)
+        result  = service.write(vault_id      = str(vault_id)  ,
+                                file_id       = str(file_id)   ,
+                                write_key_hex = write_key      ,
+                                payload_bytes = payload        )
         if result is None:
             raise HTTPException(status_code = 403,
                                 detail      = 'Write key mismatch')
+        if service is self.public_vault_service:                                 # Write public-vault.json on first push (idempotent)
+            read_key = request.headers.get(HEADER__SGRAPH_VAULT__READ_KEY, '')
+            if read_key:
+                service.ensure_public_vault_json(str(vault_id), read_key)
         return result
 
     @route_path('/read/{vault_id}/{file_id:path}')
     def read__vault_id__file_id(self, vault_id : Safe_Str__Id,                   # GET /vault/{vault_id}/read/{file_id:path}
-                                      file_id  : str
+                                      file_id  : str,
+                                      request  : Request
                                ) -> Response:
         self._validate_vault_id(vault_id)
-        payload = self.vault_service.read(vault_id = str(vault_id),
-                                          file_id  = str(file_id) )
+        service = self._get_vault_service(request)
+        payload = service.read(vault_id = str(vault_id),
+                               file_id  = str(file_id) )
         if payload is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Vault file not found')
@@ -118,11 +135,13 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
 
     @route_path('/read-base64/{vault_id}/{file_id:path}')
     def read_base64__vault_id__file_id(self, vault_id : Safe_Str__Id,           # GET /vault/{vault_id}/read-base64/{file_id:path} — JSON-safe base64 read
-                                             file_id  : str
+                                             file_id  : str,
+                                             request  : Request
                                        ) -> dict:
         self._validate_vault_id(vault_id)
-        payload = self.vault_service.read(vault_id = str(vault_id),
-                                          file_id  = str(file_id) )
+        service = self._get_vault_service(request)
+        payload = service.read(vault_id = str(vault_id),
+                               file_id  = str(file_id) )
         if payload is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Vault file not found')
@@ -145,9 +164,10 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if not write_key:
             raise HTTPException(status_code = 400,
                                 detail      = 'Missing write key')
-        result = self.vault_service.delete(vault_id      = str(vault_id) ,
-                                           file_id       = str(file_id)  ,
-                                           write_key_hex = write_key     )
+        service = self._get_vault_service(request)
+        result  = service.delete(vault_id      = str(vault_id) ,
+                                 file_id       = str(file_id)  ,
+                                 write_key_hex = write_key     )
         if result is None:
             raise HTTPException(status_code = 403,
                                 detail      = 'Write key mismatch or file not found')
@@ -167,40 +187,58 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
                                 detail      = f'Too many operations (max {BATCH_MAX_OPERATIONS})')
 
         read_only = all(op.get('op') == 'read' for op in operations)
+        service   = self._get_vault_service(request)
 
         if read_only:                                                            # Read-only batch — no auth required (data is encrypted)
-            return self.vault_service.batch_read(vault_id   = str(vault_id) ,
-                                                  operations = operations    )
+            return service.batch_read(vault_id   = str(vault_id) ,
+                                      operations = operations    )
 
         self.check_access_token(request)                                         # Mixed/write batch — require auth
         write_key = request.headers.get(HEADER__SGRAPH_VAULT__WRITE_KEY, '')
         if not write_key:
             raise HTTPException(status_code = 400,
                                 detail      = 'Missing write key')
-        result = self.vault_service.batch(vault_id      = str(vault_id)  ,
-                                          operations    = operations      ,
-                                          write_key_hex = write_key      )
+        result = service.batch(vault_id      = str(vault_id)  ,
+                               operations    = operations      ,
+                               write_key_hex = write_key      )
         if result is None:
             raise HTTPException(status_code = 403,
                                 detail      = 'Write key mismatch')
         return result
 
     def list__vault_id(self, vault_id : Safe_Str__Id,                            # GET /vault/list/{vault_id}?prefix=bare/data/
-                             prefix   : str = ''                                 # Query param: filter by file_id prefix
+                             prefix   : str = '',                                # Query param: filter by file_id prefix
+                             request  : Request = None
                        ) -> dict:
         self._validate_vault_id(vault_id)
-        return self.vault_service.list_files(vault_id = str(vault_id) ,
-                                             prefix   = prefix        )
+        service = self._get_vault_service(request) if request else self.vault_service
+        return service.list_files(vault_id = str(vault_id) ,
+                                  prefix   = prefix        )
 
     @route_path('/health/{vault_id}')
-    def health__vault_id(self, vault_id : Safe_Str__Id) -> dict:                # GET /vault/health/{vault_id} — unauthenticated existence check + Lambda warm-up
+    def health__vault_id(self, vault_id : Safe_Str__Id,                         # GET /vault/health/{vault_id} — unauthenticated existence check + Lambda warm-up
+                               request  : Request
+                         ) -> dict:
         self._validate_vault_id(vault_id)
-        manifest_path = self.vault_service.vault_manifest_path(str(vault_id))
-        exists        = self.vault_service.storage_fs.file__exists(manifest_path)
+        service       = self._get_vault_service(request)
+        manifest_path = service.vault_manifest_path(str(vault_id))
+        exists        = service.storage_fs.file__exists(manifest_path)
         if exists:
             return dict(status = 'ok', vault_id = str(vault_id))
         raise HTTPException(status_code = 404,
                             detail      = 'Vault not found')
+
+    @route_path('/public-info/{vault_id}')
+    def public_info__vault_id(self, vault_id : Safe_Str__Id) -> dict:           # GET /vault/public-info/{vault_id} — anonymous; returns public-vault.json as JSON
+        self._validate_vault_id(vault_id)
+        if self.public_vault_service is None:
+            raise HTTPException(status_code = 501,
+                                detail      = 'Public vaults not configured on this server')
+        path = path__vault_public_vault_json(str(vault_id))
+        if not self.public_vault_service.storage_fs.file__exists(path):
+            raise HTTPException(status_code = 404,
+                                detail      = 'Public vault not found')
+        return self.public_vault_service.storage_fs.file__json(path)
 
     @route_path('/zip/{vault_id}')
     def zip__vault_id(self, vault_id : Safe_Str__Id,                             # GET /vault/zip/{vault_id} — download vault as zip
@@ -255,8 +293,9 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if body.get('vault_id', '') != str(vault_id):
             raise HTTPException(status_code = 409,
                                 detail      = 'vault_id in body does not match vault_id in URL')
-        result = self.vault_service.delete_vault(vault_id      = str(vault_id),
-                                                  write_key_hex = write_key    )
+        service = self._get_vault_service(request)
+        result  = service.delete_vault(vault_id      = str(vault_id),
+                                       write_key_hex = write_key    )
         if result is None:
             raise HTTPException(status_code = 403,
                                 detail      = 'Write key mismatch')
@@ -295,6 +334,7 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         self.add_route_get   (self.health__vault_id               )
         self.add_route_get   (self.zip__vault_id                  )
         self.add_route_delete(self.destroy__vault_id              )
+        self.add_route_get   (self.public_info__vault_id          )
         self.add_route_put   (self.write__vault_id                )              # Catch: missing file_id
         self.add_route_get   (self.read__vault_id                 )              # Catch: missing file_id
         self.add_route_get   (self.read_base64__vault_id          )              # Catch: missing file_id

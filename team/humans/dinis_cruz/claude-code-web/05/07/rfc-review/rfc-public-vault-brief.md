@@ -1,0 +1,255 @@
+# Public Vault Type — Design Brief
+**Date:** 07 May 2026
+**From:** SG/Send API Team
+**To:** SGit Team
+**Status:** Ready for comment
+
+---
+
+## Core Insight: A Public Vault Is a Second Remote
+
+A public vault is not a new vault type that the server manages. It is a **second remote**
+that the SGit client pushes to — a remote that happens to point at a world-readable S3
+bucket instead of a private one.
+
+This is already how git works. Multiple remotes, each holding a different version of the
+same repository, is a first-class git concept. SGit inherits this for free.
+
+**Public vaults start public** — the owner decides at creation time. There is no
+conversion from private to public. A public vault is initialised directly in the public
+bucket; a private vault is initialised in the private bucket. The server distinguishes them
+by the `X-Vault-Public: true` header.
+
+Branches, commits, pulls, merges — all the normal git mechanics handle sync and divergence.
+No server-side publish or unpublish workflow is needed.
+
+---
+
+## Vault Layout
+
+Both buckets use identical path conventions. The public bucket adds two files at the vault
+root that are not present in private vaults.
+
+```
+sg-send__data/sg-send-api__v1.0/{deployment}/vault/{id[:2]}/{id}/
+
+    # Present in all vaults (both buckets)
+    manifest.json                    ← write auth record (write_key_hash); server-internal
+    bare/refs/<ref-id>/payload       ← HEAD pointer (mutable, encrypted)
+    bare/data/obj-cas-imm-<hash>/payload   ← vault objects (immutable, encrypted)
+    bare/indexes/<index-id>/payload  ← index objects (encrypted)
+    deleted.json                     ← tombstone written after vault is destroyed
+
+    # Public bucket only
+    public-vault.json                ← discovery entry point (plaintext, world-readable)
+```
+
+`public-vault.json` is a plain JSON file at the vault root — not an encrypted object, not
+using the `/payload` suffix convention. It is the only new file the server writes.
+
+---
+
+## `public-vault.json` Format
+
+```json
+{
+  "schema":     "sgit-public-vault/1",
+  "vault_id":   "abc123de",
+  "created_at": 1746662400000,
+  "read_key":   "<base64-encoded read key bytes>",
+  "cdn_base":   "https://data.send.sgraph.ai/public-vaults/shared/ab/abc123de"
+}
+```
+
+- **`read_key`** — the decryption key for all vault objects. Provided by the SGit client
+  at vault initialisation (via `X-Vault-Read-Key: <base64>` header). The server stores it
+  verbatim. Format: base64-encoded 32 bytes (standard HKDF output length). Clients
+  base64-decode on fetch; no further transformation needed.
+- **`cdn_base`** — Phase 2 field. In Phase 1 this will be the Lambda URL. In Phase 2 it
+  becomes the CloudFront URL so SGit can fetch objects directly from CDN without
+  constructing paths independently.
+- **`description`** is intentionally absent — vault description lives inside the
+  encrypted vault content, not in the access record.
+
+**Storage and content-type:** `public-vault.json` is a UTF-8 text file, not a binary
+blob. It must be written and served as `Content-Type: application/json`. This is the
+explicit exception to the vault's binary `/payload` convention — everything else in
+`bare/` is encrypted ciphertext stored as `application/octet-stream`. Clients fetch
+this file with a standard `fetch(url).then(r => r.json())` — no binary decode step.
+
+---
+
+## Reads Are Already Anonymous
+
+This is code-verified. The existing read endpoints require **no authentication**:
+
+```python
+# Routes__Vault__Pointer.py
+def read__vault_id__file_id(self, vault_id, file_id) -> Response:
+    self._validate_vault_id(vault_id)      # format check only — no token, no write key
+    payload = self.vault_service.read(vault_id=vault_id, file_id=file_id)
+    return Response(content=payload, media_type='application/octet-stream')
+```
+
+`check_access_token` is called only on writes, deletes, and zip downloads. The read-only
+batch handler notes explicitly: `# Read-only batch — no auth required (data is encrypted)`.
+
+This is the zero-knowledge design: the server stores only ciphertext, so gating reads
+provides no security benefit. Anyone who knows the vault ID and file path can fetch
+encrypted bytes — they are useless without the decryption key.
+
+This is already how `qa.sgraph.ai/en-gb/library` works: it reads directly from a private
+vault using the Lambda URL, with the vault ID and read key embedded in the site's config.
+
+---
+
+## Two-Phase Read Model
+
+### Phase 1 — Lambda URL, caller needs vault_id + read_key
+
+No new infrastructure. The same Lambda URL serves public vault reads anonymously.
+
+```
+GET /api/vault/read/{vault_id}/public-vault.json           → { read_key, cdn_base, ... }
+GET /api/vault/read/{vault_id}/bare/refs/<ref-id>          → encrypted HEAD ref
+GET /api/vault/read/{vault_id}/bare/data/obj-cas-imm-<h>   → encrypted object
+```
+
+The `X-Vault-Public: true` header on writes routes them to the public bucket. Reads from
+the public bucket work identically to reads from the private bucket — same endpoints, same
+anonymous access.
+
+### Phase 2 — CloudFront, vault_id alone is sufficient
+
+CloudFront distribution `data.send.sgraph.ai` adds a behaviour pointing at the public
+bucket. SGit fetches all public vault objects directly from CDN; writes continue through
+the Lambda API.
+
+```
+# Step 1: discover read key and CDN base from vault ID alone
+GET https://data.send.sgraph.ai/public-vaults/shared/{id[:2]}/{id}/public-vault.json
+    → { "read_key": "...", "cdn_base": "https://data.send.sgraph.ai/public-vaults/..." }
+
+# Step 2: fetch all objects directly from CDN using cdn_base
+GET {cdn_base}/bare/refs/<ref-id>        → encrypted HEAD ref   (Cache-Control: no-store)
+GET {cdn_base}/bare/data/<hash>          → encrypted object     (Cache-Control: immutable)
+```
+
+Cache-Control policy:
+- `bare/data/obj-cas-imm-*/payload` → `immutable, max-age=31536000` (content-addressed)
+- `bare/refs/*/payload` → `no-store` (mutable HEAD pointer)
+- `public-vault.json` → `no-store` (must be purgeable on unpublish)
+- `manifest.json` → blocked at CloudFront (403); defence in depth
+
+---
+
+## What SGit Needs to Do (Client Side)
+
+**Public vaults start public.** The owner decides at creation time:
+
+```
+sgit init --public          # creates vault in public bucket from the start
+                            # includes X-Vault-Public: true + X-Vault-Read-Key on init
+```
+
+**Converting a private vault to public is technically possible** — by changing the
+SGit-side remote config so subsequent pushes carry `X-Vault-Public: true`. The server will
+accept this and create the vault in the public bucket. However, this should be a
+deliberate, manual operation, not a convenience command. No `sgit publish` shortcut.
+The friction is intentional: making something public is a one-way door with permanent
+consequences (CDN caches, external links, read key exposure), and the user should have to
+mean it.
+
+**Destroying a public vault** is a vault delete (same as private):
+- Push a `deleted.json` tombstone to the public remote, or
+- Call the destroy endpoint — the server writes the tombstone and removes objects
+
+---
+
+## What the Server Needs to Do (Minimal)
+
+| Task | Estimate |
+|------|----------|
+| New env var `SEND__PUBLIC_VAULT__S3_BUCKET` | 30 min |
+| `Send__Config.public_vault_storage_fs()` → `Storage_FS__S3` for public bucket | 30 min |
+| Route layer: select storage backend from `X-Vault-Public: true` header | 1 hr |
+| On first push (no `manifest.json` yet in public bucket): write `public-vault.json` using read_key from `X-Vault-Read-Key` header | 1 hr |
+| Tests | 2 hr |
+| **Total** | **~5 hrs** |
+
+Not needed (removed from earlier scope):
+- ~~Publish endpoint~~ — this is `sgit push public`
+- ~~Unpublish endpoint~~ — this is `sgit push` with a tombstone object
+- ~~Cross-bucket manifest lookup~~ — each bucket is fully independent
+
+---
+
+## Bucket Independence
+
+Each bucket is fully self-contained:
+
+- Public vaults: everything (including `manifest.json` for write auth) lives in the
+  public bucket
+- Private vaults: everything lives in the private bucket
+- Neither bucket knows about the other
+- No cross-bucket coupling of any kind
+
+**`manifest.json` will be publicly readable** (we accept this). `write_key_hash` exposure
+is benign: the server hashes the submitted write key on arrival, so submitting the stored
+hash directly cannot authenticate a write. A CloudFront rule blocking `manifest.json`
+(returning 403) is recommended as defence in depth but the design does not depend on it.
+
+---
+
+## Confirmed: Blocker Resolved (07 May 2026)
+
+**`read_key → write_key` derivation is computationally infeasible. Phase 1 can proceed.**
+
+Both keys are HKDF-derived from the same master `vault_key` with different `info` contexts:
+
+```
+vault_key                                          (master secret, never leaves client)
+  ├─ HKDF(vault_key, info="read")  → read_key
+  └─ HKDF(vault_key, info="write") → write_key
+```
+
+HKDF-Expand is a one-way function (HMAC-based; output is computationally indistinguishable
+from random). Given `read_key` alone:
+
+- You cannot compute `vault_key` — HKDF is non-invertible.
+- Without `vault_key`, you cannot compute `write_key` — both keys are siblings of an
+  unrecoverable parent.
+
+Possession of `read_key` gives exactly the read access the design intends. No path to
+write escalation exists.
+
+---
+
+## Three Implementation Details to Confirm (From SGit Review)
+
+### 1. Clone semantics across buckets
+
+`sgit clone <key>` without `--public` against a vault that exists only in the public
+bucket will return 404 from the private bucket. The server does not cross-bucket lookup —
+bucket independence is a hard property. SGit should surface this clearly:
+
+```
+error: vault not found in private bucket.
+       If this is a public vault, retry with: sgit clone --public <key>
+```
+
+### 2. `read_key` round-trip format
+
+- SGit generates a 32-byte `read_key` via HKDF
+- SGit sends `X-Vault-Read-Key: <base64(32 bytes)>` on vault init
+- Server stores verbatim in `public-vault.json` as the `read_key` field
+- Readers fetch `public-vault.json`, base64-decode `read_key` → 32 bytes → use for decryption
+
+Standard base64 (not URL-safe) to match the existing key encoding conventions.
+Documenting this once to avoid a hex-vs-base64 mismatch at integration time.
+
+### 3. `description` absent from `public-vault.json`
+
+Confirmed and intentional. Vault name and description live inside the encrypted tree
+(aligns with the `.vault-settings` brief). The access record contains only what is
+needed to establish a read session — nothing more.

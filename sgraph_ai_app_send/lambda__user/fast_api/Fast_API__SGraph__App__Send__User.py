@@ -16,7 +16,12 @@ from sgraph_ai_app_send.lambda__user.storage.Send__Config                       
 from sgraph_ai_app_send.lambda__user.user__config                                   import APP__SEND__USER__FAST_API__TITLE, APP__SEND__USER__FAST_API__DESCRIPTION
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client                 import Admin__Service__Client
 from sgraph_ai_app_send.lambda__user.service.Admin__Service__Client__Setup          import setup_admin_service_client__remote
-from sgraph_ai_app_send.lambda__user.user__config                                   import HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY, ENV_VAR__N8N_WEBHOOK_URL, ENV_VAR__N8N_WEBHOOK_SECRET
+from sgraph_ai_app_send.lambda__user.user__config                                   import (HEADER__SGRAPH_SEND__ACCESS_TOKEN       ,
+                                                                                            HEADER__SGRAPH_VAULT__WRITE_KEY         ,
+                                                                                            HEADER__SGRAPH_VAULT__PUBLIC            ,
+                                                                                            HEADER__SGRAPH_VAULT__READ_KEY          ,
+                                                                                            ENV_VAR__N8N_WEBHOOK_URL                ,
+                                                                                            ENV_VAR__N8N_WEBHOOK_SECRET             )
 from sgraph_ai_app_send.utils.MCP__Setup                                            import MCP__Setup
 from sgraph_ai_app_send.utils.Version                                               import version__sgraph_ai_app_send
 
@@ -24,14 +29,15 @@ ROUTES_PATHS__API_DOCS                = ['/api/docs', '/api/openapi.json', '/api
 
 class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
-    send_config          : Send__Config          = None                              # Storage configuration (auto-detects mode)
-    transfer_service     : Transfer__Service      = None                            # Shared transfer service instance
-    presigned_service    : Service__Presigned_Urls = None                           # Presigned URL service (S3 mode only)
-    admin_service_client : Admin__Service__Client = None                            # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
-    early_access_service : Service__Early_Access  = None                            # Early Access signup (n8n webhook)
-    vault_service        : Service__Vault__Pointer = None                            # Vault pointer service (mutable files)
-    vault_zip_service    : Service__Vault__Zip      = None                            # Vault zip builder with content-addressable caching
-    vault_presigned_service : Service__Vault__Presigned = None                       # Vault presigned URL service (S3 mode only)
+    send_config             : Send__Config            = None                          # Storage configuration (auto-detects mode)
+    transfer_service        : Transfer__Service       = None                          # Shared transfer service instance
+    presigned_service       : Service__Presigned_Urls = None                          # Presigned URL service (S3 mode only)
+    admin_service_client    : Admin__Service__Client  = None                          # Admin Lambda client (REMOTE in prod, IN_MEMORY in tests)
+    early_access_service    : Service__Early_Access   = None                          # Early Access signup (n8n webhook)
+    vault_service           : Service__Vault__Pointer = None                          # Vault pointer service (private bucket)
+    public_vault_service    : Service__Vault__Pointer = None                          # Vault pointer service (public bucket; None if not configured)
+    vault_zip_service       : Service__Vault__Zip     = None                          # Vault zip builder with content-addressable caching
+    vault_presigned_service : Service__Vault__Presigned = None                        # Vault presigned URL service (S3 mode only)
 
     def app_kwargs(self, **kwargs):                                                   # Override: move docs under /api/ so CloudFront routes them to Lambda
         kwargs = super().app_kwargs(**kwargs)
@@ -79,6 +85,11 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         if self.vault_service is None:                                           # Auto-create vault pointer service (shares storage backend)
             self.vault_service = Service__Vault__Pointer(storage_fs=storage_fs)
 
+        if self.public_vault_service is None:                                    # Auto-create public vault service if public bucket env var is set
+            public_fs = self.send_config.create_public_vault_storage_backend()
+            if public_fs is not None:
+                self.public_vault_service = Service__Vault__Pointer(storage_fs=public_fs)
+
         if self.vault_zip_service is None:                                     # Auto-create vault zip service (shares storage backend for cache)
             self.vault_zip_service = Service__Vault__Zip(vault_service = self.vault_service,
                                                           storage_fs    = storage_fs       )
@@ -102,7 +113,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                                       allow_origins     = ["*"]                                                                                                      ,
                                       allow_credentials = True                                                                                                       ,
                                       allow_methods     = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]                                                          ,
-                                      allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization", HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY],
+                                      allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization", HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY, HEADER__SGRAPH_VAULT__PUBLIC, HEADER__SGRAPH_VAULT__READ_KEY],
                                       expose_headers    = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization"]                                  )
 
     def setup_routes(self):
@@ -117,6 +128,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                         service_early_access = self.early_access_service )
         self.add_routes(Routes__Vault__Pointer ,
                         vault_service        = self.vault_service        ,
+                        public_vault_service = self.public_vault_service ,
                         vault_zip_service    = self.vault_zip_service    ,
                         admin_service_client = self.admin_service_client )
         self.add_routes(Routes__Vault__Presigned,
