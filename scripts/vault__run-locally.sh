@@ -103,6 +103,22 @@ for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
     [ -f "$f" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
 done
 
+# Create en-gb/vault/index.html — serves the vault shell at /en-gb/vault so that
+# history.replaceState(null, '', '/en-gb/vault') produces a real, refreshable URL.
+# Generated from root index.html at serve time; _common/ paths are made root-absolute
+# so they resolve correctly from /en-gb/vault/ (two directories deep).
+mkdir -p "$SERVE_DIR/en-gb/vault"
+python3 -c "
+import sys
+with open('$SERVE_DIR/index.html') as f:
+    html = f.read()
+# Make local relative _common/ paths root-absolute so they work from /en-gb/vault/
+html = html.replace('href=\"_common/', 'href=\"/_common/')
+html = html.replace('src=\"_common/', 'src=\"/_common/')
+with open('$SERVE_DIR/en-gb/vault/index.html', 'w') as f:
+    f.write(html)
+print('  Created: en-gb/vault/index.html')
+"
 
 # Inject /api/health for local dev — vault-header.js calls window.location.origin/api/health
 # to display the backend version. Python http.server has no API routes, so this

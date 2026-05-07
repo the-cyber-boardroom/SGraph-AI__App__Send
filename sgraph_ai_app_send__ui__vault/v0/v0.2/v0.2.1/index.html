@@ -273,6 +273,56 @@
             return vault;
         };
 
+        // Patch VaultDataSource to expose .vault-settings as a browseable + editable file.
+        // The file is synthetic: read → serialised from vault._settings; write → parsed back
+        // into vault._settings and re-committed (same path the internal _commit() takes).
+        // This makes the metadata visible in the file browser without duplicating it in the tree.
+        (function () {
+            var proto = window.VaultDataSource && window.VaultDataSource.prototype;
+            if (!proto) return;
+
+            var _origGetTree = proto.getTree;
+            proto.getTree = function () {
+                var tree = _origGetTree.call(this);
+                var json = JSON.stringify(this._vault._settings || {}, null, 2);
+                tree.files.push({ path: '.vault-settings', name: '.vault-settings',
+                                  size: new TextEncoder().encode(json).length });
+                return tree;
+            };
+
+            var _origGetFileList = proto.getFileList;
+            proto.getFileList = function () {
+                var list = _origGetFileList.call(this);
+                var json = JSON.stringify(this._vault._settings || {}, null, 2);
+                list.push({ path: '.vault-settings', name: '.vault-settings',
+                            dir: false, size: new TextEncoder().encode(json).length });
+                return list;
+            };
+
+            var _origGetFileBytes = proto.getFileBytes;
+            proto.getFileBytes = async function (path) {
+                if (path === '.vault-settings') {
+                    var json = JSON.stringify(this._vault._settings || {}, null, 2);
+                    return new TextEncoder().encode(json).buffer;
+                }
+                return _origGetFileBytes.call(this, path);
+            };
+
+            var _origSaveFile = proto.saveFile;
+            proto.saveFile = async function (folderPath, fileName, bytes) {
+                if (fileName === '.vault-settings') {
+                    if (!this.writable) throw new Error('Read-only: no access key');
+                    var buf  = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes).buffer;
+                    var text = new TextDecoder().decode(buf);
+                    this._vault._settings = JSON.parse(text);
+                    await this._vault._commit('Update .vault-settings');
+                    if (this.onTreeChanged) this.onTreeChanged();
+                    return;
+                }
+                return _origSaveFile.call(this, folderPath, fileName, bytes);
+            };
+        }());
+
         // Hide .vs-entry immediately when a vault token is present in the URL hash.
         // This script runs after vault-shell has rendered (connectedCallback is sync) but
         // before vault-entry's async template fetch completes, so the form is never visible.
