@@ -472,7 +472,7 @@
             var lockBtn = header && header.shadowRoot && header.shadowRoot.querySelector('.vh-lock-btn');
             if (lockBtn) {
                 lockBtn.textContent = 'Open or Create Vault';
-                lockBtn.title       = 'Lock this vault and return to the entry screen';
+                lockBtn.title       = 'Open or create a vault';
                 lockBtn.style.cssText = [
                     'order:-1',
                     'color:#4ecdc4',
@@ -481,6 +481,18 @@
                     'font-weight:600'
                 ].join(';');
             }
+        }());
+
+        // Patch VaultShell._onLock: redirect to the landing page instead of showing the
+        // vault-entry/RECENT VAULTS screen (the previous UI that should never appear).
+        (function () {
+            var VaultShell = customElements.get('vault-shell');
+            if (!VaultShell) return;
+            VaultShell.prototype._onLock = function () {
+                try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
+                try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
+                window.location.replace('/en-gb/');
+            };
         }());
 
         // Patch VaultEntry._onSimpleTokenOpen:
