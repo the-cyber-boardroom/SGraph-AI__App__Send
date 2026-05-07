@@ -192,6 +192,18 @@
             return vault;
         };
 
+        // Hide .vs-entry immediately when a vault token is present in the URL hash.
+        // This script runs after vault-shell has rendered (connectedCallback is sync) but
+        // before vault-entry's async template fetch completes, so the form is never visible.
+        // vault-entry.onReady() still handles the open/create logic in the background.
+        (function () {
+            var hash = window.location.hash;
+            if (!hash || hash === '#') return;
+            var shell    = document.querySelector('vault-shell');
+            var entryDiv = shell && shell.querySelector('.vs-entry');
+            if (entryDiv) entryDiv.style.display = 'none';
+        }());
+
         // Full-page error when auto-open fails — replaces the page body entirely
         function _escHtml(s) {
             return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
