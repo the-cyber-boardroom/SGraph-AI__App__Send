@@ -365,15 +365,15 @@ class test_Routes__Transfers(TestCase):
         assert r2.status_code == 410
 
     def test__download__expired_returns_410(self):
-        from datetime import datetime, timezone, timedelta
-        past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        import time
+        past = int(time.time() * 1000) - 3_600_000                              # now - 1h in ms
         tid  = self._full_transfer(expires_at=past)
         resp = self.client.get(f'/api/transfers/download/{tid}')
         assert resp.status_code == 410
 
     def test__download__not_yet_expired_succeeds(self):
-        from datetime import datetime, timezone, timedelta
-        future = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        import time
+        future = int(time.time() * 1000) + (24 * 3_600_000)                    # now + 24h in ms
         tid    = self._full_transfer(expires_at=future)
         resp   = self.client.get(f'/api/transfers/download/{tid}')
         assert resp.status_code == 200
