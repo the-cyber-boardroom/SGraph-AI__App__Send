@@ -75,6 +75,12 @@
     <!-- 4c. Vault deep-link patch: use | separator (vault URL format) -->
     <script>
     (function() {
+        // Global state for deep-link copy button (populated by _mountBrowse patch below)
+        window._vaultDeepLinkPath  = null;
+        window._vaultCurrentToken  = null;
+        window._vaultBrowseElement = null;
+
+        // Read deep-link path from hash (e.g. #token|path/to/file.md → "path/to/file.md")
         if (typeof _plrGetHashPath === 'function') {
             _plrGetHashPath = function() {
                 var hash = window.location.hash.slice(1);
@@ -83,13 +89,18 @@
                 return hash.slice(idx + 1) || null;
             };
         }
+        // Do NOT write file paths back to the URL bar — the address bar stays clean.
+        // Instead, update the browse component's downloadUrl so the Share tab "Copy Link"
+        // button returns the correct file-specific deep link.
         if (typeof _plrSetHashPath === 'function') {
             _plrSetHashPath = function(path) {
-                var hash  = window.location.hash.slice(1);
-                var idx   = hash.indexOf('|');
-                var token = idx === -1 ? hash : hash.slice(0, idx);
-                var next  = token + (path ? '|' + path : '');
-                if (hash !== next) history.replaceState(null, '', '#' + next);
+                window._vaultDeepLinkPath = path || null;
+                var browse = window._vaultBrowseElement;
+                var token  = window._vaultCurrentToken;
+                if (browse && token) {
+                    var base = window.location.origin + '/#' + token;
+                    browse.downloadUrl = path ? (base + '|' + path) : base;
+                }
             };
         }
     })();
@@ -303,6 +314,83 @@
         window.addEventListener('hashchange', function () {
             window.location.reload();
         });
+
+        // Patch VaultShell._mountBrowse:
+        //   1. Fix downloadUrl — use vault key, not window.location.href (which may be '/'
+        //      after create-then-clear-hash).
+        //   2. Store the browse element reference so _plrSetHashPath can update it when
+        //      a file tab is opened (deep-link copy button mechanism).
+        (function () {
+            var _origMount = VaultShell.prototype._mountBrowse;
+            VaultShell.prototype._mountBrowse = async function (deepLink) {
+                await _origMount.call(this, deepLink);
+                var browse = this.querySelector('.vs-view-files send-browse');
+                var token  = this._vaultKey;
+                if (browse && token) {
+                    browse.downloadUrl = window.location.origin + '/#' + token;
+                }
+                window._vaultCurrentToken  = token  || null;
+                window._vaultBrowseElement = browse || null;
+                // Reset deep-link path on each mount (new browse, fresh state)
+                window._vaultDeepLinkPath  = null;
+            };
+        }());
+
+        // Patch VaultSettings.refresh: inject a VAULT URL row below the Vault Key section.
+        // The URL is constructed from window.location.origin + '/#' + vaultKey so it always
+        // reflects the current host (localhost, dev.vault.sgraph.ai, vault.sgraph.ai, etc.)
+        (function () {
+            var _origRefresh = VaultSettings.prototype.refresh;
+            VaultSettings.prototype.refresh = function () {
+                _origRefresh.call(this);
+                if (!this._vault || !this._vaultKey) return;
+                var root     = this.shadowRoot;
+                if (!root) return;
+                var vaultUrl = window.location.origin + '/#' + this._vaultKey;
+
+                // Update if already injected
+                var existing = root.querySelector('.vset-url-input');
+                if (existing) { existing.value = vaultUrl; return; }
+
+                // Find the vault key section to insert after it
+                var keySection = null;
+                root.querySelectorAll('.vset-section').forEach(function (s) {
+                    if (s.querySelector('.vset-key-input')) keySection = s;
+                });
+                if (!keySection) return;
+
+                var urlSection = document.createElement('div');
+                urlSection.className = 'vset-section';
+                urlSection.innerHTML =
+                    '<label class="vset-label">Vault URL</label>' +
+                    '<div class="vset-row">' +
+                    '<input class="vset-input vset-url-input" type="text" readonly>' +
+                    '<button class="vset-btn vset-copy-url">Copy</button>' +
+                    '</div>' +
+                    '<p class="vset-hint">Direct browser link to this vault. Treat it like the vault key — anyone with it can read all files.</p>';
+                keySection.after(urlSection);
+                root.querySelector('.vset-url-input').value = vaultUrl;
+
+                root.querySelector('.vset-copy-url').addEventListener('click', function () {
+                    var url = root.querySelector('.vset-url-input').value;
+                    navigator.clipboard.writeText(url).then(function () {
+                        window.sgraphVault.messages.success('Vault URL copied');
+                    });
+                });
+            };
+        }());
+
+        // Rename the "⇌ Vaults" header button to "← New vault".
+        // vault-header renders synchronously in connectedCallback (called by vault-shell._render),
+        // so the shadowRoot is already populated by the time this script runs.
+        (function () {
+            var header  = document.querySelector('vault-shell vault-header');
+            var lockBtn = header && header.shadowRoot && header.shadowRoot.querySelector('.vh-lock-btn');
+            if (lockBtn) {
+                lockBtn.textContent = '← New vault';
+                lockBtn.title       = 'Lock this vault and return to the entry screen';
+            }
+        }());
 
         // Patch VaultEntry._onSimpleTokenOpen:
         //   - When sg-vault-creating is set (new vault from landing page), create instead of open
