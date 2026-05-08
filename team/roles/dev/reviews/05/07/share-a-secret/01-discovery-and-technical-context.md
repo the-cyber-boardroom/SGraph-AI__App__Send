@@ -144,19 +144,29 @@ The zero-knowledge model is preserved throughout:
 | Expiry is server-enforced | Even if someone has the URL, the server will 404 after `expires_at` |
 | Delete auth enables early wipe | Sender can derive a delete token from the encryption key and hard-delete before expiry |
 
-### The Delete Auth Pattern (From Original Brief)
+### The Delete Auth Pattern (Implemented — Random Token Approach)
 
-When creating a secret, the sender can derive a `delete_auth` from the encryption key:
+> **Update (07 May 2026):** The original brief proposed deriving `delete_auth` from the
+> encryption key (`sha256(keyHex + ':sgraph-delete-v1')`). The implementation uses a
+> **random 32-byte token** instead. The code review accepted this deviation as the better
+> design — delete capability is fully independent of the encryption key, so an attacker
+> who obtains the share URL cannot also delete the secret. The trade-off (kill token is
+> unrecoverable if lost) is consistent with the brief's stated philosophy: "if the sender
+> loses it, they cannot delete — this is a feature, not a bug."
+
+When creating a secret, a cryptographically random `deleteAuth` token is generated:
 
 ```javascript
-// Derive delete token from the same key used for encryption
-delete_auth = sha256(encryption_key_hex + ':delete')
-// Store delete_auth_hash = sha256(delete_auth) on server
-// If sender needs to kill the secret early:
-//   DELETE /api/transfers/{id}  with header: x-sgraph-transfer-delete-auth: {delete_auth}
+// Generate a random 32-byte delete token (client-side)
+var deleteAuth = crypto.getRandomValues(new Uint8Array(32));
+// Store delete_auth_hash = sha256(deleteAuth) on server at creation time
+// Kill URL fragment carries the raw deleteAuth token (never sent in HTTP requests)
+// DELETE /api/transfers/{id}  with header: x-sgraph-transfer-delete-auth: {deleteAuth hex}
 ```
 
-This means the sender can kill a secret they've already sent — without needing a separate password. If they realise they sent the link to the wrong person, they open the "kill link" and the payload is wiped.
+This means the sender can kill a secret they've already sent. If they realise they sent
+the link to the wrong person, they open the kill link and the payload is wiped. The kill
+link is shown on the Done screen immediately after upload — it cannot be re-derived later.
 
 ---
 
