@@ -179,10 +179,10 @@
             bar.appendChild(copyBtn);
         }
 
-        // --- Present button (HTML files: fullscreen the sandboxed iframe) ---
+        // --- Full Screen + App Mode buttons (HTML files only) ---
         var _ext = (fileName || '').split('.').pop().toLowerCase();
         if (_ext === 'html' || _ext === 'htm') {
-            var presentBtn = _makeBtn('\u26f6 Present');
+            var presentBtn = _makeBtn('\u26f6 Full Screen');
             presentBtn.title = 'Open in full screen — press Esc to exit';
             presentBtn.style.fontWeight = '600';
             presentBtn.addEventListener('click', function() {
@@ -193,6 +193,17 @@
                 if (req) req.call(el);
             });
             bar.appendChild(presentBtn);
+
+            // App Mode: activates sg-app-banner maximised chrome mode
+            var appModeBtn = _makeBtn('App Mode');
+            appModeBtn.title = 'Hide vault chrome and enter maximised app mode';
+            appModeBtn.addEventListener('click', function() {
+                var banner = document.querySelector('sg-app-banner');
+                if (banner && typeof banner.activate === 'function') {
+                    banner.activate();
+                }
+            });
+            bar.appendChild(appModeBtn);
         }
 
         // --- SGit Data button: shows vault blob metadata for the current file view ---
