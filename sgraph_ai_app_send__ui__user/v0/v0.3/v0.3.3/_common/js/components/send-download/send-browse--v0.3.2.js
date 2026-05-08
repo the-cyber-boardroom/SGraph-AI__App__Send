@@ -937,8 +937,8 @@ class SendBrowse extends SendComponent {
             // Keeps VFS bridge intact (same element, same contentWindow).
             var presentBtn = document.createElement('button');
             presentBtn.className = 'sb-action-btn sb-file__present';
-            presentBtn.innerHTML = '&#x26F6; Present';
-            presentBtn.title = 'Open HTML in fullscreen (Esc to exit)';
+            presentBtn.innerHTML = '&#x26F6; Full Screen';
+            presentBtn.title = 'Open HTML in full screen (Esc to exit)';
             presentBtn.addEventListener('click', function() {
                 if (isSource) return;
                 if (wrapper.requestFullscreen) {
@@ -1062,8 +1062,8 @@ class SendBrowse extends SendComponent {
 
             var presentBtn = document.createElement('button');
             presentBtn.className = 'sb-action-btn sb-file__present';
-            presentBtn.innerHTML = '&#x26F6; Present';
-            presentBtn.title = 'Open PDF in fullscreen presentation mode';
+            presentBtn.innerHTML = '&#x26F6; Full Screen';
+            presentBtn.title = 'Open PDF in full screen';
             presentBtn.addEventListener('click', function() {
                 var win = window.open(url + '#toolbar=1&navpanes=0&view=Fit', '_blank');
                 if (!win) {
