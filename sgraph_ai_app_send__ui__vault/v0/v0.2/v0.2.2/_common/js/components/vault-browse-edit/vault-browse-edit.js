@@ -384,6 +384,13 @@
         folderBtn.innerHTML = '&#128193; New Folder';
         folderBtn.addEventListener('click', function() { _showNewFolder(self); });
         headerRight.prepend(folderBtn);
+
+        // New File button
+        var newFileBtn = document.createElement('button');
+        newFileBtn.className = 'sb-action-btn';
+        newFileBtn.innerHTML = '&#43; New File';
+        newFileBtn.addEventListener('click', function() { _showNewFile(self); });
+        headerRight.prepend(newFileBtn);
     };
 
     // --- Upload file picker ---
@@ -431,6 +438,29 @@
             }).catch(function(err) {
                 if (window.sgraphVault && window.sgraphVault.messages) {
                     window.sgraphVault.messages.error('Create folder failed: ' + err.message);
+                }
+            });
+        });
+    }
+
+    // --- New file ---
+
+    function _showNewFile(browse) {
+        _prompt('New file name:', function(name) {
+            if (!name || !name.trim()) return;
+            var trimmed = name.trim();
+            // Sensible default content per extension
+            var defaultContent = trimmed.endsWith('.json') ? '{}' : '';
+            var buf = new TextEncoder().encode(defaultContent).buffer;
+            browse.dataSource.saveFile('/', trimmed, buf).then(function() {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.success('"' + trimmed + '" created');
+                }
+                _refreshBrowseTree(browse);
+                if (browse._openFileTab) browse._openFileTab(trimmed);
+            }).catch(function(err) {
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.error('Create failed: ' + err.message);
                 }
             });
         });
