@@ -2,13 +2,36 @@
    SGraph Send — Upload Step Select: Secret Tab Patch (v0.3.2)
 
    Replaces the "Text" tab in upload-step-select with a "🔒 Secret" tab.
-   The Secret tab renders a textarea + expiry radio buttons and fires
+   The Secret tab renders a textarea + expiry pills and fires
    'step-secret-submit' with { text, config: { maxDownloads, expiresInHours } }.
 
-   Users who want to share plain text as a file can drop a .txt into the File tab.
+   "Create Secret Link →" button lives top-right (above textarea), disabled
+   until the user has typed at least one non-whitespace character.
 
    Load AFTER upload-step-select.js.
    ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Secret-tab styles (injected into Shadow DOM on first secret render) ─────── */
+var _SGRAPH_SECRET_CSS = [
+    /* Header row: mode toggle left, send button right */
+    '.secret-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3,0.75rem);}',
+    '.secret-header .mode-toggle{margin-bottom:0;}',
+    /* Compact send button for the header */
+    '.btn--secret-send{white-space:nowrap;flex-shrink:0;padding:0.375rem 0.875rem;font-size:var(--text-sm,0.875rem);}',
+    /* Secret input wrapper */
+    '.secret-input-area{margin-bottom:var(--space-4,1rem);}',
+    /* Config section */
+    '.secret-config{display:flex;flex-direction:column;gap:var(--space-2,0.5rem);margin-bottom:var(--space-4,1rem);padding:var(--space-3,0.75rem);background:rgba(78,205,196,0.03);border:1px solid rgba(78,205,196,0.1);border-radius:var(--radius-md,12px);}',
+    '.secret-config__row{display:flex;align-items:center;gap:var(--space-3,0.75rem);}',
+    '.secret-config__label{font-size:var(--text-small,0.75rem);font-weight:var(--weight-semibold,600);color:var(--color-text-secondary,#8892A0);text-transform:uppercase;letter-spacing:0.05em;min-width:3.5rem;flex-shrink:0;}',
+    '.secret-config__pills{display:flex;flex-wrap:wrap;gap:var(--space-1,0.25rem);}',
+    /* Pill toggle buttons */
+    '.secret-pill{padding:0.25rem 0.75rem;background:transparent;border:1px solid rgba(78,205,196,0.2);border-radius:999px;color:var(--color-text-secondary,#8892A0);font-size:var(--text-small,0.75rem);cursor:pointer;transition:all 0.15s ease;line-height:1.5;}',
+    '.secret-pill:hover{border-color:var(--color-primary,#4ECDC4);color:var(--color-primary,#4ECDC4);}',
+    '.secret-pill--active{background:rgba(78,205,196,0.15);border-color:var(--color-primary,#4ECDC4);color:var(--color-primary,#4ECDC4);font-weight:var(--weight-semibold,600);}'
+].join('\n');
+
+/* ─── Patch _renderIdle ──────────────────────────────────────────────────────── */
 
 UploadStepSelect.prototype._renderIdle = function() {
     var maxSize  = this._fmt(this._maxFileSize);
@@ -24,8 +47,20 @@ UploadStepSelect.prototype._renderIdle = function() {
         '</div>';
 
     if (isSecret) {
+        var _sr = this.shadowRoot;
+        if (_sr && !_sr.getElementById('sgraph-secret-styles')) {
+            var _st = document.createElement('style');
+            _st.id = 'sgraph-secret-styles';
+            _st.textContent = _SGRAPH_SECRET_CSS;
+            _sr.appendChild(_st);
+        }
+
         this._container.innerHTML =
-            modeToggle +
+            '<div class="secret-header">' +
+                modeToggle +
+                '<button class="btn btn-primary btn--secret-send" id="secret-send-btn"' +
+                    ' data-testid="secret-send-btn" disabled>Create Secret Link →</button>' +
+            '</div>' +
             '<div class="secret-input-area">' +
                 '<textarea class="text-input" id="secret-input" data-testid="secret-input"' +
                     ' placeholder="Type or paste the secret to encrypt and share..."' +
@@ -36,29 +71,26 @@ UploadStepSelect.prototype._renderIdle = function() {
             '</div>' +
             '<div class="secret-config">' +
                 '<div class="secret-config__row">' +
-                    '<span class="secret-config__label">Expires after</span>' +
-                    '<div class="secret-config__options">' +
-                        '<label><input type="radio" name="max-dl" value="1" checked> 1 view <em>(default)</em></label>' +
-                        '<label><input type="radio" name="max-dl" value="5"> 5 views</label>' +
-                        '<label><input type="radio" name="max-dl" value="10"> 10 views</label>' +
+                    '<span class="secret-config__label">Views</span>' +
+                    '<div class="secret-config__pills" id="max-dl-pills">' +
+                        '<button type="button" class="secret-pill secret-pill--active" data-name="max-dl" data-value="1">1 view</button>' +
+                        '<button type="button" class="secret-pill" data-name="max-dl" data-value="5">5 views</button>' +
+                        '<button type="button" class="secret-pill" data-name="max-dl" data-value="10">10 views</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="secret-config__row">' +
-                    '<span class="secret-config__label">Expires in</span>' +
-                    '<div class="secret-config__options">' +
-                        '<label><input type="radio" name="expiry" value="1"> 1 hour</label>' +
-                        '<label><input type="radio" name="expiry" value="24" checked> 24 hours <em>(default)</em></label>' +
-                        '<label><input type="radio" name="expiry" value="168"> 7 days</label>' +
-                        '<label><input type="radio" name="expiry" value="0"> No time limit</label>' +
+                    '<span class="secret-config__label">Expires</span>' +
+                    '<div class="secret-config__pills" id="expiry-pills">' +
+                        '<button type="button" class="secret-pill" data-name="expiry" data-value="1">1 hour</button>' +
+                        '<button type="button" class="secret-pill secret-pill--active" data-name="expiry" data-value="24">24 hours</button>' +
+                        '<button type="button" class="secret-pill" data-name="expiry" data-value="168">7 days</button>' +
+                        '<button type="button" class="secret-pill" data-name="expiry" data-value="0">Never</button>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
             '<div class="trust-badge">' +
                 '<span class="trust-badge__icon">🔒</span>' +
                 '<span>Zero cookies · Zero tracking · We cannot read your secret</span>' +
-            '</div>' +
-            '<div class="secret-actions">' +
-                '<button class="btn btn-primary" id="secret-send-btn" data-testid="secret-send-btn">Create Secret Link →</button>' +
             '</div>';
     } else {
         // File tab — unchanged from v0.3.0
@@ -87,7 +119,7 @@ UploadStepSelect.prototype._renderIdle = function() {
     }
 };
 
-// ─── Patch _setupListeners to wire Secret tab and old Text listeners ─────────
+/* ─── Patch _setupListeners to wire Secret tab ───────────────────────────────── */
 
 var _origSetupListeners = UploadStepSelect.prototype._setupListeners;
 UploadStepSelect.prototype._setupListeners = function() {
@@ -111,27 +143,40 @@ UploadStepSelect.prototype._setupListeners = function() {
         });
     }
 
-    // Secret tab: char counter
-    var secretInput = sr.querySelector('#secret-input');
-    var secretCount = sr.querySelector('#secret-char-count');
-    if (secretInput && secretCount) {
+    // Secret tab: char counter + enable/disable send button
+    var secretInput   = sr.querySelector('#secret-input');
+    var secretCount   = sr.querySelector('#secret-char-count');
+    var secretSendBtn = sr.querySelector('#secret-send-btn');
+    if (secretInput) {
         secretInput.addEventListener('input', function() {
-            secretCount.textContent = secretInput.value.length + ' characters';
+            var len = secretInput.value.length;
+            if (secretCount)   secretCount.textContent = len + ' characters';
+            if (secretSendBtn) secretSendBtn.disabled  = !secretInput.value.trim();
         });
     }
 
+    // Secret tab: pill toggle buttons
+    sr.querySelectorAll('.secret-pill').forEach(function(pill) {
+        pill.addEventListener('click', function() {
+            var name = pill.dataset.name;
+            sr.querySelectorAll('.secret-pill[data-name="' + name + '"]').forEach(function(p) {
+                p.classList.remove('secret-pill--active');
+            });
+            pill.classList.add('secret-pill--active');
+        });
+    });
+
     // Secret tab: send button
-    var secretSendBtn = sr.querySelector('#secret-send-btn');
     if (secretSendBtn) {
         secretSendBtn.addEventListener('click', function() {
             var ta = sr.querySelector('#secret-input');
             if (!ta || !ta.value.trim()) return;
 
-            var maxDlEl  = sr.querySelector('input[name="max-dl"]:checked');
-            var expiryEl = sr.querySelector('input[name="expiry"]:checked');
+            var maxDlPill  = sr.querySelector('.secret-pill[data-name="max-dl"].secret-pill--active');
+            var expiryPill = sr.querySelector('.secret-pill[data-name="expiry"].secret-pill--active');
 
-            var maxDownloads    = maxDlEl   ? parseInt(maxDlEl.value,   10) : 1;
-            var expiresInHours  = expiryEl  ? parseInt(expiryEl.value,  10) : 24;
+            var maxDownloads   = maxDlPill  ? parseInt(maxDlPill.dataset.value,  10) : 1;
+            var expiresInHours = expiryPill ? parseInt(expiryPill.dataset.value, 10) : 24;
 
             self.emit('step-secret-submit', {
                 text:   ta.value,
