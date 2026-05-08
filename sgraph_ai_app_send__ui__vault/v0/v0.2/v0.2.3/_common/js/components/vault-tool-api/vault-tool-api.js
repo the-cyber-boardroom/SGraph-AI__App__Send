@@ -121,7 +121,10 @@ async function _navigateTo(tab, timeout) {
     return { rendered: true, tab };
 }
 
-// Poll until the panel element no longer shows "Loading..." and has real content.
+// Poll until the panel element has fully rendered — handles both text and iframe panels.
+// HTML files are rendered in a same-origin iframe (BRW-013); their content is not visible
+// in the parent's textContent, so we wait for iframe.contentDocument.readyState === 'complete'
+// and for the body to have children before resolving.
 function _awaitTabRender(browse, path, timeout) {
     return new Promise((resolve, reject) => {
         const deadline = Date.now() + timeout;
@@ -141,8 +144,30 @@ function _awaitTabRender(browse, path, timeout) {
                 return;
             }
 
+            // Check for iframe first (HTML files rendered via BRW-013 srcdoc iframe)
+            const iframe = el.querySelector('iframe');
+            if (iframe) {
+                const doc = iframe.contentDocument;
+                if (!doc || doc.readyState !== 'complete') {
+                    if (Date.now() > deadline) { reject(new Error(`Iframe load timeout for "${path}"`)); return; }
+                    setTimeout(check, 50);
+                    return;
+                }
+                // Also wait for body to have children — readyState can be 'complete' before JS runs
+                const body = doc.body;
+                if (!body || body.children.length === 0) {
+                    if (Date.now() > deadline) { reject(new Error(`Iframe body empty (timeout) for "${path}"`)); return; }
+                    setTimeout(check, 50);
+                    return;
+                }
+                resolve({ rendered: true });
+                return;
+            }
+
+            // Non-iframe path — wait for loading indicator to clear and content to appear.
+            // Use innerHTML length rather than textContent to avoid false-resolve on tiny JSON.
             const text = el.textContent ?? '';
-            if (text.includes('Loading...') || text.trim().length < 10) {
+            if (text.includes('Loading...') || el.innerHTML.length < 100) {
                 if (Date.now() > deadline) { reject(new Error(`Render timeout for "${path}"`)); return; }
                 setTimeout(check, 50);
                 return;
@@ -175,5 +200,9 @@ function _dispatchStateChanged(change) {
 if (window.sgraphVault?.shell) {
     initVaultToolApi();
 } else {
+    // shell-ready has already fired by module-load time in normal operation (vault-shell.js
+    // is a synchronous classic script that runs before deferred modules). If we reach here
+    // the shell failed to initialise — warn clearly rather than waiting silently.
+    console.warn('[vault-tool-api] vault shell not initialised at module load — JS API will not be available');
     window.sgraphVault?.events?.on?.('shell-ready', initVaultToolApi);
 }

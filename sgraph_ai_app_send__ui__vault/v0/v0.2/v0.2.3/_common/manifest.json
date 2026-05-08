@@ -1,0 +1,67 @@
+{
+  "name": "SG/Vault",
+  "slug": "vault",
+  "description": "Zero-knowledge encrypted vault — SgToolApi v0.1.0 layer",
+  "version": "0.2.3",
+  "api": {
+    "version": "0.1.0",
+    "events": [
+      {
+        "name": "tool:ready",
+        "when": "activate() called on page load",
+        "detail": "{ instanceId: string, tool: 'vault', version: { api, ui, content } }"
+      },
+      {
+        "name": "tool:state-changed",
+        "when": "vault opened, locked, or navigation completes",
+        "detail": "{ instanceId: string, change: string | object }"
+      },
+      {
+        "name": "vault:opened",
+        "when": "vault token decrypted and file browser mounted",
+        "detail": "{ instanceId: string, vaultName: string, vaultId: string | null }"
+      },
+      {
+        "name": "vault:locked",
+        "when": "vault locked (user action or navigation)",
+        "detail": "{ instanceId: string }"
+      },
+      {
+        "name": "vault:navigation-complete",
+        "when": "navigateTo() resolves — panel fully rendered",
+        "detail": "{ instanceId: string, tab: string }"
+      }
+    ],
+    "actions": {
+      "getState": {
+        "params": "none",
+        "returns": "{ vaultId: string|null, title: string|null, decrypted: boolean, syncState: { ahead, behind, diverged }, activeView: string, openTabs: string[] }",
+        "async": false,
+        "throws": "never"
+      },
+      "waitForReady": {
+        "params": "{ timeout?: number }",
+        "returns": "Promise<{ ready: true }>",
+        "async": true,
+        "throws": "Error on timeout"
+      },
+      "navigateTo": {
+        "params": "{ tab: string, timeout?: number }",
+        "returns": "Promise<{ rendered: true, tab: string }>",
+        "async": true,
+        "throws": "Error if tab missing or render timeout"
+      },
+      "getSkills": {
+        "params": "none",
+        "returns": "{ human: string, browser: string, api: string }",
+        "async": false,
+        "throws": "never"
+      }
+    }
+  },
+  "skills": {
+    "human":   "/_common/skills/SKILL-human.md",
+    "browser": "/_common/skills/SKILL-browser.md",
+    "api":     "/_common/skills/SKILL-api.md"
+  }
+}

@@ -629,5 +629,64 @@
     <!-- Activates after shell-ready event. Backward compat: sgraphVault.events unchanged. -->
     <script type="module" src="_common/js/components/vault-tool-api/vault-tool-api.js"></script>
 
+    <!-- 14. v0.2.3: Patch _toggleDebug to add "Tool API" tab with sg-tool-api dev panel components.
+         The three components auto-bind on tool:ready via the SgToolApi registry.
+         Matches SKILL-browser.md: "click Debug in the vault header → see Tool API tab". -->
+    <script>
+    (function () {
+        var VaultShell = customElements.get('vault-shell');
+        if (!VaultShell) return;
+
+        var _origToggleDebug = VaultShell.prototype._toggleDebug;
+
+        VaultShell.prototype._toggleDebug = function () {
+            // Remove panel if already visible (toggle off)
+            var existing = this.querySelector('.vs-debug');
+            if (existing) {
+                existing.remove();
+                return;
+            }
+
+            // Build extended debug panel with Tool API tab
+            var debugEl = document.createElement('div');
+            debugEl.className = 'vs-debug';
+            debugEl.innerHTML = [
+                '<div class="vs-debug-tabs">',
+                '  <button class="vs-debug-tab vs-debug-tab--active" data-tab="messages">Msgs</button>',
+                '  <button class="vs-debug-tab" data-tab="events">Events</button>',
+                '  <button class="vs-debug-tab" data-tab="api">API</button>',
+                '  <button class="vs-debug-tab" data-tab="storage">Storage</button>',
+                '  <button class="vs-debug-tab" data-tab="toolapi">Tool API</button>',
+                '</div>',
+                '<div class="vs-debug-body">',
+                '  <div class="vs-debug-pane" data-pane="messages"><vault-messages-panel></vault-messages-panel></div>',
+                '  <div class="vs-debug-pane" data-pane="events" style="display:none"><vault-events-viewer></vault-events-viewer></div>',
+                '  <div class="vs-debug-pane" data-pane="api" style="display:none"><vault-api-logger></vault-api-logger></div>',
+                '  <div class="vs-debug-pane" data-pane="storage" style="display:none"><vault-storage-viewer></vault-storage-viewer></div>',
+                '  <div class="vs-debug-pane" data-pane="toolapi" style="display:none">',
+                '    <sg-tool-api-explorer></sg-tool-api-explorer>',
+                '    <sg-tool-api-console></sg-tool-api-console>',
+                '    <sg-tool-api-manifest></sg-tool-api-manifest>',
+                '  </div>',
+                '</div>'
+            ].join('\n');
+
+            debugEl.addEventListener('click', function (e) {
+                var tab = e.target.closest('.vs-debug-tab');
+                if (!tab) return;
+                debugEl.querySelectorAll('.vs-debug-tab').forEach(function (t) {
+                    t.classList.toggle('vs-debug-tab--active', t === tab);
+                });
+                debugEl.querySelectorAll('.vs-debug-pane').forEach(function (p) {
+                    p.style.display = p.dataset.pane === tab.dataset.tab ? '' : 'none';
+                });
+            });
+
+            var body = this.querySelector('.vs-body');
+            if (body) body.after(debugEl);
+        };
+    }());
+    </script>
+
 </body>
 </html>

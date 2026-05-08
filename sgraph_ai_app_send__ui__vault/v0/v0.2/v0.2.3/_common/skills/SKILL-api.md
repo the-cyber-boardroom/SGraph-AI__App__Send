@@ -76,11 +76,15 @@ detail: { instanceId: string, tool: 'vault', version: { api, ui, content } }
 
 ### `tool:state-changed`
 
-Fired on `window` when vault state changes (vault opened/locked, navigation, sync).
+Fired on `window` when vault state changes (vault opened, vault locked, navigation complete).
 
 ```
 detail: { instanceId: string, change: string | object }
 ```
+
+**Note:** Sync state transitions (`push`, `pull`, `ahead`/`behind` count changes) do not yet
+fire `tool:state-changed`. Sync event wiring is planned for Phase 2 alongside the broadcast
+event bus (Ticket 08, `vault:vault-pushed` / `vault:vault-pulled` events).
 
 ---
 
