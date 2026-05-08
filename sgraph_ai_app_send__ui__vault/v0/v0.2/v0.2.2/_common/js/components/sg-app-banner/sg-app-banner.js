@@ -42,6 +42,7 @@
     ].join('\n');
 
     // Saved state for frame-lift restore
+    var _savedLiftEl       = null;  // the element that was lifted
     var _savedWrapperStyle = null;
     var _savedIframeStyle  = null;
 
@@ -94,9 +95,11 @@
             }));
         }
 
-        // Called by the "App Mode" button in vault-browse-edit or app.json handler
-        activate() {
-            _activateAll();
+        // Called by the "App Mode" button in vault-browse-edit or app.json handler.
+        // liftEl: the element to lift to full-viewport (optional — falls back to
+        // .sb-file__html-frame wrapper for the app.json auto-activate path).
+        activate(liftEl) {
+            _activateAll(liftEl);
             this.style.display = 'flex';
         }
 
@@ -107,11 +110,12 @@
 
     // ── Core activate / deactivate ────────────────────────────────────────────
 
-    function _activateAll() {
+    function _activateAll(liftEl) {
         _injectMaxCss();
-        // Try to lift the iframe wrapper. If not present yet, use shadow CSS
-        // fallback and wait for the iframe to appear.
-        if (!_liftContentFrame()) {
+        // Try to lift the provided element (or the HTML iframe wrapper on the
+        // app.json path). If nothing is present yet, fall back to shadow CSS
+        // and wait for the iframe to appear.
+        if (!_liftContentFrame(liftEl)) {
             _injectShadowCss();
             _hideTreeStack();
             _waitForIframeAndLift();
@@ -152,6 +156,7 @@
     // captures fresh values from the new wrapper.
 
     function _reloadAndLift() {
+        _savedLiftEl       = null;
         _savedWrapperStyle = null;
         _savedIframeStyle  = null;
 
@@ -174,34 +179,51 @@
     // Applies position:fixed to the iframe wrapper div.
     // The iframe stays in its original DOM position — no reload.
 
-    function _liftContentFrame() {
-        var iframeEl = document.querySelector('.sb-file__html-frame');
-        if (!iframeEl) return false;
-        var wrapper = iframeEl.parentElement;
-        if (!wrapper) return false;
+    function _liftContentFrame(liftEl) {
+        var el = liftEl || null;
+        if (!el) {
+            // App.json path: no element provided — find the HTML iframe wrapper
+            var iframeEl = document.querySelector('.sb-file__html-frame');
+            if (!iframeEl) return false;
+            el = iframeEl.parentElement;
+            if (!el) return false;
+        }
 
-        _savedWrapperStyle = wrapper.style.cssText;
-        _savedIframeStyle  = iframeEl.style.cssText;
+        _savedLiftEl       = el;
+        _savedWrapperStyle = el.style.cssText;
 
-        wrapper.style.cssText = [
+        el.style.cssText = [
             'position:fixed', 'top:2.25rem', 'left:0', 'right:0', 'bottom:0',
             'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow:hidden'
         ].join(';');
-        iframeEl.style.cssText = 'flex:1;border:none;width:100%;height:100%;min-height:0;';
+
+        // If there's an HTML iframe inside, fix its height (was height:0 in flex layout)
+        var htmlIframe = el.querySelector('.sb-file__html-frame');
+        if (htmlIframe) {
+            _savedIframeStyle = htmlIframe.style.cssText;
+            htmlIframe.style.cssText = 'flex:1;border:none;width:100%;height:100%;min-height:0;';
+        } else {
+            _savedIframeStyle = null;
+        }
+
         return true;
     }
 
     function _dropContentFrame() {
-        var iframeEl = document.querySelector('.sb-file__html-frame');
-        if (!iframeEl) return;
-        var wrapper = iframeEl.parentElement;
-        if (!wrapper) return;
+        var el = _savedLiftEl;
+        if (!el) return;
 
-        wrapper.style.cssText  = _savedWrapperStyle ||
-            'flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;min-height:0;';
-        iframeEl.style.cssText = _savedIframeStyle  ||
-            'flex:1;border:none;width:100%;height:0;min-height:0;';
+        el.style.cssText = _savedWrapperStyle || '';
 
+        if (_savedIframeStyle !== null) {
+            var htmlIframe = el.querySelector('.sb-file__html-frame');
+            if (htmlIframe) {
+                htmlIframe.style.cssText = _savedIframeStyle ||
+                    'flex:1;border:none;width:100%;height:0;min-height:0;';
+            }
+        }
+
+        _savedLiftEl       = null;
         _savedWrapperStyle = null;
         _savedIframeStyle  = null;
     }
