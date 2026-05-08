@@ -180,7 +180,7 @@
     <script>
         VaultComponentPaths.init('/_common');
         VaultI18n.init();
-        window.sgraphVault.events.emit('app-init', { version: 'v0.2.1' });
+        window.sgraphVault.events.emit('app-init', { version: 'v0.2.2' });
     </script>
 
     <!-- 12. v0.2.1 patch: create vault from simple token + vault-not-found error page -->
@@ -439,31 +439,168 @@
             try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
         });
 
-        // Patch VaultShell._mountBrowse:
-        //   1. Fix downloadUrl — use vault key, not window.location.href (which may be '/'
-        //      after create-then-clear-hash).
-        //   2. Store the browse element reference so _plrSetHashPath can update it when
-        //      a file tab is opened (deep-link copy button mechanism).
-        // VaultShell and VaultSettings are defined inside IIFEs in their source files,
-        // so they are NOT global variables. Use customElements.get() to access their class.
+        // Patch VaultShell — single IIFE for all v0.2.2 additions:
+        //   1. _mountBrowse: fix downloadUrl, store browse/token refs, apply app.json, setup link handler
+        //   2. _onLock: redirect to landing page (never show vault-shell entry screen)
+        //   3. _applyAppJson: auto-open entry file from app.json at vault root
+        //   4. _showPresentOverlay: click-through overlay to request fullscreen (requires user gesture)
+        //   5. _setupVaultLinkHandler: intercept relative <a> clicks in markdown present-mode
+        //
+        // VaultShell is IIFE-scoped in its source file — use customElements.get() to access it.
         (function () {
-            var VaultShellClass = customElements.get('vault-shell');
-            if (!VaultShellClass) return;
-            var _origMount = VaultShellClass.prototype._mountBrowse;
-            VaultShellClass.prototype._mountBrowse = async function (deepLink) {
+            var VaultShell = customElements.get('vault-shell');
+            if (!VaultShell) return;
+
+            // ── 1. _mountBrowse ────────────────────────────────────────────────────────
+            var _origMount = VaultShell.prototype._mountBrowse;
+            VaultShell.prototype._mountBrowse = async function (deepLink) {
                 await _origMount.call(this, deepLink);
+
                 var browse = this.querySelector('.vs-view-files send-browse');
                 var token  = this._vaultKey;
+
+                // Fix downloadUrl (it defaults to window.location.href which may be '/'
+                // after create-then-clear-hash)
                 if (browse && token) {
                     browse.downloadUrl = window.location.origin + '/#' + token;
                 }
                 window._vaultCurrentToken  = token  || null;
                 window._vaultBrowseElement = browse || null;
-                // Reset deep-link path on each mount (new browse, fresh state)
                 window._vaultDeepLinkPath  = null;
+
+                // app.json auto-open
+                if (this._dataSource && browse) {
+                    await this._applyAppJson(this._dataSource, browse);
+                }
+
+                // Markdown present-mode link handler
+                if (this._dataSource && browse) {
+                    this._setupVaultLinkHandler(this._dataSource, browse);
+                }
+            };
+
+            // ── 2. _onLock ─────────────────────────────────────────────────────────────
+            VaultShell.prototype._onLock = function () {
+                try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
+                try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
+                window.location.replace('/en-gb/');
+            };
+
+            // ── 3. _applyAppJson ───────────────────────────────────────────────────────
+            // Change 3: auto-open entry file when vault loads.
+            // Schema: { "entry": "index.html", "auto_open": true, "present": false }
+            VaultShell.prototype._applyAppJson = async function (dataSource, browse) {
+                var fileList = dataSource.getFileList();
+                var entry = fileList.find(function (e) {
+                    return e.path === 'app.json' || e.path === '/app.json';
+                });
+                if (!entry) return;
+
+                var config;
+                try {
+                    var buf = await dataSource.getFileBytes(entry.path);
+                    config  = JSON.parse(new TextDecoder().decode(buf));
+                } catch (e) {
+                    console.warn('[app.json] unreadable or invalid JSON, ignoring:', e.message);
+                    return;
+                }
+
+                var entryFile = config.entry    || 'index.html';
+                var autoOpen  = config.auto_open !== false;
+                var present   = config.present  === true;
+
+                if (!autoOpen) return;
+                console.log('[app.json] entry:', entryFile, '| present:', present);
+
+                var self = this;
+                requestAnimationFrame(function () {
+                    if (browse._openFileTab) {
+                        browse._openFileTab(entryFile);
+                        if (present) self._showPresentOverlay();
+                    }
+                });
+            };
+
+            // ── 4. _showPresentOverlay ─────────────────────────────────────────────────
+            // Click-through overlay for guaranteed fullscreen (browsers require a user gesture).
+            // Calls requestFullscreen on the wrapper div (iframe.parentElement) so the
+            // SG/Vault banner inside the wrapper stays visible in fullscreen.
+            VaultShell.prototype._showPresentOverlay = function () {
+                var self = this;
+                var attempts = 0;
+                var findIframe = function () {
+                    var iframe = self.querySelector('.vs-view-files iframe');
+                    if (!iframe && attempts++ < 20) { setTimeout(findIframe, 200); return; }
+                    if (!iframe) return;
+
+                    // wrapper is iframe.parentElement (div wrapping banner + iframe)
+                    var wrapper = iframe.parentElement;
+                    if (!wrapper) return;
+                    if (getComputedStyle(wrapper).position === 'static') {
+                        wrapper.style.position = 'relative';
+                    }
+
+                    var overlay = document.createElement('div');
+                    overlay.style.cssText =
+                        'position:absolute;inset:0;display:flex;align-items:center;' +
+                        'justify-content:center;background:rgba(0,0,0,0.55);z-index:100;cursor:pointer;';
+                    overlay.innerHTML =
+                        '<div style="color:#fff;font-size:1.1rem;padding:0.9rem 2rem;' +
+                        'background:rgba(78,205,196,0.15);border:1px solid #4ecdc4;' +
+                        'border-radius:8px;">&#x26F6; Click to enter present mode</div>';
+                    overlay.addEventListener('click', function () {
+                        overlay.remove();
+                        if (wrapper.requestFullscreen) {
+                            wrapper.requestFullscreen().catch(function (err) {
+                                console.warn('[app.json] fullscreen rejected:', err);
+                            });
+                        } else if (wrapper.webkitRequestFullscreen) {
+                            wrapper.webkitRequestFullscreen();
+                        }
+                    });
+                    wrapper.appendChild(overlay);
+                };
+                setTimeout(findIframe, 400);
+            };
+
+            // ── 5. _setupVaultLinkHandler ──────────────────────────────────────────────
+            // Change 4b: intercept relative <a> clicks in the vault DOM (including markdown
+            // present-mode / page-layout-renderer) and open the target in send-browse.
+            // Only fires for paths that exist in the vault file list.
+            VaultShell.prototype._setupVaultLinkHandler = function (dataSource, browse) {
+                var fileList = dataSource.getFileList();
+                var self = this;
+
+                // Remove any previous handler
+                if (this._vaultLinkHandler) {
+                    this.removeEventListener('click', this._vaultLinkHandler, true);
+                }
+
+                this._vaultLinkHandler = function (e) {
+                    var a = e.target.closest('a');
+                    if (!a) return;
+                    var href = a.getAttribute('href');
+                    if (!href) return;
+                    // Skip absolute URLs, same-page anchors, javascript:, mailto:
+                    if (href.startsWith('http') || href.startsWith('//') ||
+                        href.startsWith('#') || href.startsWith('mailto:') ||
+                        href.startsWith('javascript:')) return;
+
+                    // Strip leading slash and find in file list (case-insensitive)
+                    var clean = href.replace(/^\//, '');
+                    var match = fileList.find(function (f) {
+                        return f.path === clean || f.path === href;
+                    });
+                    if (!match) return;
+
+                    e.preventDefault();
+                    console.log('[vault-link] opening in browse:', match.path);
+                    if (browse._openFileTab) browse._openFileTab(match.path);
+                };
+
+                this.addEventListener('click', this._vaultLinkHandler, true);
             };
         }());
-
 
         // Rename "⇌ Vaults" → "Open or Create Vault" and style as a teal navigation button.
         // Placed first in .vh-right (order:-1) so it reads as navigation rather than an action.
@@ -481,107 +618,6 @@
                     'font-weight:600'
                 ].join(';');
             }
-        }());
-
-        // Patch VaultShell._onLock: redirect to the landing page instead of showing the
-        // vault-entry/RECENT VAULTS screen (the previous UI that should never appear).
-        (function () {
-            var VaultShell = customElements.get('vault-shell');
-            if (!VaultShell) return;
-            VaultShell.prototype._onLock = function () {
-                try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
-                try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
-                window.location.replace('/en-gb/');
-            };
-        }());
-
-        // Change 3 — app.json: auto-open entry file when vault loads.
-        // Patches VaultShell._mountBrowse to check for app.json after browse mounts.
-        // Schema: { "entry": "index.html", "auto_open": true, "present": false }
-        // Unknown fields are silently ignored (forward-compatible with SG/App spec).
-        (function () {
-            var VaultShell = customElements.get('vault-shell');
-            if (!VaultShell) return;
-
-            var _origMount = VaultShell.prototype._mountBrowse;
-            VaultShell.prototype._mountBrowse = async function (deepLink) {
-                await _origMount.call(this, deepLink);
-                if (this._dataSource && this._browse) {
-                    await this._applyAppJson(this._dataSource, this._browse);
-                }
-            };
-
-            VaultShell.prototype._applyAppJson = async function (dataSource, browse) {
-                var fileList = dataSource.getFileList();
-                var entry = fileList.find(function (e) {
-                    return e.path === 'app.json' || e.path === '/app.json';
-                });
-                if (!entry) return;
-
-                var config;
-                try {
-                    var buf  = await dataSource.getFileBytes(entry.path);
-                    config = JSON.parse(new TextDecoder().decode(buf));
-                } catch (e) {
-                    console.warn('[app.json] unreadable or invalid JSON, ignoring:', e.message);
-                    return;
-                }
-
-                var entryFile = config.entry    || 'index.html';
-                var autoOpen  = config.auto_open !== false;  // default true
-                var present   = config.present  === true;    // default false
-
-                if (!autoOpen) return;
-                console.log('[app.json] entry:', entryFile, '| present:', present);
-
-                // Wait for browse to connect and sg-layout to be ready
-                var self = this;
-                requestAnimationFrame(function () {
-                    if (browse._openFileTab) {
-                        browse._openFileTab(entryFile);
-                        if (present) self._showPresentOverlay();
-                    }
-                });
-            };
-
-            // Option A from brief: overlay that requires a click (user-gesture for fullscreen).
-            // Works in all browsers; the one click is a fair price for guaranteed fullscreen.
-            VaultShell.prototype._showPresentOverlay = function () {
-                var self = this;
-                var attempts = 0;
-                var findIframe = function () {
-                    var iframe = self.querySelector('.vs-view-files iframe');
-                    if (!iframe && attempts++ < 20) { setTimeout(findIframe, 200); return; }
-                    if (!iframe) return;
-
-                    var container = iframe.parentElement;
-                    if (!container) return;
-                    if (getComputedStyle(container).position === 'static') {
-                        container.style.position = 'relative';
-                    }
-
-                    var overlay = document.createElement('div');
-                    overlay.style.cssText =
-                        'position:absolute;inset:0;display:flex;align-items:center;' +
-                        'justify-content:center;background:rgba(0,0,0,0.55);z-index:100;cursor:pointer;';
-                    overlay.innerHTML =
-                        '<div style="color:#fff;font-size:1.1rem;padding:0.9rem 2rem;' +
-                        'background:rgba(78,205,196,0.15);border:1px solid #4ecdc4;' +
-                        'border-radius:8px;">&#x26F6; Click to enter present mode</div>';
-                    overlay.addEventListener('click', function () {
-                        overlay.remove();
-                        if (iframe.requestFullscreen) {
-                            iframe.requestFullscreen().catch(function (err) {
-                                console.warn('[app.json] fullscreen rejected:', err);
-                            });
-                        } else if (iframe.webkitRequestFullscreen) {
-                            iframe.webkitRequestFullscreen();
-                        }
-                    });
-                    container.appendChild(overlay);
-                };
-                setTimeout(findIframe, 400);
-            };
         }());
 
         // Patch VaultEntry._onSimpleTokenOpen:

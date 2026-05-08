@@ -19,7 +19,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ── Version stamp — bump this to confirm the local dev server has the latest code ──
-console.log('%c[send-browse v0.3.2-vfs-4] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+console.log('%c[send-browse v0.3.3-vfs-1] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
 
 class SendBrowse extends SendComponent {
 
@@ -516,16 +516,21 @@ class SendBrowse extends SendComponent {
             return;
         }
 
-        // ── BRW-013: HTML viewer (sandboxed iframe + vault VFS bridge) ──
+        // ── BRW-013 + BRW-018 + BRW-019 + BRW-020: HTML viewer ─────────
+        // BRW-013: sandboxed iframe + vault VFS bridge (fetch, img.src, MutationObserver)
+        // BRW-018: Present button (fullscreen iframe, bridge stays intact)
+        // BRW-019: same-vault anchor navigation via postMessage
+        // BRW-020: inline vault CSS/JS before blob creation (browser resource loader
+        //          can't resolve relative paths against blob: URLs)
         if (ext === 'html' || ext === 'htm') {
             var rawText = new TextDecoder().decode(bytes);
             content.style.display = 'flex';
             content.style.flexDirection = 'column';
             content.style.height = '100%';
 
-            // VFS bridge: intercepts fetch(), img.src setter, and MutationObserver.
-            // [sg-vfs] logs → iframe console (switch context in DevTools top-left dropdown)
-            // [sg-vfs parent] logs → parent window console (visible in "top" context)
+            // VFS bridge: intercepts fetch(), img.src setter, MutationObserver, and
+            // anchor clicks for same-vault navigation.
+            // [sg-vfs] logs → iframe console   [sg-vfs parent] logs → top context
             var vfsBridgeScript =
                 '<script id="__sg-vfs">' +
                 '(function(){' +
@@ -559,8 +564,6 @@ class SendBrowse extends SendComponent {
                 '};' +
 
                 // ── HTMLImageElement.prototype.src setter override ─────────
-                // Catches img.src = '...' before the browser fires any request,
-                // even when the img element is not yet in the DOM (e.g. new Image()).
                 '(function(){' +
                   'var d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");' +
                   'if(!d||!d.set)return;' +
@@ -569,22 +572,15 @@ class SendBrowse extends SendComponent {
                     'configurable:true,' +
                     'get:_oget,' +
                     'set:function(val){' +
-                      // External/absolute URLs pass straight through.
-                      // __sgVfs is NOT in this check — we must NOT skip relative
-                      // paths even if we already loaded this element once (slide navigation
-                      // reuses the same <img> element with a new src each time).
                       'if(!val||' +
                          'val.startsWith("http")||val.startsWith("blob:")||' +
                          'val.startsWith("data:")||val.startsWith("//"))' +
                         '{_oset.call(this,val);return;}' +
                       'console.log("[sg-vfs] img.src intercepted:",val);' +
-                      // Set __sgVfs to prevent the MutationObserver backup from
-                      // double-processing while the async VFS fetch is in flight.
-                      // It is cleared once the blob URL is applied (or on error).
                       'this.__sgVfs=true;' +
                       'var el=this;' +
                       '_vfsReq(val,function(d){' +
-                        'el.__sgVfs=false;' +  // clear so future src changes are intercepted
+                        'el.__sgVfs=false;' +
                         'if(d.err){console.warn("[sg-vfs] img not in vault:",val);_oset.call(el,val);return;}' +
                         'var b=new Blob([d.buf],{type:d.mime||"image/png"});' +
                         'var burl=URL.createObjectURL(b);' +
@@ -596,12 +592,12 @@ class SendBrowse extends SendComponent {
                   'console.log("[sg-vfs] HTMLImageElement.src setter overridden");' +
                 '})();' +
 
-                // ── MutationObserver backup (catches setAttribute calls) ───
+                // ── MutationObserver backup ────────────────────────────────
                 'function _loadImgAttr(img){' +
                   'if(img.__sgVfs)return;' +
                   'var src=img.getAttribute("src");' +
                   'if(!src||src.startsWith("http")||src.startsWith("blob:")||src.startsWith("data:"))return;' +
-                  'img.src=src;' +  // triggers our overridden setter
+                  'img.src=src;' +
                 '}' +
                 'var _obs=new MutationObserver(function(muts){' +
                   'muts.forEach(function(m){' +
@@ -618,8 +614,6 @@ class SendBrowse extends SendComponent {
                 'console.log("[sg-vfs] installed OK");' +
 
                 // ── BRW-019: anchor click interceptor (same-vault navigation) ──────
-                // Intercepts relative <a href> clicks and asks the parent to navigate.
-                // Absolute hrefs, mailto:, #anchors, and javascript: pass straight through.
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");' +
                   'if(!a)return;' +
@@ -634,31 +628,66 @@ class SendBrowse extends SendComponent {
                 '})();' +
                 '<\/script>';
 
-            // Inject bridge as first child of <head> (or prepend if no <head>)
-            var htmlForIframe = self.dataSource
-                ? rawText.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
-                : rawText;
-            if (self.dataSource && htmlForIframe === rawText) {
-                htmlForIframe = vfsBridgeScript + rawText;  // no <head> tag
-            }
+            // Declare htmlDir and fileList here so both the async inline task
+            // and the VFS bridge closure share the same mutable reference.
+            var htmlDir  = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
+            var fileList = self.dataSource ? self.dataSource.getFileList() : [];
 
-            var blob    = new Blob([htmlForIframe], { type: 'text/html' });
-            var blobUrl = URL.createObjectURL(blob);
-            this._objectUrls.push(blobUrl);
+            // Wrapper div is the fullscreen target (not the iframe directly).
+            // This lets us add a branded banner INSIDE the fullscreen context —
+            // parent-side elements can't overlay a fullscreen iframe, but they can
+            // overlay a fullscreen wrapper div that contains both banner + iframe.
+            var wrapper = document.createElement('div');
+            wrapper.style.cssText = 'flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;min-height:0;';
+            content.appendChild(wrapper);
 
+            // Present-mode banner (hidden until fullscreen starts)
+            var presentBanner = document.createElement('div');
+            var bannerTitle = fileName.includes('/') ? fileName.split('/').pop() : fileName;
+            presentBanner.className = 'sb-html-present-banner';
+            presentBanner.style.cssText =
+                'display:none;align-items:center;padding:0 1rem;height:36px;flex-shrink:0;' +
+                'background:#0d1117;border-bottom:1px solid rgba(255,255,255,0.08);gap:0.5rem;';
+            presentBanner.innerHTML =
+                '<span style="color:#4ecdc4;font-weight:700;font-size:13px;font-family:sans-serif;">SG/Vault</span>' +
+                '<span style="color:#6e7a8a;font-size:13px;">·</span>' +
+                '<span style="color:#e0e6f0;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:sans-serif;"></span>' +
+                '<button style="color:#e0e6f0;background:none;border:1px solid rgba(255,255,255,0.2);' +
+                    'border-radius:4px;padding:3px 12px;cursor:pointer;font-size:12px;font-family:sans-serif;">✕ Exit</button>';
+            // Set title text safely (avoid XSS from fileName)
+            presentBanner.querySelectorAll('span')[2].textContent = bannerTitle;
+            presentBanner.querySelector('button').addEventListener('click', function() {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            });
+            wrapper.appendChild(presentBanner);
+
+            // Show/hide banner when fullscreen state changes
+            var _onFsChange = function() {
+                var isFs = document.fullscreenElement === wrapper ||
+                           document.webkitFullscreenElement === wrapper;
+                presentBanner.style.display = isFs ? 'flex' : 'none';
+            };
+            document.addEventListener('fullscreenchange',       _onFsChange);
+            document.addEventListener('webkitfullscreenchange', _onFsChange);
+            if (!self._fsListeners) self._fsListeners = [];
+            self._fsListeners.push(function() {
+                document.removeEventListener('fullscreenchange',       _onFsChange);
+                document.removeEventListener('webkitfullscreenchange', _onFsChange);
+            });
+
+            // Create iframe; src set asynchronously after CSS/JS inlining.
             var iframeEl = document.createElement('iframe');
             iframeEl.className = 'sb-file__html-frame';
-            iframeEl.sandbox   = 'allow-scripts allow-fullscreen';
-            iframeEl.setAttribute('allowfullscreen', '');
-            iframeEl.src       = blobUrl;
-            iframeEl.style.flex = '1';
-            content.appendChild(iframeEl);
+            iframeEl.sandbox   = 'allow-scripts';   // 'allow-fullscreen' is NOT a valid sandbox keyword
+            iframeEl.setAttribute('allowfullscreen', '');  // enables iframe-initiated fullscreen if needed
+            iframeEl.style.cssText = 'flex:1;border:none;width:100%;height:0;min-height:0;';
+            wrapper.appendChild(iframeEl);
 
-            // Set up parent-side VFS request handler
+            // Set up parent-side VFS message handler synchronously — it will be ready
+            // before the iframe src is set, so no messages are missed.
             console.log('[sg-vfs parent] HTML file opened:', fileName, '| dataSource:', self.dataSource ? 'YES' : 'NO (null)');
             if (self.dataSource) {
-                var htmlDir  = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
-                var fileList = self.dataSource.getFileList();
                 console.log('[sg-vfs parent] htmlDir="' + htmlDir + '" fileList=' + fileList.length + ' entries');
                 console.log('[sg-vfs parent] sample paths:', fileList.slice(0, 8).map(function(e){return e.path;}));
                 var _vfsMime = {
@@ -687,19 +716,22 @@ class SendBrowse extends SendComponent {
                         }
                         self.dataSource.getFileBytes(navMatch.path).then(function(buf) {
                             var newText = new TextDecoder().decode(buf);
-                            var newHtml = self.dataSource
-                                ? newText.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
-                                : newText;
-                            if (self.dataSource && newHtml === newText) newHtml = vfsBridgeScript + newText;
-                            var newBlob = new Blob([newHtml], { type: 'text/html' });
-                            var newUrl  = URL.createObjectURL(newBlob);
-                            self._objectUrls.push(newUrl);
-                            iframeEl.src = newUrl;
-                            // Update resolution base for subsequent VFS requests
-                            htmlDir = navMatch.path.includes('/')
+                            // BRW-020: inline assets in the new page too
+                            var newDir = navMatch.path.includes('/')
                                 ? navMatch.path.substring(0, navMatch.path.lastIndexOf('/') + 1)
                                 : '';
-                            console.log('[sg-vfs parent] navigated to:', navMatch.path, '| htmlDir now:', htmlDir);
+                            _inlineVaultAssets(newText, newDir, fileList, self.dataSource).then(function(processed) {
+                                var newHtml = self.dataSource
+                                    ? processed.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                                    : processed;
+                                if (self.dataSource && newHtml === processed) newHtml = vfsBridgeScript + processed;
+                                var newBlob = new Blob([newHtml], { type: 'text/html' });
+                                var newUrl  = URL.createObjectURL(newBlob);
+                                self._objectUrls.push(newUrl);
+                                iframeEl.src = newUrl;
+                                htmlDir = newDir;
+                                console.log('[sg-vfs parent] navigated to:', navMatch.path, '| htmlDir now:', htmlDir);
+                            });
                         }).catch(function(err) {
                             console.error('[sg-vfs parent] nav getFileBytes failed:', navMatch.path, err);
                         });
@@ -728,7 +760,6 @@ class SendBrowse extends SendComponent {
                         try {
                             e.source.postMessage({ __sgVfsReply: msgId, buf: buf, mime: mime }, '*', [buf]);
                         } catch (_) {
-                            // buf not transferable (already detached) — send without transfer
                             e.source.postMessage({ __sgVfsReply: msgId, buf: buf, mime: mime }, '*');
                         }
                     }).catch(function(err) {
@@ -741,6 +772,21 @@ class SendBrowse extends SendComponent {
                 if (!self._vfsBridges) self._vfsBridges = [];
                 self._vfsBridges.push(vfsBridge);
             }
+
+            // BRW-020: inline vault CSS/JS → inject bridge → set iframe src.
+            // <link rel="stylesheet"> and <script src="..."> use the browser's resource
+            // loader (not fetch()), so they can't be intercepted by the VFS bridge.
+            // Pre-inlining resolves them before the blob URL is created.
+            _inlineVaultAssets(rawText, htmlDir, fileList, self.dataSource).then(function(processed) {
+                var htmlForIframe = self.dataSource
+                    ? processed.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                    : processed;
+                if (self.dataSource && htmlForIframe === processed) htmlForIframe = vfsBridgeScript + processed;
+                var blob    = new Blob([htmlForIframe], { type: 'text/html' });
+                var blobUrl = URL.createObjectURL(blob);
+                self._objectUrls.push(blobUrl);
+                iframeEl.src = blobUrl;
+            });
 
             var sourceEl = document.createElement('pre');
             sourceEl.className = 'sb-file__code';
@@ -761,20 +807,20 @@ class SendBrowse extends SendComponent {
             });
             bar.appendChild(sourceBtn);
 
-            // ── BRW-018: Present button — fullscreen the existing iframe ──
-            // Keeps the VFS bridge intact (same iframe element, same contentWindow).
+            // BRW-018: Present button — fullscreen the existing iframe.
+            // Keeps VFS bridge intact (same element, same contentWindow).
             var presentBtn = document.createElement('button');
             presentBtn.className = 'sb-action-btn sb-file__present';
             presentBtn.innerHTML = '&#x26F6; Present';
             presentBtn.title = 'Open HTML in fullscreen (Esc to exit)';
             presentBtn.addEventListener('click', function() {
-                if (isSource) return;  // don't present source code view
-                if (iframeEl.requestFullscreen) {
-                    iframeEl.requestFullscreen().catch(function() { _iframeFullscreenFallback(iframeEl); });
-                } else if (iframeEl.webkitRequestFullscreen) {
-                    iframeEl.webkitRequestFullscreen();
+                if (isSource) return;
+                if (wrapper.requestFullscreen) {
+                    wrapper.requestFullscreen().catch(function() { _iframeFullscreenFallback(wrapper, presentBanner); });
+                } else if (wrapper.webkitRequestFullscreen) {
+                    wrapper.webkitRequestFullscreen();
                 } else {
-                    _iframeFullscreenFallback(iframeEl);
+                    _iframeFullscreenFallback(wrapper, presentBanner);
                 }
             });
             bar.appendChild(presentBtn);
@@ -1367,23 +1413,75 @@ function _emlSplitMultipart(body, boundary) {
     return parts;
 }
 
-// ─── BRW-018: Iframe fullscreen fallback (when requestFullscreen is unavailable) ─
-// Uses a fixed-position overlay so the iframe fills the viewport.
-// An Exit button is injected into the page body — minimal, no framework deps.
-function _iframeFullscreenFallback(iframe) {
-    var origCss = iframe.style.cssText;
-    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483646;border:none;';
-    var exitBtn = document.createElement('button');
-    exitBtn.textContent = '✕ Exit';
-    exitBtn.style.cssText =
-        'position:fixed;top:12px;right:12px;z-index:2147483647;padding:6px 14px;' +
-        'background:rgba(0,0,0,0.75);color:#fff;border:1px solid rgba(255,255,255,0.3);' +
-        'border-radius:6px;cursor:pointer;font-size:13px;font-family:sans-serif;';
-    exitBtn.addEventListener('click', function() {
-        iframe.style.cssText = origCss;
-        exitBtn.remove();
+// ─── BRW-020: Pre-inline vault CSS/JS into HTML before blob creation ─────────────
+// <link rel="stylesheet"> and <script src="..."> use the browser's native resource
+// loader which can't resolve relative paths against a blob: URL. This function
+// fetches each referenced vault file via dataSource and replaces the tags with
+// inline <style> / <script> blocks before the blob is created.
+// Returns a Promise<string> with the processed HTML.
+async function _inlineVaultAssets(html, htmlDir, fileList, dataSource) {
+    if (!dataSource || !html) return html;
+
+    // Collect all relative <link rel="stylesheet" href="..."> and <script src="...">
+    var tasks = [];
+    var linkRe   = /(<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["'])([^"'#?][^"']*)("|\s[^>]*?>|["'])/gi;
+    var scriptRe = /(<script\b[^>]*\bsrc=["'])([^"'#?][^"']*)("|\s[^>]*?>|["'])/gi;
+
+    function collectTag(re, kind) {
+        var m;
+        while ((m = re.exec(html)) !== null) {
+            var src = m[2];
+            if (src.startsWith('http') || src.startsWith('//') || src.startsWith('blob:') || src.startsWith('data:')) continue;
+            var resolved = _resolvePath(htmlDir, src);
+            var entry    = _findEntry(fileList, resolved);
+            if (!entry) continue;
+            tasks.push({ kind: kind, fullMatch: m[0], path: entry.path });
+        }
+    }
+    collectTag(linkRe,   'css');
+    collectTag(scriptRe, 'js');
+
+    if (tasks.length === 0) return html;
+
+    // Fetch all in parallel
+    var results = await Promise.all(tasks.map(function(t) {
+        return dataSource.getFileBytes(t.path).then(function(buf) {
+            return new TextDecoder().decode(buf);
+        }).catch(function() { return null; });
+    }));
+
+    // Replace each matched tag with its inline equivalent
+    var processed = html;
+    tasks.forEach(function(t, idx) {
+        var text = results[idx];
+        if (text === null) return;
+        var replacement = t.kind === 'css'
+            ? '<style>/* inlined: ' + t.path + ' */\n' + text + '\n</style>'
+            : '<script>/* inlined: ' + t.path + ' */\n' + text + '\n<\/script>';
+        processed = processed.replace(t.fullMatch, replacement);
     });
-    document.body.appendChild(exitBtn);
+
+    return processed;
+}
+
+// ─── BRW-018: Wrapper fullscreen fallback (when requestFullscreen is unavailable) ─
+// Expands the wrapper div to fill the viewport with a fixed overlay.
+// Shows the presentBanner (if supplied) so the Exit button is still accessible.
+function _iframeFullscreenFallback(wrapper, presentBanner) {
+    var origCss = wrapper.style.cssText;
+    wrapper.style.cssText =
+        'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483646;' +
+        'display:flex;flex-direction:column;overflow:hidden;';
+    if (presentBanner) {
+        presentBanner.style.display = 'flex';
+        var exitHandler = function() {
+            wrapper.style.cssText = origCss;
+            presentBanner.style.display = 'none';
+        };
+        // Wire up the Exit button inside the banner
+        var exitBtn = presentBanner.querySelector('button');
+        if (exitBtn) exitBtn.addEventListener('click', exitHandler);
+    }
 }
 
 // ─── BRW-015: Inject scrollable tab bar CSS into sg-layout Shadow DOM ────────
