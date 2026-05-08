@@ -130,14 +130,26 @@
         _restoreTreeStack();
         var banner = document.querySelector('sg-app-banner');
         if (banner) banner.style.display = 'none';
+        // sg-layout caches panel dimensions. While the iframe wrapper was
+        // position:fixed the content panel had no in-flow children and may
+        // have collapsed to height 0. A synthetic resize event makes sg-layout
+        // re-measure and restore the correct content panel height.
+        requestAnimationFrame(function() {
+            window.dispatchEvent(new Event('resize'));
+        });
     }
 
     // ── Reload App ────────────────────────────────────────────────────────────
     // Re-fetches the current file via vault-header-refresh, then re-lifts
     // the new iframe wrapper once it appears in the DOM.
+    // We do NOT drop the current frame first — the old fixed-position wrapper
+    // stays until the vault removes it during re-render, so vault chrome never
+    // becomes visible. The saved style pointers are cleared so _liftContentFrame
+    // captures fresh values from the new wrapper.
 
     function _reloadAndLift() {
-        _dropContentFrame();
+        _savedWrapperStyle = null;
+        _savedIframeStyle  = null;
         var shell = document.querySelector('vault-shell');
         if (!shell) return;
         _waitForIframeAndLift();
@@ -182,12 +194,13 @@
 
     // Watches for a new .sb-file__html-frame to appear, then lifts it.
     // Used for app.json auto-activate and Reload App.
+    // The iframe style is set before appendChild in send-browse, so
+    // MutationObserver fires after the style is already correct — no delay needed.
     function _waitForIframeAndLift() {
         var observer = new MutationObserver(function() {
             if (document.querySelector('.sb-file__html-frame')) {
                 observer.disconnect();
-                // Small delay lets the iframe's own styles settle first
-                setTimeout(function() { _liftContentFrame(); }, 50);
+                _liftContentFrame();
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });
