@@ -127,13 +127,22 @@
         _dropContentFrame();
         _removeMaxCss();
         _removeShadowCss();
+        // Belt-and-suspenders: force all sgl-stacks visible.
+        // On initial app.json activation the fallback path hides the tree stack
+        // in shadow DOM; after Reload App that state persists until deactivation.
+        var sgLayout = _getSgLayout();
+        if (sgLayout && sgLayout.shadowRoot) {
+            sgLayout.shadowRoot.querySelectorAll('.sgl-stack').forEach(function(s) {
+                s.style.removeProperty('display');
+            });
+        }
         _restoreTreeStack();
         var banner = document.querySelector('sg-app-banner');
         if (banner) banner.style.display = 'none';
-        // sg-layout caches panel dimensions. While the iframe wrapper was
-        // position:fixed the content panel had no in-flow children and may
-        // have collapsed to height 0. A synthetic resize event makes sg-layout
-        // re-measure and restore the correct content panel height.
+        // sg-layout caches panel dimensions. While the wrapper was position:fixed
+        // the content panel had no in-flow children and may have collapsed to 0px.
+        // Dispatch resize twice to ensure sg-layout re-measures in all cases.
+        window.dispatchEvent(new Event('resize'));
         requestAnimationFrame(function() {
             window.dispatchEvent(new Event('resize'));
         });
@@ -142,18 +151,28 @@
     // ── Reload App ────────────────────────────────────────────────────────────
     // Re-fetches the current file via vault-header-refresh, then re-lifts
     // the new iframe wrapper once it appears in the DOM.
-    // We do NOT drop the current frame first — the old fixed-position wrapper
-    // stays until the vault removes it during re-render, so vault chrome never
-    // becomes visible. The saved style pointers are cleared so _liftContentFrame
+    // A cover div at z-index:7998 fills the viewport below the banner during
+    // re-render so the brief gap between old wrapper removal and new lift is
+    // not visible. Saved style pointers are cleared so _liftContentFrame
     // captures fresh values from the new wrapper.
 
     function _reloadAndLift() {
         _savedWrapperStyle = null;
         _savedIframeStyle  = null;
+
+        var cover = document.createElement('div');
+        cover.style.cssText = [
+            'position:fixed', 'top:2.25rem', 'left:0', 'right:0', 'bottom:0',
+            'z-index:7998', 'background:#0a0a18'
+        ].join(';');
+        document.body.appendChild(cover);
+
+        _waitForIframeAndLift(function() { cover.remove(); });
+
         var shell = document.querySelector('vault-shell');
-        if (!shell) return;
-        _waitForIframeAndLift();
-        shell.dispatchEvent(new CustomEvent('vault-header-refresh', { bubbles: true, composed: true }));
+        if (shell) {
+            shell.dispatchEvent(new CustomEvent('vault-header-refresh', { bubbles: true, composed: true }));
+        }
     }
 
     // ── Layer 2: frame lift ───────────────────────────────────────────────────
@@ -192,20 +211,23 @@
         _savedIframeStyle  = null;
     }
 
-    // Watches for a new .sb-file__html-frame to appear, then lifts it.
-    // Used for app.json auto-activate and Reload App.
-    // The iframe style is set before appendChild in send-browse, so
-    // MutationObserver fires after the style is already correct — no delay needed.
-    function _waitForIframeAndLift() {
+    // Watches for a new .sb-file__html-frame to appear, lifts it, then calls
+    // the optional onLifted callback. Used for app.json auto-activate and
+    // Reload App (which passes a callback that removes the cover div).
+    function _waitForIframeAndLift(onLifted) {
         var observer = new MutationObserver(function() {
             if (document.querySelector('.sb-file__html-frame')) {
                 observer.disconnect();
                 _liftContentFrame();
+                if (typeof onLifted === 'function') onLifted();
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });
         // Safety: disconnect after 5 s to avoid leaking
-        setTimeout(function() { observer.disconnect(); }, 5000);
+        setTimeout(function() {
+            observer.disconnect();
+            if (typeof onLifted === 'function') onLifted(); // remove cover even on timeout
+        }, 5000);
     }
 
     // ── Layer 1: regular-DOM CSS ──────────────────────────────────────────────
