@@ -12,7 +12,7 @@
 #
 # LOCAL CDN OVERRIDE: The vault index.html loads shared components from
 # dev.send.sgraph.ai. This script merges all user UI IFD layers (v0.3.0,
-# v0.3.1, v0.3.2) on top of the vault _common/ and patches index.html to
+# v0.3.1, v0.3.2, v0.3.3) on top of the vault _common/ and patches index.html to
 # use local URLs so that local code changes are visible without a CDN deploy.
 #
 # The vault UI uses Web Crypto API (AES-256-GCM) which requires either:
@@ -24,9 +24,15 @@ PORT=10067
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
-UI_VERSION="v0.2.1"
+UI_VERSION="v0.2.2"
 IFD_PATH="v0/v0.2/$UI_VERSION"
 VAULT_BASE_VERSION="v0.2.0"   # IFD base layer — provides vault-shell, vault-browse-edit, etc.
+# Vault IFD overlay layers applied on top of base (base-to-latest).
+# Each only contains files changed in that version.
+VAULT_IFD_OVERLAYS=(
+    "v0.2.1"
+    "v0.2.2"
+)
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
 
 # User UI IFD layers — merged in order (base first, latest last) to replicate
@@ -36,6 +42,7 @@ USER_UI_LAYERS=(
     "v0/v0.3/v0.3.0/_common"
     "v0/v0.3/v0.3.1/_common"
     "v0/v0.3/v0.3.2/_common"
+    "v0/v0.3/v0.3.3/_common"
 )
 
 # Clean up on exit
@@ -58,16 +65,21 @@ if [ ! -d "$CONTENT_DIR" ]; then
     exit 1
 fi
 
-# Copy locale folders (not symlink) so we can patch index.html inside them
-for locale_dir in "$CONTENT_DIR"/*/; do
-    dirname=$(basename "$locale_dir")
-    if [ "$dirname" != "_common" ] && [ "$dirname" != "i18n" ] && [ -d "$locale_dir" ]; then
+# Merge locale dirs (en-gb/, etc.) from ALL vault IFD layers base→latest.
+# Each layer can add or update locale dirs; later layers override earlier ones.
+# This means individual version deltas don't need to copy unchanged locale dirs.
+for ver in "$VAULT_BASE_VERSION" "${VAULT_IFD_OVERLAYS[@]}"; do
+    for locale_dir in "$STATIC_DIR/v0/v0.2/$ver"/*/; do
+        [ -d "$locale_dir" ] || continue
+        dirname=$(basename "$locale_dir")
+        [ "$dirname" = "_common" ] && continue
+        [ "$dirname" = "i18n"    ] && continue
         cp -r "$locale_dir" "$SERVE_DIR/$dirname"
-    fi
+    done
 done
 
 # Build _common: start with vault IFD base layer (vault-shell, vault-browse-edit, etc.)
-# then apply the current version's overlay (IFD delta — only changed files).
+# then apply overlay deltas in order (only changed files in each delta).
 BASE_COMMON_DIR="$STATIC_DIR/v0/v0.2/$VAULT_BASE_VERSION/_common"
 if [ -d "$BASE_COMMON_DIR" ]; then
     echo "Merging vault base layer: $VAULT_BASE_VERSION ..."
@@ -76,10 +88,13 @@ else
     mkdir -p "$SERVE_DIR/_common/js"
 fi
 
-if [ -d "$CONTENT_DIR/_common" ]; then
-    echo "Merging vault overlay layer: $UI_VERSION ..."
-    cp -r "$CONTENT_DIR/_common"/. "$SERVE_DIR/_common/"
-fi
+for ver in "${VAULT_IFD_OVERLAYS[@]}"; do
+    overlay_dir="$STATIC_DIR/v0/v0.2/$ver/_common"
+    if [ -d "$overlay_dir" ]; then
+        echo "Merging vault overlay: $ver ..."
+        cp -r "$overlay_dir"/. "$SERVE_DIR/_common/"
+    fi
+done
 
 # Merge user UI IFD layers in order (v0.3.0 → v0.3.1 → v0.3.2) — replicates
 # the CDN's flattened view. Each layer only contains files changed in that
