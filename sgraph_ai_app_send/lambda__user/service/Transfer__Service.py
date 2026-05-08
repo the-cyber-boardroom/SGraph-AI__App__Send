@@ -58,7 +58,7 @@ class Transfer__Service(Type_Safe):                                             
                              transfer_id      = ''    ,                          # Optional client-provided ID (PBKDF2 simple-token mode)
                              max_downloads    = 0     ,                          # 0 = unlimited
                              auto_delete      = False ,                          # Wipe payload after last download
-                             expires_at       = ''    ,                          # ISO-8601 UTC, empty = no expiry
+                             expires_at       = 0     ,                          # ms since epoch, 0 = no expiry
                              delete_auth_hash = ''    ):                         # SHA-256 of delete_auth, empty = delete disabled
         if transfer_id:                                                          # Client-provided ID — validate format and uniqueness
             if not self.TRANSFER_ID_PATTERN.match(transfer_id):
@@ -133,7 +133,7 @@ class Transfer__Service(Type_Safe):                                             
                     created_at          = meta['created_at']               ,
                     download_count      = meta['download_count']           ,
                     max_downloads       = meta.get('max_downloads', 0)     ,
-                    expires_at          = meta.get('expires_at', '')       ,
+                    expires_at          = meta.get('expires_at', 0)        ,
                     downloads_remaining = self._downloads_remaining(meta)  ,
                     is_expired          = self._is_expired(meta)           )
 
@@ -192,11 +192,12 @@ class Transfer__Service(Type_Safe):                                             
         return dict(status='deleted', transfer_id=transfer_id)
 
     @staticmethod
-    def _is_expired(meta):                                                       # Check if transfer has passed its expiry timestamp
-        exp = meta.get('expires_at', '')
+    def _is_expired(meta):                                                       # Check if transfer has passed its expiry (ms since epoch)
+        exp = meta.get('expires_at', 0)
         if not exp:
             return False
-        return datetime.now(timezone.utc) > datetime.fromisoformat(exp)
+        import time
+        return (time.time() * 1000) > exp
 
     @staticmethod
     def _downloads_remaining(meta):                                              # Remaining downloads (0 = unlimited)

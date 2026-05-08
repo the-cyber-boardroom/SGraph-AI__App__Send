@@ -169,16 +169,17 @@ class test_Transfer__Service(TestCase):
     # --- expiry enforcement ---
 
     def test__create__with_expires_at(self):
-        from datetime import datetime, timezone, timedelta
-        future  = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        import time
+        future  = int(time.time() * 1000) + (24 * 3_600_000)                    # now + 24h in ms
         result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
                                                 sender_ip = '', expires_at = future)
         meta    = self.service.load_meta(result['transfer_id'])
         assert meta['expires_at'] == future
+        assert isinstance(meta['expires_at'], int)
 
     def test__download__not_yet_expired(self):
-        from datetime import datetime, timezone, timedelta
-        future  = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+        import time
+        future  = int(time.time() * 1000) + (24 * 3_600_000)                    # now + 24h in ms
         result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
                                                 sender_ip = '', expires_at = future)
         tid     = result['transfer_id']
@@ -187,8 +188,8 @@ class test_Transfer__Service(TestCase):
         assert self.service.get_download_payload(tid, '', '') == b'data'
 
     def test__download__expired_transfer_returns_410(self):
-        from datetime import datetime, timezone, timedelta
-        past    = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        import time
+        past    = int(time.time() * 1000) - 3_600_000                           # now - 1h in ms
         result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
                                                 sender_ip = '', expires_at = past)
         tid     = result['transfer_id']
@@ -198,6 +199,17 @@ class test_Transfer__Service(TestCase):
         assert isinstance(resp, dict)
         assert resp['status'] == 410
         assert resp['error']  == 'expired'
+
+    def test__create__with_no_expiry(self):
+        result = self.service.create_transfer(file_size_bytes=4, content_type_hint='', sender_ip='')
+        meta   = self.service.load_meta(result['transfer_id'])
+        assert meta['expires_at'] == 0
+        assert self.service._is_expired(meta) is False
+
+    def test__is_expired__zero_means_no_expiry(self):
+        assert Transfer__Service._is_expired({'expires_at': 0})  is False
+        assert Transfer__Service._is_expired({'expires_at': ''}) is False        # legacy safe
+        assert Transfer__Service._is_expired({})                 is False
 
     # --- delete_transfer ---
 
@@ -254,8 +266,8 @@ class test_Transfer__Service(TestCase):
     # --- transfer_info new fields ---
 
     def test__transfer_info__includes_new_fields(self):
-        from datetime import datetime, timezone, timedelta
-        future  = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        import time
+        future  = int(time.time() * 1000) + 3_600_000                           # now + 1h in ms
         result  = self.service.create_transfer(file_size_bytes = 4, content_type_hint = '',
                                                 sender_ip = '', max_downloads = 3, expires_at = future)
         info    = self.service.get_transfer_info(result['transfer_id'])
