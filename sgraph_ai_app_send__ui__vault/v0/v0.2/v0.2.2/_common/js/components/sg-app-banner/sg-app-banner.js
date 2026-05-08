@@ -81,11 +81,6 @@
             this.appendChild(status);
             this._statusEl = status;
 
-            // Reload App — re-fetches file from vault and re-lifts the iframe
-            var reloadBtn = _btn('Reload App', 'Re-fetch and reload the current app');
-            reloadBtn.addEventListener('click', function() { _reloadAndLift(); });
-            this.appendChild(reloadBtn);
-
             // Open Vault — exits App Mode and returns to full vault view
             var openVaultBtn = _btn('Open Vault', 'Exit app mode and return to vault');
             openVaultBtn.addEventListener('click', function() { _deactivate(); });
