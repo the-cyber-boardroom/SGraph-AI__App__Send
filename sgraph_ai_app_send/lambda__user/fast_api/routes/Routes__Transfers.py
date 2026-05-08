@@ -95,7 +95,7 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                                        transfer_id       = request.transfer_id      ,
                                                        max_downloads     = int(request.max_downloads)   ,
                                                        auto_delete       = request.auto_delete          ,
-                                                       expires_at        = str(request.expires_at)      ,
+                                                       expires_at        = int(request.expires_at or 0) ,
                                                        delete_auth_hash  = str(request.delete_auth_hash))
         if 'error' in result:
             if result['error'] == 'transfer_id_exists':

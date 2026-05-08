@@ -12,10 +12,11 @@ from   osbot_utils.type_safe.primitives.domains.identifiers.safe_int.Timestamp_N
 from   memory_fs.storage_fs.Storage_FS                                           import Storage_FS
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
 from   osbot_utils.type_safe.Type_Safe                                           import Type_Safe
-from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                    import (path__vault_manifest,
-                                                                                         path__vault_payload  ,
-                                                                                         path__vault_prefix   ,
-                                                                                         path__vault_tombstone)
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                    import (path__vault_manifest       ,
+                                                                                         path__vault_payload          ,
+                                                                                         path__vault_prefix           ,
+                                                                                         path__vault_public_vault_json,
+                                                                                         path__vault_tombstone        )
 
 VAULT_ID_PATTERN = re.compile(r'^[a-z0-9]{8,24}$')                              # Opaque lowercase alphanumeric, 8–24 chars, no hyphens/uppercase
 
@@ -228,6 +229,16 @@ class Service__Vault__Pointer(Type_Safe):                                       
         return dict(status        = 'deleted'     ,
                     vault_id      = vault_id       ,
                     files_deleted = files_deleted  )
+
+    def ensure_public_vault_json(self, vault_id, read_key_b64):                   # Write public-vault.json on first push to a public vault (idempotent)
+        path = path__vault_public_vault_json(vault_id)
+        if self.storage_fs.file__exists(path):
+            return
+        public_vault = dict(schema     = 'sgit-public-vault/1' ,
+                            vault_id   = vault_id              ,
+                            created_at = Timestamp_Now()        ,
+                            read_key   = read_key_b64           )
+        self.storage_fs.file__save(path, json.dumps(public_vault, indent=2).encode())
 
     def batch_read(self, vault_id, operations):                                  # Read-only batch (no auth required — data is encrypted)
         results = []

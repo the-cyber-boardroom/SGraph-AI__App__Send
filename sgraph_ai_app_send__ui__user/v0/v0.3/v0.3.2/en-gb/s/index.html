@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Send — Secret</title>
+    <meta name="description" content="Zero-knowledge encrypted secret sharing. Your secret is decrypted in your browser — the server never sees it.">
+
+    <!-- No-cache: each load should be fresh (secret may be consumed) -->
+    <meta http-equiv="Cache-Control" content="no-store">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
+
+    <!-- Fonts -->
+    <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+
+    <!-- Design tokens -->
+    <link rel="stylesheet" href="../../_common/css/design-tokens.css">
+
+    <!-- Secret view styles -->
+    <link rel="stylesheet" href="../../_common/js/components/send-secret-view/send-secret-view.css">
+</head>
+<body>
+
+    <header class="secret-page-header">
+        <span class="secret-page-logo">SG/Send 🔒</span>
+        <a href="https://sgraph.ai" class="secret-page-home">sgraph.ai</a>
+    </header>
+
+    <main>
+        <send-secret-view></send-secret-view>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         Secret receive page — standalone, minimal dependencies.
+         Loads only what is needed to fetch + decrypt + display a secret.
+
+         Path format:    /en-gb/s/{transferId}#{keyHex}          → view secret
+         Kill path:      /en-gb/s/kill/{transferId}#{deleteAuth}  → kill confirm
+
+         The #fragment is NEVER sent in HTTP requests — zero-knowledge guarantee.
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Build info -->
+    <script src="../../_common/js/build-info.js"></script>
+    <script>
+        if (!window.SGRAPH_BUILD) {
+            window.SGRAPH_BUILD = { appVersion: 'dev', uiVersion: 'v0.3.2' };
+        }
+    </script>
+
+    <!-- Crypto + API utilities -->
+    <script src="../../_common/js/crypto.js"></script>
+    <script src="../../_common/js/api-client.js"></script>
+    <script src="../../_common/js/api-client-v032.js"></script>
+
+    <!-- Base system (SendComponent requires these) -->
+    <script src="../../_common/js/base/send-helpers.js"></script>
+    <script src="../../_common/js/base/send-component-paths.js"></script>
+    <script>
+        // Base path: two levels up from s/ → en-gb/ → v0.3.2/ → _common/
+        // In deployment: from latest/en-gb/s/ → latest/_common/ ✓
+        SendComponentPaths.init('../../_common');
+    </script>
+    <script src="../../_common/js/base/send-component.js"></script>
+
+    <!-- Secret receive component -->
+    <script src="../../_common/js/components/send-secret-view/send-secret-view.js"></script>
+
+    <script>
+        document.body.setAttribute('data-ready', 'true');
+    </script>
+
+</body>
+</html>
