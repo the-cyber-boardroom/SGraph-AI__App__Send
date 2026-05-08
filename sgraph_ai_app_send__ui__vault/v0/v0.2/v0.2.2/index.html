@@ -43,6 +43,8 @@
 </head>
 <body>
 
+    <!-- sg-app-banner: hidden until app.json chrome.mode = "maximised" activates it -->
+    <sg-app-banner style="display:none"></sg-app-banner>
     <vault-shell></vault-shell>
 
     <!-- ===================================================================
@@ -113,7 +115,7 @@
                 var browse = window._vaultBrowseElement;
                 var token  = window._vaultCurrentToken;
                 if (browse && token) {
-                    var base = window.location.origin + '/#' + token;
+                    var base = window.location.origin + '/en-gb/vault#' + token;
                     browse.downloadUrl = path ? (base + '|' + path) : base;
                 }
             };
@@ -149,6 +151,9 @@
 
     <!-- 7c. Browse edit overlay -->
     <script src="_common/js/components/vault-browse-edit/vault-browse-edit.js"></script>
+
+    <!-- 7d. App banner (maximised chrome mode) -->
+    <script src="_common/js/components/sg-app-banner/sg-app-banner.js"></script>
 
     <!-- 8. Debug panels -->
     <script src="_common/js/components/messages-panel/messages-panel.js"></script>
@@ -460,9 +465,9 @@
                 var token  = this._vaultKey;
 
                 // Fix downloadUrl (it defaults to window.location.href which may be '/'
-                // after create-then-clear-hash)
+                // after create-then-clear-hash). Use canonical /en-gb/vault#token format.
                 if (browse && token) {
-                    browse.downloadUrl = window.location.origin + '/#' + token;
+                    browse.downloadUrl = window.location.origin + '/en-gb/vault#' + token;
                 }
                 window._vaultCurrentToken  = token  || null;
                 window._vaultBrowseElement = browse || null;
@@ -505,12 +510,22 @@
                     return;
                 }
 
-                var entryFile = config.entry    || 'index.html';
-                var autoOpen  = config.auto_open !== false;
-                var present   = config.present  === true;
+                var entryFile   = config.entry    || 'index.html';
+                var autoOpen    = config.auto_open !== false;
+                var present     = config.present  === true;
+                var chromeMode  = (config.chrome && config.chrome.mode) || 'default';
 
                 if (!autoOpen) return;
-                console.log('[app.json] entry:', entryFile, '| present:', present);
+                console.log('[app.json] entry:', entryFile, '| present:', present, '| chrome:', chromeMode);
+
+                // Maximised chrome mode: activate sg-app-banner, hide vault chrome
+                if (chromeMode === 'maximised') {
+                    var banner = document.querySelector('sg-app-banner');
+                    if (banner) {
+                        banner.style.display = '';
+                        banner.activate();
+                    }
+                }
 
                 var self = this;
                 requestAnimationFrame(function () {

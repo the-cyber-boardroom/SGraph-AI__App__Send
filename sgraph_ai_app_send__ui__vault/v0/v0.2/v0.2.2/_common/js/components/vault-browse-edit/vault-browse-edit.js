@@ -31,6 +31,26 @@
         var self = this;
         var isEditable = (type === 'text' || type === 'code' || type === 'markdown');
 
+        // --- Refresh button: re-fetch and re-render from vault (all file types) ---
+        var refreshBtn = _makeBtn('↺ Refresh');
+        refreshBtn.title = 'Re-fetch this file from the vault and re-render';
+        refreshBtn.addEventListener('click', function() {
+            if (!self.dataSource) return;
+            var origText = refreshBtn.textContent;
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '↺ …';
+            self.dataSource.getFileBytes(fileName).then(function(freshBytes) {
+                self._renderFileContent(container, freshBytes, fileName, type);
+            }).catch(function(err) {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = origText;
+                if (window.sgraphVault && window.sgraphVault.messages) {
+                    window.sgraphVault.messages.error('Refresh failed: ' + err.message);
+                }
+            });
+        });
+        bar.appendChild(refreshBtn);
+
         // --- Edit / Save / Cancel buttons (text-editable files only) ---
         if (isEditable) {
             var editBtn   = _makeBtn('Edit');
@@ -79,10 +99,8 @@
                 if (!isEditing) return;
                 isEditing = false;
                 if (textareaEl) { textareaEl.remove(); textareaEl = null; }
-                if (content) content.style.display = '';
-                editBtn.style.display   = '';
-                saveBtn.style.display   = 'none';
-                cancelBtn.style.display = 'none';
+                // Re-render from original bytes — restores content and resets button state
+                self._renderFileContent(container, bytes, fileName, type);
             }
 
             function doSave() {
