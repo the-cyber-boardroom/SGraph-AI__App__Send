@@ -492,8 +492,9 @@
             };
 
             // ── 3. _applyAppJson ───────────────────────────────────────────────────────
-            // Change 3: auto-open entry file when vault loads.
-            // Schema: { "entry": "index.html", "auto_open": true, "present": false }
+            // Schema: { "entry": "index.html", "auto_open": true, "present": true }
+            // "present": true  — auto-opens entry file in App Mode (sg-app-banner).
+            // "chrome": { "mode": "maximised" }  — legacy alias for the same behaviour.
             VaultShell.prototype._applyAppJson = async function (dataSource, browse) {
                 var fileList = dataSource.getFileList();
                 var entry = fileList.find(function (e) {
@@ -510,69 +511,25 @@
                     return;
                 }
 
-                var entryFile   = config.entry    || 'index.html';
-                var autoOpen    = config.auto_open !== false;
-                var present     = config.present  === true;
-                var chromeMode  = (config.chrome && config.chrome.mode) || 'default';
+                var entryFile  = config.entry    || 'index.html';
+                var autoOpen   = config.auto_open !== false;
+                var appMode    = config.present  === true ||
+                                 (config.chrome && config.chrome.mode === 'maximised');
 
                 if (!autoOpen) return;
-                console.log('[app.json] entry:', entryFile, '| present:', present, '| chrome:', chromeMode);
+                console.log('[app.json] entry:', entryFile, '| appMode:', appMode);
 
-                // Maximised chrome mode: activate sg-app-banner, hide vault chrome
-                if (chromeMode === 'maximised') {
+                // App Mode: show banner and wait for the iframe to appear, then lift it.
+                if (appMode) {
                     var banner = document.querySelector('sg-app-banner');
                     if (banner) banner.activate();
                 }
 
-                var self = this;
                 requestAnimationFrame(function () {
                     if (browse._openFileTab) {
                         browse._openFileTab(entryFile);
-                        if (present) self._showPresentOverlay();
                     }
                 });
-            };
-
-            // ── 4. _showPresentOverlay ─────────────────────────────────────────────────
-            // Click-through overlay for guaranteed fullscreen (browsers require a user gesture).
-            // Calls requestFullscreen on the wrapper div (iframe.parentElement) so the
-            // SG/Vault banner inside the wrapper stays visible in fullscreen.
-            VaultShell.prototype._showPresentOverlay = function () {
-                var self = this;
-                var attempts = 0;
-                var findIframe = function () {
-                    var iframe = self.querySelector('.vs-view-files iframe');
-                    if (!iframe && attempts++ < 20) { setTimeout(findIframe, 200); return; }
-                    if (!iframe) return;
-
-                    // wrapper is iframe.parentElement (div wrapping banner + iframe)
-                    var wrapper = iframe.parentElement;
-                    if (!wrapper) return;
-                    if (getComputedStyle(wrapper).position === 'static') {
-                        wrapper.style.position = 'relative';
-                    }
-
-                    var overlay = document.createElement('div');
-                    overlay.style.cssText =
-                        'position:absolute;inset:0;display:flex;align-items:center;' +
-                        'justify-content:center;background:rgba(0,0,0,0.55);z-index:100;cursor:pointer;';
-                    overlay.innerHTML =
-                        '<div style="color:#fff;font-size:1.1rem;padding:0.9rem 2rem;' +
-                        'background:rgba(78,205,196,0.15);border:1px solid #4ecdc4;' +
-                        'border-radius:8px;">&#x26F6; Click to enter present mode</div>';
-                    overlay.addEventListener('click', function () {
-                        overlay.remove();
-                        if (wrapper.requestFullscreen) {
-                            wrapper.requestFullscreen().catch(function (err) {
-                                console.warn('[app.json] fullscreen rejected:', err);
-                            });
-                        } else if (wrapper.webkitRequestFullscreen) {
-                            wrapper.webkitRequestFullscreen();
-                        }
-                    });
-                    wrapper.appendChild(overlay);
-                };
-                setTimeout(findIframe, 400);
             };
 
             // ── 5. _setupVaultLinkHandler ──────────────────────────────────────────────

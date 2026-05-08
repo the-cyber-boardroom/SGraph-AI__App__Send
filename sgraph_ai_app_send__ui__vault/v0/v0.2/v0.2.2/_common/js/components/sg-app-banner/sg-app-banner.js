@@ -2,11 +2,11 @@
    SGraph Vault — sg-app-banner
    v0.2.2 — Fixed-position app banner for maximised chrome mode.
 
-   Activated by app.json: { "chrome": { "mode": "maximised" } }
+   Activated by app.json: { "entry": "...", "present": true }
    or by clicking the "App Mode" button on any HTML file in the vault.
 
    In App Mode only TWO things are visible:
-     1. This banner (SG/Send brand · Refresh · Vault ▾ · App Mode ✓)
+     1. This banner (SG/Send brand · status · Reload App · Open Vault · App Mode)
      2. The HTML iframe content filling all remaining viewport height
 
    Strategy — two-layer approach:
@@ -16,8 +16,8 @@
        (tab bar, resize handle, collapse buttons, tree panel) without moving
        the iframe node in the DOM (which would reload it).
 
-   If no HTML iframe is present (e.g. vault opened from app.json before any
-   file is selected), Layer 1 + shadow CSS hides act as fallback.
+   If no HTML iframe is present at activate time, Layer 1 + shadow CSS act
+   as fallback; frame-lift is applied once the iframe appears.
    ================================================================================= */
 
 (function() {
@@ -51,7 +51,6 @@
         connectedCallback() {
             if (this._built) return;
             this._built = true;
-            this._vaultOpen = false;
             this._render();
         }
 
@@ -68,13 +67,12 @@
             ].join(';');
 
             // Brand
-            var brand = _el('span', {
+            this.appendChild(_el('span', {
                 style: 'color:#4ecdc4;font-weight:700;letter-spacing:0.05em;flex-shrink:0;font-size:12px;',
                 textContent: 'SG/Send'
-            });
-            this.appendChild(brand);
+            }));
 
-            // Status badge slot — reserved for vault-app events (VLT-026)
+            // Status badge — reserved for vault-app events (VLT-026)
             var status = _el('span', {
                 className: 'sg-app-banner__status',
                 style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
@@ -83,42 +81,22 @@
             this.appendChild(status);
             this._statusEl = status;
 
-            // Refresh
-            var refreshBtn = _btn('↺ Refresh', 'Re-fetch and re-render the current file');
-            refreshBtn.addEventListener('click', function() {
-                var shell = document.querySelector('vault-shell');
-                if (shell) shell.dispatchEvent(
-                    new CustomEvent('vault-header-refresh', { bubbles: true, composed: true })
-                );
-            });
-            this.appendChild(refreshBtn);
+            // Reload App — re-fetches file from vault and re-lifts the iframe
+            var reloadBtn = _btn('Reload App', 'Re-fetch and reload the current app');
+            reloadBtn.addEventListener('click', function() { _reloadAndLift(); });
+            this.appendChild(reloadBtn);
 
-            // Vault ▾ — temporary vault browser toggle
-            var vaultBtn = _btn('Vault ▾', 'Temporarily show vault file browser');
-            var self = this;
-            vaultBtn.addEventListener('click', function() {
-                self._vaultOpen = !self._vaultOpen;
-                _setVaultVisible(self._vaultOpen);
-                vaultBtn.textContent = self._vaultOpen ? 'Vault ▴' : 'Vault ▾';
-            });
-            this.appendChild(vaultBtn);
-            this._vaultBtn = vaultBtn;
+            // Open Vault — exits App Mode and returns to full vault view
+            var openVaultBtn = _btn('Open Vault', 'Exit app mode and return to vault');
+            openVaultBtn.addEventListener('click', function() { _deactivate(); });
+            this.appendChild(openVaultBtn);
 
-            // App Mode ✓ — exit toggle
-            var appBtn = _btn('App Mode ✓', 'Exit app mode — restore full vault chrome');
-            appBtn.style.cssText += ';border-color:rgba(78,205,196,0.6);color:#4ecdc4;';
-            appBtn.addEventListener('click', function() {
-                var active = !!document.getElementById(CSS_ID);
-                if (active) {
-                    _deactivate();
-                } else {
-                    _activateAll();
-                    appBtn.textContent = 'App Mode ✓';
-                    appBtn.style.borderColor = 'rgba(78,205,196,0.6)';
-                    appBtn.style.color = '#4ecdc4';
-                }
-            });
-            this.appendChild(appBtn);
+            // App Mode — label only, not a button
+            this.appendChild(_el('span', {
+                style: 'color:#4ecdc4;font-size:11px;flex-shrink:0;' +
+                       'padding:2px 8px;border:1px solid rgba(78,205,196,0.3);border-radius:4px;',
+                textContent: 'App Mode'
+            }));
         }
 
         // Called by the "App Mode" button in vault-browse-edit or app.json handler
@@ -136,11 +114,12 @@
 
     function _activateAll() {
         _injectMaxCss();
-        // Try to lift the iframe wrapper to cover sg-layout chrome entirely.
-        // Fall back to shadow-CSS + tree-hide if no iframe is present yet.
+        // Try to lift the iframe wrapper. If not present yet, use shadow CSS
+        // fallback and wait for the iframe to appear.
         if (!_liftContentFrame()) {
             _injectShadowCss();
             _hideTreeStack();
+            _waitForIframeAndLift();
         }
     }
 
@@ -153,10 +132,21 @@
         if (banner) banner.style.display = 'none';
     }
 
+    // ── Reload App ────────────────────────────────────────────────────────────
+    // Re-fetches the current file via vault-header-refresh, then re-lifts
+    // the new iframe wrapper once it appears in the DOM.
+
+    function _reloadAndLift() {
+        _dropContentFrame();
+        var shell = document.querySelector('vault-shell');
+        if (!shell) return;
+        _waitForIframeAndLift();
+        shell.dispatchEvent(new CustomEvent('vault-header-refresh', { bubbles: true, composed: true }));
+    }
+
     // ── Layer 2: frame lift ───────────────────────────────────────────────────
-    // Applies position:fixed to the iframe's wrapper div so it fills the
-    // viewport below the banner.  The iframe stays in its original DOM position
-    // (no reload), while all sg-layout chrome is covered beneath it.
+    // Applies position:fixed to the iframe wrapper div.
+    // The iframe stays in its original DOM position — no reload.
 
     function _liftContentFrame() {
         var iframeEl = document.querySelector('.sb-file__html-frame');
@@ -171,10 +161,7 @@
             'position:fixed', 'top:2.25rem', 'left:0', 'right:0', 'bottom:0',
             'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow:hidden'
         ].join(';');
-
-        // iframe used height:0 with flex parent; now parent is fixed so use 100%
         iframeEl.style.cssText = 'flex:1;border:none;width:100%;height:100%;min-height:0;';
-
         return true;
     }
 
@@ -184,13 +171,28 @@
         var wrapper = iframeEl.parentElement;
         if (!wrapper) return;
 
-        wrapper.style.cssText  = _savedWrapperStyle  ||
+        wrapper.style.cssText  = _savedWrapperStyle ||
             'flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;min-height:0;';
-        iframeEl.style.cssText = _savedIframeStyle ||
+        iframeEl.style.cssText = _savedIframeStyle  ||
             'flex:1;border:none;width:100%;height:0;min-height:0;';
 
         _savedWrapperStyle = null;
         _savedIframeStyle  = null;
+    }
+
+    // Watches for a new .sb-file__html-frame to appear, then lifts it.
+    // Used for app.json auto-activate and Reload App.
+    function _waitForIframeAndLift() {
+        var observer = new MutationObserver(function() {
+            if (document.querySelector('.sb-file__html-frame')) {
+                observer.disconnect();
+                // Small delay lets the iframe's own styles settle first
+                setTimeout(function() { _liftContentFrame(); }, 50);
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        // Safety: disconnect after 5 s to avoid leaking
+        setTimeout(function() { observer.disconnect(); }, 5000);
     }
 
     // ── Layer 1: regular-DOM CSS ──────────────────────────────────────────────
@@ -265,27 +267,6 @@
         if (!res) return;
         if (res.stack)  res.stack.style.removeProperty('display');
         if (res.treeEl) res.treeEl.style.removeProperty('display');
-    }
-
-    // ── Vault ▾ toggle ────────────────────────────────────────────────────────
-    // Drops the lifted frame (restoring sg-layout layout) and shows vault nav
-    // so the user can browse files without fully exiting App Mode.
-
-    function _setVaultVisible(show) {
-        var shell = document.querySelector('vault-shell');
-        var nav   = shell && shell.querySelector('vault-nav');
-
-        if (show) {
-            // Drop the lifted frame so vault chrome is visible behind it
-            _dropContentFrame();
-            if (nav) nav.style.removeProperty('display');
-            _restoreTreeStack();
-        } else {
-            // Re-hide vault chrome and re-lift the frame
-            if (nav) nav.style.setProperty('display', 'none', 'important');
-            _hideTreeStack();
-            _liftContentFrame();
-        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
