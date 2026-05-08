@@ -22,10 +22,25 @@
         // Call original render first
         _origRender.call(this, container, bytes, fileName, type);
 
-        // Only add edit controls if dataSource is writable
+        // App Mode: available for all file types on all vaults (writable or not)
+        var bar = container.querySelector('.sb-file__actions');
+        if (bar) {
+            var _ext0 = (fileName || '').split('.').pop().toLowerCase();
+            var appModeBtnUniversal = _makeBtn('App Mode');
+            appModeBtnUniversal.title = 'Focus on this file — hide vault chrome';
+            appModeBtnUniversal.addEventListener('click', function() {
+                var banner = document.querySelector('sg-app-banner');
+                if (banner && typeof banner.activate === 'function') {
+                    var contentEl = container.querySelector('.sb-file__content') || container;
+                    banner.activate(contentEl);
+                }
+            });
+            bar.appendChild(appModeBtnUniversal);
+        }
+
+        // Only add edit/write controls if dataSource is writable
         if (!this.dataSource || !this.dataSource.writable) return;
 
-        var bar = container.querySelector('.sb-file__actions');
         if (!bar) return;
 
         var self = this;
