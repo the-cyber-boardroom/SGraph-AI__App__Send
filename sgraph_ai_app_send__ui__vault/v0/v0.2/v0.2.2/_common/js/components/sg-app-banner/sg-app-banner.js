@@ -9,37 +9,41 @@
      1. This banner (SG/Send brand · Refresh · Vault ▾ · App Mode ✓)
      2. The HTML iframe content filling all remaining viewport height
 
-   Hidden elements:
-     - vault-header, vault-nav, vault-status-bar   (vault shell chrome)
-     - send-browse .sb-header                       (file archive header)
-     - send-browse .sb-file__actions                (per-file action bar)
-     - sg-layout shadow: .sgl-tab-bar               (Share|Info|file tabs)
-     - sg-layout shadow: .sgl-resize-handle         (tree/content splitter)
-     - sg-layout tree stack                         (file tree panel)
+   Strategy — two-layer approach:
+     Layer 1 (CSS): hide vault-shell chrome (header, nav, status bar)
+     Layer 2 (frame lift): apply position:fixed to the iframe wrapper div so
+       it fills the viewport below the banner, covering all sg-layout chrome
+       (tab bar, resize handle, collapse buttons, tree panel) without moving
+       the iframe node in the DOM (which would reload it).
+
+   If no HTML iframe is present (e.g. vault opened from app.json before any
+   file is selected), Layer 1 + shadow CSS hides act as fallback.
    ================================================================================= */
 
 (function() {
     'use strict';
 
-    var CSS_ID      = 'sg-app-banner-max-css';
+    var CSS_ID        = 'sg-app-banner-max-css';
     var SHADOW_CSS_ID = 'sg-app-banner-shadow-css';
 
-    // Regular-DOM chrome to hide (injected into document <head>)
+    // Layer 1: vault-shell chrome to hide
     var MAX_CSS = [
         'vault-shell vault-header      { display:none !important; }',
         'vault-shell vault-nav         { display:none !important; }',
         'vault-shell vault-status-bar  { display:none !important; }',
         'vault-shell .vs-body          { padding-top:0 !important; }',
-        'vault-shell .vs-shell         { padding-top:2.25rem !important; }',
-        'send-browse .sb-header        { display:none !important; }',
-        'send-browse .sb-file__actions { display:none !important; }'
+        'vault-shell .vs-shell         { padding-top:2.25rem !important; }'
     ].join('\n');
 
-    // sg-layout shadow-DOM chrome to hide (injected into sg-layout.shadowRoot)
+    // Fallback: shadow-DOM chrome to hide when no iframe is present
     var SHADOW_CSS = [
-        '.sgl-tab-bar      { display:none !important; }',
+        '.sgl-tab-bar       { display:none !important; }',
         '.sgl-resize-handle { display:none !important; }'
     ].join('\n');
+
+    // Saved state for frame-lift restore
+    var _savedWrapperStyle = null;
+    var _savedIframeStyle  = null;
 
     // ── Component ────────────────────────────────────────────────────────────
 
@@ -94,36 +98,35 @@
             var self = this;
             vaultBtn.addEventListener('click', function() {
                 self._vaultOpen = !self._vaultOpen;
-                _setVaultChromeVisible(self._vaultOpen);
+                _setVaultVisible(self._vaultOpen);
                 vaultBtn.textContent = self._vaultOpen ? 'Vault ▴' : 'Vault ▾';
             });
             this.appendChild(vaultBtn);
             this._vaultBtn = vaultBtn;
 
             // App Mode ✓ — exit toggle
-            var embedBtn = _btn('App Mode ✓', 'Exit app mode — restore full vault chrome');
-            embedBtn.style.cssText += ';border-color:rgba(78,205,196,0.6);color:#4ecdc4;';
-            embedBtn.addEventListener('click', function() {
+            var appBtn = _btn('App Mode ✓', 'Exit app mode — restore full vault chrome');
+            appBtn.style.cssText += ';border-color:rgba(78,205,196,0.6);color:#4ecdc4;';
+            appBtn.addEventListener('click', function() {
                 var active = !!document.getElementById(CSS_ID);
                 if (active) {
                     _deactivate();
                 } else {
                     _activateAll();
-                    embedBtn.textContent = 'App Mode ✓';
-                    embedBtn.style.borderColor = 'rgba(78,205,196,0.6)';
-                    embedBtn.style.color = '#4ecdc4';
+                    appBtn.textContent = 'App Mode ✓';
+                    appBtn.style.borderColor = 'rgba(78,205,196,0.6)';
+                    appBtn.style.color = '#4ecdc4';
                 }
             });
-            this.appendChild(embedBtn);
+            this.appendChild(appBtn);
         }
 
-        // Activate App Mode from external callers
+        // Called by the "App Mode" button in vault-browse-edit or app.json handler
         activate() {
             _activateAll();
             this.style.display = 'flex';
         }
 
-        // Update status badge text
         setStatus(text) {
             if (this._statusEl) this._statusEl.textContent = text || '';
         }
@@ -133,18 +136,64 @@
 
     function _activateAll() {
         _injectMaxCss();
-        _injectShadowCss();
-        _hideTreeStack();
+        // Try to lift the iframe wrapper to cover sg-layout chrome entirely.
+        // Fall back to shadow-CSS + tree-hide if no iframe is present yet.
+        if (!_liftContentFrame()) {
+            _injectShadowCss();
+            _hideTreeStack();
+        }
     }
 
     function _deactivate() {
+        _dropContentFrame();
         _removeMaxCss();
         _removeShadowCss();
         _restoreTreeStack();
-        document.querySelector('sg-app-banner').style.display = 'none';
+        var banner = document.querySelector('sg-app-banner');
+        if (banner) banner.style.display = 'none';
     }
 
-    // ── Regular-DOM CSS ───────────────────────────────────────────────────────
+    // ── Layer 2: frame lift ───────────────────────────────────────────────────
+    // Applies position:fixed to the iframe's wrapper div so it fills the
+    // viewport below the banner.  The iframe stays in its original DOM position
+    // (no reload), while all sg-layout chrome is covered beneath it.
+
+    function _liftContentFrame() {
+        var iframeEl = document.querySelector('.sb-file__html-frame');
+        if (!iframeEl) return false;
+        var wrapper = iframeEl.parentElement;
+        if (!wrapper) return false;
+
+        _savedWrapperStyle = wrapper.style.cssText;
+        _savedIframeStyle  = iframeEl.style.cssText;
+
+        wrapper.style.cssText = [
+            'position:fixed', 'top:2.25rem', 'left:0', 'right:0', 'bottom:0',
+            'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow:hidden'
+        ].join(';');
+
+        // iframe used height:0 with flex parent; now parent is fixed so use 100%
+        iframeEl.style.cssText = 'flex:1;border:none;width:100%;height:100%;min-height:0;';
+
+        return true;
+    }
+
+    function _dropContentFrame() {
+        var iframeEl = document.querySelector('.sb-file__html-frame');
+        if (!iframeEl) return;
+        var wrapper = iframeEl.parentElement;
+        if (!wrapper) return;
+
+        wrapper.style.cssText  = _savedWrapperStyle  ||
+            'flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;min-height:0;';
+        iframeEl.style.cssText = _savedIframeStyle ||
+            'flex:1;border:none;width:100%;height:0;min-height:0;';
+
+        _savedWrapperStyle = null;
+        _savedIframeStyle  = null;
+    }
+
+    // ── Layer 1: regular-DOM CSS ──────────────────────────────────────────────
 
     function _injectMaxCss() {
         if (document.getElementById(CSS_ID)) return;
@@ -159,7 +208,7 @@
         if (s) s.remove();
     }
 
-    // ── sg-layout shadow DOM CSS ──────────────────────────────────────────────
+    // ── Fallback: sg-layout shadow DOM CSS ───────────────────────────────────
 
     function _getSgLayout() {
         return document.querySelector('#sb-layout') || document.querySelector('sg-layout');
@@ -182,19 +231,13 @@
         if (s) s.remove();
     }
 
-    // ── Tree stack show/hide ──────────────────────────────────────────────────
-    // Uses getPanelElement('t-tree') to find the slotted element, then resolves
-    // its slot name to find the shadow-DOM stack container that wraps it.
+    // ── Fallback: tree stack show/hide ────────────────────────────────────────
 
     function _getTreeStack() {
         var sgLayout = _getSgLayout();
         if (!sgLayout || typeof sgLayout.getPanelElement !== 'function') return null;
         var treeEl = sgLayout.getPanelElement('t-tree');
         if (!treeEl) return null;
-
-        // treeEl is a light-DOM element assigned to a named slot. Its slot
-        // attribute tells us which shadow <slot> shows it. Walk up from that
-        // slot to find the enclosing .sgl-stack.
         var slotName = treeEl.getAttribute('slot');
         if (slotName && sgLayout.shadowRoot) {
             var slotEl = sgLayout.shadowRoot.querySelector('slot[name="' + slotName + '"]');
@@ -203,9 +246,6 @@
                 if (stack) return { stack: stack, treeEl: treeEl };
             }
         }
-
-        // Fallback: hide the panel element itself (tree content) and the first
-        // .sgl-stack in the shadow root (the tree stack).
         if (sgLayout.shadowRoot) {
             var firstStack = sgLayout.shadowRoot.querySelector('.sgl-stack');
             if (firstStack) return { stack: firstStack, treeEl: treeEl };
@@ -216,35 +256,35 @@
     function _hideTreeStack() {
         var res = _getTreeStack();
         if (!res) return;
-        if (res.stack) res.stack.style.setProperty('display', 'none', 'important');
+        if (res.stack)  res.stack.style.setProperty('display', 'none', 'important');
         if (res.treeEl) res.treeEl.style.setProperty('display', 'none', 'important');
     }
 
     function _restoreTreeStack() {
         var res = _getTreeStack();
         if (!res) return;
-        if (res.stack) res.stack.style.removeProperty('display');
+        if (res.stack)  res.stack.style.removeProperty('display');
         if (res.treeEl) res.treeEl.style.removeProperty('display');
     }
 
-    // ── Vault toggle (Vault ▾ button) ─────────────────────────────────────────
-    // Temporarily shows vault nav + tree without fully exiting App Mode.
+    // ── Vault ▾ toggle ────────────────────────────────────────────────────────
+    // Drops the lifted frame (restoring sg-layout layout) and shows vault nav
+    // so the user can browse files without fully exiting App Mode.
 
-    function _setVaultChromeVisible(show) {
+    function _setVaultVisible(show) {
         var shell = document.querySelector('vault-shell');
         var nav   = shell && shell.querySelector('vault-nav');
-        if (nav) {
-            if (show) { nav.style.removeProperty('display'); }
-            else      { nav.style.setProperty('display', 'none', 'important'); }
-        }
-        var res = _getTreeStack();
-        if (res) {
-            if (show) {
-                if (res.stack)  res.stack.style.removeProperty('display');
-                if (res.treeEl) res.treeEl.style.removeProperty('display');
-            } else {
-                _hideTreeStack();
-            }
+
+        if (show) {
+            // Drop the lifted frame so vault chrome is visible behind it
+            _dropContentFrame();
+            if (nav) nav.style.removeProperty('display');
+            _restoreTreeStack();
+        } else {
+            // Re-hide vault chrome and re-lift the frame
+            if (nav) nav.style.setProperty('display', 'none', 'important');
+            _hideTreeStack();
+            _liftContentFrame();
         }
     }
 
