@@ -1,9 +1,10 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-05-08 | **Maintained by:** Librarian (daily run)
 
 The three browser UIs served by the User Lambda. Each uses IFD versioning (no framework,
 Shadow DOM Web Components, surgical overlays). The latest user UI is v0.3.1.
+The latest vault UI is v0.2.3 (JS API layer — `window.__tool`).
 
 ---
 
@@ -102,6 +103,35 @@ and Ollama (`http://localhost:11434`, NDJSON streaming, confirmed with Gemma3:4b
 Zero-knowledge maintained throughout.
 
 **Theme:** Aurora (dark, `#1A1A2E` background, `#4ECDC4` teal accent).
+
+---
+
+---
+
+### Vault UI (latest: v0.2.3, base: v0.2.0)
+
+**Path:** `sgraph_ai_app_send__ui__vault/`  
+Separate from the User UI. A dedicated vault client served at `vault.sgraph.ai`.
+
+**v0.2.0** — Major IFD rewrite. VaultShell orchestrator, VaultDataSource adapter, sg-layout file browser, vault-auth, vault-header, vault-nav, vault-settings, vault-status-bar, vault-sgit-view (8 tabs). Code at `v0/v0.2/v0.2.0/`.
+
+**v0.2.1** — IFD overlay: site header component, sg-vault sync patches, browse `/en-gb/browse/`. Code at `v0/v0.2/v0.2.1/`.
+
+**v0.2.2** — IFD overlay: App Mode (sg-app-banner), vault-browse-edit overlay, BRW-022 polish. Code at `v0/v0.2/v0.2.2/`. Patches: `_applyAppJson`, `_onLock` redirect, `_setupVaultLinkHandler`.
+
+**v0.2.3** — IFD overlay: **JS API layer** (`window.__tool` via `SgToolApi`). Phase 1: `getState`, `waitForReady`, `navigateTo`, `getSkills`. 3 SKILL files (human/browser/api). sg-tool-api dev panel components (`sg-tool-api-explorer`, `sg-tool-api-console`, `sg-tool-api-manifest`). Code at `v0/v0.2/v0.2.3/`.
+
+| Capability | Status |
+|-----------|--------|
+| `window.__tool` set after `tool:ready` | **EXISTS** v0.2.3 |
+| `window.__tool_registry.find('vault')` | **EXISTS** v0.2.3 |
+| `window.__tool.getState()` | **EXISTS** v0.2.3 |
+| `window.__tool.waitForReady()` | **EXISTS** v0.2.3 |
+| `window.__tool.navigateTo({ tab })` | **EXISTS** v0.2.3 |
+| `window.__tool.getSkills()` | **EXISTS** v0.2.3 |
+| SKILL-human.md, SKILL-browser.md, SKILL-api.md | **EXISTS** v0.2.3 |
+| `getTree`, `getFileList`, `readFile`, `getFileMeta` (Phase 2) | PROPOSED |
+| `writeFile`, `renameFile`, `deleteFile`, `push`, `pull` (Phase 3) | PROPOSED |
 
 ---
 
