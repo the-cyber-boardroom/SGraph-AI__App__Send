@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault (v0.2.2) — Zero-knowledge encrypted vault</title>
+    <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
+
+    <!-- Redirect to landing page when no vault key in hash AND not already on /en-gb/vault.
+         If sessionStorage has the last-open vault key, inject it as the hash so the page
+         auto-reopens the same vault on refresh (instead of showing the entry form). -->
+    <script>
+    (function () {
+        var noHash      = !window.location.hash || window.location.hash === '#';
+        var pathName    = window.location.pathname.replace(/\/$/, ''); // strip trailing slash
+        var onVaultPath = pathName === '/en-gb/vault';
+
+        if (noHash && onVaultPath) {
+            // Refresh of /en-gb/vault — restore last open vault from session if available
+            var savedKey = sessionStorage.getItem('sg-vault-session');
+            if (savedKey) {
+                window.location.replace(window.location.origin + '/en-gb/vault#' + savedKey);
+            } else {
+                // No active session → back to landing page (never show vault-shell on direct load)
+                window.location.replace('/en-gb/');
+            }
+        } else if (noHash && !onVaultPath) {
+            window.location.replace('/en-gb/');
+        }
+    }());
+    </script>
+
+    <!-- Fonts (root-relative: _common/ not ../../_common/) -->
+    <link rel="stylesheet" href="_common/fonts/fonts.css">
+
+    <!-- Design tokens + shared styles -->
+    <link rel="stylesheet" href="_common/css/design-tokens.css">
+    <link rel="stylesheet" href="_common/css/shared-components.css">
+
+    <!-- Browse component styles (from SG/Send CDN — patched to /_common/ locally) -->
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse.css">
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031.css">
+</head>
+<body>
+
+    <vault-shell></vault-shell>
+
+    <!-- ===================================================================
+         Script Loading Order — v0.2.1 root shell
+         Served at / so all paths are relative to root: _common/ (no ../)
+         =================================================================== -->
+
+    <!-- 0. sg-layout (fractal window management — CDN) -->
+    <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
+
+    <!-- 0c. LLM components (from tools.sgraph.ai CDN) -->
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-events/v0/v0.1/v0.1.0/sg-llm-events.js"></script>
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-request/v0/v0.1/v0.1.2/sg-llm-request.js"></script>
+    <script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-infographic/v0/v0.1/v0.1.0/sg-llm-infographic.js"></script>
+
+    <!-- 0b. Build info (CI-generated, absent in local dev) -->
+    <script src="_common/js/build-info.js"></script>
+
+    <!-- 1. Vault services -->
+    <script src="_common/js/services/event-bus.js"></script>
+    <script src="_common/js/services/config-manager.js"></script>
+    <script src="_common/js/services/messages-service.js"></script>
+
+    <!-- 2. i18n -->
+    <script src="_common/js/vault-i18n.js"></script>
+
+    <!-- 3. SG/Send shared modules (CDN — patched to /_common/ locally) -->
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-helpers.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-component-paths.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/base/send-component.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/send-icons.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/file-type-detect.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/markdown-parser.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/markdown-parser-v031.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/sg-print.js"></script>
+
+    <!-- 4. Browse component v0.3.2 (CDN — patched locally) -->
+    <script src="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse--v0.3.2.js"></script>
+
+    <!-- 4b. Page layout renderer (CDN) -->
+    <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031--page-layout.css">
+    <script src="https://dev.send.sgraph.ai/_common/js/page-layout-renderer.js"></script>
+    <script src="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031--page-layout.js"></script>
+
+    <!-- 4c. Vault deep-link patch: use | separator (vault URL format) -->
+    <script>
+    (function() {
+        // Global state for deep-link copy button (populated by _mountBrowse patch below)
+        window._vaultDeepLinkPath  = null;
+        window._vaultCurrentToken  = null;
+        window._vaultBrowseElement = null;
+
+        // Read deep-link path from hash (e.g. #token|path/to/file.md → "path/to/file.md")
+        if (typeof _plrGetHashPath === 'function') {
+            _plrGetHashPath = function() {
+                var hash = window.location.hash.slice(1);
+                var idx  = hash.indexOf('|');
+                if (idx === -1) return null;
+                return hash.slice(idx + 1) || null;
+            };
+        }
+        // Do NOT write file paths back to the URL bar — the address bar stays clean.
+        // Instead, update the browse component's downloadUrl so the Share tab "Copy Link"
+        // button returns the correct file-specific deep link.
+        if (typeof _plrSetHashPath === 'function') {
+            _plrSetHashPath = function(path) {
+                window._vaultDeepLinkPath = path || null;
+                var browse = window._vaultBrowseElement;
+                var token  = window._vaultCurrentToken;
+                if (browse && token) {
+                    var base = window.location.origin + '/#' + token;
+                    browse.downloadUrl = path ? (base + '|' + path) : base;
+                }
+            };
+        }
+    })();
+    </script>
+
+    <!-- 5. Vault libraries (local) -->
+    <script src="_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--branches.js"></script>
+
+    <!-- 6. Vault base system (local) -->
+    <script src="_common/js/base/vault-helpers.js"></script>
+    <script src="_common/js/base/vault-component-paths.js"></script>
+    <!-- Set basePath BEFORE component scripts — connectedCallback fires immediately on define() -->
+    <script>VaultComponentPaths.init('/_common');</script>
+    <script src="_common/js/base/vault-component.js"></script>
+
+    <!-- 7. VaultDataSource adapter -->
+    <script src="_common/js/adapters/vault-data-source.js"></script>
+
+    <!-- 7b. Conflict diff view overlay -->
+    <script src="_common/js/components/vault-diff-view/vault-diff-view.js"></script>
+
+    <!-- 7c. Browse edit overlay -->
+    <script src="_common/js/components/vault-browse-edit/vault-browse-edit.js"></script>
+
+    <!-- 8. Debug panels -->
+    <script src="_common/js/components/messages-panel/messages-panel.js"></script>
+    <script src="_common/js/components/events-viewer/events-viewer.js"></script>
+    <script src="_common/js/components/api-logger/api-logger.js"></script>
+    <script src="_common/js/components/storage-viewer/storage-viewer.js"></script>
+
+    <!-- 9. Vault components -->
+    <script src="_common/js/components/vault-entry/vault-entry.js"></script>
+    <script src="_common/js/components/vault-upload/vault-upload.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--history.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--refs.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--tree.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--branches.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--status.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--repair.js"></script>
+    <script src="_common/js/components/vault-sgit-view/vault-sgit-view--object.js"></script>
+
+    <!-- 10. Shell components -->
+    <script src="_common/js/components/vault-header/vault-header.js"></script>
+    <script src="_common/js/components/vault-auth/vault-auth.js"></script>
+    <script src="_common/js/components/vault-nav/vault-nav.js"></script>
+    <script src="_common/js/components/vault-settings/vault-settings.js"></script>
+    <script src="_common/js/components/vault-status-bar/vault-status-bar.js"></script>
+    <script src="_common/js/components/vault-shell/vault-shell.js"></script>
+
+    <!-- 11. Init -->
+    <script>
+        VaultComponentPaths.init('/_common');
+        VaultI18n.init();
+        window.sgraphVault.events.emit('app-init', { version: 'v0.2.1' });
+    </script>
+
+    <!-- 12. v0.2.1 patch: create vault from simple token + vault-not-found error page -->
+    <script>
+    (function () {
+        'use strict';
+
+        // Extend SGVault with createFromToken — same key derivation as open(),
+        // so the vault can always be re-opened with just the simple token.
+        SGVault.createFromToken = async function (sgSend, token, options) {
+            options = options || {};
+            var keys = await SGVaultCrypto.deriveKeysFromSimpleToken(token);
+            var vault = new SGVault(sgSend);
+            vault._passphrase        = token;
+            vault._vaultId           = keys.vaultId;
+            vault._readKey           = keys.readKey;
+            vault._writeKey          = keys.writeKey;
+            vault._hmacKey           = keys.hmacKey;
+            vault._refFileId         = keys.refFileId;
+            vault._branchIndexFileId = keys.branchIndexFileId;
+            vault._cloneRefFileId    = await SGVaultCrypto.deriveBranchRefFileId(
+                keys.hmacKey, keys.vaultId, 'web-ui'
+            );
+            vault._initManagers();
+            vault._settings = {
+                vault_name:  options.name || token,
+                vault_id:    keys.vaultId,
+                created:     new Date().toISOString(),
+                version:     3,
+                description: options.description || ''
+            };
+            vault._tree = { '/': { type: 'folder', children: {} } };
+
+            // Initial commit (empty tree + settings)
+            await vault._commit('Initial vault creation');
+
+            // Add README.md — gives sgit clone immediate content and orients new users
+            var readmeDate  = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            var readmeBytes = new TextEncoder().encode(
+                '# New Vault\n\n' +
+                'Created at vault.sgraph.ai on ' + readmeDate + '.\n\n' +
+                'Zero-knowledge encrypted — files are encrypted in your browser. The server never sees a key.\n\n' +
+                '## Working with sgit\n\n' +
+                '    sgit clone ' + token + '\n' +
+                '    sgit push\n' +
+                '    sgit pull\n'
+            );
+            await vault.addFile('/', 'README.md', readmeBytes);
+
+            // Write the named ref (published branch HEAD) to the post-README commit.
+            // _headCommitId is set by _commit() / addFile(); _namedHeadId is set here.
+            // (Mirrors what SGVault.create() does — must NOT use _namedHeadId before this line.)
+            await vault._refManager.writeRef(vault._refFileId, vault._headCommitId);
+            vault._namedHeadId = vault._headCommitId;
+
+            // Write the branch index — required for `sgit clone` to discover refs.
+            // Without this, sgit has no way to find head_ref_id for the named branch
+            // (the web client gets away without it because it caches ref IDs in memory,
+            // but sgit starts from scratch on every clone).
+            //
+            // Derive deterministic branch IDs from the HMAC key (same approach as ref IDs).
+            var _hmac = function (hmacKey, domain) {
+                return crypto.subtle.sign('HMAC', hmacKey, new TextEncoder().encode(domain))
+                    .then(function (buf) {
+                        return Array.from(new Uint8Array(buf))
+                            .map(function (b) { return b.toString(16).padStart(2, '0'); })
+                            .join('').slice(0, 12);
+                    });
+            };
+            var namedHex = await _hmac(vault._hmacKey, 'sg-vault-v1:file-id:branch-id:named:' + vault._vaultId);
+            var cloneHex = await _hmac(vault._hmacKey, 'sg-vault-v1:file-id:branch-id:clone:web-ui:' + vault._vaultId);
+
+            // created_at must be epoch milliseconds integer — sgit's Safe_UInt__Timestamp
+            // rejects ISO strings and epoch-seconds (too small for its range check).
+            var createdAtInt = new Date(vault._settings.created).getTime();
+            var branchIndex = {
+                schema:   'branch_index_v1',
+                branches: [
+                    {
+                        branch_id:   'branch-named-' + namedHex,
+                        branch_type: 'named',
+                        head_ref_id: vault._refFileId,
+                        name:        'current',
+                        created_at:  createdAtInt
+                    },
+                    {
+                        branch_id:   'branch-clone-' + cloneHex,
+                        branch_type: 'clone',
+                        head_ref_id: vault._cloneRefFileId,
+                        name:        'web-ui',
+                        created_at:  createdAtInt
+                    }
+                ]
+            };
+            var indexPayload   = new TextEncoder().encode(JSON.stringify(branchIndex));
+            var indexEncrypted = await SGSendCrypto.encrypt(indexPayload, vault._readKey);
+            await vault._sgSend.vaultWrite(
+                vault._vaultId,
+                'bare/indexes/' + vault._branchIndexFileId,
+                vault._writeKey,
+                new Uint8Array(indexEncrypted)
+            );
+            vault._branchIndex = branchIndex;
+
+            return vault;
+        };
+
+        // Patch VaultDataSource to expose .vault-settings as a browseable + editable file.
+        // The file is synthetic: read → serialised from vault._settings; write → parsed back
+        // into vault._settings and re-committed (same path the internal _commit() takes).
+        // This makes the metadata visible in the file browser without duplicating it in the tree.
+        (function () {
+            var proto = window.VaultDataSource && window.VaultDataSource.prototype;
+            if (!proto) return;
+
+            // Settings are stored as .vault-settings.json in the encrypted commit tree
+            // (v0.2.1+; v0.2.0 used .vault-settings — _loadTreeFromCommit handles both).
+            var VSFILE = '.vault-settings.json';
+
+            var _origGetTree = proto.getTree;
+            proto.getTree = function () {
+                var tree = _origGetTree.call(this);
+                var json = JSON.stringify(this._vault._settings || {}, null, 2);
+                tree.files.push({ path: VSFILE, name: VSFILE,
+                                  size: new TextEncoder().encode(json).length });
+                return tree;
+            };
+
+            var _origGetFileList = proto.getFileList;
+            proto.getFileList = function () {
+                var list = _origGetFileList.call(this);
+                var json = JSON.stringify(this._vault._settings || {}, null, 2);
+                list.push({ path: VSFILE, name: VSFILE,
+                            dir: false, size: new TextEncoder().encode(json).length });
+                return list;
+            };
+
+            var _origGetFileBytes = proto.getFileBytes;
+            proto.getFileBytes = async function (path) {
+                if (path === VSFILE) {
+                    var json = JSON.stringify(this._vault._settings || {}, null, 2);
+                    return new TextEncoder().encode(json).buffer;
+                }
+                return _origGetFileBytes.call(this, path);
+            };
+
+            var _origSaveFile = proto.saveFile;
+            proto.saveFile = async function (folderPath, fileName, bytes) {
+                if (fileName === VSFILE) {
+                    if (!this.writable) throw new Error('Read-only: no access key');
+                    var buf  = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes).buffer;
+                    var text = new TextDecoder().decode(buf);
+                    this._vault._settings = JSON.parse(text);
+                    await this._vault._commit('Update .vault-settings');
+                    if (this.onTreeChanged) this.onTreeChanged();
+                    return;
+                }
+                return _origSaveFile.call(this, folderPath, fileName, bytes);
+            };
+        }());
+
+        // Hide .vs-entry immediately when a vault token is present in the URL hash.
+        // This script runs after vault-shell has rendered (connectedCallback is sync) but
+        // before vault-entry's async template fetch completes, so the form is never visible.
+        // vault-entry.onReady() still handles the open/create logic in the background.
+        (function () {
+            var hash = window.location.hash;
+            if (!hash || hash === '#') return;
+            var shell    = document.querySelector('vault-shell');
+            var entryDiv = shell && shell.querySelector('.vs-entry');
+            if (entryDiv) entryDiv.style.display = 'none';
+        }());
+
+        // Show a "Creating your vault…" splash immediately when the landing page redirected
+        // here with sg-vault-creating set. The splash fills the blank screen while the async
+        // crypto key derivation and initial commit network call complete.
+        (function () {
+            var hash     = window.location.hash;
+            if (!hash || hash === '#') return;
+            var token    = decodeURIComponent(hash.slice(1)).split('|')[0].toLowerCase();
+            var creating = sessionStorage.getItem('sg-vault-creating');
+            if (!creating || creating !== token) return;
+
+            var splash = document.createElement('div');
+            splash.id  = 'sg-creating-splash';
+            splash.setAttribute('style',
+                'position:fixed;inset:0;z-index:9999;background:#0d1117;' +
+                'display:flex;align-items:center;justify-content:center;' +
+                'flex-direction:column;gap:1.25rem;font-family:system-ui,sans-serif;' +
+                'text-align:center;padding:2rem');
+            splash.innerHTML =
+                '<div style="font-size:3rem">🔐</div>' +
+                '<div style="color:#4ecdc4;font-size:1.2rem;font-weight:700">Creating your vault…</div>' +
+                '<div style="color:#6e7a8a;font-size:0.85rem;max-width:360px;line-height:1.6">' +
+                'Deriving encryption keys and writing the initial commit.<br>This takes a moment.' +
+                '</div>';
+            document.body.appendChild(splash);
+        }());
+
+        // Helper: remove the creating splash (safe to call even if it was never shown).
+        function _removeSplash() {
+            var el = document.getElementById('sg-creating-splash');
+            if (el) el.remove();
+        }
+
+        // Helper: reveal the vault-entry form (used when create fails so the error is visible).
+        function _revealEntry() {
+            var shell    = document.querySelector('vault-shell');
+            var entryDiv = shell && shell.querySelector('.vs-entry');
+            if (entryDiv) entryDiv.style.display = '';
+        }
+
+        // Full-page error when auto-open fails — replaces the page body entirely
+        function _escHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function _showAutoOpenErrorPage(token, err) {
+            var msg = err ? err.message : '';
+            var isNotFound = msg.includes('not found') || msg.includes('404');
+            var title    = isNotFound ? 'Vault not found' : 'Cannot open vault';
+            var subtitle = isNotFound
+                ? 'This vault does not exist on this server:'
+                : 'The token may be invalid or in the wrong format:';
+
+            document.body.innerHTML =
+                '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+                'flex-direction:column;gap:1.25rem;padding:2rem;background:#0d1117;' +
+                'font-family:system-ui,sans-serif;text-align:center">' +
+                '<div style="font-size:3rem">🔐</div>' +
+                '<h1 style="color:#fff;font-size:1.5rem;font-weight:700;margin:0">' + _escHtml(title) + '</h1>' +
+                '<p style="color:#6e7a8a;font-size:0.875rem;max-width:420px;line-height:1.6;margin:0">' + _escHtml(subtitle) + '</p>' +
+                '<div style="display:flex;flex-direction:column;gap:0.3rem;align-items:center">' +
+                '<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#6e7a8a">Vault token</div>' +
+                '<code style="display:block;color:#4ecdc4;font-family:monospace;font-size:1.05rem;' +
+                'letter-spacing:0.02em;background:rgba(78,205,196,0.06);' +
+                'border:1px solid rgba(78,205,196,0.15);border-radius:6px;padding:0.5rem 1.25rem">' +
+                _escHtml(token) + '</code>' +
+                '</div>' +
+                '<a href="/en-gb/" style="display:inline-block;background:#4ecdc4;color:#0a1a18;' +
+                'font-weight:700;text-decoration:none;border-radius:8px;padding:0.65rem 1.5rem;' +
+                'font-size:0.9rem;margin-top:0.25rem">← Back to vault home</a>' +
+                '</div>';
+        }
+
+        // Reload when the user manually changes the URL hash (e.g. typing a new vault token
+        // in the address bar and pressing Enter). history.replaceState/pushState does NOT
+        // fire hashchange, so internal navigation within a vault is unaffected.
+        window.addEventListener('hashchange', function () {
+            window.location.reload();
+        });
+
+        // Clear session key when vault is locked so a refresh after locking
+        // shows the entry form rather than re-opening the previous vault.
+        window.sgraphVault.events.on('vault-locked', function () {
+            try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
+        });
+
+        // Patch VaultShell._mountBrowse:
+        //   1. Fix downloadUrl — use vault key, not window.location.href (which may be '/'
+        //      after create-then-clear-hash).
+        //   2. Store the browse element reference so _plrSetHashPath can update it when
+        //      a file tab is opened (deep-link copy button mechanism).
+        // VaultShell and VaultSettings are defined inside IIFEs in their source files,
+        // so they are NOT global variables. Use customElements.get() to access their class.
+        (function () {
+            var VaultShellClass = customElements.get('vault-shell');
+            if (!VaultShellClass) return;
+            var _origMount = VaultShellClass.prototype._mountBrowse;
+            VaultShellClass.prototype._mountBrowse = async function (deepLink) {
+                await _origMount.call(this, deepLink);
+                var browse = this.querySelector('.vs-view-files send-browse');
+                var token  = this._vaultKey;
+                if (browse && token) {
+                    browse.downloadUrl = window.location.origin + '/#' + token;
+                }
+                window._vaultCurrentToken  = token  || null;
+                window._vaultBrowseElement = browse || null;
+                // Reset deep-link path on each mount (new browse, fresh state)
+                window._vaultDeepLinkPath  = null;
+            };
+        }());
+
+
+        // Rename "⇌ Vaults" → "Open or Create Vault" and style as a teal navigation button.
+        // Placed first in .vh-right (order:-1) so it reads as navigation rather than an action.
+        (function () {
+            var header  = document.querySelector('vault-shell vault-header');
+            var lockBtn = header && header.shadowRoot && header.shadowRoot.querySelector('.vh-lock-btn');
+            if (lockBtn) {
+                lockBtn.textContent = 'Open or Create Vault';
+                lockBtn.title       = 'Open or create a vault';
+                lockBtn.style.cssText = [
+                    'order:-1',
+                    'color:#4ecdc4',
+                    'border-color:rgba(78,205,196,0.4)',
+                    'margin-right:0.75rem',
+                    'font-weight:600'
+                ].join(';');
+            }
+        }());
+
+        // Patch VaultShell._onLock: redirect to the landing page instead of showing the
+        // vault-entry/RECENT VAULTS screen (the previous UI that should never appear).
+        (function () {
+            var VaultShell = customElements.get('vault-shell');
+            if (!VaultShell) return;
+            VaultShell.prototype._onLock = function () {
+                try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
+                try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
+                window.location.replace('/en-gb/');
+            };
+        }());
+
+        // Change 3 — app.json: auto-open entry file when vault loads.
+        // Patches VaultShell._mountBrowse to check for app.json after browse mounts.
+        // Schema: { "entry": "index.html", "auto_open": true, "present": false }
+        // Unknown fields are silently ignored (forward-compatible with SG/App spec).
+        (function () {
+            var VaultShell = customElements.get('vault-shell');
+            if (!VaultShell) return;
+
+            var _origMount = VaultShell.prototype._mountBrowse;
+            VaultShell.prototype._mountBrowse = async function (deepLink) {
+                await _origMount.call(this, deepLink);
+                if (this._dataSource && this._browse) {
+                    await this._applyAppJson(this._dataSource, this._browse);
+                }
+            };
+
+            VaultShell.prototype._applyAppJson = async function (dataSource, browse) {
+                var fileList = dataSource.getFileList();
+                var entry = fileList.find(function (e) {
+                    return e.path === 'app.json' || e.path === '/app.json';
+                });
+                if (!entry) return;
+
+                var config;
+                try {
+                    var buf  = await dataSource.getFileBytes(entry.path);
+                    config = JSON.parse(new TextDecoder().decode(buf));
+                } catch (e) {
+                    console.warn('[app.json] unreadable or invalid JSON, ignoring:', e.message);
+                    return;
+                }
+
+                var entryFile = config.entry    || 'index.html';
+                var autoOpen  = config.auto_open !== false;  // default true
+                var present   = config.present  === true;    // default false
+
+                if (!autoOpen) return;
+                console.log('[app.json] entry:', entryFile, '| present:', present);
+
+                // Wait for browse to connect and sg-layout to be ready
+                var self = this;
+                requestAnimationFrame(function () {
+                    if (browse._openFileTab) {
+                        browse._openFileTab(entryFile);
+                        if (present) self._showPresentOverlay();
+                    }
+                });
+            };
+
+            // Option A from brief: overlay that requires a click (user-gesture for fullscreen).
+            // Works in all browsers; the one click is a fair price for guaranteed fullscreen.
+            VaultShell.prototype._showPresentOverlay = function () {
+                var self = this;
+                var attempts = 0;
+                var findIframe = function () {
+                    var iframe = self.querySelector('.vs-view-files iframe');
+                    if (!iframe && attempts++ < 20) { setTimeout(findIframe, 200); return; }
+                    if (!iframe) return;
+
+                    var container = iframe.parentElement;
+                    if (!container) return;
+                    if (getComputedStyle(container).position === 'static') {
+                        container.style.position = 'relative';
+                    }
+
+                    var overlay = document.createElement('div');
+                    overlay.style.cssText =
+                        'position:absolute;inset:0;display:flex;align-items:center;' +
+                        'justify-content:center;background:rgba(0,0,0,0.55);z-index:100;cursor:pointer;';
+                    overlay.innerHTML =
+                        '<div style="color:#fff;font-size:1.1rem;padding:0.9rem 2rem;' +
+                        'background:rgba(78,205,196,0.15);border:1px solid #4ecdc4;' +
+                        'border-radius:8px;">&#x26F6; Click to enter present mode</div>';
+                    overlay.addEventListener('click', function () {
+                        overlay.remove();
+                        if (iframe.requestFullscreen) {
+                            iframe.requestFullscreen().catch(function (err) {
+                                console.warn('[app.json] fullscreen rejected:', err);
+                            });
+                        } else if (iframe.webkitRequestFullscreen) {
+                            iframe.webkitRequestFullscreen();
+                        }
+                    });
+                    container.appendChild(overlay);
+                };
+                setTimeout(findIframe, 400);
+            };
+        }());
+
+        // Patch VaultEntry._onSimpleTokenOpen:
+        //   - When sg-vault-creating is set (new vault from landing page), create instead of open
+        //   - When auto-opening from the URL hash and any error occurs, show full-page error
+        //   - When the user manually typed a token and clicked, show the usual inline error
+        var _orig = VaultEntry.prototype._onSimpleTokenOpen;
+        VaultEntry.prototype._onSimpleTokenOpen = async function () {
+            var token       = this._simpleTokenInput.value.trim().toLowerCase();
+            var createToken = sessionStorage.getItem('sg-vault-creating');
+
+            // Create-vault flow (redirected from landing page)
+            if (createToken && createToken === token) {
+                sessionStorage.removeItem('sg-vault-creating');
+                var accessKey = this._accessKeyInput.value.trim();
+                if (!accessKey) {
+                    _removeSplash();
+                    _revealEntry();
+                    this._showError('An access key is required to create a new vault.');
+                    this._accessKeyInput.focus();
+                    return;
+                }
+                this._hideError();
+                try {
+                    var sgSend = this._getSGSend();
+                    // Name uses a friendly date/time — NOT the token. Token stays in localStorage/settings.
+                    var now     = new Date();
+                    var dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                    var timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    var vaultName = 'New Vault (' + dateStr + ' · ' + timeStr + ')';
+                    var vault = await SGVault.createFromToken(sgSend, token, { name: vaultName });
+
+                    // Clear hash — vault key is NOT exposed in the address bar.
+                    // Key is persisted in localStorage and accessible via vault Settings.
+                    window.history.replaceState(null, '', '/en-gb/vault');
+                    try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
+                    try { sessionStorage.setItem('sg-vault-session', token); } catch (_) {}
+
+                    // Patch landing page history entry to use the proper name
+                    try {
+                        var pickerKey  = 'sg-vault-picker:credentials';
+                        var pickerList = JSON.parse(localStorage.getItem(pickerKey) || '[]');
+                        for (var i = 0; i < pickerList.length; i++) {
+                            if (pickerList[i].vaultKey === token) {
+                                pickerList[i].vaultName = vaultName;
+                                break;
+                            }
+                        }
+                        localStorage.setItem(pickerKey, JSON.stringify(pickerList));
+                    } catch (_) {}
+
+                    _removeSplash();
+                    this._saveToHistory(vault, token);
+                    this.emit('vault-created', { vault, vaultKey: token });
+                } catch (err) {
+                    sessionStorage.setItem('sg-vault-creating', token); // restore for retry
+                    _removeSplash();
+                    _revealEntry();
+                    this._showError('Failed to create vault: ' + err.message);
+                }
+                return;
+            }
+
+            // Detect whether this is an auto-open triggered by the URL hash (vault-entry onReady)
+            // vs a manual open triggered by the user clicking "Open Vault".
+            var hashToken = decodeURIComponent(window.location.hash.slice(1)).split('|')[0].toLowerCase();
+            var isAutoOpen = !!hashToken && hashToken === token;
+
+            if (!isAutoOpen) {
+                // Manual open — delegate to original for standard inline error handling
+                return _orig.call(this);
+            }
+
+            // Auto-open from URL hash: any failure shows the full-page error
+            this._hideError();
+            this._showStatus('Opening vault…');
+            this._simpleTokenBtn.disabled = true;
+            try {
+                await this._openVault(token, token);
+                // Remove token from URL once vault is open (security hygiene)
+                window.history.replaceState(null, '', '/en-gb/vault');
+                try { sessionStorage.setItem('sg-vault-session', token); } catch (_) {}
+            } catch (err) {
+                _showAutoOpenErrorPage(token, err);
+            } finally {
+                this._simpleTokenBtn.disabled = false;
+                this._hideStatus();
+            }
+        };
+    })();
+    </script>
+
+</body>
+</html>
