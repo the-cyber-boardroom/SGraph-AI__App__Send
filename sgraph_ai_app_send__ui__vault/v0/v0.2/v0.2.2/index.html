@@ -521,10 +521,7 @@
                 // Maximised chrome mode: activate sg-app-banner, hide vault chrome
                 if (chromeMode === 'maximised') {
                     var banner = document.querySelector('sg-app-banner');
-                    if (banner) {
-                        banner.style.display = '';
-                        banner.activate();
-                    }
+                    if (banner) banner.activate();
                 }
 
                 var self = this;

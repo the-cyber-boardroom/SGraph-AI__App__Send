@@ -29,9 +29,11 @@
         }
 
         _render() {
+            // Start hidden — activate() reveals it. cssText overwrites inline display:none so
+            // we must explicitly set display:none here; activate() switches it to flex.
             this.style.cssText = [
                 'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:8000',
-                'display:flex', 'align-items:center', 'gap:0.6rem',
+                'display:none', 'align-items:center', 'gap:0.6rem',
                 'padding:0 0.75rem', 'height:2.25rem',
                 'background:rgba(10,10,24,0.96)',
                 'border-bottom:1px solid rgba(78,205,196,0.18)',
@@ -93,7 +95,7 @@
                     document.querySelector('sg-app-banner').style.display = 'none';
                 } else {
                     _injectMaxCss();
-                    document.querySelector('sg-app-banner').style.display = '';
+                    document.querySelector('sg-app-banner').style.display = 'flex';
                     embedBtn.textContent = 'App Mode ✓';
                     embedBtn.style.cssText += ';border-color:rgba(78,205,196,0.6);color:#4ecdc4;';
                 }
@@ -105,6 +107,7 @@
         // Called externally to activate maximised chrome mode
         activate() {
             _injectMaxCss();
+            this.style.display = 'flex';
         }
 
         // Update the status slot text (for vault-app events)
