@@ -19,7 +19,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ── Version stamp — bump this to confirm the local dev server has the latest code ──
-console.log('%c[send-browse v0.3.3-vfs-1] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+console.log('%c[send-browse v0.3.3-vfs-2] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
 
 class SendBrowse extends SendComponent {
 
@@ -625,6 +625,62 @@ class SendBrowse extends SendComponent {
                   'window.parent.postMessage({__sgVfsNavReq:href},"*");' +
                 '},true);' +
 
+                // ── Change 5: window.sg.vfs.* + window.sgVault.* ──────────────
+                // Canonical surface matches future SG/App spec (sg.vfs.write/read/list).
+                // window.sgVault.* kept as convenience alias for backward compat.
+                // _vfsMsg: generic postMessage → Promise helper (write + list envelopes).
+                '(function(){' +
+                  'function _vfsMsg(type,payload){' +
+                    'return new Promise(function(res,rej){' +
+                      'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                      'payload[type]=id;' +
+                      'var replyKey=type==="__sgVfsWriteReq"?"__sgVfsWriteReply":"__sgVfsListReply";' +
+                      'function h(e){' +
+                        'if(!e.data||e.data[replyKey]!==id)return;' +
+                        'window.removeEventListener("message",h);' +
+                        'if(e.data.ok)res(e.data);else rej(new Error(e.data.err||"VFS error"));' +
+                      '}' +
+                      'window.addEventListener("message",h);' +
+                      'window.parent.postMessage(payload,"*");' +
+                    '});' +
+                  '}' +
+                  // sg.vfs.write — canonical write (string | Uint8Array | ArrayBuffer)
+                  'function _write(path,content){' +
+                    'var bytes;' +
+                    'if(typeof content==="string"){bytes=new TextEncoder().encode(content);}' +
+                    'else{bytes=content instanceof Uint8Array?content:new Uint8Array(content);}' +
+                    // chunked btoa avoids call-stack overflow on large files
+                    'var b64="",chunk=8192;' +
+                    'for(var i=0;i<bytes.length;i+=chunk){' +
+                      'b64+=btoa(String.fromCharCode.apply(null,bytes.subarray(i,i+chunk)));' +
+                    '}' +
+                    'return _vfsMsg("__sgVfsWriteReq",{path:path,data:b64,encoding:"base64"})' +
+                      '.then(function(d){return{path:path,size:d.size};});' +
+                  '}' +
+                  // sg.vfs.read — returns ArrayBuffer (canonical)
+                  'function _read(path){return fetch(path).then(function(r){return r.arrayBuffer();});}' +
+                  // sg.vfs.readText — returns string (convenience)
+                  'function _readText(path){return fetch(path).then(function(r){return r.text();});}' +
+                  // sg.vfs.list — proper postMessage envelope, not a magic URL
+                  'function _list(path){' +
+                    'return _vfsMsg("__sgVfsListReq",{path:path||""})' +
+                      '.then(function(d){return d.entries||[];});' +
+                  '}' +
+                  // Expose canonical surface (matches SG/App spec)
+                  'window.sg={' +
+                    'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
+                    'app:{selfPath:' + JSON.stringify(fileName) + ',' +
+                         'writable:' + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + '}' +
+                  '};' +
+                  // Convenience alias (backward compat with design doc examples)
+                  'window.sgVault={' +
+                    'writeFile:_write,readFile:_readText,' +
+                    'listFiles:function(){return _list("");},' +
+                    'writable:window.sg.app.writable,selfPath:window.sg.app.selfPath' +
+                  '};' +
+                  'console.log("[sg-vfs] window.sg.vfs ready | writable="+window.sg.app.writable);' +
+                '})();' +
+
                 '})();' +
                 '<\/script>';
 
@@ -706,7 +762,9 @@ class SendBrowse extends SendComponent {
 
                     // ── BRW-019: same-vault navigation ──────────────────────
                     if (e.data.__sgVfsNavReq) {
-                        var navHref     = e.data.__sgVfsNavReq;
+                        var navHref = e.data.__sgVfsNavReq;
+                        var navErr  = _validateVfsPath(navHref, htmlDir);
+                        if (navErr) { console.warn('[sg-vfs parent] nav blocked:', navErr); return; }
                         var navResolved = _resolvePath(htmlDir, navHref);
                         var navMatch    = _findEntry(fileList, navResolved);
                         console.log('[sg-vfs parent] nav:', navHref, '→', navResolved, '→', navMatch ? navMatch.path : 'NOT FOUND');
@@ -738,17 +796,85 @@ class SendBrowse extends SendComponent {
                         return;
                     }
 
+                    // ── Change 5: write request ─────────────────────────────
+                    if (e.data.__sgVfsWriteReq) {
+                        var writeId  = e.data.__sgVfsWriteReq;
+                        var writeSrc = e.source;
+                        function _writeReply(ok, payload) {
+                            try { writeSrc.postMessage(Object.assign({ __sgVfsWriteReply: writeId, ok: ok }, payload), '*'); } catch (_) {}
+                        }
+                        // Guard: writable vault only
+                        if (!self.dataSource || !self.dataSource.writable ||
+                            self.dataSource._iframeWriteDisabled) {
+                            _writeReply(false, { err: 'Read-only vault' }); return;
+                        }
+                        // Validate path (same rules as read/nav)
+                        var wPathErr = _validateVfsPath(e.data.path, htmlDir);
+                        if (wPathErr) { _writeReply(false, { err: wPathErr }); return; }
+                        // Decode base64 → bytes
+                        var wBytes;
+                        try {
+                            var bin = atob(e.data.data || '');
+                            wBytes = new Uint8Array(bin.length);
+                            for (var i = 0; i < bin.length; i++) wBytes[i] = bin.charCodeAt(i);
+                        } catch (_) { _writeReply(false, { err: 'Bad encoding' }); return; }
+                        // Resolve path → folder + filename
+                        var wResolved = e.data.path.startsWith('/')
+                            ? e.data.path.slice(1) : _resolvePath(htmlDir, e.data.path);
+                        var wSlash   = wResolved.lastIndexOf('/');
+                        var wDir     = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
+                        var wFile    = wResolved.slice(wSlash + 1);
+                        _ensureVaultFolder(self.dataSource, wDir)
+                            .then(function() {
+                                return self.dataSource.saveFile(wDir, wFile, wBytes.buffer);
+                            })
+                            .then(function() {
+                                fileList = self.dataSource.getFileList(); // refresh after write
+                                console.log('[sg-vfs parent] wrote', wResolved, wBytes.byteLength, 'bytes');
+                                _writeReply(true, { size: wBytes.byteLength });
+                            })
+                            .catch(function(err) {
+                                console.error('[sg-vfs parent] write failed:', wResolved, err);
+                                _writeReply(false, { err: err.message || 'Write failed' });
+                            });
+                        return;
+                    }
+
+                    // ── Change 5: list request ──────────────────────────────
+                    if (e.data.__sgVfsListReq) {
+                        var listId  = e.data.__sgVfsListReq;
+                        var entries = self.dataSource ? self.dataSource.getFileList() : [];
+                        var prefix  = (e.data.path || '').replace(/^\//, '');
+                        if (prefix) {
+                            entries = entries.filter(function(f) {
+                                return f.path.startsWith(prefix);
+                            });
+                        }
+                        var listed = entries.map(function(f) {
+                            return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                        });
+                        try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
+                        return;
+                    }
+
                     if (!e.data.__sgVfsReq) return;
 
-                    var msgId    = e.data.__sgVfsReq;
-                    var reqUrl   = e.data.url;
+                    var msgId  = e.data.__sgVfsReq;
+                    var reqUrl = e.data.url;
+                    // Validate read path (same rules as write/nav — defence in depth)
+                    var readErr = _validateVfsPath(reqUrl, htmlDir);
+                    if (readErr) {
+                        console.warn('[sg-vfs parent] read blocked:', readErr);
+                        e.source.postMessage({ __sgVfsReply: msgId, err: true }, '*');
+                        return;
+                    }
                     var resolved = _resolvePath(htmlDir, reqUrl);
                     var match    = _findEntry(fileList, resolved);
 
                     console.log('[sg-vfs parent] request:', reqUrl, '→ resolved:', resolved, '→ match:', match ? match.path : 'NOT FOUND');
 
                     if (!match) {
-                        console.warn('[sg-vfs parent] NOT FOUND in vault:', resolved, '(full fileList paths:', fileList.map(function(e){return e.path;}).join(', '), ')');
+                        console.warn('[sg-vfs parent] NOT FOUND in vault:', resolved);
                         e.source.postMessage({ __sgVfsReply: msgId, err: true }, '*');
                         return;
                     }
@@ -1411,6 +1537,51 @@ function _emlSplitMultipart(body, boundary) {
         }
     }
     return parts;
+}
+
+// ─── Change 5: VFS path validation ───────────────────────────────────────────────
+// Applied symmetrically to read, navigation, AND write paths — defence in depth.
+// Returns a non-empty error string if invalid, null if OK.
+function _validateVfsPath(rawPath, htmlDir) {
+    if (!rawPath || typeof rawPath !== 'string') return 'Empty path';
+    if (rawPath.length > 1024)                   return 'Path too long';
+    if (rawPath.indexOf('\0') !== -1)             return 'Null byte in path';
+    // URL-decode to catch %2e%2e/ traversal before the string checks
+    var decoded;
+    try { decoded = decodeURIComponent(rawPath); } catch (_) { decoded = rawPath; }
+    if (decoded.indexOf('\0') !== -1)             return 'Null byte in path';
+    // Resolve: leading slash = vault-rooted (strip it); relative = resolve against htmlDir
+    var resolved = decoded.startsWith('/')
+        ? decoded.slice(1)
+        : _resolvePath(htmlDir, decoded);
+    if (!resolved)                                return 'Cannot resolve path';
+    // Traversal guard (post-resolution)
+    if (resolved.startsWith('../') || resolved.indexOf('/../') !== -1 || resolved === '..')
+                                                  return 'Path traversal';
+    // Protect vault internals
+    if (resolved === '.vault-settings.json' ||
+        resolved === '.vault-settings'       ||
+        resolved.startsWith('.vault-')       ||
+        resolved.startsWith('.vault/'))           return 'Protected path';
+    return null; // valid
+}
+
+// ─── Change 5: ensure all folder segments of a vault path exist ──────────────────
+// Creates any missing parent folders one by one (each is a vault commit).
+// Suppresses errors for already-existing folders.
+async function _ensureVaultFolder(dataSource, folderPath) {
+    if (!folderPath || folderPath === '/') return;
+    var parts = folderPath.replace(/^\//, '').split('/').filter(Boolean);
+    var current = '/';
+    for (var i = 0; i < parts.length; i++) {
+        var next = current === '/' ? '/' + parts[i] : current + '/' + parts[i];
+        try {
+            if (!dataSource._vault || !dataSource._vault._findNode(next)) {
+                await dataSource.createFolder(next);
+            }
+        } catch (_) {} // already exists — fine
+        current = next;
+    }
 }
 
 // ─── BRW-020: Pre-inline vault CSS/JS into HTML before blob creation ─────────────
