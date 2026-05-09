@@ -376,6 +376,69 @@
         }
     };
 
+    // --- Patch _openFolderPage: App Mode support for _page.json tabs ---
+    // _page.json renders into sg-layout's shadow DOM (not via _renderFileContent), so
+    // the generic App Mode button / frame-lift can't find it via document.querySelector.
+    // This patch:
+    //   1. Intercepts addTabToStack to capture the new panel ID.
+    //   2. After one rAF (original's rAF sets el.style.cssText; ours runs next in same
+    //      frame and overwrites with lift styles), gets the panel element.
+    //   3. Dispatches sg-page-layout-ready so _waitForIframeAndLift can lift it.
+    //   4. Adds an App Mode button to the page layout action bar once it appears.
+
+    if (typeof SendBrowse.prototype._openFolderPage === 'function') {
+        var _origOpenFolderPage = SendBrowse.prototype._openFolderPage;
+
+        SendBrowse.prototype._openFolderPage = async function(folderPath, pageJsonPath) {
+            var sgLayout = this._sgLayout;
+            var capturedId = null;
+
+            if (sgLayout && typeof sgLayout.addTabToStack === 'function') {
+                var _origAddTab = sgLayout.addTabToStack;
+                sgLayout.addTabToStack = function() {
+                    var id = _origAddTab.apply(this, arguments);
+                    capturedId = id;
+                    sgLayout.addTabToStack = _origAddTab;
+                    return id;
+                };
+            }
+
+            await _origOpenFolderPage.call(this, folderPath, pageJsonPath);
+
+            if (!capturedId || !sgLayout) return;
+
+            // One rAF so the original's rAF (which sets el.style.cssText) runs first.
+            requestAnimationFrame(function() {
+                var el = sgLayout.getPanelElement(capturedId);
+                if (!el) return;
+
+                // Signal sg-app-banner that a page layout panel is ready for lifting.
+                window.dispatchEvent(new CustomEvent('sg-page-layout-ready', { detail: { el: el } }));
+
+                // Add App Mode button when the action bar appears in this panel.
+                var observer = new MutationObserver(function() {
+                    var bar = el.querySelector('.plr-source-bar');
+                    if (!bar || bar.dataset.sgAppModeBtn) return;
+                    bar.dataset.sgAppModeBtn = '1';
+                    observer.disconnect();
+
+                    var btn = _makeBtn('App Mode');
+                    btn.title = 'Focus on this page — hide vault chrome';
+                    btn.addEventListener('click', function() {
+                        var banner = document.querySelector('sg-app-banner');
+                        if (banner && typeof banner.activate === 'function') {
+                            banner.activate(el);
+                        }
+                    });
+                    bar.appendChild(btn);
+                });
+                observer.observe(el, { childList: true, subtree: true });
+                // Safety: disconnect if action bar never appears
+                setTimeout(function() { observer.disconnect(); }, 5000);
+            });
+        };
+    }
+
     // --- Patch header: add Upload Files button ---
 
     var _origBuild = SendBrowse.prototype._build;
