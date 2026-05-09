@@ -19,7 +19,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ── Version stamp — bump this to confirm the local dev server has the latest code ──
-console.log('%c[send-browse v0.3.3-vfs-4] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+console.log('%c[send-browse v0.3.3-vfs-5] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
 
 class SendBrowse extends SendComponent {
 
@@ -666,9 +666,39 @@ class SendBrowse extends SendComponent {
                     'return _vfsMsg("__sgVfsListReq",{path:path||""})' +
                       '.then(function(d){return d.entries||[];});' +
                   '}' +
+                  // sg.loadCss / sg.loadJs — async asset loaders (the contract for vault HTML).
+                  // Vault iframes run from a blob: URL, so the browser's native HTML parser
+                  // can't resolve relative <link rel="stylesheet"> or <script src="..."> against
+                  // the vault. Authors load CSS/JS at runtime instead — fetch() goes through
+                  // the VFS bridge, then we inject a fresh <style>/<script> with the body
+                  // textContent, which runs in the iframe origin without any network round-trip.
+                  // See library/guides/vault-html/AUTHORING.md for the full convention.
+                  'function _loadCss(path){' +
+                    'return _readText(path).then(function(css){' +
+                      'var s=document.createElement("style");' +
+                      's.setAttribute("data-sg-loaded",path);' +
+                      's.textContent=css;' +
+                      'document.head.appendChild(s);' +
+                      'return s;' +
+                    '});' +
+                  '}' +
+                  'function _loadJs(path){' +
+                    'return _readText(path).then(function(js){' +
+                      'return new Promise(function(res,rej){' +
+                        'var s=document.createElement("script");' +
+                        's.setAttribute("data-sg-loaded",path);' +
+                        // textContent runs synchronously on append — wrap in a microtask so
+                        // any throw surfaces as a rejection rather than crashing the loader.
+                        'try{s.textContent=js;document.head.appendChild(s);res(s);}' +
+                        'catch(e){rej(e);}' +
+                      '});' +
+                    '});' +
+                  '}' +
                   // Expose canonical surface (matches SG/App spec)
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
+                    'loadCss:_loadCss,' +
+                    'loadJs:_loadJs,' +
                     'app:{selfPath:' + JSON.stringify(fileName) + ',' +
                          'writable:' + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + '}' +
                   '};' +
@@ -678,7 +708,7 @@ class SendBrowse extends SendComponent {
                     'listFiles:function(){return _list("");},' +
                     'writable:window.sg.app.writable,selfPath:window.sg.app.selfPath' +
                   '};' +
-                  'console.log("[sg-vfs] window.sg.vfs ready | writable="+window.sg.app.writable);' +
+                  'console.log("[sg-vfs] window.sg ready | writable="+window.sg.app.writable+" | loaders: sg.loadCss, sg.loadJs");' +
                 '})();' +
 
                 '})();' +
@@ -778,22 +808,22 @@ class SendBrowse extends SendComponent {
                         }
                         self.dataSource.getFileBytes(navMatch.path).then(function(buf) {
                             var newText = new TextDecoder().decode(buf);
-                            // BRW-020: inline assets in the new page too
                             var newDir = navMatch.path.includes('/')
                                 ? navMatch.path.substring(0, navMatch.path.lastIndexOf('/') + 1)
                                 : '';
-                            _inlineVaultAssets(newText, newDir, fileList, self.dataSource).then(function(processed) {
-                                var newHtml = self.dataSource
-                                    ? processed.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
-                                    : processed;
-                                if (self.dataSource && newHtml === processed) newHtml = vfsBridgeScript + processed;
-                                var newBlob = new Blob([newHtml], { type: 'text/html' });
-                                var newUrl  = URL.createObjectURL(newBlob);
-                                self._objectUrls.push(newUrl);
-                                iframeEl.src = newUrl;
-                                htmlDir = newDir;
-                                console.log('[sg-vfs parent] navigated to:', navMatch.path, '| htmlDir now:', htmlDir);
-                            });
+                            // No asset inlining — vault HTML authors load CSS/JS via
+                            // sg.loadCss / sg.loadJs (the bridge contract). We only inject
+                            // the bridge script and create the blob.
+                            htmlDir = newDir;
+                            var newHtml = self.dataSource
+                                ? newText.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                                : newText;
+                            if (self.dataSource && newHtml === newText) newHtml = vfsBridgeScript + newText;
+                            var newBlob = new Blob([newHtml], { type: 'text/html' });
+                            var newUrl  = URL.createObjectURL(newBlob);
+                            self._objectUrls.push(newUrl);
+                            iframeEl.src = newUrl;
+                            console.log('[sg-vfs parent] navigated to:', navMatch.path, '| htmlDir now:', htmlDir);
                         }).catch(function(err) {
                             console.error('[sg-vfs parent] nav getFileBytes failed:', navMatch.path, err);
                         });
@@ -903,42 +933,45 @@ class SendBrowse extends SendComponent {
                 self._vfsBridges.push(vfsBridge);
             }
 
-            // BRW-020: inline vault CSS/JS → inject bridge → set iframe src.
-            // <link rel="stylesheet"> and <script src="..."> use the browser's resource
-            // loader (not fetch()), so they can't be intercepted by the VFS bridge.
-            // Pre-inlining resolves them before the blob URL is created.
+            // Inject bridge → create blob → set iframe src.
+            //
+            // Vault HTML authors must NOT use declarative <link rel="stylesheet"> or
+            // <script src="..."> for vault-relative assets — the browser's HTML parser
+            // fetches those before our bridge runs, against the blob: URL's opaque origin,
+            // and they 404. Instead, authors call sg.loadCss(path) / sg.loadJs(path) at
+            // runtime; both go through fetch() (intercepted by the bridge) and inject the
+            // bytes as inline <style>/<script> elements. See:
+            //   library/guides/vault-html/AUTHORING.md
             //
             // _renderHtmlBlob() is reused for the initial render and for live-preview
-            // reloads triggered by the vault edit-mode textarea. It captures the closure
-            // state (vfsBridgeScript, htmlDir, fileList, self) so a single re-render
-            // does NOT need to re-register the parent-side VFS bridge. The iframe
-            // element keeps the same reference, so the existing bridge keeps matching
-            // `e.source === iframeEl.contentWindow` after the blob navigation.
+            // reloads triggered by the vault edit-mode textarea. It captures closure state
+            // (vfsBridgeScript, htmlDir, self) so re-renders do NOT need to re-register
+            // the parent-side VFS bridge — the iframe element keeps the same reference,
+            // and the existing bridge keeps matching e.source === iframeEl.contentWindow
+            // after the blob navigation.
             var _lastBlobUrl = null;
             function _renderHtmlBlob(htmlText) {
-                return _inlineVaultAssets(htmlText, htmlDir, fileList, self.dataSource).then(function(processed) {
-                    var htmlForIframe = self.dataSource
-                        ? processed.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
-                        : processed;
-                    if (self.dataSource && htmlForIframe === processed) htmlForIframe = vfsBridgeScript + processed;
-                    var blob    = new Blob([htmlForIframe], { type: 'text/html' });
-                    var blobUrl = URL.createObjectURL(blob);
-                    self._objectUrls.push(blobUrl);
-                    // Revoke the previous live-preview URL (if any) — the original
-                    // initial-render URL stays in self._objectUrls and is cleaned up
-                    // on file close. We only revoke URLs we created on a re-render.
-                    if (_lastBlobUrl) {
-                        try { URL.revokeObjectURL(_lastBlobUrl); } catch (_) {}
-                    }
-                    _lastBlobUrl = blobUrl;
-                    iframeEl.src = blobUrl;
-                });
+                var htmlForIframe = self.dataSource
+                    ? htmlText.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                    : htmlText;
+                if (self.dataSource && htmlForIframe === htmlText) htmlForIframe = vfsBridgeScript + htmlText;
+                var blob    = new Blob([htmlForIframe], { type: 'text/html' });
+                var blobUrl = URL.createObjectURL(blob);
+                self._objectUrls.push(blobUrl);
+                // Revoke the previous live-preview URL (if any) — the original
+                // initial-render URL stays in self._objectUrls and is cleaned up on
+                // file close. We only revoke URLs we created on a re-render.
+                if (_lastBlobUrl) {
+                    try { URL.revokeObjectURL(_lastBlobUrl); } catch (_) {}
+                }
+                _lastBlobUrl = blobUrl;
+                iframeEl.src = blobUrl;
+                return Promise.resolve();
             }
 
             // Expose a re-render hook on the iframe element so vault-browse-edit can
-            // call it without re-implementing the inline-and-bridge pipeline. The
-            // top-level _loadHtmlIntoIframe shim (defined alongside _inlineVaultAssets)
-            // delegates here when this property is present.
+            // call it without re-implementing the bridge-inject + blob pipeline. The
+            // top-level _loadHtmlIntoIframe shim delegates here when this is present.
             iframeEl.__sgReloadHtml = _renderHtmlBlob;
 
             _renderHtmlBlob(rawText);
@@ -1630,79 +1663,6 @@ function _loadHtmlIntoIframe(iframe, htmlText, fileName, dataSource, objectUrls,
     var url  = URL.createObjectURL(blob);
     if (objectUrls) objectUrls.push(url);
     if (iframe) iframe.src = url;
-}
-
-// ─── ArrayBuffer → base64 (UTF-8-safe, chunked to avoid stack overflow) ─────────
-function _bytesToBase64(buf) {
-    var u8 = new Uint8Array(buf);
-    var bin = '';
-    var CHUNK = 0x8000;
-    for (var i = 0; i < u8.length; i += CHUNK) {
-        bin += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + CHUNK, u8.length)));
-    }
-    return btoa(bin);
-}
-
-// ─── BRW-020: Rewrite vault <link>/<script src> to data: URIs before blob creation ─
-// <link rel="stylesheet"> and <script src="..."> use the browser's native resource
-// loader which can't resolve relative paths against a blob: URL. We rewrite the
-// src/href attribute to a base64 data: URI carrying the file bytes — the browser
-// fetches the data URI without a network call and parses the JS/CSS as a fresh
-// resource. Bytes never enter the HTML body, which sidesteps the entire class
-// of </script> / </style> early-termination bugs that body-inlining suffers from
-// (e.g. when a JS file contains the literal text "</script>" inside a comment
-// or template literal).
-async function _inlineVaultAssets(html, htmlDir, fileList, dataSource) {
-    if (!dataSource || !html) return html;
-
-    // m[1] = open part up to and including the opening quote of href/src
-    // m[2] = the URL itself
-    // m[3] = closing quote (and any remaining attributes / `>`)
-    var tasks = [];
-    var linkRe   = /(<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["'])([^"'#?][^"']*)("|\s[^>]*?>|["'])/gi;
-    var scriptRe = /(<script\b[^>]*\bsrc=["'])([^"'#?][^"']*)("|\s[^>]*?>|["'])/gi;
-
-    function collectTag(re, kind) {
-        var m;
-        while ((m = re.exec(html)) !== null) {
-            var src = m[2];
-            if (src.startsWith('http') || src.startsWith('//') || src.startsWith('blob:') || src.startsWith('data:')) continue;
-            var resolved = _resolvePath(htmlDir, src);
-            var entry    = _findEntry(fileList, resolved);
-            if (!entry) continue;
-            tasks.push({
-                kind      : kind,
-                fullMatch : m[0],
-                openPart  : m[1],
-                closePart : m[3],
-                path      : entry.path,
-            });
-        }
-    }
-    collectTag(linkRe,   'css');
-    collectTag(scriptRe, 'js');
-
-    if (tasks.length === 0) return html;
-
-    // Fetch raw bytes (no UTF-8 decode — base64 encodes the buffer directly).
-    var results = await Promise.all(tasks.map(function(t) {
-        return dataSource.getFileBytes(t.path)
-            .then(function(buf) { return buf; })
-            .catch(function() { return null; });
-    }));
-
-    var processed = html;
-    tasks.forEach(function(t, idx) {
-        var buf = results[idx];
-        if (!buf) return;
-        var b64  = _bytesToBase64(buf);
-        var mime = t.kind === 'css' ? 'text/css' : 'application/javascript';
-        // Only the URL changes — surrounding attributes, quotes, and tag close stay intact.
-        var replacement = t.openPart + 'data:' + mime + ';base64,' + b64 + t.closePart;
-        processed = processed.replace(t.fullMatch, replacement);
-    });
-
-    return processed;
 }
 
 // ─── BRW-018: Wrapper fullscreen fallback (when requestFullscreen is unavailable) ─

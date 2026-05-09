@@ -16,7 +16,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ── Version stamp — bump this to confirm the local dev server has the latest code ──
-console.log('%c[send-browse v0.3.2-vfs-4] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+console.log('%c[send-browse v0.3.2-vfs-5] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
 
 class SendBrowse extends SendComponent {
 
@@ -891,72 +891,6 @@ window.SendBrowse = SendBrowse;
 // Helper functions (outside the class)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── Async-aware regex replace helper ────────────────────────────────────────
-async function _replaceAsync(str, regex, fn) {
-    var matches = [];
-    str.replace(regex, function() { matches.push(Array.from(arguments)); return ''; });
-    var results = await Promise.all(matches.map(function(m) { return fn.apply(null, m); }));
-    var i = 0;
-    return str.replace(regex, function() { return results[i++]; });
-}
-
-// ─── Base64-encode an ArrayBuffer (UTF-8-safe, chunked to avoid stack overflow) ───
-function _bytesToBase64(buf) {
-    var u8 = new Uint8Array(buf);
-    var bin = '';
-    var CHUNK = 0x8000;
-    for (var i = 0; i < u8.length; i += CHUNK) {
-        bin += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + CHUNK, u8.length)));
-    }
-    return btoa(bin);
-}
-
-// ─── Rewrite relative <script src> and <link href> to data: URIs ─────────────
-// Browser-native resource loading for script/link tags does not go through
-// window.fetch(), so the VFS bridge cannot intercept them. We rewrite the src/href
-// attribute to a data: URI carrying the file bytes — the browser fetches the data
-// URI without a network call. Using data: URIs (instead of inlining the bytes into
-// the script/style body) avoids the entire class of `</script>` / `</style>`
-// early-termination bugs: the bytes live in an attribute value, never in the body.
-async function _inlineHtmlAssets(html, htmlDir, dataSource) {
-    if (!dataSource) return html;
-    var fileList = dataSource.getFileList();
-    var _isExt   = /^(https?:|\/\/|data:|blob:)/;
-
-    // Stylesheet links: rewrite href → data:text/css;base64,...
-    html = await _replaceAsync(html, /<link\b([^>]*)>/gi, async function(match, attrs) {
-        if (!/\brel\s*=\s*["']stylesheet["']/i.test(attrs)) return match;
-        var hm = attrs.match(/\bhref\s*=\s*["']([^"']+)["']/i);
-        if (!hm || _isExt.test(hm[1])) return match;
-        var entry = _findEntry(fileList, _resolvePath(htmlDir, hm[1]));
-        if (!entry) return match;
-        try {
-            var b   = await dataSource.getFileBytes(entry.path);
-            var b64 = _bytesToBase64(b);
-            var newAttrs = attrs.replace(/\bhref\s*=\s*["'][^"']+["']/i,
-                'href="data:text/css;base64,' + b64 + '"');
-            return '<link' + newAttrs + '>';
-        } catch (_) { return match; }
-    });
-
-    // Script src tags: rewrite src → data:application/javascript;base64,...
-    html = await _replaceAsync(html, /<script\b([^>]*)><\/script>/gi, async function(match, attrs) {
-        var sm = attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
-        if (!sm || _isExt.test(sm[1])) return match;
-        var entry = _findEntry(fileList, _resolvePath(htmlDir, sm[1]));
-        if (!entry) return match;
-        try {
-            var b   = await dataSource.getFileBytes(entry.path);
-            var b64 = _bytesToBase64(b);
-            var newAttrs = attrs.replace(/\bsrc\s*=\s*["'][^"']+["']/i,
-                'src="data:application/javascript;base64,' + b64 + '"');
-            return '<script' + newAttrs + '><\/script>';
-        } catch (_) { return match; }
-    });
-
-    return html;
-}
-
 // ─── Resolve relative path against a base directory ──────────────────────────
 function _resolvePath(base, relative) {
     if (relative.startsWith('/')) return relative.substring(1);
@@ -1074,8 +1008,10 @@ var _SG_VFS_MIME = {
 };
 
 // ─── Load HTML into an iframe with full VFS support ───────────────────────────
-// Injects the VFS bridge, inlines relative <script src> / <link href> assets,
-// sets the iframe src, and wires the parent-side message handler.
+// Injects the VFS bridge, sets the iframe src, and wires the parent-side message
+// handler. Vault HTML authors load CSS/JS at runtime via sg.loadCss / sg.loadJs
+// (see library/guides/vault-html/AUTHORING.md) — declarative <link> / <script src>
+// against vault-relative paths is unsupported and will 404.
 // objectUrlsArr and bridgesArr receive the created blob URL and message listener
 // for later cleanup (pass null to skip tracking).
 function _loadHtmlIntoIframe(iframeEl, html, fileName, dataSource, objectUrlsArr, bridgesArr) {
@@ -1088,13 +1024,10 @@ function _loadHtmlIntoIframe(iframeEl, html, fileName, dataSource, objectUrlsArr
         htmlWithBridge = _SG_VFS_BRIDGE_SCRIPT + html;
     }
 
-    (async function() {
-        var inlined = await _inlineHtmlAssets(htmlWithBridge, htmlDir, dataSource);
-        var blob    = new Blob([inlined], { type: 'text/html' });
-        var blobUrl = URL.createObjectURL(blob);
-        if (objectUrlsArr) objectUrlsArr.push(blobUrl);
-        iframeEl.src = blobUrl;
-    })();
+    var blob    = new Blob([htmlWithBridge], { type: 'text/html' });
+    var blobUrl = URL.createObjectURL(blob);
+    if (objectUrlsArr) objectUrlsArr.push(blobUrl);
+    iframeEl.src = blobUrl;
 
     if (dataSource) {
         var fileList  = dataSource.getFileList();
