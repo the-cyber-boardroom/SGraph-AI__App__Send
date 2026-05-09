@@ -22,6 +22,15 @@
         // Call original render first
         _origRender.call(this, container, bytes, fileName, type);
 
+        // If App Mode is active when a new file renders (e.g. clicking an HTML link
+        // while _page.json is in App Mode), re-lift to the new content so the old
+        // panel doesn't go blank.
+        var _banner = document.querySelector('sg-app-banner');
+        if (_banner && _banner.style.display !== 'none' && typeof _banner.activate === 'function') {
+            var _newContentEl = container.querySelector('.sb-file__content') || container;
+            _banner.activate(_newContentEl);
+        }
+
         // App Mode: available for all file types on all vaults (writable or not)
         var bar = container.querySelector('.sb-file__actions');
         if (bar) {
@@ -408,32 +417,47 @@
             if (!capturedId || !sgLayout) return;
 
             // One rAF so the original's rAF (which sets el.style.cssText) runs first.
+            // Then watch for .plr-content-frame to appear and walk up to its direct
+            // child-of-el parent (= renderedView). This is the inner content without
+            // the .plr-source-bar action buttons, which is what App Mode should lift.
             requestAnimationFrame(function() {
                 var el = sgLayout.getPanelElement(capturedId);
                 if (!el) return;
 
-                // Signal sg-app-banner that a page layout panel is ready for lifting.
-                window.dispatchEvent(new CustomEvent('sg-page-layout-ready', { detail: { el: el } }));
-
-                // Add App Mode button when the action bar appears in this panel.
                 var observer = new MutationObserver(function() {
-                    var bar = el.querySelector('.plr-source-bar');
-                    if (!bar || bar.dataset.sgAppModeBtn) return;
-                    bar.dataset.sgAppModeBtn = '1';
+                    var frame = el.querySelector('.plr-content-frame');
+                    if (!frame) return;
+
+                    // Traverse up to the direct child of el (= renderedView).
+                    var renderedView = frame;
+                    while (renderedView.parentElement && renderedView.parentElement !== el) {
+                        renderedView = renderedView.parentElement;
+                    }
+                    if (renderedView.parentElement !== el) return;
+
                     observer.disconnect();
 
-                    var btn = _makeBtn('App Mode');
-                    btn.title = 'Focus on this page — hide vault chrome';
-                    btn.addEventListener('click', function() {
-                        var banner = document.querySelector('sg-app-banner');
-                        if (banner && typeof banner.activate === 'function') {
-                            banner.activate(el);
-                        }
-                    });
-                    bar.appendChild(btn);
+                    // Signal sg-app-banner with the inner content element (no action bar).
+                    window.dispatchEvent(new CustomEvent('sg-page-layout-ready', {
+                        detail: { el: renderedView }
+                    }));
+
+                    // Add App Mode button to the action bar.
+                    var bar = el.querySelector('.plr-source-bar');
+                    if (bar && !bar.dataset.sgAppModeBtn) {
+                        bar.dataset.sgAppModeBtn = '1';
+                        var btn = _makeBtn('App Mode');
+                        btn.title = 'Focus on this page — hide vault chrome';
+                        btn.addEventListener('click', function() {
+                            var banner = document.querySelector('sg-app-banner');
+                            if (banner && typeof banner.activate === 'function') {
+                                banner.activate(renderedView);
+                            }
+                        });
+                        bar.appendChild(btn);
+                    }
                 });
                 observer.observe(el, { childList: true, subtree: true });
-                // Safety: disconnect if action bar never appears
                 setTimeout(function() { observer.disconnect(); }, 5000);
             });
         };
