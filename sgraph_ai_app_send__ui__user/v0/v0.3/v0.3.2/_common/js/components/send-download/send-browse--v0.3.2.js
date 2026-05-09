@@ -617,29 +617,36 @@ class SendBrowse extends SendComponent {
                 '})();' +
                 '<\/script>';
 
-            // Inject bridge as first child of <head> (or prepend if no <head>)
-            var htmlForIframe = self.dataSource
+            // Inject VFS bridge as first child of <head> (handles runtime fetch() calls).
+            // Static <script src> and <link href> are inlined below — browser-native
+            // resource loading does not go through window.fetch(), bypassing the bridge.
+            var htmlWithBridge = self.dataSource
                 ? rawText.replace(/(<head[^>]*>)/i, function(m) { return m + vfsBridgeScript; })
                 : rawText;
-            if (self.dataSource && htmlForIframe === rawText) {
-                htmlForIframe = vfsBridgeScript + rawText;  // no <head> tag
+            if (self.dataSource && htmlWithBridge === rawText) {
+                htmlWithBridge = vfsBridgeScript + rawText;  // no <head> tag
             }
-
-            var blob    = new Blob([htmlForIframe], { type: 'text/html' });
-            var blobUrl = URL.createObjectURL(blob);
-            this._objectUrls.push(blobUrl);
 
             var iframeEl = document.createElement('iframe');
             iframeEl.className = 'sb-file__html-frame';
             iframeEl.sandbox   = 'allow-scripts';
-            iframeEl.src       = blobUrl;
             iframeEl.style.flex = '1';
             content.appendChild(iframeEl);
 
-            // Set up parent-side VFS request handler
+            var htmlDir = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
+            var _selfHtml = self;
+            // Inline relative assets then set iframe src asynchronously.
+            (async function() {
+                var inlined = await _inlineHtmlAssets(htmlWithBridge, htmlDir, _selfHtml.dataSource);
+                var blob    = new Blob([inlined], { type: 'text/html' });
+                var blobUrl = URL.createObjectURL(blob);
+                _selfHtml._objectUrls.push(blobUrl);
+                iframeEl.src = blobUrl;
+            })();
+
+            // Set up parent-side VFS request handler (for runtime fetch() calls)
             console.log('[sg-vfs parent] HTML file opened:', fileName, '| dataSource:', self.dataSource ? 'YES' : 'NO (null)');
             if (self.dataSource) {
-                var htmlDir  = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
                 var fileList = self.dataSource.getFileList();
                 console.log('[sg-vfs parent] htmlDir="' + htmlDir + '" fileList=' + fileList.length + ' entries');
                 console.log('[sg-vfs parent] sample paths:', fileList.slice(0, 8).map(function(e){return e.path;}));
@@ -1049,6 +1056,52 @@ window.SendBrowse = SendBrowse;
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helper functions (outside the class)
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Async-aware regex replace helper ────────────────────────────────────────
+async function _replaceAsync(str, regex, fn) {
+    var matches = [];
+    str.replace(regex, function() { matches.push(Array.from(arguments)); return ''; });
+    var results = await Promise.all(matches.map(function(m) { return fn.apply(null, m); }));
+    var i = 0;
+    return str.replace(regex, function() { return results[i++]; });
+}
+
+// ─── Inline relative <script src> and <link href> assets from vault ───────────
+// Browser-native resource loading for script/link tags does not go through
+// window.fetch(), so the VFS bridge cannot intercept them. We inline them here
+// so the blob-URL iframe gets fully self-contained HTML.
+async function _inlineHtmlAssets(html, htmlDir, dataSource) {
+    if (!dataSource) return html;
+    var fileList = dataSource.getFileList();
+    var _isExt   = /^(https?:|\/\/|data:|blob:)/;
+
+    // Inline <link rel="stylesheet" href="relative.css"> → <style>...</style>
+    html = await _replaceAsync(html, /<link\b([^>]*)>/gi, async function(match, attrs) {
+        if (!/\brel\s*=\s*["']stylesheet["']/i.test(attrs)) return match;
+        var hm = attrs.match(/\bhref\s*=\s*["']([^"']+)["']/i);
+        if (!hm || _isExt.test(hm[1])) return match;
+        var entry = _findEntry(fileList, _resolvePath(htmlDir, hm[1]));
+        if (!entry) return match;
+        try {
+            var b = await dataSource.getFileBytes(entry.path);
+            return '<style>' + new TextDecoder().decode(b) + '</style>';
+        } catch (_) { return match; }
+    });
+
+    // Inline <script src="relative.js"></script> → <script>...</script>
+    html = await _replaceAsync(html, /<script\b([^>]*)><\/script>/gi, async function(match, attrs) {
+        var sm = attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+        if (!sm || _isExt.test(sm[1])) return match;
+        var entry = _findEntry(fileList, _resolvePath(htmlDir, sm[1]));
+        if (!entry) return match;
+        try {
+            var b = await dataSource.getFileBytes(entry.path);
+            return '<script>' + new TextDecoder().decode(b) + '<\/script>';
+        } catch (_) { return match; }
+    });
+
+    return html;
+}
 
 // ─── Resolve relative path against a base directory ──────────────────────────
 function _resolvePath(base, relative) {
