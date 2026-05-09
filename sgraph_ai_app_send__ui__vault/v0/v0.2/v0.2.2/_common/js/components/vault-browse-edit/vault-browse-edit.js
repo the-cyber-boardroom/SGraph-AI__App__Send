@@ -22,6 +22,8 @@
         // Call original render first
         _origRender.call(this, container, bytes, fileName, type);
 
+        var _ext0 = (fileName || '').split('.').pop().toLowerCase();
+
         // Re-lift only for HTML files clicked inside an App Mode iframe (in-app navigation).
         // Non-HTML files opened from the tree (e.g. app.json) must NOT be auto-lifted.
         var _banner = document.querySelector('sg-app-banner');
@@ -34,7 +36,6 @@
         // App Mode: available for all file types on all vaults (writable or not)
         var bar = container.querySelector('.sb-file__actions');
         if (bar) {
-            var _ext0 = (fileName || '').split('.').pop().toLowerCase();
             var appModeBtnUniversal = _makeBtn('App Mode');
             appModeBtnUniversal.title = 'Focus on this file — hide vault chrome';
             appModeBtnUniversal.addEventListener('click', function() {
@@ -204,7 +205,11 @@
             bar.appendChild(copyBtn);
         }
 
-        // --- HTML split-view editor (raw source left | live preview right) ---
+        // --- HTML split-view editor: textarea on the left, the EXISTING render iframe
+        //     on the right. We reuse `.sb-file__html-frame` (created by send-browse) so
+        //     the preview is bit-identical to the main viewer — same iframe element,
+        //     same sandbox, same background, same dimensions. No second iframe, no
+        //     drift between the two views.
         if (_ext0 === 'html' || _ext0 === 'htm') {
             var htmlEditBtn   = _makeBtn('Edit');
             var htmlSaveBtn   = _makeBtn('Save');
@@ -214,27 +219,51 @@
             htmlSaveBtn.style.fontWeight = '700';
             htmlCancelBtn.style.display  = 'none';
 
-            var _htmlTextarea  = null;
-            var _htmlSplitEl   = null;
-            var _htmlPrevTimer = null;
-            var _htmlEditing   = false;
-            var _pvBridges     = [];
+            var _htmlTextarea     = null;
+            var _htmlEdPane       = null;   // textarea pane prepended on edit, removed on exit
+            var _htmlOrigDir      = null;   // original .sb-file__content flex-direction
+            var _htmlPrevTimer    = null;
+            var _htmlEditing      = false;
+
+            function _cleanupBridges() {
+                if (self._vfsBridges) {
+                    self._vfsBridges.forEach(function(b) { window.removeEventListener('message', b); });
+                    self._vfsBridges.length = 0;
+                }
+                if (self._objectUrls) {
+                    self._objectUrls.forEach(function(u) { try { URL.revokeObjectURL(u); } catch (_) {} });
+                    self._objectUrls.length = 0;
+                }
+            }
+
+            function _exitHtmlEdit() {
+                clearTimeout(_htmlPrevTimer);
+                if (_htmlEdPane) { _htmlEdPane.remove(); _htmlEdPane = null; }
+                _htmlTextarea = null;
+                var content = container.querySelector('.sb-file__content');
+                if (content) {
+                    content.style.flexDirection = _htmlOrigDir || 'column';
+                }
+                htmlEditBtn.style.display   = '';
+                htmlSaveBtn.style.display   = 'none';
+                htmlCancelBtn.style.display = 'none';
+                _htmlEditing = false;
+            }
 
             htmlEditBtn.addEventListener('click', function() {
                 if (_htmlEditing) return;
+                var content = container.querySelector('.sb-file__content');
+                var iframe  = content && content.querySelector('.sb-file__html-frame');
+                if (!content || !iframe) return;   // cannot edit without the live iframe
                 _htmlEditing = true;
-                var content     = container.querySelector('.sb-file__content');
-                var currentText = new TextDecoder().decode(bytes);
 
-                // Split container: editor left | preview right
-                _htmlSplitEl = document.createElement('div');
-                _htmlSplitEl.style.cssText = 'display:flex;flex:1;min-height:0;overflow:hidden;';
+                _htmlOrigDir = content.style.flexDirection || '';
 
-                // Left: textarea
-                var edPane = document.createElement('div');
-                edPane.style.cssText = 'flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid rgba(78,205,196,0.2);';
+                _htmlEdPane = document.createElement('div');
+                _htmlEdPane.style.cssText = 'flex:1;display:flex;flex-direction:column;min-width:0;'
+                    + 'border-right:1px solid rgba(78,205,196,0.2);';
                 _htmlTextarea = document.createElement('textarea');
-                _htmlTextarea.value = currentText;
+                _htmlTextarea.value = new TextDecoder().decode(bytes);
                 _htmlTextarea.style.cssText = [
                     'flex:1','margin:0','padding:1rem','resize:none',
                     'font-family:var(--font-mono,monospace)','font-size:12px',
@@ -242,42 +271,33 @@
                     'background:var(--bg-primary,#0a0a18)','border:none','outline:none',
                     'box-sizing:border-box','tab-size:2','overflow-y:auto','min-height:0'
                 ].join(';');
-                edPane.appendChild(_htmlTextarea);
+                _htmlEdPane.appendChild(_htmlTextarea);
 
-                // Right: live preview
-                var pvPane = document.createElement('div');
-                pvPane.style.cssText = 'flex:1;display:flex;flex-direction:column;min-width:0;';
-                var pvLabel = document.createElement('div');
-                pvLabel.textContent = 'Preview';
-                pvLabel.style.cssText = 'padding:3px 8px;font-size:10px;color:rgba(226,232,240,0.4);' +
-                    'background:var(--bg-primary,#0a0a18);border-bottom:1px solid rgba(78,205,196,0.1);flex-shrink:0;';
-                pvPane.appendChild(pvLabel);
-                var pvFrame = document.createElement('iframe');
-                pvFrame.sandbox = 'allow-scripts';
-                pvFrame.style.cssText = 'flex:1;border:none;width:100%;min-height:0;';
-                pvPane.appendChild(pvFrame);
+                // Insert textarea pane BEFORE the iframe (which stays in place — moving an
+                // iframe in the DOM forces it to reload). This restructures the layout
+                // without remounting the rendered content.
+                content.style.display = 'flex';
+                content.style.flexDirection = 'row';
+                content.insertBefore(_htmlEdPane, iframe);
+                iframe.style.flex = '1';
+                iframe.style.minWidth = '0';
 
-                _htmlSplitEl.appendChild(edPane);
-                _htmlSplitEl.appendChild(pvPane);
-                if (content) content.style.display = 'none';
-                container.style.display = 'flex';
-                container.style.flexDirection = 'column';
-                container.appendChild(_htmlSplitEl);
                 function _updatePv() {
-                    // Remove previous VFS bridge listener before creating new one.
-                    _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
-                    _pvBridges = [];
+                    var live = container.querySelector('.sb-file__html-frame');
+                    if (!live) return;
+                    _cleanupBridges();
                     if (typeof _loadHtmlIntoIframe === 'function') {
-                        _loadHtmlIntoIframe(pvFrame, _htmlTextarea.value, fileName, self.dataSource, null, _pvBridges);
+                        _loadHtmlIntoIframe(live, _htmlTextarea.value, fileName,
+                            self.dataSource, self._objectUrls, self._vfsBridges);
                     } else {
-                        pvFrame.src = URL.createObjectURL(new Blob([_htmlTextarea.value], { type: 'text/html' }));
+                        live.src = URL.createObjectURL(new Blob([_htmlTextarea.value], { type: 'text/html' }));
                     }
                 }
                 _htmlTextarea.addEventListener('input', function() {
                     clearTimeout(_htmlPrevTimer);
                     _htmlPrevTimer = setTimeout(_updatePv, 600);
                 });
-                _updatePv();
+                // No initial _updatePv call — the iframe already shows the rendered file.
                 _htmlTextarea.focus();
                 htmlEditBtn.style.display   = 'none';
                 htmlSaveBtn.style.display   = '';
@@ -285,9 +305,16 @@
             });
 
             htmlCancelBtn.addEventListener('click', function() {
+                if (!_htmlEditing) return;
                 clearTimeout(_htmlPrevTimer);
-                _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
-                self._renderFileContent(container, bytes, fileName, type);
+                // Reload the iframe with the original bytes (in case live edits had updated it).
+                var iframe = container.querySelector('.sb-file__html-frame');
+                if (iframe && typeof _loadHtmlIntoIframe === 'function') {
+                    _cleanupBridges();
+                    _loadHtmlIntoIframe(iframe, new TextDecoder().decode(bytes), fileName,
+                        self.dataSource, self._objectUrls, self._vfsBridges);
+                }
+                _exitHtmlEdit();
             });
 
             htmlSaveBtn.addEventListener('click', function() {
@@ -301,7 +328,8 @@
                 htmlSaveBtn.textContent = 'Saving...';
                 self.dataSource.saveFile(folder, fName, newBytes.buffer).then(function() {
                     clearTimeout(_htmlPrevTimer);
-                    _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
+                    _cleanupBridges();
+                    // Full re-render rebuilds toolbar + iframe with persisted bytes.
                     self._renderFileContent(container, newBytes.buffer, fileName, type);
                     if (window.sgraphVault && window.sgraphVault.messages) {
                         window.sgraphVault.messages.success('"' + fName + '" saved');
@@ -320,11 +348,10 @@
             bar.appendChild(htmlCancelBtn);
         }
 
-        // --- Full Screen + App Mode buttons ---
-        var _ext = (fileName || '').split('.').pop().toLowerCase();
-
-        // Full Screen: HTML only (uses the iframe wrapper as fullscreen target)
-        if (_ext === 'html' || _ext === 'htm') {
+        // --- Full Screen button (HTML only) ---
+        // App Mode is added unconditionally earlier in this function (covers writable
+        // and read-only vaults); do not re-add it here.
+        if (_ext0 === 'html' || _ext0 === 'htm') {
             var presentBtn = _makeBtn('\u26f6 Full Screen');
             presentBtn.title = 'Open in full screen — press Esc to exit';
             presentBtn.style.fontWeight = '600';
@@ -337,18 +364,6 @@
             });
             bar.appendChild(presentBtn);
         }
-
-        // App Mode: all file types — lifts .sb-file__content to fill viewport
-        var appModeBtn = _makeBtn('App Mode');
-        appModeBtn.title = 'Focus on this file — hide vault chrome';
-        appModeBtn.addEventListener('click', function() {
-            var banner = document.querySelector('sg-app-banner');
-            if (banner && typeof banner.activate === 'function') {
-                var contentEl = container.querySelector('.sb-file__content') || container;
-                banner.activate(contentEl);
-            }
-        });
-        bar.appendChild(appModeBtn);
 
         // --- SGit Data button: shows vault blob metadata for the current file view ---
         var sgitDataBtn = _makeBtn('SGit Data');

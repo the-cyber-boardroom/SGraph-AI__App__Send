@@ -523,7 +523,10 @@ class SendBrowse extends SendComponent {
             var iframeEl = document.createElement('iframe');
             iframeEl.className = 'sb-file__html-frame';
             iframeEl.sandbox   = 'allow-scripts';
-            iframeEl.style.flex = '1';
+            // background+colorScheme: iframe document body is transparent when the inlined HTML has no
+            // background-color, which lets the parent (dark vault chrome) bleed through. Force a white
+            // base so unstyled or light-mode pages render correctly regardless of parent theme.
+            iframeEl.style.cssText = 'flex:1;border:none;background:#fff;color-scheme:light;';
             content.appendChild(iframeEl);
 
             if (!self._vfsBridges) self._vfsBridges = [];
@@ -897,16 +900,30 @@ async function _replaceAsync(str, regex, fn) {
     return str.replace(regex, function() { return results[i++]; });
 }
 
-// ─── Inline relative <script src> and <link href> assets from vault ───────────
+// ─── Base64-encode an ArrayBuffer (UTF-8-safe, chunked to avoid stack overflow) ───
+function _bytesToBase64(buf) {
+    var u8 = new Uint8Array(buf);
+    var bin = '';
+    var CHUNK = 0x8000;
+    for (var i = 0; i < u8.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + CHUNK, u8.length)));
+    }
+    return btoa(bin);
+}
+
+// ─── Rewrite relative <script src> and <link href> to data: URIs ─────────────
 // Browser-native resource loading for script/link tags does not go through
-// window.fetch(), so the VFS bridge cannot intercept them. We inline them here
-// so the blob-URL iframe gets fully self-contained HTML.
+// window.fetch(), so the VFS bridge cannot intercept them. We rewrite the src/href
+// attribute to a data: URI carrying the file bytes — the browser fetches the data
+// URI without a network call. Using data: URIs (instead of inlining the bytes into
+// the script/style body) avoids the entire class of `</script>` / `</style>`
+// early-termination bugs: the bytes live in an attribute value, never in the body.
 async function _inlineHtmlAssets(html, htmlDir, dataSource) {
     if (!dataSource) return html;
     var fileList = dataSource.getFileList();
     var _isExt   = /^(https?:|\/\/|data:|blob:)/;
 
-    // Inline <link rel="stylesheet" href="relative.css"> → <style>...</style>
+    // Stylesheet links: rewrite href → data:text/css;base64,...
     html = await _replaceAsync(html, /<link\b([^>]*)>/gi, async function(match, attrs) {
         if (!/\brel\s*=\s*["']stylesheet["']/i.test(attrs)) return match;
         var hm = attrs.match(/\bhref\s*=\s*["']([^"']+)["']/i);
@@ -914,28 +931,26 @@ async function _inlineHtmlAssets(html, htmlDir, dataSource) {
         var entry = _findEntry(fileList, _resolvePath(htmlDir, hm[1]));
         if (!entry) return match;
         try {
-            var b = await dataSource.getFileBytes(entry.path);
-            var css = new TextDecoder().decode(b);
-            // Escape </style so the HTML parser doesn't close the <style> block early.
-            css = css.replace(/<\/style/gi, '<\\/style');
-            return '<style>' + css + '</style>';
+            var b   = await dataSource.getFileBytes(entry.path);
+            var b64 = _bytesToBase64(b);
+            var newAttrs = attrs.replace(/\bhref\s*=\s*["'][^"']+["']/i,
+                'href="data:text/css;base64,' + b64 + '"');
+            return '<link' + newAttrs + '>';
         } catch (_) { return match; }
     });
 
-    // Inline <script src="relative.js"></script> → <script>...</script>
+    // Script src tags: rewrite src → data:application/javascript;base64,...
     html = await _replaceAsync(html, /<script\b([^>]*)><\/script>/gi, async function(match, attrs) {
         var sm = attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
         if (!sm || _isExt.test(sm[1])) return match;
         var entry = _findEntry(fileList, _resolvePath(htmlDir, sm[1]));
         if (!entry) return match;
         try {
-            var b = await dataSource.getFileBytes(entry.path);
-            var code = new TextDecoder().decode(b);
-            // Escape </script (any case) inside the script body — the HTML parser
-            // treats </script as the end tag, which truncates the script and dumps
-            // the remaining source as visible body text.
-            code = code.replace(/<\/script/gi, '<\\/script');
-            return '<script>' + code + '<\/script>';
+            var b   = await dataSource.getFileBytes(entry.path);
+            var b64 = _bytesToBase64(b);
+            var newAttrs = attrs.replace(/\bsrc\s*=\s*["'][^"']+["']/i,
+                'src="data:application/javascript;base64,' + b64 + '"');
+            return '<script' + newAttrs + '><\/script>';
         } catch (_) { return match; }
     });
 

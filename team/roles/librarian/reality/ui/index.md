@@ -115,3 +115,15 @@ Full list: [proposed/index.md](proposed/index.md)
 - **Vault upload beta** in main SG/Send UI (doc 281) — integrate vault-push into upload wizard
 - **Room + Vault pages** migrated to v0.3.0 IFD architecture
 - **`<sg-vault-picker>`** — vault selection Web Component (doc 297)
+
+---
+
+## Recent Activity (not yet folded into the curated EXISTS section)
+
+- **2026-05-09** — Vault UI `v0.2.2` HTML iframe rendering bug fixes: data-URI inlining
+  (eliminates `</script>`/`</style>` parser bugs), edit-mode preview now reuses the main
+  `.sb-file__html-frame` iframe (single iframe across view + edit), iframe gets
+  `background:#fff; color-scheme:light`, duplicate `App Mode` button removed, `_ext0`
+  hoisting fixed. Files: `send-browse--v0.3.2.js`, `vault-browse-edit.js`. See
+  [`team/comms/changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md`](../../../comms/changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md).
+  Librarian: please fold into the curated EXISTS section on next daily run.
