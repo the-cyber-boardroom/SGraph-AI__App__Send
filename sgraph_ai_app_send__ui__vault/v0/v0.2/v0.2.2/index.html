@@ -6,27 +6,23 @@
     <title>SG/Vault (v0.2.2) — Zero-knowledge encrypted vault</title>
     <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
 
-    <!-- Redirect to landing page when no vault key in hash AND not already on /en-gb/vault.
-         If sessionStorage has the last-open vault key, inject it as the hash so the page
-         auto-reopens the same vault on refresh (instead of showing the entry form). -->
+    <!-- Session restore: if a vault was open during a previous navigation, restore it.
+         Locale redirect disabled — en-gb is the only active locale for now. -->
     <script>
     (function () {
-        var noHash      = !window.location.hash || window.location.hash === '#';
-        var pathName    = window.location.pathname.replace(/\/$/, ''); // strip trailing slash
-        var onVaultPath = pathName === '/en-gb/vault';
+        var noHash   = !window.location.hash || window.location.hash === '#';
+        var pathName = window.location.pathname.replace(/\/$/, '');
 
-        if (noHash && onVaultPath) {
-            // Refresh of /en-gb/vault — restore last open vault from session if available
+        if (noHash && pathName === '/en-gb/vault') {
+            // Refresh of /en-gb/vault with no hash — restore last open vault
             var savedKey = sessionStorage.getItem('sg-vault-session');
             if (savedKey) {
                 window.location.replace(window.location.origin + '/en-gb/vault#' + savedKey);
             } else {
-                // No active session → back to landing page (never show vault-shell on direct load)
                 window.location.replace('/en-gb/');
             }
-        } else if (noHash && !onVaultPath) {
-            window.location.replace('/en-gb/');
         }
+        // No locale redirect — would loop when already at /en-gb/
     }());
     </script>
 
