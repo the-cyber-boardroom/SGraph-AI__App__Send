@@ -191,14 +191,10 @@ class VaultEntry extends VaultComponent {
         const sgSend = this._getSGSend()
         const vault  = await SGVault.open(sgSend, vaultKey)
 
-        // Update URL hash — preserve deep link path if present
-        // No encodeURIComponent — hash is never sent to server, and | / are our delimiters
-        const hashStr  = hashValue || vaultKey
-        const deepPath = this._pendingDeepLink || null
-        const fullHash = deepPath ? hashStr + '|' + deepPath : hashStr
-        window.history.replaceState(null, '', '#' + fullHash)
-
-        // Persist vault key (without deep link path) for auto-open
+        // Persist vault key in localStorage as the single source of truth.
+        // Hash is intentionally NOT written to the URL — root /#token is the
+        // only place a hash is allowed, and even there it's consumed and stripped.
+        const hashStr = hashValue || vaultKey
         try { localStorage.setItem('sg-vault-key', hashStr) } catch (_) {}
 
         // Save to recent vault history
@@ -260,7 +256,8 @@ class VaultEntry extends VaultComponent {
             const vault  = await SGVault.create(sgSend, passphrase, { name })
             const vaultKey = vault.getVaultKey(passphrase)
 
-            window.history.replaceState(null, '', '#' + vaultKey)
+            // Persist vault key in localStorage instead of the URL hash.
+            try { localStorage.setItem('sg-vault-key', vaultKey) } catch (_) {}
 
             this.emit('vault-created', { vault, vaultKey })
         } catch (err) {
