@@ -178,7 +178,7 @@ UploadStepSelect.prototype._setupListeners = function() {
             var maxDownloads   = maxDlPill  ? parseInt(maxDlPill.dataset.value,  10) : 1;
             var expiresInHours = expiryPill ? parseInt(expiryPill.dataset.value, 10) : 24;
 
-            self.emit('step-secret-submit', {
+            self._emit('step-secret-submit', {
                 text:   ta.value,
                 config: { maxDownloads: maxDownloads, expiresInHours: expiresInHours }
             });
