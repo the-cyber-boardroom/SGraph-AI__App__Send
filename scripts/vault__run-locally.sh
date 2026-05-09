@@ -118,22 +118,17 @@ for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
     [ -f "$f" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
 done
 
-# Create en-gb/vault/index.html — serves the vault shell at /en-gb/vault so that
-# history.replaceState(null, '', '/en-gb/vault') produces a real, refreshable URL.
-# Generated from root index.html at serve time; _common/ paths are made root-absolute
-# so they resolve correctly from /en-gb/vault/ (two directories deep).
+# Create en-gb/index.html and en-gb/vault/index.html, both with root-absolute
+# _common/ paths so assets resolve correctly when served from /en-gb/ or
+# /en-gb/vault/. This mirrors what the CI deploy workflow does.
 mkdir -p "$SERVE_DIR/en-gb/vault"
-python3 -c "
-import sys
-with open('$SERVE_DIR/index.html') as f:
-    html = f.read()
-# Make local relative _common/ paths root-absolute so they work from /en-gb/vault/
-html = html.replace('href=\"_common/', 'href=\"/_common/')
-html = html.replace('src=\"_common/', 'src=\"/_common/')
-with open('$SERVE_DIR/en-gb/vault/index.html', 'w') as f:
-    f.write(html)
-print('  Created: en-gb/vault/index.html')
-"
+sed -e 's|href="_common/|href="/_common/|g' \
+    -e 's|src="_common/|src="/_common/|g' \
+    "$SERVE_DIR/index.html" > "$SERVE_DIR/en-gb/index.html"
+sed -e 's|href="_common/|href="/_common/|g' \
+    -e 's|src="_common/|src="/_common/|g' \
+    "$SERVE_DIR/index.html" > "$SERVE_DIR/en-gb/vault/index.html"
+echo "  Created: en-gb/index.html, en-gb/vault/index.html"
 
 # Inject /api/health for local dev — vault-header.js calls window.location.origin/api/health
 # to display the backend version. Python http.server has no API routes, so this

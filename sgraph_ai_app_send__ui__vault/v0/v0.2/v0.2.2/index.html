@@ -6,23 +6,39 @@
     <title>SG/Vault (v0.2.2) — Zero-knowledge encrypted vault</title>
     <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
 
-    <!-- Session restore: if a vault was open during a previous navigation, restore it.
-         Locale redirect disabled — en-gb is the only active locale for now. -->
+    <!-- Routing rules:
+         - Root `/` is the only place a # (vault key) is allowed in the URL.
+           At root, redirect to /en-gb/ (forwarding the hash so the en-gb
+           page can save the token to localStorage and then strip).
+         - Every other path strips any hash on entry. The token (if any)
+           is saved to localStorage('sg-vault-key') as the source of truth
+           for the currently loaded vault. -->
     <script>
     (function () {
-        var noHash   = !window.location.hash || window.location.hash === '#';
-        var pathName = window.location.pathname.replace(/\/$/, '');
+        var path     = window.location.pathname.replace(/\/$/, '');
+        var hash     = window.location.hash;
+        var hasHash  = hash && hash !== '#';
+        var isRoot   = (path === '' || path === '/index.html');
 
-        if (noHash && pathName === '/en-gb/vault') {
-            // Refresh of /en-gb/vault with no hash — restore last open vault
-            var savedKey = sessionStorage.getItem('sg-vault-session');
-            if (savedKey) {
-                window.location.replace(window.location.origin + '/en-gb/vault#' + savedKey);
-            } else {
-                window.location.replace('/en-gb/');
-            }
+        // Save vault key (if present in hash) to localStorage as the
+        // single source of truth for "currently loaded vault".
+        if (hasHash) {
+            try {
+                var token = decodeURIComponent(hash.slice(1)).split('|')[0].toLowerCase();
+                if (token) localStorage.setItem('sg-vault-key', token);
+            } catch (_) {}
         }
-        // No locale redirect — would loop when already at /en-gb/
+
+        if (isRoot) {
+            // Root: pure redirect to /en-gb/. No language detection.
+            window.location.replace('/en-gb/');
+            return;
+        }
+
+        // Anywhere else: strip hash from URL (it must not persist).
+        if (hasHash) {
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
     }());
     </script>
 
@@ -111,7 +127,8 @@
                 var browse = window._vaultBrowseElement;
                 var token  = window._vaultCurrentToken;
                 if (browse && token) {
-                    var base = window.location.origin + '/en-gb/vault#' + token;
+                    // Share URLs use root /#token — the only place a hash is allowed.
+                    var base = window.location.origin + '/#' + token;
                     browse.downloadUrl = path ? (base + '|' + path) : base;
                 }
             };
@@ -343,13 +360,13 @@
             };
         }());
 
-        // Hide .vs-entry immediately when a vault token is present in the URL hash.
-        // This script runs after vault-shell has rendered (connectedCallback is sync) but
-        // before vault-entry's async template fetch completes, so the form is never visible.
-        // vault-entry.onReady() still handles the open/create logic in the background.
+        // Hide .vs-entry immediately when a vault token is loaded (from localStorage).
+        // The top-level routing script saves any incoming hash token to
+        // localStorage('sg-vault-key') before this runs.
         (function () {
-            var hash = window.location.hash;
-            if (!hash || hash === '#') return;
+            var token = '';
+            try { token = (localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
+            if (!token) return;
             var shell    = document.querySelector('vault-shell');
             var entryDiv = shell && shell.querySelector('.vs-entry');
             if (entryDiv) entryDiv.style.display = 'none';
@@ -359,9 +376,9 @@
         // here with sg-vault-creating set. The splash fills the blank screen while the async
         // crypto key derivation and initial commit network call complete.
         (function () {
-            var hash     = window.location.hash;
-            if (!hash || hash === '#') return;
-            var token    = decodeURIComponent(hash.slice(1)).split('|')[0].toLowerCase();
+            var token = '';
+            try { token = (localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
+            if (!token) return;
             var creating = sessionStorage.getItem('sg-vault-creating');
             if (!creating || creating !== token) return;
 
@@ -427,16 +444,14 @@
                 '</div>';
         }
 
-        // Reload when the user manually changes the URL hash (e.g. typing a new vault token
-        // in the address bar and pressing Enter). history.replaceState/pushState does NOT
-        // fire hashchange, so internal navigation within a vault is unaffected.
-        window.addEventListener('hashchange', function () {
-            window.location.reload();
-        });
+        // hashchange listener intentionally removed. The hash is no longer used
+        // as the source of truth for the loaded vault — localStorage('sg-vault-key')
+        // is. The top-level routing script strips any hash on entry.
 
-        // Clear session key when vault is locked so a refresh after locking
+        // Clear vault key when vault is locked so a refresh after locking
         // shows the entry form rather than re-opening the previous vault.
         window.sgraphVault.events.on('vault-locked', function () {
+            try { localStorage.removeItem('sg-vault-key');     } catch (_) {}
             try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
         });
 
@@ -460,10 +475,11 @@
                 var browse = this.querySelector('.vs-view-files send-browse');
                 var token  = this._vaultKey;
 
-                // Fix downloadUrl (it defaults to window.location.href which may be '/'
-                // after create-then-clear-hash). Use canonical /en-gb/vault#token format.
+                // Fix downloadUrl: share URLs use root /#token — the only place
+                // a hash is allowed. Root redirects to /en-gb/ which consumes the
+                // hash into localStorage and opens the vault.
                 if (browse && token) {
-                    browse.downloadUrl = window.location.origin + '/en-gb/vault#' + token;
+                    browse.downloadUrl = window.location.origin + '/#' + token;
                 }
                 window._vaultCurrentToken  = token  || null;
                 window._vaultBrowseElement = browse || null;
@@ -653,24 +669,27 @@
                 return;
             }
 
-            // Detect whether this is an auto-open triggered by the URL hash (vault-entry onReady)
-            // vs a manual open triggered by the user clicking "Open Vault".
-            var hashToken = decodeURIComponent(window.location.hash.slice(1)).split('|')[0].toLowerCase();
-            var isAutoOpen = !!hashToken && hashToken === token;
+            // Detect whether this is an auto-open triggered by an incoming token
+            // (forwarded from root /#token, saved by the routing script to
+            // localStorage('sg-vault-key')) vs a manual open triggered by the
+            // user clicking "Open Vault".
+            var storedToken = '';
+            try { storedToken = (localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
+            var isAutoOpen = !!storedToken && storedToken === token;
 
             if (!isAutoOpen) {
                 // Manual open — delegate to original for standard inline error handling
                 return _orig.call(this);
             }
 
-            // Auto-open from URL hash: any failure shows the full-page error
+            // Auto-open: any failure shows the full-page error
             this._hideError();
             this._showStatus('Opening vault…');
             this._simpleTokenBtn.disabled = true;
             try {
                 await this._openVault(token, token);
-                // Remove token from URL once vault is open (security hygiene)
-                window.history.replaceState(null, '', '/en-gb/vault');
+                // Token already saved to localStorage by the routing script.
+                // Keep sessionStorage backup for legacy code paths.
                 try { sessionStorage.setItem('sg-vault-session', token); } catch (_) {}
             } catch (err) {
                 _showAutoOpenErrorPage(token, err);
