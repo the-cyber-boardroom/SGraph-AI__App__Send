@@ -59,7 +59,7 @@ UploadStepSelect.prototype._renderIdle = function() {
             '<div class="secret-header">' +
                 modeToggle +
                 '<button class="btn btn-primary btn--secret-send" id="secret-send-btn"' +
-                    ' data-testid="secret-send-btn" disabled>Create Secret Link →</button>' +
+                    ' data-testid="secret-send-btn" disabled>Review →</button>' +
             '</div>' +
             '<div class="secret-input-area">' +
                 '<textarea class="text-input" id="secret-input" data-testid="secret-input"' +
