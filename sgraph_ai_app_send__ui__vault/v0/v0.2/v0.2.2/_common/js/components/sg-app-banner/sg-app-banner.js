@@ -119,6 +119,9 @@
         if (!_liftContentFrame(liftEl)) {
             _injectShadowCss();
             _hideTreeStack();
+            // Trigger sg-layout to recalculate panel dimensions after tree hide.
+            window.dispatchEvent(new Event('resize'));
+            requestAnimationFrame(function() { window.dispatchEvent(new Event('resize')); });
             _waitForIframeAndLift();
         }
     }
@@ -234,25 +237,40 @@
         _savedIframeStyle  = null;
     }
 
-    // Watches for a new .sb-file__html-frame to appear, lifts it, then calls
-    // the optional onLifted callback. Used for app.json auto-activate and
-    // Reload App (which passes a callback that removes the cover div).
+    // Watches for file content to appear — HTML iframe, any other content element, or
+    // a _page.json panel (in sg-layout shadow DOM, signalled via sg-page-layout-ready).
+    // onLifted callback called when lift succeeds or on timeout.
     function _waitForIframeAndLift(onLifted) {
+        var done = false;
+
+        function finish(liftEl) {
+            if (done) return;
+            done = true;
+            window.removeEventListener('sg-page-layout-ready', onPageLayoutReady);
+            observer.disconnect();
+            _liftContentFrame(liftEl);
+            if (typeof onLifted === 'function') onLifted();
+        }
+
+        // _page.json panels live in sg-layout's shadow DOM — not reachable by
+        // document.querySelector. vault-browse-edit patches _openFolderPage to
+        // dispatch this event with the panel element reference.
+        function onPageLayoutReady(e) {
+            finish(e.detail && e.detail.el ? e.detail.el : undefined);
+        }
+        window.addEventListener('sg-page-layout-ready', onPageLayoutReady);
+
         var observer = new MutationObserver(function() {
-            // Lift as soon as any file content is ready — HTML iframe or any other type.
+            // Light-DOM file content (HTML iframe, PDF, markdown, images, etc.)
             if (document.querySelector('.sb-file__html-frame') ||
                 document.querySelector('.sb-file__content')) {
-                observer.disconnect();
-                _liftContentFrame();
-                if (typeof onLifted === 'function') onLifted();
+                finish(undefined);
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });
-        // Safety: disconnect after 5 s to avoid leaking
-        setTimeout(function() {
-            observer.disconnect();
-            if (typeof onLifted === 'function') onLifted(); // remove cover even on timeout
-        }, 5000);
+
+        // Safety: disconnect after 5 s
+        setTimeout(function() { finish(undefined); }, 5000);
     }
 
     // ── Layer 1: regular-DOM CSS ──────────────────────────────────────────────
