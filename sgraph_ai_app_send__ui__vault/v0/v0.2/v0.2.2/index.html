@@ -517,19 +517,24 @@
                                  (config.chrome && config.chrome.mode === 'maximised');
 
                 if (!autoOpen) return;
-                console.log('[app.json] entry:', entryFile, '| appMode:', appMode);
 
-                // App Mode: show banner and wait for the iframe to appear, then lift it.
-                // Skip if the user manually exited App Mode this session (Refresh should
-                // not force the user back into App Mode against their will).
-                if (appMode && !window._sgAppModeUserExited) {
-                    var banner = document.querySelector('sg-app-banner');
-                    if (banner) banner.activate();
-                }
+                // Only activate App Mode when the entry file actually exists in the vault.
+                // If it doesn't exist the tab open will fail and _waitForIframeAndLift would
+                // then lift the next .sb-file__content that appears (e.g. app.json itself).
+                var entryExists = fileList.some(function (e) {
+                    return !e.dir && (e.path === entryFile || e.path.endsWith('/' + entryFile));
+                });
+                console.log('[app.json] entry:', entryFile, '| appMode:', appMode, '| exists:', entryExists);
 
                 requestAnimationFrame(function () {
                     if (browse._openFileTab) {
                         browse._openFileTab(entryFile);
+                    }
+                    // Activate App Mode in the same frame as the tab open, and only when
+                    // the entry file exists — prevents app.json's own code view being lifted.
+                    if (appMode && entryExists && !window._sgAppModeUserExited) {
+                        var banner = document.querySelector('sg-app-banner');
+                        if (banner) banner.activate();
                     }
                 });
             };

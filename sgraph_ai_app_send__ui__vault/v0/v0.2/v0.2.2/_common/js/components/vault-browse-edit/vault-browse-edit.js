@@ -22,11 +22,11 @@
         // Call original render first
         _origRender.call(this, container, bytes, fileName, type);
 
-        // If App Mode is active when a new file renders (e.g. clicking an HTML link
-        // while _page.json is in App Mode), re-lift to the new content so the old
-        // panel doesn't go blank.
+        // Re-lift only for HTML files clicked inside an App Mode iframe (in-app navigation).
+        // Non-HTML files opened from the tree (e.g. app.json) must NOT be auto-lifted.
         var _banner = document.querySelector('sg-app-banner');
-        if (_banner && _banner.style.display !== 'none' && typeof _banner.activate === 'function') {
+        if (_banner && _banner.style.display !== 'none' && typeof _banner.activate === 'function'
+                && (_ext0 === 'html' || _ext0 === 'htm')) {
             var _newContentEl = container.querySelector('.sb-file__content') || container;
             _banner.activate(_newContentEl);
         }
@@ -218,6 +218,7 @@
             var _htmlSplitEl   = null;
             var _htmlPrevTimer = null;
             var _htmlEditing   = false;
+            var _pvBridges     = [];
 
             htmlEditBtn.addEventListener('click', function() {
                 if (_htmlEditing) return;
@@ -262,8 +263,6 @@
                 container.style.display = 'flex';
                 container.style.flexDirection = 'column';
                 container.appendChild(_htmlSplitEl);
-
-                var _pvBridges = [];
                 function _updatePv() {
                     // Remove previous VFS bridge listener before creating new one.
                     _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
