@@ -263,9 +263,19 @@
                 container.style.flexDirection = 'column';
                 container.appendChild(_htmlSplitEl);
 
+                var _pvHtmlDir = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
                 function _updatePv() {
-                    var blob = new Blob([_htmlTextarea.value], { type: 'text/html' });
-                    pvFrame.src = URL.createObjectURL(blob);
+                    var html = _htmlTextarea.value;
+                    // Inline vault assets so the preview renders correctly from a blob URL.
+                    if (typeof _inlineHtmlAssets === 'function' && self.dataSource) {
+                        _inlineHtmlAssets(html, _pvHtmlDir, self.dataSource).then(function(inlined) {
+                            var blob = new Blob([inlined], { type: 'text/html' });
+                            pvFrame.src = URL.createObjectURL(blob);
+                        });
+                    } else {
+                        var blob = new Blob([html], { type: 'text/html' });
+                        pvFrame.src = URL.createObjectURL(blob);
+                    }
                 }
                 _htmlTextarea.addEventListener('input', function() {
                     clearTimeout(_htmlPrevTimer);

@@ -1096,7 +1096,12 @@ async function _inlineHtmlAssets(html, htmlDir, dataSource) {
         if (!entry) return match;
         try {
             var b = await dataSource.getFileBytes(entry.path);
-            return '<script>' + new TextDecoder().decode(b) + '<\/script>';
+            var code = new TextDecoder().decode(b);
+            // Escape </script (any case) inside the script body — the HTML parser
+            // treats </script as the end tag, which truncates the script and dumps
+            // the remaining source as visible body text.
+            code = code.replace(/<\/script/gi, '<\\/script');
+            return '<script>' + code + '<\/script>';
         } catch (_) { return match; }
     });
 
