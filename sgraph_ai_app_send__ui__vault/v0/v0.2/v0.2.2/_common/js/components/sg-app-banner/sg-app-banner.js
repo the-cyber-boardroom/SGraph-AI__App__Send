@@ -97,8 +97,9 @@
 
         // Called by the "App Mode" button in vault-browse-edit or app.json handler.
         // liftEl: the element to lift to full-viewport (optional — falls back to
-        // .sb-file__html-frame wrapper for the app.json auto-activate path).
+        // .sb-file__html-frame wrapper or .sb-file__content for the app.json path).
         activate(liftEl) {
+            window._sgAppModeUserExited = false;
             _activateAll(liftEl);
             this.style.display = 'flex';
         }
@@ -123,6 +124,7 @@
     }
 
     function _deactivate() {
+        window._sgAppModeUserExited = true;
         _dropContentFrame();
         _removeMaxCss();
         _removeShadowCss();
@@ -182,10 +184,14 @@
     function _liftContentFrame(liftEl) {
         var el = liftEl || null;
         if (!el) {
-            // App.json path: no element provided — find the HTML iframe wrapper
+            // App.json path: no element provided.
+            // Try HTML iframe wrapper first, then fall back to any file content element.
             var iframeEl = document.querySelector('.sb-file__html-frame');
-            if (!iframeEl) return false;
-            el = iframeEl.parentElement;
+            if (iframeEl) {
+                el = iframeEl.parentElement;
+            } else {
+                el = document.querySelector('.sb-file__content');
+            }
             if (!el) return false;
         }
 
@@ -233,7 +239,9 @@
     // Reload App (which passes a callback that removes the cover div).
     function _waitForIframeAndLift(onLifted) {
         var observer = new MutationObserver(function() {
-            if (document.querySelector('.sb-file__html-frame')) {
+            // Lift as soon as any file content is ready — HTML iframe or any other type.
+            if (document.querySelector('.sb-file__html-frame') ||
+                document.querySelector('.sb-file__content')) {
                 observer.disconnect();
                 _liftContentFrame();
                 if (typeof onLifted === 'function') onLifted();

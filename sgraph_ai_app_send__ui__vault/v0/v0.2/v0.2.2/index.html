@@ -520,7 +520,9 @@
                 console.log('[app.json] entry:', entryFile, '| appMode:', appMode);
 
                 // App Mode: show banner and wait for the iframe to appear, then lift it.
-                if (appMode) {
+                // Skip if the user manually exited App Mode this session (Refresh should
+                // not force the user back into App Mode against their will).
+                if (appMode && !window._sgAppModeUserExited) {
                     var banner = document.querySelector('sg-app-banner');
                     if (banner) banner.activate();
                 }
