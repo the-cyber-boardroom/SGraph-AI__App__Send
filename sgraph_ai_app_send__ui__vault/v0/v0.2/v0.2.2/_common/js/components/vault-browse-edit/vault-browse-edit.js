@@ -53,7 +53,8 @@
         if (!bar) return;
 
         var self = this;
-        var isEditable = (type === 'text' || type === 'code' || type === 'markdown');
+        // HTML files get their own split-view editor below; exclude from simple textarea edit.
+        var isEditable = (type === 'text' || type === 'code' || type === 'markdown') && _ext0 !== 'html' && _ext0 !== 'htm';
 
         // --- Refresh button: re-fetch and re-render from vault (all file types) ---
         var refreshBtn = _makeBtn('↺ Refresh');
@@ -201,6 +202,114 @@
             bar.appendChild(saveBtn);
             bar.appendChild(cancelBtn);
             bar.appendChild(copyBtn);
+        }
+
+        // --- HTML split-view editor (raw source left | live preview right) ---
+        if (_ext0 === 'html' || _ext0 === 'htm') {
+            var htmlEditBtn   = _makeBtn('Edit');
+            var htmlSaveBtn   = _makeBtn('Save');
+            var htmlCancelBtn = _makeBtn('Cancel');
+            htmlSaveBtn.style.display    = 'none';
+            htmlSaveBtn.style.color      = 'var(--accent,#4ECDC4)';
+            htmlSaveBtn.style.fontWeight = '700';
+            htmlCancelBtn.style.display  = 'none';
+
+            var _htmlTextarea  = null;
+            var _htmlSplitEl   = null;
+            var _htmlPrevTimer = null;
+            var _htmlEditing   = false;
+
+            htmlEditBtn.addEventListener('click', function() {
+                if (_htmlEditing) return;
+                _htmlEditing = true;
+                var content     = container.querySelector('.sb-file__content');
+                var currentText = new TextDecoder().decode(bytes);
+
+                // Split container: editor left | preview right
+                _htmlSplitEl = document.createElement('div');
+                _htmlSplitEl.style.cssText = 'display:flex;flex:1;min-height:0;overflow:hidden;';
+
+                // Left: textarea
+                var edPane = document.createElement('div');
+                edPane.style.cssText = 'flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid rgba(78,205,196,0.2);';
+                _htmlTextarea = document.createElement('textarea');
+                _htmlTextarea.value = currentText;
+                _htmlTextarea.style.cssText = [
+                    'flex:1','margin:0','padding:1rem','resize:none',
+                    'font-family:var(--font-mono,monospace)','font-size:12px',
+                    'color:var(--color-text,#e2e8f0)','line-height:1.5',
+                    'background:var(--bg-primary,#0a0a18)','border:none','outline:none',
+                    'box-sizing:border-box','tab-size:2','overflow-y:auto','min-height:0'
+                ].join(';');
+                edPane.appendChild(_htmlTextarea);
+
+                // Right: live preview
+                var pvPane = document.createElement('div');
+                pvPane.style.cssText = 'flex:1;display:flex;flex-direction:column;min-width:0;';
+                var pvLabel = document.createElement('div');
+                pvLabel.textContent = 'Preview';
+                pvLabel.style.cssText = 'padding:3px 8px;font-size:10px;color:rgba(226,232,240,0.4);' +
+                    'background:var(--bg-primary,#0a0a18);border-bottom:1px solid rgba(78,205,196,0.1);flex-shrink:0;';
+                pvPane.appendChild(pvLabel);
+                var pvFrame = document.createElement('iframe');
+                pvFrame.sandbox = 'allow-scripts';
+                pvFrame.style.cssText = 'flex:1;border:none;width:100%;min-height:0;';
+                pvPane.appendChild(pvFrame);
+
+                _htmlSplitEl.appendChild(edPane);
+                _htmlSplitEl.appendChild(pvPane);
+                if (content) content.style.display = 'none';
+                container.style.display = 'flex';
+                container.style.flexDirection = 'column';
+                container.appendChild(_htmlSplitEl);
+
+                function _updatePv() {
+                    var blob = new Blob([_htmlTextarea.value], { type: 'text/html' });
+                    pvFrame.src = URL.createObjectURL(blob);
+                }
+                _htmlTextarea.addEventListener('input', function() {
+                    clearTimeout(_htmlPrevTimer);
+                    _htmlPrevTimer = setTimeout(_updatePv, 600);
+                });
+                _updatePv();
+                _htmlTextarea.focus();
+                htmlEditBtn.style.display   = 'none';
+                htmlSaveBtn.style.display   = '';
+                htmlCancelBtn.style.display = '';
+            });
+
+            htmlCancelBtn.addEventListener('click', function() {
+                clearTimeout(_htmlPrevTimer);
+                self._renderFileContent(container, bytes, fileName, type);
+            });
+
+            htmlSaveBtn.addEventListener('click', function() {
+                if (!_htmlTextarea || !self.dataSource) return;
+                var newText  = _htmlTextarea.value;
+                var newBytes = new TextEncoder().encode(newText);
+                var parts    = fileName.split('/');
+                var fName    = parts.pop();
+                var folder   = parts.length ? '/' + parts.join('/') : '/';
+                htmlSaveBtn.disabled    = true;
+                htmlSaveBtn.textContent = 'Saving...';
+                self.dataSource.saveFile(folder, fName, newBytes.buffer).then(function() {
+                    clearTimeout(_htmlPrevTimer);
+                    self._renderFileContent(container, newBytes.buffer, fileName, type);
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.success('"' + fName + '" saved');
+                    }
+                }).catch(function(err) {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.error('Save failed: ' + err.message);
+                    }
+                    htmlSaveBtn.disabled    = false;
+                    htmlSaveBtn.textContent = 'Save';
+                });
+            });
+
+            bar.appendChild(htmlEditBtn);
+            bar.appendChild(htmlSaveBtn);
+            bar.appendChild(htmlCancelBtn);
         }
 
         // --- Full Screen + App Mode buttons ---
