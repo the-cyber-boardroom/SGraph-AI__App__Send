@@ -33,7 +33,9 @@
         'vault-shell vault-status-bar  { display:none !important; }',
         'vault-shell .vs-body          { padding-top:0 !important; }',
         'vault-shell .vs-shell         { padding-top:2.25rem !important; }',
-        'send-browse .sb-header        { display:none !important; }'
+        'send-browse .sb-header        { display:none !important; }',
+        'send-browse .sb-file__actions { display:none !important; }',
+        'send-browse .sb-file__markdown { max-width:100% !important; }'
     ].join('\n');
 
     // Shadow-DOM chrome to hide (sg-layout internals + page layout action bar)
@@ -208,7 +210,7 @@
 
         el.style.cssText = [
             'position:fixed', 'top:2.25rem', 'left:0', 'right:0', 'bottom:0',
-            'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow:hidden'
+            'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow-y:auto'
         ].join(';');
 
         // If there's an HTML iframe inside, fix its height (was height:0 in flex layout)

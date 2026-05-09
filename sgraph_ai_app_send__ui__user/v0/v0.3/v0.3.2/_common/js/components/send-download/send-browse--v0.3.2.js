@@ -619,7 +619,7 @@ class SendBrowse extends SendComponent {
 
             // Inject bridge as first child of <head> (or prepend if no <head>)
             var htmlForIframe = self.dataSource
-                ? rawText.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                ? rawText.replace(/(<head[^>]*>)/i, function(m) { return m + vfsBridgeScript; })
                 : rawText;
             if (self.dataSource && htmlForIframe === rawText) {
                 htmlForIframe = vfsBridgeScript + rawText;  // no <head> tag
