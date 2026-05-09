@@ -1,15 +1,16 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-05-09 | **Maintained by:** Librarian (daily run)
 
-The three browser UIs served by the User Lambda. Each uses IFD versioning (no framework,
-Shadow DOM Web Components, surgical overlays). The latest user UI is v0.3.1.
+The browser UIs served by the User Lambda. Each uses IFD versioning (no framework,
+Shadow DOM Web Components, surgical overlays). The latest user UI is v0.3.2. The vault
+browser UI (`sgraph_ai_app_send__ui__vault`) is a distinct UI product at v0.2.2.
 
 ---
 
 ## EXISTS (Code-Verified)
 
-### User UI (latest: v0.3.1 IFD overlay, base: v0.3.0)
+### User UI (latest: v0.3.2 IFD overlay, base: v0.3.0)
 
 **v0.3.0** — IFD major version, full architectural rewrite. Code at
 `sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.0/`. Completed 22 March 2026.
@@ -24,6 +25,44 @@ Shadow DOM Web Components, surgical overlays). The latest user UI is v0.3.1.
 - Dark mode `_page.json` background fix (commit `231fcc9`): `page-layout-renderer.js` was
   unconditionally setting `container.style.background = '#ffffff'`; now removes inline
   background in dark mode so CSS class wins
+
+**v0.3.2** — IFD overlay on v0.3.0 + v0.3.1. Code at `sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.2/`.
+First committed 2026-05-07 (commits `e3d010c`, `0404827`). Contains 8 surgical overlay scripts +
+a new page (`en-gb/s/index.html`). Version stamp: `send-browse v0.3.2-vfs-4`.
+
+**v0.3.2 Feature 1 — Share a Secret** (commit `e3d010c`, 07 May):
+- New page: `en-gb/s/{transferId}#{keyHex}` — ephemeral encrypted text viewer
+- `send-secret-view.js/.css` — `<send-secret-view>` Web Component; handles view flow and kill-confirm flow
+- Secret is fetched via download-base64 endpoint, decrypted AES-256-GCM client-side, displayed inline
+- Kill flow: DELETE `/api/transfers/delete/{id}` on confirm
+- Ephemerality notice shown after view (D1 or D2 delivery modes)
+
+**v0.3.2 Feature 2 — Options Step / 5-step wizard** (commit `0404827`, 07 May):
+- Delivery + Share steps consolidated into a single Options step (6-step → 5-step wizard)
+- `upload-step-options.js/.css` — `<upload-step-options>` Web Component
+- `send-upload-options.js` — patches `SendUpload` for 5-step flow
+- `upload-constants-patch.js` — patches `TOTAL_STEPS` constant (6 → 5)
+
+**v0.3.2 Secret Tab UX** (commit `3144b38`, 08 May):
+- Pill toggles for Secret/File mode in UploadStepSelect
+- Secret mode Send button disabled until text is entered
+- `upload-step-select-secret.js` — patches `UploadStepSelect`
+- `send-upload-secret.js` — patches `SendUpload` (secret fast-path)
+- `upload-engine-secret.js` — patches `UploadEngine` (secret params)
+- `upload-step-done-secret.js` — registers `<upload-step-done-secret>` element
+
+**v0.3.2 sg-vault-picker** (commit range, 07–08 May):
+- `sg-vault-picker.js/.css` — `<sg-vault-picker>` Web Component (vault selection; enter key, browse recent, create new)
+- Previously PROPOSED; now EXISTS at `v0.3.2/_common/js/components/sg-vault-picker/`
+
+**v0.3.2 VFS asset inlining in send-browse** (commit `85d3d16`, 09 May):
+- `send-browse--v0.3.2.js`: `_inlineHtmlAssets()` + `_replaceAsync()` helpers
+- Before creating a blob-URL iframe for HTML vault files, all relative `<script src>` and
+  `<link rel="stylesheet" href>` tags are asynchronously resolved to their vault file contents
+  and inlined. This is required because browser-native resource loading bypasses `window.fetch()`,
+  so the VFS bridge cannot intercept these tags at runtime.
+- VFS bridge (`window.fetch()` override) preserved for dynamic runtime fetch() calls
+- `_loadHtmlIntoIframe()` extracted (commit `c448bc9`) — used by both view and edit preview
 
 #### Pages
 
@@ -57,6 +96,51 @@ Shadow DOM Web Components, surgical overlays). The latest user UI is v0.3.1.
 SGMETA envelope for filenames. Key never sent to server.
 
 **Localisation:** 17 locales. All locale pages include Welcome translations (v0.12.3).
+
+---
+
+---
+
+### Vault Browser UI (latest: v0.2.2)
+
+**Package:** `sgraph_ai_app_send__ui__vault/` — distinct UI product from the user UI.
+**v0.2.1** — landing page (EXISTS since ~04/15): `en-gb/index.html` + `browse/index.html`.
+"Open a vault." hero, auto-detect input (vault key or share token), recent vaults localStorage.
+
+**v0.2.2** — overlay on v0.2.1. Code at `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.2/`.
+3 files: `index.html`, `sg-app-banner.js`, `vault-browse-edit.js`. First committed 2026-05-08.
+
+#### sg-app-banner (v0.2.2, commit `891f645`, 08 May)
+
+**`<sg-app-banner>`** Web Component — fixed-position banner activated in App Mode.
+
+| Property | Detail |
+|----------|--------|
+| Default state | Hidden (`display:none`). Must call `activate()` to show. |
+| Activation | `activate(liftEl?)` — hides vault chrome (Layer 1 CSS), lifts content frame (Layer 2 fixed positioning) |
+| Layer 1 CSS | Hides `vault-header`, `vault-nav`, `vault-status-bar`, `.sb-header`, `.sb-file__actions`, `.sb-file__markdown` max-width |
+| Layer 2 (frame lift) | Applies `position:fixed` to the provided element (or `.sb-file__html-frame` for HTML auto-activate). No DOM move — avoids iframe reload. |
+| Shadow CSS | `sgl-tab-bar`, `sgl-resize-handle`, `plr-source-bar` hidden via injected shadow DOM CSS |
+| Deactivate | `Open Vault` button calls `_deactivate()` — restores all saved styles, removes CSS, removes banner |
+| App Mode label | Non-clickable badge in top-right of banner |
+| `present:true` in app.json | Auto-activates App Mode when `app.json` entry has `present: true` |
+
+#### vault-browse-edit (v0.2.2)
+
+Patches `SendBrowse.prototype._renderFileContent` (loaded after `send-browse--v0.3.2.js`).
+
+| Feature | Detail | Commit |
+|---------|--------|--------|
+| **App Mode button (all types)** | "App Mode" button added to file action bar on ALL file types (PDF, markdown, images, video, page layouts, HTML) on ALL vaults (read-only and writable). Lifts `.sb-file__content`. | `124a81b`, `cdcff8b` (08 May) |
+| **HTML auto-re-lift** | When App Mode is active and user navigates to an HTML file inside the iframe, banner re-lifts on the new content element | `vault-browse-edit.js` |
+| **HTML split-view editor** | HTML files: raw source textarea (left) + sandboxed live-preview iframe (right). Preview updates 600ms after typing stops. Edit button in action bar; Save/Cancel. | `85d3d16` (09 May) |
+| **Text/code/markdown edit** | Edit/Save/Cancel for non-HTML text files (writable vaults only) | pre-v0.2.2 |
+| **Upload Files button** | Opens file picker for multi-file upload to vault (writable vaults) | pre-v0.2.2 |
+| **New File button (BRW-024)** | Creates new empty file in vault; name prompt; writable vaults | `e56da6a` (08 May) |
+| **Refresh button** | Re-fetches current file from vault and re-renders; all file types, writable vaults | pre-v0.2.2 |
+
+**VFS pipeline for edit preview** (commit `2a079ee`, 08 May): identical `_inlineHtmlAssets` VFS
+pipeline used for both the view iframe and the edit split-view live preview.
 
 ---
 
