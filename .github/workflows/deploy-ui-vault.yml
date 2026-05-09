@@ -77,6 +77,8 @@ jobs:
         # The i18n script needs a complete en-gb/ tree. Seed it from the
         # base version (BASE_SOURCE_DIR), then overwrite with the current
         # version's root index.html (which changed in this release).
+        # en-gb/index.html is served at /en-gb/ so _common/ paths must be
+        # root-absolute (/_common/) — same fix as en-gb/vault/index.html.
         run: |
           BASE_ENGB="${{ env.BASE_SOURCE_DIR }}/en-gb"
           CURR_ENGB="${{ env.SOURCE_DIR }}/en-gb"
@@ -85,7 +87,16 @@ jobs:
           fi
           if [ -f "${{ env.SOURCE_DIR }}/index.html" ]; then
             mkdir -p "$CURR_ENGB"
-            cp "${{ env.SOURCE_DIR }}/index.html" "$CURR_ENGB/index.html"
+            python3 -c "
+          import sys
+          with open('${{ env.SOURCE_DIR }}/index.html') as f:
+              html = f.read()
+          html = html.replace('href=\"_common/', 'href=\"/_common/')
+          html = html.replace('src=\"_common/',  'src=\"/_common/')
+          with open('$CURR_ENGB/index.html', 'w') as f:
+              f.write(html)
+          print('Generated en-gb/index.html with root-absolute _common/ paths')
+          "
           fi
 
       - name: Generate i18n locale pages
