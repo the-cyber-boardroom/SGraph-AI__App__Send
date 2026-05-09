@@ -56,8 +56,8 @@ Integrate vault-push mode into the main upload wizard as a beta feature. User ca
 
 ## `<sg-vault-picker>` Component (04/19 — doc 297)
 
-A Web Component for selecting a vault (enter key, browse recent, create new). Used as a
-building block for vault-integrated upload and other vault-aware workflows. PROPOSED.
+~~PROPOSED~~ → **EXISTS as of v0.3.2** (committed 07–08 May). See `ui/index.md` v0.3.2 section.
+The component shipped in `sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.2/_common/js/components/sg-vault-picker/`.
 
 ---
 

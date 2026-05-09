@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.27.4 | **Last updated:** 2026-05-05 | **Maintained by:** Librarian (daily run)
+**Version:** v0.27.18 | **Last updated:** 2026-05-09 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-05-03)
+## Quick Stats (as of 2026-05-09)
 
 | Metric | Count |
 |--------|-------|
@@ -41,11 +41,11 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Unit tests passing | **~602** |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
-| Browser UIs | 3 (user, admin, workspace) |
+| Browser UIs | 4 (user, admin, workspace, vault) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 118+ |
-| Total documents catalogued | 348 (master indexes 04/25–05/05) |
+| Open PROPOSED items (across all domains) | 117+ |
+| Total documents catalogued | 350 (master indexes 04/25–05/09) |
 
 ---
 

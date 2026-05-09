@@ -7,6 +7,18 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-09
+
+- `index.md` — Updated: version v0.27.4 → v0.27.18, date, browser UIs count (3→4), PROPOSED count (118+→117+)
+- `ui/index.md` — Updated: latest user UI v0.3.1 → v0.3.2; added v0.3.2 section (Share a Secret, Options step, sg-vault-picker, VFS inlining, Secret tab UX); added Vault Browser UI v0.2.2 section (sg-app-banner, vault-browse-edit App Mode + HTML split-view editor + New File button)
+- `ui/proposed/index.md` — `sg-vault-picker` marked EXISTS (shipped in v0.3.2)
+- `infra/index.md` — Added: SnapStart boto3 lazy client fix in `Storage_FS__S3` (commit `b61a181`)
+
+Master index: `team/roles/librarian/reviews/05/09/v0.27.18__master-index__code-changes-08-09-may.md`
+Processes: 0 new human briefs; code-verified 10 version increments (v0.27.8 → v0.27.18)
+
+---
+
 ## 2026-05-04
 
 - No domain files updated — no new briefs or code changes
