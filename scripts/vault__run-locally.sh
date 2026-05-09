@@ -24,15 +24,12 @@ PORT=10067
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
-UI_VERSION="v0.2.2"
+UI_VERSION="v0.2.3"
 IFD_PATH="v0/v0.2/$UI_VERSION"
-VAULT_BASE_VERSION="v0.2.0"   # IFD base layer — provides vault-shell, vault-browse-edit, etc.
-# Vault IFD overlay layers applied on top of base (base-to-latest).
-# Each only contains files changed in that version.
-VAULT_IFD_OVERLAYS=(
-    "v0.2.1"
-    "v0.2.2"
-)
+VAULT_BASE_VERSION="v0.2.3"   # Full self-contained snapshot — no overlays needed.
+# v0.2.3 consolidates v0.2.0 + v0.2.1 + v0.2.2 into one complete tree.
+# Future deltas (v0.2.4, v0.2.5, ...) can be added back here as overlays.
+VAULT_IFD_OVERLAYS=()
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
 
 # User UI IFD layers — merged in order (base first, latest last) to replicate
