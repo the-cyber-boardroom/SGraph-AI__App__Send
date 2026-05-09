@@ -915,7 +915,10 @@ async function _inlineHtmlAssets(html, htmlDir, dataSource) {
         if (!entry) return match;
         try {
             var b = await dataSource.getFileBytes(entry.path);
-            return '<style>' + new TextDecoder().decode(b) + '</style>';
+            var css = new TextDecoder().decode(b);
+            // Escape </style so the HTML parser doesn't close the <style> block early.
+            css = css.replace(/<\/style/gi, '<\\/style');
+            return '<style>' + css + '</style>';
         } catch (_) { return match; }
     });
 
