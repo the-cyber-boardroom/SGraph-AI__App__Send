@@ -49,23 +49,15 @@ class test_Deploy__User__Service__base():     # Base class for deployment tests 
         self.deploy_fast_api.lambda_function().configuration_update(Runtime='python3.13')
         self.deploy_fast_api.lambda_function().wait_for_function_update_to_complete()
 
-    def test_5b__enable_snapstart(self):                                          # Publish version + create 'snapstart' alias + alias Function URL
-        result = self.deploy_fast_api.enable_snapstart()
-        assert result['version']   != '$LATEST'
-        assert result['alias']     == 'snapstart'
-        assert result['alias_url'].startswith('https://')
+    def test_5b__disable_snapstart(self):                                         # Disable SnapStart — removes connection-pool stale-socket timeouts
+        result = self.deploy_fast_api.disable_snapstart()
+        assert result['snapstart'] == 'disabled'
 
     def test_6__invoke(self):
         assert self.deploy_fast_api.invoke().get('errorMessage') == DEFAULT__ERROR_MESSAGE__WHEN_FAST_API_IS_OK
 
     def test_7__invoke__function_url(self):
         assert self.deploy_fast_api.invoke__function_url('/info/health') == {'status': 'ok'}
-
-    # test_7b__invoke__snapstart_url is intentionally absent from the deploy pipeline.
-    # SnapStart snapshot initialisation takes up to ~75s after publish_version (Lambda
-    # returns 504 Gateway Timeout while the snapshot is warming). That is too long for a
-    # deploy step. Validation lives in tests/smoke/test_smoke__snapstart.py which runs
-    # as a separate CI action after deployment completes.
 
     # def test_8__delete(self):
     #     assert self.deploy_fast_api.delete() is True
