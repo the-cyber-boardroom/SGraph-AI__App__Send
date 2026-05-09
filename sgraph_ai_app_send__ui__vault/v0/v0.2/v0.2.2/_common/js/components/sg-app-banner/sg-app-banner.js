@@ -217,7 +217,7 @@
         var htmlIframe = el.querySelector('.sb-file__html-frame');
         if (htmlIframe) {
             _savedIframeStyle = htmlIframe.style.cssText;
-            htmlIframe.style.cssText = 'flex:1;border:none;width:100%;height:100%;min-height:0;';
+            htmlIframe.style.cssText = 'flex:1;border:none;width:100%;height:100%;min-height:0;background:#fff;color-scheme:light;';
         } else {
             _savedIframeStyle = null;
         }

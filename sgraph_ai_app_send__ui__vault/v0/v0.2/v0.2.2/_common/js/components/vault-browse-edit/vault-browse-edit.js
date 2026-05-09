@@ -219,11 +219,12 @@
             htmlSaveBtn.style.fontWeight = '700';
             htmlCancelBtn.style.display  = 'none';
 
-            var _htmlTextarea     = null;
-            var _htmlEdPane       = null;   // textarea pane prepended on edit, removed on exit
-            var _htmlOrigDir      = null;   // original .sb-file__content flex-direction
-            var _htmlPrevTimer    = null;
-            var _htmlEditing      = false;
+            var _htmlTextarea            = null;
+            var _htmlEdPane              = null;   // textarea pane prepended on edit, removed on exit
+            var _htmlSplitHost           = null;   // the iframe's parent at edit-time (we flex-row it)
+            var _htmlOrigSplitHostStyle  = null;   // original cssText of the split host
+            var _htmlPrevTimer           = null;
+            var _htmlEditing             = false;
 
             function _cleanupBridges() {
                 if (self._vfsBridges) {
@@ -240,10 +241,13 @@
                 clearTimeout(_htmlPrevTimer);
                 if (_htmlEdPane) { _htmlEdPane.remove(); _htmlEdPane = null; }
                 _htmlTextarea = null;
-                var content = container.querySelector('.sb-file__content');
-                if (content) {
-                    content.style.flexDirection = _htmlOrigDir || 'column';
+                if (_htmlSplitHost) {
+                    // Restore cssText so flex-direction, display, etc. revert to whatever
+                    // the split host (often `.sb-file__content`) was using before edit.
+                    _htmlSplitHost.style.cssText = _htmlOrigSplitHostStyle || '';
                 }
+                _htmlSplitHost          = null;
+                _htmlOrigSplitHostStyle = null;
                 htmlEditBtn.style.display   = '';
                 htmlSaveBtn.style.display   = 'none';
                 htmlCancelBtn.style.display = 'none';
@@ -256,8 +260,6 @@
                 var iframe  = content && content.querySelector('.sb-file__html-frame');
                 if (!content || !iframe) return;   // cannot edit without the live iframe
                 _htmlEditing = true;
-
-                _htmlOrigDir = content.style.flexDirection || '';
 
                 _htmlEdPane = document.createElement('div');
                 _htmlEdPane.style.cssText = 'flex:1;display:flex;flex-direction:column;min-width:0;'
@@ -274,11 +276,15 @@
                 _htmlEdPane.appendChild(_htmlTextarea);
 
                 // Insert textarea pane BEFORE the iframe (which stays in place — moving an
-                // iframe in the DOM forces it to reload). This restructures the layout
-                // without remounting the rendered content.
-                content.style.display = 'flex';
-                content.style.flexDirection = 'row';
-                content.insertBefore(_htmlEdPane, iframe);
+                // iframe in the DOM forces it to reload). We insert into the iframe's actual
+                // parent, not `content`, because overlays (App-Mode lift, page-layout wrapping,
+                // etc.) can wrap the iframe in an intermediate element. We flex-row that host
+                // so the textarea sits to the iframe's left.
+                _htmlSplitHost = iframe.parentNode || content;
+                _htmlOrigSplitHostStyle = _htmlSplitHost.style.cssText;
+                _htmlSplitHost.style.display = 'flex';
+                _htmlSplitHost.style.flexDirection = 'row';
+                _htmlSplitHost.insertBefore(_htmlEdPane, iframe);
                 iframe.style.flex = '1';
                 iframe.style.minWidth = '0';
 
