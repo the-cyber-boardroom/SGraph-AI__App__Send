@@ -32,13 +32,15 @@
         'vault-shell vault-nav         { display:none !important; }',
         'vault-shell vault-status-bar  { display:none !important; }',
         'vault-shell .vs-body          { padding-top:0 !important; }',
-        'vault-shell .vs-shell         { padding-top:2.25rem !important; }'
+        'vault-shell .vs-shell         { padding-top:2.25rem !important; }',
+        'send-browse .sb-header        { display:none !important; }'
     ].join('\n');
 
-    // Fallback: shadow-DOM chrome to hide when no iframe is present
+    // Shadow-DOM chrome to hide (sg-layout internals + page layout action bar)
     var SHADOW_CSS = [
         '.sgl-tab-bar       { display:none !important; }',
-        '.sgl-resize-handle { display:none !important; }'
+        '.sgl-resize-handle { display:none !important; }',
+        '.plr-source-bar    { display:none !important; }'
     ].join('\n');
 
     // Saved state for frame-lift restore
@@ -100,6 +102,9 @@
         // .sb-file__html-frame wrapper or .sb-file__content for the app.json path).
         activate(liftEl) {
             window._sgAppModeUserExited = false;
+            // Drop any previous lift before re-activating (e.g. switching from
+            // _page.json to an HTML file while App Mode is active).
+            _dropContentFrame();
             _activateAll(liftEl);
             this.style.display = 'flex';
         }
@@ -113,15 +118,15 @@
 
     function _activateAll(liftEl) {
         _injectMaxCss();
+        // Always inject shadow CSS and hide the tree so sg-layout chrome never
+        // leaks through regardless of which lift path is taken.
+        _injectShadowCss();
+        _hideTreeStack();
+        window.dispatchEvent(new Event('resize'));
+        requestAnimationFrame(function() { window.dispatchEvent(new Event('resize')); });
         // Try to lift the provided element (or the HTML iframe wrapper on the
-        // app.json path). If nothing is present yet, fall back to shadow CSS
-        // and wait for the iframe to appear.
+        // app.json path). If nothing is present yet, wait for content to appear.
         if (!_liftContentFrame(liftEl)) {
-            _injectShadowCss();
-            _hideTreeStack();
-            // Trigger sg-layout to recalculate panel dimensions after tree hide.
-            window.dispatchEvent(new Event('resize'));
-            requestAnimationFrame(function() { window.dispatchEvent(new Event('resize')); });
             _waitForIframeAndLift();
         }
     }
