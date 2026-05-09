@@ -263,9 +263,16 @@
                 container.style.flexDirection = 'column';
                 container.appendChild(_htmlSplitEl);
 
+                var _pvBridges = [];
                 function _updatePv() {
-                    var blob = new Blob([_htmlTextarea.value], { type: 'text/html' });
-                    pvFrame.src = URL.createObjectURL(blob);
+                    // Remove previous VFS bridge listener before creating new one.
+                    _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
+                    _pvBridges = [];
+                    if (typeof _loadHtmlIntoIframe === 'function') {
+                        _loadHtmlIntoIframe(pvFrame, _htmlTextarea.value, fileName, self.dataSource, null, _pvBridges);
+                    } else {
+                        pvFrame.src = URL.createObjectURL(new Blob([_htmlTextarea.value], { type: 'text/html' }));
+                    }
                 }
                 _htmlTextarea.addEventListener('input', function() {
                     clearTimeout(_htmlPrevTimer);
@@ -280,6 +287,7 @@
 
             htmlCancelBtn.addEventListener('click', function() {
                 clearTimeout(_htmlPrevTimer);
+                _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
                 self._renderFileContent(container, bytes, fileName, type);
             });
 
@@ -294,6 +302,7 @@
                 htmlSaveBtn.textContent = 'Saving...';
                 self.dataSource.saveFile(folder, fName, newBytes.buffer).then(function() {
                     clearTimeout(_htmlPrevTimer);
+                    _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
                     self._renderFileContent(container, newBytes.buffer, fileName, type);
                     if (window.sgraphVault && window.sgraphVault.messages) {
                         window.sgraphVault.messages.success('"' + fName + '" saved');

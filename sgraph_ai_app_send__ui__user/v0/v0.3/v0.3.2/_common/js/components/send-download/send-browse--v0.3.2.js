@@ -520,183 +520,14 @@ class SendBrowse extends SendComponent {
             content.style.flexDirection = 'column';
             content.style.height = '100%';
 
-            // VFS bridge: intercepts fetch(), img.src setter, and MutationObserver.
-            // [sg-vfs] logs → iframe console (switch context in DevTools top-left dropdown)
-            // [sg-vfs parent] logs → parent window console (visible in "top" context)
-            var vfsBridgeScript =
-                '<script id="__sg-vfs">' +
-                '(function(){' +
-                'console.log("[sg-vfs] installing...");' +
-
-                // ── Shared VFS request helper ──────────────────────────────
-                'function _vfsReq(url,cb){' +
-                  'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
-                  'function h(e){if(!e.data||e.data.__sgVfsReply!==id)return;' +
-                    'window.removeEventListener("message",h);' +
-                    'console.log("[sg-vfs] ←",url,e.data.err?"ERR":"OK",e.data.buf&&e.data.buf.byteLength,"b");' +
-                    'cb(e.data);}' +
-                  'window.addEventListener("message",h);' +
-                  'console.log("[sg-vfs] →",url);' +
-                  'window.parent.postMessage({__sgVfsReq:id,url:url},"*");' +
-                '}' +
-
-                // ── fetch() override ───────────────────────────────────────
-                'var _of=window.fetch;' +
-                'window.fetch=function(u,o){' +
-                  'var us=typeof u==="string"?u:(u&&u.url?u.url:String(u));' +
-                  'if(!us||us.startsWith("http")||us.startsWith("blob:")||us.startsWith("data:")||us.startsWith("#"))' +
-                    'return _of.apply(this,arguments);' +
-                  'console.log("[sg-vfs] fetch intercepted:",us);' +
-                  'return new Promise(function(res,rej){' +
-                    '_vfsReq(us,function(d){' +
-                      'if(d.err)return _of.apply(window,[u,o]).then(res).catch(rej);' +
-                      'res(new Response(d.buf,{status:200,headers:{"Content-Type":d.mime||"application/octet-stream"}}));' +
-                    '});' +
-                  '});' +
-                '};' +
-
-                // ── HTMLImageElement.prototype.src setter override ─────────
-                // Catches img.src = '...' before the browser fires any request,
-                // even when the img element is not yet in the DOM (e.g. new Image()).
-                '(function(){' +
-                  'var d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");' +
-                  'if(!d||!d.set)return;' +
-                  'var _oset=d.set,_oget=d.get;' +
-                  'Object.defineProperty(HTMLImageElement.prototype,"src",{' +
-                    'configurable:true,' +
-                    'get:_oget,' +
-                    'set:function(val){' +
-                      // External/absolute URLs pass straight through.
-                      // __sgVfs is NOT in this check — we must NOT skip relative
-                      // paths even if we already loaded this element once (slide navigation
-                      // reuses the same <img> element with a new src each time).
-                      'if(!val||' +
-                         'val.startsWith("http")||val.startsWith("blob:")||' +
-                         'val.startsWith("data:")||val.startsWith("//"))' +
-                        '{_oset.call(this,val);return;}' +
-                      'console.log("[sg-vfs] img.src intercepted:",val);' +
-                      // Set __sgVfs to prevent the MutationObserver backup from
-                      // double-processing while the async VFS fetch is in flight.
-                      // It is cleared once the blob URL is applied (or on error).
-                      'this.__sgVfs=true;' +
-                      'var el=this;' +
-                      '_vfsReq(val,function(d){' +
-                        'el.__sgVfs=false;' +  // clear so future src changes are intercepted
-                        'if(d.err){console.warn("[sg-vfs] img not in vault:",val);_oset.call(el,val);return;}' +
-                        'var b=new Blob([d.buf],{type:d.mime||"image/png"});' +
-                        'var burl=URL.createObjectURL(b);' +
-                        'console.log("[sg-vfs] img.src → blob:",val,"→",burl);' +
-                        '_oset.call(el,burl);' +
-                      '});' +
-                    '}' +
-                  '});' +
-                  'console.log("[sg-vfs] HTMLImageElement.src setter overridden");' +
-                '})();' +
-
-                // ── MutationObserver backup (catches setAttribute calls) ───
-                'function _loadImgAttr(img){' +
-                  'if(img.__sgVfs)return;' +
-                  'var src=img.getAttribute("src");' +
-                  'if(!src||src.startsWith("http")||src.startsWith("blob:")||src.startsWith("data:"))return;' +
-                  'img.src=src;' +  // triggers our overridden setter
-                '}' +
-                'var _obs=new MutationObserver(function(muts){' +
-                  'muts.forEach(function(m){' +
-                    'm.addedNodes.forEach(function(n){' +
-                      'if(n.nodeType!==1)return;' +
-                      'if(n.tagName==="IMG")_loadImgAttr(n);' +
-                      'n.querySelectorAll&&n.querySelectorAll("img").forEach(_loadImgAttr);' +
-                    '});' +
-                    'if(m.type==="attributes"&&m.target.tagName==="IMG")_loadImgAttr(m.target);' +
-                  '});' +
-                '});' +
-                '_obs.observe(document.documentElement||document,{childList:true,subtree:true,attributes:true,attributeFilter:["src"]});' +
-                '(document.querySelectorAll("img")||[]).forEach(_loadImgAttr);' +
-                'console.log("[sg-vfs] installed OK");' +
-
-                '})();' +
-                '<\/script>';
-
-            // Inject VFS bridge as first child of <head> (handles runtime fetch() calls).
-            // Static <script src> and <link href> are inlined below — browser-native
-            // resource loading does not go through window.fetch(), bypassing the bridge.
-            var htmlWithBridge = self.dataSource
-                ? rawText.replace(/(<head[^>]*>)/i, function(m) { return m + vfsBridgeScript; })
-                : rawText;
-            if (self.dataSource && htmlWithBridge === rawText) {
-                htmlWithBridge = vfsBridgeScript + rawText;  // no <head> tag
-            }
-
             var iframeEl = document.createElement('iframe');
             iframeEl.className = 'sb-file__html-frame';
             iframeEl.sandbox   = 'allow-scripts';
             iframeEl.style.flex = '1';
             content.appendChild(iframeEl);
 
-            var htmlDir = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
-            var _selfHtml = self;
-            // Inline relative assets then set iframe src asynchronously.
-            (async function() {
-                var inlined = await _inlineHtmlAssets(htmlWithBridge, htmlDir, _selfHtml.dataSource);
-                var blob    = new Blob([inlined], { type: 'text/html' });
-                var blobUrl = URL.createObjectURL(blob);
-                _selfHtml._objectUrls.push(blobUrl);
-                iframeEl.src = blobUrl;
-            })();
-
-            // Set up parent-side VFS request handler (for runtime fetch() calls)
-            console.log('[sg-vfs parent] HTML file opened:', fileName, '| dataSource:', self.dataSource ? 'YES' : 'NO (null)');
-            if (self.dataSource) {
-                var fileList = self.dataSource.getFileList();
-                console.log('[sg-vfs parent] htmlDir="' + htmlDir + '" fileList=' + fileList.length + ' entries');
-                console.log('[sg-vfs parent] sample paths:', fileList.slice(0, 8).map(function(e){return e.path;}));
-                var _vfsMime = {
-                    json:'application/json', js:'application/javascript',
-                    mjs:'application/javascript', css:'text/css',
-                    html:'text/html', htm:'text/html',
-                    png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
-                    gif:'image/gif', svg:'image/svg+xml', webp:'image/webp',
-                    pdf:'application/pdf', txt:'text/plain', md:'text/markdown',
-                    woff:'font/woff', woff2:'font/woff2', ttf:'font/ttf', otf:'font/otf'
-                };
-
-                var vfsBridge = function(e) {
-                    if (!e.data || !e.data.__sgVfsReq) return;
-                    if (e.source !== iframeEl.contentWindow) return;
-
-                    var msgId    = e.data.__sgVfsReq;
-                    var reqUrl   = e.data.url;
-                    var resolved = _resolvePath(htmlDir, reqUrl);
-                    var match    = _findEntry(fileList, resolved);
-
-                    console.log('[sg-vfs parent] request:', reqUrl, '→ resolved:', resolved, '→ match:', match ? match.path : 'NOT FOUND');
-
-                    if (!match) {
-                        console.warn('[sg-vfs parent] NOT FOUND in vault:', resolved, '(full fileList paths:', fileList.map(function(e){return e.path;}).join(', '), ')');
-                        e.source.postMessage({ __sgVfsReply: msgId, err: true }, '*');
-                        return;
-                    }
-
-                    self.dataSource.getFileBytes(match.path).then(function(buf) {
-                        var ext2 = match.path.split('.').pop().toLowerCase();
-                        var mime = _vfsMime[ext2] || 'application/octet-stream';
-                        console.log('[sg-vfs parent] sending', match.path, buf.byteLength, 'bytes mime=' + mime);
-                        try {
-                            e.source.postMessage({ __sgVfsReply: msgId, buf: buf, mime: mime }, '*', [buf]);
-                        } catch (_) {
-                            // buf not transferable (already detached) — send without transfer
-                            e.source.postMessage({ __sgVfsReply: msgId, buf: buf, mime: mime }, '*');
-                        }
-                    }).catch(function(err) {
-                        console.error('[sg-vfs parent] getFileBytes failed for', match.path, err);
-                        e.source.postMessage({ __sgVfsReply: msgId, err: true }, '*');
-                    });
-                };
-
-                window.addEventListener('message', vfsBridge);
-                if (!self._vfsBridges) self._vfsBridges = [];
-                self._vfsBridges.push(vfsBridge);
-            }
+            if (!self._vfsBridges) self._vfsBridges = [];
+            _loadHtmlIntoIframe(iframeEl, rawText, fileName, self.dataSource, self._objectUrls, self._vfsBridges);
 
             var sourceEl = document.createElement('pre');
             sourceEl.className = 'sb-file__code';
@@ -1096,7 +927,12 @@ async function _inlineHtmlAssets(html, htmlDir, dataSource) {
         if (!entry) return match;
         try {
             var b = await dataSource.getFileBytes(entry.path);
-            return '<script>' + new TextDecoder().decode(b) + '<\/script>';
+            var code = new TextDecoder().decode(b);
+            // Escape </script (any case) inside the script body — the HTML parser
+            // treats </script as the end tag, which truncates the script and dumps
+            // the remaining source as visible body text.
+            code = code.replace(/<\/script/gi, '<\\/script');
+            return '<script>' + code + '<\/script>';
         } catch (_) { return match; }
     });
 
@@ -1144,6 +980,122 @@ function _findEntry(fileList, resolved) {
         });
     }
     return match || null;
+}
+
+// ─── VFS iframe constants ─────────────────────────────────────────────────────
+// Injected into every HTML file's <head> so runtime fetch() / img.src calls
+// from inside the iframe are intercepted and served from the vault.
+var _SG_VFS_BRIDGE_SCRIPT =
+    '<script id="__sg-vfs">' +
+    '(function(){' +
+    'console.log("[sg-vfs] installing...");' +
+    'function _vfsReq(url,cb){' +
+      'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+      'function h(e){if(!e.data||e.data.__sgVfsReply!==id)return;' +
+        'window.removeEventListener("message",h);cb(e.data);}' +
+      'window.addEventListener("message",h);' +
+      'window.parent.postMessage({__sgVfsReq:id,url:url},"*");' +
+    '}' +
+    'var _of=window.fetch;' +
+    'window.fetch=function(u,o){' +
+      'var us=typeof u==="string"?u:(u&&u.url?u.url:String(u));' +
+      'if(!us||us.startsWith("http")||us.startsWith("blob:")||us.startsWith("data:")||us.startsWith("#"))' +
+        'return _of.apply(this,arguments);' +
+      'return new Promise(function(res,rej){' +
+        '_vfsReq(us,function(d){' +
+          'if(d.err)return _of.apply(window,[u,o]).then(res).catch(rej);' +
+          'res(new Response(d.buf,{status:200,headers:{"Content-Type":d.mime||"application/octet-stream"}}));' +
+        '});' +
+      '});' +
+    '};' +
+    '(function(){' +
+      'var d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");' +
+      'if(!d||!d.set)return;' +
+      'var _oset=d.set,_oget=d.get;' +
+      'Object.defineProperty(HTMLImageElement.prototype,"src",{configurable:true,get:_oget,' +
+        'set:function(val){' +
+          'if(!val||val.startsWith("http")||val.startsWith("blob:")||val.startsWith("data:")||val.startsWith("//"))' +
+            '{_oset.call(this,val);return;}' +
+          'this.__sgVfs=true;var el=this;' +
+          '_vfsReq(val,function(d){' +
+            'el.__sgVfs=false;' +
+            'if(d.err){_oset.call(el,val);return;}' +
+            '_oset.call(el,URL.createObjectURL(new Blob([d.buf],{type:d.mime||"image/png"})));' +
+          '});' +
+        '}' +
+      '});' +
+    '})();' +
+    'function _loadImgAttr(img){' +
+      'if(img.__sgVfs)return;' +
+      'var src=img.getAttribute("src");' +
+      'if(!src||src.startsWith("http")||src.startsWith("blob:")||src.startsWith("data:"))return;' +
+      'img.src=src;' +
+    '}' +
+    'var _obs=new MutationObserver(function(muts){' +
+      'muts.forEach(function(m){' +
+        'm.addedNodes.forEach(function(n){' +
+          'if(n.nodeType!==1)return;' +
+          'if(n.tagName==="IMG")_loadImgAttr(n);' +
+          'n.querySelectorAll&&n.querySelectorAll("img").forEach(_loadImgAttr);' +
+        '});' +
+        'if(m.type==="attributes"&&m.target.tagName==="IMG")_loadImgAttr(m.target);' +
+      '});' +
+    '});' +
+    '_obs.observe(document.documentElement||document,{childList:true,subtree:true,attributes:true,attributeFilter:["src"]});' +
+    '(document.querySelectorAll("img")||[]).forEach(_loadImgAttr);' +
+    '})();' +
+    '<\/script>';
+
+var _SG_VFS_MIME = {
+    json:'application/json', js:'application/javascript', mjs:'application/javascript',
+    css:'text/css', html:'text/html', htm:'text/html',
+    png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif',
+    svg:'image/svg+xml', webp:'image/webp', pdf:'application/pdf',
+    txt:'text/plain', md:'text/markdown',
+    woff:'font/woff', woff2:'font/woff2', ttf:'font/ttf', otf:'font/otf'
+};
+
+// ─── Load HTML into an iframe with full VFS support ───────────────────────────
+// Injects the VFS bridge, inlines relative <script src> / <link href> assets,
+// sets the iframe src, and wires the parent-side message handler.
+// objectUrlsArr and bridgesArr receive the created blob URL and message listener
+// for later cleanup (pass null to skip tracking).
+function _loadHtmlIntoIframe(iframeEl, html, fileName, dataSource, objectUrlsArr, bridgesArr) {
+    var htmlDir = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
+
+    var htmlWithBridge = dataSource
+        ? html.replace(/(<head[^>]*>)/i, function(m) { return m + _SG_VFS_BRIDGE_SCRIPT; })
+        : html;
+    if (dataSource && htmlWithBridge === html) {
+        htmlWithBridge = _SG_VFS_BRIDGE_SCRIPT + html;
+    }
+
+    (async function() {
+        var inlined = await _inlineHtmlAssets(htmlWithBridge, htmlDir, dataSource);
+        var blob    = new Blob([inlined], { type: 'text/html' });
+        var blobUrl = URL.createObjectURL(blob);
+        if (objectUrlsArr) objectUrlsArr.push(blobUrl);
+        iframeEl.src = blobUrl;
+    })();
+
+    if (dataSource) {
+        var fileList  = dataSource.getFileList();
+        var vfsBridge = function(e) {
+            if (!e.data || !e.data.__sgVfsReq) return;
+            if (e.source !== iframeEl.contentWindow) return;
+            var msgId    = e.data.__sgVfsReq;
+            var resolved = _resolvePath(htmlDir, e.data.url);
+            var match    = _findEntry(fileList, resolved);
+            if (!match) { e.source.postMessage({ __sgVfsReply: msgId, err: true }, '*'); return; }
+            dataSource.getFileBytes(match.path).then(function(buf) {
+                var mime = _SG_VFS_MIME[match.path.split('.').pop().toLowerCase()] || 'application/octet-stream';
+                try   { e.source.postMessage({ __sgVfsReply: msgId, buf: buf, mime: mime }, '*', [buf]); }
+                catch (_) { e.source.postMessage({ __sgVfsReply: msgId, buf: buf, mime: mime }, '*'); }
+            }).catch(function() { e.source.postMessage({ __sgVfsReply: msgId, err: true }, '*'); });
+        };
+        window.addEventListener('message', vfsBridge);
+        if (bridgesArr) bridgesArr.push(vfsBridge);
+    }
 }
 
 // ─── BRW-014: Navigate to folder ─────────────────────────────────────────────
