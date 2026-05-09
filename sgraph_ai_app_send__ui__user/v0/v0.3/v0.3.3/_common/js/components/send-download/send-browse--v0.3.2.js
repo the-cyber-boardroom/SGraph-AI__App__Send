@@ -19,7 +19,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ── Version stamp — bump this to confirm the local dev server has the latest code ──
-console.log('%c[send-browse v0.3.3-vfs-2] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+console.log('%c[send-browse v0.3.3-vfs-3] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
 
 class SendBrowse extends SendComponent {
 
@@ -737,7 +737,11 @@ class SendBrowse extends SendComponent {
             iframeEl.className = 'sb-file__html-frame';
             iframeEl.sandbox   = 'allow-scripts';   // 'allow-fullscreen' is NOT a valid sandbox keyword
             iframeEl.setAttribute('allowfullscreen', '');  // enables iframe-initiated fullscreen if needed
-            iframeEl.style.cssText = 'flex:1;border:none;width:100%;height:0;min-height:0;';
+            // background+color-scheme: iframe document body is transparent when the inlined
+            // HTML has no background-color, which lets the parent (dark vault chrome) bleed
+            // through. Force a white base so unstyled / light-mode pages render correctly
+            // regardless of parent theme.
+            iframeEl.style.cssText = 'flex:1;border:none;width:100%;height:0;min-height:0;background:#fff;color-scheme:light;';
             wrapper.appendChild(iframeEl);
 
             // Set up parent-side VFS message handler synchronously — it will be ready
@@ -1584,16 +1588,32 @@ async function _ensureVaultFolder(dataSource, folderPath) {
     }
 }
 
-// ─── BRW-020: Pre-inline vault CSS/JS into HTML before blob creation ─────────────
+// ─── ArrayBuffer → base64 (UTF-8-safe, chunked to avoid stack overflow) ─────────
+function _bytesToBase64(buf) {
+    var u8 = new Uint8Array(buf);
+    var bin = '';
+    var CHUNK = 0x8000;
+    for (var i = 0; i < u8.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + CHUNK, u8.length)));
+    }
+    return btoa(bin);
+}
+
+// ─── BRW-020: Rewrite vault <link>/<script src> to data: URIs before blob creation ─
 // <link rel="stylesheet"> and <script src="..."> use the browser's native resource
-// loader which can't resolve relative paths against a blob: URL. This function
-// fetches each referenced vault file via dataSource and replaces the tags with
-// inline <style> / <script> blocks before the blob is created.
-// Returns a Promise<string> with the processed HTML.
+// loader which can't resolve relative paths against a blob: URL. We rewrite the
+// src/href attribute to a base64 data: URI carrying the file bytes — the browser
+// fetches the data URI without a network call and parses the JS/CSS as a fresh
+// resource. Bytes never enter the HTML body, which sidesteps the entire class
+// of </script> / </style> early-termination bugs that body-inlining suffers from
+// (e.g. when a JS file contains the literal text "</script>" inside a comment
+// or template literal).
 async function _inlineVaultAssets(html, htmlDir, fileList, dataSource) {
     if (!dataSource || !html) return html;
 
-    // Collect all relative <link rel="stylesheet" href="..."> and <script src="...">
+    // m[1] = open part up to and including the opening quote of href/src
+    // m[2] = the URL itself
+    // m[3] = closing quote (and any remaining attributes / `>`)
     var tasks = [];
     var linkRe   = /(<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["'])([^"'#?][^"']*)("|\s[^>]*?>|["'])/gi;
     var scriptRe = /(<script\b[^>]*\bsrc=["'])([^"'#?][^"']*)("|\s[^>]*?>|["'])/gi;
@@ -1606,7 +1626,13 @@ async function _inlineVaultAssets(html, htmlDir, fileList, dataSource) {
             var resolved = _resolvePath(htmlDir, src);
             var entry    = _findEntry(fileList, resolved);
             if (!entry) continue;
-            tasks.push({ kind: kind, fullMatch: m[0], path: entry.path });
+            tasks.push({
+                kind      : kind,
+                fullMatch : m[0],
+                openPart  : m[1],
+                closePart : m[3],
+                path      : entry.path,
+            });
         }
     }
     collectTag(linkRe,   'css');
@@ -1614,21 +1640,21 @@ async function _inlineVaultAssets(html, htmlDir, fileList, dataSource) {
 
     if (tasks.length === 0) return html;
 
-    // Fetch all in parallel
+    // Fetch raw bytes (no UTF-8 decode — base64 encodes the buffer directly).
     var results = await Promise.all(tasks.map(function(t) {
-        return dataSource.getFileBytes(t.path).then(function(buf) {
-            return new TextDecoder().decode(buf);
-        }).catch(function() { return null; });
+        return dataSource.getFileBytes(t.path)
+            .then(function(buf) { return buf; })
+            .catch(function() { return null; });
     }));
 
-    // Replace each matched tag with its inline equivalent
     var processed = html;
     tasks.forEach(function(t, idx) {
-        var text = results[idx];
-        if (text === null) return;
-        var replacement = t.kind === 'css'
-            ? '<style>/* inlined: ' + t.path + ' */\n' + text + '\n</style>'
-            : '<script>/* inlined: ' + t.path + ' */\n' + text + '\n<\/script>';
+        var buf = results[idx];
+        if (!buf) return;
+        var b64  = _bytesToBase64(buf);
+        var mime = t.kind === 'css' ? 'text/css' : 'application/javascript';
+        // Only the URL changes — surrounding attributes, quotes, and tag close stay intact.
+        var replacement = t.openPart + 'data:' + mime + ';base64,' + b64 + t.closePart;
         processed = processed.replace(t.fullMatch, replacement);
     });
 
