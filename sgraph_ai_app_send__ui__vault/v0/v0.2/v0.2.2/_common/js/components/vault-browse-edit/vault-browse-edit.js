@@ -223,6 +223,9 @@
             var _htmlEdPane              = null;   // textarea pane prepended on edit, removed on exit
             var _htmlSplitHost           = null;   // the iframe's parent at edit-time (we flex-row it)
             var _htmlOrigSplitHostStyle  = null;   // original cssText of the split host
+            var _htmlEdIframe            = null;   // the iframe whose height/min-height we override during edit
+            var _htmlOrigIframeHeight    = null;   // original inline `height` value (restored on exit)
+            var _htmlOrigIframeMinHeight = null;   // original inline `min-height` value (restored on exit)
             var _htmlPrevTimer           = null;
             var _htmlEditing             = false;
 
@@ -246,8 +249,18 @@
                     // the split host (often `.sb-file__content`) was using before edit.
                     _htmlSplitHost.style.cssText = _htmlOrigSplitHostStyle || '';
                 }
+                if (_htmlEdIframe) {
+                    // Restore the iframe's inline height/min-height that we overrode for
+                    // flex-row layout. cssText carries the original `height:0;min-height:0`
+                    // (needed by the column-flex layout the wrapper reverts to).
+                    _htmlEdIframe.style.height    = _htmlOrigIframeHeight    || '';
+                    _htmlEdIframe.style.minHeight = _htmlOrigIframeMinHeight || '';
+                }
                 _htmlSplitHost          = null;
                 _htmlOrigSplitHostStyle = null;
+                _htmlEdIframe           = null;
+                _htmlOrigIframeHeight   = null;
+                _htmlOrigIframeMinHeight = null;
                 htmlEditBtn.style.display   = '';
                 htmlSaveBtn.style.display   = 'none';
                 htmlCancelBtn.style.display = 'none';
@@ -287,11 +300,24 @@
                 _htmlSplitHost.insertBefore(_htmlEdPane, iframe);
                 iframe.style.flex = '1';
                 iframe.style.minWidth = '0';
+                // The iframe was sized for column-flex (`height:0;min-height:0` + `flex:1`
+                // expanded it vertically). In a row-flex container the cross-axis is now
+                // vertical, and explicit `height:0` overrides the default `align-items:stretch`
+                // — collapsing the iframe to 0 px tall, hiding the live preview. Override
+                // height to fill the cross-axis; restore on exit.
+                _htmlEdIframe            = iframe;
+                _htmlOrigIframeHeight    = iframe.style.height;
+                _htmlOrigIframeMinHeight = iframe.style.minHeight;
+                iframe.style.height      = '100%';
+                iframe.style.minHeight   = '0';
 
                 function _updatePv() {
                     var live = container.querySelector('.sb-file__html-frame');
                     if (!live) return;
-                    _cleanupBridges();
+                    // Do NOT call _cleanupBridges() here — the parent-side VFS bridge listener
+                    // is keyed to this iframe element and survives a `src` reload (contentWindow
+                    // is re-evaluated each message). Wiping it on every keystroke would break
+                    // VFS reads/writes for the live preview.
                     if (typeof _loadHtmlIntoIframe === 'function') {
                         _loadHtmlIntoIframe(live, _htmlTextarea.value, fileName,
                             self.dataSource, self._objectUrls, self._vfsBridges);

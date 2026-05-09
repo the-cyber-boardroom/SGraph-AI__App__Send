@@ -19,7 +19,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 // ── Version stamp — bump this to confirm the local dev server has the latest code ──
-console.log('%c[send-browse v0.3.3-vfs-3] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
+console.log('%c[send-browse v0.3.3-vfs-4] loaded OK', 'color:#0a0;font-weight:bold;background:#e8ffe8;padding:2px 6px;border-radius:3px');
 
 class SendBrowse extends SendComponent {
 
@@ -907,16 +907,41 @@ class SendBrowse extends SendComponent {
             // <link rel="stylesheet"> and <script src="..."> use the browser's resource
             // loader (not fetch()), so they can't be intercepted by the VFS bridge.
             // Pre-inlining resolves them before the blob URL is created.
-            _inlineVaultAssets(rawText, htmlDir, fileList, self.dataSource).then(function(processed) {
-                var htmlForIframe = self.dataSource
-                    ? processed.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
-                    : processed;
-                if (self.dataSource && htmlForIframe === processed) htmlForIframe = vfsBridgeScript + processed;
-                var blob    = new Blob([htmlForIframe], { type: 'text/html' });
-                var blobUrl = URL.createObjectURL(blob);
-                self._objectUrls.push(blobUrl);
-                iframeEl.src = blobUrl;
-            });
+            //
+            // _renderHtmlBlob() is reused for the initial render and for live-preview
+            // reloads triggered by the vault edit-mode textarea. It captures the closure
+            // state (vfsBridgeScript, htmlDir, fileList, self) so a single re-render
+            // does NOT need to re-register the parent-side VFS bridge. The iframe
+            // element keeps the same reference, so the existing bridge keeps matching
+            // `e.source === iframeEl.contentWindow` after the blob navigation.
+            var _lastBlobUrl = null;
+            function _renderHtmlBlob(htmlText) {
+                return _inlineVaultAssets(htmlText, htmlDir, fileList, self.dataSource).then(function(processed) {
+                    var htmlForIframe = self.dataSource
+                        ? processed.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                        : processed;
+                    if (self.dataSource && htmlForIframe === processed) htmlForIframe = vfsBridgeScript + processed;
+                    var blob    = new Blob([htmlForIframe], { type: 'text/html' });
+                    var blobUrl = URL.createObjectURL(blob);
+                    self._objectUrls.push(blobUrl);
+                    // Revoke the previous live-preview URL (if any) — the original
+                    // initial-render URL stays in self._objectUrls and is cleaned up
+                    // on file close. We only revoke URLs we created on a re-render.
+                    if (_lastBlobUrl) {
+                        try { URL.revokeObjectURL(_lastBlobUrl); } catch (_) {}
+                    }
+                    _lastBlobUrl = blobUrl;
+                    iframeEl.src = blobUrl;
+                });
+            }
+
+            // Expose a re-render hook on the iframe element so vault-browse-edit can
+            // call it without re-implementing the inline-and-bridge pipeline. The
+            // top-level _loadHtmlIntoIframe shim (defined alongside _inlineVaultAssets)
+            // delegates here when this property is present.
+            iframeEl.__sgReloadHtml = _renderHtmlBlob;
+
+            _renderHtmlBlob(rawText);
 
             var sourceEl = document.createElement('pre');
             sourceEl.className = 'sb-file__code';
@@ -1586,6 +1611,25 @@ async function _ensureVaultFolder(dataSource, folderPath) {
         } catch (_) {} // already exists — fine
         current = next;
     }
+}
+
+// ─── Top-level live-preview entry point used by vault-browse-edit ───────────────
+// vault-browse-edit checks `typeof _loadHtmlIntoIframe === 'function'` to decide
+// whether to use the rich VFS-aware re-render or fall back to a bare blob. We
+// delegate to the per-iframe `__sgReloadHtml` closure stashed during the initial
+// render — that closure carries all the closure state (vfsBridgeScript, htmlDir,
+// fileList, dataSource) needed to inline assets and re-inject the bridge without
+// disturbing the parent-side message listener.
+function _loadHtmlIntoIframe(iframe, htmlText, fileName, dataSource, objectUrls, vfsBridges) {
+    if (iframe && typeof iframe.__sgReloadHtml === 'function') {
+        return iframe.__sgReloadHtml(htmlText);
+    }
+    // Fallback if the iframe wasn't initialised by the HTML pipeline (defensive —
+    // shouldn't fire in practice). No asset inlining, no VFS bridge.
+    var blob = new Blob([htmlText], { type: 'text/html' });
+    var url  = URL.createObjectURL(blob);
+    if (objectUrls) objectUrls.push(url);
+    if (iframe) iframe.src = url;
 }
 
 // ─── ArrayBuffer → base64 (UTF-8-safe, chunked to avoid stack overflow) ─────────
