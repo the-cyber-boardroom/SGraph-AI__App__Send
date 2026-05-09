@@ -56,7 +56,7 @@
                            ? Date.now() + (config.expiresInHours * 3600000)
                            : 0
         };
-        el._shareMode        = 'combined'; // Key always embedded in URL fragment
+        el._shareMode        = 'token';   // Simple token — the only supported mode for secrets
         el._selectedDelivery = 'download';
         el._isSecretMode     = true;
 
@@ -88,7 +88,7 @@ SendUpload.prototype._wireEvents = function() {
                            ? Date.now() + (config.expiresInHours * 3600000)
                            : 0
         };
-        self._shareMode        = 'combined';
+        self._shareMode        = 'token';
         self._selectedDelivery = 'download';
         self._isSecretMode     = true;
         self.state             = 'confirming';
