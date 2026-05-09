@@ -87,16 +87,10 @@ jobs:
           fi
           if [ -f "${{ env.SOURCE_DIR }}/index.html" ]; then
             mkdir -p "$CURR_ENGB"
-            python3 -c "
-          import sys
-          with open('${{ env.SOURCE_DIR }}/index.html') as f:
-              html = f.read()
-          html = html.replace('href=\"_common/', 'href=\"/_common/')
-          html = html.replace('src=\"_common/',  'src=\"/_common/')
-          with open('$CURR_ENGB/index.html', 'w') as f:
-              f.write(html)
-          print('Generated en-gb/index.html with root-absolute _common/ paths')
-          "
+            sed -e 's|href="_common/|href="/_common/|g' \
+                -e 's|src="_common/|src="/_common/|g' \
+                "${{ env.SOURCE_DIR }}/index.html" > "$CURR_ENGB/index.html"
+            echo "Generated en-gb/index.html with root-absolute _common/ paths"
           fi
 
       - name: Generate i18n locale pages
@@ -109,16 +103,10 @@ jobs:
         # so assets resolve correctly from two directories deep.
         run: |
           mkdir -p ${{ env.SOURCE_DIR }}/en-gb/vault
-          python3 -c "
-          import re, sys
-          with open('${{ env.SOURCE_DIR }}/index.html') as f:
-              html = f.read()
-          html = html.replace('href=\"_common/', 'href=\"/_common/')
-          html = html.replace('src=\"_common/',  'src=\"/_common/')
-          with open('${{ env.SOURCE_DIR }}/en-gb/vault/index.html', 'w') as f:
-              f.write(html)
-          print('Generated en-gb/vault/index.html')
-          "
+          sed -e 's|href="_common/|href="/_common/|g' \
+              -e 's|src="_common/|src="/_common/|g' \
+              "${{ env.SOURCE_DIR }}/index.html" > "${{ env.SOURCE_DIR }}/en-gb/vault/index.html"
+          echo "Generated en-gb/vault/index.html"
 
       - name: Check AWS credentials
         id: check-creds
