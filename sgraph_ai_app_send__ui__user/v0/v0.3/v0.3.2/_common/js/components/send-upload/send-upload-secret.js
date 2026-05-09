@@ -60,8 +60,9 @@
         el._selectedDelivery = 'download';
         el._isSecretMode     = true;
 
-        // Skip steps 2-4 (options, confirm) — go straight to processing
-        el._startProcessing();
+        // Land on the Confirm step (matches the file flow). User clicks
+        // "Encrypt & Upload" there to start processing.
+        el.state = 'confirming';
     }
 })();
 
@@ -90,7 +91,7 @@ SendUpload.prototype._wireEvents = function() {
         self._shareMode        = 'combined';
         self._selectedDelivery = 'download';
         self._isSecretMode     = true;
-        self._startProcessing();
+        self.state             = 'confirming';
     });
 };
 

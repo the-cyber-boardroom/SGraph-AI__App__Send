@@ -26,3 +26,11 @@ UploadConstants.STATE_TO_STEP = {
 if (typeof SendStepIndicator !== 'undefined') {
     SendStepIndicator.STEP_LABELS = UploadConstants.STEP_LABELS;
 }
+
+// stepForState() in v0.3.0 is closed over a private STATE_TO_STEP variable, so
+// reassigning the public property alone has no effect. Override the function so
+// it reads from the public (patched) property — required for the stepper to
+// advance to step 2 when state becomes 'choosing-options'.
+UploadConstants.stepForState = function(state) {
+    return UploadConstants.STATE_TO_STEP[state] || 1;
+};
