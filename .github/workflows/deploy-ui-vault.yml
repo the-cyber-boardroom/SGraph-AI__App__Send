@@ -75,22 +75,15 @@ jobs:
       - name: Populate en-gb/ for i18n (IFD delta merge)
         # v0.2.2 is an IFD delta — only changed files are committed.
         # The i18n script needs a complete en-gb/ tree. Seed it from the
-        # base version (BASE_SOURCE_DIR), then overwrite with the current
-        # version's root index.html (which changed in this release).
-        # en-gb/index.html is served at /en-gb/ so _common/ paths must be
-        # root-absolute (/_common/) — same fix as en-gb/vault/index.html.
+        # base version (BASE_SOURCE_DIR), which provides the landing page
+        # at en-gb/index.html (Design 02, "Open a vault." hero + recent
+        # vaults grid). v0.2.2 only changes the root vault shell, NOT the
+        # landing page — so we must NOT overwrite en-gb/index.html.
         run: |
           BASE_ENGB="${{ env.BASE_SOURCE_DIR }}/en-gb"
           CURR_ENGB="${{ env.SOURCE_DIR }}/en-gb"
           if [ -d "$BASE_ENGB" ]; then
             cp -r "$BASE_ENGB" "$CURR_ENGB"
-          fi
-          if [ -f "${{ env.SOURCE_DIR }}/index.html" ]; then
-            mkdir -p "$CURR_ENGB"
-            sed -e 's|href="_common/|href="/_common/|g' \
-                -e 's|src="_common/|src="/_common/|g' \
-                "${{ env.SOURCE_DIR }}/index.html" > "$CURR_ENGB/index.html"
-            echo "Generated en-gb/index.html with root-absolute _common/ paths"
           fi
 
       - name: Generate i18n locale pages

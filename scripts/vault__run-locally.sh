@@ -118,17 +118,18 @@ for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
     [ -f "$f" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
 done
 
-# Create en-gb/index.html and en-gb/vault/index.html, both with root-absolute
-# _common/ paths so assets resolve correctly when served from /en-gb/ or
-# /en-gb/vault/. This mirrors what the CI deploy workflow does.
+# en-gb/index.html: the landing page (Design 02, "Open a vault." hero +
+# recent vaults grid) — comes from v0.2.1/en-gb/, already copied above by
+# the locale-merge step. Do NOT overwrite it with the root vault shell.
+#
+# en-gb/vault/index.html: vault shell at the clean /en-gb/vault URL.
+# Generated from root index.html with _common/ paths made root-absolute
+# so assets resolve from two directories deep.
 mkdir -p "$SERVE_DIR/en-gb/vault"
 sed -e 's|href="_common/|href="/_common/|g' \
     -e 's|src="_common/|src="/_common/|g' \
-    "$SERVE_DIR/index.html" > "$SERVE_DIR/en-gb/index.html"
-sed -e 's|href="_common/|href="/_common/|g' \
-    -e 's|src="_common/|src="/_common/|g' \
     "$SERVE_DIR/index.html" > "$SERVE_DIR/en-gb/vault/index.html"
-echo "  Created: en-gb/index.html, en-gb/vault/index.html"
+echo "  Created: en-gb/vault/index.html"
 
 # Inject /api/health for local dev — vault-header.js calls window.location.origin/api/health
 # to display the backend version. Python http.server has no API routes, so this
