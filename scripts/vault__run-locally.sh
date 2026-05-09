@@ -170,6 +170,26 @@ print('  Patched:', path)
 " "$index_html"
 done
 
+# Sanity check: print which version of send-browse--v0.3.2.js the merged tree
+# is serving. The IFD merge (vault layers + user UI layers) overwrites earlier
+# copies with later ones; this banner tells you at a glance which version
+# survived the merge. If the running browser shows a different banner, it's
+# loading the CDN (dev.send.sgraph.ai) instead of localhost.
+SEND_BROWSE_FILE="$SERVE_DIR/_common/js/components/send-download/send-browse--v0.3.2.js"
+echo ""
+echo "Merged send-browse version stamp:"
+if [ -f "$SEND_BROWSE_FILE" ]; then
+    BANNER=$(grep -m1 "loaded OK" "$SEND_BROWSE_FILE" || echo "  (no [send-browse ...] loaded OK banner found)")
+    echo "  $BANNER"
+    if grep -q "_bytesToBase64\|data:application/javascript;base64" "$SEND_BROWSE_FILE"; then
+        echo "  data-URI inlining: PRESENT (Bug-1 fix in this build)"
+    else
+        echo "  data-URI inlining: MISSING (older build — Bug 1 will reproduce)"
+    fi
+else
+    echo "  (file missing — no user UI layer wrote it)"
+fi
+
 echo ""
 echo "Starting vault.sgraph.ai local server..."
 echo "  Root:       $SERVE_DIR"
