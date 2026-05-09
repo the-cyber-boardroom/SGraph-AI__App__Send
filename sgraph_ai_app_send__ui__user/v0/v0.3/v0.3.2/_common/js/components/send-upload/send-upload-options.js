@@ -104,6 +104,7 @@ SendUpload.prototype._syncComponent = function(key) {
         e['options'].selectedDelivery    = this._selectedDelivery;
         e['options'].fileSummary         = this._fileSummary();
         e['options'].shareMode           = this._shareMode;
+        e['options'].secretMode          = !!this._isSecretMode;
         return; // Don't fall through to original
     }
 

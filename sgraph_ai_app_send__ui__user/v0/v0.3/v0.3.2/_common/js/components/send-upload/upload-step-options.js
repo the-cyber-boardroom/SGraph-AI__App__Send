@@ -30,6 +30,7 @@ class UploadStepOptions extends HTMLElement {
         this._selectedDelivery    = null;
         this._fileSummary         = null;
         this._shareMode           = 'token';
+        this._secretMode          = false;
     }
 
     set deliveryOptions(v)      { this._deliveryOptions = v || [];  this._render(); }
@@ -37,6 +38,7 @@ class UploadStepOptions extends HTMLElement {
     set selectedDelivery(v)     { this._selectedDelivery = v;       this._render(); }
     set fileSummary(v)          { this._fileSummary = v;            this._render(); }
     set shareMode(v)            { this._shareMode = v || 'token';   this._render(); }
+    set secretMode(v)           { this._secretMode = !!v;           this._render(); }
 
     // ─── Render ──────────────────────────────────────────────────────────────
 
@@ -51,10 +53,12 @@ class UploadStepOptions extends HTMLElement {
                 'How should the recipient get this?' +
             '</h3>' +
             '<div class="delivery-cards">' + cardsHtml + '</div>' +
-            '<div class="share-mode-row">' +
-                '<span class="share-mode-row__label">Share via:</span>' +
-                '<div class="share-pills">' + shareHtml + '</div>' +
-            '</div>' +
+            (this._secretMode ? '' :
+                '<div class="share-mode-row">' +
+                    '<span class="share-mode-row__label">Share via:</span>' +
+                    '<div class="share-pills">' + shareHtml + '</div>' +
+                '</div>'
+            ) +
             '<button class="back-link" id="options-back-btn">&larr; Back</button>';
 
         this._wireListeners();
