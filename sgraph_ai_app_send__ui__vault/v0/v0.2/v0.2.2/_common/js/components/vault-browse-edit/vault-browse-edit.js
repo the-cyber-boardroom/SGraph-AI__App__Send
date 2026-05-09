@@ -263,18 +263,15 @@
                 container.style.flexDirection = 'column';
                 container.appendChild(_htmlSplitEl);
 
-                var _pvHtmlDir = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
+                var _pvBridges = [];
                 function _updatePv() {
-                    var html = _htmlTextarea.value;
-                    // Inline vault assets so the preview renders correctly from a blob URL.
-                    if (typeof _inlineHtmlAssets === 'function' && self.dataSource) {
-                        _inlineHtmlAssets(html, _pvHtmlDir, self.dataSource).then(function(inlined) {
-                            var blob = new Blob([inlined], { type: 'text/html' });
-                            pvFrame.src = URL.createObjectURL(blob);
-                        });
+                    // Remove previous VFS bridge listener before creating new one.
+                    _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
+                    _pvBridges = [];
+                    if (typeof _loadHtmlIntoIframe === 'function') {
+                        _loadHtmlIntoIframe(pvFrame, _htmlTextarea.value, fileName, self.dataSource, null, _pvBridges);
                     } else {
-                        var blob = new Blob([html], { type: 'text/html' });
-                        pvFrame.src = URL.createObjectURL(blob);
+                        pvFrame.src = URL.createObjectURL(new Blob([_htmlTextarea.value], { type: 'text/html' }));
                     }
                 }
                 _htmlTextarea.addEventListener('input', function() {
@@ -290,6 +287,7 @@
 
             htmlCancelBtn.addEventListener('click', function() {
                 clearTimeout(_htmlPrevTimer);
+                _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
                 self._renderFileContent(container, bytes, fileName, type);
             });
 
@@ -304,6 +302,7 @@
                 htmlSaveBtn.textContent = 'Saving...';
                 self.dataSource.saveFile(folder, fName, newBytes.buffer).then(function() {
                     clearTimeout(_htmlPrevTimer);
+                    _pvBridges.forEach(function(b) { window.removeEventListener('message', b); });
                     self._renderFileContent(container, newBytes.buffer, fileName, type);
                     if (window.sgraphVault && window.sgraphVault.messages) {
                         window.sgraphVault.messages.success('"' + fName + '" saved');
