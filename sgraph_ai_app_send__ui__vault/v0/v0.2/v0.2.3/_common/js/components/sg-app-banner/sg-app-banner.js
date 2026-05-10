@@ -330,7 +330,8 @@
 
         el.style.cssText = [
             'position:fixed', 'top:2.25rem', 'left:0', 'right:0', 'bottom:0',
-            'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow-y:auto'
+            'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow-y:auto',
+            'background:#fff', 'color-scheme:light'
         ].join(';');
 
         // If there's an HTML iframe inside, fix its height (was height:0 in flex layout)
