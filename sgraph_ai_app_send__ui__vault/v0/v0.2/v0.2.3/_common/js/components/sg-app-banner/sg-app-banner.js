@@ -25,6 +25,13 @@
 
     var CSS_ID        = 'sg-app-banner-max-css';
     var SHADOW_CSS_ID = 'sg-app-banner-shadow-css';
+    var STATUS_CSS_ID = 'sg-app-banner-status-css';
+
+    // Spinner animation + status fade, injected once into <head>.
+    var STATUS_CSS = [
+        '@keyframes sgab-spin { to { transform: rotate(360deg); } }',
+        '.sgab-spin { display:inline-block; animation:sgab-spin 1s linear infinite; }'
+    ].join('\n');
 
     // Layer 1: vault-shell chrome to hide
     var MAX_CSS = [
@@ -60,6 +67,7 @@
         }
 
         _render() {
+            _injectStatusCss();
             // Start hidden. activate() switches display to 'flex'.
             this.style.cssText = [
                 'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:8000',
@@ -111,8 +119,86 @@
             this.style.display = 'flex';
         }
 
-        setStatus(text) {
-            if (this._statusEl) this._statusEl.textContent = text || '';
+        // ── HUD API ────────────────────────────────────────────────────────
+        // Called by vault-data-source to surface write feedback in App Mode.
+        // All methods are no-ops when the banner is not active.
+
+        isActive() { return this.style.display !== 'none'; }
+
+        clearStatus() {
+            if (!this._statusEl) return;
+            if (this._dismissTimer) { clearTimeout(this._dismissTimer); this._dismissTimer = null; }
+            this._removeErrorDetail();
+            this._statusEl.innerHTML = '';
+        }
+
+        // icon: '⟳' (spins), '✓' (teal), '✗' (red), '↓', '↑' …
+        // autoDismissMs: 0 = stays until next call; >0 = auto-clears after ms.
+        showStatus(icon, text, autoDismissMs) {
+            if (!this._statusEl) return;
+            if (this._dismissTimer) { clearTimeout(this._dismissTimer); this._dismissTimer = null; }
+            this._removeErrorDetail();
+
+            var frag = document.createDocumentFragment();
+            var iconEl = document.createElement('span');
+            iconEl.textContent = icon;
+            if (icon === '↻' || icon === '⟳') iconEl.className = 'sgab-spin';
+            if (icon === '✓') iconEl.style.color = '#4ecdc4';
+            frag.appendChild(iconEl);
+            frag.appendChild(document.createTextNode(' ' + text));
+
+            this._statusEl.innerHTML = '';
+            this._statusEl.appendChild(frag);
+
+            if (autoDismissMs) {
+                var self = this;
+                this._dismissTimer = setTimeout(function() { self.clearStatus(); }, autoDismissMs);
+            }
+        }
+
+        // Pins an error with an optional expandable detail row below the strip.
+        showStatusError(summary, detail) {
+            if (!this._statusEl) return;
+            if (this._dismissTimer) { clearTimeout(this._dismissTimer); this._dismissTimer = null; }
+            this._removeErrorDetail();
+
+            this._statusEl.innerHTML = '';
+
+            var errSpan = document.createElement('span');
+            errSpan.textContent = summary;
+            errSpan.style.color = '#ff6b6b';
+            this._statusEl.appendChild(errSpan);
+
+            if (detail) {
+                var detailEl = document.createElement('div');
+                detailEl.textContent = detail;
+                detailEl.style.cssText = [
+                    'position:absolute', 'top:100%', 'left:0', 'right:0',
+                    'background:rgba(10,10,24,0.97)',
+                    'border-bottom:1px solid rgba(255,107,107,0.35)',
+                    'padding:0.3rem 0.75rem', 'font-size:11px', 'color:#ff9f43',
+                    'backdrop-filter:blur(4px)', '-webkit-backdrop-filter:blur(4px)',
+                    'display:none', 'z-index:8001'
+                ].join(';');
+                this.appendChild(detailEl);
+                this._errorDetailEl = detailEl;
+
+                var shown = false;
+                var toggleBtn = document.createElement('button');
+                toggleBtn.textContent = ' [Details ▾]';
+                toggleBtn.style.cssText = 'background:none;border:none;color:#ff9f43;' +
+                    'cursor:pointer;font-size:11px;padding:0 0 0 4px;font-family:inherit;';
+                toggleBtn.addEventListener('click', function() {
+                    shown = !shown;
+                    detailEl.style.display = shown ? 'block' : 'none';
+                    toggleBtn.textContent = shown ? ' [Details ▴]' : ' [Details ▾]';
+                });
+                this._statusEl.appendChild(toggleBtn);
+            }
+        }
+
+        _removeErrorDetail() {
+            if (this._errorDetailEl) { this._errorDetailEl.remove(); this._errorDetailEl = null; }
         }
     }
 
@@ -149,7 +235,10 @@
         }
         _restoreTreeStack();
         var banner = document.querySelector('sg-app-banner');
-        if (banner) banner.style.display = 'none';
+        if (banner) {
+            if (typeof banner.clearStatus === 'function') banner.clearStatus();
+            banner.style.display = 'none';
+        }
         // sg-layout caches panel dimensions. While the wrapper was position:fixed
         // the content panel had no in-flow children and may have collapsed to 0px.
         // Dispatch resize twice to ensure sg-layout re-measures in all cases.
@@ -278,6 +367,16 @@
 
         // Safety: disconnect after 5 s
         setTimeout(function() { finish(undefined); }, 5000);
+    }
+
+    // ── Status HUD CSS (spinner + fade) ──────────────────────────────────────
+
+    function _injectStatusCss() {
+        if (document.getElementById(STATUS_CSS_ID)) return;
+        var s = document.createElement('style');
+        s.id = STATUS_CSS_ID;
+        s.textContent = STATUS_CSS;
+        document.head.appendChild(s);
     }
 
     // ── Layer 1: regular-DOM CSS ──────────────────────────────────────────────

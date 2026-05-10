@@ -162,17 +162,21 @@ class VaultDataSource {
 
     async saveFile(folderPath, fileName, bytes) {
         if (!this.writable) throw new Error('Read-only: no access key');
-        const data = new Uint8Array(bytes);
-
-        // Check if file exists → update, else → add
+        _hudNotify('start', fileName);
+        const data   = new Uint8Array(bytes);
         const folder = this._vault._findNode(folderPath);
-        if (folder && folder.children && folder.children[fileName]) {
-            await this._vault.updateFile(folderPath, fileName, data);
-        } else {
-            await this._vault.addFile(folderPath, fileName, data);
+        try {
+            if (folder && folder.children && folder.children[fileName]) {
+                await this._vault.updateFile(folderPath, fileName, data);
+            } else {
+                await this._vault.addFile(folderPath, fileName, data);
+            }
+            _hudNotify('ok', fileName);
+            if (this.onTreeChanged) this.onTreeChanged();
+        } catch (err) {
+            _hudNotify('error', fileName, err.message);
+            throw err;
         }
-
-        if (this.onTreeChanged) this.onTreeChanged();
     }
 
     async renameFile(folderPath, oldName, newName) {
@@ -219,3 +223,16 @@ class VaultDataSource {
 }
 
 window.VaultDataSource = VaultDataSource;
+
+// Surfaces write feedback on the sg-app-banner HUD when App Mode is active.
+// No-op when the banner is absent or inactive (non-App-Mode saves).
+function _hudNotify(state, fileName, detail) {
+    var banner = document.querySelector('sg-app-banner');
+    if (!banner || typeof banner.isActive !== 'function' || !banner.isActive()) return;
+    if (state === 'start')
+        banner.showStatus('↻', 'Saving ' + fileName + '…');
+    else if (state === 'ok')
+        banner.showStatus('✓', 'Saved', 3000);
+    else if (state === 'error')
+        banner.showStatusError('✗ Save failed', detail || 'Unknown error');
+}
