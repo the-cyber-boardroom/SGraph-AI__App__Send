@@ -37,53 +37,34 @@ class VaultEntry extends VaultComponent {
     }
 
     onReady() {
-        // Restore server endpoint from sessionStorage
+        // Restore server endpoint — only if a non-default value is stored
         const savedEndpoint = sessionStorage.getItem('sg-vault-endpoint')
         if (savedEndpoint) this._endpointInput.value = savedEndpoint
 
-        // Restore access key from sessionStorage
-        const saved = sessionStorage.getItem('sg-vault-access-key')
+        // Restore access key
+        const saved = VaultLoader.storage.getAccessKey()
         if (saved) this._accessKeyInput.value = saved
 
         // Show version info
         this._renderVersion()
 
+        // Migrate legacy vault history into unified sg-vault-recent list (one-shot)
+        VaultLoader.recent.migrate()
+
         // Show recent vaults
         this._renderRecentVaults()
 
-        // Check URL hash for vault key or simple token
-        // Supports deep links: #token|path/to/file.md or #passphrase:vault_id|path
-        const hash = window.location.hash.slice(1)
-        if (hash) {
-            const decoded = decodeURIComponent(hash)
-            const pipeIdx = decoded.indexOf('|')
-            const vaultPart = pipeIdx >= 0 ? decoded.slice(0, pipeIdx) : decoded
-            const deepPath  = pipeIdx >= 0 ? decoded.slice(pipeIdx + 1) : null
-
-            // Store deep link path for after vault opens
-            if (deepPath) this._pendingDeepLink = deepPath
-
-            if (this._isSimpleToken(vaultPart)) {
-                this._simpleTokenInput.value = vaultPart
+        // The head routing script handles any /#token hash: it saves the token to
+        // localStorage('sg-vault-key') and strips the hash before this runs.
+        // All we need to do is check localStorage for the current key.
+        const savedKey = VaultLoader.storage.getCurrentKey()
+        if (savedKey) {
+            if (this._isSimpleToken(savedKey)) {
+                this._simpleTokenInput.value = savedKey
                 this._onSimpleTokenOpen()
-            } else if (vaultPart.includes(':')) {
-                this._keyInput.value = vaultPart
-                this._onOpen()
             } else {
-                // Try as simple token anyway (might be a token without strict format)
-                this._simpleTokenInput.value = vaultPart
-                this._onSimpleTokenOpen()
-            }
-        } else {
-            const savedKey = localStorage.getItem('sg-vault-key')
-            if (savedKey) {
-                if (this._isSimpleToken(savedKey)) {
-                    this._simpleTokenInput.value = savedKey
-                    this._onSimpleTokenOpen()
-                } else {
-                    this._keyInput.value = savedKey
-                    this._onOpen()
-                }
+                this._keyInput.value = savedKey
+                this._onOpen()
             }
         }
     }
@@ -102,8 +83,7 @@ class VaultEntry extends VaultComponent {
 
     _isSimpleToken(str) {
         if (!str) return false
-        // word-word-NNNN format (same regex as FriendlyCrypto)
-        return /^[a-z]+-[a-z]+-\d{4}$/.test(str.trim())
+        try { return VaultLoader.detectFormat(str.trim()).format === 1 } catch (_) { return false }
     }
 
     // --- Simple token open ---
@@ -188,41 +168,30 @@ class VaultEntry extends VaultComponent {
     async _openVault(vaultKey, hashValue) {
         this._showStatus('Opening vault...')
 
-        const sgSend = this._getSGSend()
-        const vault  = await SGVault.open(sgSend, vaultKey)
-
-        // Persist vault key in localStorage as the single source of truth.
-        // Hash is intentionally NOT written to the URL — root /#token is the
-        // only place a hash is allowed, and even there it's consumed and stripped.
-        const hashStr = hashValue || vaultKey
-        try { localStorage.setItem('sg-vault-key', hashStr) } catch (_) {}
-
-        // Save to recent vault history
-        this._saveToHistory(vault, hashStr)
+        const key    = (hashValue || vaultKey).trim()
+        const result = await VaultLoader.open(key, {
+            accessKey: this._accessKeyInput.value.trim() || undefined,
+            endpoint:  this._endpointInput.value.trim()  || undefined
+        })
 
         const accessKey = this._accessKeyInput.value.trim()
-        this.emit('vault-opened', { vault, vaultKey, accessKey, deepLink: deepPath })
+        this.emit('vault-opened', {
+            vault:    result.vault,
+            vaultKey: result.vaultKey,
+            accessKey,
+            deepLink: this._pendingDeepLink
+        })
         this._pendingDeepLink = null
     }
 
     // --- Endpoint / Access Key ---
 
     _onEndpointChange() {
-        const endpoint = this._endpointInput.value.trim()
-        if (endpoint) {
-            sessionStorage.setItem('sg-vault-endpoint', endpoint)
-        } else {
-            sessionStorage.removeItem('sg-vault-endpoint')
-        }
+        VaultLoader.storage.setEndpoint(this._endpointInput.value.trim())
     }
 
     _onAccessKeyChange() {
-        const key = this._accessKeyInput.value.trim()
-        if (key) {
-            sessionStorage.setItem('sg-vault-access-key', key)
-        } else {
-            sessionStorage.removeItem('sg-vault-access-key')
-        }
+        VaultLoader.storage.setAccessKey(this._accessKeyInput.value.trim())
     }
 
     // --- Create vault ---
@@ -256,9 +225,8 @@ class VaultEntry extends VaultComponent {
             const vault  = await SGVault.create(sgSend, passphrase, { name })
             const vaultKey = vault.getVaultKey(passphrase)
 
-            // Persist vault key in localStorage instead of the URL hash.
-            try { localStorage.setItem('sg-vault-key', vaultKey) } catch (_) {}
-
+            VaultLoader.storage.setCurrentKey(vaultKey)
+            VaultLoader.recent.add(vaultKey, name)
             this.emit('vault-created', { vault, vaultKey })
         } catch (err) {
             this._showError(err.message)
@@ -312,36 +280,21 @@ class VaultEntry extends VaultComponent {
         this._renderRecentVaults()
     }
 
-    // --- Vault History (localStorage: sg-vault-history) -------------------------
-
-    _saveToHistory(vault, key) {
-        try {
-            const history  = this._getHistory()
-            const filtered = history.filter(h => h.key !== key)
-            filtered.unshift({ key, name: vault.name || 'Untitled Vault', lastOpened: Date.now() })
-            localStorage.setItem('sg-vault-history', JSON.stringify(filtered.slice(0, 10)))
-        } catch (_) {}
-    }
-
-    _getHistory() {
-        try {
-            return JSON.parse(localStorage.getItem('sg-vault-history') || '[]')
-        } catch { return [] }
-    }
+    // --- Recent Vaults (unified sg-vault-recent via VaultLoader.recent) ----------
 
     _renderRecentVaults() {
         const container = this.$('#recent-vaults')
         if (!container) return
-        const history = this._getHistory()
-        if (history.length === 0) { container.hidden = true; return }
+        const list = VaultLoader.recent.list()
+        if (list.length === 0) { container.hidden = true; return }
 
         container.hidden = false
         container.innerHTML = `
             <div class="vault-recent">
                 <div class="vault-recent__title">Recent Vaults</div>
                 <div class="vault-recent__list">
-                    ${history.map(h => `
-                        <div class="vault-recent__item">
+                    ${list.map(h => `
+                        <div class="vault-recent__item${h.isCurrent ? ' vault-recent__item--current' : ''}">
                             <div class="vault-recent__info">
                                 <span class="vault-recent__name">${this.escapeHtml(h.name)}</span>
                                 <span class="vault-recent__key">${this.escapeHtml(this._truncateKey(h.key))}</span>
@@ -367,7 +320,6 @@ class VaultEntry extends VaultComponent {
             })
         })
 
-        // Clicking the item row also opens (not just the button)
         container.querySelectorAll('.vault-recent__item').forEach(row => {
             row.addEventListener('click', (e) => {
                 if (e.target.closest('.vault-recent__open')) return

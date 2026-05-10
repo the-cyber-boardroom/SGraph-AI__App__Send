@@ -21,6 +21,7 @@
                 <footer class="vsb-bar">
                     <span class="vsb-stats"></span>
                     <span class="vsb-spacer"></span>
+                    <a class="vsb-peek-link" href="/en-gb/vault/peek" title="Debug: inspect vault state">peek</a>
                     <button class="vsb-msg-badge" title="Messages" style="display:none">0</button>
                 </footer>
             `;
@@ -74,6 +75,11 @@
             border-top: 1px solid var(--color-border); font-family: var(--font-mono);
         }
         .vsb-spacer { flex: 1; }
+        .vsb-peek-link {
+            font-size: 0.65rem; color: var(--color-text-secondary); opacity: 0.55;
+            text-decoration: none; padding: 0 0.25rem;
+        }
+        .vsb-peek-link:hover { opacity: 1; color: var(--color-teal, #4ecdc4); }
         .vsb-msg-badge {
             display: none; align-items: center; justify-content: center;
             min-width: 1.25rem; height: 1.25rem; padding: 0 0.375rem;

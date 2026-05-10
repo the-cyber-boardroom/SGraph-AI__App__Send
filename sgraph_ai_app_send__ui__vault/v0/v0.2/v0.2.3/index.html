@@ -6,38 +6,27 @@
     <title>SG/Vault (v0.2.2) — Zero-knowledge encrypted vault</title>
     <meta name="description" content="Store and share files securely with zero-knowledge encryption. Your files are encrypted in your browser. The server sees nothing.">
 
-    <!-- Routing rules:
-         - Root `/` is the only place a # (vault key) is allowed in the URL.
-           At root, redirect to /en-gb/ (forwarding the hash so the en-gb
-           page can save the token to localStorage and then strip).
-         - Every other path strips any hash on entry. The token (if any)
-           is saved to localStorage('sg-vault-key') as the source of truth
-           for the currently loaded vault. -->
+    <!-- vault-loader: loaded in <head> so VaultLoaderRouting is available to the routing script below.
+         Load order: events → storage → format → recent → routing → composed API. -->
+    <script src="_common/js/vault-loader/vault-loader-events.js"></script>
+    <script src="_common/js/vault-loader/vault-loader-storage.js"></script>
+    <script src="_common/js/vault-loader/vault-loader-format.js"></script>
+    <script src="_common/js/vault-loader/vault-loader-recent.js"></script>
+    <script src="_common/js/vault-loader/vault-loader-routing.js"></script>
+    <script src="_common/js/vault-loader/vault-loader.js"></script>
+
+    <!-- Routing: root is the only hash inbox; all other paths strip and discard.
+         With #token → save to LS → /en-gb/vault (direct vault open for share-link recipients).
+         Without # → /en-gb/ (landing, user picks from list).
+         Anywhere else → strip hash, render page. -->
     <script>
     (function () {
-        var path     = window.location.pathname.replace(/\/$/, '');
-        var hash     = window.location.hash;
-        var hasHash  = hash && hash !== '#';
-        var isRoot   = (path === '' || path === '/index.html');
-
-        // Save vault key (if present in hash) to localStorage as the
-        // single source of truth for "currently loaded vault".
-        if (hasHash) {
-            try {
-                var token = decodeURIComponent(hash.slice(1)).split('|')[0].toLowerCase();
-                if (token) localStorage.setItem('sg-vault-key', token);
-            } catch (_) {}
-        }
-
+        var path   = window.location.pathname.replace(/\/$/, '');
+        var isRoot = (path === '' || path === '/index.html');
         if (isRoot) {
-            // Root: pure redirect to /en-gb/. No language detection.
-            window.location.replace('/en-gb/');
-            return;
-        }
-
-        // Anywhere else: strip hash from URL (it must not persist).
-        if (hasHash) {
-            history.replaceState(null, '', window.location.pathname + window.location.search);
+            VaultLoaderRouting.runRoot();
+        } else {
+            VaultLoaderRouting.runVault();
         }
     }());
     </script>
@@ -444,14 +433,11 @@
                 '</div>';
         }
 
-        // hashchange listener intentionally removed. The hash is no longer used
-        // as the source of truth for the loaded vault — localStorage('sg-vault-key')
-        // is. The top-level routing script strips any hash on entry.
-
-        // Clear vault key when vault is locked so a refresh after locking
-        // shows the entry form rather than re-opening the previous vault.
+        // vault-locked: clear the session-scoped vault handle.
+        // VaultLoader.lock() (called by _onLock) already removes sg-vault-key via
+        // clearCurrentKey(). Only sg-vault-session (the in-tab vault handle) is left
+        // to clean up here — it is not managed by VaultLoader.
         window.sgraphVault.events.on('vault-locked', function () {
-            try { localStorage.removeItem('sg-vault-key');     } catch (_) {}
             try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
         });
 
@@ -499,7 +485,7 @@
             // ── 2. _onLock ─────────────────────────────────────────────────────────────
             VaultShell.prototype._onLock = function () {
                 try { sessionStorage.removeItem('sg-vault-session'); } catch (_) {}
-                try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
+                VaultLoader.lock();
                 window.location.replace('/en-gb/');
             };
 
@@ -610,16 +596,16 @@
 
         // Patch VaultEntry._onSimpleTokenOpen:
         //   - When sg-vault-creating is set (new vault from landing page), create instead of open
-        //   - When auto-opening from the URL hash and any error occurs, show full-page error
+        //   - When auto-opening from LS key (set by root routing script), show full-page error on failure
         //   - When the user manually typed a token and clicked, show the usual inline error
         var _orig = VaultEntry.prototype._onSimpleTokenOpen;
         VaultEntry.prototype._onSimpleTokenOpen = async function () {
             var token       = this._simpleTokenInput.value.trim().toLowerCase();
-            var createToken = sessionStorage.getItem('sg-vault-creating');
+            var createToken = VaultLoader.storage.getCreatingFlag();
 
             // Create-vault flow (redirected from landing page)
             if (createToken && createToken === token) {
-                sessionStorage.removeItem('sg-vault-creating');
+                VaultLoader.storage.clearCreatingFlag();
                 var accessKey = this._accessKeyInput.value.trim();
                 if (!accessKey) {
                     _removeSplash();
@@ -630,38 +616,24 @@
                 }
                 this._hideError();
                 try {
-                    var sgSend = this._getSGSend();
-                    // Name uses a friendly date/time — NOT the token. Token stays in localStorage/settings.
-                    var now     = new Date();
-                    var dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-                    var timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    // Name uses a friendly date/time — NOT the token.
+                    var now       = new Date();
+                    var dateStr   = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                    var timeStr   = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                     var vaultName = 'New Vault (' + dateStr + ' · ' + timeStr + ')';
-                    var vault = await SGVault.createFromToken(sgSend, token, { name: vaultName });
+                    var result = await VaultLoader.create(token, {
+                        name:      vaultName,
+                        accessKey: accessKey,
+                        endpoint:  this._endpointInput.value.trim() || undefined
+                    });
 
-                    // Clear hash — vault key is NOT exposed in the address bar.
-                    // Key is persisted in localStorage and accessible via vault Settings.
                     window.history.replaceState(null, '', '/en-gb/vault');
-                    try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
                     try { sessionStorage.setItem('sg-vault-session', token); } catch (_) {}
 
-                    // Patch landing page history entry to use the proper name
-                    try {
-                        var pickerKey  = 'sg-vault-picker:credentials';
-                        var pickerList = JSON.parse(localStorage.getItem(pickerKey) || '[]');
-                        for (var i = 0; i < pickerList.length; i++) {
-                            if (pickerList[i].vaultKey === token) {
-                                pickerList[i].vaultName = vaultName;
-                                break;
-                            }
-                        }
-                        localStorage.setItem(pickerKey, JSON.stringify(pickerList));
-                    } catch (_) {}
-
                     _removeSplash();
-                    this._saveToHistory(vault, token);
-                    this.emit('vault-created', { vault, vaultKey: token });
+                    this.emit('vault-created', { vault: result.vault, vaultKey: result.vaultKey });
                 } catch (err) {
-                    sessionStorage.setItem('sg-vault-creating', token); // restore for retry
+                    VaultLoader.storage.setCreatingFlag(token); // restore flag for retry
                     _removeSplash();
                     _revealEntry();
                     this._showError('Failed to create vault: ' + err.message);
@@ -669,13 +641,10 @@
                 return;
             }
 
-            // Detect whether this is an auto-open triggered by an incoming token
-            // (forwarded from root /#token, saved by the routing script to
-            // localStorage('sg-vault-key')) vs a manual open triggered by the
-            // user clicking "Open Vault".
-            var storedToken = '';
-            try { storedToken = (localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
-            var isAutoOpen = !!storedToken && storedToken === token;
+            // Detect whether this is an auto-open triggered by the LS key
+            // (set by root routing script when a share-link /#token arrived).
+            var storedToken = (VaultLoader.storage.getCurrentKey() || '').toLowerCase();
+            var isAutoOpen  = !!storedToken && storedToken === token;
 
             if (!isAutoOpen) {
                 // Manual open — delegate to original for standard inline error handling
@@ -688,8 +657,6 @@
             this._simpleTokenBtn.disabled = true;
             try {
                 await this._openVault(token, token);
-                // Token already saved to localStorage by the routing script.
-                // Keep sessionStorage backup for legacy code paths.
                 try { sessionStorage.setItem('sg-vault-session', token); } catch (_) {}
             } catch (err) {
                 _showAutoOpenErrorPage(token, err);

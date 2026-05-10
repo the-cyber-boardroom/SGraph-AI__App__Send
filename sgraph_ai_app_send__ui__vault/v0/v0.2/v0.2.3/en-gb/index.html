@@ -297,6 +297,7 @@
     }
     .vp-vault-card:hover .vp-vault-card__del { opacity: 1; }
     .vp-vault-card__del:hover { color: #e06c75; background: rgba(224,108,117,0.1); }
+    .vp-vault-card--current { border-color: rgba(78,205,196,0.4); background: var(--teal-dim); }
 
     /* ── Create CTA ────────────────────────────────────────────────────── */
     .vp-create-cta {
@@ -556,6 +557,17 @@
         .vp-trust-badge { font-size: 0.6rem; }
     }
     </style>
+
+    <!-- vault-loader: events + storage + format + recent + routing only.
+         Loaded in <head> so runLanding() runs synchronously before body renders.
+         Paths are root-absolute (/_common/) so they work regardless of URL depth. -->
+    <script src="/_common/js/vault-loader/vault-loader-events.js"></script>
+    <script src="/_common/js/vault-loader/vault-loader-storage.js"></script>
+    <script src="/_common/js/vault-loader/vault-loader-format.js"></script>
+    <script src="/_common/js/vault-loader/vault-loader-recent.js"></script>
+    <script src="/_common/js/vault-loader/vault-loader-routing.js"></script>
+    <!-- Strip any stray hash before the page renders -->
+    <script>VaultLoaderRouting.runLanding();</script>
 </head>
 <body>
 
@@ -693,31 +705,10 @@
                 'dell','dune','fell','ford','glen','hill','lake','moor',
                 'peak','plain','reef','ridge','river','shore','vale','wood'];
 
-    var STORAGE_KEY = 'sg-vault-picker:credentials';
-
     function _generateKey() {
         var buf = new Uint32Array(3);
         crypto.getRandomValues(buf);
         return ADJ[buf[0] % ADJ.length] + '-' + NOUN[buf[1] % NOUN.length] + '-' + ((buf[2] % 9000) + 1000);
-    }
-
-    function _loadVaults() {
-        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-        catch (_) { return []; }
-    }
-
-    function _saveVaults(list) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    }
-
-    function _storeVault(key, name) {
-        var list = _loadVaults().filter(function (c) { return c.vaultKey !== key; });
-        list.unshift({ vaultKey: key, vaultName: name || key, savedAt: Date.now() });
-        _saveVaults(list);
-    }
-
-    function _removeVault(key) {
-        _saveVaults(_loadVaults().filter(function (c) { return c.vaultKey !== key; }));
     }
 
     function _timeAgo(ts) {
@@ -742,7 +733,8 @@
 
     /* ── Navigation ──────────────────────────────────────────────────── */
     function _navigateToBrowse(key) {
-        window.location.href = '/#' + encodeURIComponent(key);
+        VaultLoaderStorage.setCurrentKey(key);
+        window.location.assign('/en-gb/vault');
     }
 
     /* ── Open vault from input ────────────────────────────────────────── */
@@ -756,13 +748,13 @@
             input.focus();
             return;
         }
-        _storeVault(key, key);
+        VaultLoaderRecent.add(key, key);
         _navigateToBrowse(key);
     }
 
     /* ── Recent vaults ────────────────────────────────────────────────── */
     function _renderRecentVaults() {
-        var list = _loadVaults();
+        var list    = VaultLoaderRecent.list();
         var section = document.getElementById('recentSection');
         var grid    = document.getElementById('vaultGrid');
         var mgr     = document.getElementById('manageLink');
@@ -772,22 +764,24 @@
         if (mgr) mgr.textContent = list.length + ' vault' + (list.length !== 1 ? 's' : '') + ' · manage ›';
 
         grid.innerHTML = list.slice(0, 12).map(function (v) {
-            return '<div class="vp-vault-card" data-key="' + _esc(v.vaultKey) + '">' +
-                '<div class="vp-vault-card__name">' + _esc(v.vaultName || v.vaultKey) + '</div>' +
-                '<div class="vp-vault-card__id">' + _esc(_truncateKey(v.vaultKey)) + '</div>' +
+            var cls = 'vp-vault-card' + (v.isCurrent ? ' vp-vault-card--current' : '');
+            return '<div class="' + cls + '" data-key="' + _esc(v.key) + '">' +
+                '<div class="vp-vault-card__name">' + _esc(v.name) + '</div>' +
+                '<div class="vp-vault-card__id">' + _esc(_truncateKey(v.key)) + '</div>' +
                 '<div class="vp-vault-card__footer">' +
-                    '<span class="vp-vault-card__time">' + _timeAgo(v.savedAt) + '</span>' +
+                    '<span class="vp-vault-card__time">' + _timeAgo(v.lastOpened) + '</span>' +
                     '<span class="vp-vault-card__open">Open →</span>' +
                 '</div>' +
-                '<button class="vp-vault-card__del" data-del="' + _esc(v.vaultKey) + '" title="Remove from list">×</button>' +
+                '<button class="vp-vault-card__del" data-del="' + _esc(v.key) + '" title="Remove from list">×</button>' +
             '</div>';
         }).join('');
 
         grid.querySelectorAll('.vp-vault-card').forEach(function (card) {
             card.addEventListener('click', function (e) {
                 if (e.target.dataset.del) return;
-                var key = card.getAttribute('data-key');
-                _storeVault(key, card.querySelector('.vp-vault-card__name').textContent);
+                var key  = card.getAttribute('data-key');
+                var name = card.querySelector('.vp-vault-card__name').textContent;
+                VaultLoaderRecent.add(key, name);
                 _navigateToBrowse(key);
             });
         });
@@ -795,7 +789,7 @@
         grid.querySelectorAll('[data-del]').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                _removeVault(btn.getAttribute('data-del'));
+                VaultLoaderRecent.remove(btn.getAttribute('data-del'));
                 _renderRecentVaults();
             });
         });
@@ -894,10 +888,10 @@
         if (!key) return;
         var accessKey = document.getElementById('recoveryAccessKey').value.trim();
         if (!accessKey) return; // button should be disabled, belt-and-suspenders
-        sessionStorage.setItem('sg-vault-access-key', accessKey);
-        sessionStorage.setItem('sg-vault-creating', key);
+        VaultLoaderStorage.setAccessKey(accessKey);
+        VaultLoaderStorage.setCreatingFlag(key);
         try { localStorage.setItem(ACCESS_KEY_STORAGE, accessKey); } catch (_) {}
-        _storeVault(key, key);
+        VaultLoaderRecent.add(key, key);
         _closeModal();
         _navigateToBrowse(key);
     });
@@ -911,18 +905,27 @@
     document.getElementById('createLink').addEventListener('click', _startCreate);
     document.getElementById('createCtaBtn').addEventListener('click', _startCreate);
     document.getElementById('manageLink').addEventListener('click', function () {
-        _saveVaults([]);
+        VaultLoaderRecent.clear();
         _renderRecentVaults();
     });
 
     /* ── Init ─────────────────────────────────────────────────────────── */
+    VaultLoaderRecent.migrate();
     _renderRecentVaults();
 
     // Focus input on load if no recent vaults
-    if (_loadVaults().length === 0) {
+    if (VaultLoaderRecent.list().length === 0) {
         document.getElementById('vaultKeyInput').focus();
     }
 })();
 </script>
+
+<!-- D4: low-visibility peek link (debug/support entry point) -->
+<div style="text-align:center;padding:1rem 0 0.5rem;border-top:1px solid rgba(255,255,255,0.06)">
+    <a href="/en-gb/vault/peek"
+       style="font-size:0.7rem;color:rgba(110,122,138,0.6);text-decoration:none;opacity:0.6"
+       title="Debug: inspect localStorage and vault key format">peek</a>
+</div>
+
 </body>
 </html>
