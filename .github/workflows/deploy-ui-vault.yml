@@ -56,10 +56,17 @@ env:
   SOURCE_DIR        : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3
 
 jobs:
+  # Gate: vault UI tests must pass before deploy runs.
+  # Same reusable workflow as test-ui-vault.yml so the deploy gate cannot drift
+  # apart from the standalone CI signal.
+  tests:
+    uses: ./.github/workflows/_test-ui-vault.yml
+
   deploy:
     name: "Publish Vault UI to S3 + CloudFront (${{ inputs.environment || github.ref_name || 'dev' }})"
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: tests
     environment: ${{ inputs.environment || (github.ref_name == 'main' && 'main') || 'dev' }}
 
     steps:

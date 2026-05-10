@@ -43,15 +43,13 @@ test('regression 48bd735 — navigate to browse writes key to LS before vault sh
     const isVisible = await openBtn.isVisible().catch(() => false);
 
     if (!isVisible) {
-        // Landing page JS requires CDN deps to render cards — skip click, test LS directly.
-        // Simulate what _navigateToBrowse would do after the fix.
-        await page.evaluate(() => {
-            localStorage.setItem('sg-vault-key', 'apple-river-1234');
-            window.location.assign('/en-gb/vault');
-        });
-    } else {
-        await openBtn.click();
+        // Landing page vault cards require CDN-hosted JS to render.
+        // Skip rather than simulate: a simulation cannot catch _navigateToBrowse regressions.
+        // To run this test fully: use a dev server with CDN access (no route blocking).
+        test.skip();
+        return;
     }
+    await openBtn.click();
 
     await page.waitForURL('**/en-gb/vault**', { timeout: 8000 });
 

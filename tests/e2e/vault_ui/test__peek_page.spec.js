@@ -89,25 +89,18 @@ test('peek page shows recent vault entry count from localStorage', async ({ page
 test('paste-to-inspect detects simple token format', async ({ page }) => {
     await page.goto('/en-gb/vault/peek/', { waitUntil: 'domcontentloaded' });
 
-    // Find the inspect textarea or input
-    const textarea = page.locator('#inspectInput, textarea, input[type="text"]').first();
-    if (!(await textarea.isVisible())) return; // graceful skip if no text input
+    // #inspectInput and #inspectResult are defined in the peek page — fail if absent.
+    const textarea = page.locator('#inspectInput');
+    await expect(textarea).toBeVisible();
 
     await textarea.fill('apple-river-1234');
-    // Trigger inspect (button or Enter)
-    const inspectBtn = page.locator('button').filter({ hasText: /inspect/i }).first();
-    if (await inspectBtn.isVisible()) {
-        await inspectBtn.click();
-    } else {
-        await textarea.press('Enter');
-    }
+    await page.locator('button').filter({ hasText: /^Inspect$/i }).first().click();
 
-    // Expect format detection output to mention format 1 or "simple"
+    // Format detection result is always rendered in #inspectResult after click.
     const result = page.locator('#inspectResult');
-    if (await result.isVisible()) {
-        const text = await result.textContent();
-        expect(text.toLowerCase()).toMatch(/format.*1|simple/i);
-    }
+    await expect(result).toBeVisible();
+    const text = await result.textContent();
+    expect(text.toLowerCase()).toMatch(/format.*1|simple/i);
 });
 
 // ---------------------------------------------------------------------------
