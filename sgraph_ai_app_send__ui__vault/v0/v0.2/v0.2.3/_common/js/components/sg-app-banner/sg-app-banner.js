@@ -85,11 +85,15 @@
                 textContent: 'SG/Send'
             }));
 
-            // Status badge — reserved for vault-app events (VLT-026)
+            // Status badge — reserved for vault-app events (VLT-026).
+            // Idle: dim placeholder. Active (showStatus / showStatusError): bright,
+            // bold, with a subtle pill background — see _setStatusActive() below.
             var status = _el('span', {
                 className: 'sg-app-banner__status',
                 style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
-                       'color:rgba(226,232,240,0.45);font-size:11px;'
+                       'color:rgba(226,232,240,0.45);font-size:12px;line-height:1.6;' +
+                       'padding:2px 10px;border-radius:4px;border:1px solid transparent;' +
+                       'transition:background 0.15s,border-color 0.15s,color 0.15s;'
             });
             this.appendChild(status);
             this._statusEl = status;
@@ -130,6 +134,31 @@
             if (this._dismissTimer) { clearTimeout(this._dismissTimer); this._dismissTimer = null; }
             this._removeErrorDetail();
             this._statusEl.innerHTML = '';
+            this._setStatusActive(null);
+        }
+
+        // tone: 'teal' | 'red' | null (null reverts to dim idle baseline).
+        // Toggles a pill background + bold text so the active status pops
+        // against the banner strip.
+        _setStatusActive(tone) {
+            if (!this._statusEl) return;
+            var s = this._statusEl.style;
+            if (tone === 'teal') {
+                s.color       = '#e2e8f0';
+                s.fontWeight  = '600';
+                s.background  = 'rgba(78,205,196,0.14)';
+                s.borderColor = 'rgba(78,205,196,0.35)';
+            } else if (tone === 'red') {
+                s.color       = '#ffe5e5';
+                s.fontWeight  = '600';
+                s.background  = 'rgba(255,107,107,0.16)';
+                s.borderColor = 'rgba(255,107,107,0.45)';
+            } else {
+                s.color       = 'rgba(226,232,240,0.45)';
+                s.fontWeight  = '';
+                s.background  = '';
+                s.borderColor = 'transparent';
+            }
         }
 
         // icon: '⟳' (spins), '✓' (teal), '✗' (red), '↓', '↑' …
@@ -142,13 +171,14 @@
             var frag = document.createDocumentFragment();
             var iconEl = document.createElement('span');
             iconEl.textContent = icon;
-            if (icon === '↻' || icon === '⟳') iconEl.className = 'sgab-spin';
+            if (icon === '↻' || icon === '⟳') { iconEl.className = 'sgab-spin'; iconEl.style.color = '#4ecdc4'; }
             if (icon === '✓') iconEl.style.color = '#4ecdc4';
             frag.appendChild(iconEl);
             frag.appendChild(document.createTextNode(' ' + text));
 
             this._statusEl.innerHTML = '';
             this._statusEl.appendChild(frag);
+            this._setStatusActive('teal');
 
             if (autoDismissMs) {
                 var self = this;
@@ -163,6 +193,7 @@
             this._removeErrorDetail();
 
             this._statusEl.innerHTML = '';
+            this._setStatusActive('red');
 
             var errSpan = document.createElement('span');
             errSpan.textContent = summary;
