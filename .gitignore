@@ -248,3 +248,6 @@ modules/
 
 .local-server-website
 .idea
+
+# Node.js
+node_modules/
