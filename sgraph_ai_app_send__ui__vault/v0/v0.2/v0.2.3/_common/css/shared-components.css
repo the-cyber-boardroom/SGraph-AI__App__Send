@@ -225,3 +225,13 @@ textarea.input {
 .hidden {
     display: none !important;
 }
+
+/* ─── Browse Overrides for Vault Layout ─────────────────────────────────
+   send-browse.css caps .sb-file__markdown at max-width: 800px for the
+   wide-screen Send share view. Inside vault chrome the file panel is
+   already narrower, so the cap leaves a ~40% empty column on the right.
+   Let markdown fill the available width in vault. App Mode applies the
+   same override via sg-app-banner.js — this makes it the default. */
+.sb-file__markdown {
+    max-width: 100% !important;
+}

@@ -312,6 +312,11 @@
             this._updateVaultKey();
             this._refreshSyncState();
 
+            // Keep vault header in sync — .vault-settings.json edits update _vault.name
+            if (this._vault) {
+                this.querySelector('vault-header')?.setVaultName(this._vault.name || '');
+            }
+
             // Refresh settings if visible
             if (this._activeView === 'settings') {
                 this.querySelector('vault-settings')?.refresh();

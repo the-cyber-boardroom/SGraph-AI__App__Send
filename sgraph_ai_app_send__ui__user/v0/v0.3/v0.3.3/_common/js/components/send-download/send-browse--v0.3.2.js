@@ -97,7 +97,6 @@ class SendBrowse extends SendComponent {
                     <div class="sb-header__right">
                         <button class="sb-action-btn" id="sb-copy-link">${SendIcons.LINK_SM} Copy Link</button>
                         <button class="sb-action-btn" id="sb-email">${SendIcons.MAIL || '✉'}</button>
-                        <button class="sb-save-btn" id="sb-save-zip">${SendIcons.DOWNLOAD_SM} Save locally</button>
                         <a href="${this._buildSwitchUrl('gallery')}" class="sb-action-btn">Gallery view</a>
                     </div>
                 </div>
@@ -1278,32 +1277,6 @@ class SendBrowse extends SendComponent {
     // v0.3.2: BRW-009 save via dataSource + BRW-016 print moved to per-tab action bar
     _setupHeaderListeners() {
         var self = this;
-
-        // BRW-009: Save locally — re-generate clean zip via dataSource
-        var saveBtn = this.querySelector('#sb-save-zip');
-        if (saveBtn) saveBtn.addEventListener('click', async function() {
-            if (self.dataSource && self.dataSource.getZipBlob) {
-                try {
-                    var zipBlob = await self.dataSource.getZipBlob();
-                    var url = URL.createObjectURL(zipBlob);
-                    var a = document.createElement('a');
-                    a.href = url;
-                    a.download = (self.dataSource.getOrigName ? self.dataSource.getOrigName() : null) || self.zipOrigName || 'archive.zip';
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    return;
-                } catch (_) { /* fall through */ }
-            }
-            // Fallback: raw bytes
-            if (self.zipOrigBytes) {
-                var blob = new Blob([self.zipOrigBytes], { type: 'application/zip' });
-                var url2 = URL.createObjectURL(blob);
-                var a2 = document.createElement('a');
-                a2.href = url2; a2.download = self.zipOrigName || 'archive.zip';
-                document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
-                URL.revokeObjectURL(url2);
-            }
-        });
 
         var copyBtn = this.querySelector('#sb-copy-link');
         if (copyBtn) copyBtn.addEventListener('click', async function() {

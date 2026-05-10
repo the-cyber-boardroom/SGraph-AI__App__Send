@@ -88,6 +88,13 @@ class VaultDataSource {
     // ─── Required: file bytes (fetch + decrypt on demand) ────────────────
 
     async getFileBytes(path) {
+        // Serve .vault-settings.json from _settings — always current, works after reload
+        // when the file is not in root.children (it lives in this._vault._settings instead).
+        if (path.replace(/^\//, '') === '.vault-settings.json') {
+            const json = JSON.stringify(this._vault._settings, null, 2);
+            return new TextEncoder().encode(json).buffer;
+        }
+
         const parts      = path.split('/');
         const fileName   = parts.pop();
         const folderPath = '/' + parts.join('/');
@@ -162,6 +169,35 @@ class VaultDataSource {
 
     async saveFile(folderPath, fileName, bytes) {
         if (!this.writable) throw new Error('Read-only: no access key');
+
+        // .vault-settings.json is special: it lives in this._vault._settings, not
+        // root.children. Writing it through addFile() creates a duplicate tree entry that
+        // causes the synthetic copy (always appended last in _commit()) to overwrite the
+        // user's edits on the next reload. Instead, parse and merge directly into _settings.
+        if (folderPath === '/' && fileName === '.vault-settings.json') {
+            _hudNotify('start', fileName);
+            try {
+                const data   = bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes;
+                const parsed = JSON.parse(new TextDecoder().decode(data));
+                const s      = this._vault._settings;
+                // Preserve identity fields that callers must not clobber
+                const kept   = { vault_id: s.vault_id, created: s.created, version: s.version };
+                Object.assign(s, parsed, kept);
+                // Clean up any stale regular-file entry in root.children (defensive)
+                const root = this._vault._findNode('/');
+                if (root && root.children && root.children['.vault-settings.json']) {
+                    delete root.children['.vault-settings.json'];
+                }
+                await this._vault._commit('Update .vault-settings');
+                _hudNotify('ok', fileName);
+                if (this.onTreeChanged) this.onTreeChanged();
+            } catch (err) {
+                _hudNotify('error', fileName, err.message);
+                throw err;
+            }
+            return;
+        }
+
         _hudNotify('start', fileName);
         const data   = new Uint8Array(bytes);
         const folder = this._vault._findNode(folderPath);
