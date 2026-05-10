@@ -23,6 +23,11 @@ on:
   # Allow manual trigger from GitHub Actions UI.
   workflow_dispatch:
 
+# Cancel any in-progress run for the same ref when a newer push arrives.
+concurrency:
+  group: vault-ui-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── Unit tests (~5s): pure JS, Node + jsdom, zero network ─────────────────
   unit:
