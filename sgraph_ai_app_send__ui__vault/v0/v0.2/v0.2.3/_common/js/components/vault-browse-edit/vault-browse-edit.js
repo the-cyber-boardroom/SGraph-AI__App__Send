@@ -89,14 +89,17 @@
             cancelBtn.style.display = 'none';
 
             var content   = container.querySelector('.sb-file__content');
-            var preEl     = content ? content.querySelector('pre') : null;
             var textareaEl = null;
             var isEditing  = false;
 
             editBtn.addEventListener('click', function() {
                 if (isEditing) return;
                 isEditing = true;
-                var currentText = preEl ? preEl.textContent : new TextDecoder().decode(bytes);
+                // Always decode the original bytes — never read from the rendered DOM.
+                // Reading from <pre> picks up the first code block in rendered markdown,
+                // not the source. For text/code files <pre> matches the file content but
+                // bytes is still the source of truth.
+                var currentText = new TextDecoder().decode(bytes);
 
                 textareaEl = document.createElement('textarea');
                 textareaEl.value = currentText;
