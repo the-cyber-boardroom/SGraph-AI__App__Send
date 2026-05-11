@@ -24,15 +24,12 @@ PORT=10067
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
-UI_VERSION="v0.2.2"
+UI_VERSION="v0.2.3"
 IFD_PATH="v0/v0.2/$UI_VERSION"
-VAULT_BASE_VERSION="v0.2.0"   # IFD base layer — provides vault-shell, vault-browse-edit, etc.
-# Vault IFD overlay layers applied on top of base (base-to-latest).
-# Each only contains files changed in that version.
-VAULT_IFD_OVERLAYS=(
-    "v0.2.1"
-    "v0.2.2"
-)
+VAULT_BASE_VERSION="v0.2.3"   # Full self-contained snapshot — no overlays needed.
+# v0.2.3 consolidates v0.2.0 + v0.2.1 + v0.2.2 into one complete tree.
+# Future deltas (v0.2.4, v0.2.5, ...) can be added back here as overlays.
+VAULT_IFD_OVERLAYS=()
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
 
 # User UI IFD layers — merged in order (base first, latest last) to replicate
@@ -118,22 +115,18 @@ for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
     [ -f "$f" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
 done
 
-# Create en-gb/vault/index.html — serves the vault shell at /en-gb/vault so that
-# history.replaceState(null, '', '/en-gb/vault') produces a real, refreshable URL.
-# Generated from root index.html at serve time; _common/ paths are made root-absolute
-# so they resolve correctly from /en-gb/vault/ (two directories deep).
+# en-gb/index.html: the landing page (Design 02, "Open a vault." hero +
+# recent vaults grid) — comes from v0.2.1/en-gb/, already copied above by
+# the locale-merge step. Do NOT overwrite it with the root vault shell.
+#
+# en-gb/vault/index.html: vault shell at the clean /en-gb/vault URL.
+# Generated from root index.html with _common/ paths made root-absolute
+# so assets resolve from two directories deep.
 mkdir -p "$SERVE_DIR/en-gb/vault"
-python3 -c "
-import sys
-with open('$SERVE_DIR/index.html') as f:
-    html = f.read()
-# Make local relative _common/ paths root-absolute so they work from /en-gb/vault/
-html = html.replace('href=\"_common/', 'href=\"/_common/')
-html = html.replace('src=\"_common/', 'src=\"/_common/')
-with open('$SERVE_DIR/en-gb/vault/index.html', 'w') as f:
-    f.write(html)
-print('  Created: en-gb/vault/index.html')
-"
+sed -e 's|href="_common/|href="/_common/|g' \
+    -e 's|src="_common/|src="/_common/|g' \
+    "$SERVE_DIR/index.html" > "$SERVE_DIR/en-gb/vault/index.html"
+echo "  Created: en-gb/vault/index.html"
 
 # Inject /api/health for local dev — vault-header.js calls window.location.origin/api/health
 # to display the backend version. Python http.server has no API routes, so this
@@ -169,6 +162,26 @@ with open(path, 'w') as f: f.write(patched)
 print('  Patched:', path)
 " "$index_html"
 done
+
+# Sanity check: print which version of send-browse--v0.3.2.js the merged tree
+# is serving. The IFD merge (vault layers + user UI layers) overwrites earlier
+# copies with later ones; this banner tells you at a glance which version
+# survived the merge. If the running browser shows a different banner, it's
+# loading the CDN (dev.send.sgraph.ai) instead of localhost.
+SEND_BROWSE_FILE="$SERVE_DIR/_common/js/components/send-download/send-browse--v0.3.2.js"
+echo ""
+echo "Merged send-browse version stamp:"
+if [ -f "$SEND_BROWSE_FILE" ]; then
+    BANNER=$(grep -m1 "loaded OK" "$SEND_BROWSE_FILE" || echo "  (no [send-browse ...] loaded OK banner found)")
+    echo "  $BANNER"
+    if grep -q "_bytesToBase64\|data:application/javascript;base64" "$SEND_BROWSE_FILE"; then
+        echo "  data-URI inlining: PRESENT (Bug-1 fix in this build)"
+    else
+        echo "  data-URI inlining: MISSING (older build — Bug 1 will reproduce)"
+    fi
+else
+    echo "  (file missing — no user UI layer wrote it)"
+fi
 
 echo ""
 echo "Starting vault.sgraph.ai local server..."

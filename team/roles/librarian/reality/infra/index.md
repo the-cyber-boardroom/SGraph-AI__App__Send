@@ -1,6 +1,6 @@
 # Infrastructure — Reality Index
 
-**Domain:** infra/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/ | **Last updated:** 2026-05-09 | **Maintained by:** Librarian (daily run)
 
 This domain covers deployment infrastructure: storage backends, Lambda functions, CI/CD pipelines, container deployments, and the 7 deployment targets. It does not cover the application API (see `../api/`) or security properties (see `../security/`).
 
@@ -59,6 +59,20 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 - **Triggers:** push to `main` on `sgraph_ai__website/**` paths, or manual `workflow_dispatch`
 - **Target:** S3 bucket (`WEBSITE_S3_BUCKET` secret) + CloudFront distribution (`WEBSITE_CF_DIST` secret)
 - **Region:** eu-west-2
+
+### SnapStart S3 Client Fix (08 May 2026)
+
+**`Storage_FS__S3`** — boto3 client now created lazily to prevent SnapStart stale-connection timeouts.
+Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a181`).
+
+| Before | After |
+|--------|-------|
+| `setup()` called `bucket_exists()` at Lambda init, creating and caching a boto3 S3 client | `setup()` returns `self` immediately — no boto3 client at snapshot time |
+| boto3 client serialised into SnapStart snapshot including urllib3 connection pool | `_s3()` method creates `S3()` lazily on first actual request after restore |
+| After SnapStart restore, pooled TCP connections dead → requests hang until Lambda timeout | Fresh boto3 client created on demand; stale-connection timeout eliminated |
+| Presigned services also affected | Presigned services receive fresh `S3()` instances (lazily initialised via `@cache_on_self`) |
+
+`_ensure_bucket()` extracted from `setup()` for explicit use in dev/deploy contexts.
 
 ### CI Configuration Notes
 

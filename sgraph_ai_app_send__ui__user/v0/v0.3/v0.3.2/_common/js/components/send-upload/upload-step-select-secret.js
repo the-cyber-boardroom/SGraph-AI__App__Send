@@ -59,7 +59,7 @@ UploadStepSelect.prototype._renderIdle = function() {
             '<div class="secret-header">' +
                 modeToggle +
                 '<button class="btn btn-primary btn--secret-send" id="secret-send-btn"' +
-                    ' data-testid="secret-send-btn" disabled>Create Secret Link →</button>' +
+                    ' data-testid="secret-send-btn" disabled>Review →</button>' +
             '</div>' +
             '<div class="secret-input-area">' +
                 '<textarea class="text-input" id="secret-input" data-testid="secret-input"' +
@@ -178,7 +178,7 @@ UploadStepSelect.prototype._setupListeners = function() {
             var maxDownloads   = maxDlPill  ? parseInt(maxDlPill.dataset.value,  10) : 1;
             var expiresInHours = expiryPill ? parseInt(expiryPill.dataset.value, 10) : 24;
 
-            self.emit('step-secret-submit', {
+            self._emit('step-secret-submit', {
                 text:   ta.value,
                 config: { maxDownloads: maxDownloads, expiresInHours: expiresInHours }
             });

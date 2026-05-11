@@ -80,8 +80,22 @@ const MarkdownParser = {
             if (/^[\s]*[-*+]\s+/.test(line)) {
                 const items = [];
                 while (i < lines.length && /^[\s]*[-*+]\s+/.test(lines[i])) {
-                    items.push(lines[i].replace(/^[\s]*[-*+]\s+/, ''));
+                    const m = lines[i].match(/^(\s*)[-*+]\s+(.*)/);
+                    const minCont = (m[1] || '').length + 2;
+                    let itemText = m[2];
                     i++;
+                    while (i < lines.length) {
+                        const next = lines[i];
+                        if (!next.trim()) break;
+                        if (/^#{1,6}\s/.test(next) || /^```/.test(next) || /^>\s?/.test(next) || /^\|/.test(next)) break;
+                        const spaces = (next.match(/^(\s*)/)[1] || '').length;
+                        if (spaces < minCont) break;
+                        const stripped = next.slice(spaces);
+                        if (/^[-*+]\s+/.test(stripped) || /^\d+\.\s+/.test(stripped)) break;
+                        itemText += '\n' + stripped;
+                        i++;
+                    }
+                    items.push(itemText);
                 }
                 blocks.push({ type: 'ul', items });
                 continue;
@@ -90,8 +104,22 @@ const MarkdownParser = {
             if (/^[\s]*\d+\.\s+/.test(line)) {
                 const items = [];
                 while (i < lines.length && /^[\s]*\d+\.\s+/.test(lines[i])) {
-                    items.push(lines[i].replace(/^[\s]*\d+\.\s+/, ''));
+                    const m = lines[i].match(/^(\s*)\d+\.\s+(.*)/);
+                    const minCont = (m[1] || '').length + 2;
+                    let itemText = m[2];
                     i++;
+                    while (i < lines.length) {
+                        const next = lines[i];
+                        if (!next.trim()) break;
+                        if (/^#{1,6}\s/.test(next) || /^```/.test(next) || /^>\s?/.test(next) || /^\|/.test(next)) break;
+                        const spaces = (next.match(/^(\s*)/)[1] || '').length;
+                        if (spaces < minCont) break;
+                        const stripped = next.slice(spaces);
+                        if (/^[-*+]\s+/.test(stripped) || /^\d+\.\s+/.test(stripped)) break;
+                        itemText += '\n' + stripped;
+                        i++;
+                    }
+                    items.push(itemText);
                 }
                 blocks.push({ type: 'ol', items });
                 continue;

@@ -63,10 +63,11 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
         if self.presigned_service is None:                                           # Auto-create presigned URL service
             from sgraph_ai_app_send.lambda__user.storage.Storage_FS__S3 import Storage_FS__S3
+            from osbot_aws.aws.s3.S3 import S3
             presigned_kwargs = dict(transfer_service = self.transfer_service,
                                     storage_mode     = self.send_config.storage_mode)
-            if isinstance(storage_fs, Storage_FS__S3):                               # Wire S3 client from storage backend
-                presigned_kwargs['s3']        = storage_fs.s3
+            if isinstance(storage_fs, Storage_FS__S3):                               # Wire S3 client — fresh S3() so boto3 client is created lazily after SnapStart restore
+                presigned_kwargs['s3']        = S3()
                 presigned_kwargs['s3_bucket'] = storage_fs.s3_bucket
             self.presigned_service = Service__Presigned_Urls(**presigned_kwargs)
 
@@ -96,10 +97,11 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
 
         if self.vault_presigned_service is None:                                 # Auto-create vault presigned URL service
             from sgraph_ai_app_send.lambda__user.storage.Storage_FS__S3 import Storage_FS__S3
+            from osbot_aws.aws.s3.S3 import S3
             vault_presigned_kwargs = dict(vault_service = self.vault_service      ,
                                           storage_mode  = self.send_config.storage_mode)
-            if isinstance(storage_fs, Storage_FS__S3):                           # Wire S3 client from storage backend
-                vault_presigned_kwargs['s3']        = storage_fs.s3
+            if isinstance(storage_fs, Storage_FS__S3):                           # Wire S3 client — fresh S3() so boto3 client is created lazily after SnapStart restore
+                vault_presigned_kwargs['s3']        = S3()
                 vault_presigned_kwargs['s3_bucket'] = storage_fs.s3_bucket
             self.vault_presigned_service = Service__Vault__Presigned(**vault_presigned_kwargs)
 

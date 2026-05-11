@@ -32,16 +32,21 @@
         'vault-shell vault-nav         { display:none !important; }',
         'vault-shell vault-status-bar  { display:none !important; }',
         'vault-shell .vs-body          { padding-top:0 !important; }',
-        'vault-shell .vs-shell         { padding-top:2.25rem !important; }'
+        'vault-shell .vs-shell         { padding-top:2.25rem !important; }',
+        'send-browse .sb-header        { display:none !important; }',
+        'send-browse .sb-file__actions { display:none !important; }',
+        'send-browse .sb-file__markdown { max-width:100% !important; }'
     ].join('\n');
 
-    // Fallback: shadow-DOM chrome to hide when no iframe is present
+    // Shadow-DOM chrome to hide (sg-layout internals + page layout action bar)
     var SHADOW_CSS = [
         '.sgl-tab-bar       { display:none !important; }',
-        '.sgl-resize-handle { display:none !important; }'
+        '.sgl-resize-handle { display:none !important; }',
+        '.plr-source-bar    { display:none !important; }'
     ].join('\n');
 
     // Saved state for frame-lift restore
+    var _savedLiftEl       = null;  // the element that was lifted
     var _savedWrapperStyle = null;
     var _savedIframeStyle  = null;
 
@@ -81,11 +86,6 @@
             this.appendChild(status);
             this._statusEl = status;
 
-            // Reload App — re-fetches file from vault and re-lifts the iframe
-            var reloadBtn = _btn('Reload App', 'Re-fetch and reload the current app');
-            reloadBtn.addEventListener('click', function() { _reloadAndLift(); });
-            this.appendChild(reloadBtn);
-
             // Open Vault — exits App Mode and returns to full vault view
             var openVaultBtn = _btn('Open Vault', 'Exit app mode and return to vault');
             openVaultBtn.addEventListener('click', function() { _deactivate(); });
@@ -99,9 +99,15 @@
             }));
         }
 
-        // Called by the "App Mode" button in vault-browse-edit or app.json handler
-        activate() {
-            _activateAll();
+        // Called by the "App Mode" button in vault-browse-edit or app.json handler.
+        // liftEl: the element to lift to full-viewport (optional — falls back to
+        // .sb-file__html-frame wrapper or .sb-file__content for the app.json path).
+        activate(liftEl) {
+            window._sgAppModeUserExited = false;
+            // Drop any previous lift before re-activating (e.g. switching from
+            // _page.json to an HTML file while App Mode is active).
+            _dropContentFrame();
+            _activateAll(liftEl);
             this.style.display = 'flex';
         }
 
@@ -112,28 +118,42 @@
 
     // ── Core activate / deactivate ────────────────────────────────────────────
 
-    function _activateAll() {
+    function _activateAll(liftEl) {
         _injectMaxCss();
-        // Try to lift the iframe wrapper. If not present yet, use shadow CSS
-        // fallback and wait for the iframe to appear.
-        if (!_liftContentFrame()) {
-            _injectShadowCss();
-            _hideTreeStack();
+        // Always inject shadow CSS and hide the tree so sg-layout chrome never
+        // leaks through regardless of which lift path is taken.
+        _injectShadowCss();
+        _hideTreeStack();
+        window.dispatchEvent(new Event('resize'));
+        requestAnimationFrame(function() { window.dispatchEvent(new Event('resize')); });
+        // Try to lift the provided element (or the HTML iframe wrapper on the
+        // app.json path). If nothing is present yet, wait for content to appear.
+        if (!_liftContentFrame(liftEl)) {
             _waitForIframeAndLift();
         }
     }
 
     function _deactivate() {
+        window._sgAppModeUserExited = true;
         _dropContentFrame();
         _removeMaxCss();
         _removeShadowCss();
+        // Belt-and-suspenders: force all sgl-stacks visible.
+        // On initial app.json activation the fallback path hides the tree stack
+        // in shadow DOM; after Reload App that state persists until deactivation.
+        var sgLayout = _getSgLayout();
+        if (sgLayout && sgLayout.shadowRoot) {
+            sgLayout.shadowRoot.querySelectorAll('.sgl-stack').forEach(function(s) {
+                s.style.removeProperty('display');
+            });
+        }
         _restoreTreeStack();
         var banner = document.querySelector('sg-app-banner');
         if (banner) banner.style.display = 'none';
-        // sg-layout caches panel dimensions. While the iframe wrapper was
-        // position:fixed the content panel had no in-flow children and may
-        // have collapsed to height 0. A synthetic resize event makes sg-layout
-        // re-measure and restore the correct content panel height.
+        // sg-layout caches panel dimensions. While the wrapper was position:fixed
+        // the content panel had no in-flow children and may have collapsed to 0px.
+        // Dispatch resize twice to ensure sg-layout re-measures in all cases.
+        window.dispatchEvent(new Event('resize'));
         requestAnimationFrame(function() {
             window.dispatchEvent(new Event('resize'));
         });
@@ -142,70 +162,122 @@
     // ── Reload App ────────────────────────────────────────────────────────────
     // Re-fetches the current file via vault-header-refresh, then re-lifts
     // the new iframe wrapper once it appears in the DOM.
-    // We do NOT drop the current frame first — the old fixed-position wrapper
-    // stays until the vault removes it during re-render, so vault chrome never
-    // becomes visible. The saved style pointers are cleared so _liftContentFrame
+    // A cover div at z-index:7998 fills the viewport below the banner during
+    // re-render so the brief gap between old wrapper removal and new lift is
+    // not visible. Saved style pointers are cleared so _liftContentFrame
     // captures fresh values from the new wrapper.
 
     function _reloadAndLift() {
+        _savedLiftEl       = null;
         _savedWrapperStyle = null;
         _savedIframeStyle  = null;
+
+        var cover = document.createElement('div');
+        cover.style.cssText = [
+            'position:fixed', 'top:2.25rem', 'left:0', 'right:0', 'bottom:0',
+            'z-index:7998', 'background:#0a0a18'
+        ].join(';');
+        document.body.appendChild(cover);
+
+        _waitForIframeAndLift(function() { cover.remove(); });
+
         var shell = document.querySelector('vault-shell');
-        if (!shell) return;
-        _waitForIframeAndLift();
-        shell.dispatchEvent(new CustomEvent('vault-header-refresh', { bubbles: true, composed: true }));
+        if (shell) {
+            shell.dispatchEvent(new CustomEvent('vault-header-refresh', { bubbles: true, composed: true }));
+        }
     }
 
     // ── Layer 2: frame lift ───────────────────────────────────────────────────
     // Applies position:fixed to the iframe wrapper div.
     // The iframe stays in its original DOM position — no reload.
 
-    function _liftContentFrame() {
-        var iframeEl = document.querySelector('.sb-file__html-frame');
-        if (!iframeEl) return false;
-        var wrapper = iframeEl.parentElement;
-        if (!wrapper) return false;
+    function _liftContentFrame(liftEl) {
+        var el = liftEl || null;
+        if (!el) {
+            // App.json path: no element provided.
+            // Try HTML iframe wrapper first, then fall back to any file content element.
+            var iframeEl = document.querySelector('.sb-file__html-frame');
+            if (iframeEl) {
+                el = iframeEl.parentElement;
+            } else {
+                el = document.querySelector('.sb-file__content');
+            }
+            if (!el) return false;
+        }
 
-        _savedWrapperStyle = wrapper.style.cssText;
-        _savedIframeStyle  = iframeEl.style.cssText;
+        _savedLiftEl       = el;
+        _savedWrapperStyle = el.style.cssText;
 
-        wrapper.style.cssText = [
+        el.style.cssText = [
             'position:fixed', 'top:2.25rem', 'left:0', 'right:0', 'bottom:0',
-            'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow:hidden'
+            'z-index:7999', 'display:flex', 'flex-direction:column', 'overflow-y:auto'
         ].join(';');
-        iframeEl.style.cssText = 'flex:1;border:none;width:100%;height:100%;min-height:0;';
+
+        // If there's an HTML iframe inside, fix its height (was height:0 in flex layout)
+        var htmlIframe = el.querySelector('.sb-file__html-frame');
+        if (htmlIframe) {
+            _savedIframeStyle = htmlIframe.style.cssText;
+            htmlIframe.style.cssText = 'flex:1;border:none;width:100%;height:100%;min-height:0;background:#fff;color-scheme:light;';
+        } else {
+            _savedIframeStyle = null;
+        }
+
         return true;
     }
 
     function _dropContentFrame() {
-        var iframeEl = document.querySelector('.sb-file__html-frame');
-        if (!iframeEl) return;
-        var wrapper = iframeEl.parentElement;
-        if (!wrapper) return;
+        var el = _savedLiftEl;
+        if (!el) return;
 
-        wrapper.style.cssText  = _savedWrapperStyle ||
-            'flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;min-height:0;';
-        iframeEl.style.cssText = _savedIframeStyle  ||
-            'flex:1;border:none;width:100%;height:0;min-height:0;';
+        el.style.cssText = _savedWrapperStyle || '';
 
+        if (_savedIframeStyle !== null) {
+            var htmlIframe = el.querySelector('.sb-file__html-frame');
+            if (htmlIframe) {
+                htmlIframe.style.cssText = _savedIframeStyle ||
+                    'flex:1;border:none;width:100%;height:0;min-height:0;';
+            }
+        }
+
+        _savedLiftEl       = null;
         _savedWrapperStyle = null;
         _savedIframeStyle  = null;
     }
 
-    // Watches for a new .sb-file__html-frame to appear, then lifts it.
-    // Used for app.json auto-activate and Reload App.
-    // The iframe style is set before appendChild in send-browse, so
-    // MutationObserver fires after the style is already correct — no delay needed.
-    function _waitForIframeAndLift() {
+    // Watches for file content to appear — HTML iframe, any other content element, or
+    // a _page.json panel (in sg-layout shadow DOM, signalled via sg-page-layout-ready).
+    // onLifted callback called when lift succeeds or on timeout.
+    function _waitForIframeAndLift(onLifted) {
+        var done = false;
+
+        function finish(liftEl) {
+            if (done) return;
+            done = true;
+            window.removeEventListener('sg-page-layout-ready', onPageLayoutReady);
+            observer.disconnect();
+            _liftContentFrame(liftEl);
+            if (typeof onLifted === 'function') onLifted();
+        }
+
+        // _page.json panels live in sg-layout's shadow DOM — not reachable by
+        // document.querySelector. vault-browse-edit patches _openFolderPage to
+        // dispatch this event with the panel element reference.
+        function onPageLayoutReady(e) {
+            finish(e.detail && e.detail.el ? e.detail.el : undefined);
+        }
+        window.addEventListener('sg-page-layout-ready', onPageLayoutReady);
+
         var observer = new MutationObserver(function() {
-            if (document.querySelector('.sb-file__html-frame')) {
-                observer.disconnect();
-                _liftContentFrame();
+            // Light-DOM file content (HTML iframe, PDF, markdown, images, etc.)
+            if (document.querySelector('.sb-file__html-frame') ||
+                document.querySelector('.sb-file__content')) {
+                finish(undefined);
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });
-        // Safety: disconnect after 5 s to avoid leaking
-        setTimeout(function() { observer.disconnect(); }, 5000);
+
+        // Safety: disconnect after 5 s
+        setTimeout(function() { finish(undefined); }, 5000);
     }
 
     // ── Layer 1: regular-DOM CSS ──────────────────────────────────────────────

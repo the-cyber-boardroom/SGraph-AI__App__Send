@@ -56,12 +56,13 @@
                            ? Date.now() + (config.expiresInHours * 3600000)
                            : 0
         };
-        el._shareMode        = 'combined'; // Key always embedded in URL fragment
+        el._shareMode        = 'token';   // Simple token — the only supported mode for secrets
         el._selectedDelivery = 'download';
         el._isSecretMode     = true;
 
-        // Skip steps 2-4 (options, confirm) — go straight to processing
-        el._startProcessing();
+        // Land on the Confirm step (matches the file flow). User clicks
+        // "Encrypt & Upload" there to start processing.
+        el.state = 'confirming';
     }
 })();
 
@@ -87,10 +88,10 @@ SendUpload.prototype._wireEvents = function() {
                            ? Date.now() + (config.expiresInHours * 3600000)
                            : 0
         };
-        self._shareMode        = 'combined';
+        self._shareMode        = 'token';
         self._selectedDelivery = 'download';
         self._isSecretMode     = true;
-        self._startProcessing();
+        self.state             = 'confirming';
     });
 };
 

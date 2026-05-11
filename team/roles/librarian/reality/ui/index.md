@@ -1,16 +1,17 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-05-08 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-05-11 | **Maintained by:** Librarian (daily run)
 
-The three browser UIs served by the User Lambda. Each uses IFD versioning (no framework,
-Shadow DOM Web Components, surgical overlays). The latest user UI is v0.3.1.
-The latest vault UI is v0.2.3 (JS API layer — `window.__tool`).
+The browser UIs served by the User Lambda. Each uses IFD versioning (no framework,
+Shadow DOM Web Components, surgical overlays). The latest user UI is v0.3.2. The vault
+browser UI (`sgraph_ai_app_send__ui__vault`) is a distinct UI product at **v0.2.3**
+(JS API layer — `window.__tool` via SgToolApi; branch `claude/review-vault-ui-Hh145`).
 
 ---
 
 ## EXISTS (Code-Verified)
 
-### User UI (latest: v0.3.1 IFD overlay, base: v0.3.0)
+### User UI (latest: v0.3.2 IFD overlay, base: v0.3.0)
 
 **v0.3.0** — IFD major version, full architectural rewrite. Code at
 `sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.0/`. Completed 22 March 2026.
@@ -25,6 +26,44 @@ The latest vault UI is v0.2.3 (JS API layer — `window.__tool`).
 - Dark mode `_page.json` background fix (commit `231fcc9`): `page-layout-renderer.js` was
   unconditionally setting `container.style.background = '#ffffff'`; now removes inline
   background in dark mode so CSS class wins
+
+**v0.3.2** — IFD overlay on v0.3.0 + v0.3.1. Code at `sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.2/`.
+First committed 2026-05-07 (commits `e3d010c`, `0404827`). Contains 8 surgical overlay scripts +
+a new page (`en-gb/s/index.html`). Version stamp: `send-browse v0.3.2-vfs-4`.
+
+**v0.3.2 Feature 1 — Share a Secret** (commit `e3d010c`, 07 May):
+- New page: `en-gb/s/{transferId}#{keyHex}` — ephemeral encrypted text viewer
+- `send-secret-view.js/.css` — `<send-secret-view>` Web Component; handles view flow and kill-confirm flow
+- Secret is fetched via download-base64 endpoint, decrypted AES-256-GCM client-side, displayed inline
+- Kill flow: DELETE `/api/transfers/delete/{id}` on confirm
+- Ephemerality notice shown after view (D1 or D2 delivery modes)
+
+**v0.3.2 Feature 2 — Options Step / 5-step wizard** (commit `0404827`, 07 May):
+- Delivery + Share steps consolidated into a single Options step (6-step → 5-step wizard)
+- `upload-step-options.js/.css` — `<upload-step-options>` Web Component
+- `send-upload-options.js` — patches `SendUpload` for 5-step flow
+- `upload-constants-patch.js` — patches `TOTAL_STEPS` constant (6 → 5)
+
+**v0.3.2 Secret Tab UX** (commit `3144b38`, 08 May):
+- Pill toggles for Secret/File mode in UploadStepSelect
+- Secret mode Send button disabled until text is entered
+- `upload-step-select-secret.js` — patches `UploadStepSelect`
+- `send-upload-secret.js` — patches `SendUpload` (secret fast-path)
+- `upload-engine-secret.js` — patches `UploadEngine` (secret params)
+- `upload-step-done-secret.js` — registers `<upload-step-done-secret>` element
+
+**v0.3.2 sg-vault-picker** (commit range, 07–08 May):
+- `sg-vault-picker.js/.css` — `<sg-vault-picker>` Web Component (vault selection; enter key, browse recent, create new)
+- Previously PROPOSED; now EXISTS at `v0.3.2/_common/js/components/sg-vault-picker/`
+
+**v0.3.2 VFS asset inlining in send-browse** (commit `85d3d16`, 09 May):
+- `send-browse--v0.3.2.js`: `_inlineHtmlAssets()` + `_replaceAsync()` helpers
+- Before creating a blob-URL iframe for HTML vault files, all relative `<script src>` and
+  `<link rel="stylesheet" href>` tags are asynchronously resolved to their vault file contents
+  and inlined. This is required because browser-native resource loading bypasses `window.fetch()`,
+  so the VFS bridge cannot intercept these tags at runtime.
+- VFS bridge (`window.fetch()` override) preserved for dynamic runtime fetch() calls
+- `_loadHtmlIntoIframe()` extracted (commit `c448bc9`) — used by both view and edit preview
 
 #### Pages
 
@@ -58,6 +97,88 @@ The latest vault UI is v0.2.3 (JS API layer — `window.__tool`).
 SGMETA envelope for filenames. Key never sent to server.
 
 **Localisation:** 17 locales. All locale pages include Welcome translations (v0.12.3).
+
+---
+
+---
+
+### Vault Browser UI (latest: v0.2.2)
+
+**Package:** `sgraph_ai_app_send__ui__vault/` — distinct UI product from the user UI.
+**v0.2.1** — landing page (EXISTS since ~04/15): `en-gb/index.html` + `browse/index.html`.
+"Open a vault." hero, auto-detect input (vault key or share token), recent vaults localStorage.
+
+**v0.2.2** — overlay on v0.2.1. Code at `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.2/`.
+3 files: `index.html`, `sg-app-banner.js`, `vault-browse-edit.js`. First committed 2026-05-08.
+
+#### sg-app-banner (v0.2.2, commit `891f645`, 08 May)
+
+**`<sg-app-banner>`** Web Component — fixed-position banner activated in App Mode.
+
+| Property | Detail |
+|----------|--------|
+| Default state | Hidden (`display:none`). Must call `activate()` to show. |
+| Activation | `activate(liftEl?)` — hides vault chrome (Layer 1 CSS), lifts content frame (Layer 2 fixed positioning) |
+| Layer 1 CSS | Hides `vault-header`, `vault-nav`, `vault-status-bar`, `.sb-header`, `.sb-file__actions`, `.sb-file__markdown` max-width |
+| Layer 2 (frame lift) | Applies `position:fixed` to the provided element (or `.sb-file__html-frame` for HTML auto-activate). No DOM move — avoids iframe reload. |
+| Shadow CSS | `sgl-tab-bar`, `sgl-resize-handle`, `plr-source-bar` hidden via injected shadow DOM CSS |
+| Deactivate | `Open Vault` button calls `_deactivate()` — restores all saved styles, removes CSS, removes banner |
+| App Mode label | Non-clickable badge in top-right of banner |
+| `present:true` in app.json | Auto-activates App Mode when `app.json` entry has `present: true` |
+
+#### vault-browse-edit (v0.2.2)
+
+Patches `SendBrowse.prototype._renderFileContent` (loaded after `send-browse--v0.3.2.js`).
+
+| Feature | Detail | Commit |
+|---------|--------|--------|
+| **App Mode button (all types)** | "App Mode" button added to file action bar on ALL file types (PDF, markdown, images, video, page layouts, HTML) on ALL vaults (read-only and writable). Lifts `.sb-file__content`. | `124a81b`, `cdcff8b` (08 May) |
+| **HTML auto-re-lift** | When App Mode is active and user navigates to an HTML file inside the iframe, banner re-lifts on the new content element | `vault-browse-edit.js` |
+| **HTML split-view editor** | HTML files: raw source textarea (left) + sandboxed live-preview iframe (right). Preview updates 600ms after typing stops. Edit button in action bar; Save/Cancel. | `85d3d16` (09 May) |
+| **Text/code/markdown edit** | Edit/Save/Cancel for non-HTML text files (writable vaults only) | pre-v0.2.2 |
+| **Upload Files button** | Opens file picker for multi-file upload to vault (writable vaults) | pre-v0.2.2 |
+| **New File button (BRW-024)** | Creates new empty file in vault; name prompt; writable vaults | `e56da6a` (08 May) |
+| **Refresh button** | Re-fetches current file from vault and re-renders; all file types, writable vaults | pre-v0.2.2 |
+
+**VFS pipeline for edit preview** (commit `2a079ee`, 08 May): identical `_inlineHtmlAssets` VFS
+pipeline used for both the view iframe and the edit split-view live preview.
+
+#### v0.2.3 — JS API layer (branch `claude/review-vault-ui-Hh145`, 2026-05-11)
+
+**Status:** Code-complete on feature branch. Pending vault-loader refactoring before merge to dev.
+
+IFD overlay on v0.2.2. Files at `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/`. Adopts the
+`sg-tool-api` pattern (already live on infographic-gen, voice-memo, video-creator) — wraps
+existing `VaultShell` + `VaultDataSource` internals in a registered `SgToolApi` instance so
+documentation agents and QA can drive the vault programmatically.
+
+| Capability | Status |
+|-----------|--------|
+| `window.__tool` set after `tool:ready` | **EXISTS** — `vault-tool-api.js` |
+| `window.__tool_registry.find('vault')` | **EXISTS** — slug `'vault'` |
+| `window.__tool.getState()` | **EXISTS** — sync, returns `{ vaultId, title, decrypted, syncState, activeView, openTabs }` |
+| `window.__tool.waitForReady()` | **EXISTS** — async, 30s timeout |
+| `window.__tool.navigateTo({ tab })` | **EXISTS** — async, iframe-aware render detection |
+| `window.__tool.getSkills()` | **EXISTS** — returns SKILL file paths |
+| `_common/manifest.json` | **EXISTS** — feeds `<sg-tool-api-manifest>` |
+| SKILL-human.md / SKILL-browser.md / SKILL-api.md | **EXISTS** at `_common/skills/` |
+| sg-tool-api dev panel in Debug sidebar | **EXISTS** — "Tool API" tab in `_toggleDebug` patch |
+| `vault-loader` routing architecture | **DOES NOT EXIST in v0.2.3** — will be merged in post-refactor version |
+| Phase 2 file ops (`getTree`, `readFile`, etc.) | **PROPOSED** |
+| Phase 3 mutations + push/pull | **PROPOSED** |
+
+**Key files:**
+- `_common/js/components/vault-tool-api/vault-tool-api.js` — ES module wrapper (phase 1, 4 methods)
+- `_common/js/components/vault-tool-api/vault-events.js` — frozen `VAULT_EVENTS` constants
+- `_common/skills/SKILL-human.md` — human guide
+- `_common/skills/SKILL-browser.md` — Playwright/browser-console guide with full examples
+- `_common/skills/SKILL-api.md` — machine-readable method + event spec
+- `_common/manifest.json` — tool manifest for `<sg-tool-api-manifest>` component
+
+**Backward compat:** `window.sgraphVault.events` untouched. SgToolApi layer is purely additive.
+
+**Architect review:** Approved — two commits `df21d44` + `13b1719`. Plan doc at
+`team/roles/dev/reviews/05/08/v0.2.3__dev__vault-js-api-plan.md`.
 
 ---
 
@@ -106,35 +227,6 @@ Zero-knowledge maintained throughout.
 
 ---
 
----
-
-### Vault UI (latest: v0.2.3, base: v0.2.0)
-
-**Path:** `sgraph_ai_app_send__ui__vault/`  
-Separate from the User UI. A dedicated vault client served at `vault.sgraph.ai`.
-
-**v0.2.0** — Major IFD rewrite. VaultShell orchestrator, VaultDataSource adapter, sg-layout file browser, vault-auth, vault-header, vault-nav, vault-settings, vault-status-bar, vault-sgit-view (8 tabs). Code at `v0/v0.2/v0.2.0/`.
-
-**v0.2.1** — IFD overlay: site header component, sg-vault sync patches, browse `/en-gb/browse/`. Code at `v0/v0.2/v0.2.1/`.
-
-**v0.2.2** — IFD overlay: App Mode (sg-app-banner), vault-browse-edit overlay, BRW-022 polish. Code at `v0/v0.2/v0.2.2/`. Patches: `_applyAppJson`, `_onLock` redirect, `_setupVaultLinkHandler`.
-
-**v0.2.3** — IFD overlay: **JS API layer** (`window.__tool` via `SgToolApi`). Phase 1: `getState`, `waitForReady`, `navigateTo`, `getSkills`. 3 SKILL files (human/browser/api). sg-tool-api dev panel components (`sg-tool-api-explorer`, `sg-tool-api-console`, `sg-tool-api-manifest`). Code at `v0/v0.2/v0.2.3/`.
-
-| Capability | Status |
-|-----------|--------|
-| `window.__tool` set after `tool:ready` | **EXISTS** v0.2.3 |
-| `window.__tool_registry.find('vault')` | **EXISTS** v0.2.3 |
-| `window.__tool.getState()` | **EXISTS** v0.2.3 |
-| `window.__tool.waitForReady()` | **EXISTS** v0.2.3 |
-| `window.__tool.navigateTo({ tab })` | **EXISTS** v0.2.3 |
-| `window.__tool.getSkills()` | **EXISTS** v0.2.3 |
-| SKILL-human.md, SKILL-browser.md, SKILL-api.md | **EXISTS** v0.2.3 |
-| `getTree`, `getFileList`, `readFile`, `getFileMeta` (Phase 2) | PROPOSED |
-| `writeFile`, `renameFile`, `deleteFile`, `push`, `pull` (Phase 3) | PROPOSED |
-
----
-
 ## PROPOSED
 
 Full list: [proposed/index.md](proposed/index.md)
@@ -145,3 +237,15 @@ Full list: [proposed/index.md](proposed/index.md)
 - **Vault upload beta** in main SG/Send UI (doc 281) — integrate vault-push into upload wizard
 - **Room + Vault pages** migrated to v0.3.0 IFD architecture
 - **`<sg-vault-picker>`** — vault selection Web Component (doc 297)
+
+---
+
+## Recent Activity (not yet folded into the curated EXISTS section)
+
+- **2026-05-09** — Vault UI `v0.2.2` HTML iframe rendering bug fixes: data-URI inlining
+  (eliminates `</script>`/`</style>` parser bugs), edit-mode preview now reuses the main
+  `.sb-file__html-frame` iframe (single iframe across view + edit), iframe gets
+  `background:#fff; color-scheme:light`, duplicate `App Mode` button removed, `_ext0`
+  hoisting fixed. Files: `send-browse--v0.3.2.js`, `vault-browse-edit.js`. See
+  [`team/comms/changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md`](../../../comms/changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md).
+  Librarian: please fold into the curated EXISTS section on next daily run.

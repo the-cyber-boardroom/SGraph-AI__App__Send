@@ -1,0 +1,82 @@
+name: Vault UI Tests (reusable)
+
+# Reusable workflow — invoked by both:
+#   - test-ui-vault.yml   (push / PR / manual)
+#   - deploy-ui-vault.yml (gates the deploy job via `needs:`)
+#
+# Defines the unit → integration → E2E pipeline once. Job definitions live
+# here so the deploy gate and the standalone CI signal cannot drift apart.
+
+on:
+  workflow_call:
+
+jobs:
+  # ── Unit tests (~5s): pure JS, Node + jsdom, zero network ─────────────────
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:vault-unit
+
+  # ── Integration tests (~10s): Node + jsdom + in-memory SGVault stub ───────
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:vault-integration
+
+  # ── E2E tests (~60s): Playwright + local file server ──────────────────────
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [unit, integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:vault-e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

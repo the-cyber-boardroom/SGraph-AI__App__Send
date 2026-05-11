@@ -51,6 +51,12 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
 
     SNAPSTART_ALIAS = 'snapstart'
 
+    def disable_snapstart(self):                                                   # Disable SnapStart — set ApplyOn=None, wait for update
+        lf = self.lambda_function()
+        lf.configuration_update(SnapStart={'ApplyOn': 'None'})
+        lf.wait_for_function_update_to_complete()
+        return dict(snapstart = 'disabled')
+
     def enable_snapstart(self):                                                   # Enable SnapStart: configure → wait → publish version → alias → alias Function URL
         lf = self.lambda_function()
 
