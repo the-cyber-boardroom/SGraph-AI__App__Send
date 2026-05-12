@@ -96,7 +96,7 @@
             // Clone head reachable from named → clone is BEHIND
             if (namedAncestors.has(cloneHead)) {
                 const commits = await walkChain(namedHead);
-                this._renderHistoryLinear(container, commits, namedHead);
+                this._renderHistoryLinear(container, commits, namedHead, cloneHead);
                 return;
             }
 
@@ -283,7 +283,10 @@
 
         // --- Linear (single-chain) renderer (used for BEHIND path) ---------------
 
-        _renderHistoryLinear(container, commits, namedHeadId) {
+        // cloneHeadId is optional. When provided (BEHIND mode), the chain was walked
+        // from namedHead so the Working HEAD may not appear in the list; badges are
+        // keyed off commit.id rather than position so we don't mislabel namedHead.
+        _renderHistoryLinear(container, commits, namedHeadId, cloneHeadId) {
             if (!commits || commits.length === 0) {
                 container.innerHTML = '<div class="sgit-empty">No commits found</div>';
                 return;
@@ -296,7 +299,7 @@
                         <span class="sgit-ch-id">Commit</span>
                         <span class="sgit-ch-date">Date</span>
                     </div>
-                    ${commits.map((c, i) => this._renderCommitRow(c, i, commits.length, namedHeadId)).join('')}
+                    ${commits.map((c, i) => this._renderCommitRow(c, i, commits.length, namedHeadId, cloneHeadId)).join('')}
                 </div>
             `;
         },
@@ -469,7 +472,7 @@
 
         // --- Single row for linear mode ------------------------------------------
 
-        _renderCommitRow(commit, index, total, namedHeadId) {
+        _renderCommitRow(commit, index, total, namedHeadId, cloneHeadId) {
             if (commit._error) {
                 return `<div class="sgit-commit-row">
                     <span class="sgit-ch-graph"><span class="sgit-graph-dot sgit-graph-dot--error"></span></span>
@@ -479,7 +482,11 @@
                 </div>`;
             }
 
-            const isHead      = index === 0;
+            // In BEHIND mode (cloneHeadId provided) the chain was walked from namedHead,
+            // so the row at index 0 is namedHead — not the working head. Key the badges
+            // off commit.id when we know cloneHeadId; fall back to position for the
+            // pre-existing single-chain callers that walk from the working head.
+            const isHead      = cloneHeadId ? commit.id === cloneHeadId : index === 0;
             const isNamedHere = namedHeadId && commit.id === namedHeadId && !isHead;
             const msg         = commit.message || '(no message)';
             const date        = commit.timestamp_ms
@@ -488,10 +495,10 @@
             const branch  = commit.branch_id || '';
             const hasLine = index < total - 1;
 
-            return `<div class="sgit-commit-row${isHead ? ' sgit-commit-row--head' : ''}">
+            return `<div class="sgit-commit-row${(isHead || isNamedHere) ? ' sgit-commit-row--head' : ''}">
                 <span class="sgit-ch-graph">
                     <span class="sgit-graph-line-top${index === 0 ? ' sgit-graph-line--hidden' : ''}"></span>
-                    <span class="sgit-graph-dot${isHead ? ' sgit-graph-dot--head' : ''}"></span>
+                    <span class="sgit-graph-dot${(isHead || isNamedHere) ? ' sgit-graph-dot--head' : ''}"></span>
                     <span class="sgit-graph-line-bottom${!hasLine ? ' sgit-graph-line--hidden' : ''}"></span>
                 </span>
                 <span class="sgit-ch-msg">
