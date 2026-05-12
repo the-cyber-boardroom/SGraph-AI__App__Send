@@ -115,6 +115,7 @@
         }
 
         setReadOnly(isReadOnly) {
+            this._isReadOnly = isReadOnly;
             const badge = this.shadowRoot.querySelector('.vh-readonly-badge');
             if (badge) badge.style.display = isReadOnly ? '' : 'none';
             if (!isReadOnly) this._hideUnlockPanel();
@@ -135,9 +136,12 @@
         _hideUnlockPanel() {
             const panel = this.shadowRoot.querySelector('.vh-unlock-panel');
             if (panel) panel.style.display = 'none';
-            // Restore badge if still read-only (shell will hide it on successful unlock)
-            const badge = this.shadowRoot.querySelector('.vh-readonly-badge');
-            if (badge) badge.style.display = '';
+            // Only restore the badge when cancelling — not after a successful unlock
+            // (setReadOnly(false) already hid the badge before calling here)
+            if (this._isReadOnly !== false) {
+                const badge = this.shadowRoot.querySelector('.vh-readonly-badge');
+                if (badge) badge.style.display = '';
+            }
         }
 
         _applyUnlock() {
