@@ -383,7 +383,8 @@
                     }
                 }
 
-                this._syncState = { ahead, behind, diverged };
+                this._syncState   = { ahead, behind, diverged };
+                this._lastSyncedAt = Date.now();
                 const header = this.querySelector('vault-header');
                 header?.setAheadCount(ahead);
                 header?.setBehindCount(behind);
@@ -450,11 +451,15 @@
             const header = this.querySelector('vault-header');
             header?.setPullBusy(true);
             try {
+                const prevHead = this._vault._headCommitId;
                 const changed = await this._vault.pull();
                 if (changed) {
                     await this._mountBrowse();
                     this.querySelector('vault-status-bar')?.updateStats(this._vault);
                     await this._refreshSyncState();
+                    window.dispatchEvent(new CustomEvent('sg-vault-synced', {
+                        detail: { prevHead, newHead: this._vault._headCommitId }
+                    }));
                     window.sgraphVault.messages.success('Pulled \u2014 vault updated from named branch');
                     if (this._activeView === 'sgit') {
                         const sgit = this.querySelector('vault-sgit-view');
@@ -468,6 +473,36 @@
             } finally {
                 header?.setPullBusy(false);
             }
+        }
+
+        // Non-destructive in-place refresh — pulls upstream changes and refreshes
+        // chrome WITHOUT destroying the active SG/App iframe.
+        // Called by sg.sync.refresh() via the VFS bridge.
+        async _refreshInPlace() {
+            if (!this._vault) throw new Error('No vault');
+            const prevHead = this._vault._headCommitId;
+
+            // Push any unsynced local commits first so pull doesn't diverge
+            const { ahead } = this._syncState || {};
+            if (ahead > 0 && this._accessKey) {
+                await this._vault.push();
+            }
+
+            const changed = await this._vault.pull();
+            const newHead  = this._vault._headCommitId;
+
+            // Refresh chrome (status bar + sync state) without remounting the iframe
+            this.querySelector('vault-status-bar')?.updateStats(this._vault);
+            await this._refreshSyncState();
+
+            // Notify the active VFS bridge so it can refresh fileList and cache
+            if (changed) {
+                window.dispatchEvent(new CustomEvent('sg-vault-synced', {
+                    detail: { prevHead, newHead }
+                }));
+            }
+
+            return { from: prevHead, to: newHead, changed: !!changed };
         }
 
         async _onAutoMerge() {
@@ -487,6 +522,7 @@
             if (syncBtn) { syncBtn.disabled = true; syncBtn.textContent = 'Syncing…'; }
             window.sgraphVault.messages.info('Merging collaborator changes\u2026');
             try {
+                const mergeHead = this._vault._headCommitId;
                 const result = await this._vault.merge(namedHead);
                 if (result?.merged) {
                     // Refresh whatever view the user is already on — don't navigate away
@@ -499,6 +535,9 @@
                         await this._mountBrowse();
                     }
                     await this._refreshSyncState();
+                    window.dispatchEvent(new CustomEvent('sg-vault-synced', {
+                        detail: { prevHead: mergeHead, newHead: this._vault._headCommitId }
+                    }));
 
                     if (result.conflicts?.length > 0) {
                         window.sgraphVault.messages.warn(
@@ -586,10 +625,14 @@
             // We are cleanly behind — safe to auto-pull
             window.sgraphVault.messages.info('Syncing vault\u2026')
             try {
+                const autoSyncPrevHead = this._vault._headCommitId
                 const result = await this._vault.merge(liveNamedHead)
                 if (result.merged) {
                     await this._mountBrowse()
                     await this._refreshSyncState()
+                    window.dispatchEvent(new CustomEvent('sg-vault-synced', {
+                        detail: { prevHead: autoSyncPrevHead, newHead: this._vault._headCommitId }
+                    }))
                     if (result.conflicts?.length > 0) {
                         window.sgraphVault.messages.warn(
                             `Synced \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
