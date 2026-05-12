@@ -1,0 +1,15 @@
+SGraph Send — Test File (Plain Text)
+======================================
+
+This is a test file for the SGraph Send encrypted file sharing platform.
+
+How it works:
+  1. Drag this file into the upload zone (or click upload)
+  2. The file is encrypted in your browser using AES-256-GCM
+  3. Only encrypted ciphertext is sent to the server
+  4. You receive a link + decryption key to share
+
+The server never sees this text. Your decryption key never leaves your device.
+
+Size: Under 1 KB
+Created: 2026-03-02

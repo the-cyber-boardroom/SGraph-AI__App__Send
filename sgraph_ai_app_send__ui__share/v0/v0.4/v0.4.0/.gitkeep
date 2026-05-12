@@ -1,0 +1,10 @@
+Sender (share) IFD tree — v0.4.0 base.
+
+This directory will hold the wizard, unified Done component, kill-link UI,
+ephemeral-by-default defaults, and all NEW v0.4.0 sender UX work.
+
+URL: send.sgraph.ai/en-gb/share/
+
+Scaffolded in Phase A0 (empty). Files arrive in Phase A-share onwards.
+
+Plan: team/roles/architect/reviews/05/10/v0.27.29__plan__v0.4.0-major-release.md

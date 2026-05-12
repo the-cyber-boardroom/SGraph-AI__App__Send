@@ -47,7 +47,10 @@ class VsVaultLoader extends HTMLElement {
   .vsl-check { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.3rem; }
   .vsl-check label { font-size: 0.72rem; color: var(--text); cursor: pointer; }
 </style>
-<div class="vsl-label">Vault key</div>
+<div class="vsl-label">
+  Vault key
+  <span id="vsl-current-hint" style="float:right;font-weight:400;text-transform:none;letter-spacing:0;color:var(--teal);display:none;cursor:pointer;font-size:0.68rem">↻ use current vault</span>
+</div>
 <input class="vsl-input" id="vsl-key" type="text" placeholder="word-word-NNNN or passphrase:vault_id" autocomplete="off" spellcheck="false">
 <div class="vsl-row">
   <button class="vsl-btn vsl-btn--primary" id="vsl-load">Load vault</button>
@@ -63,8 +66,10 @@ class VsVaultLoader extends HTMLElement {
   <input class="vsl-input" id="vsl-tok" type="password" placeholder="(optional — needed for writes)">
 </div>`
 
-        const epEl  = this.querySelector('#vsl-ep')
-        const tokEl = this.querySelector('#vsl-tok')
+        const epEl   = this.querySelector('#vsl-ep')
+        const tokEl  = this.querySelector('#vsl-tok')
+        const keyEl  = this.querySelector('#vsl-key')
+        const hintEl = this.querySelector('#vsl-current-hint')
 
         // Restore from sessionStorage
         const savedEp  = sessionStorage.getItem('sg-vault-endpoint')
@@ -72,11 +77,27 @@ class VsVaultLoader extends HTMLElement {
         if (savedEp)  epEl.value  = savedEp
         if (savedTok) tokEl.value = savedTok
 
+        // Auto-pick up the vault currently loaded in /en-gb/vault (sg-vault-key in localStorage)
+        const currentKey = (localStorage.getItem('sg-vault-key') || '').trim()
+        if (currentKey) {
+            keyEl.value = currentKey
+            this._setStatus(`Picked up current vault from /en-gb/vault — auto-loading…`, 'ok')
+            hintEl.style.display = 'inline'
+            hintEl.title = 'Re-fill from localStorage["sg-vault-key"]'
+            hintEl.onclick = () => {
+                const k = (localStorage.getItem('sg-vault-key') || '').trim()
+                keyEl.value = k
+                this._setStatus(k ? 'Filled from current vault — click Load' : 'No current vault in localStorage', k ? '' : 'err')
+            }
+            // Auto-load so the user lands on a ready-to-run harness
+            setTimeout(() => this._load(), 0)
+        }
+
         this.querySelector('#vsl-load').onclick   = () => this._load()
         this.querySelector('#vsl-create').onclick = () => this._createEphemeral()
         this.querySelector('#vsl-clear').onclick  = () => this._clear()
 
-        this.querySelector('#vsl-key').addEventListener('keydown', e => { if (e.key === 'Enter') this._load() })
+        keyEl.addEventListener('keydown', e => { if (e.key === 'Enter') this._load() })
     }
 
     _getSetup() {

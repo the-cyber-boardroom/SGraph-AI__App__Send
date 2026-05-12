@@ -63,6 +63,10 @@ class SendBrowse extends SendComponent {
             this._vfsBridges.forEach(b => window.removeEventListener('message', b));
             this._vfsBridges = [];
         }
+        if (this._syncHandlers) {
+            this._syncHandlers.forEach(h => window.removeEventListener('sg-vault-synced', h));
+            this._syncHandlers = [];
+        }
         if (this._boundKeyHandler) {
             document.removeEventListener('keydown', this._boundKeyHandler);
             this._boundKeyHandler = null;
@@ -530,7 +534,10 @@ class SendBrowse extends SendComponent {
             // VFS bridge: intercepts fetch(), img.src setter, MutationObserver, and
             // anchor clicks for same-vault navigation.
             // [sg-vfs] logs → iframe console   [sg-vfs parent] logs → top context
-            var vfsBridgeScript =
+            //
+            // Built as a function so sg.app.selfPath reflects the CURRENT document
+            // (not the entry document) after in-iframe navigation.
+            var _buildVfsBridgeScript = function(currentPath) { return
                 '<script id="__sg-vfs">' +
                 '(function(){' +
                 'console.log("[sg-vfs] installing...");' +
@@ -656,14 +663,30 @@ class SendBrowse extends SendComponent {
                     'return _vfsMsg("__sgVfsWriteReq",{path:path,data:b64,encoding:"base64"})' +
                       '.then(function(d){return{path:path,size:d.size};});' +
                   '}' +
-                  // sg.vfs.read — returns ArrayBuffer (canonical)
-                  'function _read(path){return fetch(path).then(function(r){return r.arrayBuffer();});}' +
-                  // sg.vfs.readText — returns string (convenience)
-                  'function _readText(path){return fetch(path).then(function(r){return r.text();});}' +
+                  // sg.vfs.read — strict postMessage path (errors on missing path, no fuzzy match)
+                  'function _read(path){' +
+                    'return new Promise(function(res,rej){' +
+                      'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                      'function h(e){' +
+                        'if(!e.data||e.data.__sgVfsReadReply!==id)return;' +
+                        'window.removeEventListener("message",h);' +
+                        'if(e.data.ok)res(e.data.buf);' +
+                        'else rej(new Error(e.data.err==="ENOENT"?"No such file: "+e.data.path:(e.data.err||"Read failed")));' +
+                      '}' +
+                      'window.addEventListener("message",h);' +
+                      'window.parent.postMessage({__sgVfsReadReq:id,path:path},"*");' +
+                    '});' +
+                  '}' +
+                  // sg.vfs.readText — returns string (convenience wrapper over _read)
+                  'function _readText(path){return _read(path).then(function(buf){return new TextDecoder().decode(buf);});}' +
                   // sg.vfs.list — proper postMessage envelope, not a magic URL
                   'function _list(path){' +
                     'return _vfsMsg("__sgVfsListReq",{path:path||""})' +
-                      '.then(function(d){return d.entries||[];});' +
+                      '.then(function(d){return d.entries||[];})' +
+                      '.catch(function(err){' +
+                        'if(err.message==="ENOENT")throw new Error("No such path: "+(path||""));' +
+                        'throw err;' +
+                      '});' +
                   '}' +
                   // sg.loadCss / sg.loadJs — async asset loaders (the contract for vault HTML).
                   // Vault iframes run from a blob: URL, so the browser's native HTML parser
@@ -714,19 +737,46 @@ class SendBrowse extends SendComponent {
                     'loadCss:_loadCss,' +
                     'loadJs:_loadJs,' +
                     'app:{' +
-                      'selfPath:'   + JSON.stringify(fileName) + ',' +
+                      'selfPath:'   + JSON.stringify(currentPath) + ',' +
                       'writable:'   + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + ',' +
                       'vaultName:'  + JSON.stringify((self.dataSource && self.dataSource._vault && self.dataSource._vault.name) || '') + ',' +
                       'vaultId:'    + JSON.stringify((self.dataSource && self.dataSource._vault && self.dataSource._vault.vaultId) || '') + ',' +
                       'fileCount:'  + ((self.dataSource ? self.dataSource.getFileList().filter(function(f){return !f.dir;}).length : 0)) + ',' +
                       'totalSize:'  + ((self.dataSource ? self.dataSource.getOrigSize() : 0)) +
                     '},' +
-                    'git:{' +
-                      'status:function(){return _sgCmd("git",{action:"status"});},' +
+                    // sg.git.* — deprecated, retained for back-compat. Emits a one-shot
+                    // console.warn the first time any method is called. Authors should
+                    // migrate to sg.sync.* (preferred namespace).
+                    'git:(function(){' +
+                      'var _warned=false;' +
+                      'function _w(){if(!_warned){_warned=true;console.warn("[sg-vfs] sg.git.* is deprecated and will be removed in a future release. Please use sg.sync.* instead.");}}' +
+                      'return{' +
+                        'status:function(){_w();return _sgCmd("git",{action:"status"});},' +
+                        'check:function(){_w();return _sgCmd("git",{action:"check"});},' +
+                        'push:function(){_w();return _sgCmd("git",{action:"push"});},' +
+                        'pull:function(){_w();return _sgCmd("git",{action:"pull"});},' +
+                        'refresh:function(){_w();return _sgCmd("git",{action:"refresh"});}' +
+                      '};' +
+                    '})(),' +
+                    // sg.sync — author-facing sync namespace (preferred over sg.git)
+                    'sync:{' +
+                      'status:function(){' +
+                        'return _sgCmd("git",{action:"status"}).then(function(s){' +
+                          'return{' +
+                            'current:!s.ahead&&!s.behind&&!s.diverged,' +
+                            'serverHasNewer:s.behind>0||!!s.diverged,' +
+                            'localHasUnsynced:s.ahead>0,' +
+                            'serverVersion:s.namedHeadId,' +
+                            'writable:!!s.writable,' +
+                            'lastSyncedAt:s.lastCheckedAt||null' +
+                          '};' +
+                        '});' +
+                      '},' +
                       'check:function(){return _sgCmd("git",{action:"check"});},' +
                       'push:function(){return _sgCmd("git",{action:"push"});},' +
                       'pull:function(){return _sgCmd("git",{action:"pull"});},' +
-                      'refresh:function(){return _sgCmd("git",{action:"refresh"});}' +
+                      // Non-destructive in-place refresh — does not destroy the iframe
+                      'refresh:function(){return _sgCmd("git",{action:"syncRefresh"});}' +
                     '},' +
                     'auth:{' +
                       'hasKey:' + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + ',' +
@@ -735,7 +785,16 @@ class SendBrowse extends SendComponent {
                       'clear:function(){return _sgCmd("auth",{action:"clear"});}' +
                     '},' +
                     'ui:{' +
-                      'message:function(text,type){window.parent.postMessage({__sgUiMsg:{text:String(text||""),msgType:type||"info"}},"*");}' +
+                      'message:function(text,type,opts){' +
+                        'opts=opts||{};' +
+                        'var handle=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                        'var ttl=opts.ttl===null?null:(typeof opts.ttl==="number"?opts.ttl:3000);' +
+                        'window.parent.postMessage({__sgUiMsg:{handle:handle,text:String(text||""),msgType:type||"info",ttl:ttl}},"*");' +
+                        'return handle;' +
+                      '},' +
+                      'dismiss:function(handle){' +
+                        'window.parent.postMessage({__sgUiMsg:{handle:handle,dismiss:true}},"*");' +
+                      '}' +
                     '}' +
                   '};' +
                   // Convenience alias (backward compat with design doc examples)
@@ -745,16 +804,18 @@ class SendBrowse extends SendComponent {
                     'writable:window.sg.app.writable,selfPath:window.sg.app.selfPath' +
                   '};' +
                   'console.log("[sg-vfs] window.sg ready | writable="+window.sg.app.writable+' +
-                    '" | vaultName="+window.sg.app.vaultName+" | loaders: sg.loadCss, sg.loadJs | sg.git, sg.auth, sg.ui");' +
+                    '" | vaultName="+window.sg.app.vaultName+" | loaders: sg.loadCss, sg.loadJs | sg.sync, sg.git (deprecated), sg.auth, sg.ui");' +
                 '})();' +
 
                 '})();' +
-                '<\/script>';
+                '<\/script>'; };
+            var vfsBridgeScript = _buildVfsBridgeScript(fileName);
 
             // Declare htmlDir and fileList here so both the async inline task
             // and the VFS bridge closure share the same mutable reference.
-            var htmlDir  = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
-            var fileList = self.dataSource ? self.dataSource.getFileList() : [];
+            var htmlDir   = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
+            var fileList  = self.dataSource ? self.dataSource.getFileList() : [];
+            var _uiHandles = {}; // handle → timeout id, for sg.ui.dismiss
 
             // Wrapper div is the fullscreen target (not the iframe directly).
             // This lets us add a branded banner INSIDE the fullscreen context —
@@ -852,10 +913,13 @@ class SendBrowse extends SendComponent {
                             // sg.loadCss / sg.loadJs (the bridge contract). We only inject
                             // the bridge script and create the blob.
                             htmlDir = newDir;
+                            // Rebuild the bridge script so sg.app.selfPath reflects the
+                            // newly-navigated-to document (not the original entry).
+                            var navBridge = _buildVfsBridgeScript(navMatch.path);
                             var newHtml = self.dataSource
-                                ? newText.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                                ? newText.replace(/(<head[^>]*>)/i, '$1' + navBridge)
                                 : newText;
-                            if (self.dataSource && newHtml === newText) newHtml = vfsBridgeScript + newText;
+                            if (self.dataSource && newHtml === newText) newHtml = navBridge + newText;
                             var newBlob = new Blob([newHtml], { type: 'text/html' });
                             var newUrl  = URL.createObjectURL(newBlob);
                             self._objectUrls.push(newUrl);
@@ -895,24 +959,29 @@ class SendBrowse extends SendComponent {
                         var wSlash   = wResolved.lastIndexOf('/');
                         var wDir     = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                         var wFile    = wResolved.slice(wSlash + 1);
+                        var _wSize = wBytes.byteLength;
                         _ensureVaultFolder(self.dataSource, wDir)
                             .then(function() {
                                 return self.dataSource.saveFile(wDir, wFile, wBytes.buffer);
                             })
                             .then(function() {
                                 fileList = self.dataSource.getFileList(); // refresh after write
-                                console.log('[sg-vfs parent] wrote', wResolved, wBytes.byteLength, 'bytes');
-                                _writeReply(true, { size: wBytes.byteLength });
-                                // Auto-push: keep named ref in sync after every commit
+                                console.log('[sg-vfs parent] wrote', wResolved, _wSize, 'bytes');
                                 var ds = self.dataSource;
                                 if (ds && ds.writable && ds._vault && typeof ds._vault.push === 'function') {
-                                    ds._vault.push().catch(function(err) {
-                                        console.warn('[sg-vfs parent] auto-push failed (non-fatal):', err);
+                                    return ds._vault.push().then(function() {
+                                        var sh = window.sgraphVault && window.sgraphVault.shell;
+                                        if (sh && typeof sh._refreshSyncState === 'function') sh._refreshSyncState();
+                                        return { size: _wSize };
                                     });
                                 }
+                                return { size: _wSize };
+                            })
+                            .then(function(payload) {
+                                _writeReply(true, payload);
                             })
                             .catch(function(err) {
-                                console.error('[sg-vfs parent] write failed:', wResolved, err);
+                                console.error('[sg-vfs parent] write/push failed:', wResolved, err);
                                 _writeReply(false, { err: err.message || 'Write failed' });
                             });
                         return;
@@ -924,9 +993,16 @@ class SendBrowse extends SendComponent {
                         var entries = self.dataSource ? self.dataSource.getFileList() : [];
                         var prefix  = (e.data.path || '').replace(/^\//, '');
                         if (prefix) {
-                            entries = entries.filter(function(f) {
-                                return f.path.startsWith(prefix);
+                            // Strict: prefix must match an entry exactly or as a directory
+                            var normPrefix = prefix.endsWith('/') ? prefix : prefix + '/';
+                            var filtered = entries.filter(function(f) {
+                                return f.path === prefix || f.path.startsWith(normPrefix);
                             });
+                            if (filtered.length === 0) {
+                                try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {}
+                                return;
+                            }
+                            entries = filtered;
                         }
                         var listed = entries.map(function(f) {
                             return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
@@ -949,11 +1025,13 @@ class SendBrowse extends SendComponent {
                             var gitAction = e.data.action;
                             if (gitAction === 'status') {
                                 var ss = (shell && shell._syncState) || { ahead: 0, behind: 0, diverged: false };
+                                var lastChecked = shell && shell._lastSyncedAt ? new Date(shell._lastSyncedAt).toISOString() : null;
                                 _cmdReply(true, {
                                     ahead: ss.ahead || 0, behind: ss.behind || 0, diverged: !!ss.diverged,
                                     headCommitId: vault ? vault._headCommitId : null,
                                     namedHeadId:  vault ? vault._namedHeadId  : null,
-                                    writable: !!(self.dataSource && self.dataSource.writable)
+                                    writable: !!(self.dataSource && self.dataSource.writable),
+                                    lastCheckedAt: lastChecked
                                 });
                                 return;
                             }
@@ -987,6 +1065,25 @@ class SendBrowse extends SendComponent {
                                     shell._onRefresh().then(function() { _cmdReply(true, {}); })
                                         .catch(function(err) { _cmdReply(false, null, err.message); });
                                 } else { _cmdReply(false, null, 'Shell not available'); }
+                                return;
+                            }
+                            // Non-destructive in-place refresh (sg.sync.refresh)
+                            if (gitAction === 'syncRefresh') {
+                                if (!shell || typeof shell._refreshInPlace !== 'function') {
+                                    _cmdReply(false, null, 'Shell does not support in-place refresh');
+                                    return;
+                                }
+                                var preRefreshCount = fileList.filter(function(f) { return !f.dir; }).length;
+                                shell._refreshInPlace().then(function(res) {
+                                    fileList = self.dataSource ? self.dataSource.getFileList() : fileList;
+                                    var postCount = fileList.filter(function(f) { return !f.dir; }).length;
+                                    _cmdReply(true, {
+                                        from:         res.from,
+                                        to:           res.to,
+                                        changed:      res.changed,
+                                        filesChanged: Math.abs(postCount - preRefreshCount)
+                                    });
+                                }).catch(function(err) { _cmdReply(false, null, err.message); });
                                 return;
                             }
                             _cmdReply(false, null, 'Unknown git action: ' + e.data.action);
@@ -1033,22 +1130,82 @@ class SendBrowse extends SendComponent {
                         return;
                     }
 
-                    // ── sg.ui.message (fire-and-forget, no reply) ───────────
+                    // ── sg.ui.message / sg.ui.dismiss ──────────────────────
                     if (e.data.__sgUiMsg) {
-                        var uiText = String(e.data.__sgUiMsg.text || '');
-                        var uiType = e.data.__sgUiMsg.msgType || 'info';
+                        var uiMsg    = e.data.__sgUiMsg;
+                        var uiHandle = uiMsg.handle || '';
                         var uiBanner = document.querySelector('sg-app-banner');
+                        var _icons   = { info: '•', success: '✓', warn: '⚠', error: '✗' };
+
+                        function _uiDismiss() {
+                            if (uiBanner && typeof uiBanner.isActive === 'function' && uiBanner.isActive()) {
+                                // Clear with a 1ms TTL — shortest the banner accepts
+                                if (typeof uiBanner.clearStatus === 'function') uiBanner.clearStatus();
+                                else uiBanner.showStatus('', '', 1);
+                            }
+                        }
+
+                        // Dismiss path
+                        if (uiMsg.dismiss) {
+                            if (_uiHandles[uiHandle]) { clearTimeout(_uiHandles[uiHandle]); delete _uiHandles[uiHandle]; }
+                            _uiDismiss();
+                            return;
+                        }
+
+                        var uiText = String(uiMsg.text || '');
+                        var uiType = uiMsg.msgType || 'info';
+                        // ttl: null → persistent, number → auto-dismiss after that ms, missing → default 3000ms
+                        var uiTtl  = uiMsg.ttl === null ? null : (typeof uiMsg.ttl === 'number' ? uiMsg.ttl : 3000);
+
                         if (uiBanner && typeof uiBanner.isActive === 'function' && uiBanner.isActive()) {
-                            var _icons = { info: '•', success: '✓', warn: '⚠', error: '✗' };
                             if (uiType === 'error') {
                                 uiBanner.showStatusError(uiText, '');
                             } else {
-                                uiBanner.showStatus(_icons[uiType] || '•', uiText, uiType === 'success' ? 3000 : undefined);
+                                // Pass no built-in TTL — we manage the timer ourselves for dismiss support
+                                uiBanner.showStatus(_icons[uiType] || '•', uiText);
                             }
                         } else if (window.sgraphVault && window.sgraphVault.messages) {
                             var _msgFn = window.sgraphVault.messages[uiType] || window.sgraphVault.messages.info;
                             _msgFn.call(window.sgraphVault.messages, uiText);
                         }
+
+                        if (uiHandle) {
+                            if (_uiHandles[uiHandle]) clearTimeout(_uiHandles[uiHandle]);
+                            if (uiTtl !== null) {
+                                _uiHandles[uiHandle] = setTimeout(function() {
+                                    delete _uiHandles[uiHandle];
+                                    _uiDismiss();
+                                }, uiTtl);
+                            }
+                        }
+                        return;
+                    }
+
+                    // ── sg.vfs.read / sg.vfs.readText (strict author API) ───
+                    if (e.data.__sgVfsReadReq) {
+                        var readId   = e.data.__sgVfsReadReq;
+                        var readSrc  = e.source;
+                        function _readReply(ok, payload) {
+                            try { readSrc.postMessage(Object.assign({ __sgVfsReadReply: readId, ok: ok }, payload), '*'); } catch (_) {}
+                        }
+                        if (!self.dataSource) { _readReply(false, { err: 'No data source' }); return; }
+                        var rPath    = e.data.path || '';
+                        var rPathErr = _validateVfsPath(rPath, htmlDir);
+                        if (rPathErr) { _readReply(false, { err: rPathErr }); return; }
+                        var rResolved = rPath.startsWith('/') ? rPath.slice(1) : _resolvePath(htmlDir, rPath);
+                        var rMatch    = _findEntryStrict(fileList, rResolved);
+                        if (!rMatch) {
+                            console.warn('[sg-vfs parent] ENOENT (strict):', rResolved);
+                            _readReply(false, { err: 'ENOENT', path: rResolved });
+                            return;
+                        }
+                        self.dataSource.getFileBytes(rMatch.path).then(function(buf) {
+                            var ext3 = rMatch.path.split('.').pop().toLowerCase();
+                            var mime2 = _vfsMime[ext3] || 'application/octet-stream';
+                            _readReply(true, { buf: buf, mime: mime2, path: rMatch.path });
+                        }).catch(function(err) {
+                            _readReply(false, { err: err.message || 'Read failed' });
+                        });
                         return;
                     }
 
@@ -1092,6 +1249,20 @@ class SendBrowse extends SendComponent {
                 window.addEventListener('message', vfsBridge);
                 if (!self._vfsBridges) self._vfsBridges = [];
                 self._vfsBridges.push(vfsBridge);
+
+                // Refresh fileList and notify iframe when vault shell syncs new content
+                var _vaultSyncedHandler = function(evt) {
+                    fileList = self.dataSource ? self.dataSource.getFileList() : [];
+                    try {
+                        iframeEl.contentWindow.postMessage({
+                            __sgVfsCacheInvalidate: true,
+                            version: evt.detail && evt.detail.newHead || null
+                        }, '*');
+                    } catch (_) {}
+                };
+                window.addEventListener('sg-vault-synced', _vaultSyncedHandler);
+                if (!self._syncHandlers) self._syncHandlers = [];
+                self._syncHandlers.push(_vaultSyncedHandler);
             }
 
             // Inject bridge → create blob → set iframe src.
@@ -1501,7 +1672,14 @@ function _resolvePath(base, relative) {
     return resolved.join('/');
 }
 
+// ─── Find entry — strict exact match only (author API: sg.vfs.read/readText) ─
+function _findEntryStrict(fileList, resolved) {
+    try { resolved = decodeURIComponent(resolved); } catch (_) {}
+    return fileList.find(function(e) { return !e.dir && e.path === resolved; }) || null;
+}
+
 // ─── Find entry by resolved path (BRW-011: URL decode, fuzzy matching) ──────
+// Used for legacy HTML asset resolution (img.src, anchor nav) — NOT author API.
 function _findEntry(fileList, resolved) {
     try { resolved = decodeURIComponent(resolved); } catch (_) {}
 
