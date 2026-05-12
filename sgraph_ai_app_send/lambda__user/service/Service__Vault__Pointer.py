@@ -206,7 +206,7 @@ class Service__Vault__Pointer(Type_Safe):                                       
         return dict(vault_id = vault_id ,
                     results  = results  )
 
-    def delete_vault(self, vault_id, write_key_hex):                              # Delete all files belonging to a vault — leaves tombstone to block re-creation
+    def delete_vault(self, vault_id, write_key_hex, purge=False):                 # Delete all files belonging to a vault; purge=True skips the tombstone
         submitted_hash = self._hash_write_key(write_key_hex)
         if not self._check_vault_write_key(vault_id, submitted_hash):
             return None                                                          # Auth failure (also catches already-deleted vaults)
@@ -219,16 +219,22 @@ class Service__Vault__Pointer(Type_Safe):                                       
             self.storage_fs.file__delete(str(path))
             files_deleted += 1
 
-        tombstone = dict(vault_id   = vault_id       ,                          # Non-sensitive, non-encrypted metadata only
-                         status     = 'deleted'      ,
-                         deleted_at = Timestamp_Now() )
-        self.storage_fs.file__save(path__vault_tombstone(vault_id),
-                                   json.dumps(tombstone).encode())
-        self._manifest_cache[vault_id] = tombstone                              # Cache tombstone — any further writes in this instance fail fast
+        if purge:
+            self._manifest_cache.pop(vault_id, None)                            # Clear cache without tombstone — vault_id becomes fully reusable
+            tombstone_written = False
+        else:
+            tombstone = dict(vault_id   = vault_id       ,                      # Non-sensitive, non-encrypted metadata only
+                             status     = 'deleted'      ,
+                             deleted_at = Timestamp_Now() )
+            self.storage_fs.file__save(path__vault_tombstone(vault_id),
+                                       json.dumps(tombstone).encode())
+            self._manifest_cache[vault_id] = tombstone                          # Cache tombstone — any further writes in this instance fail fast
+            tombstone_written = True
 
-        return dict(status        = 'deleted'     ,
-                    vault_id      = vault_id       ,
-                    files_deleted = files_deleted  )
+        return dict(status            = 'deleted'        ,
+                    vault_id          = vault_id          ,
+                    files_deleted     = files_deleted     ,
+                    tombstone_written = tombstone_written )
 
     def ensure_public_vault_json(self, vault_id, read_key_b64):                   # Write public-vault.json on first push to a public vault (idempotent)
         path = path__vault_public_vault_json(vault_id)

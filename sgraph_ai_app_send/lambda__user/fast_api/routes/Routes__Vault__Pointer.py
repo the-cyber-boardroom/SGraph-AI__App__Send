@@ -293,9 +293,11 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if body.get('vault_id', '') != str(vault_id):
             raise HTTPException(status_code = 409,
                                 detail      = 'vault_id in body does not match vault_id in URL')
+        purge   = bool(body.get('purge', False))
         service = self._get_vault_service(request)
         result  = service.delete_vault(vault_id      = str(vault_id),
-                                       write_key_hex = write_key    )
+                                       write_key_hex = write_key    ,
+                                       purge         = purge        )
         if result is None:
             raise HTTPException(status_code = 403,
                                 detail      = 'Write key mismatch')
@@ -320,10 +322,6 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
     def read_base64__vault_id(self, vault_id: str):                              # GET /vault/read-base64/{vault_id} — missing file_id
         raise HTTPException(status_code=400, detail='Missing file_id in path')
 
-    @route_path('/delete/{vault_id}')
-    async def delete__vault_id(self, vault_id: str):                             # DELETE /vault/delete/{vault_id} — missing file_id
-        raise HTTPException(status_code=400, detail='Missing file_id in path')
-
     def setup_routes(self):                                                      # Register all endpoints
         self.add_route_put   (self.write__vault_id__file_id       )
         self.add_route_get   (self.read__vault_id__file_id        )
@@ -338,5 +336,4 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         self.add_route_put   (self.write__vault_id                )              # Catch: missing file_id
         self.add_route_get   (self.read__vault_id                 )              # Catch: missing file_id
         self.add_route_get   (self.read_base64__vault_id          )              # Catch: missing file_id
-        self.add_route_delete(self.delete__vault_id               )              # Catch: missing file_id
         return self
