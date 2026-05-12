@@ -238,7 +238,12 @@
             this._setAccessStatus('Checking…', 'info');
 
             try {
-                const resp = await fetch(`${window.location.origin}/api/transfers/check_token/${encodeURIComponent(key)}`);
+                // The check-token API lives on the SG-Send backend (e.g. dev.send.sgraph.ai),
+                // not on the vault static-site origin (dev.vault.sgraph.ai). window.location.origin
+                // pointed at the wrong host and the path used an underscore — the request landed
+                // on S3 and came back as <Error><Code>AccessDenied</Code>.
+                const endpoint = this._vault?._sgSend?.endpoint || 'https://dev.send.sgraph.ai';
+                const resp = await fetch(`${endpoint}/api/transfers/check-token/${encodeURIComponent(key)}`);
                 if (!resp.ok) {
                     this._setAccessStatus('Server error — could not validate', 'error');
                     return;
