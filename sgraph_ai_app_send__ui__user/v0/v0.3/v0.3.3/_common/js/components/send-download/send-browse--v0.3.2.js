@@ -656,10 +656,22 @@ class SendBrowse extends SendComponent {
                     'return _vfsMsg("__sgVfsWriteReq",{path:path,data:b64,encoding:"base64"})' +
                       '.then(function(d){return{path:path,size:d.size};});' +
                   '}' +
-                  // sg.vfs.read — returns ArrayBuffer (canonical)
-                  'function _read(path){return fetch(path).then(function(r){return r.arrayBuffer();});}' +
-                  // sg.vfs.readText — returns string (convenience)
-                  'function _readText(path){return fetch(path).then(function(r){return r.text();});}' +
+                  // sg.vfs.read — strict postMessage path (errors on missing path, no fuzzy match)
+                  'function _read(path){' +
+                    'return new Promise(function(res,rej){' +
+                      'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                      'function h(e){' +
+                        'if(!e.data||e.data.__sgVfsReadReply!==id)return;' +
+                        'window.removeEventListener("message",h);' +
+                        'if(e.data.ok)res(e.data.buf);' +
+                        'else rej(new Error(e.data.err==="ENOENT"?"No such file: "+e.data.path:(e.data.err||"Read failed")));' +
+                      '}' +
+                      'window.addEventListener("message",h);' +
+                      'window.parent.postMessage({__sgVfsReadReq:id,path:path},"*");' +
+                    '});' +
+                  '}' +
+                  // sg.vfs.readText — returns string (convenience wrapper over _read)
+                  'function _readText(path){return _read(path).then(function(buf){return new TextDecoder().decode(buf);});}' +
                   // sg.vfs.list — proper postMessage envelope, not a magic URL
                   'function _list(path){' +
                     'return _vfsMsg("__sgVfsListReq",{path:path||""})' +
@@ -728,6 +740,24 @@ class SendBrowse extends SendComponent {
                       'pull:function(){return _sgCmd("git",{action:"pull"});},' +
                       'refresh:function(){return _sgCmd("git",{action:"refresh"});}' +
                     '},' +
+                    // sg.sync — author-facing sync namespace (preferred over sg.git)
+                    'sync:{' +
+                      'status:function(){' +
+                        'return _sgCmd("git",{action:"status"}).then(function(s){' +
+                          'return{' +
+                            'current:!s.ahead&&!s.behind&&!s.diverged,' +
+                            'serverHasNewer:s.behind>0||!!s.diverged,' +
+                            'localHasUnsynced:s.ahead>0,' +
+                            'serverVersion:s.namedHeadId,' +
+                            'writable:!!s.writable' +
+                          '};' +
+                        '});' +
+                      '},' +
+                      'check:function(){return _sgCmd("git",{action:"check"});},' +
+                      'push:function(){return _sgCmd("git",{action:"push"});},' +
+                      'pull:function(){return _sgCmd("git",{action:"pull"});},' +
+                      'refresh:function(){return _sgCmd("git",{action:"refresh"});}' +
+                    '},' +
                     'auth:{' +
                       'hasKey:' + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + ',' +
                       'setKey:function(key){return _sgCmd("auth",{action:"setKey",key:key});},' +
@@ -735,7 +765,16 @@ class SendBrowse extends SendComponent {
                       'clear:function(){return _sgCmd("auth",{action:"clear"});}' +
                     '},' +
                     'ui:{' +
-                      'message:function(text,type){window.parent.postMessage({__sgUiMsg:{text:String(text||""),msgType:type||"info"}},"*");}' +
+                      'message:function(text,type,opts){' +
+                        'opts=opts||{};' +
+                        'var handle=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                        'var ttl=opts.ttl===null?null:(typeof opts.ttl==="number"?opts.ttl:3000);' +
+                        'window.parent.postMessage({__sgUiMsg:{handle:handle,text:String(text||""),msgType:type||"info",ttl:ttl}},"*");' +
+                        'return handle;' +
+                      '},' +
+                      'dismiss:function(handle){' +
+                        'window.parent.postMessage({__sgUiMsg:{handle:handle,dismiss:true}},"*");' +
+                      '}' +
                     '}' +
                   '};' +
                   // Convenience alias (backward compat with design doc examples)
@@ -745,7 +784,7 @@ class SendBrowse extends SendComponent {
                     'writable:window.sg.app.writable,selfPath:window.sg.app.selfPath' +
                   '};' +
                   'console.log("[sg-vfs] window.sg ready | writable="+window.sg.app.writable+' +
-                    '" | vaultName="+window.sg.app.vaultName+" | loaders: sg.loadCss, sg.loadJs | sg.git, sg.auth, sg.ui");' +
+                    '" | vaultName="+window.sg.app.vaultName+" | loaders: sg.loadCss, sg.loadJs | sg.sync, sg.git (deprecated), sg.auth, sg.ui");' +
                 '})();' +
 
                 '})();' +
@@ -753,8 +792,9 @@ class SendBrowse extends SendComponent {
 
             // Declare htmlDir and fileList here so both the async inline task
             // and the VFS bridge closure share the same mutable reference.
-            var htmlDir  = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
-            var fileList = self.dataSource ? self.dataSource.getFileList() : [];
+            var htmlDir   = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
+            var fileList  = self.dataSource ? self.dataSource.getFileList() : [];
+            var _uiHandles = {}; // handle → timeout id, for sg.ui.dismiss
 
             // Wrapper div is the fullscreen target (not the iframe directly).
             // This lets us add a branded banner INSIDE the fullscreen context —
@@ -895,24 +935,29 @@ class SendBrowse extends SendComponent {
                         var wSlash   = wResolved.lastIndexOf('/');
                         var wDir     = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                         var wFile    = wResolved.slice(wSlash + 1);
+                        var _wSize = wBytes.byteLength;
                         _ensureVaultFolder(self.dataSource, wDir)
                             .then(function() {
                                 return self.dataSource.saveFile(wDir, wFile, wBytes.buffer);
                             })
                             .then(function() {
                                 fileList = self.dataSource.getFileList(); // refresh after write
-                                console.log('[sg-vfs parent] wrote', wResolved, wBytes.byteLength, 'bytes');
-                                _writeReply(true, { size: wBytes.byteLength });
-                                // Auto-push: keep named ref in sync after every commit
+                                console.log('[sg-vfs parent] wrote', wResolved, _wSize, 'bytes');
                                 var ds = self.dataSource;
                                 if (ds && ds.writable && ds._vault && typeof ds._vault.push === 'function') {
-                                    ds._vault.push().catch(function(err) {
-                                        console.warn('[sg-vfs parent] auto-push failed (non-fatal):', err);
+                                    return ds._vault.push().then(function() {
+                                        var sh = window.sgraphVault && window.sgraphVault.shell;
+                                        if (sh && typeof sh._refreshSyncState === 'function') sh._refreshSyncState();
+                                        return { size: _wSize };
                                     });
                                 }
+                                return { size: _wSize };
+                            })
+                            .then(function(payload) {
+                                _writeReply(true, payload);
                             })
                             .catch(function(err) {
-                                console.error('[sg-vfs parent] write failed:', wResolved, err);
+                                console.error('[sg-vfs parent] write/push failed:', wResolved, err);
                                 _writeReply(false, { err: err.message || 'Write failed' });
                             });
                         return;
@@ -1033,22 +1078,82 @@ class SendBrowse extends SendComponent {
                         return;
                     }
 
-                    // ── sg.ui.message (fire-and-forget, no reply) ───────────
+                    // ── sg.ui.message / sg.ui.dismiss ──────────────────────
                     if (e.data.__sgUiMsg) {
-                        var uiText = String(e.data.__sgUiMsg.text || '');
-                        var uiType = e.data.__sgUiMsg.msgType || 'info';
+                        var uiMsg    = e.data.__sgUiMsg;
+                        var uiHandle = uiMsg.handle || '';
                         var uiBanner = document.querySelector('sg-app-banner');
+                        var _icons   = { info: '•', success: '✓', warn: '⚠', error: '✗' };
+
+                        function _uiDismiss() {
+                            if (uiBanner && typeof uiBanner.isActive === 'function' && uiBanner.isActive()) {
+                                // Clear with a 1ms TTL — shortest the banner accepts
+                                if (typeof uiBanner.clearStatus === 'function') uiBanner.clearStatus();
+                                else uiBanner.showStatus('', '', 1);
+                            }
+                        }
+
+                        // Dismiss path
+                        if (uiMsg.dismiss) {
+                            if (_uiHandles[uiHandle]) { clearTimeout(_uiHandles[uiHandle]); delete _uiHandles[uiHandle]; }
+                            _uiDismiss();
+                            return;
+                        }
+
+                        var uiText = String(uiMsg.text || '');
+                        var uiType = uiMsg.msgType || 'info';
+                        // ttl: null → persistent, number → auto-dismiss after that ms, missing → default 3000ms
+                        var uiTtl  = uiMsg.ttl === null ? null : (typeof uiMsg.ttl === 'number' ? uiMsg.ttl : 3000);
+
                         if (uiBanner && typeof uiBanner.isActive === 'function' && uiBanner.isActive()) {
-                            var _icons = { info: '•', success: '✓', warn: '⚠', error: '✗' };
                             if (uiType === 'error') {
                                 uiBanner.showStatusError(uiText, '');
                             } else {
-                                uiBanner.showStatus(_icons[uiType] || '•', uiText, uiType === 'success' ? 3000 : undefined);
+                                // Pass no built-in TTL — we manage the timer ourselves for dismiss support
+                                uiBanner.showStatus(_icons[uiType] || '•', uiText);
                             }
                         } else if (window.sgraphVault && window.sgraphVault.messages) {
                             var _msgFn = window.sgraphVault.messages[uiType] || window.sgraphVault.messages.info;
                             _msgFn.call(window.sgraphVault.messages, uiText);
                         }
+
+                        if (uiHandle) {
+                            if (_uiHandles[uiHandle]) clearTimeout(_uiHandles[uiHandle]);
+                            if (uiTtl !== null) {
+                                _uiHandles[uiHandle] = setTimeout(function() {
+                                    delete _uiHandles[uiHandle];
+                                    _uiDismiss();
+                                }, uiTtl);
+                            }
+                        }
+                        return;
+                    }
+
+                    // ── sg.vfs.read / sg.vfs.readText (strict author API) ───
+                    if (e.data.__sgVfsReadReq) {
+                        var readId   = e.data.__sgVfsReadReq;
+                        var readSrc  = e.source;
+                        function _readReply(ok, payload) {
+                            try { readSrc.postMessage(Object.assign({ __sgVfsReadReply: readId, ok: ok }, payload), '*'); } catch (_) {}
+                        }
+                        if (!self.dataSource) { _readReply(false, { err: 'No data source' }); return; }
+                        var rPath    = e.data.path || '';
+                        var rPathErr = _validateVfsPath(rPath, htmlDir);
+                        if (rPathErr) { _readReply(false, { err: rPathErr }); return; }
+                        var rResolved = rPath.startsWith('/') ? rPath.slice(1) : _resolvePath(htmlDir, rPath);
+                        var rMatch    = _findEntryStrict(fileList, rResolved);
+                        if (!rMatch) {
+                            console.warn('[sg-vfs parent] ENOENT (strict):', rResolved);
+                            _readReply(false, { err: 'ENOENT', path: rResolved });
+                            return;
+                        }
+                        self.dataSource.getFileBytes(rMatch.path).then(function(buf) {
+                            var ext3 = rMatch.path.split('.').pop().toLowerCase();
+                            var mime2 = _vfsMime[ext3] || 'application/octet-stream';
+                            _readReply(true, { buf: buf, mime: mime2, path: rMatch.path });
+                        }).catch(function(err) {
+                            _readReply(false, { err: err.message || 'Read failed' });
+                        });
                         return;
                     }
 
@@ -1501,7 +1606,14 @@ function _resolvePath(base, relative) {
     return resolved.join('/');
 }
 
+// ─── Find entry — strict exact match only (author API: sg.vfs.read/readText) ─
+function _findEntryStrict(fileList, resolved) {
+    try { resolved = decodeURIComponent(resolved); } catch (_) {}
+    return fileList.find(function(e) { return !e.dir && e.path === resolved; }) || null;
+}
+
 // ─── Find entry by resolved path (BRW-011: URL decode, fuzzy matching) ──────
+// Used for legacy HTML asset resolution (img.src, anchor nav) — NOT author API.
 function _findEntry(fileList, resolved) {
     try { resolved = decodeURIComponent(resolved); } catch (_) {}
 
