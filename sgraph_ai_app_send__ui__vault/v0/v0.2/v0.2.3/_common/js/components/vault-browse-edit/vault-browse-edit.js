@@ -14,11 +14,33 @@
 
     if (typeof SendBrowse === 'undefined') return;
 
+    // --- Helper: sniff ArrayBuffer for text vs binary ---
+
+    function _isLikelyText(buffer) {
+        if (buffer.byteLength > 2 * 1024 * 1024) return false;
+        var bytes = new Uint8Array(buffer, 0, Math.min(buffer.byteLength, 4096));
+        for (var i = 0; i < bytes.length; i++) {
+            if (bytes[i] === 0) return false;
+        }
+        try {
+            new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
     // --- Patch _renderFileContent: add Edit/Save/Delete to action bar ---
 
     var _origRender = SendBrowse.prototype._renderFileContent;
 
     SendBrowse.prototype._renderFileContent = function(container, bytes, fileName, type) {
+        // Upgrade unknown-extension files to 'text' when content is decodable UTF-8.
+        // This makes .issues, Makefile, dotfiles, etc. render as text and be editable.
+        if (type === null && _isLikelyText(bytes)) {
+            type = 'text';
+        }
+
         // Call original render first
         _origRender.call(this, container, bytes, fileName, type);
 
