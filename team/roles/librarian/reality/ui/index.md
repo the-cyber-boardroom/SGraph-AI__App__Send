@@ -107,6 +107,27 @@ SGMETA envelope for filenames. Key never sent to server.
 **v0.2.1** — landing page (EXISTS since ~04/15): `en-gb/index.html` + `browse/index.html`.
 "Open a vault." hero, auto-detect input (vault key or share token), recent vaults localStorage.
 
+**v0.2.3** — overlay/extension on v0.2.2. Code at `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/`.
+First committed 2026-05-12.
+
+New page: `/en-gb/vault/token` — **Token Test Harness** developer page.
+6 files in `en-gb/vault/token/`: `index.html`, `vault-token-harness.js`, `vault-credentials.js`,
+`vault-hkdf.js`, `vault-token-manager.js`, `vault-api-log.js`.
+
+Custom elements defined:
+- `<vt-vault-loader>` — enter a vault key or ro-token, resolves & stores credentials
+- `<vt-vault-frame>` — iframe vault panel (owner teal border / RO orange border)
+- `<vt-token-manager>` — create, list, revoke read-only tokens; writes `.vault/owner/readonly-tokens.json`
+- `<vt-crypto-lab>` — HKDF derivation inspector, owner-namespace file inspector, token check
+- `<vt-storage-inspector>` — localStorage / sessionStorage viewer; access-token management
+- `<vt-api-log>` — scrolling log of all fetch() calls; masks token values as `***`
+
+New modules (Phase 2 will move to `_common/`):
+- `vault-credentials.js` — `parseCredential`, `resolveCredential`, `storeCredentials`, `getCredentials`, `clearCredentials`
+- `vault-hkdf.js` — HKDF-SHA256 key derivation + AES-256-GCM inner encryption (`deriveVaultSecretKey`, `ownerEncrypt`, `ownerDecrypt`)
+
+Routing entry added to `peek/index.html` routing table.
+
 **v0.2.2** — overlay on v0.2.1. Code at `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.2/`.
 3 files: `index.html`, `sg-app-banner.js`, `vault-browse-edit.js`. First committed 2026-05-08.
 
