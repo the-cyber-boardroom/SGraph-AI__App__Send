@@ -25,6 +25,7 @@ on:
       - main
     paths:
       - 'sgraph_ai_app_send__ui__user/v0/v0.3/**'
+      - 'sgraph_ai_app_send__ui__user/dev/**'
       - 'sgraph_ai_app_send/version'
       - 'scripts/generate_send_i18n_pages.py'
       - 'scripts/inject_build_version.py'
@@ -181,3 +182,37 @@ jobs:
 
           echo ""
           echo "=== Deployed $TOTAL version(s): ${VERSIONS[*]} ==="
+
+      - name: Deploy /dev/ tools to S3 latest/dev/
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        run: |
+          DEV_SOURCE_DIR="sgraph_ai_app_send__ui__user/dev/"
+          DEV_BUCKET_PATH="s3://${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }}/websites/sgraph-send/${{ steps.env.outputs.deploy_env }}/latest/dev/"
+
+          if [ ! -d "$DEV_SOURCE_DIR" ]; then
+            echo "  SKIP: $DEV_SOURCE_DIR does not exist"
+            exit 0
+          fi
+
+          echo ""
+          echo "=== Syncing /dev/ tools ==="
+          echo "  source: $DEV_SOURCE_DIR"
+          echo "  target: $DEV_BUCKET_PATH"
+
+          # HTML gets a short cache so redirects + updates roll out quickly.
+          aws s3 sync "$DEV_SOURCE_DIR" "$DEV_BUCKET_PATH" \
+            --exclude "*" --include "*.html" \
+            --cache-control "public, max-age=300" \
+            --content-type "text/html; charset=utf-8"
+
+          # CSS / JS / JSON get a 1-day cache (CloudFront invalidation clears stale on each deploy).
+          aws s3 sync "$DEV_SOURCE_DIR" "$DEV_BUCKET_PATH" \
+            --exclude "*" --include "*.css" --include "*.js" --include "*.json" \
+            --cache-control "public, max-age=86400"
+
+          # Everything else (images, fonts, misc) — short cache as a safe default.
+          aws s3 sync "$DEV_SOURCE_DIR" "$DEV_BUCKET_PATH" \
+            --exclude "*.html" --exclude "*.css" --exclude "*.js" --exclude "*.json" \
+            --cache-control "public, max-age=300"
+
+          echo "=== /dev/ tools deployed ==="
