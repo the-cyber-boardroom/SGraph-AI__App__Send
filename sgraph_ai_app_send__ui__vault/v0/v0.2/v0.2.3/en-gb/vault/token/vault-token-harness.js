@@ -15,6 +15,35 @@ import './vault-api-log.js';
 import './vault-token-manager.js';
 
 /* ── Shared util ──────────────────────────────────────────────────────────── */
+
+/**
+ * Walk sg-layout's shadow DOM tree (recursively) and click the first tab button
+ * whose text content includes `titleFragment`. Returns true if found and clicked.
+ */
+function _activateSGLayoutTab(titleFragment) {
+    const layout = document.getElementById('sg-layout-root');
+    if (!layout) return false;
+
+    function search(root) {
+        if (!root) return false;
+        const nodes = root.querySelectorAll('button, [role="tab"]');
+        for (const node of nodes) {
+            if (node.textContent && node.textContent.includes(titleFragment)) {
+                node.click();
+                return true;
+            }
+        }
+        // Recurse into shadow roots of child elements
+        for (const child of root.querySelectorAll('*')) {
+            if (child.shadowRoot && search(child.shadowRoot)) return true;
+        }
+        return false;
+    }
+
+    // Try shadow root first, then light DOM fallback
+    return search(layout.shadowRoot || layout);
+}
+
 function esc(s) {
     const d = document.createElement('div');
     d.textContent = String(s == null ? '' : s);
@@ -241,6 +270,10 @@ class VtVaultFrame extends HTMLElement {
         document.addEventListener('vt:load-ro-in-frame',    e => {
             if (this._mode === 'ro') this._loadROToken(e.detail);
         });
+
+        // Hydrate from sessionStorage if credentials were loaded before this frame mounted
+        const saved = getCredentials();
+        if (saved) this._onCredentials(saved);
     }
 
     _render() {
@@ -317,6 +350,8 @@ class VtVaultFrame extends HTMLElement {
         const { token, vaultId } = detail || {};
         const roUrl = `${location.origin}/en-gb/vault/#ro-${token}`;
         this._showROPlaceholder(vaultId, token, roUrl);
+        // Switch the sg-layout tab so the user can see the result
+        _activateSGLayoutTab('RO View');
     }
 
     _showROPlaceholder(vaultId, token, roUrl) {
