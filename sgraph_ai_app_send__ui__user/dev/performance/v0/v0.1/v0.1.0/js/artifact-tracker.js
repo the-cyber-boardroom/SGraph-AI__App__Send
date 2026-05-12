@@ -111,8 +111,8 @@
 
       for (const v of vOrphans) {
         onProgress && onProgress(`Destroying vault ${v.vault_id} ...`);
-        if (!v.write_key) { fail++; continue; }   // can't destroy without write key
-        const r = await client.vaultDestroy(v.vault_id, v.write_key);
+        if (!v.write_key) { fail++; continue; }
+        const r = await client.vaultDestroy(v.vault_id, v.write_key, { purge: true });
         if (r.ok || r.status === 404) { this.pruneVault(v.vault_id); okV++; }
         else fail++;
       }
