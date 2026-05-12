@@ -111,30 +111,47 @@ async function createTransferToken(vault, roToken, expiresAt, maxUses) {
     const accessKey = sessionStorage.getItem('sg-vault-access-key')
         || localStorage.getItem('sg-vault-access-key-saved')
         || '';
+    // Correct header name: x-sgraph-access-token (not X-SGraph-Send-Access-Token)
     const headers = { 'Content-Type': 'application/json' };
-    if (accessKey) headers['X-SGraph-Send-Access-Token'] = accessKey;
+    if (accessKey) headers['x-sgraph-access-token'] = accessKey;
 
-    // 1. Create transfer slot
-    const createBody = { name: roToken };
-    if (expiresAt) createBody.expires_at = expiresAt;
-    if (maxUses)   createBody.max_uses   = maxUses;
+    // Generate a random delete_auth secret; server stores SHA-256(secret).
+    // We keep the plaintext secret as delete_key for use in revocation.
+    const deleteAuthBytes = crypto.getRandomValues(new Uint8Array(32));
+    const deleteAuth      = Array.from(deleteAuthBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const deleteAuthHashBuf = await crypto.subtle.digest('SHA-256', deleteAuthBytes);
+    const deleteAuthHash  = Array.from(new Uint8Array(deleteAuthHashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // 1. Create transfer slot — schema requires: file_size_bytes, delete_auth_hash,
+    //    expires_at (ms epoch int), max_downloads (not max_uses)
+    const createBody = {
+        file_size_bytes:   0,
+        delete_auth_hash:  deleteAuthHash,
+        max_downloads:     maxUses ? Number(maxUses) : 0,
+        auto_delete:       false,
+        expires_at:        expiresAt ? new Date(expiresAt).getTime() : 0
+    };
     const createResp = await fetch(`${endpoint}/api/transfers/create`, {
         method: 'POST', headers, body: JSON.stringify(createBody)
     });
-    if (!createResp.ok) throw new Error(`Create failed: HTTP ${createResp.status}`);
+    if (!createResp.ok) {
+        const errText = await createResp.text().catch(() => '');
+        throw new Error(`Create failed: HTTP ${createResp.status}${errText ? ' — ' + errText : ''}`);
+    }
     const createData = await createResp.json();
-    const transferId = createData.transfer_id || createData.id;
-    const deleteKey  = createData.delete_key  || createData.deleteKey;
+    const transferId = createData.transfer_id;
+    const uploadUrl  = createData.upload_url;  // server-provided upload path
 
     // 2. Encrypt payload { vault_id, read_key } with roToken as passphrase
-    const payload = JSON.stringify({ vault_id: vault.vaultId, read_key: vault.readKey || '' });
+    const payload      = JSON.stringify({ vault_id: vault.vaultId, read_key: vault.readKey || '' });
     const payloadBytes = new TextEncoder().encode(payload);
-    const encPayload = await _encryptWithPassphrase(roToken, payloadBytes);
+    const encPayload   = await _encryptWithPassphrase(roToken, payloadBytes);
 
-    // 3. Upload ciphertext
+    // 3. Upload ciphertext — use upload_url from response
     const uploadHeaders = { 'Content-Type': 'application/octet-stream' };
-    if (accessKey) uploadHeaders['X-SGraph-Send-Access-Token'] = accessKey;
-    const uploadResp = await fetch(`${endpoint}/api/transfers/upload/${encodeURIComponent(transferId)}`, {
+    if (accessKey) uploadHeaders['x-sgraph-access-token'] = accessKey;
+    const uploadPath = uploadUrl || `/api/transfers/upload/${encodeURIComponent(transferId)}`;
+    const uploadResp = await fetch(`${endpoint}${uploadPath}`, {
         method: 'POST', headers: uploadHeaders,
         body: Uint8Array.from(atob(encPayload), c => c.charCodeAt(0))
     });
@@ -146,14 +163,15 @@ async function createTransferToken(vault, roToken, expiresAt, maxUses) {
     });
     if (!completeResp.ok) throw new Error(`Complete failed: HTTP ${completeResp.status}`);
 
-    return { transferId, deleteKey };
+    // deleteAuth (preimage) is the delete_key — never sent to server, stored locally only
+    return { transferId, deleteKey: deleteAuth };
 }
 
 async function revokeTransferToken(transferId, deleteKey) {
     const endpoint = sessionStorage.getItem('sg-vault-endpoint') || 'https://dev.send.sgraph.ai';
     const resp = await fetch(`${endpoint}/api/transfers/delete/${encodeURIComponent(transferId)}`, {
         method: 'DELETE',
-        headers: { 'X-Transfer-Delete-Auth': deleteKey }
+        headers: { 'x-sgraph-transfer-delete-auth': deleteKey }
     });
     return resp.ok;
 }

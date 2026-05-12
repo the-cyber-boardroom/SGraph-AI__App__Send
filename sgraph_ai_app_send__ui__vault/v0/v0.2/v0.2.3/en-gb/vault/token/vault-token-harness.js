@@ -598,7 +598,7 @@ class VtCryptoLab extends HTMLElement {
             const accessKey = sessionStorage.getItem('sg-vault-access-key')
                 || localStorage.getItem('sg-vault-access-key-saved') || '';
             const headers = {};
-            if (accessKey) headers['X-SGraph-Send-Access-Token'] = accessKey;
+            if (accessKey) headers['x-sgraph-access-token'] = accessKey;
 
             const resp = await fetch(
                 `${endpoint}/api/transfers/check-token/${encodeURIComponent(token)}`,

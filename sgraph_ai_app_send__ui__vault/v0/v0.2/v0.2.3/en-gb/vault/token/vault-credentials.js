@@ -84,7 +84,7 @@ export async function resolveCredential(credential) {
     if (credential.mode === 'readonly') {
         const token = credential.roToken;
         const headers = { 'Content-Type': 'application/json' };
-        if (accessKey) headers['X-SGraph-Send-Access-Token'] = accessKey;
+        if (accessKey) headers['x-sgraph-access-token'] = accessKey;
 
         const resp = await fetch(`${endpoint}/api/transfers/check-token/${encodeURIComponent(token)}`, { headers });
         if (!resp.ok) {
