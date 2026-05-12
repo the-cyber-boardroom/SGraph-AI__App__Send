@@ -6,15 +6,19 @@
 
   const $api = global.ApiClient;
   const $art = global.ArtifactTracker;
+  const $runs = global.RunStore;
   const SCENARIOS = global.SCENARIOS || [];
 
   class PerfApp extends HTMLElement {
     constructor() {
       super();
-      this.results = [];           // { run_id, scenario_id, scenario_name, ok, summary, steps, ts }
+      this.results = [];           // current in-progress run's rows
       this.selected = new Set();
       this.running = false;
       this.logLines = [];
+      this.view = 'current';       // 'current' | 'runs'
+      this.compareSelection = new Set();
+      this.compareView = null;     // { runA, runB, rows } | null
     }
 
     connectedCallback() {
@@ -76,28 +80,14 @@
 
           <div class="panel">
             <div class="panel-header">
-              <h2>Results</h2>
+              <h2>${this.view === 'runs' ? 'Past runs' : (this.compareView ? 'Compare' : 'Current run')}</h2>
               <div class="spacer"></div>
-              <button id="copy-json">Copy JSON</button>
-              <button id="clear-results">Clear</button>
+              <button id="view-current" class="${this.view === 'current' && !this.compareView ? 'primary' : ''}">Current</button>
+              <button id="view-runs" class="${this.view === 'runs' && !this.compareView ? 'primary' : ''}">Past runs (${$runs.list().length})</button>
+              ${this.view === 'current' ? '<button id="copy-json">Copy JSON</button>' : ''}
+              ${this.view === 'current' ? '<button id="clear-results">Clear</button>' : ''}
             </div>
-            <table class="results-table" id="results-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Scenario</th>
-                  <th>Time</th>
-                  <th class="num">Total ms</th>
-                  <th class="num">Calls</th>
-                  <th class="num">Bytes in</th>
-                  <th class="num">Bytes out</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="results-body">
-                <tr><td colspan="8" style="color:var(--fg-dim);padding:16px;text-align:center">No runs yet. Pick a scenario and press Run.</td></tr>
-              </tbody>
-            </table>
+            <div id="right-panel-body"></div>
             <pre class="log-area" id="log-area"></pre>
           </div>
         </div>
@@ -105,14 +95,238 @@
         <div class="footer">
           <div class="stat">Tracked: <strong>${counts.transfers}</strong> transfers, <strong>${counts.vaults}</strong> vaults</div>
           <div class="stat">Orphans: <strong>${orphans.total}</strong></div>
-          <div class="stat">Results: <strong>${this.results.length}</strong></div>
+          <div class="stat">Saved runs: <strong>${$runs.list().length}</strong> (${fmtBytes($runs.storageStats().bytes)})</div>
           <div class="spacer"></div>
           <div class="stat">Base URL: <strong>${$api.baseUrl() || '(same-origin)'}</strong></div>
         </div>
       `;
 
       this.renderScenarios();
+      this.renderRightPanel();
       this.bindEvents();
+    }
+
+    // ----------------------------------------------------- right-panel view --
+    renderRightPanel() {
+      const body = this.querySelector('#right-panel-body');
+      if (!body) return;
+      if (this.compareView) return this.renderCompare(body);
+      if (this.view === 'runs') return this.renderRuns(body);
+      return this.renderCurrent(body);
+    }
+
+    renderCurrent(body) {
+      body.innerHTML = `
+        <table class="results-table" id="results-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Scenario</th>
+              <th>Time</th>
+              <th class="num">Total ms</th>
+              <th class="num">Calls</th>
+              <th class="num">Bytes in</th>
+              <th class="num">Bytes out</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      `;
+      this.renderResults();
+    }
+
+    renderRuns(body) {
+      const runs = $runs.list();
+      if (runs.length === 0) {
+        body.innerHTML = `<div style="padding:24px;color:var(--fg-dim);text-align:center">
+          No saved runs yet. Every batch you execute is auto-saved here.
+        </div>`;
+        return;
+      }
+      body.innerHTML = `
+        <div class="controls-bar">
+          <button id="compare-selected" class="primary" ${this.compareSelection.size !== 2 ? 'disabled' : ''}>
+            ⇆ Compare selected (${this.compareSelection.size}/2)
+          </button>
+          <button id="export-run">Export selected as JSON</button>
+          <button id="delete-run" class="danger">Delete selected</button>
+          <div class="spacer" style="flex:1"></div>
+          <button id="clear-all-runs" class="danger">Clear all runs</button>
+        </div>
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th style="width:24px"></th>
+              <th>Label</th>
+              <th>When</th>
+              <th>Scenarios</th>
+              <th class="num">Total ms</th>
+              <th class="num">OK</th>
+              <th class="num">Fail</th>
+              <th>Host · token</th>
+            </tr>
+          </thead>
+          <tbody id="runs-body">
+            ${runs.map(r => {
+              const checked = this.compareSelection.has(r.id);
+              return `
+                <tr class="${r.fail_count === 0 ? 'ok' : 'err'}" data-run-id="${escapeAttr(r.id)}">
+                  <td><input type="checkbox" class="run-cmp" data-run-id="${escapeAttr(r.id)}" ${checked ? 'checked' : ''}></td>
+                  <td>
+                    <input type="text" class="run-label" data-run-id="${escapeAttr(r.id)}"
+                           value="${escapeAttr(r.label || '')}" placeholder="(no label)"
+                           style="background:transparent;border:1px dashed var(--border);width:140px">
+                  </td>
+                  <td>${new Date(r.ts).toLocaleString()}</td>
+                  <td>${r.scenarios.length} (${r.results.length} runs)</td>
+                  <td class="num">${Math.round(r.wall_ms_total)}</td>
+                  <td class="num">${r.ok_count}</td>
+                  <td class="num">${r.fail_count}</td>
+                  <td>${escapeHtml(r.host)}${r.token_hint ? ' · ' + escapeHtml(r.token_hint) : ''}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+
+      this.querySelectorAll('.run-cmp').forEach(cb => {
+        cb.onchange = () => {
+          if (cb.checked) {
+            this.compareSelection.add(cb.dataset.runId);
+            if (this.compareSelection.size > 2) {
+              const first = this.compareSelection.values().next().value;
+              this.compareSelection.delete(first);
+            }
+          } else {
+            this.compareSelection.delete(cb.dataset.runId);
+          }
+          this.renderRightPanel();
+        };
+      });
+
+      this.querySelectorAll('.run-label').forEach(inp => {
+        inp.onchange = () => {
+          $runs.relabel(inp.dataset.runId, inp.value.trim());
+          this.log(`Run ${inp.dataset.runId.slice(0, 12)}… relabelled.`);
+        };
+      });
+
+      const cmpBtn = this.querySelector('#compare-selected');
+      if (cmpBtn) cmpBtn.onclick = () => {
+        if (this.compareSelection.size !== 2) return;
+        const [a, b] = [...this.compareSelection];
+        // Pick earliest as A, latest as B (B-A delta is "what changed since A")
+        const rA = $runs.get(a), rB = $runs.get(b);
+        const [first, second] = rA.ts <= rB.ts ? [a, b] : [b, a];
+        this.compareView = $runs.compare(first, second);
+        this.render();
+      };
+
+      const exportBtn = this.querySelector('#export-run');
+      if (exportBtn) exportBtn.onclick = () => {
+        if (this.compareSelection.size === 0) { this.log('Select at least one run to export.'); return; }
+        const selected = [...this.compareSelection].map(id => $runs.get(id)).filter(Boolean);
+        const json = JSON.stringify(selected, null, 2);
+        navigator.clipboard.writeText(json).then(
+          () => this.log(`Copied ${selected.length} run(s).`),
+          err => this.log('Copy failed: ' + err)
+        );
+      };
+
+      const delBtn = this.querySelector('#delete-run');
+      if (delBtn) delBtn.onclick = () => {
+        if (this.compareSelection.size === 0) return;
+        if (!confirm(`Delete ${this.compareSelection.size} run(s) from local storage?`)) return;
+        this.compareSelection.forEach(id => $runs.remove(id));
+        this.compareSelection.clear();
+        this.render();
+      };
+
+      const clrBtn = this.querySelector('#clear-all-runs');
+      if (clrBtn) clrBtn.onclick = () => {
+        if (!confirm('Delete ALL saved runs?')) return;
+        $runs.clearAll();
+        this.compareSelection.clear();
+        this.render();
+      };
+    }
+
+    renderCompare(body) {
+      const cv = this.compareView;
+      const A = cv.runA, B = cv.runB;
+      const fmt = ms => ms == null ? '—' : ms.toFixed(1);
+      const fmtPct = pct => {
+        if (pct == null) return '';
+        const cls = pct < -5 ? 'ok' : pct > 5 ? 'err' : '';
+        const sign = pct >= 0 ? '+' : '';
+        return `<span class="status" style="color:var(--${cls === 'ok' ? 'ok' : cls === 'err' ? 'err' : 'fg-dim'})">${sign}${pct.toFixed(1)}%</span>`;
+      };
+      const fmtDelta = ms => {
+        if (ms == null) return '';
+        const sign = ms >= 0 ? '+' : '';
+        return `${sign}${ms.toFixed(1)}`;
+      };
+
+      body.innerHTML = `
+        <div class="controls-bar">
+          <button id="back-to-runs">‹ Back to runs</button>
+          <div class="stat" style="margin-left:12px">
+            <strong>A:</strong> ${escapeHtml(A.label || A.id.slice(4, 20))} · ${new Date(A.ts).toLocaleString()}
+          </div>
+          <div class="stat">
+            <strong>B:</strong> ${escapeHtml(B.label || B.id.slice(4, 20))} · ${new Date(B.ts).toLocaleString()}
+          </div>
+          <div class="spacer" style="flex:1"></div>
+          <button id="export-compare">Export comparison</button>
+        </div>
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th class="num">A ms</th>
+              <th class="num">B ms</th>
+              <th class="num">Δ ms</th>
+              <th class="num">Δ %</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cv.rows.map(r => `
+              <tr>
+                <td class="scenario-name">${escapeHtml(r.scenario_name)}<br>
+                  <span style="color:var(--fg-dim);font-size:10px">${escapeHtml(r.scenario_id)}</span>
+                </td>
+                <td class="num">${fmt(r.a_ms)}${r.a_runs > 1 ? ' <span style="color:var(--fg-dim)">×' + r.a_runs + '</span>' : ''}</td>
+                <td class="num">${fmt(r.b_ms)}${r.b_runs > 1 ? ' <span style="color:var(--fg-dim)">×' + r.b_runs + '</span>' : ''}</td>
+                <td class="num">${fmtDelta(r.delta_ms)}</td>
+                <td class="num">${fmtPct(r.delta_pct)}</td>
+                <td>${r.a_ms == null ? 'A missing' : r.b_ms == null ? 'B missing' : (r.a_ok && r.b_ok ? '✓' : '✗')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="padding:12px;color:var(--fg-dim);font-size:11px;border-top:1px solid var(--border)">
+          Δ = B − A. Negative % means B was faster than A. Green/red threshold = ±5%.
+          Per-scenario timings shown are the mean of repeats inside that run (×N indicates loop count).
+        </div>
+      `;
+
+      this.querySelector('#back-to-runs').onclick = () => {
+        this.compareView = null;
+        this.render();
+      };
+      this.querySelector('#export-compare').onclick = () => {
+        const json = JSON.stringify({
+          comparison: { run_a: A.id, run_b: B.id, generated_at: new Date().toISOString() },
+          rows: cv.rows,
+        }, null, 2);
+        navigator.clipboard.writeText(json).then(
+          () => this.log(`Copied comparison (${cv.rows.length} rows).`),
+          err => this.log('Copy failed: ' + err)
+        );
+      };
     }
 
     renderScenarios() {
@@ -207,7 +421,8 @@
         this.runScenarios(sel, loops);
       };
 
-      $('#copy-json').onclick = () => {
+      const copyBtn = $('#copy-json');
+      if (copyBtn) copyBtn.onclick = () => {
         const json = JSON.stringify({
           generated_at: new Date().toISOString(),
           host: location.host,
@@ -220,9 +435,19 @@
         );
       };
 
-      $('#clear-results').onclick = () => {
+      const clrBtn = $('#clear-results');
+      if (clrBtn) clrBtn.onclick = () => {
         this.results = [];
         this.renderResults();
+      };
+
+      const vcBtn = $('#view-current');
+      if (vcBtn) vcBtn.onclick = () => {
+        this.view = 'current'; this.compareView = null; this.render();
+      };
+      const vrBtn = $('#view-runs');
+      if (vrBtn) vrBtn.onclick = () => {
+        this.view = 'runs'; this.compareView = null; this.render();
       };
 
       $('#stop-run').onclick = () => { this._stop = true; this.log('Stop requested.'); };
@@ -250,6 +475,9 @@
         }
       }
 
+      // Capture only the rows produced by this invocation (not anything still in this.results from before).
+      const batchStart = this.results.length;
+
       for (let loop = 1; loop <= loops && !this._stop; loop++) {
         if (loops > 1) this.log(`--- loop ${loop}/${loops} ---`);
         for (const s of scenarios) {
@@ -260,6 +488,18 @@
 
       this.running = false;
       runBtn.disabled = false; stopBtn.disabled = true;
+
+      // Save this batch as a discrete "run" record.
+      const newRows = this.results.slice(0, this.results.length - batchStart);
+      if (newRows.length > 0) {
+        const token = $api.getToken();
+        const saved = $runs.save(newRows, {
+          base_url:   $api.baseUrl(),
+          token_hint: token ? token.slice(0, 4) + '…' : '',
+        });
+        if (saved) this.log(`✓ Saved run ${saved.id.slice(0, 16)}… (${newRows.length} scenario result(s)).`);
+      }
+
       this.render();
     }
 
@@ -295,9 +535,9 @@
     // ---------------------------------------------------- render results -----
     renderResults() {
       const tbody = this.querySelector('#results-body');
-      if (!tbody) return;
+      if (!tbody) return;        // not in current-view — nothing to do
       if (this.results.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="color:var(--fg-dim);padding:16px;text-align:center">No runs yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="color:var(--fg-dim);padding:16px;text-align:center">No runs yet. Pick a scenario and press Run.</td></tr>`;
         return;
       }
       tbody.innerHTML = this.results.map((r, i) => {
