@@ -42,10 +42,37 @@ function maskId(id) {
 class VtVaultLoader extends HTMLElement {
     connectedCallback() {
         this._render();
-        // Restore from sessionStorage on page reload
+        // 1. Restore already-resolved credentials from sessionStorage (page reload)
         const saved = getCredentials();
         if (saved) {
             this._showLoaded(saved);
+            document.dispatchEvent(new CustomEvent('vt:credentials-loaded', { detail: saved }));
+            return;
+        }
+        // 2. Auto-load from the vault key stored by the main vault shell (localStorage)
+        const lsKey = localStorage.getItem('sg-vault-key');
+        if (lsKey) {
+            const inp = this.querySelector('#vl-input');
+            if (inp) inp.value = lsKey;
+            this._setStatus('Vault key detected from main vault — click Load vault or press Ctrl+Enter.', 'ok');
+            this._autoLoad(lsKey);
+        }
+    }
+
+    async _autoLoad(key) {
+        const credential = parseCredential(key);
+        if (!credential) return;
+        this._setStatus('Auto-loading vault from main vault key…', 'busy');
+        const btn = this.querySelector('#vl-load-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+        try {
+            const resolved = await resolveCredential(credential);
+            storeCredentials(resolved);
+            this._showLoaded(resolved);
+            document.dispatchEvent(new CustomEvent('vt:credentials-loaded', { detail: resolved }));
+        } catch (err) {
+            this._setStatus(`Auto-load failed: ${err.message} — paste key manually.`, 'err');
+            if (btn) { btn.disabled = false; btn.textContent = 'Load vault'; }
         }
     }
 
