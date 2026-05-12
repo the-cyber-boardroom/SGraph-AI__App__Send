@@ -693,13 +693,50 @@ class SendBrowse extends SendComponent {
                       '});' +
                     '});' +
                   '}' +
+                  // ── Generic command helper (git / auth round-trips) ────────
+                  'function _sgCmd(cmdType,payload){' +
+                    'return new Promise(function(res,rej){' +
+                      'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                      'payload.__sgCmdId=id;payload.__sgCmdType=cmdType;' +
+                      'function h(e){' +
+                        'if(!e.data||e.data.__sgCmdReply!==id)return;' +
+                        'window.removeEventListener("message",h);' +
+                        'if(e.data.ok)res(e.data.result);' +
+                        'else rej(new Error(e.data.err||"Command failed"));' +
+                      '}' +
+                      'window.addEventListener("message",h);' +
+                      'window.parent.postMessage(payload,"*");' +
+                    '});' +
+                  '}' +
                   // Expose canonical surface (matches SG/App spec)
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
                     'loadCss:_loadCss,' +
                     'loadJs:_loadJs,' +
-                    'app:{selfPath:' + JSON.stringify(fileName) + ',' +
-                         'writable:' + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + '}' +
+                    'app:{' +
+                      'selfPath:'   + JSON.stringify(fileName) + ',' +
+                      'writable:'   + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + ',' +
+                      'vaultName:'  + JSON.stringify((self.dataSource && self.dataSource._vault && self.dataSource._vault.name) || '') + ',' +
+                      'vaultId:'    + JSON.stringify((self.dataSource && self.dataSource._vault && self.dataSource._vault.vaultId) || '') + ',' +
+                      'fileCount:'  + ((self.dataSource ? self.dataSource.getFileList().filter(function(f){return !f.dir;}).length : 0)) + ',' +
+                      'totalSize:'  + ((self.dataSource ? self.dataSource.getOrigSize() : 0)) +
+                    '},' +
+                    'git:{' +
+                      'status:function(){return _sgCmd("git",{action:"status"});},' +
+                      'check:function(){return _sgCmd("git",{action:"check"});},' +
+                      'push:function(){return _sgCmd("git",{action:"push"});},' +
+                      'pull:function(){return _sgCmd("git",{action:"pull"});},' +
+                      'refresh:function(){return _sgCmd("git",{action:"refresh"});}' +
+                    '},' +
+                    'auth:{' +
+                      'hasKey:' + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + ',' +
+                      'setKey:function(key){return _sgCmd("auth",{action:"setKey",key:key});},' +
+                      'check:function(key){return _sgCmd("auth",{action:"check",key:key});},' +
+                      'clear:function(){return _sgCmd("auth",{action:"clear"});}' +
+                    '},' +
+                    'ui:{' +
+                      'message:function(text,type){window.parent.postMessage({__sgUiMsg:{text:String(text||""),msgType:type||"info"}},"*");}' +
+                    '}' +
                   '};' +
                   // Convenience alias (backward compat with design doc examples)
                   'window.sgVault={' +
@@ -707,7 +744,8 @@ class SendBrowse extends SendComponent {
                     'listFiles:function(){return _list("");},' +
                     'writable:window.sg.app.writable,selfPath:window.sg.app.selfPath' +
                   '};' +
-                  'console.log("[sg-vfs] window.sg ready | writable="+window.sg.app.writable+" | loaders: sg.loadCss, sg.loadJs");' +
+                  'console.log("[sg-vfs] window.sg ready | writable="+window.sg.app.writable+' +
+                    '" | vaultName="+window.sg.app.vaultName+" | loaders: sg.loadCss, sg.loadJs | sg.git, sg.auth, sg.ui");' +
                 '})();' +
 
                 '})();' +
@@ -894,6 +932,123 @@ class SendBrowse extends SendComponent {
                             return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
                         });
                         try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
+                        return;
+                    }
+
+                    // ── sg.git.* / sg.auth.* commands ──────────────────────
+                    if (e.data.__sgCmdType) {
+                        var cmdId  = e.data.__sgCmdId;
+                        var cmdSrc = e.source;
+                        function _cmdReply(ok, result, errMsg) {
+                            try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null }, '*'); } catch (_) {}
+                        }
+                        var vault = self.dataSource && self.dataSource._vault;
+                        var shell = window.sgraphVault && window.sgraphVault.shell;
+
+                        if (e.data.__sgCmdType === 'git') {
+                            var gitAction = e.data.action;
+                            if (gitAction === 'status') {
+                                var ss = (shell && shell._syncState) || { ahead: 0, behind: 0, diverged: false };
+                                _cmdReply(true, {
+                                    ahead: ss.ahead || 0, behind: ss.behind || 0, diverged: !!ss.diverged,
+                                    headCommitId: vault ? vault._headCommitId : null,
+                                    namedHeadId:  vault ? vault._namedHeadId  : null,
+                                    writable: !!(self.dataSource && self.dataSource.writable)
+                                });
+                                return;
+                            }
+                            if (gitAction === 'check') {
+                                if (shell && typeof shell._checkBehindOnly === 'function') {
+                                    shell._checkBehindOnly(false).then(function() {
+                                        var s = (shell._syncState) || {};
+                                        _cmdReply(true, { ahead: s.ahead||0, behind: s.behind||0, diverged: !!s.diverged });
+                                    }).catch(function(err) { _cmdReply(false, null, err.message); });
+                                } else { _cmdReply(false, null, 'Shell not available'); }
+                                return;
+                            }
+                            if (gitAction === 'push') {
+                                if (!vault || !(self.dataSource && self.dataSource.writable)) { _cmdReply(false, null, 'Read-only vault'); return; }
+                                vault.push().then(function() {
+                                    if (shell) shell._refreshSyncState();
+                                    _cmdReply(true, { pushed: true });
+                                }).catch(function(err) { _cmdReply(false, null, err.message); });
+                                return;
+                            }
+                            if (gitAction === 'pull') {
+                                if (!vault || !(self.dataSource && self.dataSource.writable)) { _cmdReply(false, null, 'Read-only vault'); return; }
+                                vault.pull().then(function(changed) {
+                                    if (changed && shell) { shell._mountBrowse(); shell._refreshSyncState(); }
+                                    _cmdReply(true, { pulled: !!changed });
+                                }).catch(function(err) { _cmdReply(false, null, err.message); });
+                                return;
+                            }
+                            if (gitAction === 'refresh') {
+                                if (shell && typeof shell._onRefresh === 'function') {
+                                    shell._onRefresh().then(function() { _cmdReply(true, {}); })
+                                        .catch(function(err) { _cmdReply(false, null, err.message); });
+                                } else { _cmdReply(false, null, 'Shell not available'); }
+                                return;
+                            }
+                            _cmdReply(false, null, 'Unknown git action: ' + e.data.action);
+                            return;
+                        }
+
+                        if (e.data.__sgCmdType === 'auth') {
+                            var authAction = e.data.action;
+                            var _endpoint  = (vault && vault._sgSend) ? vault._sgSend.endpoint : window.location.origin;
+                            if (authAction === 'setKey') {
+                                var newKey = String(e.data.key || '').trim();
+                                // Propagate to vault-shell (updates token, dataSource.writable, header, sessionStorage)
+                                self.dispatchEvent(new CustomEvent('vault-settings-access-key', {
+                                    bubbles: true, composed: true, detail: { key: newKey }
+                                }));
+                                if (!newKey) { _cmdReply(true, { ok: true, valid: false, remaining: 0 }); return; }
+                                fetch(_endpoint + '/api/transfers/check_token/' + encodeURIComponent(newKey))
+                                    .then(function(r) { return r.json(); })
+                                    .then(function(d) { _cmdReply(true, { ok: true, valid: !!d.valid, remaining: d.remaining, status: d.status }); })
+                                    .catch(function() { _cmdReply(true, { ok: true, valid: null }); });
+                                return;
+                            }
+                            if (authAction === 'check') {
+                                var checkKey = String(e.data.key || '').trim();
+                                if (!checkKey) { _cmdReply(true, { valid: false, remaining: 0 }); return; }
+                                fetch(_endpoint + '/api/transfers/check_token/' + encodeURIComponent(checkKey))
+                                    .then(function(r) { return r.json(); })
+                                    .then(function(d) { _cmdReply(true, { valid: !!d.valid, remaining: d.remaining, status: d.status }); })
+                                    .catch(function(err) { _cmdReply(false, null, err.message); });
+                                return;
+                            }
+                            if (authAction === 'clear') {
+                                self.dispatchEvent(new CustomEvent('vault-settings-access-key', {
+                                    bubbles: true, composed: true, detail: { key: '' }
+                                }));
+                                _cmdReply(true, { cleared: true });
+                                return;
+                            }
+                            _cmdReply(false, null, 'Unknown auth action: ' + e.data.action);
+                            return;
+                        }
+
+                        _cmdReply(false, null, 'Unknown command type');
+                        return;
+                    }
+
+                    // ── sg.ui.message (fire-and-forget, no reply) ───────────
+                    if (e.data.__sgUiMsg) {
+                        var uiText = String(e.data.__sgUiMsg.text || '');
+                        var uiType = e.data.__sgUiMsg.msgType || 'info';
+                        var uiBanner = document.querySelector('sg-app-banner');
+                        if (uiBanner && typeof uiBanner.isActive === 'function' && uiBanner.isActive()) {
+                            var _icons = { info: '•', success: '✓', warn: '⚠', error: '✗' };
+                            if (uiType === 'error') {
+                                uiBanner.showStatusError(uiText, '');
+                            } else {
+                                uiBanner.showStatus(_icons[uiType] || '•', uiText, uiType === 'success' ? 3000 : undefined);
+                            }
+                        } else if (window.sgraphVault && window.sgraphVault.messages) {
+                            var _msgFn = window.sgraphVault.messages[uiType] || window.sgraphVault.messages.info;
+                            _msgFn.call(window.sgraphVault.messages, uiText);
+                        }
                         return;
                     }
 
