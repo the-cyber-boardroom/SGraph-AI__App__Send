@@ -534,7 +534,10 @@ class SendBrowse extends SendComponent {
             // VFS bridge: intercepts fetch(), img.src setter, MutationObserver, and
             // anchor clicks for same-vault navigation.
             // [sg-vfs] logs → iframe console   [sg-vfs parent] logs → top context
-            var vfsBridgeScript =
+            //
+            // Built as a function so sg.app.selfPath reflects the CURRENT document
+            // (not the entry document) after in-iframe navigation.
+            var _buildVfsBridgeScript = function(currentPath) { return
                 '<script id="__sg-vfs">' +
                 '(function(){' +
                 'console.log("[sg-vfs] installing...");' +
@@ -679,7 +682,11 @@ class SendBrowse extends SendComponent {
                   // sg.vfs.list — proper postMessage envelope, not a magic URL
                   'function _list(path){' +
                     'return _vfsMsg("__sgVfsListReq",{path:path||""})' +
-                      '.then(function(d){return d.entries||[];});' +
+                      '.then(function(d){return d.entries||[];})' +
+                      '.catch(function(err){' +
+                        'if(err.message==="ENOENT")throw new Error("No such path: "+(path||""));' +
+                        'throw err;' +
+                      '});' +
                   '}' +
                   // sg.loadCss / sg.loadJs — async asset loaders (the contract for vault HTML).
                   // Vault iframes run from a blob: URL, so the browser's native HTML parser
@@ -730,20 +737,27 @@ class SendBrowse extends SendComponent {
                     'loadCss:_loadCss,' +
                     'loadJs:_loadJs,' +
                     'app:{' +
-                      'selfPath:'   + JSON.stringify(fileName) + ',' +
+                      'selfPath:'   + JSON.stringify(currentPath) + ',' +
                       'writable:'   + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + ',' +
                       'vaultName:'  + JSON.stringify((self.dataSource && self.dataSource._vault && self.dataSource._vault.name) || '') + ',' +
                       'vaultId:'    + JSON.stringify((self.dataSource && self.dataSource._vault && self.dataSource._vault.vaultId) || '') + ',' +
                       'fileCount:'  + ((self.dataSource ? self.dataSource.getFileList().filter(function(f){return !f.dir;}).length : 0)) + ',' +
                       'totalSize:'  + ((self.dataSource ? self.dataSource.getOrigSize() : 0)) +
                     '},' +
-                    'git:{' +
-                      'status:function(){return _sgCmd("git",{action:"status"});},' +
-                      'check:function(){return _sgCmd("git",{action:"check"});},' +
-                      'push:function(){return _sgCmd("git",{action:"push"});},' +
-                      'pull:function(){return _sgCmd("git",{action:"pull"});},' +
-                      'refresh:function(){return _sgCmd("git",{action:"refresh"});}' +
-                    '},' +
+                    // sg.git.* — deprecated, retained for back-compat. Emits a one-shot
+                    // console.warn the first time any method is called. Authors should
+                    // migrate to sg.sync.* (preferred namespace).
+                    'git:(function(){' +
+                      'var _warned=false;' +
+                      'function _w(){if(!_warned){_warned=true;console.warn("[sg-vfs] sg.git.* is deprecated and will be removed in a future release. Please use sg.sync.* instead.");}}' +
+                      'return{' +
+                        'status:function(){_w();return _sgCmd("git",{action:"status"});},' +
+                        'check:function(){_w();return _sgCmd("git",{action:"check"});},' +
+                        'push:function(){_w();return _sgCmd("git",{action:"push"});},' +
+                        'pull:function(){_w();return _sgCmd("git",{action:"pull"});},' +
+                        'refresh:function(){_w();return _sgCmd("git",{action:"refresh"});}' +
+                      '};' +
+                    '})(),' +
                     // sg.sync — author-facing sync namespace (preferred over sg.git)
                     'sync:{' +
                       'status:function(){' +
@@ -753,7 +767,8 @@ class SendBrowse extends SendComponent {
                             'serverHasNewer:s.behind>0||!!s.diverged,' +
                             'localHasUnsynced:s.ahead>0,' +
                             'serverVersion:s.namedHeadId,' +
-                            'writable:!!s.writable' +
+                            'writable:!!s.writable,' +
+                            'lastSyncedAt:s.lastCheckedAt||null' +
                           '};' +
                         '});' +
                       '},' +
@@ -793,7 +808,8 @@ class SendBrowse extends SendComponent {
                 '})();' +
 
                 '})();' +
-                '<\/script>';
+                '<\/script>'; };
+            var vfsBridgeScript = _buildVfsBridgeScript(fileName);
 
             // Declare htmlDir and fileList here so both the async inline task
             // and the VFS bridge closure share the same mutable reference.
@@ -897,10 +913,13 @@ class SendBrowse extends SendComponent {
                             // sg.loadCss / sg.loadJs (the bridge contract). We only inject
                             // the bridge script and create the blob.
                             htmlDir = newDir;
+                            // Rebuild the bridge script so sg.app.selfPath reflects the
+                            // newly-navigated-to document (not the original entry).
+                            var navBridge = _buildVfsBridgeScript(navMatch.path);
                             var newHtml = self.dataSource
-                                ? newText.replace(/(<head[^>]*>)/i, '$1' + vfsBridgeScript)
+                                ? newText.replace(/(<head[^>]*>)/i, '$1' + navBridge)
                                 : newText;
-                            if (self.dataSource && newHtml === newText) newHtml = vfsBridgeScript + newText;
+                            if (self.dataSource && newHtml === newText) newHtml = navBridge + newText;
                             var newBlob = new Blob([newHtml], { type: 'text/html' });
                             var newUrl  = URL.createObjectURL(newBlob);
                             self._objectUrls.push(newUrl);
@@ -974,9 +993,16 @@ class SendBrowse extends SendComponent {
                         var entries = self.dataSource ? self.dataSource.getFileList() : [];
                         var prefix  = (e.data.path || '').replace(/^\//, '');
                         if (prefix) {
-                            entries = entries.filter(function(f) {
-                                return f.path.startsWith(prefix);
+                            // Strict: prefix must match an entry exactly or as a directory
+                            var normPrefix = prefix.endsWith('/') ? prefix : prefix + '/';
+                            var filtered = entries.filter(function(f) {
+                                return f.path === prefix || f.path.startsWith(normPrefix);
                             });
+                            if (filtered.length === 0) {
+                                try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {}
+                                return;
+                            }
+                            entries = filtered;
                         }
                         var listed = entries.map(function(f) {
                             return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
@@ -999,11 +1025,13 @@ class SendBrowse extends SendComponent {
                             var gitAction = e.data.action;
                             if (gitAction === 'status') {
                                 var ss = (shell && shell._syncState) || { ahead: 0, behind: 0, diverged: false };
+                                var lastChecked = shell && shell._lastSyncedAt ? new Date(shell._lastSyncedAt).toISOString() : null;
                                 _cmdReply(true, {
                                     ahead: ss.ahead || 0, behind: ss.behind || 0, diverged: !!ss.diverged,
                                     headCommitId: vault ? vault._headCommitId : null,
                                     namedHeadId:  vault ? vault._namedHeadId  : null,
-                                    writable: !!(self.dataSource && self.dataSource.writable)
+                                    writable: !!(self.dataSource && self.dataSource.writable),
+                                    lastCheckedAt: lastChecked
                                 });
                                 return;
                             }

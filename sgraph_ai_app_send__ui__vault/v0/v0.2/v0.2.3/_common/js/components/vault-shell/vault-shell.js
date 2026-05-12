@@ -383,7 +383,8 @@
                     }
                 }
 
-                this._syncState = { ahead, behind, diverged };
+                this._syncState   = { ahead, behind, diverged };
+                this._lastSyncedAt = Date.now();
                 const header = this.querySelector('vault-header');
                 header?.setAheadCount(ahead);
                 header?.setBehindCount(behind);

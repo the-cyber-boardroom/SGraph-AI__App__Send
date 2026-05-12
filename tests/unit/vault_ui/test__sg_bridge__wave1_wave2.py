@@ -162,7 +162,8 @@ class test__sg_bridge__wave1__sg_sync_namespace(TestCase):
         assert 'serverVersion:'    in chunk
 
     def test__sg_git_still_present_for_compat(self):
-        assert "'git:{'" in self.src
+        # sg.git.* survives as a deprecation-wrapped IIFE
+        assert "'git:(function(){'" in self.src
 
     def test__sg_sync_refresh_uses_syncRefresh_action(self):
         # sg.sync.refresh() must call syncRefresh (non-destructive), not refresh (destructive)
@@ -304,3 +305,119 @@ class test__sg_bridge__wave2__syncRefresh_bridge_action(TestCase):
         chunk = self.src[idx:idx+300]
         assert '_refreshInPlace' in chunk
         assert 'Shell does not support' in chunk
+
+
+# ─── Follow-ups (brief gaps) ──────────────────────────────────────────────────
+
+class test__sg_bridge__followup__list_strict(TestCase):
+    """sg.vfs.list must reject ENOENT for non-existent paths (brief priority #3)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.src = file_contents(SEND_BROWSE)
+
+    def test__list_handler_returns_enoent_on_empty_match(self):
+        idx   = self.src.index('e.data.__sgVfsListReq')
+        chunk = self.src[idx:idx+1500]
+        assert "err: 'ENOENT'" in chunk
+        assert 'filtered.length === 0' in chunk
+
+    def test__list_handler_normalises_trailing_slash(self):
+        idx   = self.src.index('e.data.__sgVfsListReq')
+        chunk = self.src[idx:idx+1500]
+        assert 'normPrefix' in chunk
+
+    def test__iframe_list_translates_enoent(self):
+        idx   = self.src.index("'function _list(path){")
+        chunk = self.src[idx:idx+500]
+        assert 'ENOENT' in chunk
+        assert 'No such path' in chunk
+
+
+class test__sg_bridge__followup__last_synced_at(TestCase):
+    """sg.sync.status() must include lastSyncedAt (brief example object)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.browse = file_contents(SEND_BROWSE)
+        cls.shell  = file_contents(VAULT_SHELL)
+
+    def test__shell_tracks_last_synced_at(self):
+        assert 'this._lastSyncedAt = Date.now()' in self.shell
+
+    def test__bridge_status_returns_lastCheckedAt(self):
+        # Parent status response includes ISO-formatted lastCheckedAt
+        assert 'lastCheckedAt: lastChecked' in self.browse
+        assert '.toISOString()' in self.browse
+
+    def test__sync_status_exposes_lastSyncedAt(self):
+        idx   = self.browse.index("'sync:{'")
+        chunk = self.browse[idx:idx+1000]
+        assert 'lastSyncedAt' in chunk
+
+
+class test__sg_bridge__followup__git_deprecation(TestCase):
+    """sg.git.* must emit a one-shot deprecation warning recommending sg.sync."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.src = file_contents(SEND_BROWSE)
+
+    def test__sg_git_wrapped_in_iife(self):
+        assert "'git:(function(){'" in self.src
+
+    def test__sg_git_has_warn_helper(self):
+        idx   = self.src.index("'git:(function(){'")
+        chunk = self.src[idx:idx+1200]
+        assert "var _warned=false" in chunk
+        assert 'console.warn' in chunk
+        assert 'sg.git.* is deprecated' in chunk
+
+    def test__sg_git_warn_is_one_shot(self):
+        idx   = self.src.index("'git:(function(){'")
+        chunk = self.src[idx:idx+1200]
+        # warn fires only when _warned is false, then sets _warned=true
+        assert 'if(!_warned)' in chunk
+        assert '_warned=true' in chunk
+
+    def test__every_sg_git_method_calls_warn(self):
+        idx   = self.src.index("'git:(function(){'")
+        chunk = self.src[idx:idx+1500]
+        # All 5 methods (status, check, push, pull, refresh) call _w()
+        assert chunk.count('_w();') >= 5
+
+
+class test__sg_bridge__followup__self_path_current_doc(TestCase):
+    """sg.app.selfPath must reflect the CURRENT document after in-iframe nav."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.src = file_contents(SEND_BROWSE)
+
+    def test__bridge_script_is_a_function(self):
+        # vfsBridgeScript built per-document, not a single static string
+        assert 'var _buildVfsBridgeScript = function(currentPath)' in self.src
+
+    def test__selfPath_uses_currentPath_parameter(self):
+        assert "'selfPath:'   + JSON.stringify(currentPath)" in self.src
+
+    def test__initial_build_uses_entry_filename(self):
+        assert 'var vfsBridgeScript = _buildVfsBridgeScript(fileName);' in self.src
+
+    def test__nav_rebuilds_bridge_with_new_path(self):
+        # When navigating to a new file, the bridge is rebuilt with navMatch.path
+        idx   = self.src.index('e.data.__sgVfsNavReq')
+        chunk = self.src[idx:idx+3000]
+        assert '_buildVfsBridgeScript(navMatch.path)' in chunk
+
+    def test__no_stale_vfsBridgeScript_reference_in_nav(self):
+        # The old bug: nav handler used the cached vfsBridgeScript with stale path.
+        # After the fix, nav must use the rebuilt navBridge — never the cached one.
+        nav_idx = self.src.index('e.data.__sgVfsNavReq')
+        # Find the end of the nav handler block (closing 'return;' after the body)
+        nav_end = self.src.index('return;\n                    }', nav_idx)
+        nav_chunk = self.src[nav_idx:nav_end]
+        assert 'navBridge' in nav_chunk
+        # The cached vfsBridgeScript must not be referenced inside the nav body
+        assert "+ vfsBridgeScript)" not in nav_chunk
+
