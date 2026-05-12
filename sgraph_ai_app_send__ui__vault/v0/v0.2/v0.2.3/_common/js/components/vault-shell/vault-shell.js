@@ -31,6 +31,9 @@
             this._syncState     = { ahead: 0, behind: 0, diverged: false };
             this._autoSyncEnabled = true;   // overridden from localStorage in _initAutoSync()
             this._autoSyncCheckPending = false;
+            this._lastBehindCheckTime  = 0;
+            this._behindCheckTimer     = null;
+            this._visibilityHandler    = () => { if (!document.hidden) this._scheduleBehindCheck(500); };
         }
 
         connectedCallback() {
@@ -38,8 +41,14 @@
             this._setupListeners();
             this._setupLoadingHook();
             this._initAutoSync();
+            document.addEventListener('visibilitychange', this._visibilityHandler);
             window.sgraphVault.shell = this;
             window.sgraphVault.events.emit('shell-ready', {});
+        }
+
+        disconnectedCallback() {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            clearTimeout(this._behindCheckTimer);
         }
 
         // --- Render ---------------------------------------------------------------
@@ -99,6 +108,7 @@
             this.addEventListener('vault-created', (e) => this._onVaultOpened(e.detail.vault, e.detail.vaultKey, e.detail.accessKey));
 
             // Header events
+            this.addEventListener('vault-header-check',   () => this._checkBehindOnly(true));
             this.addEventListener('vault-header-push',    () => this._onPush());
             this.addEventListener('vault-header-pull',    () => this._onPull());
             this.addEventListener('vault-header-refresh', () => this._onRefresh());
@@ -197,6 +207,9 @@
             // Show ahead/behind counts + diverged state if writable
             this._refreshSyncState();
 
+            // Check server for upstream changes shortly after open
+            this._scheduleBehindCheck(1500);
+
             // Ensure files view is active
             this._switchView('files');
 
@@ -256,6 +269,7 @@
                 this.querySelector('vault-header')?.setVaultName(vault.name || '');
 
                 this._refreshSyncState();
+                this.querySelector('vault-header')?.setRefreshAvailable(false);
                 window.sgraphVault.messages.success('Vault refreshed');
             } catch (err) {
                 window.sgraphVault.messages.error(`Refresh failed: ${err.message}`);
@@ -501,6 +515,40 @@
                 window.sgraphVault.messages.error(`Sync failed: ${err.message}`);
             } finally {
                 header?.setPullBusy(false);
+            }
+        }
+
+        // --- Behind check (cheap ref read, event/visibility-triggered) -----------------
+
+        _scheduleBehindCheck(delayMs) {
+            const DEBOUNCE_MS = 30 * 1000;
+            if (Date.now() - this._lastBehindCheckTime < DEBOUNCE_MS) return;
+            clearTimeout(this._behindCheckTimer);
+            this._behindCheckTimer = setTimeout(() => this._checkBehindOnly(false), delayMs || 0);
+        }
+
+        async _checkBehindOnly(isExplicit) {
+            if (!this._vault) return;
+            this._lastBehindCheckTime = Date.now();
+            const header = this.querySelector('vault-header');
+            header?.setCheckBusy(true);
+            try {
+                const liveRef = await this._vault._refManager.readRef(this._vault._refFileId);
+                const changed = liveRef && liveRef !== this._vault._namedHeadId;
+                if (changed) {
+                    this._vault._namedHeadId = liveRef;
+                }
+                if (this._accessKey) {
+                    await this._refreshSyncState();
+                } else if (changed) {
+                    // Read-only vault: highlight Refresh so user knows new content is available
+                    header?.setRefreshAvailable(true);
+                    if (isExplicit) window.sgraphVault.messages.info('New content available — click Refresh to update');
+                } else if (isExplicit) {
+                    window.sgraphVault.messages.success('Already up to date');
+                }
+            } catch (_) { /* silent — network errors don't need user notification */ } finally {
+                header?.setCheckBusy(false);
             }
         }
 

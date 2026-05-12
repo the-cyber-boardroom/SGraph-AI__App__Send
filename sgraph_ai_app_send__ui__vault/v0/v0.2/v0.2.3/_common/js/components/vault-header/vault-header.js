@@ -38,9 +38,12 @@
                             <button class="vh-unlock-cancel" title="Cancel">&#10005;</button>
                             <span class="vh-unlock-status"></span>
                         </div>
-                        <button class="vh-push-btn" style="display:none" title="Push commits to named branch">Push <span class="vh-ahead-badge"></span></button>
-                        <button class="vh-pull-btn" style="display:none" title="Pull commits from named branch">Pull <span class="vh-behind-badge"></span></button>
-                        <button class="vh-refresh-btn" title="Refresh vault (load latest commits)">Refresh</button>
+                        <div class="vh-sync-section">
+                            <button class="vh-check-btn" title="Check server for new commits">&#8635;</button>
+                            <button class="vh-push-btn" style="display:none" title="Push commits to named branch">Push <span class="vh-ahead-badge"></span></button>
+                            <button class="vh-pull-btn" style="display:none" title="Pull commits from named branch">Pull <span class="vh-behind-badge"></span></button>
+                            <button class="vh-refresh-btn" title="Reload vault from server (fetch latest commits)">Refresh</button>
+                        </div>
                         <button class="vh-upload-btn">Upload</button>
                         <button class="vh-debug-btn">Debug</button>
                         <a class="vh-raw-link" title="View raw vault data" href="#">raw</a>
@@ -52,6 +55,7 @@
             `;
 
             this.shadowRoot.addEventListener('click', (e) => {
+                if (e.target.closest('.vh-check-btn'))   this._emit('vault-header-check');
                 if (e.target.closest('.vh-push-btn'))    this._emit('vault-header-push');
                 if (e.target.closest('.vh-pull-btn'))    this._emit('vault-header-pull');
                 if (e.target.closest('.vh-refresh-btn')) this._emit('vault-header-refresh');
@@ -209,6 +213,18 @@
             }
         }
 
+        setCheckBusy(busy) {
+            const btn = this.shadowRoot.querySelector('.vh-check-btn');
+            if (!btn) return;
+            btn.disabled = busy;
+            btn.classList.toggle('vh-check-btn--spinning', busy);
+        }
+
+        setRefreshAvailable(show) {
+            const btn = this.shadowRoot.querySelector('.vh-refresh-btn');
+            if (btn) btn.classList.toggle('vh-refresh-btn--available', show);
+        }
+
         showLoading() {
             const bar = this.shadowRoot.querySelector('.vh-loading-bar');
             if (bar) bar.style.display = '';
@@ -282,13 +298,37 @@
         .vh-pull-btn:hover:not(:disabled) { background: rgba(69,183,209,0.12); }
         .vh-pull-btn:disabled { opacity: 0.5; cursor: default; }
         .vh-behind-badge { font-size: 0.65rem; font-family: var(--font-mono); }
-        .vh-upload-btn, .vh-lock-btn, .vh-debug-btn, .vh-refresh-btn {
+        .vh-upload-btn, .vh-lock-btn, .vh-debug-btn {
             font-size: var(--text-small); padding: 0.25rem 0.625rem; border-radius: var(--radius-sm);
             border: 1px solid var(--color-border); background: transparent;
             color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family);
         }
-        .vh-upload-btn:hover, .vh-lock-btn:hover, .vh-debug-btn:hover, .vh-refresh-btn:hover {
+        .vh-upload-btn:hover, .vh-lock-btn:hover, .vh-debug-btn:hover {
             background: var(--bg-secondary); color: var(--color-text);
+        }
+        .vh-sync-section {
+            display: flex; align-items: center; gap: var(--space-1);
+            padding-left: var(--space-2); margin-left: var(--space-1);
+            border-left: 1px solid var(--color-border);
+        }
+        .vh-check-btn {
+            font-size: 1rem; padding: 0.2rem 0.45rem; border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border); background: transparent;
+            color: var(--color-text-secondary); cursor: pointer; line-height: 1;
+        }
+        .vh-check-btn:hover:not(:disabled) { background: var(--bg-secondary); color: var(--color-text); }
+        .vh-check-btn:disabled { opacity: 0.5; cursor: default; }
+        .vh-check-btn--spinning { animation: vh-spin 0.8s linear infinite; }
+        @keyframes vh-spin { to { transform: rotate(360deg); } }
+        .vh-refresh-btn {
+            font-size: var(--text-small); padding: 0.25rem 0.75rem; border-radius: var(--radius-sm);
+            border: 1px solid var(--color-primary); background: transparent;
+            color: var(--color-primary); cursor: pointer; font-family: var(--font-family); font-weight: 600;
+        }
+        .vh-refresh-btn:hover { background: rgba(78,205,196,0.12); }
+        .vh-refresh-btn--available {
+            background: rgba(78,205,196,0.1);
+            box-shadow: 0 0 0 1px var(--color-primary);
         }
         .vh-upload-btn {
             background: var(--color-primary); color: var(--bg-primary);
