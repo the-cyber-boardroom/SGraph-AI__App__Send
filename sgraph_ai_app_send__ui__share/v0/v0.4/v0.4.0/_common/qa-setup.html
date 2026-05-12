@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>QA Setup</title></head>
+<body data-ready="true">
+    <h1>QA Setup (in _common)</h1>
+    <p>To be used by browser automation</p>
+    <script>
+        // Expose helpers for Playwright's page.evaluate()
+        window.QA = {
+            setToken:    function(t) { localStorage.setItem('sgraph-send-token', t); return true; },
+            getToken:    function()  { return localStorage.getItem('sgraph-send-token');           },
+            clearToken:  function()  { localStorage.removeItem('sgraph-send-token'); return true;  },
+            setItem:     function(k, v) { localStorage.setItem(k, v); return true;                },
+            getItem:     function(k)    { return localStorage.getItem(k);                         },
+            clear:       function()     { localStorage.clear(); return true;                      },
+            dump:        function()     { return JSON.parse(JSON.stringify(localStorage));         },
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+    "test_file"    : true,
+    "platform"     : "SGraph Send",
+    "purpose"      : "QA testing of encrypted upload flow",
+    "created"      : "2026-03-02",
+    "encryption"   : "AES-256-GCM (Web Crypto API)",
+    "sample_data"  : {
+        "items"    : ["alpha", "bravo", "charlie", "delta"],
+        "count"    : 4,
+        "verified" : false
+    },
+    "note": "This file is encrypted in your browser before upload. The server only stores ciphertext."
+}

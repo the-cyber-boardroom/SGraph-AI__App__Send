@@ -1,0 +1,107 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — v0.3.1 CSS overlay for send-browse.css
+   Later rules win — loaded after v0.3.0 base CSS.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* BRW-010: Markdown link color — readable on white background */
+.sb-file__markdown a { color: #0969da; text-decoration: none; }
+.sb-file__markdown a:hover { text-decoration: underline; }
+
+/* CSV table viewer */
+.sb-file__csv {
+    background: white;
+    color: #1a1a1a;
+    padding: 1rem;
+    min-height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+}
+.sb-file__csv table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.85rem;
+}
+.sb-file__csv th {
+    background: #f0f4f8;
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #d0d7de;
+    position: sticky;
+    top: 0;
+}
+.sb-file__csv td {
+    padding: 6px 12px;
+    border: 1px solid #d0d7de;
+    white-space: nowrap;
+}
+.sb-file__csv tr:nth-child(even) { background: #f6f8fa; }
+.sb-file__csv tr:hover { background: #e8f0fe; }
+
+/* HTML sandboxed iframe viewer */
+.sb-file__html-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+    border-radius: 4px;
+}
+
+/* BRW-023: Selection colour — solid blue so teal-coloured text (links, code)
+   remains legible. 25% opacity teal + color:inherit was invisible on teal text. */
+.sb-file__markdown ::selection,
+.sb-file__markdown *::selection {
+    background: #1a73e8;
+    color: #ffffff;
+}
+
+/* BRW-025: Folder name truncation — match .sb-tree__file-name which already
+   has these properties. Without them long names wrap to a second line. */
+.sb-tree__folder-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;   /* flex child must be 0 not auto for ellipsis to fire */
+}
+
+/* BRW-022: Markdown Present mode overlay */
+.sb-present-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #ffffff;
+    overflow-y: auto;
+    padding: 3rem 4rem 4rem;
+    box-sizing: border-box;
+}
+
+.sb-present-close {
+    position: fixed;
+    top: 1rem;
+    right: 1.5rem;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.07);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 6px;
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #1a1a1a;
+    cursor: pointer;
+    font-family: inherit;
+}
+.sb-present-close:hover {
+    background: rgba(0, 0, 0, 0.13);
+}
+
+.sb-present-content {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* BRW-024: Print — when overlay is open, hide everything else */
+@media print {
+    body > *:not(.sb-present-overlay) { display: none !important; }
+    .sb-present-overlay { position: static !important; overflow: visible !important; }
+    .sb-present-close { display: none !important; }
+}
