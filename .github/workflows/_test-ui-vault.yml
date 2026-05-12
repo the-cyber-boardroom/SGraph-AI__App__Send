@@ -1,11 +1,7 @@
 name: Vault UI Tests (reusable)
 
-# Reusable workflow — invoked by both:
-#   - test-ui-vault.yml   (push / PR / manual)
-#   - deploy-ui-vault.yml (gates the deploy job via `needs:`)
-#
-# Defines the unit → integration → E2E pipeline once. Job definitions live
-# here so the deploy gate and the standalone CI signal cannot drift apart.
+# Reusable workflow — invoked by deploy-ui-vault.yml as a test gate before deploy.
+# Defines the unit → integration → E2E pipeline once so the gate cannot drift.
 
 on:
   workflow_call:
