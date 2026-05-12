@@ -195,9 +195,7 @@
             // before first render. Without this, a CLI push (which only updates the
             // named ref) leaves this browser's clone ref stale, and the Files panel
             // renders the previous commit's tree until the user clicks Refresh.
-            if (vault._headCommitId !== vault._namedHeadId) {
-                try { await vault.merge(vault._namedHeadId); } catch (_) { /* diverged or read-only — proceed as-is */ }
-            }
+            await this._syncToNamedHead(vault);
 
             // Create VaultDataSource, load all sub-trees, then mount browse
             this._mountBrowse(deepLink);
@@ -251,6 +249,28 @@
             this.querySelector('vault-entry')?.refresh?.();
         }
 
+        // --- Sync Helper ----------------------------------------------------------
+        // Aligns the in-memory working tree with the published named ref before render.
+        // Writable vaults fast-forward the clone ref (vault.merge); read-only vaults
+        // load the named commit's tree in memory only — without this, a read-only
+        // collaborator's Refresh button silently caught the merge error and left the
+        // Files panel stuck on the stale clone-ref tree.
+        async _syncToNamedHead(vault) {
+            if (!vault || !vault._namedHeadId)                  return;
+            if (vault._headCommitId === vault._namedHeadId)     return;
+
+            if (vault.writable) {
+                try { await vault.merge(vault._namedHeadId); } catch (_) { /* diverged — three-way merge already attempted */ }
+                return;
+            }
+
+            // Read-only: bring the in-memory tree up to the published head without writing the ref.
+            try {
+                await vault._loadTreeFromCommit(vault._namedHeadId);
+                vault._headCommitId = vault._namedHeadId;
+            } catch (_) { /* leave tree as-is if the named commit can't be loaded */ }
+        }
+
         // --- Mount Browse Component -----------------------------------------------
 
         async _onRefresh() {
@@ -263,9 +283,7 @@
 
                 // Auto-merge if clone ref is behind named ref — Refresh should always
                 // show the latest published content, not just reload from the old clone.
-                if (vault._headCommitId !== vault._namedHeadId) {
-                    try { await vault.merge(vault._namedHeadId); } catch (_) { /* diverged — proceed as-is */ }
-                }
+                await this._syncToNamedHead(vault);
                 this._vault   = vault;
 
                 // Remount browse with fresh vault data

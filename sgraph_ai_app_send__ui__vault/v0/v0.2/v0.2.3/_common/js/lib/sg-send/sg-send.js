@@ -121,7 +121,10 @@ class SGSend {
 
     async vaultRead(vaultId, fileId) {
         const url      = `${this.endpoint}/api/vault/read/${vaultId}/${fileId}`
-        const response = await fetch(url, { method: 'GET', mode: 'cors' })     // No auth required (zero-knowledge)
+        // cache: 'no-store' — refs are mutable server-side (overwritten by every push). The browser's
+        // default heuristic freshness would otherwise serve a stale ref ciphertext from disk cache,
+        // causing the Files panel to render a previous commit's tree after a Cmd-R reload.
+        const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' })     // No auth required (zero-knowledge)
         if (response.status === 404) return null
         if (!response.ok) {
             const detail = await response.text().catch(() => response.statusText)
