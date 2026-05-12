@@ -537,7 +537,7 @@ class SendBrowse extends SendComponent {
             //
             // Built as a function so sg.app.selfPath reflects the CURRENT document
             // (not the entry document) after in-iframe navigation.
-            var _buildVfsBridgeScript = function(currentPath) { return
+            var _buildVfsBridgeScript = function(currentPath) { return '' +
                 '<script id="__sg-vfs">' +
                 '(function(){' +
                 'console.log("[sg-vfs] installing...");' +
