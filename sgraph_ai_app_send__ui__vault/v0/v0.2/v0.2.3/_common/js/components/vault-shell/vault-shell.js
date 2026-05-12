@@ -125,9 +125,19 @@
             });
             this.addEventListener('vault-settings-access-key', (e) => {
                 this._accessKey = e.detail.key;
-                sessionStorage.setItem('sg-vault-access-key', e.detail.key);
+                if (e.detail.key) {
+                    sessionStorage.setItem('sg-vault-access-key', e.detail.key);
+                } else {
+                    sessionStorage.removeItem('sg-vault-access-key');
+                }
                 if (this._vault?._sgSend) this._vault._sgSend.token = e.detail.key;
-                this.querySelector('vault-header')?.setReadOnly(false);
+                // Update the live dataSource so edit/write buttons activate immediately
+                if (this._dataSource) {
+                    this._dataSource._accessKey = e.detail.key;
+                    this._dataSource.writable   = !!e.detail.key;
+                }
+                this.querySelector('vault-header')?.setReadOnly(!e.detail.key);
+                this.querySelector('vault-browse-edit, send-browse')?._remountIfNeeded?.();
             });
 
             // Status bar debug click
@@ -591,7 +601,10 @@
             this._accessKey = key;
             sessionStorage.setItem('sg-vault-access-key', key);
             if (this._vault?._sgSend) this._vault._sgSend.token = key;
-
+            if (this._dataSource) {
+                this._dataSource._accessKey = key;
+                this._dataSource.writable   = !!key;
+            }
             this.querySelector('vault-header')?.setReadOnly(false);
             window.sgraphVault.messages.success('Access key set — write operations enabled');
 

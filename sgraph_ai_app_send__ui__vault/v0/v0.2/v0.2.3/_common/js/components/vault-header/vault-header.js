@@ -28,7 +28,16 @@
                         <span class="vh-vault-name"></span>
                     </div>
                     <div class="vh-right">
-                        <span class="vh-readonly-badge" style="display:none">Read-only</span>
+                        <span class="vh-readonly-badge" style="display:none" title="Click to enter access key and enable write access">
+                            Read-only
+                            <button class="vh-unlock-btn" title="Enter access key">&#128275;</button>
+                        </span>
+                        <div class="vh-unlock-panel" style="display:none">
+                            <input class="vh-unlock-input" type="password" placeholder="Access key…" autocomplete="off">
+                            <button class="vh-unlock-apply">Apply</button>
+                            <button class="vh-unlock-cancel" title="Cancel">&#10005;</button>
+                            <span class="vh-unlock-status"></span>
+                        </div>
                         <button class="vh-push-btn" style="display:none" title="Push commits to named branch">Push <span class="vh-ahead-badge"></span></button>
                         <button class="vh-pull-btn" style="display:none" title="Pull commits from named branch">Pull <span class="vh-behind-badge"></span></button>
                         <button class="vh-refresh-btn" title="Refresh vault (load latest commits)">Refresh</button>
@@ -51,6 +60,15 @@
                 if (e.target.closest('.vh-debug-btn'))   this._emit('vault-header-debug');
                 if (e.target.closest('.vh-raw-link'))   { e.preventDefault(); this._emit('vault-header-raw'); }
                 if (e.target.closest('.vh-vault-name') && !e.target.closest('input')) this._startNameEdit();
+                if (e.target.closest('.vh-readonly-badge') || e.target.closest('.vh-unlock-btn')) this._showUnlockPanel();
+                if (e.target.closest('.vh-unlock-apply'))  this._applyUnlock();
+                if (e.target.closest('.vh-unlock-cancel')) this._hideUnlockPanel();
+            });
+
+            this.shadowRoot.addEventListener('keydown', (e) => {
+                if (!e.target.closest('.vh-unlock-input')) return;
+                if (e.key === 'Enter')  this._applyUnlock();
+                if (e.key === 'Escape') this._hideUnlockPanel();
             });
 
             this._fetchAppVersion();
@@ -95,6 +113,39 @@
         setReadOnly(isReadOnly) {
             const badge = this.shadowRoot.querySelector('.vh-readonly-badge');
             if (badge) badge.style.display = isReadOnly ? '' : 'none';
+            if (!isReadOnly) this._hideUnlockPanel();
+        }
+
+        _showUnlockPanel() {
+            const badge = this.shadowRoot.querySelector('.vh-readonly-badge');
+            const panel = this.shadowRoot.querySelector('.vh-unlock-panel');
+            const input = this.shadowRoot.querySelector('.vh-unlock-input');
+            if (!panel) return;
+            if (badge) badge.style.display = 'none';
+            panel.style.display = 'flex';
+            if (input) { input.value = ''; input.focus(); }
+            const status = this.shadowRoot.querySelector('.vh-unlock-status');
+            if (status) status.textContent = '';
+        }
+
+        _hideUnlockPanel() {
+            const panel = this.shadowRoot.querySelector('.vh-unlock-panel');
+            if (panel) panel.style.display = 'none';
+            // Restore badge if still read-only (shell will hide it on successful unlock)
+            const badge = this.shadowRoot.querySelector('.vh-readonly-badge');
+            if (badge) badge.style.display = '';
+        }
+
+        _applyUnlock() {
+            const input  = this.shadowRoot.querySelector('.vh-unlock-input');
+            const status = this.shadowRoot.querySelector('.vh-unlock-status');
+            const key    = input?.value?.trim();
+            if (!key) {
+                if (status) { status.textContent = 'Key required'; status.style.color = '#ff6b6b'; }
+                return;
+            }
+            if (status) { status.textContent = 'Applying…'; status.style.color = 'var(--color-text-secondary)'; }
+            this._emit('vault-settings-access-key', { key });
         }
 
         showLockButton(show) {
@@ -250,9 +301,38 @@
         }
         .vh-raw-link:hover { color: var(--color-primary); opacity: 1; }
         .vh-readonly-badge {
-            font-size: var(--text-small); padding: 0.125rem 0.5rem; border-radius: 9999px;
-            background: rgba(233, 196, 69, 0.15); color: #E9C445; font-weight: 600;
+            display: flex; align-items: center; gap: 4px;
+            font-size: var(--text-small); padding: 0.125rem 0.4rem 0.125rem 0.5rem;
+            border-radius: 9999px; background: rgba(233, 196, 69, 0.15);
+            color: #E9C445; font-weight: 600; cursor: pointer;
         }
+        .vh-readonly-badge:hover { background: rgba(233, 196, 69, 0.25); }
+        .vh-unlock-btn {
+            background: none; border: none; cursor: pointer; padding: 0; font-size: 0.75rem;
+            color: #E9C445; line-height: 1;
+        }
+        .vh-unlock-panel {
+            display: flex; align-items: center; gap: 4px;
+        }
+        .vh-unlock-input {
+            font-size: var(--text-small); padding: 0.2rem 0.5rem; width: 160px;
+            background: var(--bg-primary, #0a0a18); border: 1px solid var(--color-primary, #4ECDC4);
+            border-radius: var(--radius-sm, 4px); color: var(--color-text, #e2e8f0);
+            font-family: var(--font-mono); outline: none;
+        }
+        .vh-unlock-apply {
+            font-size: var(--text-small); padding: 0.2rem 0.6rem; border-radius: var(--radius-sm, 4px);
+            border: 1px solid var(--color-primary, #4ECDC4); background: transparent;
+            color: var(--color-primary, #4ECDC4); cursor: pointer; font-family: var(--font-family);
+            font-weight: 600;
+        }
+        .vh-unlock-apply:hover { background: rgba(78,205,196,0.12); }
+        .vh-unlock-cancel {
+            font-size: var(--text-small); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm, 4px);
+            border: 1px solid var(--color-border, #2a2a4a); background: transparent;
+            color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family);
+        }
+        .vh-unlock-status { font-size: var(--text-small); color: var(--color-text-secondary); }
         .vh-loading-bar {
             position: absolute; bottom: -2px; left: 0; right: 0; height: 2px; overflow: hidden; z-index: 30;
         }

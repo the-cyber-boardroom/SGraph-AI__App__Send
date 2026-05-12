@@ -65,10 +65,13 @@
                     <div class="vset-section">
                         <label class="vset-label">Access Key</label>
                         <div class="vset-row">
-                            <input class="vset-input vset-access-input" type="password" placeholder="Enter access key for uploads">
+                            <input class="vset-input vset-access-input" type="password" placeholder="Enter access key to enable writes">
+                            <button class="vset-btn vset-validate-access">Check</button>
                             <button class="vset-btn vset-save-access">Set</button>
+                            <button class="vset-btn vset-clear-access" title="Clear access key">Clear</button>
                         </div>
-                        <p class="vset-hint">Only needed for uploading files.</p>
+                        <div class="vset-access-status"></div>
+                        <p class="vset-hint">Needed for writing files. Leave empty to open in read-only mode. <em>Check</em> validates the key and shows remaining uses.</p>
                     </div>
 
                     <div class="vset-section">
@@ -157,12 +160,14 @@
 
         _setupListeners() {
             this.shadowRoot.addEventListener('click', (e) => {
-                if (e.target.closest('.vset-save-name'))    return this._saveName();
-                if (e.target.closest('.vset-copy-key'))     return this._copyWithFlash('.vset-copy-key', '.vset-key-input');
-                if (e.target.closest('.vset-copy-url'))     return this._copyWithFlash('.vset-copy-url', '.vset-url-input');
-                if (e.target.closest('.vset-copy-readkey')) return this._copyWithFlash('.vset-copy-readkey', '.vset-readkey-input');
-                if (e.target.closest('.vset-save-access'))  return this._saveAccess();
-                if (e.target.closest('.vset-json-toggle'))  return this._toggleJson(e);
+                if (e.target.closest('.vset-save-name'))       return this._saveName();
+                if (e.target.closest('.vset-copy-key'))        return this._copyWithFlash('.vset-copy-key', '.vset-key-input');
+                if (e.target.closest('.vset-copy-url'))        return this._copyWithFlash('.vset-copy-url', '.vset-url-input');
+                if (e.target.closest('.vset-copy-readkey'))    return this._copyWithFlash('.vset-copy-readkey', '.vset-readkey-input');
+                if (e.target.closest('.vset-save-access'))     return this._saveAccess();
+                if (e.target.closest('.vset-clear-access'))    return this._clearAccess();
+                if (e.target.closest('.vset-validate-access')) return this._validateAccess();
+                if (e.target.closest('.vset-json-toggle'))     return this._toggleJson(e);
             });
         }
 
@@ -202,13 +207,63 @@
 
         _saveAccess() {
             const input = this.shadowRoot.querySelector('.vset-access-input');
-            const key = input?.value?.trim();
-            if (!key) return;
+            const key = input?.value?.trim() ?? '';
             this._accessKey = key;
             this.dispatchEvent(new CustomEvent('vault-settings-access-key', {
                 detail: { key }, bubbles: true, composed: true
             }));
-            window.sgraphVault.messages.success('Access key updated');
+            window.sgraphVault.messages.success(key ? 'Access key set — write mode enabled' : 'Access key cleared — vault is read-only');
+            this._setAccessStatus('');
+        }
+
+        _clearAccess() {
+            const input = this.shadowRoot.querySelector('.vset-access-input');
+            if (input) input.value = '';
+            this._accessKey = '';
+            this.dispatchEvent(new CustomEvent('vault-settings-access-key', {
+                detail: { key: '' }, bubbles: true, composed: true
+            }));
+            window.sgraphVault.messages.success('Access key cleared — vault is read-only');
+            this._setAccessStatus('');
+        }
+
+        async _validateAccess() {
+            const input  = this.shadowRoot.querySelector('.vset-access-input');
+            const btn    = this.shadowRoot.querySelector('.vset-validate-access');
+            const key    = input?.value?.trim();
+            if (!key) { this._setAccessStatus('Enter a key first', 'warn'); return; }
+
+            const orig = btn.textContent;
+            btn.disabled = true; btn.textContent = '…';
+            this._setAccessStatus('Checking…', 'info');
+
+            try {
+                const resp = await fetch(`${window.location.origin}/api/transfers/check_token/${encodeURIComponent(key)}`);
+                if (!resp.ok) {
+                    this._setAccessStatus('Server error — could not validate', 'error');
+                    return;
+                }
+                const data = await resp.json();
+                if (!data.valid) {
+                    this._setAccessStatus(`✗ Invalid — ${data.reason || data.status || 'not found'}`, 'error');
+                } else if (data.remaining === 0) {
+                    this._setAccessStatus(`⚠ Valid but exhausted (${data.status})`, 'warn');
+                } else {
+                    const rem = data.remaining > 0 ? ` · ${data.remaining} uses remaining` : ' · unlimited';
+                    this._setAccessStatus(`✓ Valid${rem}`, 'ok');
+                }
+            } catch (err) {
+                this._setAccessStatus(`✗ Check failed: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = orig;
+            }
+        }
+
+        _setAccessStatus(msg, type) {
+            const el = this.shadowRoot.querySelector('.vset-access-status');
+            if (!el) return;
+            el.textContent = msg;
+            el.className = 'vset-access-status' + (type ? ' vset-access-status--' + type : '');
         }
 
         _toggleJson(e) {
@@ -253,6 +308,11 @@
         .vset-btn:hover { background: var(--bg-secondary); color: var(--color-text); }
         .vset-hint { font-size: var(--text-small); color: var(--color-text-secondary); margin: var(--space-1) 0 0; }
         .vset-hint--warn { color: var(--color-primary); }
+        .vset-access-status { font-size: var(--text-small); margin-top: var(--space-1); min-height: 1.2em; }
+        .vset-access-status--ok    { color: #4ecdc4; }
+        .vset-access-status--warn  { color: #E9C445; }
+        .vset-access-status--error { color: #ff6b6b; }
+        .vset-access-status--info  { color: var(--color-text-secondary); }
         .vset-hint code { font-family: var(--font-mono); background: var(--bg-primary); padding: 0.1em 0.3em; border-radius: 3px; }
         .vset-stats-grid {
             display: grid; grid-template-columns: auto 1fr;
