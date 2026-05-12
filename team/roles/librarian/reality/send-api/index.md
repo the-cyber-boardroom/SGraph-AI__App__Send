@@ -1,6 +1,6 @@
 # send-api — Reality Index
 
-**Domain:** `send-api/` | **Last updated:** 2026-05-05 | **Maintained by:** Librarian (daily run)
+**Domain:** `send-api/` | **Last updated:** 2026-05-12 | **Maintained by:** Librarian (daily run)
 
 The User Lambda: the public-facing API at `send.sgraph.ai`. Handles encrypted file transfers,
 multipart uploads, vault blob storage (pointer model), room joins, early access signups, and
@@ -34,7 +34,7 @@ MCP tool exposure. All 26 API endpoints are tested and passing.
 | GET | `/presigned/upload-url/{id}` | Get single presigned PUT URL | Yes |
 | GET | `/presigned/download-url/{id}` | Get presigned S3 GET URL | Yes |
 
-### Vault Pointer (`/vault/*`) — 8 endpoints
+### Vault Pointer (`/vault/*`) — 9 endpoints
 
 The User Lambda implements a zero-knowledge vault blob store. The server holds AES-256-GCM
 ciphertext — it never decrypts. Reads are public; writes are double-gated (access token + write_key).
@@ -45,6 +45,7 @@ ciphertext — it never decrypts. Reads are public; writes are double-gated (acc
 | GET | `/vault/read/{vault_id}/{file_id}` | Read encrypted blob (raw binary, no auth) | Yes |
 | GET | `/vault/read-base64/{vault_id}/{file_id}` | Read as base64 JSON (MCP-safe, no auth) | Yes |
 | DELETE | `/vault/delete/{vault_id}/{file_id}` | Delete vault file (auth + write_key required) | Yes |
+| DELETE | `/vault/destroy/{vault_id}` | Delete entire vault; body `{vault_id, purge?: bool}`; `purge=true` skips tombstone | Yes |
 | POST | `/vault/presigned/initiate/{vault_id}` | Initiate S3 multipart for large blob (auth + write_key) | Yes |
 | POST | `/vault/presigned/complete/{vault_id}` | Complete S3 multipart (auth + write_key) | Yes |
 | POST | `/vault/presigned/cancel/{vault_id}` | Cancel S3 multipart (auth + write_key) | Yes |
@@ -53,6 +54,8 @@ ciphertext — it never decrypts. Reads are public; writes are double-gated (acc
 **Storage model:** Blobs stored at `transfers/vault/{vault_id}/{file_id}/payload` in Storage_FS.
 Write-key hash stored in `transfers/vault/{vault_id}/vault_pointer.json`.
 Read-base64 response size limited to 3.75MB (Lambda response limit).
+Destroy without `purge` writes a tombstone at `vault/{id[:2]}/{id}/deleted.json` to block vault_id reuse.
+Destroy with `purge: true` skips the tombstone — vault_id is fully reusable afterwards.
 
 ### Room Join (`/join/*`) — 3 endpoints
 
