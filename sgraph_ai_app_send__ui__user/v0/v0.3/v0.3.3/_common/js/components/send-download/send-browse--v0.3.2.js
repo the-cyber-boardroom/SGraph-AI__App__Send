@@ -865,6 +865,13 @@ class SendBrowse extends SendComponent {
                                 fileList = self.dataSource.getFileList(); // refresh after write
                                 console.log('[sg-vfs parent] wrote', wResolved, wBytes.byteLength, 'bytes');
                                 _writeReply(true, { size: wBytes.byteLength });
+                                // Auto-push: keep named ref in sync after every commit
+                                var ds = self.dataSource;
+                                if (ds && ds.writable && ds._vault && typeof ds._vault.push === 'function') {
+                                    ds._vault.push().catch(function(err) {
+                                        console.warn('[sg-vfs parent] auto-push failed (non-fatal):', err);
+                                    });
+                                }
                             })
                             .catch(function(err) {
                                 console.error('[sg-vfs parent] write failed:', wResolved, err);
