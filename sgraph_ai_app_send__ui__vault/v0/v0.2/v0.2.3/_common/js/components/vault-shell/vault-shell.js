@@ -176,7 +176,7 @@
 
         // --- Vault Lifecycle ------------------------------------------------------
 
-        _onVaultOpened(vault, vaultKey, accessKey, deepLink) {
+        async _onVaultOpened(vault, vaultKey, accessKey, deepLink) {
             this._vault     = vault;
             this._vaultKey  = vaultKey;
             this._accessKey = accessKey || '';
@@ -190,6 +190,14 @@
             header?.setVaultName(vault.name || '');
             header?.showLockButton(true);
             header?.setReadOnly(!this._accessKey);
+
+            // Auto-fast-forward the per-client clone ref to the published named ref
+            // before first render. Without this, a CLI push (which only updates the
+            // named ref) leaves this browser's clone ref stale, and the Files panel
+            // renders the previous commit's tree until the user clicks Refresh.
+            if (vault._headCommitId !== vault._namedHeadId) {
+                try { await vault.merge(vault._namedHeadId); } catch (_) { /* diverged or read-only — proceed as-is */ }
+            }
 
             // Create VaultDataSource, load all sub-trees, then mount browse
             this._mountBrowse(deepLink);
