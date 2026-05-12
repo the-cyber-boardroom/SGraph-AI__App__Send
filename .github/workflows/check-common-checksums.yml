@@ -1,0 +1,44 @@
+name: Check _common/ Byte-Identical (share vs open)
+
+# Verifies that the duplicated `_common/` utilities under the v0.4.x share
+# and open trees remain byte-identical. Drift is the cost of duplicating
+# `_common/` across two parallel IFD trees in v0.4.0; this workflow makes
+# drift visible at PR time so it cannot land silently on dev.
+#
+# Plan: team/roles/architect/reviews/05/10/v0.27.29__plan__v0.4.0-major-release.md §9
+# Manifest: scripts/check_common_checksums.py (MANIFEST list)
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'sgraph_ai_app_send__ui__share/v0/v0.4/**'
+      - 'sgraph_ai_app_send__ui__open/v0/v0.4/**'
+      - 'scripts/check_common_checksums.py'
+      - '.github/workflows/check-common-checksums.yml'
+  pull_request:
+    paths:
+      - 'sgraph_ai_app_send__ui__share/v0/v0.4/**'
+      - 'sgraph_ai_app_send__ui__open/v0/v0.4/**'
+      - 'scripts/check_common_checksums.py'
+      - '.github/workflows/check-common-checksums.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Verify _common/ files match between share and open trees
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run checksum comparison
+        run: python scripts/check_common_checksums.py
