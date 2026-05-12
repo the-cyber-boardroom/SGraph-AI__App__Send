@@ -1,0 +1,190 @@
+.sv-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 80px);
+    overflow: hidden;
+}
+
+.sv-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+}
+
+.sv-header__name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    flex: 1;
+}
+
+.sv-header__size {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.sv-save-btn {
+    background: var(--accent, #4ECDC4);
+    color: #0a0e17;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sv-save-btn:hover { opacity: 0.85; }
+
+.sv-action-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--color-text-secondary, #8892A0);
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.sv-action-btn:hover {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
+}
+
+.sv-action-btn--active {
+    border-color: var(--accent, #4ECDC4);
+    color: var(--accent, #4ECDC4);
+}
+
+.sv-share {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02);
+}
+
+.sv-share__row {
+    margin-bottom: 0.5rem;
+}
+
+.sv-share__label {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #8892A0);
+    margin-bottom: 0.35rem;
+}
+
+.sv-share__input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sv-share__url {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    color: var(--color-text, #E0E0E0);
+    font-family: monospace;
+    min-width: 0;
+}
+
+.sv-share__actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sv-content {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.sv-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+    margin: auto;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.sv-markdown {
+    background: white;
+    color: #1a1a1a;
+    padding: 2rem;
+    line-height: 1.6;
+    max-width: 800px;
+    margin: 0 auto;
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+.sv-markdown h1, .sv-markdown h2 { border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
+.sv-markdown code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+.sv-markdown pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+.sv-markdown pre code { background: none; padding: 0; }
+.sv-markdown blockquote { border-left: 3px solid #ddd; margin-left: 0; padding-left: 1rem; color: #555; }
+.sv-markdown table { border-collapse: collapse; width: 100%; }
+.sv-markdown th, .sv-markdown td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+.sv-markdown th { background: #f4f4f4; }
+
+.sv-pdf {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.sv-code {
+    margin: 0;
+    padding: 1.5rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+.sv-text-display {
+    padding: 1.5rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.sv-text-display pre {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 1.5rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.sv-copy-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--accent, #4ECDC4);
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.sv-copy-btn:hover {
+    border-color: var(--accent, #4ECDC4);
+}

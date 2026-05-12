@@ -1,0 +1,10 @@
+Receiver (open) IFD tree — v0.4.0 base.
+
+This directory will hold send-browse, send-download, send-gallery, send-viewer,
+send-secret-view, and the recipient shells.
+
+URLs: send.sgraph.ai/en-gb/open/{,browse,download,gallery,v,view,s}/
+
+Scaffolded in Phase A0 (empty). Files arrive in Phase A-open onwards.
+
+Plan: team/roles/architect/reviews/05/10/v0.27.29__plan__v0.4.0-major-release.md
