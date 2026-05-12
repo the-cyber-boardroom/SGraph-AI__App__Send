@@ -63,6 +63,10 @@ class SendBrowse extends SendComponent {
             this._vfsBridges.forEach(b => window.removeEventListener('message', b));
             this._vfsBridges = [];
         }
+        if (this._syncHandlers) {
+            this._syncHandlers.forEach(h => window.removeEventListener('sg-vault-synced', h));
+            this._syncHandlers = [];
+        }
         if (this._boundKeyHandler) {
             document.removeEventListener('keydown', this._boundKeyHandler);
             this._boundKeyHandler = null;
@@ -756,7 +760,8 @@ class SendBrowse extends SendComponent {
                       'check:function(){return _sgCmd("git",{action:"check"});},' +
                       'push:function(){return _sgCmd("git",{action:"push"});},' +
                       'pull:function(){return _sgCmd("git",{action:"pull"});},' +
-                      'refresh:function(){return _sgCmd("git",{action:"refresh"});}' +
+                      // Non-destructive in-place refresh — does not destroy the iframe
+                      'refresh:function(){return _sgCmd("git",{action:"syncRefresh"});}' +
                     '},' +
                     'auth:{' +
                       'hasKey:' + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + ',' +
@@ -1034,6 +1039,25 @@ class SendBrowse extends SendComponent {
                                 } else { _cmdReply(false, null, 'Shell not available'); }
                                 return;
                             }
+                            // Non-destructive in-place refresh (sg.sync.refresh)
+                            if (gitAction === 'syncRefresh') {
+                                if (!shell || typeof shell._refreshInPlace !== 'function') {
+                                    _cmdReply(false, null, 'Shell does not support in-place refresh');
+                                    return;
+                                }
+                                var preRefreshCount = fileList.filter(function(f) { return !f.dir; }).length;
+                                shell._refreshInPlace().then(function(res) {
+                                    fileList = self.dataSource ? self.dataSource.getFileList() : fileList;
+                                    var postCount = fileList.filter(function(f) { return !f.dir; }).length;
+                                    _cmdReply(true, {
+                                        from:         res.from,
+                                        to:           res.to,
+                                        changed:      res.changed,
+                                        filesChanged: Math.abs(postCount - preRefreshCount)
+                                    });
+                                }).catch(function(err) { _cmdReply(false, null, err.message); });
+                                return;
+                            }
                             _cmdReply(false, null, 'Unknown git action: ' + e.data.action);
                             return;
                         }
@@ -1197,6 +1221,20 @@ class SendBrowse extends SendComponent {
                 window.addEventListener('message', vfsBridge);
                 if (!self._vfsBridges) self._vfsBridges = [];
                 self._vfsBridges.push(vfsBridge);
+
+                // Refresh fileList and notify iframe when vault shell syncs new content
+                var _vaultSyncedHandler = function(evt) {
+                    fileList = self.dataSource ? self.dataSource.getFileList() : [];
+                    try {
+                        iframeEl.contentWindow.postMessage({
+                            __sgVfsCacheInvalidate: true,
+                            version: evt.detail && evt.detail.newHead || null
+                        }, '*');
+                    } catch (_) {}
+                };
+                window.addEventListener('sg-vault-synced', _vaultSyncedHandler);
+                if (!self._syncHandlers) self._syncHandlers = [];
+                self._syncHandlers.push(_vaultSyncedHandler);
             }
 
             // Inject bridge → create blob → set iframe src.
