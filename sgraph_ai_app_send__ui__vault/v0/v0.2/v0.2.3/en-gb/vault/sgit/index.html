@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — SGit Performance Harness</title>
+    <meta name="robots" content="noindex">
+
+    <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --bg:       #0d1117;
+        --bg2:      #111820;
+        --bg3:      #161d27;
+        --border:   rgba(255,255,255,0.08);
+        --text:     #e0e6f0;
+        --muted:    #6e7a8a;
+        --teal:     #4ecdc4;
+        --teal-dim: rgba(78,205,196,0.12);
+        --warn:     #e0ac4e;
+        --warn-dim: rgba(224,172,78,0.10);
+        --err:      #e06c75;
+        --success:  #1f9d55;
+
+        /* sg-layout dark-theme overrides */
+        --sgl-bg:           var(--bg);
+        --sgl-bg-panel:     var(--bg2);
+        --sgl-bg-tab:       var(--bg3);
+        --sgl-bg-tab-active: var(--bg2);
+        --sgl-border:       var(--border);
+        --sgl-text:         var(--text);
+        --sgl-text-muted:   var(--muted);
+        --sgl-accent:       var(--teal);
+        --sgl-resize-handle: rgba(255,255,255,0.06);
+    }
+
+    html, body {
+        width: 100%; height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        overflow: hidden;
+    }
+
+    /* ── App chrome ─────────────────────────────────────────────────────── */
+    #app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+
+    .vs-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.4rem 0.9rem;
+        background: var(--bg2);
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+        min-height: 38px;
+    }
+    .vs-header__title {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #fff;
+        white-space: nowrap;
+    }
+    .vs-header__badge {
+        font-size: 0.6rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--warn);
+        background: var(--warn-dim);
+        border: 1px solid rgba(224,172,78,0.25);
+        border-radius: 3px;
+        padding: 0.1rem 0.4rem;
+    }
+    .vs-header__nav {
+        margin-left: auto;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+    .vs-header__nav a {
+        color: var(--muted);
+        font-size: 0.75rem;
+        text-decoration: none;
+    }
+    .vs-header__nav a:hover { color: var(--teal); }
+
+    #layout-root {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+    }
+
+    /* ── sg-layout not-yet-loaded fallback ──────────────────────────────── */
+    #layout-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--muted);
+        font-size: 0.85rem;
+    }
+    </style>
+</head>
+<body>
+<div id="app">
+
+    <div class="vs-header">
+        <span class="vs-header__title">SG/Vault — SGit Performance Harness</span>
+        <span class="vs-header__badge">internal · perf</span>
+        <nav class="vs-header__nav">
+            <a href="/en-gb/vault">Vault shell</a>
+            <a href="/en-gb/vault/peek">Peek</a>
+        </nav>
+    </div>
+
+    <div id="layout-root">
+        <div id="layout-loading">Loading layout…</div>
+    </div>
+
+</div>
+
+<!-- ── Vault library chain (load-order matters — IIFE extensions) ──────── -->
+<script src="../../../_common/js/lib/sg-send/sg-send-crypto.js"></script>
+<script src="../../../_common/js/lib/sg-send/sg-send.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault--branches.js"></script>
+
+<!-- ── Harness modules (non-module scripts; must come after vault chain) ── -->
+<script src="./sgit-instrumentation.js"></script>
+<script src="./sgit-optimisations.js"></script>
+<script src="./sgit-fast-client.js"></script>
+<script src="./sgit-vault-setup.js"></script>
+<script src="./sgit-scenarios.js"></script>
+
+<!-- ── CDN: sg-vault-trace (captures sg-vault-*:* events, used by vs-request-trace) -->
+<script type="module"
+  src="https://tools.sgraph.ai/components/vault-embed/sg-vault-trace/v0/v0.1/v0.1.0/sg-vault-trace.js"></script>
+
+<!-- ── CDN: sg-layout (multi-panel workspace shell) ── -->
+<script type="module" src="https://tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
+
+<!-- ── Harness custom elements (module; depends on above globals) ── -->
+<script type="module" src="./vault-sgit-harness.js"></script>
+
+<!-- ── Layout bootstrap (runs after DOMContentLoaded; sg-layout may be async) ── -->
+<script type="module">
+(async function () {
+
+    const LAYOUT_KEY    = 'vs-layout'
+    const DEFAULT_LAYOUT = {
+        type: 'row',
+        sizes: [0.28, 0.72],
+        children: [
+            {
+                type: 'stack', id: 'left',
+                tabs: [
+                    { tag: 'vs-vault-loader',    title: '🔑 Vault Loader'  },
+                    { tag: 'vs-opt-toggles',     title: '⚡ Optimisations' },
+                    { tag: 'vs-scenario-picker', title: '🧪 Scenarios'     },
+                    { tag: 'vs-vault-setup',     title: '🏗 Vault Setup'   },
+                ]
+            },
+            {
+                type: 'column',
+                sizes: [0.45, 0.35, 0.20],
+                children: [
+                    {
+                        type: 'stack', id: 'metrics',
+                        tabs: [{ tag: 'vs-metrics-card',   title: '📊 Side-by-Side' }]
+                    },
+                    {
+                        type: 'stack', id: 'trace',
+                        tabs: [{ tag: 'vs-request-trace',  title: '📡 Request Trace' }]
+                    },
+                    {
+                        type: 'stack', id: 'history',
+                        tabs: [{ tag: 'vs-run-history',    title: '📈 Run History'  }]
+                    }
+                ]
+            }
+        ]
+    }
+
+    // Wait for sg-layout to define itself (CDN module may be async)
+    async function waitForElement(tag, maxMs = 8000) {
+        const deadline = Date.now() + maxMs
+        while (!customElements.get(tag)) {
+            if (Date.now() > deadline) return false
+            await new Promise(r => setTimeout(r, 50))
+        }
+        return true
+    }
+
+    const root = document.getElementById('layout-root')
+    const loading = document.getElementById('layout-loading')
+
+    const sgLayoutReady = await waitForElement('sg-layout')
+
+    if (!sgLayoutReady) {
+        // Graceful degradation: render panels as a simple stacked list without sg-layout
+        loading.textContent = 'sg-layout unavailable — falling back to stacked view.'
+        root.style.overflow = 'auto'
+        root.style.padding  = '1rem'
+        const tags = ['vs-vault-loader','vs-opt-toggles','vs-scenario-picker','vs-vault-setup',
+                      'vs-metrics-card','vs-request-trace','vs-run-history']
+        for (const tag of tags) {
+            const el = document.createElement(tag)
+            el.style.cssText = 'display:block;margin-bottom:1rem;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden'
+            root.appendChild(el)
+        }
+        return
+    }
+
+    loading.remove()
+
+    // Restore persisted layout or use default
+    let layoutTree = DEFAULT_LAYOUT
+    try {
+        const saved = localStorage.getItem(LAYOUT_KEY)
+        if (saved) layoutTree = JSON.parse(saved)
+    } catch (_) {}
+
+    const sgLayout = document.createElement('sg-layout')
+    sgLayout.style.cssText = 'width:100%;height:100%;display:block'
+    root.appendChild(sgLayout)
+
+    await customElements.whenDefined('sg-layout')
+    sgLayout.setLayout(layoutTree)
+
+    // Persist layout changes
+    sgLayout.addEventListener('layout-changed', (e) => {
+        try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(e.detail || layoutTree)) } catch (_) {}
+    })
+
+}())
+</script>
+</body>
+</html>
