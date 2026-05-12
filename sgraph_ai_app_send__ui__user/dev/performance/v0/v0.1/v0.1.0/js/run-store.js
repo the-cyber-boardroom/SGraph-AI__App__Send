@@ -49,6 +49,7 @@
       wall_ms:       r.wall_ms,
       summary:       r.summary,
       steps:        (r.steps || []).map(compactStep),
+      log:          (r.log || []).slice(),
       note:          r.note || null,
       error:         r.error || null,
       ts:            r.ts,
