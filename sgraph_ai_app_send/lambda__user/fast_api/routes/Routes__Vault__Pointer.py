@@ -30,8 +30,7 @@ ROUTES_PATHS__VAULT = [f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}/{{file_id:path}
                        f'/{TAG__ROUTES_VAULT}/public-info/{{vault_id}}'                   ,
                        f'/{TAG__ROUTES_VAULT}/write/{{vault_id}}'                         ,
                        f'/{TAG__ROUTES_VAULT}/read/{{vault_id}}'                          ,
-                       f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}'                   ,
-                       f'/{TAG__ROUTES_VAULT}/delete/{{vault_id}}'                        ]
+                       f'/{TAG__ROUTES_VAULT}/read-base64/{{vault_id}}'                   ]
 
 
 LAMBDA_BASE64_LIMIT = 3750000                                                    # ~3.75MB (base64 adds ~33%, must stay under Lambda 5MB response limit)
