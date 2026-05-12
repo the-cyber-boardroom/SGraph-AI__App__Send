@@ -550,7 +550,8 @@ class VtCryptoLab extends HTMLElement {
             const rawBytes = await vault.getFile(folder, fileName);
             const innerBytes = rawBytes instanceof ArrayBuffer ? new Uint8Array(rawBytes) : rawBytes;
 
-            if (as === 'owner' && pathInput.includes('.vault/owner')) {
+            const isOwnerPath = pathInput.startsWith('/.vault/owner/') || pathInput === '/.vault/owner';
+            if (as === 'owner' && isOwnerPath) {
                 // Inner-decrypt
                 const base64 = btoa(String.fromCharCode(...innerBytes));
                 const decrypted = await ownerDecrypt(this._credentials.vaultKey, vault.vaultId, base64);
@@ -563,7 +564,7 @@ class VtCryptoLab extends HTMLElement {
                     fileResult.className = 'cl-result cl-result--ok';
                     fileResult.textContent = text;
                 }
-            } else if (as === 'ro' && pathInput.includes('.vault/owner')) {
+            } else if (as === 'ro' && isOwnerPath) {
                 // RO simulation: show that inner bytes cannot be decrypted
                 fileResult.className = 'cl-result cl-result--warn';
                 fileResult.textContent = JSON.stringify({

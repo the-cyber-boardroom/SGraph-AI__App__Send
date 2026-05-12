@@ -238,6 +238,8 @@ class VtTokenManager extends HTMLElement {
     async _loadVaultAndTokens() {
         this._setStatus('Loading vault…', 'muted');
         try {
+            // Phase 1 limitation: vault instance is not refreshed mid-session.
+            // If another client pushes changes, this instance may be stale until page reload.
             this._vault  = await openVaultFromCredentials(this._credentials);
             this._tokens = await loadTokenList(this._vault);
         } catch (err) {
@@ -485,7 +487,9 @@ class VtTokenManager extends HTMLElement {
         let serverOk = false;
         try {
             serverOk = await revokeTransferToken(t.transfer_id, t.delete_key);
-        } catch (_) {}
+        } catch (err) {
+            console.warn('[revoke] server delete failed:', err);
+        }
 
         t.revoked    = true;
         t.revoked_at = new Date().toISOString();

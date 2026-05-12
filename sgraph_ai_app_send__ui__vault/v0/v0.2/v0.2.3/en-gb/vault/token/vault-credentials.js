@@ -105,8 +105,9 @@ export async function resolveCredential(credential) {
             const { vault_id, read_key } = JSON.parse(new TextDecoder().decode(payload));
             return { mode: 'readonly', vaultId: vault_id, readKey: read_key, roToken: token };
         }
-        // Token valid but no payload to decrypt — return minimal resolved form
-        return { mode: 'readonly', vaultId: data.vault_id || null, readKey: data.read_key || null, roToken: token };
+        // Server returned a valid token response but with neither a plaintext vault_id nor an
+        // encrypted ciphertext payload — this is an unexpected server state, not a silent fallback.
+        throw new Error('RO token resolved but server returned no vault_id or ciphertext payload');
     }
 
     throw new Error(`Unknown credential mode: ${credential.mode}`);
