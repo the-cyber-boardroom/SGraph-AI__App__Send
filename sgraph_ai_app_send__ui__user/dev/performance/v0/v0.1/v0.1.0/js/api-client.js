@@ -72,7 +72,6 @@
   const ApiClient = {
 
     baseUrl() {
-      // Same-origin by default. Can be overridden via ?api=<url> on the URL.
       const params = new URLSearchParams(location.search);
       return (params.get('api') || '').replace(/\/$/, '');
     },
@@ -214,7 +213,8 @@
       });
     },
 
-    vaultDestroy(vaultId, writeKeyHex) {
+    // purge=true → backend skips deleted.json tombstone; vault_id becomes fully reusable.
+    vaultDestroy(vaultId, writeKeyHex, { purge = false } = {}) {
       return timedFetch(this.url(`/api/vault/destroy/${encodeURIComponent(vaultId)}`), {
         method: 'DELETE',
         headers: {
@@ -222,7 +222,7 @@
           'x-sgraph-vault-write-key': writeKeyHex,
           ...this.authHeaders(),
         },
-        body: JSON.stringify({ vault_id: vaultId }),
+        body: JSON.stringify({ vault_id: vaultId, ...(purge ? { purge: true } : {}) }),
       });
     },
 

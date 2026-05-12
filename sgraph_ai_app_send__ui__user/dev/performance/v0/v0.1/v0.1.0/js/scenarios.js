@@ -10,7 +10,6 @@
   const $art = global.ArtifactTracker;
 
   function step(label, fetched, opts) {
-    // opts.expectStatus — when set, that status counts as ok (e.g. 404 for "must-not-exist" probes)
     const expected = opts && opts.expectStatus;
     const passed = expected != null
       ? fetched.status === expected
@@ -38,10 +37,8 @@
   }
 
   // ---------------------------------------------------------------- helpers ---
-  // Returns { create, transferId, deleteAuth } — the deleteAuth string is required
-  // by /transfers/delete to dismantle the artefact afterwards.
   async function ensureCleanTransfer(ctx, scenarioId, sizeBytes) {
-    const deleteAuth     = $api.randomHex(16);                       // 32-char hex
+    const deleteAuth     = $api.randomHex(16);
     const deleteAuthHash = await $api.sha256Hex(deleteAuth);
     const create = await $api.transferCreate(sizeBytes, 'application/octet-stream', {
       delete_auth_hash: deleteAuthHash,
@@ -165,12 +162,12 @@
       id: `vault.roundtrip.${fileCount}f-${sizeKB}kb`,
       group: 'C · Vault round-trips',
       name: `Vault round-trip · ${fileCount}× ${sizeKB} KB`,
-      desc: `new vault_id → write × N → read × N → list → delete × N → destroy. ⚠ destroy leaves deleted.json tombstone.`,
+      desc: `new vault_id → write × N → read × N → list → delete × N → destroy (purged, no tombstone).`,
       flags: [
         { label: 'needs token', kind: 'warn' },
-        { label: 'leaves tombstone', kind: 'danger' },
+        { label: 'no side effects', kind: 'ok' },
       ],
-      sideEffects: 'destroy writes deleted.json (small JSON file) at vault path.',
+      sideEffects: 'none — destroy uses purge:true, no deleted.json written.',
       async run(ctx) {
         const steps = [];
         const vaultId  = newVaultId();
@@ -197,9 +194,9 @@
         for (let i = 0; i < fileIds.length; i++) {
           steps.push(step(`delete(${i + 1}/${fileCount})`, await $api.vaultDeleteFile(vaultId, fileIds[i], writeKey)));
         }
-        // destroy
-        const destroy = await $api.vaultDestroy(vaultId, writeKey);
-        steps.push(step('destroy', destroy));
+        // purge-destroy — no tombstone written
+        const destroy = await $api.vaultDestroy(vaultId, writeKey, { purge: true });
+        steps.push(step('destroy(purge)', destroy));
         if (destroy.ok) $art.markVaultDestroyed(vaultId);
 
         return { ok: steps.every(s => s.ok), steps, summary: summarise(steps) };
@@ -245,8 +242,8 @@
     id: 'concurrency.vault-read-parallel-20',
     group: 'D · Concurrency',
     name: '20× parallel vault read (same file)',
-    desc: 'Write one vault file, fire 20 parallel reads, destroy.',
-    flags: [{ label: 'needs token', kind: 'warn' }, { label: 'leaves tombstone', kind: 'danger' }],
+    desc: 'Write one vault file, fire 20 parallel reads, destroy (purged, no tombstone).',
+    flags: [{ label: 'needs token', kind: 'warn' }, { label: 'no side effects', kind: 'ok' }],
     async run(ctx) {
       const steps = [];
       const vaultId  = newVaultId();
@@ -268,7 +265,7 @@
         status: 200, ok: true, bytes_in: 0, bytes_out: 0,
       });
 
-      steps.push(step('destroy', await $api.vaultDestroy(vaultId, writeKey)));
+      steps.push(step('destroy(purge)', await $api.vaultDestroy(vaultId, writeKey, { purge: true })));
       $art.markVaultDestroyed(vaultId);
       return { ok: steps.every(s => s.ok !== false), steps, summary: summarise(steps) };
     }
@@ -297,10 +294,10 @@
       id: `batch.vault-read-${fileCount}`,
       group: 'F · Vault batch',
       name: `Batch read · ${fileCount} files`,
-      desc: `Write N files, batch-read all in one /api/vault/batch call, destroy.`,
+      desc: `Write N files, batch-read all in one /api/vault/batch call, destroy (purged, no tombstone).`,
       flags: [
         { label: 'needs token', kind: 'warn' },
-        { label: 'leaves tombstone', kind: 'danger' },
+        { label: 'no side effects', kind: 'ok' },
         { label: 'high server cost', kind: 'danger' },
       ],
       async run(ctx) {
@@ -318,7 +315,7 @@
         const ops = fileIds.map(fid => ({ op: 'read', file_id: fid }));
         steps.push(step(`batch-read[${fileCount}]`, await $api.vaultBatch(vaultId, ops)));
 
-        steps.push(step('destroy', await $api.vaultDestroy(vaultId, writeKey)));
+        steps.push(step('destroy(purge)', await $api.vaultDestroy(vaultId, writeKey, { purge: true })));
         $art.markVaultDestroyed(vaultId);
         return { ok: steps.every(s => s.ok), steps, summary: summarise(steps) };
       }
@@ -350,7 +347,7 @@
     sc_token_check,
     transferRoundtrip(1),
     transferRoundtrip(100),
-    transferRoundtrip(1024),       // 1 MB
+    transferRoundtrip(1024),
     vaultRoundtrip(1, 1),
     vaultRoundtrip(5, 10),
     vaultRoundtrip(20, 10),

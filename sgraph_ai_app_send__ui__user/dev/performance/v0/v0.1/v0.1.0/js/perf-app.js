@@ -29,11 +29,25 @@
       const ts = new Date().toISOString().slice(11, 19);
       this.logLines.push(`[${ts}] ${line}`);
       if (this.logLines.length > 200) this.logLines.shift();
+      this._flushLog();
+    }
+
+    _flushLog() {
       const el = this.querySelector('.log-area');
-      if (el) {
-        el.textContent = this.logLines.join('\n');
-        el.scrollTop = el.scrollHeight;
-      }
+      if (!el) return;
+      el.textContent = this.logLines.join('\n');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    _defaultRunLabel(newRows, loops) {
+      const names = [...new Set(newRows.map(r => r.scenario_name))];
+      if (names.length === 0) return '';
+      const base = names.length === 1
+        ? names[0]
+        : names.length <= 3
+          ? names.join(', ')
+          : `${names[0]} + ${names.length - 1} more`;
+      return loops > 1 ? `${base} ×${loops}` : base;
     }
 
     // ------------------------------------------------------- render layout ---
@@ -104,6 +118,7 @@
       this.renderScenarios();
       this.renderRightPanel();
       this.bindEvents();
+      this._flushLog();
     }
 
     // ----------------------------------------------------- right-panel view --
@@ -494,6 +509,7 @@
       if (newRows.length > 0) {
         const token = $api.getToken();
         const saved = $runs.save(newRows, {
+          label:      this._defaultRunLabel(newRows, loops),
           base_url:   $api.baseUrl(),
           token_hint: token ? token.slice(0, 4) + '…' : '',
         });
