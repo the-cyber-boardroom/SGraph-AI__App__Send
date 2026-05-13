@@ -4,8 +4,8 @@
 # ===============================================================================
 
 from memory_fs.storage_fs.Storage_FS                                            import Storage_FS
-from memory_fs.storage_fs.providers.Storage_FS__Local_Disk                      import Storage_FS__Local_Disk
 from memory_fs.storage_fs.providers.Storage_FS__Memory                          import Storage_FS__Memory
+from sgraph_ai_app_send.lambda__user.storage.Storage_FS__Local_Disk             import Storage_FS__Local_Disk
 from osbot_aws.AWS_Config                                                       import aws_config
 from osbot_utils.type_safe.Type_Safe                                            import Type_Safe
 from osbot_utils.utils.Env                                                      import get_env
