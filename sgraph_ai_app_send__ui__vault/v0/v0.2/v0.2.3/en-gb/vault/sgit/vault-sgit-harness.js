@@ -315,6 +315,22 @@ async function _runScenario(scenario, setup) {
     const bSend   = new InstrumentedSGSend({ endpoint: setup._endpoint, token: setup._token }, { client: 'baseline' })
     const oSend   = new InstrumentedSGSend({ endpoint: setup._endpoint, token: setup._token }, { client: 'optimised' })
 
+    // ── Capture every sg-vault-*:* event fired during this scenario into a replayable log
+    const traceEvents = []
+    const TRACE_EVENT_NAMES = [
+        'sg-vault-fetch:fetch-started', 'sg-vault-fetch:fetch-completed',
+        'sg-vault-write:write-started', 'sg-vault-write:write-completed',
+        'sg-vault-ref:fetch-started',   'sg-vault-ref:fetch-completed',
+        'sg-vault-ref:write-started',   'sg-vault-ref:write-completed',
+        'sg-vault-batch:batch-started', 'sg-vault-batch:batch-completed',
+        'sg-vault-ref:cache-hit',
+    ]
+    const captures = TRACE_EVENT_NAMES.map(name => {
+        const fn = e => traceEvents.push({ type: name, ts: e.detail?.ts, detail: { ...(e.detail || {}) } })
+        document.addEventListener(name, fn)
+        return [name, fn]
+    })
+
     _hFire('vs:scenario-started', { scenario: scenario.id, client: 'both' })
 
     // ── Baseline ──
@@ -339,6 +355,9 @@ async function _runScenario(scenario, setup) {
     const oMetrics = oSend.getMetrics()
     _hFire('vs:scenario-completed', { scenario: scenario.id, client: 'optimised', metrics: oMetrics, error: oErr })
 
+    // ── Stop capturing ──
+    captures.forEach(([name, fn]) => document.removeEventListener(name, fn))
+
     // ── Deltas ──
     const deltas = {
         requests: oMetrics.requests - bMetrics.requests,
@@ -346,7 +365,13 @@ async function _runScenario(scenario, setup) {
         bytes:    (oMetrics.totalReqBytes + oMetrics.totalResBytes) - (bMetrics.totalReqBytes + bMetrics.totalResBytes)
     }
 
-    const result = { scenario: scenario.id, label: scenario.label, baseline: bMetrics, optimised: oMetrics, deltas, opts: { ...opts }, ts: Date.now() }
+    const result = {
+        scenario: scenario.id, label: scenario.label,
+        baseline: bMetrics, optimised: oMetrics, deltas,
+        opts: { ...opts }, ts: Date.now(),
+        traceEvents,
+        bError: bErr, oError: oErr,
+    }
     window.__vsHarness.lastRun = result
     window.__vsHarness.history.unshift(result)
     if (window.__vsHarness.history.length > 50) window.__vsHarness.history.pop()
@@ -360,6 +385,10 @@ class VsMetricsCard extends HTMLElement {
     connectedCallback() {
         this._render('Waiting for a scenario run…')
         document.addEventListener('vs:run-completed', e => this._update(e.detail))
+        document.addEventListener('vs:run-selected',  e => {
+            if (e.detail) this._update(e.detail)
+            else this._render('Live mode — run a scenario to see metrics.')
+        })
     }
 
     _render(placeholder) {
@@ -445,109 +474,317 @@ ${discrepancy}
 }
 
 // ── <vs-request-trace> ────────────────────────────────────────────────────────
-// Thin wrapper that hosts <sg-vault-trace> and adds a filter bar.
+// Native trace renderer. Subscribes to InstrumentedSGSend events directly and
+// appends rows live. Re-renders from a stored event log when a history row is
+// clicked (vs:run-selected). No CDN dependency.
+
+const TRACE_LIVE_EVENT_NAMES = [
+    'sg-vault-fetch:fetch-started', 'sg-vault-fetch:fetch-completed',
+    'sg-vault-write:write-started', 'sg-vault-write:write-completed',
+    'sg-vault-ref:fetch-started',   'sg-vault-ref:fetch-completed',
+    'sg-vault-ref:write-started',   'sg-vault-ref:write-completed',
+    'sg-vault-batch:batch-started', 'sg-vault-batch:batch-completed',
+    'sg-vault-ref:cache-hit',
+]
 
 class VsRequestTrace extends HTMLElement {
     connectedCallback() {
+        this._filter   = 'all'
+        this._events   = []        // collected event objects: { type, ts, detail }
+        this._selected = null      // null = live mode; otherwise replayed run result
+
         this.innerHTML = `
 <style>
-  vs-request-trace { display: block; height: 100%; overflow: hidden; }
-  .vrt-bar  { display: flex; gap: 0.5rem; padding: 0.4rem 0.6rem; background: var(--bg3); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  vs-request-trace { display: block; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+  .vrt-bar  { display: flex; gap: 0.4rem; padding: 0.4rem 0.6rem; background: var(--bg3); border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
+  .vrt-label { font-size: 0.62rem; color: var(--muted); }
   .vrt-btn  { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 3px; cursor: pointer; }
-  .vrt-btn.active { border-color: var(--teal); color: var(--teal); }
-  .vrt-trace { height: calc(100% - 34px); overflow: auto; }
-  sg-vault-trace { display: block; height: 100%; }
+  .vrt-btn:hover { color: var(--teal); border-color: rgba(78,205,196,0.4); }
+  .vrt-btn.active { border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
+  .vrt-mode { margin-left: auto; font-size: 0.62rem; color: var(--muted); padding: 0.1rem 0.4rem; border-radius: 3px; border: 1px solid var(--border); }
+  .vrt-mode--replay { color: var(--warn); border-color: rgba(224,172,78,0.4); background: var(--warn-dim); }
+  .vrt-rows { height: calc(100% - 36px); overflow: auto; padding: 0.25rem 0.4rem; }
+  .vrt-row { display: grid; grid-template-columns: 50px 70px 1fr 60px; gap: 0.5rem; padding: 0.18rem 0.3rem; font-size: 0.7rem; font-family: monospace; border-bottom: 1px solid rgba(255,255,255,0.03); align-items: baseline; }
+  .vrt-row:hover { background: rgba(255,255,255,0.02); }
+  .vrt-row--baseline  { border-left: 2px solid var(--teal); }
+  .vrt-row--optimised { border-left: 2px solid var(--warn); }
+  .vrt-row--hidden    { display: none; }
+  .vrt-tag { font-size: 0.6rem; padding: 0 0.3rem; border-radius: 2px; font-weight: 700; text-align: center; }
+  .vrt-tag--b { color: var(--teal); background: var(--teal-dim); }
+  .vrt-tag--o { color: var(--warn); background: var(--warn-dim); }
+  .vrt-type   { color: var(--text); }
+  .vrt-type--write { color: var(--warn); }
+  .vrt-type--batch { color: #c084fc; }
+  .vrt-type--cache { color: #1f9d55; }
+  .vrt-type--start { color: var(--muted); }
+  .vrt-fid    { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vrt-ms     { text-align: right; color: var(--muted); }
+  .vrt-empty  { color: var(--muted); font-style: italic; text-align: center; margin-top: 1.5rem; font-size: 0.8rem; padding: 0 1rem; }
 </style>
-<div class="vrt-bar" id="vrt-bar">
-  <span style="font-size:0.62rem;color:var(--muted);align-self:center">Filter:</span>
+<div class="vrt-bar">
+  <span class="vrt-label">Filter:</span>
   <button class="vrt-btn active" data-filter="all">All</button>
   <button class="vrt-btn" data-filter="baseline">Baseline</button>
   <button class="vrt-btn" data-filter="optimised">Optimised</button>
   <button class="vrt-btn" data-filter="writes">Writes</button>
   <button class="vrt-btn" data-filter="reads">Reads</button>
-  <button class="vrt-btn" style="margin-left:auto" id="vrt-clear">Clear</button>
+  <button class="vrt-btn" id="vrt-clear" style="margin-left:0.5rem">Clear</button>
   <button class="vrt-btn" id="vrt-export">Copy log</button>
+  <span class="vrt-mode" id="vrt-mode">live</span>
 </div>
-<div class="vrt-trace">
-  <sg-vault-trace id="vrt-trace" format="compact"></sg-vault-trace>
+<div class="vrt-rows" id="vrt-rows">
+  <div class="vrt-empty">Run a scenario to see request traces — every sg-vault-*:* event is captured.</div>
 </div>`
 
         // Filter buttons
-        this.querySelector('#vrt-bar').addEventListener('click', e => {
-            const btn = e.target.closest('[data-filter]')
-            if (!btn) return
-            this.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'))
-            btn.classList.add('active')
-            // sg-vault-trace doesn't have a native filter API, so we show/hide rows
-            this._applyFilter(btn.dataset.filter)
+        this.querySelectorAll('[data-filter]').forEach(btn => {
+            btn.onclick = () => {
+                this.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'))
+                btn.classList.add('active')
+                this._filter = btn.dataset.filter
+                this._applyFilter()
+            }
         })
 
         this.querySelector('#vrt-clear').onclick  = () => {
-            const t = this.querySelector('sg-vault-trace')
-            t?.clearLog?.()
-            this.querySelector('#vrt-trace').innerHTML = '<sg-vault-trace id="vrt-trace" format="compact"></sg-vault-trace>'
+            this._events = []
+            this._selected = null
+            this._setMode('live')
+            this._renderRows()
         }
 
-        this.querySelector('#vrt-export').onclick = () => {
-            const t = this.querySelector('sg-vault-trace')
-            const log = t?.getLog?.() || []
-            const md = '| ts | client | event | fileId | ms |\n|---|---|---|---|---|\n' +
-                log.map(e => `| ${e.ts?.toFixed(0)||''} | ${e.detail?.client||''} | ${e.type} | ${e.detail?.fileId||''} | ${e.detail?.fetchMs||e.detail?.writeMs||e.detail?.batchMs||''} |`).join('\n')
-            navigator.clipboard?.writeText(md).catch(() => {})
+        this.querySelector('#vrt-export').onclick = () => this._exportMarkdown()
+
+        // Live subscription — captures events for all runs unless replaying
+        this._liveHandlers = TRACE_LIVE_EVENT_NAMES.map(name => {
+            const fn = e => {
+                if (this._selected) return  // in replay mode, ignore live events
+                this._appendEvent({ type: name, ts: e.detail?.ts, detail: { ...(e.detail || {}) } })
+            }
+            document.addEventListener(name, fn)
+            return [name, fn]
+        })
+
+        // History row click → replay that run's stored events
+        this._onSelect = e => {
+            const run = e.detail
+            this._selected = run
+            this._events   = (run?.traceEvents || []).slice()
+            this._setMode('replay', run?.label)
+            this._renderRows()
+        }
+        document.addEventListener('vs:run-selected', this._onSelect)
+    }
+
+    disconnectedCallback() {
+        this._liveHandlers?.forEach(([n, fn]) => document.removeEventListener(n, fn))
+        document.removeEventListener('vs:run-selected', this._onSelect)
+    }
+
+    _setMode(mode, label) {
+        const el = this.querySelector('#vrt-mode')
+        if (!el) return
+        if (mode === 'live') {
+            el.textContent = 'live'
+            el.className   = 'vrt-mode'
+        } else {
+            el.textContent = `replay: ${label || ''}`
+            el.className   = 'vrt-mode vrt-mode--replay'
         }
     }
 
-    _applyFilter(f) { /* sg-vault-trace renders its own rows; filter is best-effort */ }
+    _appendEvent(ev) {
+        this._events.push(ev)
+        const rowsEl = this.querySelector('#vrt-rows')
+        // First event after empty state — clear placeholder
+        if (this._events.length === 1) rowsEl.innerHTML = ''
+        const node = this._buildRow(ev)
+        if (!this._matches(ev)) node.classList.add('vrt-row--hidden')
+        rowsEl.appendChild(node)
+        rowsEl.scrollTop = rowsEl.scrollHeight
+    }
+
+    _renderRows() {
+        const rowsEl = this.querySelector('#vrt-rows')
+        if (!this._events.length) {
+            rowsEl.innerHTML = '<div class="vrt-empty">No events for this run.</div>'
+            return
+        }
+        rowsEl.innerHTML = ''
+        for (const ev of this._events) {
+            const node = this._buildRow(ev)
+            if (!this._matches(ev)) node.classList.add('vrt-row--hidden')
+            rowsEl.appendChild(node)
+        }
+    }
+
+    _buildRow(ev) {
+        const client = ev.detail?.client || '?'
+        const tag    = client === 'baseline' ? 'B' : client === 'optimised' ? 'O' : '?'
+        const tagCls = client === 'baseline' ? 'b' : 'o'
+        const rowCls = client === 'baseline' ? 'baseline' : 'optimised'
+        const fileId = ev.detail?.fileId || ev.detail?.vaultId || ''
+        const ms     = ev.detail?.fetchMs ?? ev.detail?.writeMs ?? ev.detail?.batchMs
+        const msStr  = ms != null ? ms.toFixed(1) + 'ms' : ''
+
+        // Compact event type label
+        const isStart  = ev.type.endsWith(':fetch-started')  || ev.type.endsWith(':write-started') || ev.type.endsWith(':batch-started')
+        const isCache  = ev.type.endsWith(':cache-hit')
+        const isWrite  = ev.type.includes(':write-')
+        const isBatch  = ev.type.includes(':batch-')
+        const short    = ev.type
+            .replace('sg-vault-', '')
+            .replace(':fetch-completed', ' ✓')
+            .replace(':fetch-started',   ' →')
+            .replace(':write-completed', ' ✓')
+            .replace(':write-started',   ' →')
+            .replace(':batch-completed', ' ✓')
+            .replace(':batch-started',   ' →')
+            .replace(':cache-hit',       ' ⚡cache')
+
+        const typeCls =
+            isCache ? 'cache' :
+            isStart ? 'start' :
+            isBatch ? 'batch' :
+            isWrite ? 'write' : ''
+
+        const row = document.createElement('div')
+        row.className = `vrt-row vrt-row--${rowCls}`
+        row.dataset.client = client
+        row.dataset.evtype = ev.type
+        row.innerHTML = `
+<span class="vrt-tag vrt-tag--${tagCls}">[${tag}]</span>
+<span class="vrt-type ${typeCls ? 'vrt-type--' + typeCls : ''}">${short}</span>
+<span class="vrt-fid" title="${fileId}">${fileId}</span>
+<span class="vrt-ms">${msStr}</span>`
+        return row
+    }
+
+    _matches(ev) {
+        const f = this._filter
+        if (f === 'all') return true
+        const client  = ev.detail?.client
+        const isWrite = ev.type.includes(':write-') || ev.type.includes(':batch-')
+        const isRead  = ev.type.includes(':fetch-') || ev.type.includes(':cache-hit')
+        if (f === 'baseline')  return client === 'baseline'
+        if (f === 'optimised') return client === 'optimised'
+        if (f === 'writes')    return isWrite
+        if (f === 'reads')     return isRead
+        return true
+    }
+
+    _applyFilter() {
+        this.querySelectorAll('.vrt-row').forEach(r => {
+            const ev = { type: r.dataset.evtype, detail: { client: r.dataset.client } }
+            r.classList.toggle('vrt-row--hidden', !this._matches(ev))
+        })
+    }
+
+    _exportMarkdown() {
+        const rows = this._events.map(e => {
+            const ms = e.detail?.fetchMs ?? e.detail?.writeMs ?? e.detail?.batchMs
+            return `| ${(e.ts ?? 0).toFixed(0)} | ${e.detail?.client || ''} | ${e.type} | ${e.detail?.fileId || ''} | ${ms != null ? ms.toFixed(1) : ''} |`
+        }).join('\n')
+        const md = `| ts | client | event | fileId | ms |\n|---|---|---|---|---|\n${rows}`
+        navigator.clipboard?.writeText(md).catch(() => {})
+    }
 }
 
 // ── <vs-run-history> ──────────────────────────────────────────────────────────
 
 class VsRunHistory extends HTMLElement {
     connectedCallback() {
+        this._selectedIdx = null
         this._render()
-        document.addEventListener('vs:run-completed', () => this._render())
+        document.addEventListener('vs:run-completed', () => {
+            this._selectedIdx = null  // newest run is at index 0, but live mode shows it via vs:run-completed
+            this._render()
+        })
     }
 
     _render() {
         const hist = window.__vsHarness?.history || []
-        const rows = hist.map(r => {
-            const dr = r.deltas.requests
+        const sel  = this._selectedIdx
+        const rows = hist.map((r, i) => {
+            const dr    = r.deltas.requests
             const color = dr < 0 ? '#1f9d55' : dr > 0 ? 'var(--err)' : 'var(--muted)'
-            const pct = r.baseline.requests === 0 ? '—' : `${Math.round(Math.abs(dr) / r.baseline.requests * 100)} %`
-            return `<tr>
+            const pct   = r.baseline.requests === 0 ? '—' : `${Math.round(Math.abs(dr) / r.baseline.requests * 100)} %`
+            const date  = new Date(r.ts)
+            const time  = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            const toggles = Object.keys(r.opts||{}).filter(k => r.opts[k]).join(', ') || '—'
+            return `<tr data-idx="${i}" class="vrh-row${sel === i ? ' vrh-row--selected' : ''}" title="Click to replay this run">
+  <td style="color:var(--muted);font-size:0.65rem">${time}</td>
   <td>${r.label}</td>
   <td>${r.baseline.requests} / ${(r.baseline.totalMs).toFixed(0)} ms</td>
   <td>${r.optimised.requests} / ${(r.optimised.totalMs).toFixed(0)} ms</td>
   <td style="color:${color};font-weight:700">${dr <= 0 ? '−' : '+'}${Math.abs(dr)} (${pct})</td>
-  <td style="font-size:0.65rem;color:var(--muted)">${Object.keys(r.opts||{}).filter(k=>r.opts[k]).join(',') || '—'}</td>
+  <td style="font-size:0.65rem;color:var(--muted)">${toggles}</td>
 </tr>`
         }).join('')
 
         this.innerHTML = `
 <style>
   vs-run-history { display: block; height: 100%; overflow: auto; }
-  .vrh-wrap { padding: 0.6rem; }
-  .vrh-header { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 0.4rem; display: flex; justify-content: space-between; }
+  .vrh-wrap { padding: 0.6rem; font-family: system-ui, sans-serif; }
+  .vrh-header { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 0.4rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
   .vrh-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
   .vrh-table th { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0.2rem 0.4rem; border-bottom: 1px solid var(--border); text-align: left; }
   .vrh-table td { padding: 0.3rem 0.4rem; border-bottom: 1px solid var(--border); font-family: monospace; }
+  .vrh-row { cursor: pointer; }
+  .vrh-row:hover { background: rgba(78,205,196,0.04); }
+  .vrh-row--selected { background: var(--teal-dim); }
+  .vrh-row--selected td:first-child { border-left: 2px solid var(--teal); padding-left: 0.3rem; }
   .vrh-empty { color: var(--muted); font-style: italic; font-size: 0.8rem; text-align: center; margin-top: 2rem; }
-  .vrh-export { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; cursor: pointer; }
-  .vrh-export:hover { color: var(--teal); border-color: rgba(78,205,196,0.4); }
+  .vrh-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; cursor: pointer; }
+  .vrh-btn:hover { color: var(--teal); border-color: rgba(78,205,196,0.4); }
+  .vrh-hint { font-size: 0.62rem; color: var(--muted); font-style: italic; font-weight: 400; text-transform: none; letter-spacing: 0; }
 </style>
 <div class="vrh-wrap">
-  <div class="vrh-header">Run History (${hist.length})
-    <button class="vrh-export" id="vrh-export">Export Markdown</button>
+  <div class="vrh-header">
+    <span>Run History (${hist.length}) <span class="vrh-hint">— click a row to replay its metrics + trace</span></span>
+    <span style="display:flex;gap:0.4rem">
+      <button class="vrh-btn" id="vrh-live">▶ Live mode</button>
+      <button class="vrh-btn" id="vrh-clear">Clear history</button>
+      <button class="vrh-btn" id="vrh-export">Export Markdown</button>
+    </span>
   </div>
   ${hist.length === 0
     ? '<div class="vrh-empty">No runs yet. Run a scenario to see results.</div>'
     : `<table class="vrh-table">
-  <thead><tr><th>Scenario</th><th>Baseline (req/ms)</th><th>Optimised (req/ms)</th><th>Δ Req</th><th>Toggles</th></tr></thead>
+  <thead><tr><th>Time</th><th>Scenario</th><th>Baseline (req/ms)</th><th>Optimised (req/ms)</th><th>Δ Req</th><th>Toggles</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>`}
 </div>`
 
+        this.querySelectorAll('[data-idx]').forEach(tr => {
+            tr.onclick = () => this._select(Number(tr.dataset.idx))
+        })
         this.querySelector('#vrh-export')?.addEventListener('click', () => this._export())
+        this.querySelector('#vrh-clear')?.addEventListener('click',  () => this._clearHistory())
+        this.querySelector('#vrh-live')?.addEventListener('click',   () => this._goLive())
+    }
+
+    _select(idx) {
+        const run = window.__vsHarness?.history?.[idx]
+        if (!run) return
+        this._selectedIdx = idx
+        this._render()
+        _hFire('vs:run-selected', run)
+    }
+
+    _goLive() {
+        this._selectedIdx = null
+        this._render()
+        _hFire('vs:run-selected', null)   // clears replay mode
+    }
+
+    _clearHistory() {
+        if (!confirm('Clear all run history? This does not delete vault data.')) return
+        window.__vsHarness.history = []
+        window.__vsHarness.lastRun = null
+        this._selectedIdx = null
+        this._render()
+        _hFire('vs:run-selected', null)
     }
 
     _export() {
