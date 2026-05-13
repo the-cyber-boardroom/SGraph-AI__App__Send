@@ -90,7 +90,9 @@ async function loadTokenList(vault) {
         : (plaintext instanceof Uint8Array ? plaintext : plaintext);
     const base64 = btoa(String.fromCharCode(...innerBytes));
     const decrypted = await ownerDecrypt(vault._passphrase, vault.vaultId, base64);
-    return JSON.parse(decoder.decode(decrypted));
+    const tokens = JSON.parse(decoder.decode(decrypted));
+    // Migrate entries saved before schema normalisation (max_uses → uses_max)
+    return tokens.map(t => ({ ...t, uses_max: t.uses_max ?? t.max_uses ?? null }));
 }
 
 async function saveTokenList(vault, tokens) {
@@ -151,8 +153,15 @@ async function createTransferToken(vault, roToken, expiresAt, maxUses) {
     const transferId = createData.transfer_id;
     const uploadUrl  = createData.upload_url;  // server-provided upload path
 
-    // 2. Encrypt payload { vault_id, read_key } with roToken as passphrase
-    const payload      = JSON.stringify({ vault_id: vault.vaultId, read_key: vault.readKey || '' });
+    // 2. Encrypt payload { vault_id, read_key } with roToken as passphrase.
+    // vault._readKey is an AES-256-GCM CryptoKey (no public getter) — export raw bytes and base64-encode.
+    // PHASE 2 PREREQUISITE: consuming this read_key requires SGVault.openReadOnly(sgSend, vaultId, readKeyBase64)
+    // which does not yet exist in _common/js/lib/sg-vault/sg-vault.js. Phase 2 must add it before
+    // #ro-[token] URLs can load a real vault. The method should importKey('raw', base64decode(readKeyBase64),
+    // {name:'AES-GCM'}, false, ['decrypt']), set vault._writeKey=null, vault._passphrase=null, and load the tree.
+    const rawReadKeyBytes = new Uint8Array(await crypto.subtle.exportKey('raw', vault._readKey));
+    const readKeyB64      = btoa(String.fromCharCode(...rawReadKeyBytes));
+    const payload      = JSON.stringify({ vault_id: vault.vaultId, read_key: readKeyB64 });
     const payloadBytes = new TextEncoder().encode(payload);
     const encPayload   = await _encryptWithPassphrase(roToken, payloadBytes);
 
@@ -390,8 +399,8 @@ class VtTokenManager extends HTMLElement {
             const expLabel = t.revoked
                 ? `revoked ${new Date(t.revoked_at).toLocaleString()}`
                 : (t.expires_at ? expiryLabel(t.expires_at) : 'no expiry');
-            const usesLabel = t.max_uses
-                ? `${t.uses || 0} / ${t.max_uses} uses`
+            const usesLabel = t.uses_max
+                ? `${t.uses || 0} / ${t.uses_max} uses`
                 : `${t.uses || 0} uses`;
             const origin = location.origin;
             const shareUrl = `${origin}/en-gb/vault/#ro-${t.token}`;
@@ -468,14 +477,15 @@ class VtTokenManager extends HTMLElement {
             );
 
             const entry = {
-                token:      roToken,
+                token:       roToken,
                 transfer_id: transferId,
                 delete_key:  deleteKey,
                 label,
                 created_at:  new Date().toISOString(),
                 expires_at:  expiresAt,
-                max_uses:    maxUses ? Number(maxUses) : null,
+                uses_max:    maxUses ? Number(maxUses) : null,
                 uses:        0,
+                note:        '',
                 revoked:     false,
                 revoked_at:  null
             };
