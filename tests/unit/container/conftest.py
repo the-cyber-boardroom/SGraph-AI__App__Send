@@ -16,7 +16,9 @@ def _build_vault_static():
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     script   = os.path.join(repo_root, 'scripts', 'build-vault-static.sh')
 
-    result = subprocess.run(['bash', script, out_dir], capture_output=True, text=True)
+    env = os.environ.copy()
+    env['VAULT_DEFAULT_ENDPOINT'] = ''         # Matches container build — relative API paths
+    result = subprocess.run(['bash', script, out_dir], capture_output=True, text=True, env=env)
     if result.returncode != 0:
         raise RuntimeError(f'build-vault-static.sh failed:\n{result.stderr}')
 

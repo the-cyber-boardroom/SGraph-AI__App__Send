@@ -143,6 +143,34 @@ print('  Patched:', path)
 " "$index_html"
 done
 
+# Optionally rewrite the default backend endpoint to a different value.
+# Set VAULT_DEFAULT_ENDPOINT to override the hardcoded 'https://dev.send.sgraph.ai'
+# defaults in vault-entry, vault-loader-storage, vault-settings, etc.
+#   VAULT_DEFAULT_ENDPOINT=""                              → relative paths (same-origin)
+#   VAULT_DEFAULT_ENDPOINT="http://localhost:8080"         → explicit local
+#   (unset)                                                → leave production default in place
+if [ -n "${VAULT_DEFAULT_ENDPOINT+x}" ]; then
+    echo "Rewriting default backend endpoint → '${VAULT_DEFAULT_ENDPOINT}' ..."
+    python3 - <<PYEOF
+import os
+target = "${VAULT_DEFAULT_ENDPOINT}"
+old    = "https://dev.send.sgraph.ai"
+for root, dirs, files in os.walk("${SERVE_DIR}"):
+    for name in files:
+        if not (name.endswith(".js") or name.endswith(".html")):
+            continue
+        path = os.path.join(root, name)
+        try:
+            with open(path) as f: data = f.read()
+        except UnicodeDecodeError:
+            continue
+        if old not in data:
+            continue
+        with open(path, "w") as f: f.write(data.replace(old, target))
+        print(f"  Rewrote endpoint in: {path}")
+PYEOF
+fi
+
 # Sanity check: confirm which send-browse version survived the merge.
 SEND_BROWSE_FILE="$SERVE_DIR/_common/js/components/send-download/send-browse--v0.3.2.js"
 echo ""

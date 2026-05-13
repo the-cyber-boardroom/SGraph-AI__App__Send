@@ -13,8 +13,10 @@ COPY sgraph_ai_app_send__ui__vault/ ./sgraph_ai_app_send__ui__vault/
 COPY sgraph_ai_app_send__ui__workspace/ ./sgraph_ai_app_send__ui__workspace/
 COPY scripts/ ./scripts/
 
-# Build the flattened vault static tree (replicates dev.vault.sgraph.ai layout)
-RUN bash scripts/build-vault-static.sh /app/static_vault
+# Build the flattened vault static tree (replicates dev.vault.sgraph.ai layout).
+# VAULT_DEFAULT_ENDPOINT="" → vault UI defaults to relative API paths (same-origin),
+# so /api/vault/read/... is served by THIS container, not dev.send.sgraph.ai.
+RUN VAULT_DEFAULT_ENDPOINT="" bash scripts/build-vault-static.sh /app/static_vault
 
 # Drop raw UI source trees — only the built /app/static_vault is needed at runtime
 RUN rm -rf sgraph_ai_app_send__ui__user sgraph_ai_app_send__ui__vault \

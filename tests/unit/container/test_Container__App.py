@@ -48,6 +48,13 @@ class test_Container__App(TestCase):
         assert self.client.get('/info/health').status_code == 200
         assert self.client.get('/api/docs').status_code    == 200
 
+    def test__vault_entry_endpoint_is_relative(self):
+        # Container build sets VAULT_DEFAULT_ENDPOINT="" so vault API calls are same-origin.
+        # If this regresses, the browser will call dev.send.sgraph.ai instead of this container.
+        response = self.client.get('/_common/js/components/vault-entry/vault-entry.js')
+        assert response.status_code == 200
+        assert 'https://dev.send.sgraph.ai' not in response.text
+
     def test__api_transfers_create(self):
         response = self.client.post('/api/transfers/create', json={'size': 1024})
         assert response.status_code == 200
