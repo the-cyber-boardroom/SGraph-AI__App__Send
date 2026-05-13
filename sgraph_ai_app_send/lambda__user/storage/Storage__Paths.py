@@ -1,10 +1,18 @@
 import os
 
-STORAGE__BASE       = 'sg-send__data'
-STORAGE__VERSION    = 'sg-send-api__v1.0'
-STORAGE__DEPLOYMENT = os.environ.get('SEND__DEPLOYMENT_ID', 'shared')
+# The on-disk / in-bucket path tree is built from three pieces, each independently
+# overridable via env var. Empty values are dropped, so SEND__STORAGE_BASE="" and
+# SEND__STORAGE_VERSION="" produces a flat tree rooted at the deployment slug
+# (or fully flat if SEND__DEPLOYMENT_ID is also empty).
+#
+# CAUTION: changing these values for an existing deployment makes prior data
+# unreadable (different path tree). Treat them as deploy-time configuration.
 
-_ROOT = f'{STORAGE__BASE}/{STORAGE__VERSION}/{STORAGE__DEPLOYMENT}'
+STORAGE__BASE       = os.environ.get('SEND__STORAGE_BASE'   , 'sg-send__data'    )   # multi-tenant slot (one bucket can host multiple apps)
+STORAGE__VERSION    = os.environ.get('SEND__STORAGE_VERSION', 'sg-send-api__v1.0')   # schema version
+STORAGE__DEPLOYMENT = os.environ.get('SEND__DEPLOYMENT_ID'  , 'shared'           )   # per-stage slot (dev / qa / prod / etc.)
+
+_ROOT = '/'.join(p for p in (STORAGE__BASE, STORAGE__VERSION, STORAGE__DEPLOYMENT) if p)
 
 
 def path__transfer_meta(transfer_id: str) -> str:
