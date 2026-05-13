@@ -12,6 +12,7 @@
  */
 
 import { ownerEncrypt, ownerDecrypt, deriveVaultSecretKey, exportKeyBytes } from './vault-hkdf.js';
+import { getCredentials } from './vault-credentials.js';
 
 /* ── Friendly token generation ────────────────────────────────────────────── */
 const ADJECTIVES = [
@@ -74,6 +75,10 @@ async function openVaultFromCredentials(credentials) {
 }
 
 async function loadTokenList(vault) {
+    // Vault opens with lazy subtrees — load the chain before listing
+    await vault.loadSubTreeOnDemand('/.vault');
+    await vault.loadSubTreeOnDemand('/.vault/owner');
+
     const ownerFolder = vault.listFolder('/.vault/owner');
     if (!ownerFolder || !ownerFolder.some(e => e.name === 'readonly-tokens.json')) {
         return [];
@@ -89,6 +94,10 @@ async function loadTokenList(vault) {
 }
 
 async function saveTokenList(vault, tokens) {
+    // Ensure lazy subtrees are loaded before checking folder existence
+    await vault.loadSubTreeOnDemand('/.vault');
+    await vault.loadSubTreeOnDemand('/.vault/owner');
+
     const plainBytes  = new TextEncoder().encode(JSON.stringify(tokens, null, 2));
     const innerCipher = await ownerEncrypt(vault._passphrase, vault.vaultId, plainBytes);
     const innerBytes  = Uint8Array.from(atob(innerCipher), c => c.charCodeAt(0));
@@ -210,6 +219,9 @@ class VtTokenManager extends HTMLElement {
         document.addEventListener('vt:credentials-cleared', () => this._onClear());
         document.addEventListener('vt:load-ro-token-in-frame', e => this._onLoadInFrame(e.detail));
         this._render();
+        // Hydrate from sessionStorage if credentials were loaded before this element mounted
+        const saved = getCredentials();
+        if (saved) this._onCredentials(saved);
     }
 
     async _onCredentials(credentials) {
@@ -237,17 +249,20 @@ class VtTokenManager extends HTMLElement {
 
     async _loadVaultAndTokens() {
         this._setStatus('Loading vault…', 'muted');
+        let errMsg = null;
         try {
-            // Phase 1 limitation: vault instance is not refreshed mid-session.
-            // If another client pushes changes, this instance may be stale until page reload.
             this._vault  = await openVaultFromCredentials(this._credentials);
             this._tokens = await loadTokenList(this._vault);
         } catch (err) {
             this._tokens = [];
-            this._setStatus(`Vault load error: ${err.message}`, 'err');
+            errMsg = err.message;
         }
         this._renderTokenList();
-        this._setStatus('', '');
+        if (errMsg) {
+            this._setStatus(`Vault load error: ${errMsg}`, 'err');
+        } else {
+            this._setStatus('', '');
+        }
     }
 
     _render() {
