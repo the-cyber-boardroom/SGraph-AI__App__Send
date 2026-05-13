@@ -32,3 +32,6 @@ ENV_VAR__N8N_WEBHOOK_SECRET                 = 'N8N_WEBHOOK_SECRET'
 HEADER__SGRAPH_VAULT__PUBLIC                = 'x-vault-public'
 HEADER__SGRAPH_VAULT__READ_KEY              = 'x-vault-read-key'
 ENV_VAR__SEND__PUBLIC_VAULT__S3_BUCKET      = 'SEND__PUBLIC_VAULT__S3_BUCKET'
+
+ENV_VAR__SEND__VAULT_STATIC_DIR             = 'SEND__VAULT_STATIC_DIR'
+SEND__VAULT_STATIC_DIR__DEFAULT             = '/app/static_vault'

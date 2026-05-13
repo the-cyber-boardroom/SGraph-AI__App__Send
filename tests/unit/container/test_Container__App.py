@@ -23,15 +23,30 @@ class test_Container__App(TestCase):
         response = self.client.get('/info/status')
         assert response.status_code == 200
 
-    def test__root_redirects_to_ui(self):
-        response = self.client.get('/', follow_redirects=False)
-        assert response.status_code == 307
-        assert '/send/' in response.headers['location']
-
-    def test__static_ui_served(self):
-        response = self.client.get('/send/v0/v0.2/v0.2.0/index.html')
+    def test__root_serves_vault_ui(self):
+        response = self.client.get('/')
         assert response.status_code == 200
         assert 'text/html' in response.headers['content-type']
+
+    def test__vault_landing_page(self):
+        response = self.client.get('/en-gb/')
+        assert response.status_code == 200
+        assert 'text/html' in response.headers['content-type']
+
+    def test__vault_clean_url(self):
+        response = self.client.get('/en-gb/vault/')
+        assert response.status_code == 200
+        assert 'text/html' in response.headers['content-type']
+
+    def test__common_assets_served(self):
+        response = self.client.get('/_common/js/build-info.js')
+        assert response.status_code == 200
+        assert 'SGRAPH_BUILD' in response.text
+
+    def test__api_routes_not_shadowed_by_static(self):
+        # Regression: static mounts must not shadow /api/* or /info/* routes
+        assert self.client.get('/info/health').status_code == 200
+        assert self.client.get('/api/docs').status_code    == 200
 
     def test__api_transfers_create(self):
         response = self.client.post('/api/transfers/create', json={'size': 1024})
@@ -59,7 +74,6 @@ class test_Container__App(TestCase):
     def test__openapi_docs(self):
         response = self.client.get('/api/docs')
         assert response.status_code == 200
-
 
 
 class test_Container__App__Disk_Storage(TestCase):

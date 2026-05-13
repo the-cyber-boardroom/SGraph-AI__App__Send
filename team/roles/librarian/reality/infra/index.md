@@ -1,6 +1,6 @@
 # Infrastructure — Reality Index
 
-**Domain:** infra/ | **Last updated:** 2026-05-09 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/ | **Last updated:** 2026-05-13 | **Maintained by:** Librarian (daily run)
 
 This domain covers deployment infrastructure: storage backends, Lambda functions, CI/CD pipelines, container deployments, and the 7 deployment targets. It does not cover the application API (see `../api/`) or security properties (see `../security/`).
 
@@ -30,11 +30,16 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 
 ### Docker Container Deployment
 
-- **`sgraph_ai_app_send__docker/` package** — code-verified: commits `bbaaddb`, `ea06040`
-- `Dockerfile` — Python 3.12-slim, uvicorn port 8080, supports MEMORY/DISK/S3 storage modes
-- `Fast_API__SGraph__Send__Container` — extends User FastAPI app with conditional global auth middleware (`x-sgraph-access-token` header, `/auth/set-cookie-form` excluded)
+- **`sgraph_ai_app_send__docker/` package** — code-verified: commits `bbaaddb`, `ea06040`, `cecfed4`
+- `Dockerfile` — Python 3.12-slim + bash; runs `scripts/build-vault-static.sh /app/static_vault` at build time; uvicorn port 8080; supports MEMORY/DISK/S3 storage modes
+- **Default UI — vault app.** Container serves the vault UI (`sgraph_ai_app_send__ui__vault`) at the root, not the send UI. The send UI is not mounted in the container.
+- **Build pipeline** — `scripts/build-vault-static.sh` flattens the IFD vault v0.2.3 tree, merges user-UI `_common/` layers (send-browse, sg-site-header, etc.), patches CDN URLs to local `/_common/`, and writes to `OUT_DIR` (default `.local-server-vault`). Called by Dockerfile (`/app/static_vault`) and by `scripts/vault__run-locally.sh`.
+- **Static URL structure** — `GET /` → vault index.html; `GET /en-gb/` → vault landing page; `GET /en-gb/vault/` → vault shell (clean URL); `GET /_common/*` → shared assets; `GET /en-gb/browse/` → browse page
+- **Explicit sub-path mounts** — static files mounted at `/_common`, `/en-gb`, `/i18n` (not a catch-all `/`). API routes (`/api/*`, `/info/*`, `/auth/*`) take precedence.
+- `Fast_API__SGraph__Send__Container` — extends User FastAPI app with conditional global auth middleware (`x-sgraph-access-token` header/cookie, `/auth/set-cookie-form` excluded)
 - `create_app()` factory function
-- **16 container tests** — 9 in `test_Container__App.py` (health, status, root, static UI, transfers, vault read/write, auth cookie form, disk storage) + 7 in `test_Container__App__Auth.py` (auth enforcement, header token, cookie token, form exclusion). Code-verified: commit `bbaaddb`
+- **`SEND__VAULT_STATIC_DIR`** env var — overrides static dir path (default `/app/static_vault`). Used to point tests at a tmpdir.
+- **20 container tests** — 13 in `test_Container__App.py` (health, status, vault UI at root, vault landing page, vault clean URL, common assets, no API route shadowing, transfers, vault read/write, auth form, disk storage) + 7 in `test_Container__App__Auth.py` (auth enforcement, vault UI blocked, header token, cookie token, form exclusion). Code-verified: this commit.
 
 ### sg-send-ec2 CLI
 
