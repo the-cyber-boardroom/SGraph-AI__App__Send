@@ -24,6 +24,12 @@ function _hFire(name, detail) {
     document.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail }))
 }
 
+function _escapeHtml(s) {
+    const d = document.createElement('div')
+    d.textContent = String(s == null ? '' : s)
+    return d.innerHTML
+}
+
 // ── <vs-vault-loader> ──────────────────────────────────────────────────────────
 
 class VsVaultLoader extends HTMLElement {
@@ -473,10 +479,99 @@ ${discrepancy}
     }
 }
 
+// ── Content inspector helpers ─────────────────────────────────────────────────
+// Lazy-opened "viewer" vault, re-used across every inspect click. The first
+// fetch hits the network; subsequent fetches of the same -imm- object are served
+// from the browser Cache API (the vault library's built-in client-side cache).
+// Inspect requests are NOT instrumented — they don't appear in the trace.
+
+async function _getViewerVault() {
+    const harness = window.__vsHarness
+    if (harness.viewer) return harness.viewer
+    const setup = harness.setup
+    if (!setup?.isLoaded) throw new Error('Load a vault first')
+    const send = new SGSend({ endpoint: setup._endpoint, token: setup._token })
+    const v    = await SGVault.open(send, setup._vaultKey)
+    harness.viewer = v
+    return v
+}
+
+// Reset the viewer when the vault changes or is cleared
+document.addEventListener('vs:vault-loaded',  () => { window.__vsHarness.viewer = null })
+document.addEventListener('vs:vault-cleared', () => { window.__vsHarness.viewer = null })
+
+function _ab2hex(ab, max = 256) {
+    const bytes = new Uint8Array(ab).slice(0, max)
+    let out = ''
+    for (let i = 0; i < bytes.length; i++) {
+        out += bytes[i].toString(16).padStart(2, '0')
+        if (i % 16 === 15) out += '\n'
+        else if (i % 2 === 1) out += ' '
+    }
+    return out + (ab.byteLength > max ? `\n… (${ab.byteLength - max} more bytes)` : '')
+}
+
+function _prettyDecrypted(bytes) {
+    // Try JSON
+    try {
+        const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+        try {
+            const obj = JSON.parse(text)
+            return { kind: 'json', text: JSON.stringify(obj, null, 2), preview: obj }
+        } catch (_) {
+            return { kind: 'text', text }
+        }
+    } catch (_) {
+        return { kind: 'binary', text: _ab2hex(bytes, 512) }
+    }
+}
+
+async function _inspectFile(fileIdFull) {
+    if (!fileIdFull) throw new Error('No file id on this event')
+    const v        = await _getViewerVault()
+    const send     = v._sgSend
+    const readKey  = v._readKey
+    const isRef    = fileIdFull.startsWith('bare/refs/')
+    const isData   = fileIdFull.startsWith('bare/data/')
+
+    const t0     = performance.now()
+    const encrypted = await send.vaultRead(v._vaultId, fileIdFull)
+    const fetchMs = performance.now() - t0
+
+    if (!encrypted) {
+        return { fileIdFull, error: '404 — not found on server (or pending eventual consistency)', fetchMs }
+    }
+
+    const encryptedBytes = encrypted.byteLength
+
+    try {
+        const plaintext = await SGSendCrypto.decrypt(encrypted, readKey)
+        const pretty    = _prettyDecrypted(plaintext)
+        return {
+            fileIdFull, fetchMs,
+            encryptedBytes,
+            plaintextBytes: plaintext.byteLength,
+            isRef, isData,
+            kind: pretty.kind,
+            text: pretty.text,
+        }
+    } catch (e) {
+        return {
+            fileIdFull, fetchMs,
+            encryptedBytes,
+            isRef, isData,
+            decryptError: e.message,
+            text: _ab2hex(encrypted, 256),
+            kind: 'binary',
+        }
+    }
+}
+
 // ── <vs-request-trace> ────────────────────────────────────────────────────────
 // Native trace renderer. Subscribes to InstrumentedSGSend events directly and
 // appends rows live. Re-renders from a stored event log when a history row is
-// clicked (vs:run-selected). No CDN dependency.
+// clicked (vs:run-selected). No CDN dependency. Click a row to fetch+decrypt
+// the file's content from the server (uses Cache API on repeated views).
 
 const TRACE_LIVE_EVENT_NAMES = [
     'sg-vault-fetch:fetch-started', 'sg-vault-fetch:fetch-completed',
@@ -504,11 +599,14 @@ class VsRequestTrace extends HTMLElement {
   .vrt-mode { margin-left: auto; font-size: 0.62rem; color: var(--muted); padding: 0.1rem 0.4rem; border-radius: 3px; border: 1px solid var(--border); }
   .vrt-mode--replay { color: var(--warn); border-color: rgba(224,172,78,0.4); background: var(--warn-dim); }
   .vrt-rows { height: calc(100% - 36px); overflow: auto; padding: 0.25rem 0.4rem; }
-  .vrt-row { display: grid; grid-template-columns: 50px 70px 1fr 60px; gap: 0.5rem; padding: 0.18rem 0.3rem; font-size: 0.7rem; font-family: monospace; border-bottom: 1px solid rgba(255,255,255,0.03); align-items: baseline; }
-  .vrt-row:hover { background: rgba(255,255,255,0.02); }
+  .vrt-row { display: grid; grid-template-columns: 50px 70px 1fr 60px; gap: 0.5rem; padding: 0.18rem 0.3rem; font-size: 0.7rem; font-family: monospace; border-bottom: 1px solid rgba(255,255,255,0.03); align-items: baseline; cursor: pointer; }
+  .vrt-row:hover { background: rgba(78,205,196,0.04); }
+  .vrt-row[data-disabled="1"] { cursor: default; }
+  .vrt-row[data-disabled="1"]:hover { background: transparent; }
   .vrt-row--baseline  { border-left: 2px solid var(--teal); }
   .vrt-row--optimised { border-left: 2px solid var(--warn); }
   .vrt-row--hidden    { display: none; }
+  .vrt-row--open      { background: rgba(78,205,196,0.06); }
   .vrt-tag { font-size: 0.6rem; padding: 0 0.3rem; border-radius: 2px; font-weight: 700; text-align: center; }
   .vrt-tag--b { color: var(--teal); background: var(--teal-dim); }
   .vrt-tag--o { color: var(--warn); background: var(--warn-dim); }
@@ -520,6 +618,17 @@ class VsRequestTrace extends HTMLElement {
   .vrt-fid    { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .vrt-ms     { text-align: right; color: var(--muted); }
   .vrt-empty  { color: var(--muted); font-style: italic; text-align: center; margin-top: 1.5rem; font-size: 0.8rem; padding: 0 1rem; }
+  /* ── Inspect drawer ─────────────────────────────────────────────────── */
+  .vrt-drawer { background: var(--bg2); border-left: 2px solid var(--teal); padding: 0.5rem 0.7rem; margin: 0.1rem 0 0.3rem 1.5rem; border-radius: 0 4px 4px 0; font-family: monospace; font-size: 0.7rem; }
+  .vrt-drawer--err  { border-left-color: var(--err); }
+  .vrt-drawer__head { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; font-size: 0.65rem; color: var(--muted); }
+  .vrt-drawer__pill { display: inline-block; padding: 0 0.35rem; border-radius: 3px; font-weight: 700; background: var(--bg3); border: 1px solid var(--border); }
+  .vrt-drawer__pill--json { color: var(--teal); border-color: rgba(78,205,196,0.3); }
+  .vrt-drawer__pill--text { color: var(--text); }
+  .vrt-drawer__pill--bin  { color: var(--warn); border-color: rgba(224,172,78,0.3); }
+  .vrt-drawer__pre { white-space: pre-wrap; word-break: break-all; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.5rem; max-height: 280px; overflow: auto; color: var(--text); font-size: 0.7rem; line-height: 1.45; }
+  .vrt-drawer__err { color: var(--err); font-size: 0.7rem; margin-top: 0.3rem; }
+  .vrt-drawer__loading { color: var(--muted); font-style: italic; }
 </style>
 <div class="vrt-bar">
   <span class="vrt-label">Filter:</span>
@@ -624,6 +733,7 @@ class VsRequestTrace extends HTMLElement {
         const tagCls = client === 'baseline' ? 'b' : 'o'
         const rowCls = client === 'baseline' ? 'baseline' : 'optimised'
         const fileId = ev.detail?.fileId || ev.detail?.vaultId || ''
+        const fileIdFull = ev.detail?.fileIdFull
         const ms     = ev.detail?.fetchMs ?? ev.detail?.writeMs ?? ev.detail?.batchMs
         const msStr  = ms != null ? ms.toFixed(1) + 'ms' : ''
 
@@ -648,16 +758,76 @@ class VsRequestTrace extends HTMLElement {
             isBatch ? 'batch' :
             isWrite ? 'write' : ''
 
+        // We only show one inspect drawer per logical fetch — bind clicks to the
+        // "completed" event (which carries useful metadata), or to any event with
+        // a usable fileIdFull. Skip "started" rows: they fire the same fetch.
+        const opFileIds = ev.detail?.opFileIds || []
+        const inspectable = !!fileIdFull || (isBatch && opFileIds.length > 0)
+
         const row = document.createElement('div')
         row.className = `vrt-row vrt-row--${rowCls}`
         row.dataset.client = client
         row.dataset.evtype = ev.type
+        if (!inspectable) row.dataset.disabled = '1'
         row.innerHTML = `
 <span class="vrt-tag vrt-tag--${tagCls}">[${tag}]</span>
 <span class="vrt-type ${typeCls ? 'vrt-type--' + typeCls : ''}">${short}</span>
-<span class="vrt-fid" title="${fileId}">${fileId}</span>
+<span class="vrt-fid" title="${fileIdFull || fileId}">${fileId}</span>
 <span class="vrt-ms">${msStr}</span>`
+
+        if (inspectable) {
+            row.onclick = () => this._toggleInspect(row, ev)
+        }
         return row
+    }
+
+    async _toggleInspect(row, ev) {
+        // Drawer is the sibling node right after this row, if open
+        const next = row.nextElementSibling
+        if (next?.classList.contains('vrt-drawer')) {
+            next.remove()
+            row.classList.remove('vrt-row--open')
+            return
+        }
+
+        row.classList.add('vrt-row--open')
+        const drawer = document.createElement('div')
+        drawer.className = 'vrt-drawer'
+        drawer.innerHTML = `<div class="vrt-drawer__loading">Fetching + decrypting…</div>`
+        row.after(drawer)
+
+        const opFileIds = ev.detail?.opFileIds || []
+        const isBatch   = ev.type.includes(':batch-')
+
+        try {
+            if (isBatch && opFileIds.length) {
+                // Render each op's file content
+                const results = await Promise.all(opFileIds.map(fid =>
+                    _inspectFile(fid).catch(e => ({ fileIdFull: fid, error: e.message }))))
+                drawer.innerHTML = results.map(r => this._renderResult(r)).join('<hr style="border:none;border-top:1px dashed var(--border);margin:0.5rem 0">')
+            } else {
+                const result = await _inspectFile(ev.detail.fileIdFull)
+                drawer.innerHTML = this._renderResult(result)
+            }
+        } catch (e) {
+            drawer.classList.add('vrt-drawer--err')
+            drawer.innerHTML = `<div class="vrt-drawer__err">Inspect failed: ${e.message}</div>`
+        }
+    }
+
+    _renderResult(r) {
+        if (r.error) {
+            return `<div class="vrt-drawer__err">${r.fileIdFull}: ${r.error}</div>`
+        }
+        const kindCls = r.kind === 'json' ? 'json' : r.kind === 'binary' ? 'bin' : 'text'
+        const head = `<div class="vrt-drawer__head">
+  <span class="vrt-drawer__pill vrt-drawer__pill--${kindCls}">${r.kind || 'unknown'}</span>
+  <span>${r.fileIdFull}</span>
+  <span style="margin-left:auto">${r.encryptedBytes} B encrypted${r.plaintextBytes != null ? ` → ${r.plaintextBytes} B plain` : ''} · fetched in ${r.fetchMs?.toFixed(1)}ms</span>
+</div>`
+        const body = `<pre class="vrt-drawer__pre">${_escapeHtml(r.text || '')}</pre>`
+        const err  = r.decryptError ? `<div class="vrt-drawer__err">Decrypt failed: ${r.decryptError} — showing raw bytes (hex).</div>` : ''
+        return head + body + err
     }
 
     _matches(ev) {

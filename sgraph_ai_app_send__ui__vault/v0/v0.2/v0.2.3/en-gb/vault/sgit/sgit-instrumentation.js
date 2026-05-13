@@ -42,29 +42,30 @@ class InstrumentedSGSend extends SGSend {
 
     async vaultRead(vaultId, fileId) {
         const typeHint = fileId.startsWith('bare/refs/') ? 'ref' : 'fetch'
-        this._fire(`sg-vault-${typeHint}:fetch-started`, { vaultId, fileId: _mask(fileId) })
+        this._fire(`sg-vault-${typeHint}:fetch-started`, { vaultId, fileId: _mask(fileId), fileIdFull: fileId })
         const t0  = performance.now()
         const res = await super.vaultRead(vaultId, fileId)
         const ms  = performance.now() - t0
         const resBytes = res?.byteLength || 0
         this._fire(`sg-vault-${typeHint}:fetch-completed`, {
-            vaultId, fileId: _mask(fileId), bytesReceived: resBytes, fetchMs: ms,
+            vaultId, fileId: _mask(fileId), fileIdFull: fileId,
+            bytesReceived: resBytes, fetchMs: ms,
             cacheHit: false, status: res ? 200 : 404
         })
-        this._record(typeHint + '-read', { fileId: _mask(fileId), resBytes, durationMs: ms, status: res ? 200 : 404 })
+        this._record(typeHint + '-read', { fileId: _mask(fileId), fileIdFull: fileId, resBytes, durationMs: ms, status: res ? 200 : 404 })
         return res
     }
 
     async vaultReadLarge(vaultId, filePath) {
-        this._fire('sg-vault-fetch:fetch-started', { vaultId, fileId: _mask(filePath), large: true })
+        this._fire('sg-vault-fetch:fetch-started', { vaultId, fileId: _mask(filePath), fileIdFull: filePath, large: true })
         const t0  = performance.now()
         const res = await super.vaultReadLarge(vaultId, filePath)
         const ms  = performance.now() - t0
         const resBytes = res?.byteLength || 0
         this._fire('sg-vault-fetch:fetch-completed', {
-            vaultId, fileId: _mask(filePath), bytesReceived: resBytes, fetchMs: ms, large: true
+            vaultId, fileId: _mask(filePath), fileIdFull: filePath, bytesReceived: resBytes, fetchMs: ms, large: true
         })
-        this._record('fetch-read-large', { fileId: _mask(filePath), resBytes, durationMs: ms })
+        this._record('fetch-read-large', { fileId: _mask(filePath), fileIdFull: filePath, resBytes, durationMs: ms })
         return res
     }
 
@@ -73,14 +74,14 @@ class InstrumentedSGSend extends SGSend {
     async vaultWrite(vaultId, fileId, writeKey, data) {
         const typeHint  = fileId.startsWith('bare/refs/') ? 'ref' : 'write'
         const reqBytes  = data?.byteLength || data?.length || 0
-        this._fire(`sg-vault-${typeHint}:write-started`, { vaultId, fileId: _mask(fileId), reqBytes })
+        this._fire(`sg-vault-${typeHint}:write-started`, { vaultId, fileId: _mask(fileId), fileIdFull: fileId, reqBytes })
         const t0  = performance.now()
         const res = await super.vaultWrite(vaultId, fileId, writeKey, data)
         const ms  = performance.now() - t0
         this._fire(`sg-vault-${typeHint}:write-completed`, {
-            vaultId, fileId: _mask(fileId), writeMs: ms, status: 200
+            vaultId, fileId: _mask(fileId), fileIdFull: fileId, writeMs: ms, status: 200
         })
-        this._record(typeHint + '-write', { fileId: _mask(fileId), reqBytes, durationMs: ms })
+        this._record(typeHint + '-write', { fileId: _mask(fileId), fileIdFull: fileId, reqBytes, durationMs: ms })
         return res
     }
 
@@ -89,14 +90,15 @@ class InstrumentedSGSend extends SGSend {
     async vaultBatch(vaultId, writeKey, ops) {
         const opCount  = ops?.length || 0
         const reqBytes = JSON.stringify(ops).length
-        this._fire('sg-vault-batch:batch-started', { vaultId, opCount, reqBytes })
+        const opFileIds = (ops || []).map(o => o.file_id).filter(Boolean)
+        this._fire('sg-vault-batch:batch-started', { vaultId, opCount, reqBytes, opFileIds })
         const t0  = performance.now()
         const res = await super.vaultBatch(vaultId, writeKey, ops)
         const ms  = performance.now() - t0
         this._fire('sg-vault-batch:batch-completed', {
-            vaultId, opCount, batchMs: ms, status: 200, resBytes: JSON.stringify(res).length
+            vaultId, opCount, batchMs: ms, status: 200, resBytes: JSON.stringify(res).length, opFileIds
         })
-        this._record('batch', { opCount, reqBytes, resBytes: JSON.stringify(res).length, durationMs: ms })
+        this._record('batch', { opCount, reqBytes, resBytes: JSON.stringify(res).length, durationMs: ms, opFileIds })
         return res
     }
 }
