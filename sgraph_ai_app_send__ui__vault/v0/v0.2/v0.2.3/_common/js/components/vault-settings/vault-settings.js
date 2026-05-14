@@ -74,6 +74,15 @@
                         <p class="vset-hint">Needed for writing files. Leave empty to open in read-only mode. <em>Check</em> validates the key and shows remaining uses.</p>
                     </div>
 
+                    <div class="vset-section vset-share-section" style="display:none">
+                        <label class="vset-label">Read-only sharing</label>
+                        <p class="vset-hint">Create read-only links to share this vault with others. Recipients can browse files but cannot modify anything.</p>
+                        <div class="vset-row vset-share-row">
+                            <button class="vset-btn vset-btn--primary vset-open-token-mgr">Manage read-only tokens ↗</button>
+                        </div>
+                        <p class="vset-hint">Opens the Token Manager in a new tab. Your vault will be pre-loaded automatically.</p>
+                    </div>
+
                     <div class="vset-section">
                         <label class="vset-label">Statistics</label>
                         <div class="vset-stats"></div>
@@ -144,6 +153,10 @@
             const accessInput = root.querySelector('.vset-access-input');
             if (accessInput) accessInput.value = this._accessKey || '';
 
+            // Share section: only visible when vault was opened with a passphrase (owner mode, not ro-token)
+            const shareSection = root.querySelector('.vset-share-section');
+            if (shareSection) shareSection.style.display = this._vault._passphrase ? '' : 'none';
+
             const stats = this._vault.getStats();
             const statsEl = root.querySelector('.vset-stats');
             if (statsEl) {
@@ -167,7 +180,8 @@
                 if (e.target.closest('.vset-save-access'))     return this._saveAccess();
                 if (e.target.closest('.vset-clear-access'))    return this._clearAccess();
                 if (e.target.closest('.vset-validate-access')) return this._validateAccess();
-                if (e.target.closest('.vset-json-toggle'))     return this._toggleJson(e);
+                if (e.target.closest('.vset-json-toggle'))        return this._toggleJson(e);
+                if (e.target.closest('.vset-open-token-mgr'))  return this._openTokenManager();
             });
         }
 
@@ -271,6 +285,11 @@
             el.className = 'vset-access-status' + (type ? ' vset-access-status--' + type : '');
         }
 
+        _openTokenManager() {
+            const base = window.location.pathname.split('/en-gb/')[0];
+            window.open(base + '/en-gb/vault/token/', '_blank');
+        }
+
         _toggleJson(e) {
             const jsonEl = this.shadowRoot.querySelector('.vset-json');
             if (!jsonEl) return;
@@ -311,6 +330,11 @@
             color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family);
         }
         .vset-btn:hover { background: var(--bg-secondary); color: var(--color-text); }
+        .vset-btn--primary {
+            background: var(--color-primary, #4ecdc4); color: #000;
+            border-color: var(--color-primary, #4ecdc4); font-weight: 600;
+        }
+        .vset-btn--primary:hover { opacity: 0.88; background: var(--color-primary, #4ecdc4); }
         .vset-hint { font-size: var(--text-small); color: var(--color-text-secondary); margin: var(--space-1) 0 0; }
         .vset-hint--warn { color: var(--color-primary); }
         .vset-access-status { font-size: var(--text-small); margin-top: var(--space-1); min-height: 1.2em; }
