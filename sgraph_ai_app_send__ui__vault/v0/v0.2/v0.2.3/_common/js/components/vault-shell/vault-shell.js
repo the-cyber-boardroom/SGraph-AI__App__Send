@@ -29,6 +29,7 @@
             this._loadingCount  = 0;
             this._pendingAction = null;
             this._syncState     = { ahead: 0, behind: 0, diverged: false };
+            this._isROMode      = false;     // true when vault opened via ro-token (no passphrase, no write key)
             this._autoSyncEnabled = true;   // overridden from localStorage in _initAutoSync()
             this._autoSyncCheckPending = false;
             this._lastBehindCheckTime  = 0;
@@ -189,7 +190,14 @@
             const header = this.querySelector('vault-header');
             header?.setVaultName(vault.name || '');
             header?.showLockButton(true);
-            header?.setReadOnly(!this._accessKey);
+
+            // Distinguish true RO mode (ro-token, no passphrase) from owner without access key.
+            this._isROMode = (!vault.writable && vault._passphrase === null);
+            if (this._isROMode) {
+                header?.setROMode(true);
+            } else {
+                header?.setReadOnly(!this._accessKey);
+            }
 
             // Auto-fast-forward the per-client clone ref to the published named ref
             // before first render. Without this, a CLI push (which only updates the
@@ -228,6 +236,7 @@
             this._vault     = null;
             this._vaultKey  = '';
             this._accessKey = '';
+            this._isROMode  = false;
 
             this.querySelector('.vs-shell').style.display  = 'none';
             this.querySelector('.vs-entry').style.display   = '';
@@ -277,14 +286,22 @@
             if (!this._vaultKey) return;
             this.querySelector('vault-header')?.showLoading();
             try {
-                const entry   = this.querySelector('vault-entry');
-                const sgSend  = entry._getSGSend();
-                const vault   = await SGVault.open(sgSend, this._vaultKey);
+                let vault;
+                if (this._isROMode) {
+                    // RO-token vaults: re-open via VaultLoader so format 5 dispatch runs correctly.
+                    // SGVault.open() cannot handle ro-word-word-NNNN keys.
+                    const result = await VaultLoader.open(this._vaultKey);
+                    vault = result.vault;
+                } else {
+                    const entry  = this.querySelector('vault-entry');
+                    const sgSend = entry._getSGSend();
+                    vault = await SGVault.open(sgSend, this._vaultKey);
 
-                // Auto-merge if clone ref is behind named ref — Refresh should always
-                // show the latest published content, not just reload from the old clone.
-                await this._syncToNamedHead(vault);
-                this._vault   = vault;
+                    // Auto-merge if clone ref is behind named ref — Refresh should always
+                    // show the latest published content, not just reload from the old clone.
+                    await this._syncToNamedHead(vault);
+                }
+                this._vault = vault;
 
                 // Remount browse with fresh vault data
                 await this._mountBrowse();

@@ -32,6 +32,9 @@
                             Read-only
                             <button class="vh-unlock-btn" title="Enter access key">&#128275;</button>
                         </span>
+                        <span class="vh-ro-badge" style="display:none" title="Opened with a read-only token — cannot modify this vault">
+                            &#128065; Read-only
+                        </span>
                         <div class="vh-unlock-panel" style="display:none">
                             <input class="vh-unlock-input" type="password" placeholder="Access key…" autocomplete="off">
                             <button class="vh-unlock-apply">Apply</button>
@@ -119,6 +122,19 @@
             const badge = this.shadowRoot.querySelector('.vh-readonly-badge');
             if (badge) badge.style.display = isReadOnly ? '' : 'none';
             if (!isReadOnly) this._hideUnlockPanel();
+        }
+
+        // True RO mode: vault opened via ro-token. Shows distinct badge, hides write controls.
+        setROMode(isRO) {
+            this._isROMode = isRO;
+            const roBadge   = this.shadowRoot.querySelector('.vh-ro-badge');
+            const rwBadge   = this.shadowRoot.querySelector('.vh-readonly-badge');
+            const syncSec   = this.shadowRoot.querySelector('.vh-sync-section');
+            const uploadBtn = this.shadowRoot.querySelector('.vh-upload-btn');
+            if (roBadge)   roBadge.style.display   = isRO ? '' : 'none';
+            if (rwBadge)   rwBadge.style.display    = 'none';   // suppress the old "unlock" badge
+            if (syncSec)   syncSec.style.display    = isRO ? 'none' : '';
+            if (uploadBtn) uploadBtn.style.display  = isRO ? 'none' : '';
         }
 
         _showUnlockPanel() {
@@ -351,6 +367,13 @@
             color: #E9C445; font-weight: 600; cursor: pointer;
         }
         .vh-readonly-badge:hover { background: rgba(233, 196, 69, 0.25); }
+        .vh-ro-badge {
+            display: flex; align-items: center; gap: 4px;
+            font-size: var(--text-small); padding: 0.125rem 0.6rem;
+            border-radius: 9999px; background: rgba(100, 160, 220, 0.15);
+            color: #64a0dc; font-weight: 600; cursor: default;
+            border: 1px solid rgba(100, 160, 220, 0.25);
+        }
         .vh-unlock-btn {
             background: none; border: none; cursor: pointer; padding: 0; font-size: 0.75rem;
             color: #E9C445; line-height: 1;
