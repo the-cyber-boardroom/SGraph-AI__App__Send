@@ -220,11 +220,11 @@ jobs:
           file: sgraph_ai_app_send__docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          # Always tag with the version. Only main updates :latest — dev pushes
-          # produce versioned tags only so they don't override the stable image.
+          # Every successful publish updates :latest in addition to its
+          # immutable version tag. Both dev and main pushes share :latest.
           tags: |
             ${{ env.DOCKERHUB_IMAGE }}:${{ steps.version.outputs.tag }}
-            ${{ inputs.target_deploy == 'main' && format('{0}:latest', env.DOCKERHUB_IMAGE) || '' }}
+            ${{ env.DOCKERHUB_IMAGE }}:latest
 
       - name: Smoke test
         run: |

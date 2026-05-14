@@ -380,7 +380,7 @@ See the [Security domain in the reality doc](../team/roles/librarian/reality/sec
 | Architectures | `linux/amd64`, `linux/arm64` |
 | Image size | ~250 MB |
 | Default port | 8080 |
-| Tag policy | `:latest` = latest `main` build · `:vX.Y.Z` = every dev or main build (immutable) |
+| Tag policy | `:latest` = most recent published build (dev or main) · `:vX.Y.Z` = immutable version tag for that build |
 | Default user | `root` (inside container) |
 | Source | <https://github.com/the-cyber-boardroom/SGraph-AI__App__Send> |
 | Dockerfile | `sgraph_ai_app_send__docker/Dockerfile` |
