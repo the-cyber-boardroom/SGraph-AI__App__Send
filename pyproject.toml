@@ -24,9 +24,6 @@ mgraph-ai-service-cache        = "*"
 mgraph-ai-service-cache-client = "*"
 fastapi-mcp                    = "*"
 
-[tool.poetry.scripts]
-sg-send-ec2 = "sgraph_ai_app_send__docker.provision_ec2:app"
-
 [build-system]
 requires = ["poetry-core>=1.9.1"]
 build-backend = "poetry.core.masonry.api"

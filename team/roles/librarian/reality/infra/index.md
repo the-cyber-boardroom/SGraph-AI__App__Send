@@ -41,18 +41,19 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 - **`SEND__VAULT_STATIC_DIR`** env var — overrides static dir path (default `/app/static_vault`). Used to point tests at a tmpdir.
 - **20 container tests** — 13 in `test_Container__App.py` (health, status, vault UI at root, vault landing page, vault clean URL, common assets, no API route shadowing, transfers, vault read/write, auth form, disk storage) + 7 in `test_Container__App__Auth.py` (auth enforcement, vault UI blocked, header token, cookie token, form exclusion). Code-verified: this commit.
 
-### sg-send-ec2 CLI
+### Docker Hub Publish CI Job
 
-- `sgraph_ai_app_send__docker/provision_ec2.py` — Typer CLI for EC2/ECR provisioning
-- Commands: `create`, `wait`, `health`, `connect`, `exec`, `forward`, `list`, `info`, `delete`
-- IAM instance profile, security groups, SSM-based shell, tag-based metadata store
-- Code-verified: commit `bbaaddb`
+- `.github/workflows/ci-pipeline.yml` — `publish-to-dockerhub` job
+- Multi-arch build (`linux/amd64`, `linux/arm64`) via `docker/setup-buildx-action@v3`
+- Triggered by `should_publish_dockerhub: true` input on the calling workflow:
+  - `ci-pipeline__dev.yml` — pushes `diniscruz/sg-send-vault:{version}` only
+  - `ci-pipeline__main.yml` — pushes `diniscruz/sg-send-vault:{version}` + `:latest`
+- Smoke test: `/info/health` + `/` both return 200 against the just-pushed image
+- Secrets required: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`
 
-### Docker ECR CI Job
+### EC2 / ECR removed
 
-- `.github/workflows/ci-pipeline.yml` gains Docker ECR build+push job
-- Auto-create ECR repo, parameterised by ECR repo name
-- Code-verified: commits `9e1ea2a`, `3438122`, `945d622`
+The `sg-send-ec2` CLI (`provision_ec2.py`) and the ECR CI push job were removed in v0.27.45 (this commit). EC2 integration is now handled by the separate **SG/Compute** project. Container deployments pull from Docker Hub.
 
 ### Static Website Deployment
 
@@ -91,17 +92,18 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 | `scripts/generate_i18n_pages.py` | Reads en-GB HTML + locale JSON, produces pre-rendered locale folder trees |
 | `scripts/store_ci_artifacts.py` | Stores build artifacts to S3 under `ci/{date}/{version}/` |
 
-### Deployment Targets (7 Total)
+### Deployment Targets
 
 | Target | Pattern | Status |
 |--------|---------|--------|
 | AWS Lambda (User + Admin) | Lambda | EXISTS |
-| Docker container (local/EC2) | Container | EXISTS |
-| ECR + ECS Fargate | Container | EXISTS (ECR CI job) |
-| GCP (container) | Container | INFRASTRUCTURE READY |
-| EC2/AMI | Server | EXISTS (sg-send-ec2 CLI) |
+| Docker container (Docker Hub) | Container | EXISTS — `diniscruz/sg-send-vault` (multi-arch) |
+| Docker container (local build) | Container | EXISTS |
+| GCP (container) | Container | PROPOSED — image is portable, no GCP wiring in this repo |
+| ECS / Fargate | Container | PROPOSED — image is published, no task definition in this repo |
+| EC2 provisioning | Server | MOVED to SG/Compute project |
 | CLI | CLI | EXISTS (sgit-ai PyPI) |
-| Memory/Disk (local dev) | CLI | EXISTS |
+| Memory/Disk (local dev) | Container | EXISTS |
 
 ### Deployment Tests
 
