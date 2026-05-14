@@ -241,10 +241,10 @@ jobs:
           fi
           echo "Health check passed"
   publish-to-dockerhub:
-    if: inputs.should_publish_dockerhub && needs.publish-to-pypi.result == 'success'
+    if: inputs.should_publish_dockerhub && needs.run-tests.result == 'success' && (needs.increment-tag.result == 'success' || needs.increment-tag.result == 'skipped')
     name: "Publish to: Docker Hub"
     runs-on: ubuntu-latest
-    needs: [publish-to-pypi]
+    needs: [run-tests, increment-tag]
     steps:
       - uses: actions/checkout@v4
 
@@ -274,17 +274,20 @@ jobs:
           file: sgraph_ai_app_send__docker/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          # Always tag with the version. Only main updates :latest — dev pushes
+          # produce versioned tags only so they don't override the stable image.
           tags: |
-            ${{ env.DOCKERHUB_IMAGE }}:latest
             ${{ env.DOCKERHUB_IMAGE }}:${{ steps.version.outputs.tag }}
+            ${{ inputs.target_deploy == 'main' && format('{0}:latest', env.DOCKERHUB_IMAGE) || '' }}
 
       - name: Smoke test
         run: |
-          docker run -d --name sg-send-vault-test -p 8080:8080 ${{ env.DOCKERHUB_IMAGE }}:latest
+          IMG=${{ env.DOCKERHUB_IMAGE }}:${{ steps.version.outputs.tag }}
+          docker run -d --name sg-send-vault-test -p 8080:8080 "$IMG"
           sleep 5
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/info/health)
           ROOT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
           docker stop sg-send-vault-test
           if [ "$STATUS" != "200" ];      then echo "Health check failed: $STATUS";  exit 1; fi
           if [ "$ROOT_STATUS" != "200" ]; then echo "Root check failed: $ROOT_STATUS"; exit 1; fi
-          echo "Health + vault UI checks passed"
+          echo "Health + vault UI checks passed for $IMG"
