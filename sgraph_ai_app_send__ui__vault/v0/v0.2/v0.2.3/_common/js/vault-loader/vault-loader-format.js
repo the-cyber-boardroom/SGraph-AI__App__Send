@@ -7,7 +7,8 @@
      2  passphrase:hex_id   <pass>:<12 lowercase hex>    (rw) derivation: PBKDF2
      3  passphrase:alnum_id <pass>:<4–24 a-z0-9>         (rw) derivation: PBKDF2
      4  read-only cred      <vault_id> <64-hex read_key>  (ro) no derivation needed
-     5  server access token opaque string — orthogonal axis, not handled here
+     5  ro-token            ro-word-word-NNNN             (ro) resolve via transfers API
+     6  server access token opaque string — orthogonal axis, not handled here
 
    Detection order matters: #2 is a strict subset of #3, so it must be checked first.
    The passphrase may itself contain colons (e.g. "pass:with:colons:vault_id") — the
@@ -23,10 +24,21 @@
     var RE_HEX_ID_PART  = /^[a-f0-9]{12}$/;
     var RE_ALNUM_PART   = /^[a-z0-9]{4,24}$/;
     var RE_READ_ONLY    = /^([a-z0-9]{4,24})\s+([a-f0-9]{64})$/;
+    var RE_RO_TOKEN     = /^ro-([a-z]+-[a-z]+-\d{4})$/;
 
     function detectFormat(input) {
         var s = (input || '').trim();
         if (!s) throw new Error('Vault key cannot be empty');
+
+        // Format 5 — ro-token: ro-word-word-NNNN (must be checked before Format 1)
+        var m5 = RE_RO_TOKEN.exec(s);
+        if (m5) {
+            return {
+                format: 5,
+                kind:   'ro-token',
+                parts:  { roToken: m5[1], raw: s }
+            };
+        }
 
         // Format 1 — simple token: word-word-NNNN (no colon)
         if (RE_SIMPLE_TOKEN.test(s)) {

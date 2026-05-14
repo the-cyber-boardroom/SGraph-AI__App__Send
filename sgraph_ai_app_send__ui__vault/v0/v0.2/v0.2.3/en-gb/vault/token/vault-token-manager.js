@@ -153,15 +153,13 @@ async function createTransferToken(vault, roToken, expiresAt, maxUses) {
     const transferId = createData.transfer_id;
     const uploadUrl  = createData.upload_url;  // server-provided upload path
 
-    // 2. Encrypt payload { vault_id, read_key } with roToken as passphrase.
-    // vault._readKey is an AES-256-GCM CryptoKey (no public getter) — export raw bytes and base64-encode.
-    // PHASE 2 PREREQUISITE: consuming this read_key requires SGVault.openReadOnly(sgSend, vaultId, readKeyBase64)
-    // which does not yet exist in _common/js/lib/sg-vault/sg-vault.js. Phase 2 must add it before
-    // #ro-[token] URLs can load a real vault. The method should importKey('raw', base64decode(readKeyBase64),
-    // {name:'AES-GCM'}, false, ['decrypt']), set vault._writeKey=null, vault._passphrase=null, and load the tree.
+    // 2. Encrypt payload { vault_id, read_key, ref_file_id } with roToken as passphrase.
+    // vault._readKey is an AES-256-GCM CryptoKey — export raw bytes and base64-encode.
+    // vault._refFileId is the named-branch ref path; RO recipients need it to find HEAD
+    // (they can't derive it without the HMAC key, which only the owner has).
     const rawReadKeyBytes = new Uint8Array(await crypto.subtle.exportKey('raw', vault._readKey));
     const readKeyB64      = btoa(String.fromCharCode(...rawReadKeyBytes));
-    const payload      = JSON.stringify({ vault_id: vault.vaultId, read_key: readKeyB64 });
+    const payload      = JSON.stringify({ vault_id: vault.vaultId, read_key: readKeyB64, ref_file_id: vault._refFileId });
     const payloadBytes = new TextEncoder().encode(payload);
     const encPayload   = await _encryptWithPassphrase(roToken, payloadBytes);
 

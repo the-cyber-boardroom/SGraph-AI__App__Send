@@ -84,6 +84,37 @@ class SGVault {
         return vault
     }
 
+    // --- Read-Only Vault Open (Phase 2) -----------------------------------------
+    // Opens a vault using a pre-derived read key (from an RO token payload).
+    // vault._passphrase = null, vault._writeKey = null → vault.writable = false.
+    // refFileId is the named-branch ref path on the server (stored in the token
+    // payload by the owner; derived from HMAC which RO recipients don't have).
+
+    static async openReadOnly(sgSend, vaultId, readKeyBase64, refFileId) {
+        const vault = new SGVault(sgSend)
+        vault._vaultId    = vaultId
+        vault._passphrase = null
+        vault._writeKey   = null
+        vault._hmacKey    = null
+        vault._readKey    = await crypto.subtle.importKey(
+            'raw',
+            Uint8Array.from(atob(readKeyBase64), c => c.charCodeAt(0)),
+            { name: 'AES-GCM' },
+            false,
+            ['decrypt']
+        )
+        vault._refFileId = refFileId
+        vault._initManagers()
+
+        const namedCommitId = await vault._refManager.readRef(vault._refFileId)
+        if (!namedCommitId) throw new Error('Vault not found: HEAD ref missing')
+        vault._namedHeadId  = namedCommitId
+        vault._headCommitId = namedCommitId
+
+        await vault._loadTreeFromCommit(vault._headCommitId)
+        return vault
+    }
+
     static async open(sgSend, fullVaultKey) {
         const isSimpleToken = /^[a-z]+-[a-z]+-\d{4}$/.test(fullVaultKey)
 
