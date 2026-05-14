@@ -121,10 +121,17 @@ class MCP__Setup(Type_Safe):
         for _, name, _ in candidates:
             name_counts[name] = name_counts.get(name, 0) + 1
 
-        # Set operation_id, appending HTTP method for duplicates
+        # Set operation_id, appending HTTP method (and parameter count for paths
+        # that still collide after method-disambiguation — e.g. catch route
+        # /vault/write/{vault_id} vs real route /vault/write/{vault_id}/{file_id:path}
+        # both reduce to 'api_vault_write' with method PUT).
         for route, name, method in candidates:
             if name_counts[name] > 1:
-                route.operation_id = f"{name}_{method}"
+                op_id    = f"{name}_{method}"
+                same_op  = sum(1 for r, n, m in candidates if f"{n}_{m}" == op_id)
+                if same_op > 1:
+                    op_id = f"{op_id}_p{route.path.count('{')}"
+                route.operation_id = op_id
             else:
                 route.operation_id = name
 

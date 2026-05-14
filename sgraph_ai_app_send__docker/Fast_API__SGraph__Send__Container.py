@@ -38,7 +38,10 @@ class Fast_API__SGraph__Send__Container(Fast_API__SGraph__App__Send__User):
     def setup_routes(self):
         super().setup_routes()
         self.add_routes(Routes__Set_Cookie)
-        self.setup_static_routes()         # must register after API routes
+        # NOTE: do NOT call self.setup_static_routes() here — the base
+        # Fast_API.setup() already invokes it polymorphically (line 142
+        # of osbot_fast_api/api/Fast_API.py), and an explicit call would
+        # register every static route twice.
 
     def setup_static_routes(self):
         vault_static_dir = get_env(ENV_VAR__SEND__VAULT_STATIC_DIR, SEND__VAULT_STATIC_DIR__DEFAULT)
