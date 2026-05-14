@@ -1,25 +1,29 @@
 /* =============================================================================
    SGraph Send — Upload Step Done Component
-   Step 6: Done / Share Results
+   v0.4.0 — Step 5: Done / Share Results (unified file + secret modes)
 
    Usage:  <upload-step-done></upload-step-done>
 
    Properties (set by orchestrator):
+     mode             — 'file' (default) | 'secret'
      result           — { transferId, combinedUrl, linkOnlyUrl, keyString,
-                          friendlyKey, delivery, transparency, isText }
-     shareMode        — 'token' | 'combined' | 'separate'
+                          friendlyKey, delivery, transparency,
+                          [deleteAuth, isSecretMode] }
+     shareMode        — 'token' | 'combined' | 'separate' (file mode only)
      showPicker       — boolean (true to show share mode card picker)
      fileSummary      — { icon, name, meta, isFolder }
      deliveryOptions  — Array of { id, icon, title }
      stageTimestamps  — object (for timing breakdown)
      selectedDelivery — string (delivery mode id)
+     secretConfig     — { max_downloads, auto_delete, expires_at } (secret mode)
+     deleteAuth       — raw 32-byte token (secret mode, for kill URL fragment)
 
    Events emitted:
-     step-send-another      — user wants to start over
-     step-change-mode       — user clicked "Change"
-     step-share-mode-changed — detail: { mode: string }
-     step-copy              — detail: { text: string, button: Element }
-     step-email-link        — user clicked email link button
+     step-send-another       — user wants to start over (file or secret)
+     step-change-mode        — user clicked "Change" (file mode)
+     step-share-mode-changed — detail: { mode: string } (file mode)
+     step-copy               — detail: { text: string, button: Element }
+     step-email-link         — user clicked email link button
    ============================================================================= */
 
 class UploadStepDone extends HTMLElement {
@@ -39,6 +43,7 @@ class UploadStepDone extends HTMLElement {
         super();
         this.attachShadow({ mode: 'open' });
         this._ready            = false;
+        this._mode             = 'file';
         this._result           = null;
         this._shareMode        = 'token';
         this._showPicker       = false;
@@ -46,6 +51,8 @@ class UploadStepDone extends HTMLElement {
         this._deliveryOptions  = [];
         this._stageTimestamps  = null;
         this._selectedDelivery = null;
+        this._secretConfig     = null;
+        this._deleteAuth       = null;
     }
 
     connectedCallback() { this._init(); }
@@ -84,6 +91,9 @@ class UploadStepDone extends HTMLElement {
 
     // ── Properties ───────────────────────────────────────────────────────────────
 
+    set mode(v)             { this._mode = v === 'secret' ? 'secret' : 'file'; this.render(); }
+    get mode()              { return this._mode; }
+
     set result(v)           { this._result = v;           this.render(); }
     get result()            { return this._result; }
 
@@ -105,6 +115,12 @@ class UploadStepDone extends HTMLElement {
     set selectedDelivery(v) { this._selectedDelivery = v; this.render(); }
     get selectedDelivery()  { return this._selectedDelivery; }
 
+    set secretConfig(v)     { this._secretConfig = v;     this.render(); }
+    get secretConfig()      { return this._secretConfig; }
+
+    set deleteAuth(v)       { this._deleteAuth = v;       this.render(); }
+    get deleteAuth()        { return this._deleteAuth; }
+
     // ── Rendering ────────────────────────────────────────────────────────────────
 
     render() {
@@ -119,6 +135,14 @@ class UploadStepDone extends HTMLElement {
 
         if (!result) {
             this._container.innerHTML = '';
+            return;
+        }
+
+        // Secret mode short-circuits the entire file-mode rendering: a single
+        // link box + kill link + ephemerality notice. Branching here keeps the
+        // file-mode path below byte-equivalent to v0.3.0.
+        if (this._mode === 'secret') {
+            this._renderSecret(result);
             return;
         }
 
@@ -177,6 +201,140 @@ class UploadStepDone extends HTMLElement {
                 panel.setData(result.transparency);
             }
         }
+    }
+
+    // ── Secret-mode rendering ───────────────────────────────────────────────────
+    //
+    // The secret view is intentionally minimal: one share link + one kill link
+    // + a one-line ephemerality notice. No timings, no share-mode picker, no
+    // transparency panel. The kill URL carries the raw deleteAuth in the
+    // fragment (#) so it is never sent in HTTP requests.
+
+    _renderSecret(result) {
+        var shareUrl   = result.combinedUrl || '';   // /<locale>/s/{id}#{key}
+        var killUrl    = this._buildKillUrl(result);
+        var noticeHtml = this._buildSecretNotice();
+
+        this._container.innerHTML =
+            '<div class="secret-done">' +
+                '<div class="secret-done__header">🔒 Secret link created</div>' +
+
+                '<div class="secret-done__section">' +
+                    '<div class="secret-done__label">Share this link:</div>' +
+                    '<div class="secret-done__link-box">' +
+                        '<input type="text" readonly class="secret-done__link-input" id="secret-share-link-input" value="' + this._escAttr(shareUrl) + '">' +
+                        '<button class="secret-done__copy-btn" id="copy-secret-share-link">📋 Copy Link</button>' +
+                    '</div>' +
+                    noticeHtml +
+                '</div>' +
+
+                '<div class="secret-done__section secret-done__section--kill">' +
+                    '<div class="secret-done__label">Kill link — save this to delete the secret early:</div>' +
+                    '<div class="secret-done__link-box secret-done__link-box--secondary">' +
+                        '<input type="text" readonly class="secret-done__link-input" id="secret-kill-link-input" value="' + this._escAttr(killUrl) + '">' +
+                        '<button class="secret-done__copy-btn" id="copy-secret-kill-link">📋 Copy Kill Link</button>' +
+                    '</div>' +
+                '</div>' +
+
+                '<div class="secret-done__actions">' +
+                    '<button class="btn btn-secondary" id="email-secret-link">📧 Email Link</button>' +
+                    '<button class="btn btn-primary" id="create-another-secret">🔄 Create Another Secret</button>' +
+                '</div>' +
+
+                '<div class="secret-done__transparency">' +
+                    '🔒 The server holds only encrypted ciphertext. The decryption key is embedded in the link — it never left your browser.' +
+                '</div>' +
+            '</div>';
+
+        this._wireSecretActions(shareUrl, killUrl);
+    }
+
+    _buildKillUrl(result) {
+        var locale = this._detectLocalePrefix();
+        var auth   = result.deleteAuth || this._deleteAuth || '';
+        return window.location.origin + '/' + locale + '/s/kill/' + result.transferId + '#' + auth;
+    }
+
+    _buildSecretNotice() {
+        var cfg   = this._secretConfig || {};
+        var parts = [];
+        if (cfg.max_downloads === 1) {
+            parts.push('1 view');
+        } else if (cfg.max_downloads > 1) {
+            parts.push(cfg.max_downloads + ' views');
+        }
+        if (cfg.expires_at) {
+            var exp = new Date(cfg.expires_at);
+            parts.push('expires ' + exp.toLocaleString());
+        }
+        parts.push('then permanently deleted');
+        return '<div class="secret-done__notice">⚠ ' + this._esc(parts.join(' · ')) + '</div>';
+    }
+
+    _wireSecretActions(shareUrl, killUrl) {
+        var self = this;
+        var sr   = this.shadowRoot;
+
+        var copyShare = sr.querySelector('#copy-secret-share-link');
+        if (copyShare) {
+            copyShare.addEventListener('click', function() {
+                self._copyToClipboard(shareUrl, copyShare, 'Copied!');
+                self._emit('step-copy', { text: shareUrl, button: copyShare });
+            });
+        }
+
+        var copyKill = sr.querySelector('#copy-secret-kill-link');
+        if (copyKill) {
+            copyKill.addEventListener('click', function() {
+                self._copyToClipboard(killUrl, copyKill, 'Copied!');
+                self._emit('step-copy', { text: killUrl, button: copyKill });
+            });
+        }
+
+        var emailBtn = sr.querySelector('#email-secret-link');
+        if (emailBtn) {
+            emailBtn.addEventListener('click', function() {
+                var subject = 'Secure secret via SG/Send';
+                var body    = "I've shared a secret with you via SG/Send (zero-knowledge encrypted).\n\n" +
+                              'Open this link to view it:\n' + shareUrl + '\n\n' +
+                              'This link can only be viewed once. Do not forward it.';
+                window.open('mailto:?subject=' + encodeURIComponent(subject) +
+                            '&body='   + encodeURIComponent(body), '_blank');
+            });
+        }
+
+        var anotherBtn = sr.querySelector('#create-another-secret');
+        if (anotherBtn) {
+            anotherBtn.addEventListener('click', function() { self._emit('step-send-another'); });
+        }
+    }
+
+    _copyToClipboard(text, btn, label) {
+        var orig = btn.textContent;
+        var done = function() {
+            btn.textContent = label;
+            setTimeout(function() { btn.textContent = orig; }, 1500);
+        };
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(done).catch(function() {});
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity  = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+            document.body.removeChild(ta);
+            done();
+        }
+    }
+
+    _escAttr(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;');
     }
 
     // ── Section renderers ────────────────────────────────────────────────────────
