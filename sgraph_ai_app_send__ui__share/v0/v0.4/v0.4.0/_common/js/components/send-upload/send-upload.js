@@ -1,7 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SGraph Send — Upload Orchestrator (v0.3.0)
+   SGraph Send — Upload Orchestrator
+   v0.4.0 — Unified file + secret share orchestrator (merged from v0.3.0 base
+            + v0.3.2 send-upload-secret.js + send-upload-options.js).
 
-   Thin coordinator — owns the state machine and wires sub-components together.
+   Thin coordinator — owns the 5-step state machine and wires sub-components.
    All business logic is in dedicated modules:
 
      UploadConstants    — step labels, state mapping, carousel, size limits
@@ -11,27 +13,41 @@
      UploadCrypto       — friendly keys, PBKDF2 key derivation
      UploadFileUtils    — file type detection, delivery options
 
-   Sub-components (Shadow DOM):
-     <upload-step-select>    — Step 1: file/folder selection
-     <upload-step-delivery>  — Step 2: delivery mode
-     <upload-step-share>     — Step 3: share mode
-     <upload-step-confirm>   — Step 4: review + word picker
-     <upload-step-progress>  — Step 5: encrypt & upload progress
-     <upload-step-done>      — Step 6: share links + QR
+   5-step wizard:
+     1. Upload                  — file/folder/secret selection
+     2. Options                 — delivery mode + share mode in one screen
+     3. Confirm                 — review + word picker
+     4. Encrypt & Upload        — progress, carousel
+     5. Done                    — share links + QR (mode='secret' adds kill link)
+
+   Sub-components (all live in send-upload/):
+     <upload-step-select>     — Step 1: file/folder/secret selection
+     <upload-step-options>    — Step 2: combined delivery + share-mode picker
+     <upload-step-confirm>    — Step 3: review + word picker
+     <upload-step-progress>   — Step 4: encrypt & upload progress
+     <upload-step-done>       — Step 5: share links + QR (mode='file'|'secret')
+
+   Secret mode (when user picks the "🔒 Secret" tab in Step 1):
+     - selectedFile = a File wrapping the typed text (secret.txt)
+     - _isSecretMode = true; _secretConfig = { max_downloads, auto_delete,
+       expires_at, delete_auth_hash }
+     - _deleteAuth is a 32-byte random token; only sha256(deleteAuth) goes to
+       the server. The kill URL carries the raw token in the fragment (never
+       sent in HTTP requests — zero-knowledge preserved).
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 class SendUpload extends HTMLElement {
 
     constructor() {
         super();
-        this._state            = 'idle';
-        this._mode             = 'file';
-        this.selectedFile      = null;
-        this.result            = null;
-        this.errorMessage      = '';
-        this._folderScan       = null;
-        this._folderName       = null;
-        this._folderOptions    = { level: 4, includeEmpty: false, includeHidden: false };
+        this._state               = 'idle';
+        this._mode                = 'file';
+        this.selectedFile         = null;
+        this.result               = null;
+        this.errorMessage         = '';
+        this._folderScan          = null;
+        this._folderName          = null;
+        this._folderOptions       = { level: 4, includeEmpty: false, includeHidden: false };
         this._deliveryOptions     = null;
         this._recommendedDelivery = null;
         this._selectedDelivery    = null;
@@ -39,12 +55,17 @@ class SendUpload extends HTMLElement {
         this._friendlyParts       = null;
         this._friendlyKey         = null;
         this._thumbnailUrl        = null;
-        this._stageTimestamps  = {};
-        this._capabilities     = null;
+        this._stageTimestamps     = {};
+        this._capabilities        = null;
         this._beforeUnloadHandler = null;
-        this._carouselIndex    = 0;
-        this._carouselTimer    = null;
-        this._els              = {};
+        this._carouselIndex       = 0;
+        this._carouselTimer       = null;
+        this._els                 = {};
+
+        // Secret-mode state
+        this._isSecretMode = false;
+        this._secretConfig = null;
+        this._deleteAuth   = null;
     }
 
     get state()  { return this._state; }
@@ -53,9 +74,6 @@ class SendUpload extends HTMLElement {
     // ═══ Lifecycle ══════════════════════════════════════════════════════════
 
     connectedCallback() {
-        if (typeof SendStepIndicator !== 'undefined') {
-            SendStepIndicator.STEP_LABELS = UploadConstants.STEP_LABELS;
-        }
         this._checkCapabilities();
         this._render();
         this._wireEvents();
@@ -110,9 +128,9 @@ class SendUpload extends HTMLElement {
                     '<div class="step-content"></div>' +
                 '</div>';
             var container = this.querySelector('.step-content');
-            var names = ['select','delivery','share','confirm','progress','done'];
-            var tags  = ['upload-step-select','upload-step-delivery','upload-step-share',
-                         'upload-step-confirm','upload-step-progress','upload-step-done'];
+            var names = ['select','options','confirm','progress','done'];
+            var tags  = ['upload-step-select','upload-step-options','upload-step-confirm',
+                         'upload-step-progress','upload-step-done'];
             for (var i = 0; i < names.length; i++) {
                 var el = document.createElement(tags[i]);
                 el.style.display = 'none';
@@ -138,12 +156,12 @@ class SendUpload extends HTMLElement {
         var actionSlot = this.querySelector('.upload-header-row__action');
         if (actionSlot) {
             var btnHtml = '';
-            if (this._state === 'choosing-delivery' || this._state === 'choosing-share') {
-                btnHtml = '<button class="upload-next-btn" id="upload-next-btn">Next \u2192</button>';
+            if (this._state === 'choosing-options') {
+                btnHtml = '<button class="upload-next-btn" id="upload-next-btn">Next →</button>';
             } else if (this._state === 'confirming') {
-                btnHtml = '<button class="upload-next-btn upload-next-btn--send" id="upload-next-btn">Encrypt & Upload \u2192</button>';
+                btnHtml = '<button class="upload-next-btn upload-next-btn--send" id="upload-next-btn">Encrypt & Upload →</button>';
             } else if (isProc) {
-                btnHtml = '<button class="upload-next-btn upload-next-btn--disabled" disabled>Encrypting\u2026</button>';
+                btnHtml = '<button class="upload-next-btn upload-next-btn--disabled" disabled>Encrypting…</button>';
             } else if (this._state === 'complete') {
                 btnHtml = '<button class="upload-next-btn" id="upload-email-btn">Email Link</button>';
             }
@@ -153,7 +171,7 @@ class SendUpload extends HTMLElement {
 
         // Show/hide sub-components
         var activeKey = this._activeComponent();
-        var keys = ['select','delivery','share','confirm','progress','done','error'];
+        var keys = ['select','options','confirm','progress','done','error'];
         for (var k = 0; k < keys.length; k++) {
             if (this._els[keys[k]]) this._els[keys[k]].style.display = keys[k] === activeKey ? '' : 'none';
         }
@@ -173,8 +191,7 @@ class SendUpload extends HTMLElement {
     _activeComponent() {
         switch (this._state) {
             case 'idle': case 'file-ready': case 'folder-options': return 'select';
-            case 'choosing-delivery': return 'delivery';
-            case 'choosing-share':    return 'share';
+            case 'choosing-options':  return 'options';
             case 'confirming':        return 'confirm';
             case 'zipping': case 'reading': case 'encrypting':
             case 'creating': case 'uploading': case 'completing': return 'progress';
@@ -197,14 +214,13 @@ class SendUpload extends HTMLElement {
             e.select.maxFileSize  = UploadConstants.MAX_FILE_SIZE;
             e.select.thumbnailUrl = this._thumbnailUrl;
         }
-        if (key === 'delivery' && e.delivery) {
-            e.delivery.deliveryOptions     = this._deliveryOptions;
-            e.delivery.recommendedDelivery = this._recommendedDelivery;
-            e.delivery.selectedDelivery    = this._selectedDelivery;
-            e.delivery.fileSummary         = this._fileSummary();
-        }
-        if (key === 'share' && e.share) {
-            e.share.shareMode = this._shareMode;
+        if (key === 'options' && e.options) {
+            e.options.deliveryOptions     = this._deliveryOptions;
+            e.options.recommendedDelivery = this._recommendedDelivery;
+            e.options.selectedDelivery    = this._selectedDelivery;
+            e.options.fileSummary         = this._fileSummary();
+            e.options.shareMode           = this._shareMode;
+            e.options.secretMode          = !!this._isSecretMode;
         }
         if (key === 'confirm' && e.confirm) {
             if (!this._friendlyParts && this._shareMode === 'token') {
@@ -232,6 +248,7 @@ class SendUpload extends HTMLElement {
             e.progress.stageTimestamps = this._stageTimestamps;
         }
         if (key === 'done' && e.done && this.result) {
+            e.done.mode            = this._isSecretMode ? 'secret' : 'file';
             e.done.result          = this.result;
             e.done.shareMode       = this._shareMode;
             e.done.fileSummary     = this._fileSummary();
@@ -239,6 +256,10 @@ class SendUpload extends HTMLElement {
             e.done.stageTimestamps = this._stageTimestamps;
             e.done.selectedDelivery= this._selectedDelivery;
             e.done.showPicker      = false;
+            if (this._isSecretMode && this._secretConfig) {
+                e.done.secretConfig = this._secretConfig;
+                e.done.deleteAuth   = this._deleteAuth;
+            }
         }
         if (key === 'error' && e.error) {
             e.error.textContent = this.errorMessage;
@@ -263,40 +284,42 @@ class SendUpload extends HTMLElement {
         // Step indicator click navigation (bubbles from send-step-indicator)
         this.addEventListener('step-nav', function(e) {
             var step = e.detail.step;
-            // Clear friendly key when navigating back past share mode (avoid ID collision)
-            if (step <= 3) {
+            // Clear friendly key when navigating back past Options (avoid ID collision)
+            if (step <= 2) {
                 self._friendlyParts = null;
                 self._friendlyKey   = null;
             }
-            // Step 1 click resets file selection (v0.2.16)
             if (step === 1) {
                 self._resetSelection();
                 self.state = 'idle';
             } else if (step === 2) {
-                self.state = 'choosing-delivery';
+                self.state = 'choosing-options';
             } else if (step === 3) {
-                self.state = 'choosing-share';
-            } else if (step === 4) {
                 self.state = 'confirming';
             }
-            // Steps 5-6 (processing/done) are not navigable
+            // Steps 4-5 (processing/done) are not navigable
         });
 
+        // ─── Step 1: select ─────────────────────────────────────────────────
         c.addEventListener('step-file-dropped',    function(e) { self._onDrop(e.detail); });
-        c.addEventListener('step-file-selected',    function(e) { self._onFileInput(e.detail.files); });
-        c.addEventListener('step-folder-selected',  function(e) { self._onFolderInput(e.detail.files); });
-        c.addEventListener('step-paste',            function(e) { self._onPaste(e.detail.files); });
-        c.addEventListener('step-continue',         function()  { self._advanceToDelivery(); });
-        c.addEventListener('step-folder-upload',    function(e) { self._onFolderUpload(e.detail.options); });
-        c.addEventListener('step-folder-cancel',    function()  { self._folderScan = null; self._folderName = null; self.state = 'idle'; });
-        c.addEventListener('step-back-to-idle',     function()  { self._resetSelection(); self.state = 'idle'; });
-        c.addEventListener('step-text-submit',      function(e) { self._onTextSubmit(e.detail.text); });
-        c.addEventListener('step-delivery-selected',function(e) { self._selectedDelivery = e.detail.deliveryId; self.state = 'choosing-share'; });
-        c.addEventListener('step-share-selected',   function(e) { self._shareMode = e.detail.mode; self.state = 'confirming'; });
-        c.addEventListener('step-confirmed',        function()  { self._startProcessing(); });
-        c.addEventListener('step-change-delivery',  function()  { self.state = 'choosing-delivery'; });
-        c.addEventListener('step-change-share',     function()  { self.state = 'choosing-share'; });
-        c.addEventListener('step-shuffle-word',     function(e) {
+        c.addEventListener('step-file-selected',   function(e) { self._onFileInput(e.detail.files); });
+        c.addEventListener('step-folder-selected', function(e) { self._onFolderInput(e.detail.files); });
+        c.addEventListener('step-paste',           function(e) { self._onPaste(e.detail.files); });
+        c.addEventListener('step-continue',        function()  { self._advanceToOptions(); });
+        c.addEventListener('step-folder-upload',   function(e) { self._onFolderUpload(e.detail.options); });
+        c.addEventListener('step-folder-cancel',   function()  { self._folderScan = null; self._folderName = null; self.state = 'idle'; });
+        c.addEventListener('step-back-to-idle',    function()  { self._resetSelection(); self.state = 'idle'; });
+        c.addEventListener('step-secret-submit',   function(e) { self._onSecretSubmit(e.detail); });
+
+        // ─── Step 2: options (lightweight selection — no auto-advance) ──────
+        c.addEventListener('step-delivery-chosen',  function(e) { self._selectedDelivery = e.detail.deliveryId; });
+        c.addEventListener('step-sharemode-chosen', function(e) { self._shareMode        = e.detail.mode; });
+        c.addEventListener('step-change-delivery',  function() { self.state = 'choosing-options'; });
+        c.addEventListener('step-change-share',     function() { self.state = 'choosing-options'; });
+
+        // ─── Step 3: confirm ────────────────────────────────────────────────
+        c.addEventListener('step-confirmed', function() { self._startProcessing(); });
+        c.addEventListener('step-shuffle-word', function(e) {
             var idx = e.detail.index;
             if (self._friendlyParts && self._friendlyParts.words[idx] !== undefined) {
                 self._friendlyParts.words[idx] = UploadCrypto.randomWord();
@@ -309,18 +332,21 @@ class SendUpload extends HTMLElement {
             self._friendlyKey   = UploadCrypto.formatFriendly(self._friendlyParts);
             self.state = 'confirming';
         });
-        c.addEventListener('step-send-another',       function()  { self._resetForNew(); });
-        c.addEventListener('step-change-mode',        function()  { if (self._els.done) self._els.done.showPicker = true; });
+
+        // ─── Step 5: done ───────────────────────────────────────────────────
+        c.addEventListener('step-send-another',       function() { self._resetForNew(); });
+        c.addEventListener('step-change-mode',        function() { if (self._els.done) self._els.done.showPicker = true; });
         c.addEventListener('step-share-mode-changed', function(e) {
             self._shareMode = e.detail.mode;
             if (self._els.done) { self._els.done.shareMode = e.detail.mode; self._els.done.showPicker = false; }
         });
         c.addEventListener('step-email-link', function() { self._openEmailLink(); });
+
+        // ─── Universal Back ─────────────────────────────────────────────────
         c.addEventListener('step-back', function() {
             switch (self._state) {
-                case 'choosing-delivery': self._resetSelection(); self.state = 'idle'; break;
-                case 'choosing-share':    self.state = 'choosing-delivery'; break;
-                case 'confirming':        self.state = 'choosing-share'; break;
+                case 'choosing-options': self._resetSelection(); self.state = 'idle'; break;
+                case 'confirming':       self.state = 'choosing-options'; break;
             }
         });
     }
@@ -330,12 +356,9 @@ class SendUpload extends HTMLElement {
         var nextBtn = this.querySelector('#upload-next-btn');
         if (nextBtn) {
             nextBtn.addEventListener('click', function() {
-                if (self._state === 'choosing-delivery') {
-                    // Advance with current default
+                if (self._state === 'choosing-options') {
                     self._selectedDelivery = self._selectedDelivery || self._recommendedDelivery || 'download';
-                    self.state = 'choosing-share';
-                } else if (self._state === 'choosing-share') {
-                    self._shareMode = self._shareMode || 'token';
+                    self._shareMode        = self._shareMode        || 'token';
                     self.state = 'confirming';
                 } else if (self._state === 'confirming') {
                     self._startProcessing();
@@ -395,16 +418,8 @@ class SendUpload extends HTMLElement {
         this._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
         if (this._thumbnailUrl) { URL.revokeObjectURL(this._thumbnailUrl); this._thumbnailUrl = null; }
         this.selectedFile = null;
-        // Smart skip: folders/multi-file go straight to delivery
-        this._advanceToDelivery();
-    }
-
-    _onTextSubmit(text) {
-        // Convert text to a .txt File and feed into the normal upload pipeline
-        var blob = new Blob([text], { type: 'text/plain' });
-        var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        var file = new File([blob], 'message-' + ts + '.txt', { type: 'text/plain' });
-        this._setFile(file);
+        // Smart skip: folders/multi-file go straight to options
+        this._advanceToOptions();
     }
 
     _onFolderInput(files) {
@@ -414,8 +429,7 @@ class SendUpload extends HTMLElement {
         this._folderScan = result.scan;
         this._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
         this.selectedFile = null;
-        // Smart skip: go straight to delivery with defaults (v0.2.5+ pattern)
-        this._advanceToDelivery();
+        this._advanceToOptions();
     }
 
     async _onFolderDrop(directoryEntry) {
@@ -424,8 +438,35 @@ class SendUpload extends HTMLElement {
         this._folderScan = result.scan;
         this._folderOptions = { level: 9, includeEmpty: false, includeHidden: false };
         this.selectedFile = null;
-        // Smart skip: go straight to delivery with defaults (v0.2.5+ pattern)
-        this._advanceToDelivery();
+        this._advanceToOptions();
+    }
+
+    _onSecretSubmit(detail) {
+        // text + config = { maxDownloads, expiresInHours }
+        var text   = detail.text;
+        var config = detail.config;
+
+        // Wrap text in a File blob — same content pipeline as a regular upload
+        var blob = new Blob([text], { type: 'text/plain' });
+        var file = new File([blob], 'secret.txt', { type: 'text/plain' });
+        this.selectedFile = file;
+
+        // expires_at: Timestamp_Now format (int milliseconds since epoch).
+        // The # fragment key never touches the server — zero-knowledge preserved.
+        this._secretConfig = {
+            max_downloads: config.maxDownloads,
+            auto_delete:   config.maxDownloads > 0,
+            expires_at:    config.expiresInHours > 0
+                           ? Date.now() + (config.expiresInHours * 3600000)
+                           : 0
+        };
+        this._shareMode        = 'token';     // Simple token — the only mode for secrets
+        this._selectedDelivery = 'download';
+        this._isSecretMode     = true;
+
+        // Land on Confirm (matches the file flow). User clicks
+        // "Encrypt & Upload" there to start processing.
+        this.state = 'confirming';
     }
 
     _setFile(file) {
@@ -434,8 +475,8 @@ class SendUpload extends HTMLElement {
         this._folderName   = null;
         if (this._thumbnailUrl) URL.revokeObjectURL(this._thumbnailUrl);
         this._thumbnailUrl = UploadFileUtils.isImageFile(file) ? URL.createObjectURL(file) : null;
-        // Smart skip: go straight to delivery (v0.2.6+)
-        this._advanceToDelivery();
+        // Smart skip: go straight to Options (v0.2.6+)
+        this._advanceToOptions();
     }
 
     _resetSelection() {
@@ -447,11 +488,11 @@ class SendUpload extends HTMLElement {
 
     // ═══ Wizard Flow ════════════════════════════════════════════════════════
 
-    _advanceToDelivery() {
+    _advanceToOptions() {
         this._deliveryOptions     = UploadFileUtils.detectDeliveryOptions(this.selectedFile, this._folderScan);
         this._recommendedDelivery = UploadFileUtils.getSmartDefault(this.selectedFile, this._folderScan);
         this._selectedDelivery    = this._recommendedDelivery;
-        this.state = 'choosing-delivery';
+        this.state = 'choosing-options';
     }
 
     _onFolderUpload(options) {
@@ -461,7 +502,7 @@ class SendUpload extends HTMLElement {
             this.state = 'error';
             return;
         }
-        this._advanceToDelivery();
+        this._advanceToOptions();
     }
 
     // ═══ Upload Pipeline ════════════════════════════════════════════════════
@@ -479,6 +520,27 @@ class SendUpload extends HTMLElement {
             this.errorMessage = 'File too large. Maximum: ' + SendHelpers.formatBytes(UploadConstants.MAX_FILE_SIZE);
             this.state = 'error';
             return;
+        }
+
+        // Secret mode: generate deleteAuth and its sha256 hash before the engine
+        // runs. deleteAuth is a cryptographically random 32-byte token; only its
+        // hash goes to the server. The kill URL carries the raw token in the
+        // fragment (never sent in HTTP requests — zero-knowledge guarantee).
+        if (this._isSecretMode && this._secretConfig && !this._secretConfig.delete_auth_hash) {
+            var deleteAuthBytes = new Uint8Array(32);
+            crypto.getRandomValues(deleteAuthBytes);
+            this._deleteAuth = Array.from(deleteAuthBytes)
+                .map(function(b) { return b.toString(16).padStart(2, '0'); })
+                .join('');
+            var enc     = new TextEncoder();
+            var hashBuf = await crypto.subtle.digest('SHA-256', enc.encode(this._deleteAuth));
+            this._secretConfig.delete_auth_hash = Array.from(new Uint8Array(hashBuf))
+                .map(function(b) { return b.toString(16).padStart(2, '0'); })
+                .join('');
+
+            // Signal the engine to attach secretConfig to createTransfer
+            UploadEngine._pendingSecretConfig = this._secretConfig;
+            UploadEngine._pendingDeleteAuth   = this._deleteAuth;
         }
 
         var self = this;
@@ -539,6 +601,10 @@ class SendUpload extends HTMLElement {
             }
             this.errorMessage = err.message || 'Upload failed';
             this.state = 'error';
+        } finally {
+            // Always clear engine pending context so it never leaks into the next run
+            UploadEngine._pendingSecretConfig = null;
+            UploadEngine._pendingDeleteAuth   = null;
         }
     }
 
@@ -573,16 +639,19 @@ class SendUpload extends HTMLElement {
 
     _resetForNew() {
         this._resetSelection();
-        this.result             = null;
-        this.errorMessage       = '';
-        this._deliveryOptions   = null;
-        this._recommendedDelivery = null;
-        this._selectedDelivery  = null;
-        this._shareMode         = 'token';
-        this._friendlyParts     = null;
-        this._friendlyKey       = null;
-        this._stageTimestamps   = {};
-        this._carouselIndex     = 0;
+        this.result              = null;
+        this.errorMessage        = '';
+        this._deliveryOptions    = null;
+        this._recommendedDelivery= null;
+        this._selectedDelivery   = null;
+        this._shareMode          = 'token';
+        this._friendlyParts      = null;
+        this._friendlyKey        = null;
+        this._stageTimestamps    = {};
+        this._carouselIndex      = 0;
+        this._isSecretMode       = false;
+        this._secretConfig       = null;
+        this._deleteAuth         = null;
         this.state = 'idle';
     }
 
@@ -594,7 +663,7 @@ class SendUpload extends HTMLElement {
             // SECURITY: only include the link, NOT the key — key must travel separately
             body = "I've sent you an encrypted file via SG/Send.\n\n" +
                    "Open this link to download:\n" + (this.result.linkOnlyUrl || '') + "\n\n" +
-                   "You'll need the decryption key to open it \u2014 I'll send that separately.";
+                   "You'll need the decryption key to open it — I'll send that separately.";
         } else if (this._shareMode === 'token' && this.result.friendlyKey) {
             var tokenLink = this.result.tokenLink || this.result.combinedUrl || '';
             body = "I've sent you an encrypted file via SG/Send.\n\n" +
