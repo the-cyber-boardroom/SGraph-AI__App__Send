@@ -55,6 +55,13 @@ class test_Container__App(TestCase):
         assert response.status_code == 200
         assert 'https://dev.send.sgraph.ai' not in response.text
 
+    def test__vault_header_does_not_call_api_health(self):
+        # /api/health does not exist on the Send API — build script strips the call
+        # from vault-header._fetchAppVersion so DevTools is not noisy with 404s.
+        response = self.client.get('/_common/js/components/vault-header/vault-header.js')
+        assert response.status_code == 200
+        assert '/api/health' not in response.text
+
     def test__api_transfers_create(self):
         response = self.client.post('/api/transfers/create', json={'size': 1024})
         assert response.status_code == 200
