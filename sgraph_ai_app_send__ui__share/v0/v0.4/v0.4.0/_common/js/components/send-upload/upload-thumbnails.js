@@ -78,10 +78,12 @@ var UploadThumbnails = (function() {
     }
 
     function computeFolderHash(fileHashes) {
+        // Short hash (8 hex chars = 4 bytes) keeps the gallery folder name readable
+        // in the recipient's file tree. Inlined from v0.3.1 overlay.
         var data = new TextEncoder().encode(fileHashes.join(''));
         return crypto.subtle.digest('SHA-256', data).then(function(hashBuf) {
             var arr = new Uint8Array(hashBuf), hex = '';
-            for (var i = 0; i < 8; i++) hex += ('0' + arr[i].toString(16)).slice(-2);
+            for (var i = 0; i < 4; i++) hex += ('0' + arr[i].toString(16)).slice(-2);
             return hex;
         });
     }

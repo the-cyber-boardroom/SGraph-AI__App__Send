@@ -225,6 +225,40 @@ Full list: [proposed/index.md](proposed/index.md)
 
 ## Recent Activity (not yet folded into the curated EXISTS section)
 
+- **2026-05-12 → 2026-05-14** — **v0.4.0 share tree** (sender wizard, file + secret).
+  New tree at `sgraph_ai_app_send__ui__share/v0/v0.4/v0.4.0/`. v0.4.0 is the IFD
+  major base for the share tree; v0.4.1+ surgical overlays land at
+  `__share/v0/v0.4/v0.4.x/`. Phase A copied/laid out the v0.3.0 base + v0.3.1
+  folder patch + v0.3.2 overlays under the new path structure (`en-gb/share/`
+  shell, two levels deep, `_common/` lives at the tree root). Phase B inlined
+  every overlay into its parent file (one commit per merge group):
+    1. `api-client-v032.js` → `api-client.js` (BOTH trees: `secretConfig`
+       optional 3rd arg on `createTransfer`, `downloadBase64` and
+       `deleteTransfer` promoted to native methods).
+    2. `upload-constants-patch.js` → `upload-constants.js` + 5-step
+       `STEP_LABELS` written natively into `send-step-indicator.js`.
+       `upload-step-select-secret.js` → `upload-step-select.js` (Secret tab,
+       textarea + Views/Expires pills + "Review →").
+    3. `upload-step-options.{js,css}` relocated into `upload-step-options/`.
+    4. `send-upload-secret.js` + `send-upload-options.js` → `send-upload.js`
+       (single orchestrator, native 5-step state machine, secret-mode
+       `_isSecretMode` + `_secretConfig` + `_deleteAuth`).
+    5. `upload-engine-secret.js` → `upload-engine.js` (`_pendingSecretConfig`
+       contract; secret-mode URL builder).
+    6. `upload-step-done-secret.js` → `upload-step-done.js` (new `mode`
+       property; share + kill links + ephemerality notice render natively
+       under shadow DOM).
+    7. `upload-folder-v031.js` → `upload-folder.js` + `upload-thumbnails.js`
+       (`__gallery__{8-char hash}` naming inlined; flat shell, no overlays).
+  Phase B also published a new sibling **open tree** at
+  `sgraph_ai_app_send__ui__open/v0/v0.4/v0.4.0/` containing the receiver
+  routes (`en-gb/open/{,s,v,download,gallery,view,browse}/`). `welcome/` is
+  deferred and stays on v0.3.x during retention. Checksum drift checker
+  (`scripts/check_common_checksums.py`) covers 15 files that must stay
+  byte-identical between trees. Plan: `team/roles/architect/reviews/05/10/v0.27.29__plan__v0.4.0-major-release.md`.
+  Librarian: please fold into the curated EXISTS section on next daily run
+  when v0.4.0 ships.
+
 - **2026-05-09** — Vault UI `v0.2.2` HTML iframe rendering bug fixes: data-URI inlining
   (eliminates `</script>`/`</style>` parser bugs), edit-mode preview now reuses the main
   `.sb-file__html-frame` iframe (single iframe across view + edit), iframe gets
