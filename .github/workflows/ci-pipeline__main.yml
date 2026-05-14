@@ -9,9 +9,10 @@ jobs:
   deploy-qa:
     uses: ./.github/workflows/ci-pipeline.yml
     with:
-      git_branch          : 'main'
-      release_type        : 'major'
-      should_increment_tag: true
-      should_publish_pypi : true
-      target_deploy       : 'main'
+      git_branch              : 'main'
+      release_type            : 'major'
+      should_increment_tag    : true
+      should_publish_pypi     : true
+      should_publish_dockerhub: true
+      target_deploy           : 'main'
     secrets: inherit

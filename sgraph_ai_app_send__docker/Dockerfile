@@ -37,8 +37,15 @@ RUN mkdir -p /data
 
 EXPOSE 8080
 
-ENV SEND__STORAGE_MODE=memory
+# Defaults: disk storage at /data, flat layout (no nested sg-send__data/v1.0/shared/).
+# Without a -v mount, /data is in the container's writable layer — ephemeral with --rm.
+# With   `-v <host>:/data`, data persists on the host.
+# Override any of these at runtime with `-e VAR=value`.
+ENV SEND__STORAGE_MODE=disk
 ENV SEND__DISK_PATH=/data
+ENV SEND__STORAGE_BASE=
+ENV SEND__STORAGE_VERSION=
+ENV SEND__DEPLOYMENT_ID=
 ENV SEND__VAULT_STATIC_DIR=/app/static_vault
 
 CMD ["uvicorn", "sgraph_ai_app_send__docker.app:create_app", \
