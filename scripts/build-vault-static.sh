@@ -171,37 +171,6 @@ for root, dirs, files in os.walk("${SERVE_DIR}"):
 PYEOF
 fi
 
-# Strip the vault-header /api/health call — that endpoint does not exist on the
-# Send API (Lambda or container), so it always 404s and adds a noisy DevTools
-# error. The version banner still works via window.SGRAPH_BUILD (injected above).
-HEADER_JS="$SERVE_DIR/_common/js/components/vault-header/vault-header.js"
-if [ -f "$HEADER_JS" ]; then
-    echo "Stripping /api/health call from vault-header.js ..."
-    python3 - <<PYEOF
-import re
-path = "$HEADER_JS"
-with open(path) as f: src = f.read()
-pattern = re.compile(
-    r"async _fetchAppVersion\(\)\s*\{.*?\}\s*catch\s*\(_\)\s*\{[^}]*\}\s*\}",
-    re.DOTALL,
-)
-replacement = (
-    "async _fetchAppVersion() {\n"
-    "            const el = this.shadowRoot.querySelector('.vh-version');\n"
-    "            const build = window.SGRAPH_BUILD;\n"
-    "            if (el && build) {\n"
-    "                el.textContent = \`\${build.appVersion}  .  UI \${build.uiVersion} (IFD)\`;\n"
-    "            }\n"
-    "        }"
-)
-new, n = pattern.subn(replacement, src, count=1)
-if n != 1:
-    raise SystemExit(f"failed to patch _fetchAppVersion in {path} (matches={n})")
-with open(path, "w") as f: f.write(new)
-print("  Patched vault-header.js (_fetchAppVersion no longer hits /api/health)")
-PYEOF
-fi
-
 # Sanity check: confirm which send-browse version survived the merge.
 SEND_BROWSE_FILE="$SERVE_DIR/_common/js/components/send-download/send-browse--v0.3.2.js"
 echo ""

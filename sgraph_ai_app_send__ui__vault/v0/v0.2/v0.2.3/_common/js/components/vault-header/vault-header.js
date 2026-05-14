@@ -246,19 +246,11 @@
         }
 
         async _fetchAppVersion() {
-            try {
-                const resp = await fetch(`${window.location.origin}/api/health`);
-                if (resp.ok) {
-                    const data = await resp.json();
-                    const el = this.shadowRoot.querySelector('.vh-version');
-                    const build = window.SGRAPH_BUILD;
-                    if (el && build) {
-                        el.textContent = `${build.appVersion}  .  UI ${build.uiVersion} (IFD)`;
-                    } else if (el && data.version) {
-                        el.textContent = `v0.2.0 (IFD) / ${data.version}`;
-                    }
-                }
-            } catch (_) { /* silently fail */ }
+            const el    = this.shadowRoot.querySelector('.vh-version');
+            const build = window.SGRAPH_BUILD;
+            if (el && build) {
+                el.textContent = `${build.appVersion}  .  UI ${build.uiVersion} (IFD)`;
+            }
         }
     }
 
