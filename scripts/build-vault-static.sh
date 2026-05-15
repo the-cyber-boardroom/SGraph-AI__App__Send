@@ -55,7 +55,13 @@ if [ ! -d "$CONTENT_DIR" ]; then
 fi
 
 # Merge locale dirs (en-gb/, etc.) from ALL vault IFD layers base→latest.
-for ver in "$VAULT_BASE_VERSION" "${VAULT_IFD_OVERLAYS[@]}"; do
+# Guard with length check so macOS system bash (3.2) does not treat an empty
+# VAULT_IFD_OVERLAYS array as unbound under set -u.
+_vault_locale_versions=("$VAULT_BASE_VERSION")
+if [ ${#VAULT_IFD_OVERLAYS[@]} -gt 0 ]; then
+    _vault_locale_versions=("${_vault_locale_versions[@]}" "${VAULT_IFD_OVERLAYS[@]}")
+fi
+for ver in "${_vault_locale_versions[@]}"; do
     for locale_dir in "$STATIC_DIR/v0/v0.2/$ver"/*/; do
         [ -d "$locale_dir" ] || continue
         dirname=$(basename "$locale_dir")
@@ -74,13 +80,15 @@ else
     mkdir -p "$SERVE_DIR/_common/js"
 fi
 
-for ver in "${VAULT_IFD_OVERLAYS[@]}"; do
-    overlay_dir="$STATIC_DIR/v0/v0.2/$ver/_common"
-    if [ -d "$overlay_dir" ]; then
-        echo "Merging vault overlay: $ver ..."
-        cp -r "$overlay_dir"/. "$SERVE_DIR/_common/"
-    fi
-done
+if [ ${#VAULT_IFD_OVERLAYS[@]} -gt 0 ]; then
+    for ver in "${VAULT_IFD_OVERLAYS[@]}"; do
+        overlay_dir="$STATIC_DIR/v0/v0.2/$ver/_common"
+        if [ -d "$overlay_dir" ]; then
+            echo "Merging vault overlay: $ver ..."
+            cp -r "$overlay_dir"/. "$SERVE_DIR/_common/"
+        fi
+    done
+fi
 
 # Merge user UI IFD layers — provides send-browse, sg-site-header, etc.
 for layer in "${USER_UI_LAYERS[@]}"; do

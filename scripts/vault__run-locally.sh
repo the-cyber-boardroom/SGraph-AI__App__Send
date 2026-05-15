@@ -23,8 +23,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Build the static tree
-bash "$SCRIPT_DIR/build-vault-static.sh" "$SERVE_DIR"
+# Build the static tree — exit loudly on failure so we never serve an empty dir
+bash "$SCRIPT_DIR/build-vault-static.sh" "$SERVE_DIR" || {
+    echo ""
+    echo "ERROR: build-vault-static.sh failed — server not started."
+    exit 1
+}
 
 echo ""
 echo "Starting vault.sgraph.ai local server..."
