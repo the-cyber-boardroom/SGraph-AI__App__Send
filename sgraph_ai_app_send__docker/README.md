@@ -171,6 +171,36 @@ The image ships with all three empty → flat layout (`/data/vault/...`). The li
 | `SGRAPH_SEND__ACCESS_TOKEN` | unset | If set, all routes require this token (header `x-sgraph-access-token` or cookie) |
 | `SEND__ENABLE_AUTH` | unset | Force-enable auth even without a token value (useful for tests) |
 
+### TLS (HTTPS)
+
+The container can terminate its own TLS — there is no reverse proxy. With TLS off
+(the default) it serves plain HTTP on `:8080`, identical on Lambda / CI / laptop.
+With TLS on it binds `:443` using a mounted cert/key pair.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FAST_API__TLS__ENABLED` | `false` | Master switch. `true` / `1` / `yes` turns TLS on. |
+| `FAST_API__TLS__CERT_FILE` | `/certs/cert.pem` | Path to the cert file (mount it in). |
+| `FAST_API__TLS__KEY_FILE` | `/certs/key.pem` | Path to the key file (mount it in). |
+| `FAST_API__TLS__PORT` | `443` | Bind port when TLS is on. |
+
+The container does **not** generate certs — mount them in (a `cert-init` sidecar
+owns acquisition). If TLS is enabled but the cert/key files are missing, the
+container **fails loud** (non-zero exit) — it never silently falls back to HTTP.
+
+Why TLS matters for the vault UI: `crypto.subtle` (Web Crypto) is only available
+in a secure context. Served over HTTPS, `window.isSecureContext` is `true` and
+vaults open from any host — not just `localhost`. See
+[Troubleshooting](#vault-wont-open-from-a-lan-ip-or-other-hostname).
+
+```bash
+docker run --rm -p 443:443 \
+  -e FAST_API__TLS__ENABLED=true \
+  -v "$(pwd)/certs:/certs:ro" \
+  -v "$(pwd)/_sg-send_data:/data" \
+  diniscruz/sg-send-vault:latest
+```
+
 ### Internal (rarely overridden)
 
 | Variable | Default | Purpose |

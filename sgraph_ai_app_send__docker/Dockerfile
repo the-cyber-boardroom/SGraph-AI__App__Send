@@ -35,7 +35,7 @@ RUN pip install --no-cache-dir -e . && \
 
 RUN mkdir -p /data
 
-EXPOSE 8080
+EXPOSE 8080 443
 
 # Defaults: disk storage at /data, flat layout (no nested sg-send__data/v1.0/shared/).
 # Without a -v mount, /data is in the container's writable layer — ephemeral with --rm.
@@ -48,5 +48,7 @@ ENV SEND__STORAGE_VERSION=
 ENV SEND__DEPLOYMENT_ID=
 ENV SEND__VAULT_STATIC_DIR=/app/static_vault
 
-CMD ["uvicorn", "sgraph_ai_app_send__docker.app:create_app", \
-     "--factory", "--host", "0.0.0.0", "--port", "8080"]
+# Entrypoint honours the FAST_API__TLS__* contract. With TLS off (default)
+# this serves plain HTTP on :8080, identical to the previous uvicorn CMD.
+# With FAST_API__TLS__ENABLED=true it binds :443 using the mounted cert/key.
+CMD ["python", "-m", "sgraph_ai_app_send__docker.serve"]
