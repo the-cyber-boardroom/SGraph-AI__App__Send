@@ -1,25 +1,27 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — Upload Constants
-   v0.3.0 — Shared configuration for the upload workflow
+   v0.4.0 — Shared configuration for the upload workflow
 
    Step labels, state-to-step mapping, carousel messages, size limits, SGMETA.
+
+   Five-step wizard (merged Delivery + Share-mode → Options as of v0.3.2,
+   inlined here in v0.4.0).
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 var UploadConstants = (function() {
     'use strict';
 
-    // ─── Six-step wizard (v0.2.8+) ──────────────────────────────────────
-    var STEP_LABELS = ['Upload', 'Delivery', 'Share mode', 'Confirm', 'Encrypt & Upload', 'Done'];
-    var TOTAL_STEPS = 6;
+    // ─── Five-step wizard ───────────────────────────────────────────────
+    var STEP_LABELS = ['Upload', 'Options', 'Confirm', 'Encrypt & Upload', 'Done'];
+    var TOTAL_STEPS = 5;
 
     var STATE_TO_STEP = {
         'idle': 1, 'folder-options': 1, 'file-ready': 1,
-        'choosing-delivery': 2,
-        'choosing-share': 3,
-        'confirming': 4,
-        'zipping': 5, 'reading': 5, 'encrypting': 5,
-        'creating': 5, 'uploading': 5, 'completing': 5,
-        'complete': 6,
+        'choosing-options': 2,
+        'confirming':       3,
+        'zipping': 4, 'reading': 4, 'encrypting': 4,
+        'creating': 4, 'uploading': 4, 'completing': 4,
+        'complete': 5,
         'error': 1
     };
 

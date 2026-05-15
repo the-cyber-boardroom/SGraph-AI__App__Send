@@ -1,12 +1,25 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — Upload Engine
-   v0.3.0 — Encryption and upload pipeline
+   v0.4.0 — Encryption and upload pipeline (secret-mode merged inline from v0.3.2)
 
    Handles: read file → SGMETA wrap → encrypt → create transfer → upload
    (direct or presigned multipart) → complete transfer → build result URLs.
 
    All methods are static — no instance state. The orchestrator calls these
    and manages state transitions.
+
+   Secret-mode contract:
+     The orchestrator sets UploadEngine._pendingSecretConfig and
+     UploadEngine._pendingDeleteAuth before calling run(). When set, run():
+       1. Threads secretConfig into the createTransfer body (both random-key
+          and friendly-key code paths).
+       2. Builds /<locale>/s/{transferId}#{keyString} as the share URL,
+          replacing the normal delivery URL.
+       3. Returns deleteAuth in result.deleteAuth and result.isSecretMode=true
+          so the Done component can render the kill-link section.
+     The orchestrator clears the pending fields after run() returns. _pending
+     fields are also read once at the top of run() so a re-entrant call would
+     not pick them up.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 var UploadEngine = (function() {
@@ -24,7 +37,7 @@ var UploadEngine = (function() {
 
     // ─── Full upload pipeline ───────────────────────────────────────────
     // Returns { transferId, combinedUrl, linkOnlyUrl, keyString, friendlyKey,
-    //           delivery, transparency }
+    //           delivery, transparency, [deleteAuth, isSecretMode] }
     //
     // onStage(stageName) is called before each stage so the orchestrator
     // can update the UI.
@@ -36,6 +49,12 @@ var UploadEngine = (function() {
         var delivery    = opts.delivery    || 'download';
         var capabilities= opts.capabilities;
         var onStage     = opts.onStage     || function() {};
+
+        // Capture secret-mode context once. Cleared by the orchestrator after
+        // run() returns — reading them here means a concurrent invocation
+        // cannot accidentally inherit them.
+        var secretConfig = UploadEngine._pendingSecretConfig || null;
+        var deleteAuth   = UploadEngine._pendingDeleteAuth   || null;
 
         // ── Read ────────────────────────────────────────────────────────
         onStage('reading');
@@ -61,9 +80,9 @@ var UploadEngine = (function() {
         var createResult;
         if (shareMode === 'token' && friendlyKey) {
             var derivedId = await UploadCrypto.deriveTransferId(friendlyKey);
-            createResult  = await _createTransferWithId(fileSizeBytes, contentType, derivedId);
+            createResult  = await _createTransferWithId(fileSizeBytes, contentType, derivedId, secretConfig);
         } else {
-            createResult = await ApiClient.createTransfer(fileSizeBytes, contentType);
+            createResult = await ApiClient.createTransfer(fileSizeBytes, contentType, secretConfig);
         }
 
         // ── Upload ──────────────────────────────────────────────────────
@@ -81,10 +100,19 @@ var UploadEngine = (function() {
         var completeResult = await ApiClient.completeTransfer(createResult.transfer_id);
 
         // ── Build result ────────────────────────────────────────────────
-        var combinedUrl = buildUrl(createResult.transfer_id, keyString, delivery);
-        var linkOnlyUrl = buildLinkOnlyUrl(createResult.transfer_id);
+        var combinedUrl, linkOnlyUrl;
+        if (secretConfig) {
+            // Secret mode: route to the /s/ receive page (read-only, kill-aware)
+            var locale  = detectLocalePrefix();
+            combinedUrl = window.location.origin + '/' + locale +
+                          '/s/' + createResult.transfer_id + '#' + keyString;
+            linkOnlyUrl = buildLinkOnlyUrl(createResult.transfer_id);
+        } else {
+            combinedUrl = buildUrl(createResult.transfer_id, keyString, delivery);
+            linkOnlyUrl = buildLinkOnlyUrl(createResult.transfer_id);
+        }
 
-        return {
+        var result = {
             transferId:   createResult.transfer_id,
             combinedUrl:  combinedUrl,
             linkOnlyUrl:  linkOnlyUrl,
@@ -94,22 +122,34 @@ var UploadEngine = (function() {
             isText:       false,
             transparency: completeResult.transparency || null
         };
+        if (secretConfig) {
+            result.deleteAuth   = deleteAuth;
+            result.isSecretMode = true;
+        }
+        return result;
     }
 
     // ─── Create transfer with deterministic ID (token mode) ─────────────
 
-    async function _createTransferWithId(fileSize, contentType, transferId) {
+    async function _createTransferWithId(fileSize, contentType, transferId, secretConfig) {
         var fetchFn = typeof ApiClient._fetch === 'function'
             ? ApiClient._fetch.bind(ApiClient)
             : function(path, opts) { return fetch(path, opts); };
+        var body = {
+            file_size_bytes:   fileSize,
+            content_type_hint: contentType || 'application/octet-stream',
+            transfer_id:       transferId
+        };
+        if (secretConfig) {
+            if (secretConfig.max_downloads)    body.max_downloads    = secretConfig.max_downloads;
+            if (secretConfig.auto_delete)      body.auto_delete      = secretConfig.auto_delete;
+            if (secretConfig.expires_at)       body.expires_at       = secretConfig.expires_at;
+            if (secretConfig.delete_auth_hash) body.delete_auth_hash = secretConfig.delete_auth_hash;
+        }
         var res = await fetchFn('/api/transfers/create', {
             method: 'POST',
             headers: Object.assign({ 'Content-Type': 'application/json' }, ApiClient._authHeaders()),
-            body: JSON.stringify({
-                file_size_bytes:   fileSize,
-                content_type_hint: contentType || 'application/octet-stream',
-                transfer_id:       transferId
-            })
+            body: JSON.stringify(body)
         });
         if (!res.ok) {
             if (res.status === 401) throw new Error('ACCESS_TOKEN_INVALID');

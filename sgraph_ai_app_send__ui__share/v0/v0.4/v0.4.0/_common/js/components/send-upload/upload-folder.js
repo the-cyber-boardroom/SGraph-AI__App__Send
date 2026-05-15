@@ -148,7 +148,8 @@ var UploadFolder = (function() {
             catch (e) { fileHashes.push('0000000000000000'); }
         }
         var folderHash = await UploadThumbnails.computeFolderHash(fileHashes);
-        var previewDir = '_gallery.' + folderHash;
+        // Naming convention (v0.3.1, now native in v0.4.0): __gallery__{hash}
+        var previewDir = '__gallery__' + folderHash;
 
         // Load PDF.js if needed
         var hasPdfs = fileEntries.some(function(e) { return UploadThumbnails.getFileCategory(e.name) === 'pdf'; });

@@ -25,7 +25,6 @@ OPEN_BASE  = REPO_ROOT / "sgraph_ai_app_send__ui__open/v0/v0.4/v0.4.0/_common"
 # Keep this list in sync with §3.3 and §9 of the v0.4.0 plan.
 MANIFEST = [
     "js/api-client.js",
-    "js/api-client-v032.js",
     "js/crypto.js",
     "js/friendly-crypto.js",
     "js/i18n.js",

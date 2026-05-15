@@ -542,3 +542,109 @@
         gap: var(--space-3, 0.75rem);
     }
 }
+
+/* ─── Secret-mode done view (renders when host[mode="secret"]) ─────────────── */
+
+.secret-done {
+    padding: var(--space-4, 1rem) 0;
+}
+
+.secret-done__header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.secret-done__section {
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.secret-done__section--kill {
+    opacity: 0.8;
+}
+
+.secret-done__label {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+}
+
+.secret-done__link-box {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.secret-done__link-input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    background: var(--color-surface, #1E2A4A);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    color: var(--color-text);
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.secret-done__link-box--secondary .secret-done__link-input {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.secret-done__copy-btn {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--color-accent);
+    background: transparent;
+    color: var(--color-accent);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+
+.secret-done__copy-btn:hover {
+    background: rgba(78, 205, 196, 0.1);
+}
+
+.secret-done__notice {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(224, 124, 79, 0.12);
+    border: 1px solid rgba(224, 124, 79, 0.3);
+    border-radius: 6px;
+    font-size: 13px;
+    color: #E07C4F;
+}
+
+.secret-done__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: var(--space-4, 1rem);
+    padding-top: var(--space-4, 1rem);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.secret-done__actions .btn-secondary {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--color-text-secondary);
+}
+
+.secret-done__transparency {
+    margin-top: var(--space-4, 1rem);
+    padding: 12px;
+    background: rgba(78, 205, 196, 0.06);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}

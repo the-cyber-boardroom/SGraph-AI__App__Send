@@ -24,8 +24,8 @@
     <link rel="stylesheet" href="../../_common/js/components/send-locale/send-locale.css">
     <link rel="stylesheet" href="../../_common/js/components/send-test-files/send-test-files.css">
 
-    <!-- Options step CSS (v0.3.2 merge; Phase B inlines into send-upload.css) -->
-    <link rel="stylesheet" href="../../_common/js/components/send-upload/upload-step-options.css">
+    <!-- Options step CSS (light-DOM component — stylesheet must live in document scope) -->
+    <link rel="stylesheet" href="../../_common/js/components/send-upload/upload-step-options/upload-step-options.css">
 </head>
 <body>
 
@@ -52,13 +52,12 @@
          Path note: en-gb/share/ is two levels deep under the tree root, so
          all _common/ paths use ../../_common/ (vs ../_common/ in v0.3.x).
 
-         Phase A: v0.3.0 base files + v0.3.1 folder patch + v0.3.2 overlays
-                  loaded in overlay order (same logical content as v0.3.2,
-                  new path structure).
-         Phase B: all overlay files below are inlined into single unified
-                  components; the v0.3.x-named files (api-client-v032.js,
-                  upload-constants-patch.js, *-secret.js, *-options.js) are
-                  deleted; this shell is rewritten to a flat script list.
+         All v0.3.x overlays (api-client-v032, upload-constants-patch,
+         upload-folder-v031, upload-step-select-secret, upload-step-done-secret,
+         upload-step-options, send-upload-secret, send-upload-options,
+         upload-engine-secret) have been inlined into their parent files and
+         deleted. This shell loads each component exactly once, in dependency
+         order, with no closure-bound overrides.
          ═══════════════════════════════════════════════════════════════════════ -->
 
     <!-- 0. Build info -->
@@ -108,8 +107,9 @@
     <script src="../../_common/js/components/send-upload/upload-folder.js"></script>
     <script src="../../_common/js/components/send-upload/upload-engine.js"></script>
 
-    <!-- Upload step sub-components (v0.3.0 base) -->
+    <!-- Upload step sub-components -->
     <script src="../../_common/js/components/send-upload/upload-step-select/upload-step-select.js"></script>
+    <script src="../../_common/js/components/send-upload/upload-step-options/upload-step-options.js"></script>
     <script src="../../_common/js/components/send-upload/upload-step-confirm/upload-step-confirm.js"></script>
     <script src="../../_common/js/components/send-upload/upload-step-progress/upload-step-progress.js"></script>
     <script src="../../_common/js/components/send-upload/upload-step-done/upload-step-done.js"></script>
@@ -117,20 +117,6 @@
     <!-- Upload orchestrator -->
     <script src="../../_common/js/components/send-upload/send-upload.js"></script>
     <script src="../../_common/js/components/send-test-files/send-test-files.js"></script>
-
-    <!-- ═══ v0.3.1 overlay ═══════════════════════════════════════════════════ -->
-    <script src="../../_common/js/components/send-upload/upload-folder-v031.js"></script>
-
-    <!-- ═══ v0.3.2 overlays (load order matters — see v0.3.2 shell comments) ═
-         Phase B inlines these into their parent files and deletes them.      ═ -->
-    <script src="../../_common/js/api-client-v032.js"></script>
-    <script src="../../_common/js/upload-constants-patch.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-step-select-secret.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-step-done-secret.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-step-options.js"></script>
-    <script src="../../_common/js/components/send-upload/send-upload-secret.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-engine-secret.js"></script>
-    <script src="../../_common/js/components/send-upload/send-upload-options.js"></script>
 
     <!-- 5. Init -->
     <script>

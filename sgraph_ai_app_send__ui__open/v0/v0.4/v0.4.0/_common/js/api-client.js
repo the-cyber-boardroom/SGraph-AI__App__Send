@@ -1,24 +1,28 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph Send — API Client
-   v0.2.2 — Configurable API endpoint for local dev / cross-origin
+   v0.4.0 — Unified client (merged v0.3.2 secret-share patches inline)
 
    In production (CloudFront), API calls go to same-origin /api/*.
    For local development, set window.SGRAPH_BUILD.apiEndpoint to point
    at a remote API (e.g. 'https://dev.send.sgraph.ai').
 
    Routes:
-     /api/transfers/create                    POST  — create transfer
-     /api/transfers/upload/{id}               POST  — upload encrypted payload
-     /api/transfers/complete/{id}             POST  — complete transfer
-     /api/transfers/info/{id}                 GET   — transfer info
-     /api/transfers/download/{id}             GET   — download encrypted payload
-     /api/transfers/check-token/{name}        GET   — check token (no usage consumed)
-     /api/transfers/validate-token/{name}     POST  — validate token (consumes a use)
-     /api/presigned/capabilities              GET   — check upload capabilities
-     /api/presigned/initiate                  POST  — start multipart upload
-     /api/presigned/complete                  POST  — complete multipart upload
-     /api/presigned/cancel/{id}/{upload_id}   POST  — cancel multipart upload
-     /api/presigned/download-url/{id}         GET   — presigned download URL
+     /api/transfers/create                    POST   — create transfer
+                                                       (optional secretConfig for max_downloads,
+                                                       auto_delete, expires_at, delete_auth_hash)
+     /api/transfers/upload/{id}               POST   — upload encrypted payload
+     /api/transfers/complete/{id}             POST   — complete transfer
+     /api/transfers/info/{id}                 GET    — transfer info
+     /api/transfers/download/{id}             GET    — download encrypted payload
+     /api/transfers/download-base64/{id}      GET    — download encrypted payload as base64 JSON
+     /api/transfers/delete/{id}               DELETE — delete (requires x-sgraph-transfer-delete-auth)
+     /api/transfers/check-token/{name}        GET    — check token (no usage consumed)
+     /api/transfers/validate-token/{name}     POST   — validate token (consumes a use)
+     /api/presigned/capabilities              GET    — check upload capabilities
+     /api/presigned/initiate                  POST   — start multipart upload
+     /api/presigned/complete                  POST   — complete multipart upload
+     /api/presigned/cancel/{id}/{upload_id}   POST   — cancel multipart upload
+     /api/presigned/download-url/{id}         GET    — presigned download URL
 
    Auth: Access token sent via x-sgraph-access-token header.
    Token management uses localStorage.
@@ -82,17 +86,24 @@ const ApiClient = {
 
     // ─── Transfer Lifecycle ──────────────────────────────────────────────
 
-    async createTransfer(fileSize, contentType) {
+    async createTransfer(fileSize, contentType, secretConfig) {
+        const body = {
+            file_size_bytes:    fileSize,
+            content_type_hint:  contentType || 'application/octet-stream'
+        };
+        if (secretConfig) {
+            if (secretConfig.max_downloads)    body.max_downloads    = secretConfig.max_downloads;
+            if (secretConfig.auto_delete)      body.auto_delete      = secretConfig.auto_delete;
+            if (secretConfig.expires_at)       body.expires_at       = secretConfig.expires_at;
+            if (secretConfig.delete_auth_hash) body.delete_auth_hash = secretConfig.delete_auth_hash;
+        }
         const res = await this._fetch('/api/transfers/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...this._authHeaders()
             },
-            body: JSON.stringify({
-                file_size_bytes:    fileSize,
-                content_type_hint:  contentType || 'application/octet-stream'
-            })
+            body: JSON.stringify(body)
         });
         if (!res.ok) {
             if (res.status === 401) throw new Error('ACCESS_TOKEN_INVALID');
@@ -125,6 +136,22 @@ const ApiClient = {
         if (!res.ok) {
             if (res.status === 401) throw new Error('ACCESS_TOKEN_INVALID');
             throw new Error(`Complete failed: ${res.status}`);
+        }
+        return res.json();
+    },
+
+    async deleteTransfer(transferId, deleteAuth) {
+        const res = await this._fetch(`/api/transfers/delete/${transferId}`, {
+            method: 'DELETE',
+            headers: {
+                'x-sgraph-transfer-delete-auth': deleteAuth,
+                ...this._authHeaders()
+            }
+        });
+        if (!res.ok) {
+            if (res.status === 404) throw new Error('delete:not-found');
+            if (res.status === 403) throw new Error('delete:forbidden');
+            throw new Error(`delete:${res.status}`);
         }
         return res.json();
     },
@@ -164,6 +191,18 @@ const ApiClient = {
             throw new Error(`Download failed: ${res.status}`);
         }
         return res.arrayBuffer();
+    },
+
+    async downloadBase64(transferId) {
+        const res = await this._fetch(`/api/transfers/download-base64/${transferId}`, {
+            headers: this._authHeaders()
+        });
+        if (!res.ok) {
+            if (res.status === 403 || res.status === 410) throw new Error('download:exhausted');
+            if (res.status === 404)                        throw new Error('download:not-found');
+            throw new Error(`download:${res.status}`);
+        }
+        return res.json();
     },
 
     // ─── Presigned URLs (S3) ─────────────────────────────────────────────
