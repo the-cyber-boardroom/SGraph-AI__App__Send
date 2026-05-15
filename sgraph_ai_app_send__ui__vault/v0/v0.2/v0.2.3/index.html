@@ -414,6 +414,13 @@
                 ? 'This vault does not exist on this server:'
                 : 'The token may be invalid or in the wrong format:';
 
+            var isInRecent = (function () {
+                try {
+                    if (typeof VaultLoaderRecent === 'undefined') return false;
+                    return VaultLoaderRecent.list().some(function (e) { return e.key === token; });
+                } catch (_) { return false; }
+            }());
+
             document.body.innerHTML =
                 '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
                 'flex-direction:column;gap:1.25rem;padding:2rem;background:#0d1117;' +
@@ -428,10 +435,22 @@
                 'border:1px solid rgba(78,205,196,0.15);border-radius:6px;padding:0.5rem 1.25rem">' +
                 _escHtml(token) + '</code>' +
                 '</div>' +
+                (isInRecent
+                    ? '<button id="sg-forget-btn" style="background:transparent;border:1px solid rgba(110,122,138,0.4);' +
+                      'color:#6e7a8a;border-radius:8px;padding:0.5rem 1.25rem;font-size:0.82rem;cursor:pointer;' +
+                      'font-family:system-ui,sans-serif">Remove from saved vaults</button>'
+                    : '') +
                 '<a href="/en-gb/" style="display:inline-block;background:#4ecdc4;color:#0a1a18;' +
                 'font-weight:700;text-decoration:none;border-radius:8px;padding:0.65rem 1.5rem;' +
                 'font-size:0.9rem;margin-top:0.25rem">← Back to vault home</a>' +
                 '</div>';
+
+            if (isInRecent) {
+                document.getElementById('sg-forget-btn').addEventListener('click', function () {
+                    try { VaultLoaderRecent.remove(token); } catch (_) {}
+                    window.location.assign('/en-gb/');
+                });
+            }
         }
 
         // vault-locked: clear the session-scoped vault handle.
