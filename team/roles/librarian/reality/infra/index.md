@@ -39,7 +39,8 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 - `Fast_API__SGraph__Send__Container` — extends User FastAPI app with conditional global auth middleware (`x-sgraph-access-token` header/cookie, `/auth/set-cookie-form` excluded)
 - `create_app()` factory function
 - **`SEND__VAULT_STATIC_DIR`** env var — overrides static dir path (default `/app/static_vault`). Used to point tests at a tmpdir.
-- **20 container tests** — 13 in `test_Container__App.py` (health, status, vault UI at root, vault landing page, vault clean URL, common assets, no API route shadowing, transfers, vault read/write, auth form, disk storage) + 7 in `test_Container__App__Auth.py` (auth enforcement, vault UI blocked, header token, cookie token, form exclusion). Code-verified: this commit.
+- **Native TLS** — `Fast_API__TLS__Launcher` (`sgraph_ai_app_send__docker/Fast_API__TLS__Launcher.py`) reads the `FAST_API__TLS__*` env contract (`ENABLED` / `CERT_FILE` / `KEY_FILE` / `PORT`). TLS off (default) → plain HTTP on `:8080`. TLS on → binds `:443` with the mounted cert/key. TLS on but files missing → fails loud (non-zero exit), never silent HTTP fallback. Container entrypoint is `sgraph_ai_app_send__docker/serve.py` (`python -m sgraph_ai_app_send__docker.serve`), replacing the previous direct `uvicorn` CMD. No cert generation in-container — a sidecar owns acquisition. Vendored from the `SGraph-AI__Service__Playwright` reference launcher; destined for `OSBot__Fast_API`.
+- **31 container tests** — 13 in `test_Container__App.py` + 7 in `test_Container__App__Auth.py` + 9 in `test_Fast_API__TLS__Launcher.py` (env→config, truthy/falsy switch, custom paths/port, uvicorn kwargs for on/off, fail-loud on missing cert/key). Code-verified: this commit.
 
 ### Docker Hub Publish CI Job
 
