@@ -534,6 +534,9 @@
                 var appMode    = config.present  === true ||
                                  (config.chrome && config.chrome.mode === 'maximised');
 
+                // Remember for _onAuthSubmit so entering an access key can re-activate.
+                this._appJsonMode = appMode;
+
                 if (!autoOpen) return;
 
                 // Only activate App Mode when the entry file actually exists in the vault.
@@ -555,6 +558,22 @@
                         if (banner) banner.activate();
                     }
                 });
+            };
+
+            // ── 4. _onAuthSubmit ───────────────────────────────────────────────────────
+            // After the access key is accepted, re-activate App Mode if app.json
+            // configured it and the user hasn't explicitly exited App Mode.
+            var _origOnAuthSubmit = VaultShell.prototype._onAuthSubmit;
+            VaultShell.prototype._onAuthSubmit = function(key) {
+                _origOnAuthSubmit.call(this, key);
+                var banner = document.querySelector('sg-app-banner');
+                if (this._appJsonMode && this._dataSource && this._browse &&
+                    banner && !banner.isActive() && !window._sgAppModeUserExited) {
+                    var self = this;
+                    requestAnimationFrame(function() {
+                        self._applyAppJson(self._dataSource, self._browse);
+                    });
+                }
             };
 
             // ── 5. _setupVaultLinkHandler ──────────────────────────────────────────────

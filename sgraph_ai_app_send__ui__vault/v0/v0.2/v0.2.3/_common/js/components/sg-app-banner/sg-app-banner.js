@@ -121,6 +121,68 @@
             _dropContentFrame();
             _activateAll(liftEl);
             this.style.display = 'flex';
+            this._startReadyWatch();
+        }
+
+        // ── App-ready watch ────────────────────────────────────────────────
+        // Shows "Loading app…" in the status bar. Dismisses when the iframe
+        // sends postMessage({ type: 'sg-app-ready' }) or { type: 'ui-ready' }.
+        // After 8 s without a ready signal, shows a warning with any captured
+        // iframe error details. The app developer adds one line to signal ready:
+        //   window.parent.postMessage({ type: 'sg-app-ready' }, '*');
+        _startReadyWatch() {
+            this._stopReadyWatch();
+            this._lastIframeError = null;
+            this.showStatus('⟳', 'Loading app…');
+
+            var self = this;
+            this._readyMsgHandler = function(e) {
+                if (!e.data || typeof e.data !== 'object') return;
+                var t = e.data.type;
+                if (t === 'sg-app-ready' || t === 'ui-ready') {
+                    self._stopReadyWatch();
+                    self.clearStatus();
+                } else if (t === 'sg-app-error') {
+                    self._lastIframeError = String(e.data.message || 'Unknown error in app');
+                }
+            };
+            window.addEventListener('message', this._readyMsgHandler);
+
+            this._readyTimer = setTimeout(function() {
+                self._readyTimer = null;
+                window.removeEventListener('message', self._readyMsgHandler);
+                self._readyMsgHandler = null;
+                if (!self.isActive()) return;
+
+                var detail = self._lastIframeError || null;
+                // Inspect iframe body visibility as an additional clue.
+                if (!detail) {
+                    try {
+                        var iframe = document.querySelector('.sb-file__html-frame');
+                        if (iframe && iframe.contentDocument && iframe.contentDocument.body) {
+                            var bs = iframe.contentWindow.getComputedStyle(iframe.contentDocument.body);
+                            if (bs.display === 'none') {
+                                detail = 'App body is hidden (display:none) — the app initialisation script may have failed. Check browser console for errors.';
+                            }
+                        }
+                    } catch (_) {}
+                }
+                self.showStatusError('App did not signal ready — it may have an error', detail);
+            }, 8000);
+
+            // Best-effort: inject an onerror listener into the iframe so errors
+            // are forwarded as sg-app-error postMessages. This only works when
+            // the iframe is same-origin and already loaded; errors during initial
+            // parse may already have fired before this runs.
+            requestAnimationFrame(function() { _tryInjectIframeErrorListener(); });
+        }
+
+        _stopReadyWatch() {
+            if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
+            if (this._readyMsgHandler) {
+                window.removeEventListener('message', this._readyMsgHandler);
+                this._readyMsgHandler = null;
+            }
         }
 
         // ── HUD API ────────────────────────────────────────────────────────
@@ -267,6 +329,7 @@
         _restoreTreeStack();
         var banner = document.querySelector('sg-app-banner');
         if (banner) {
+            if (typeof banner._stopReadyWatch === 'function') banner._stopReadyWatch();
             if (typeof banner.clearStatus === 'function') banner.clearStatus();
             banner.style.display = 'none';
         }
@@ -483,6 +546,29 @@
         if (!res) return;
         if (res.stack)  res.stack.style.removeProperty('display');
         if (res.treeEl) res.treeEl.style.removeProperty('display');
+    }
+
+    // ── Iframe error injection ────────────────────────────────────────────────
+    // Forwards uncaught errors from the HTML iframe to the parent window as
+    // sg-app-error postMessages. Works only when the iframe is same-origin and
+    // has finished loading; errors that fire during initial parse will already
+    // have fired before this runs. Cross-origin frames are silently skipped.
+
+    function _tryInjectIframeErrorListener() {
+        var iframe = document.querySelector('.sb-file__html-frame');
+        if (!iframe) return;
+        try {
+            var iwin = iframe.contentWindow;
+            if (!iwin) return;
+            var prev = iwin.onerror;
+            iwin.onerror = function(msg, src, line, col, err) {
+                window.postMessage({
+                    type: 'sg-app-error',
+                    message: String(msg) + (line ? ' (line ' + line + (col ? ':' + col : '') + ')' : '')
+                }, window.location.origin);
+                return typeof prev === 'function' ? prev.apply(this, arguments) : false;
+            };
+        } catch (_) { /* cross-origin or security restricted */ }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
