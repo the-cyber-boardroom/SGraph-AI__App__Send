@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-05-17 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -94,6 +94,38 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | `sgit share --auto` | Auto-refresh share token on every push | Section 18 |
 | `.sgitignore` support | Pattern-based exclusion from vault commits | Section 16 |
 | `.keep` files for empty directories | Git-compatible empty directory handling | Section 16 |
+
+---
+
+## Communication Vault Pattern (05/11 brief — doc 362)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Communication vault template | Structured vault: initial prompt + SKILL.md + messages folder for agent-to-agent messaging | doc 362 |
+| Email-FS-light bidirectional protocol | Standardised bidirectional agent-to-agent message format in vault | doc 362 |
+| Per-agent protocol pages | Audience-specific agent pages (Lovable, Claude Code, Cursor, ChatGPT) | doc 362 |
+
+## Observable LLM Orchestration Tool (05/12 brief — doc 373)
+
+Full 6-component tool built as SG/App, stored as vault:
+
+| Component | One-Line Description | Source |
+|-----------|---------------------|--------|
+| Prompt inspector | Decompose and inspect prompt structure; token breakdown | doc 373 |
+| Compression workbench | Test compression strategies on context windows | doc 373 |
+| Tool router | Visualise tool selection decisions per request | doc 373 |
+| Conversation graph | Non-linear conversation as graph (not linear chat) | doc 373 |
+| Parallel analyst | Run same prompt against multiple models in parallel | doc 373 |
+| Replay surface | Rerun prior conversations from any checkpoint | doc 373 |
+
+## QA Stack on SG/Compute (05/12 brief — doc 374)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Vault-driven QA control surface (SG/App) | Test definition, execution, results — all stored in vault | doc 374 |
+| iframe injection test runner | Fast in-process tests for our own pages | doc 374 |
+| Playwright integration | Real browser automation for any site | doc 374 |
+| Scheduling layer (cron-equivalent) | Run tests on intervals; requires SG/Compute cron support | doc 374 |
 
 ---
 

@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-05-03 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-05-17 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -63,6 +63,35 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | Type_Safe remediation of sg_send_deploy | 17 modules, 5-phase plan to fix 65+ violations | Section 16 |
 | Shared `EC2__Types.py` module | Named Id subclasses and Enums as prerequisite for Type_Safe adoption | Section 16 |
 | Fix `__init__` bypasses in EC2 schemas | P0 correctness fix for EC2 Instance + Security Group schemas | Section 16 |
+
+---
+
+## SG/Compute Package Manager (05/11 briefs — docs 357, 358, 370)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| SG/Compute package manager — full architecture | 10-principle graph-driven package manager with fractal composition (4 levels: Global → Consulting → Engagement → App) | doc 357 |
+| SKILL.md + USAGE.md sidecar pattern | Agent-readable package metadata alongside code; versioned with package | doc 357 |
+| Package manager: fractal 4-level nesting | Managers nesting inside managers; each level can override/extend parent | doc 357 |
+| Package manager commercial model | 3 tiers (free generic / maintainer-supported / enterprise); 8 revenue streams | doc 370 |
+| Sidecar signing + marketplace for packages | Cryptographic signing of sidecars; discovery, licensing, marketplace | doc 370 |
+
+## EC2 Image Build CLI (05/11 brief — doc 358)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| `sg-image` CLI — 6-phase pipeline | capture → package → load → test → strip → measure; S3-first (5× faster than AMI) | doc 358 |
+| GPU-aware image build workflow | Separate runtime from model weights; CUDA + NCCL aware | doc 358 |
+
+## Publishing / Subdomain Infrastructure (05/11–05/12 briefs — docs 366, 375, 376)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| `sgit publish --slug <name>` CLI command | One-command publish to `*.sgraph.app` slug | doc 376 |
+| `sgit publish-static` CLI command | Offline static HTML bundle from vault; host anywhere | doc 375 |
+| `sgraph.app` wildcard subdomain registration | Slug-to-share-token lookup; no new persistence layer | doc 376 |
+| Slug uniqueness enforcement + management | Per-user slug registry | doc 376 |
+| Serverless static vault projection | Fully offline; browser-side decryption; any host target | doc 375 |
 
 ---
 
