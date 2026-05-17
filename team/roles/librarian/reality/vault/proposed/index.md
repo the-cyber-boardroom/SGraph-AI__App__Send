@@ -1,6 +1,6 @@
 # vault/proposed — Index
 
-**Domain:** `vault/` | **Last updated:** 2026-04-28
+**Domain:** `vault/` | **Last updated:** 2026-05-17
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16–17, 19, 29
 
 ---
@@ -87,3 +87,31 @@ Collaborative vault features: presence indicators, merge request workflow, comme
 from structure-key-split. Currently requires write_key; proposed to accept read_key or structure_key.
 
 *Source: monolith Section 23 lines 2172–2190.*
+
+---
+
+## Publishing Layer (05/11–05/12 briefs — docs 366, 375, 376)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Published readonly vault URLs (`*.sgraph.app/en-gb/#<share-token>`) | Public-facing vault with no read key required in URL | doc 366 |
+| Auto-publish on commit (opt-in, free tier) | Vault publish triggered automatically on sgit push | doc 366 |
+| SEO layer for published vaults (metadata only) | Server-side sitemap, robots.txt, meta tags — content stays encrypted | doc 366 |
+| Analytics for published vaults | View counts, referrer data per published vault | doc 366 |
+| Custom domain support for published vaults (paid tier) | Bring-your-own-domain with DNS delegation | doc 366 |
+
+## GitHub-as-Vault-Projection (05/11 brief — doc 359)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Two-layer VCS pattern | Git (developer surface) + SGit (consumer distribution) — separate concerns | doc 359 |
+| GitHub Action for bidirectional vault sync (Phase 3) | Auto-sync: vault changes propagate back to Git | doc 359 |
+| CLAUDE.md injection for customer AI dev context | Inject project-aware CLAUDE.md into customer Git repo from vault template | doc 359 |
+
+## Customer Workflow Primitives (05/11 briefs — docs 364, 360)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Template vault clone API (`POST /vault/clone`) | Server-side clone of template vault to new customer instance | doc 364 |
+| One-time share token (no PKI Phase 1) | Disposable read access token; expires after single use | doc 364 |
+| Bring-your-own-key commercial pattern | Customer controls encryption key; no data custody by SGraph | doc 360 |

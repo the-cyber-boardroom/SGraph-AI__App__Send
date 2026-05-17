@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-17
+
+- `index.md` — Updated: version v0.27.18 → v0.27.52, date 05/09 → 05/17, PROPOSED count 117+ → 164+, documents 350 → 382
+- `infra/proposed/index.md` — Added: SG/Compute package manager (5 items), EC2 image build CLI (2 items), publishing/subdomain infrastructure (5 items) — 12 new PROPOSED
+- `vault/proposed/index.md` — Added: publishing layer (5 items), GitHub-as-vault-projection (3 items), customer workflow primitives (3 items) — 11 new PROPOSED
+- `ai-agents/proposed/index.md` — Added: communication vault pattern (3 items), observable LLM orchestration tool (6 items), QA stack on SG/Compute (4 items) — 13 new PROPOSED
+- `website/proposed/index.md` — Added: agentic newsroom (5 items), CV/portfolio products (5 items), Portugal publication (4 items), sg-video (1 item) — 15 new PROPOSED (note: `<sg-video>` logically belongs in ui/proposed but recorded here with publishing products)
+
+Master index: `team/roles/librarian/reviews/05/17/v0.27.52__master-index__briefs-10-13-may.md`
+Processed: 32 new human briefs (05/10–05/13); no code changes verified (aspirational/strategy batch)
+New EXISTS items: 0 | New PROPOSED items: 47
+
+---
+
 ## 2026-05-09
 
 - `index.md` — Updated: version v0.27.4 → v0.27.18, date, browser UIs count (3→4), PROPOSED count (118+→117+)
