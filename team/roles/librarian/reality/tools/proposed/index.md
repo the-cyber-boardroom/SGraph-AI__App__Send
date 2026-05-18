@@ -1,6 +1,6 @@
 # Tools — Proposed Items Index
 
-**Domain:** tools/proposed/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** tools/proposed/ | **Last updated:** 2026-05-18 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -84,5 +84,25 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | News Report Tool | Sonar API integration for automated news report generation | Section 24 |
 
 ---
+
+## Social Previews and Vault Rendering (05/14 briefs — docs 388, 391)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Dynamic social previews for public vaults | OG meta tags + Twitter Card tags for vault URLs; crawler-detected; cached per vault version | doc 388 |
+| Preview sidecar service | User-agent detection for social crawlers (WhatsApp, Facebook, Twitter, LinkedIn, Slack) + dynamic OG image generation | doc 388 |
+| og-config.json author configuration | Author-placed file in vault root to override social preview defaults | doc 388 |
+| Vault rendering: bare-metal mode | Published vaults bypass iframe wrapper; vault HTML calls backend directly via same-origin shim | doc 391 |
+| Bootstrap script for bare-metal rendering | < 1KB script injecting `window.SG.vault` API surface (get, put, list, commit, subscribe) | doc 391 |
+
+## Infographic Tool v2 (05/14 brief — doc 390)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Infographic tool v2 — pre-auth payment integration | Cost-visible submit UI with Stripe pre-auth hold; replaces bring-your-own-key model | doc 390 |
+| Session asset tray | Thumbnail history of generated infographics per session; iteration history; prompt recall | doc 390 |
+| Curated model picker (3 tiers) | Fast/cheap, balanced, high-quality — hides raw model IDs from users | doc 390 |
+| Visible/editable system prompt with presets | System prompt shown and editable; saveable as named presets | doc 390 |
+| Variant grid | 2-3 simultaneous generations per submit for easy comparison | doc 390 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 17–32)*

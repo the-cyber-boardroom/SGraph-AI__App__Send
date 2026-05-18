@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-05-17 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-05-18 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -128,5 +128,19 @@ Full 6-component tool built as SG/App, stored as vault:
 | Scheduling layer (cron-equivalent) | Run tests on intervals; requires SG/Compute cron support | doc 374 |
 
 ---
+
+## Unified Observability Session (05/17 brief — doc 398)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Unified observability session REPL | Interactive session querying S3/CloudWatch/CloudTrail/billing/vault in one interface; no consolidated backend in v1 | doc 398 |
+| Agent-trace feature | `agent-trace <agent> --session <id>`: pulls Bedrock calls + S3 reads + vault commits + costs into one trace | doc 398 |
+
+## Bedrock CLI Native Support (05/17 brief — doc 404)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Bedrock CLI command tree | chat, agent, tool, kb, guardrail, eval, observe, meta sub-commands; abstracts Bedrock complexity behind clean CLI | doc 404 |
+| Vault-grounded Bedrock sessions | Chat sessions, agent definitions, memory (short+long), tool traces, eval results, token usage all stored in vault | doc 404 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 16–32)*
