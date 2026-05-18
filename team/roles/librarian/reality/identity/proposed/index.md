@@ -1,6 +1,6 @@
 # Identity — Proposed Items Index
 
-**Domain:** identity/proposed/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** identity/proposed/ | **Last updated:** 2026-05-18 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -66,5 +66,22 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | Email pipeline: Composer→Reviewer→Sender | Three-agent email pipeline for outbound communications | Section 16 |
 
 ---
+
+## Pre-Authorisation and Micropayments (05/14 brief — doc 396)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Pre-authorisation + micropayments model | Stripe hold (£5 default) + internal micropayment ledger; replaces bring-your-own-key and subscription models | doc 396 |
+| Internal micropayment ledger | Per-action cost tracking; vault-backed for auditability | doc 396 |
+| Settlement scheduling | Periodic (weekly), threshold-driven, or pre-expiry settlement of accumulated micropayments to Stripe charge | doc 396 |
+| Hold renewal automation | Continuous coverage signal; renews hold before expiry to avoid charge gaps | doc 396 |
+
+## Dynamic Credential Delivery Service (05/17 brief — doc 397)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Dynamic credential delivery service | STS AssumeRole pattern; just-in-time narrowly-scoped AWS credentials per CLI operation | doc 397 |
+| Scope catalogue versioned in vault | Per-operation IAM scope definitions versioned in vault for audit and rollback | doc 397 |
+| Per-action credential caching with auto-refresh | Cache per (caller, scope) tuple; auto-refresh before STS credential expiry | doc 397 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 6, 16, 20, 31)*

@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-05-17 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-05-18 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -94,5 +94,57 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | Serverless static vault projection | Fully offline; browser-side decryption; any host target | doc 375 |
 
 ---
+
+---
+
+## Vault Hosting Architecture (05/14 briefs — docs 384, 385, 389)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Vault collections as named primitive | Bounded set of related vaults; packaged as zip for portability across substrates | doc 384 |
+| Vault-as-zip format | Encrypted object store bundled as zip; safe to transmit across EC2, containers, local FS | doc 384 |
+| Container vault hosts | Short-lifecycle Docker containers running vault apps; co-located with vault data for agentic workflows | doc 384 |
+| Vault Synchronizer `deploy container` command | CLI command to deploy a vault app in a container with vault collection mounted | doc 384 |
+| Vault hosting: dedicated EC2 density mode | One vault per EC2 instance; highest isolation; for regulated/isolation-sensitive workloads | doc 385 |
+| Vault hosting: multi-container density mode | Multiple containers per EC2 + nginx/Traefik routing layer; moderate multi-tenancy | doc 385 |
+| Vault hosting: multi-vault-per-app density mode | Multiple vaults sharing one app process; lowest cost; for batch workloads | doc 385 |
+| Routing layer on EC2 for multi-container mode | Hostname → container routing table; nginx/Traefik-style dispatch | doc 385 |
+| Vault Synchronizer `--density` flag | Selects density mode at deploy time (dedicated / multi-container / multi-vault) | doc 385 |
+| EC2 warm pools for boot optimisation | Pre-provisioned pool of 3-5 instances; target 10-20s boot (from 2-4 min cold) | doc 389 |
+| AMI baking with preinstalled vault app | Baked AMI eliminates app install from boot path; primary boot-time reduction lever | doc 389 |
+| Vault Synchronizer `deploy ephemeral` command | CLI command to launch a vault on a pre-provisioned warm pool instance | doc 389 |
+| Boot instrumentation and metrics | Phase-by-phase timing capture (API call → running → SSH → vault-app-ready) | doc 389 |
+
+## Fargate and Container Experiments (05/17 briefs — docs 399, 403)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Fargate CLI commands | create-cluster, run-task, list-tasks, stop-task, logs — CLI-native ECS/Fargate operations | doc 399 |
+| Fargate vault hosting benchmark | 7-metric measurement: cold start, clone time, vault op sequences, cost/operation, cost/session, concurrency | doc 399 |
+| SG/Compute container hosts primitive | EC2+Docker node-pool: submit tasks, placement logic, multi-region parallel execution, 15-min idle teardown | doc 403 |
+| Container host CLI (host + container sub-commands) | create/list/describe/stop/metrics for hosts; run/list/logs/stop for containers | doc 403 |
+
+## Instance Sizing Decision Table (05/17 brief — doc 401)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| EC2 instance sizing measurement programme | Startup matrix (t3/t4g, m7i/m8g, c7i/c8g), workload benchmarks, break-even analysis, burstable credit dynamics | doc 401 |
+| Instance sizing decision table | Output: recommended default instance per workload class (short/cold, short/warm, medium, long, warm-pool, multi-host) | doc 401 |
+
+## S3 Native CLI (05/17 brief — doc 402)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| S3 native CLI commands | ls, view, edit, cat, tail, head, cp, mv, rm, stat, presign, search, bucket-create, bucket-list, bucket-stat, bucket-config | doc 402 |
+| S3 vim edit integration | Download S3 object → open `$EDITOR` → re-upload with ETag conflict detection | doc 402 |
+| S3 rsync-style sync primitive | Compare source/destination, transfer changed, checksums, --delete, --dry-run, --reverse | doc 402 |
+| Vault-aware S3 wrappers | vault-open, vault-sync, vault-diff, vault-ls — thin wrappers over S3 CLI with vault semantics | doc 402 |
+
+## IAM Graph Visualisation and Lockdown (05/17 brief — doc 400)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| IAM graph visualisation | Discovery pass → graph data structure (role, policy, resource, action tuples) → vault-stored; cleanup and expansion commands | doc 400 |
+| CloudTrail evidence layer for IAM | Per-role: observed actions vs granted permissions over N days; drives evidence-based permission tightening | doc 400 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 16–32)*

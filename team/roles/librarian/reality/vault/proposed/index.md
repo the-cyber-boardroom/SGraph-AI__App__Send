@@ -1,6 +1,6 @@
 # vault/proposed — Index
 
-**Domain:** `vault/` | **Last updated:** 2026-05-17
+**Domain:** `vault/` | **Last updated:** 2026-05-18
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16–17, 19, 29
 
 ---
@@ -107,6 +107,18 @@ from structure-key-split. Currently requires write_key; proposed to accept read_
 | Two-layer VCS pattern | Git (developer surface) + SGit (consumer distribution) — separate concerns | doc 359 |
 | GitHub Action for bidirectional vault sync (Phase 3) | Auto-sync: vault changes propagate back to Git | doc 359 |
 | CLAUDE.md injection for customer AI dev context | Inject project-aware CLAUDE.md into customer Git repo from vault template | doc 359 |
+
+## Manager Vaults and Credential Manager (05/14 briefs — docs 386, 387)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Manager vault pattern | Vaults whose purpose is to manage other vaults; same architecture as content vaults, different operational scope | doc 386 |
+| Credential manager vault | First manager vault instantiation; distributes scoped API credentials via Simple Tokens | doc 387 |
+| Simple Token format `tok_<random>` | API credential proxy token; distinct from vault key-derivation word-word-NNNN tokens | doc 387 |
+| Token lifecycle operations | issue, revoke, rotate, adjust scope, quota enforcement — all tracked in vault audit trail | doc 387 |
+| Token resolution service: proxy mode | API calls routed through credential manager; actual keys never exposed to callers | doc 387 |
+| Token resolution service: direct mode | Token resolved to actual key at request time; simpler but exposes keys to callers | doc 387 |
+| Cross-vault API surface for manager vault operations | Manager vault exposes API for other vaults to request credentials and report usage | doc 386 |
 
 ## Customer Workflow Primitives (05/11 briefs — docs 364, 360)
 
