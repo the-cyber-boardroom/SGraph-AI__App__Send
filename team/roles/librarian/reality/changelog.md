@@ -7,6 +7,19 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-19
+
+- `ui/index.md` — Major update: v0.4.0 Share + Open trees folded from "Recent Activity" into EXISTS; Vault UI v0.2.3 additions (App Mode loading overlay, auth re-activation, Remove from saved vaults, Open in new window); v0.2.2 iframe bug fixes folded into EXISTS; legacy v0.3.x section clearly labelled; PROPOSED cleaned (sg-vault-picker removed — now EXISTS)
+- `infra/index.md` — Updated: Docker Hub CI now documents parallel matrix strategy (push-by-digest + manifest merge, commit `c21cb5c`)
+- `index.md` — Updated: Browser UIs count 4→6 (share, open, admin, workspace, vault + user legacy)
+
+Master index: `team/roles/librarian/reviews/05/19/v0.27.53__master-index__code-changes-14-15-may.md`
+Processed: 0 new human briefs; code-verified 5 commits from 05/14–05/15 (v0.27.29–v0.27.45 range)
+New EXISTS items: v0.4.0 Share UI, v0.4.0 Open UI, Vault UI v0.2.3 additions
+New PROPOSED items: 0
+
+---
+
 ## 2026-05-17
 
 - `index.md` — Updated: version v0.27.18 → v0.27.52, date 05/09 → 05/17, PROPOSED count 117+ → 164+, documents 350 → 382
