@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.27.53 | **Last updated:** 2026-05-18 | **Maintained by:** Librarian (daily run)
+**Version:** v0.27.53 | **Last updated:** 2026-05-19 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -20,7 +20,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Vault** | [`vault/`](vault/index.md) | Vault/SGit crypto + storage layer | Key derivation, object CAS, AES-256-GCM |
 | **CLI** | [`cli/`](cli/index.md) | sgit CLI (PyPI: sgit-ai) | 20+ commands, verified integrations |
 | **Website** | [`website/`](website/index.md) | sgraph.ai website (21 pages, web components) | 21 pages, 11 components, CI pipeline |
-| **Browser UIs** | [`ui/`](ui/index.md) | Three browser UIs (user, admin, workspace) | 3 UIs, ~30 web components |
+| **Browser UIs** | [`ui/`](ui/index.md) | Share (v0.4), Open (v0.4), Admin, Workspace, Vault; v0.3.x user legacy | 5 active + 1 legacy; ~35 web components |
 | **Tools** | [`tools/`](tools/index.md) | tools.sgraph.ai browser tools | 4 tools live |
 | **Infrastructure** | [`infra/`](infra/index.md) | Deployment, CI/CD, Lambda, Docker | 7 targets, 2 Lambda functions |
 | **Security** | [`security/`](security/index.md) | Security properties, violations, AppSec | 11 verified properties |
@@ -41,7 +41,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Unit tests passing | **~602** |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
-| Browser UIs | 4 (user, admin, workspace, vault) |
+| Browser UIs | **6** (share v0.4, open v0.4, admin, workspace, vault; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
 | Open PROPOSED items (across all domains) | 205+ (164 + 41 added 05/18) |

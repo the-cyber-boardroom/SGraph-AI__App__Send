@@ -114,10 +114,10 @@ each resolves to a real file. Report broken links in a health scan review file.
 **Why:** Link rot accumulates silently. Last full scan: unknown.
 
 ### B-007 · QA_START_HERE.md — Update to reflect v0.3.1 + post-April state
-**Status:** QUEUED
+**Status:** DONE (2026-05-19)
 **What:** `team/comms/QA_START_HERE.md` was last updated 30 March 2026 (v0.3.1 launch).
-It needs updating to reflect current state, recent UI fixes (text selection, dark mode),
-and the structure key encryption split upcoming in vault web team.
+Updated to reflect v0.4.0 share + open trees, v0.2.3 vault UI, current changelog pointers,
+`data-testid` preservation note, and structure key encryption split warning.
 **Why:** QA team reads this first. Stale landing page erodes trust.
 
 ### B-008 · ROLE.md — Verify all key references still resolve
@@ -155,6 +155,7 @@ None currently active.
 |------|------|---------|
 | 2026-04-28 | Create DAILY_RUN.md | This file — daily playbook + backlog established |
 | 2026-04-28 | Reality document refactoring plan | 13-domain fractal tree designed; domain index files created |
+| 2026-05-19 | No new briefs; code scan 14–15 May; B-007 | v0.4.0 Share + Open UI trees folded into reality doc; Vault UI v0.2.3 additions; QA_START_HERE.md updated |
 | 2026-05-04 | No new briefs; backlog B-010 | Activity log updated: 33 entries added covering 04/01–05/04 |
 | 2026-05-03 | Process 04/29 late batch (4 briefs) | Docs 333–336 catalogued; infra/proposed + cli/proposed updated; master index, architect review, dev review, debrief produced |
 

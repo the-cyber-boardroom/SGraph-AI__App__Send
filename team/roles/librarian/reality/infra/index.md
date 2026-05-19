@@ -44,8 +44,8 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 
 ### Docker Hub Publish CI Job
 
-- `.github/workflows/ci-pipeline.yml` — `publish-to-dockerhub` job
-- Multi-arch build (`linux/amd64`, `linux/arm64`) via `docker/setup-buildx-action@v3`
+- `.github/workflows/ci-pipeline.yml` — `publish-to-dockerhub` + `publish-to-dockerhub-manifest` jobs
+- Multi-arch build (`linux/amd64`, `linux/arm64`) via matrix strategy: each leg builds ONE platform, pushes by digest (no tag), uploads digest as artifact. `publish-to-dockerhub-manifest` (depends on both legs) downloads both digests and assembles a multi-arch manifest via `docker buildx imagetools create`. Both legs run in parallel (commit `c21cb5c`, 15 May 2026).
 - Triggered by `should_publish_dockerhub: true` input on the calling workflow:
   - `ci-pipeline__dev.yml` — pushes `diniscruz/sg-send-vault:{version}` only
   - `ci-pipeline__main.yml` — pushes `diniscruz/sg-send-vault:{version}` + `:latest`

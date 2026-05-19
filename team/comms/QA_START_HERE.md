@@ -1,6 +1,6 @@
 # QA Team: Start Here
 
-**Last updated:** 30 March 2026 | **Current UI version:** v0.3.1 (IFD overlay on v0.3.0)
+**Last updated:** 19 May 2026 | **Current state:** v0.4.0 (share + open trees) in repo; v0.3.2 on legacy user UI
 
 ---
 
@@ -10,38 +10,73 @@ This is the single entry point for the QA team when you clone this repo. It tell
 
 ---
 
-## Current State: v0.3.1 Live
+## Current State: v0.4.0 Share + Open Trees (May 2026)
 
-v0.3.1 is an IFD overlay on v0.3.0 production. **Only the browse view** (`/en-gb/browse/`) has patches. All other pages are unchanged v0.3.0.
+As of 14 May 2026, the UI has been split into two purpose-built IFD trees:
 
-**16 fixes shipped** in 5 overlay files with zero modifications to v0.3.0 code.
+- **Share tree** (`sgraph_ai_app_send__ui__share/v0/v0.4/v0.4.0/`) — sender wizard (`/en-gb/share/`)
+- **Open tree** (`sgraph_ai_app_send__ui__open/v0/v0.4/v0.4.0/`) — receiver routes (`/en-gb/open/...`)
+
+The old `sgraph_ai_app_send__ui__user/` (v0.3.x) is **legacy** — retained for rollback, not yet deployed as primary.
+
+**Vault Browser UI** is at **v0.2.3** (package `sgraph_ai_app_send__ui__vault/`).
 
 ---
 
 ## What Changed (Most Recent First)
 
-Read the changelogs in order. Each one tells you what broke and what should still pass.
+| Date | Change | Summary |
+|------|--------|---------|
+| **15 May** | Vault UI v0.2.3 updates | App Mode loading overlay (`sg-app-ready` postMessage), Re-activate App Mode after auth, 'Remove from saved vaults' button, ↗ 'Open in new window' on vault cards |
+| **14 May** | v0.4.0 Phase B complete | All v0.3.x overlays inlined into share + open trees; unified Done screen; ephemeral-by-default |
+| **12 May** | v0.4.0 Phase A | Share + open tree scaffold; CI workflows `deploy-ui-share.yml` and `deploy-ui-open.yml` created |
+| **09 May** | Vault UI v0.2.2 iframe fixes | data-URI inlining, single-iframe edit-mode, color-scheme:light, duplicate button removed |
+| **08 May** | Vault UI v0.2.2 + v0.2.3 | `<sg-app-banner>` App Mode, HTML split-view editor, Token Test Harness dev page |
+| **07–08 May** | User UI v0.3.2 | Share a Secret page, Options step (5-step wizard), Secret Tab UX, `<sg-vault-picker>` |
+| **30 Mar** | User UI v0.3.1 | 16 browse view fixes; gallery folder rename |
 
-| Date | Changelog | QA Brief | Summary |
-|------|-----------|----------|---------|
-| **30 Mar** | [v0.3.1 Browse Overhaul (16 fixes)](changelog/03/30/v0.20.4__changelog__v031-browse-view-overhaul.md) | [**v0.3.1 Final Checks**](qa/briefs/03/30/v0.20.4__qa-brief__v031-final-checks-before-go-live.md) | 16 browse view fixes, gallery folder rename. **HIGH priority — final validation.** |
-| 28 Mar | [v0.3.1 MVP IFD Overlay](changelog/03/28/v0.19.5__changelog__v031-mvp-ifd-overlay-and-browse-fixes.md) | [Browse bug fixes](qa/briefs/03/28/v0.19.5__qa-brief__v031-browse-view-bug-fixes.md) | First v0.3.1 overlay: folder basenames + PDF Present mode |
-| 23 Mar | [QA Change Requests CR-001–004](changelog/03/23/v0.16.54__changelog__qa-change-requests-cr001-cr004.md) | [Token counter zero-state](qa/briefs/03/23/v0.16.54__qa-brief__token-counter-zero-state.md) | `data-ready` signal, `data-testid` attributes (100+ elements), token counter API contract |
-| 23 Mar | [Two-column download layout](changelog/03/23/v0.16.50__changelog__two-column-download-layout-restored.md) | [Download layout update](qa/briefs/03/23/v0.16.50__qa-brief__download-layout-test-update.md) | Single-file download restored to two-column layout |
+---
+
+## Architecture: IFD Overlay Chain
+
+**All browser UIs use IFD methodology** — no build step, no bundler, surgical overlay scripts.
+For v0.4.0, all overlays have been inlined (base tree is self-contained). No prototype patches.
+
+**UI packages in this repo:**
+
+| Package | Latest | Status |
+|---------|--------|--------|
+| `sgraph_ai_app_send__ui__share/` | v0.4.0 | ACTIVE — sender wizard |
+| `sgraph_ai_app_send__ui__open/` | v0.4.0 | ACTIVE — receiver routes |
+| `sgraph_ai_app_send__ui__vault/` | v0.2.3 | ACTIVE — vault browser UI |
+| `sgraph_ai_app_send__ui__admin/` | v0.1.7 | ACTIVE — admin console |
+| `sgraph_ai_app_send__ui__workspace/` | v0.1.0 | ACTIVE — LLM workspace |
+| `sgraph_ai_app_send__ui__user/` | v0.3.2 | LEGACY — rollback only |
 
 ---
 
 ## Your Priority Right Now
 
-**Read this QA brief first:**
-[v0.20.4__qa-brief__v031-final-checks-before-go-live.md](qa/briefs/03/30/v0.20.4__qa-brief__v031-final-checks-before-go-live.md)
+For the **v0.4.0 share + open trees**, the key test areas are:
 
-It contains:
-- 16 test cases with checkboxes (BRW-001 through BRW-015 + gallery rename + regressions)
-- Version detection instructions (footer, `window.SGRAPH_BUILD`, Network tab)
-- A suggested test zip structure for comprehensive testing
-- Rollback plan
-- Security checks (HTML iframe isolation)
+1. **5-step wizard (file mode):** Upload → Options → Confirm → Encrypt & Upload → Done. Verify ephemeral defaults (max_views=20, expires=7d) appear in Options step.
+2. **5-step wizard (secret mode):** Secret tab (pill toggle), textarea, Views/Expires pills, "Review →". Verify ephemeral defaults (max_views=2, expires=24h). Verify Done screen shows kill link.
+3. **Unified Done screen:** Both file and secret paths land on the same `<upload-step-done>` component with correct content for each mode.
+4. **Kill link:** Shown on Done screen for both modes. Test kill flow (ephemeral delete).
+5. **Open tree — receiver routes:** Browse, download, gallery, view, secret-view all load and decrypt correctly.
+6. **Vault UI v0.2.3:** App Mode loading overlay (trigger `sg-app-ready` postMessage), Remove from saved vaults on error page, Open in new window on vault cards.
+
+---
+
+## Changelogs Since March (read in order)
+
+| Date | Changelog | Summary |
+|------|-----------|---------|
+| 09 May | [`v0.27.18__changelog__vault-html-iframe-bugs.md`](changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md) | Vault UI v0.2.2 iframe fixes |
+| 30 Mar | [`v0.20.4__changelog__v031-browse-view-overhaul.md`](changelog/03/30/v0.20.4__changelog__v031-browse-view-overhaul.md) | v0.3.1 — 16 browse fixes |
+| 28 Mar | [`v0.19.5__changelog__v031-mvp-ifd-overlay-and-browse-fixes.md`](changelog/03/28/v0.19.5__changelog__v031-mvp-ifd-overlay-and-browse-fixes.md) | v0.3.1 first overlay |
+| 23 Mar | [`v0.16.54__changelog__qa-change-requests-cr001-cr004.md`](changelog/03/23/v0.16.54__changelog__qa-change-requests-cr001-cr004.md) | `data-ready`, `data-testid` (100+), token counter API |
+| 23 Mar | [`v0.16.50__changelog__two-column-download-layout-restored.md`](changelog/03/23/v0.16.50__changelog__two-column-download-layout-restored.md) | Two-column download layout restored |
 
 ---
 
@@ -58,9 +93,7 @@ team/comms/
   plans/MM/DD/              <-- What's planned (pre-implementation)
 ```
 
-### The Pattern: Changelog + QA Brief = Test Update
-
-Every UI change produces **two documents**:
+Every UI change produces two documents:
 
 1. **Changelog** — what changed, which files, expected test impact (good failures vs bad failures)
 2. **QA Brief** — specific test cases, what to verify, what NOT to change
@@ -72,54 +105,35 @@ Every UI change produces **two documents**:
 
 ## Version Detection
 
-### How to confirm which version is running
-
 ```javascript
 // In Playwright or browser console:
 const version = await page.evaluate(() => window.SGRAPH_BUILD?.uiVersion);
-// Expected: 'v0.3.1' on upload and browse pages
+// v0.4.0 share tree: check for 'v0.4.0' or inspect Network tab for share/index.html
 ```
 
-### v0.3.1 overlay files (should appear in Network tab)
-
-| File | Loaded on | What it patches |
-|------|-----------|-----------------|
-| `send-browse-v031.js` | Browse pages | 12 browse fixes |
-| `send-browse-v031.css` | Browse pages | Link color, styling |
-| `markdown-parser-v031.js` | Browse pages | Image rendering, bare links |
-| `send-gallery-v031.js` | Browse pages | Gallery folder naming |
-| `upload-folder-v031.js` | Upload page | Gallery folder naming |
-
-If any overlay returns 404, the page falls back to v0.3.0 behaviour (no crash).
-
----
-
-## Pages Affected by v0.3.1
-
-| Page | v0.3.1 patches? | What changed |
-|------|-----------------|-------------|
-| `/en-gb/` (upload) | Minimal — gallery folder rename only | `upload-folder-v031.js` |
-| `/en-gb/browse/` | **All 16 fixes** | 5 overlay files |
-| `/en-gb/gallery/` | No patches | Still v0.3.0 |
-| `/en-gb/download/` | No patches | Still v0.3.0 |
-| All other pages | No patches | Still v0.3.0 |
+For v0.4.0: No overlay files in the Network tab (all inlined). The shell is a flat list
+of `_common/js/...` scripts.
 
 ---
 
 ## Key Test Data Attributes
 
-Since CR-003 (23 March), 100+ `data-testid` attributes are available across 7 pages. Additionally, 14 `data-qa-mask` attributes exist for screenshot determinism.
+`data-testid` attributes (100+) across 7 pages exist since CR-003 (23 March). These were
+in the v0.3.x user UI. Verify that v0.4.0 share/open trees preserve the same `data-testid`
+attributes where the components are the same.
 
-Use `data-testid` selectors for robust tests:
 ```javascript
 await page.locator('[data-testid="access-gate-token-input"]').fill('test-token');
 await page.locator('[data-testid="access-gate-submit"]').click();
 ```
 
-Use `data-qa-mask` for screenshot masking:
-```javascript
-const masks = await page.locator('[data-qa-mask]').all();
-```
+---
+
+## Structure Key Encryption Split (⚠️ Active Cross-Team Change)
+
+An active architectural change (`vault/proposed/structure-key-split.md`) affects the vault
+crypto layer. If you see vault tests related to key derivation or structure key handling,
+consult the Architect and Vault team before writing new tests in this area.
 
 ---
 
@@ -127,8 +141,9 @@ const masks = await page.locator('[data-qa-mask]').all();
 
 | Resource | Location |
 |----------|----------|
-| Reality document (what exists in code) | `team/roles/librarian/reality/v0.16.26__what-exists-today.md` |
-| v0.3.0 QA triage (66 issues, 17 fixed) | `team/humans/dinis_cruz/debriefs/03/27/v0.17.2__debrief__v030-qa-triage-17-fixes.md` |
+| Reality document (what exists in code) | `team/roles/librarian/reality/index.md` |
+| UI domain detail | `team/roles/librarian/reality/ui/index.md` |
+| QA domain detail | `team/roles/librarian/reality/qa/index.md` |
 | QA site | [qa.send.sgraph.ai](https://qa.send.sgraph.ai) |
 | Product (live) | [send.sgraph.ai](https://send.sgraph.ai) |
 | Dev environment | [dev.send.sgraph.ai](https://dev.send.sgraph.ai) |
