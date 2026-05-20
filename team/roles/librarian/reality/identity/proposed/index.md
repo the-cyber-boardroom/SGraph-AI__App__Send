@@ -1,6 +1,6 @@
 # Identity — Proposed Items Index
 
-**Domain:** identity/proposed/ | **Last updated:** 2026-05-18 | **Maintained by:** Librarian (daily run)
+**Domain:** identity/proposed/ | **Last updated:** 2026-05-20 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -83,5 +83,17 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | Dynamic credential delivery service | STS AssumeRole pattern; just-in-time narrowly-scoped AWS credentials per CLI operation | doc 397 |
 | Scope catalogue versioned in vault | Per-operation IAM scope definitions versioned in vault for audit and rollback | doc 397 |
 | Per-action credential caching with auto-refresh | Cache per (caller, scope) tuple; auto-refresh before STS credential expiry | doc 397 |
+
+---
+
+## USDC and Agentic Commerce (05/15 brief — doc 415)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| AgentCore Payments prototype (agent-buys-from-third-party via x402) | Integration with one external x402-capable service; validates scenario 3 (cross-org transactions) end-to-end | doc 415 |
+| x402 micropayment receiver on one SG service | HTTP 402 + payment validation + access grant for one SG service (e.g. per-vault-open at $0.001) | doc 415 |
+| USDC backend treasury for inter-org settlements | Circle Mint or Coinbase Business account; sub-cent settlements to third parties; customer stays fiat-fronted | doc 415 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 6, 16, 20, 31)*

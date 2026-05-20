@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-20
+
+- `index.md` — Updated: version v0.27.53 → v0.27.54; date 05/19 → 05/20; PROPOSED count 205+ → 237+; documents 405 → 415
+- `infra/proposed/index.md` — Added: Firecracker substrate section (9 items: PoC, microVM substrate option, vault-attached compute, AI sandbox, Playwright fleet, fourth density mode, Podman default, firecracker-containerd, benchmark)
+- `security/proposed/index.md` — Added: Nitro Enclaves section (12 items: three-tier key arch, server-side search, AI inference, MPC, verifiable ops, signing, confidential cred mgr, async sharing, SG-vault-enclave EIF, PCR-based KMS policy, CLI primitives, enclave-protected density tier)
+- `ai-agents/proposed/index.md` — Added: Observability pipeline concrete sources (6 items) and AgentCore resell products (5 items)
+- `identity/proposed/index.md` — Added: USDC and agentic commerce section (3 items: AgentCore Payments prototype, x402 receiver, USDC backend treasury)
+
+Master index: `team/roles/librarian/reviews/05/20/v0.27.54__master-index__briefs-15-may.md`
+Processed: 10 new human briefs (05/15 new files); 0 code commits scanned
+New EXISTS items: 0 | New PROPOSED items: 32
+
+---
+
 ## 2026-05-19
 
 - `ui/index.md` — Major update: v0.4.0 Share + Open trees folded from "Recent Activity" into EXISTS; Vault UI v0.2.3 additions (App Mode loading overlay, auth re-activation, Remove from saved vaults, Open in new window); v0.2.2 iframe bug fixes folded into EXISTS; legacy v0.3.x section clearly labelled; PROPOSED cleaned (sg-vault-picker removed — now EXISTS)
