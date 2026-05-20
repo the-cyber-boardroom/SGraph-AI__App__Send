@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-05-18 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-05-20 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -142,5 +142,32 @@ Full 6-component tool built as SG/App, stored as vault:
 |---------|---------------------|--------|
 | Bedrock CLI command tree | chat, agent, tool, kb, guardrail, eval, observe, meta sub-commands; abstracts Bedrock complexity behind clean CLI | doc 404 |
 | Vault-grounded Bedrock sessions | Chat sessions, agent definitions, memory (short+long), tool traces, eval results, token usage all stored in vault | doc 404 |
+
+---
+
+## Observability Pipeline Concrete Sources (05/15 addendum — doc 407)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| CloudFront → Firehose → S3 as named observability source | Already-existing pipeline; source contract for the unified observability REPL to consume it | doc 407 |
+| CloudTrail → S3 as named observability source | Already-existing pipeline; source contract for REPL; all AWS API call audit data | doc 407 |
+| CloudWatch dashboard screenshot integration | `dashboard fetch/list/screenshot` commands; attaches AWS-rendered dashboard images to investigation records | doc 407 |
+| Product analytics layer (layer 2 observability) | Distinct from infra observability: vault clones, downloads, conversion funnel, churn, feature usage | doc 407 |
+| SG billing emission pipeline | Pre-auth micropayment events flowing into observability session as a first-class source | doc 407 |
+| Per-customer reporting surface (layer 3 observability) | Customer-facing filtered view of their own usage and billing; depends on layer 2 substrate | doc 407 |
+
+## AgentCore Resell Products (05/15 brief — doc 413)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Vault-Grounded Agent Hosting | AgentCore Runtime + vault-bound state, audit trail, and portability as a managed product | doc 413 |
+| Multi-Region Agent Test Fleet | Container hosts + AgentCore Runtime + Evaluations + vault — QA-as-a-service product | doc 413 |
+| Compliance-Bundled Agent Deployment | AgentCore Policy + Evaluations + vault audit trail packaged for regulated-industry customers | doc 413 |
+| Multi-Provider Token Brokerage | Single Simple Token routes to AgentCore / OpenAI / Anthropic; one bill from SG | doc 413 |
+| Specialised Manager Vaults as products | Pre-packaged manager vault templates (customer engagement, investor relations, compliance audit) | doc 413 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 16–32)*

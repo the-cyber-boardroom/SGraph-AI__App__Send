@@ -1,6 +1,6 @@
 # Security — Proposed Items Index
 
-**Domain:** security/proposed/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** security/proposed/ | **Last updated:** 2026-05-20 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -56,5 +56,26 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | cdn.sgraph.ai (zero-dep requirement) | DOES NOT EXIST — no timeline | v0.7.6 brief |
 
 ---
+
+---
+
+## Nitro Enclaves — Confidential Computing (05/15 briefs — docs 409, 414)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Three-tier vault key architecture | Customer key client-side / vault key in enclave / KMS-wrapped service keys — fourth ZK boundary | doc 414 |
+| Server-side vault search via Nitro Enclave | Vault key sent to attested enclave; decryption + in-memory search index; never on parent | doc 414 |
+| Server-side AI inference via Nitro Enclave | LLM features for regulated/high-trust customers; enclave holds vault key for duration of inference session | doc 414 |
+| Multi-party vault computation via Nitro Enclave | Two parties' inputs decrypted in enclave; neither sees the other's data; no party sees either input | doc 414 |
+| Verifiable vault operations | PCR0 of signing enclave recorded in vault commit; auditors can verify exact code that ran | doc 414 |
+| Server-side signing via Nitro Enclave | Customer signing key sealed in enclave; customer verifies via attestation; no key on parent | doc 414 |
+| Confidential credential manager via Nitro Enclave | Proxy-mode decryption inside enclave; API keys never in plaintext on parent EC2 | doc 414 |
+| Async vault sharing via Nitro Enclave | Re-encryption of data keys under recipient's public key while sender is offline | doc 414 |
+| Open-source SG-vault-enclave EIF | Takes vault key, decrypts S3 content, exposes vsock read/write/search API; PCR values published | doc 414 |
+| PCR-based KMS key policy for service keys | Credential manager service keys only decryptable by specific verified enclave image (PCR0/PCR8 condition) | doc 414 |
+| Nitro Enclaves CLI primitives | `sg-compute aws nitro-enclaves run`, `build`, `describe` etc. following established CLI pattern | doc 414 |
+| Enclave-protected tier in vault hosting density modes | Fourth density tier: highest cost, cryptographic isolation from platform operator | doc 414 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 10, 11, 16, 17, 31)*
