@@ -44,8 +44,6 @@
 </head>
 <body>
 
-    <!-- sg-app-banner: hidden until app.json chrome.mode = "maximised" activates it -->
-    <sg-app-banner style="display:none"></sg-app-banner>
     <vault-shell></vault-shell>
 
     <!-- ===================================================================
@@ -154,9 +152,6 @@
 
     <!-- 7c. Browse edit overlay -->
     <script src="_common/js/components/vault-browse-edit/vault-browse-edit.js"></script>
-
-    <!-- 7d. App banner (maximised chrome mode) -->
-    <script src="_common/js/components/sg-app-banner/sg-app-banner.js"></script>
 
     <!-- 8. Debug panels -->
     <script src="_common/js/components/messages-panel/messages-panel.js"></script>
@@ -510,14 +505,21 @@
             };
 
             // ── 3. _applyAppJson ───────────────────────────────────────────────────────
-            // Schema: { "entry": "index.html", "auto_open": true, "present": true }
-            // "present": true  — auto-opens entry file in App Mode (sg-app-banner).
-            // "chrome": { "mode": "maximised" }  — legacy alias for the same behaviour.
+            // Checks for app.json (at .vault/app.json or legacy app.json at root).
+            // When found: auto-opens the entry file in the vault file browser (unchanged),
+            // and shows the "▶ Open [title]" button in vault-header that launches /en-gb/app.
+            // sg-app-banner / chrome.mode activation is removed — the app page is the new
+            // delivery mechanism. chrome.mode field is silently ignored (no-op).
             VaultShell.prototype._applyAppJson = async function (dataSource, browse) {
                 var fileList = dataSource.getFileList();
-                var entry = fileList.find(function (e) {
-                    return e.path === 'app.json' || e.path === '/app.json';
-                });
+                // Check .vault/app.json first (new location), fall back to app.json (legacy)
+                var candidates = ['.vault/app.json', 'app.json'];
+                var entry = null;
+                for (var i = 0; i < candidates.length; i++) {
+                    var p = candidates[i];
+                    entry = fileList.find(function (f) { return f.path === p || f.path === p.replace(/^\//, ''); });
+                    if (entry) break;
+                }
                 if (!entry) return;
 
                 var config;
@@ -529,54 +531,26 @@
                     return;
                 }
 
-                var entryFile  = config.entry    || 'index.html';
-                var autoOpen   = config.auto_open !== false;
-                var appMode    = config.present  === true ||
-                                 (config.chrome && config.chrome.mode === 'maximised');
+                var entryFile = config.entry    || 'index.html';
+                var autoOpen  = config.auto_open !== false;
 
-                // Remember for _onAuthSubmit so entering an access key can re-activate.
-                this._appJsonMode = appMode;
+                console.log('[app.json] entry:', entryFile, '| title:', config.title || '(none)');
 
-                if (!autoOpen) return;
+                // Show "▶ Open [App]" button in the vault header
+                var header = this.querySelector('vault-header');
+                if (header && typeof header.setAppJson === 'function') {
+                    header.setAppJson(config, this._vaultKey);
+                }
 
-                // Only activate App Mode when the entry file actually exists in the vault.
-                // If it doesn't exist the tab open will fail and _waitForIframeAndLift would
-                // then lift the next .sb-file__content that appears (e.g. app.json itself).
-                var entryExists = fileList.some(function (e) {
-                    return !e.dir && (e.path === entryFile || e.path.endsWith('/' + entryFile));
-                });
-                console.log('[app.json] entry:', entryFile, '| appMode:', appMode, '| exists:', entryExists);
-
-                requestAnimationFrame(function () {
-                    if (browse._openFileTab) {
+                // Auto-open entry file in the vault file browser (preview — unchanged behaviour)
+                if (autoOpen && browse && browse._openFileTab) {
+                    requestAnimationFrame(function () {
                         browse._openFileTab(entryFile);
-                    }
-                    // Activate App Mode in the same frame as the tab open, and only when
-                    // the entry file exists — prevents app.json's own code view being lifted.
-                    if (appMode && entryExists && !window._sgAppModeUserExited) {
-                        var banner = document.querySelector('sg-app-banner');
-                        if (banner) banner.activate();
-                    }
-                });
-            };
-
-            // ── 4. _onAuthSubmit ───────────────────────────────────────────────────────
-            // After the access key is accepted, re-activate App Mode if app.json
-            // configured it and the user hasn't explicitly exited App Mode.
-            var _origOnAuthSubmit = VaultShell.prototype._onAuthSubmit;
-            VaultShell.prototype._onAuthSubmit = function(key) {
-                _origOnAuthSubmit.call(this, key);
-                var banner = document.querySelector('sg-app-banner');
-                if (this._appJsonMode && this._dataSource && this._browse &&
-                    banner && !banner.isActive() && !window._sgAppModeUserExited) {
-                    var self = this;
-                    requestAnimationFrame(function() {
-                        self._applyAppJson(self._dataSource, self._browse);
                     });
                 }
             };
 
-            // ── 5. _setupVaultLinkHandler ──────────────────────────────────────────────
+            // ── 4. _setupVaultLinkHandler ──────────────────────────────────────────────
             // Change 4b: intercept relative <a> clicks in the vault DOM (including markdown
             // present-mode / page-layout-renderer) and open the target in send-browse.
             // Only fires for paths that exist in the vault file list.
