@@ -1,6 +1,6 @@
 # vault/proposed — Index
 
-**Domain:** `vault/` | **Last updated:** 2026-05-18
+**Domain:** `vault/` | **Last updated:** 2026-05-21
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16–17, 19, 29
 
 ---
@@ -127,3 +127,36 @@ from structure-key-split. Currently requires write_key; proposed to accept read_
 | Template vault clone API (`POST /vault/clone`) | Server-side clone of template vault to new customer instance | doc 364 |
 | One-time share token (no PKI Phase 1) | Disposable read access token; expires after single use | doc 364 |
 | Bring-your-own-key commercial pattern | Customer controls encryption key; no data custody by SGraph | doc 360 |
+
+---
+
+## Vault Demo Capabilities (05/16 briefs — docs 417)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-128 | Read-only vault opening — polished | Visual read-only badge/banner, mobile responsive, polished load, "make this your own" CTA | doc 417 |
+| P-129 | Session-scoped client-side changes | In-memory state shim over JS API; overrides reads; writes land in-session; discarded on refresh/tab-close | doc 417 |
+| P-130 | Cross-vault navigation defaults | New tab for cross-vault links; same tab for in-vault anchors; share tokens carried in cross-vault links | doc 417 |
+| P-131 | "Make this your own" CTA on read-only views | Conversion path from read-only visitor to account holder | doc 417 |
+| P-132 | Session change reset capability | Clear session-scoped changes without reloading the page | doc 417 |
+
+## Vault Testing Framework (05/16 briefs — doc 418)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-133 | Four-layer vault testing model | Unit / integration / QA / browser-automation, all via the vault JS API surface | doc 418 |
+| P-134 | Vitest-based test runner for unit/integration layers | Vitest wrapping with vault-aware context helpers | doc 418 |
+| P-135 | Playwright-based test runner for browser-automation layer | Playwright driving real browsers against deployed vault URLs | doc 418 |
+| P-136 | Unified test definition format with `layer` option | Single test file format routes tests to correct execution environment | doc 418 |
+| P-137 | Per-vault test fixture support | Committed test data in vault; reproducible across runs; lives in vault for portability | doc 418 |
+
+## Vault Discovery and Public Keys (05/16 briefs — doc 422)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-153 | Discovery endpoint at `/.well-known/vaults` | Returns structured JSON listing of public vaults with metadata | doc 422 |
+| P-154 | Vault visibility model | Four levels: public / unlisted / private / count-only | doc 422 |
+| P-155 | Ed25519 signing + X25519 encryption key pair per vault | New PKI layer — public key safe to expose; private key never leaves owner | doc 422 |
+| P-156 | Public key in vault metadata for discovery and cryptographic addressing | Serialized in discovery endpoint output and vault metadata | doc 422 |
+| P-157 | "Send content to a vault" via public-key encryption | One-way anonymous submission: encrypt to vault's X25519 public key; only owner can decrypt | doc 422 |
+| P-158 | Self-contained demo server with vault catalogue UI | Portable Docker image or VM with bundled vaults; works offline/air-gapped | doc 422 |

@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-05-20 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-05-21 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -166,3 +166,54 @@ All items below are PROPOSED — does not exist yet.
 | Real benchmark on c8i-flex.large: Docker vs Podman vs Firecracker | Cold-start, memory, CPU for vault app workload; one-day exercise, sub-$5 cost | doc 411 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 16–32)*
+
+---
+
+## Vault App CI Pipeline (05/16 briefs — doc 419)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-138 | Three-class CI pipeline | Smoke tests (every commit) / per-vault runs (commit + nightly) / browser-automation (release candidates + nightly) | doc 419 |
+| P-139 | Vault test registry as manager vault | Registered vaults + per-vault test configuration; version-controlled | doc 419 |
+| P-140 | Ephemeral compute triggered from CI | CI calls sg-compute fargate or container commands to spin up isolated test environments | doc 419 |
+| P-141 | CI failure reports with reproduction commands | Link to failing vault commit + vault app commit + full logs + local reproduction command | doc 419 |
+
+## Serverless for Agents — SG/Compute Framing (05/16 briefs — doc 424)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-165 | Serverless vault-app hosting | Stable URL backed by ephemeral compute; on-demand lifecycle; pre-auth pay-per-use billing | doc 424 |
+| P-166 | Cold-start measurement framework per substrate | Measured cold-start times for EC2 (warm/cold), Fargate, container-on-host, Firecracker | doc 424 |
+| P-167 | "Serverless for agents" reference example | Minimal vault-app demonstrating cold-start → warm-state → tear-down lifecycle | doc 424 |
+| P-168 | Pre-warmed container pools (reserved capacity) | Keep N containers ready to serve traffic without paying for idle EC2 capacity | doc 424 |
+| P-169 | Enclave-serverless integration path | Nitro Enclaves + on-demand lifecycle for high-trust serverless compute | doc 424 |
+
+## Multi-Cloud Deployment + Agent Communication (05/16 briefs — doc 425)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-170 | SG/Deploy — separate codebase | Multi-cloud deployment tool separate from SG/Compute; communicates via vault, not code imports | doc 425 |
+| P-171 | GCP Cloud Run deployment | sg-deploy gcp cloud-run deploy command; vault Docker image on GCP | doc 425 |
+| P-172 | Akamai Cloud (Linode) deployment | sg-deploy akamai linode deploy command; vault Docker image on Linode | doc 425 |
+| P-173 | Vault-as-communication-medium for agent handoffs | Agents write requests to shared vaults; no direct calls, no shared DB; full audit trail | doc 425 |
+| P-174 | Multi-cloud cost tracking via observability | Per-cloud cost data flowing through unified observability session for comparison | doc 425 |
+
+## On-Demand Vault Provisioning (05/16 briefs — doc 428)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-190 | DNS pinning fix — holding-page-detects-readiness Lambda | Lambda checks provisioning state per request; returns HTTP 302 when instance is ready | doc 428 |
+| P-191 | Address router as separate primitive | Lambda + state machine handling all *.sgraph.app traffic; decides per-slug action | doc 428 |
+| P-192 | Randomised ephemeral address pattern | GUID-based: `ephemeral-7g3kp9-x.sgraph.app`; implies temporality; unguessable | doc 428 |
+| P-193 | "Found existing instance, want to join?" UX | Holding-page Lambda detects running instance; offers join vs. create-new choice | doc 428 |
+| P-194 | Multi-instance-per-user support | User can have multiple active instances simultaneously, each addressable | doc 428 |
+
+## DNS Registry for Labs (05/16 briefs — doc 429)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-195 | Admin interface as vault app | Vault app wrapping the on-demand provisioning CLI; list/create/inspect/wake/sleep/teardown labs | doc 429 |
+| P-196 | DNS-as-registry via A records (corrected) | A records for registered lab slugs (not CNAMEs); admin vault is registry of truth; DNS is a projection | doc 429 |
+| P-197 | Three lab states with clean transitions | cold (A→Lambda IP) → provisioning (A→Lambda IP) → live (A→instance IP) | doc 429 |
+| P-198 | TXT records for vault public key distribution | DKIM pattern: `"sg-pubkey=ed25519:Mxe..."` at registered slug's DNS name | doc 429 |
+| P-199 | DNS sync process (admin vault → Route 53) | Background process: on admin vault commit, creates/updates/removes A records in Route 53 | doc 429 |
