@@ -619,8 +619,11 @@
         }
 
         // _page.json: render via PageLayoutRenderer.
-        // Fetches the renderer + CSS from /_common/ in the parent context (no CSP/CORS
-        // issues), then inlines everything into a self-contained blob iframe.
+        // Fetches the renderer + its dependencies + CSS from /_common/ in the parent
+        // context (no CSP/CORS issues), then inlines everything into a self-contained
+        // blob iframe. PageLayoutRenderer references SendHelpers, FileTypeDetect,
+        // MarkdownParser and the _resolvePath/_findEntry helpers as bare globals — each
+        // dependency is inlined as its own <script> so its top-level binding is visible.
         async _mountPageLayout(entry) {
             this._setStatus('Loading page…');
 
@@ -629,11 +632,45 @@
                 ? entry.path.substring(0, entry.path.lastIndexOf('/') + 1) : '';
             var bridgeScript = this._buildVfsBridgeScript(entry.path);
 
-            // Fetch renderer JS and all CSS from the parent origin so we can inline them.
-            var plrJs   = await fetch('/_common/js/page-layout-renderer.js').then(function (r) { return r.text(); });
-            var css1    = await fetch('/_common/js/components/send-download/send-browse.css').then(function (r) { return r.text(); });
-            var css2    = await fetch('/_common/js/components/send-download/send-browse-v031.css').then(function (r) { return r.text(); });
-            var css3    = await fetch('/_common/js/components/send-download/send-browse-v031--page-layout.css').then(function (r) { return r.text(); });
+            function _fetchText(url) { return fetch(url).then(function (r) { return r.text(); }); }
+
+            var deps = await Promise.all([
+                _fetchText('/_common/js/base/send-helpers.js'),
+                _fetchText('/_common/js/file-type-detect.js'),
+                _fetchText('/_common/lib/markdown/markdown-parser.js'),
+                _fetchText('/_common/lib/markdown/markdown-renderer.js'),
+                _fetchText('/_common/js/page-layout-renderer.js'),
+                _fetchText('/_common/js/components/send-download/send-browse.css'),
+                _fetchText('/_common/js/components/send-download/send-browse-v031.css'),
+                _fetchText('/_common/js/components/send-download/send-browse-v031--page-layout.css')
+            ]);
+            var sendHelpersJs = deps[0], fileTypeJs = deps[1], mdParserJs = deps[2],
+                mdRendererJs  = deps[3], plrJs = deps[4],
+                css1 = deps[5], css2 = deps[6], css3 = deps[7];
+
+            // Path-resolution helpers PageLayoutRenderer expects as globals (from
+            // send-browse-v031.js / send-browse--v0.3.2.js). Inlined here to avoid
+            // loading the full send-browse component just for two utilities.
+            var pathHelpers =
+                'function _resolvePath(base,relative){' +
+                  'if(relative.startsWith("/"))return relative.substring(1);' +
+                  'var combined=base+relative,parts=combined.split("/"),resolved=[];' +
+                  'for(var i=0;i<parts.length;i++){' +
+                    'if(parts[i]==="..")resolved.pop();' +
+                    'else if(parts[i]!=="."&&parts[i]!=="")resolved.push(parts[i]);}' +
+                  'return resolved.join("/");}' +
+                'function _findEntry(fileList,resolved){' +
+                  'try{resolved=decodeURIComponent(resolved);}catch(_){}' +
+                  'var match=fileList.find(function(e){return !e.dir&&e.path===resolved;});if(match)return match;' +
+                  'match=fileList.find(function(e){return !e.dir&&e.path.endsWith("/"+resolved);});if(match)return match;' +
+                  'if(resolved.indexOf(".")===-1){' +
+                    'var exts=[".md",".pdf",".txt",".html",".jpg",".jpeg",".png",".webp"];' +
+                    'for(var i=0;i<exts.length;i++){' +
+                      'match=fileList.find(function(e){return !e.dir&&e.path===resolved+exts[i];});if(match)return match;' +
+                      'match=fileList.find(function(e){return !e.dir&&e.path.endsWith("/"+resolved+exts[i]);});if(match)return match;}}' +
+                  'var filename=resolved.split("/").pop();' +
+                  'if(filename){match=fileList.find(function(e){return !e.dir&&e.path.split("/").pop()===filename;});}' +
+                  'return match||null;}';
 
             var html = '<!DOCTYPE html><html><head>' +
                 '<meta charset="utf-8">' +
@@ -644,7 +681,12 @@
                 'body{background:#0d1117;}#plr-root{min-height:100vh;}</style>' +
                 '</head><body>' +
                 '<div id="plr-root"></div>' +
-                '<script>' + plrJs + '<\/script>' +
+                '<script>' + sendHelpersJs + '<\/script>' +
+                '<script>' + fileTypeJs    + '<\/script>' +
+                '<script>' + mdParserJs    + '<\/script>' +
+                '<script>' + mdRendererJs  + '<\/script>' +
+                '<script>' + pathHelpers   + '<\/script>' +
+                '<script>' + plrJs         + '<\/script>' +
                 '<script>(function(){' +
                   'var fileList=' + JSON.stringify(fileList) + ';' +
                   'var folderPath=' + JSON.stringify(folderPath) + ';' +

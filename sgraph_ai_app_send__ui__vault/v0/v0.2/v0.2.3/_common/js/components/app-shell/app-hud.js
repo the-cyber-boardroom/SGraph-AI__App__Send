@@ -67,8 +67,12 @@
                 title.style.display = appTitle ? '' : 'none';
             }
             if (link && vaultKey) {
+                // Go straight to the vault file browser. Using /#key would route through
+                // the root hash inbox, which redirects back to /app when the vault has an
+                // app.json — an infinite loop. /en-gb/vault/ reads the key from
+                // localStorage (saved by app-shell on open) and does not auto-open the app.
                 var base = window.location.pathname.split('/en-gb/')[0];
-                link.href  = base + '/#' + vaultKey;
+                link.href  = base + '/en-gb/vault/';
                 link.style.display = '';
             }
             if (copy && vaultKey) {
