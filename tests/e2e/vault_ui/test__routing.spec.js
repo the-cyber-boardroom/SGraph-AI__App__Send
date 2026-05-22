@@ -4,8 +4,8 @@
 
    Routing table:
      /                 no hash      → /en-gb/
-     /#<token>         valid fmt 1  → /en-gb/vault, LS saved
-     /#<garbage>       bad format   → /en-gb/vault, LS saved (routing doesn't validate)
+     /#<token>         valid fmt 1  → /en-gb/app#token, LS saved
+     /#<garbage>       bad format   → /en-gb/app#token, LS saved (routing doesn't validate)
      /en-gb/           any hash     → stays at /en-gb/, hash stripped
      /en-gb/vault      no LS key    → stays at /en-gb/vault (shell renders entry form)
      /en-gb/vault      LS key set   → stays at /en-gb/vault (shell auto-opens)
@@ -38,25 +38,25 @@ test('root without hash redirects to /en-gb/', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Cell 2 — /#<valid simple token> → /en-gb/vault, token in localStorage
+// Cell 2 — /#<valid simple token> → /en-gb/app#token, token in localStorage
 // ---------------------------------------------------------------------------
-test('root with valid token hash redirects to /en-gb/vault and saves token', async ({ page }) => {
+test('root with valid token hash redirects to /en-gb/app and saves token', async ({ page }) => {
     await page.goto('/#apple-river-1234', { waitUntil: 'commit' });
-    await page.waitForURL('**/en-gb/vault**', { timeout: 8000 });
+    await page.waitForURL('**/en-gb/app**', { timeout: 8000 });
 
-    expect(page.url()).toContain('/en-gb/vault');
+    expect(page.url()).toContain('/en-gb/app');
     const key = await page.evaluate(() => localStorage.getItem('sg-vault-key'));
     expect(key).toBe('apple-river-1234');
 });
 
 // ---------------------------------------------------------------------------
-// Cell 3 — /#<any non-empty hash> → /en-gb/vault (routing accepts any token)
-// The vault shell is responsible for rejecting invalid keys, not the router.
+// Cell 3 — /#<any non-empty hash> → /en-gb/app (routing accepts any token)
+// The app-shell is responsible for rejecting invalid keys, not the router.
 // ---------------------------------------------------------------------------
-test('root with any non-empty hash redirects to /en-gb/vault', async ({ page }) => {
+test('root with any non-empty hash redirects to /en-gb/app', async ({ page }) => {
     await page.goto('/#not-a-simple-token', { waitUntil: 'commit' });
-    await page.waitForURL('**/en-gb/vault**', { timeout: 8000 });
-    expect(page.url()).toContain('/en-gb/vault');
+    await page.waitForURL('**/en-gb/app**', { timeout: 8000 });
+    expect(page.url()).toContain('/en-gb/app');
 });
 
 // ---------------------------------------------------------------------------
