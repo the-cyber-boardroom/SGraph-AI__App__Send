@@ -82,6 +82,7 @@
             var endpoint = (window.SG_ENDPOINT || window.location.origin).replace(/\/$/, '');
             var sgSend   = new SGSend({ endpoint: endpoint });
 
+            this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') });
             var vault, isRO = false;
             this._setStatus('Opening vault…');
 
@@ -96,6 +97,7 @@
             this._vault    = vault;
             this._writable = !isRO;
             this._t.vaultOpened = performance.now();
+            this._emitVaultEvent('open-ok', { label: 'Vault opened', vaultName: vault.name || '', ms: Math.round(this._t.vaultOpened - this._t.start) });
 
             // Key never stays in address bar
             if (window.history && window.history.replaceState) {
@@ -109,11 +111,14 @@
             if (accessKey) this._writable = true;
             await this._dataSource.loadAllSubTrees();
             this._t.treeLoaded = performance.now();
+            this._emitVaultEvent('tree-loaded', { label: 'File tree loaded', fileCount: this._dataSource.getFileList().filter(function(f){return !f.dir;}).length, ms: Math.round(this._t.treeLoaded - this._t.vaultOpened) });
 
             // Read app.json
             var appJson = await this._readAppJson();
             this._appJson = appJson;
             this._t.appJsonFetched = performance.now();
+            if (appJson) this._emitVaultEvent('app-json', { label: 'app.json found', entry: appJson.entry || 'index.html', title: appJson.title || '', ms: Math.round(this._t.appJsonFetched - this._t.treeLoaded) });
+            else         this._emitVaultEvent('app-json-missing', { label: 'No app.json' });
 
             // Update page title
             var appTitle  = appJson && appJson.title  ? appJson.title  : '';
@@ -146,6 +151,7 @@
             this._setStatus('Loading resources…');
             var resourcesData = await this._fetchResources(appJson);
             this._t.resourcesLoaded = performance.now();
+            this._emitVaultEvent('resources-loaded', { label: 'Resources pre-fetched', cssCount: resourcesData.css.length, jsCount: resourcesData.js.length, ms: Math.round(this._t.resourcesLoaded - (this._t.appJsonFetched || this._t.treeLoaded)) });
             await this._mountApp(appJson, resourcesData);
         }
 
@@ -554,6 +560,7 @@
             iframe.addEventListener('load', () => {
                 this._iframeStatus  = 'ready';
                 this._t.iframeReady = performance.now();
+                this._emitVaultEvent('iframe-ready', { label: 'App iframe ready', entry: entryFile, ms: Math.round(this._t.iframeReady - this._t.start) });
             });
             this._iframeEl    = iframe;
             this._iframeStatus = 'loading';
@@ -730,9 +737,16 @@
                     var wDir      = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                     var wFile     = wResolved.slice(wSlash + 1);
                     var wSize     = wBytes.byteLength;
+                    var _t0w = performance.now();
                     dataSource.saveFile(wDir, wFile, wBytes.buffer)
-                        .then(function () { wReply(true, { size: wSize }); })
-                        .catch(function (err) { wReply(false, { err: err.message || 'Write failed' }); });
+                        .then(function () {
+                            wReply(true, { size: wSize });
+                            self._emitBridgeCall('vfs.write', { path: wResolved, bytes: wSize, ms: Math.round(performance.now() - _t0w), ok: true });
+                        })
+                        .catch(function (err) {
+                            wReply(false, { err: err.message || 'Write failed' });
+                            self._emitBridgeCall('vfs.write', { path: wResolved, ms: Math.round(performance.now() - _t0w), ok: false, err: err.message });
+                        });
                     return;
                 }
 
@@ -755,6 +769,7 @@
                     var listed = entries.map(function (f) {
                         return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
                     });
+                    self._emitBridgeCall('vfs.list', { path: (e.data.path || ''), count: listed.length, ok: true });
                     try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
                     return;
                 }
@@ -770,9 +785,14 @@
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
                     var rMatch    = self._findEntryStrict(fileList, rResolved);
                     if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
+                    var _t0r = performance.now();
                     dataSource.getFileBytes(rMatch.path).then(function (buf) {
                         rReply(true, { buf: buf, path: rMatch.path });
-                    }).catch(function (err) { rReply(false, { err: err.message || 'Read failed' }); });
+                        self._emitBridgeCall('vfs.read', { path: rResolved, bytes: buf.byteLength, ms: Math.round(performance.now() - _t0r), ok: true });
+                    }).catch(function (err) {
+                        rReply(false, { err: err.message || 'Read failed' });
+                        self._emitBridgeCall('vfs.read', { path: rResolved, ms: Math.round(performance.now() - _t0r), ok: false, err: err.message });
+                    });
                     return;
                 }
 
@@ -854,6 +874,7 @@
                 // ── sg.ui.message / dismiss ───────────────────────────────────
                 if (e.data.__sgUiMsg) {
                     var uiMsg = e.data.__sgUiMsg;
+                    if (!uiMsg.dismiss) self._emitBridgeCall('ui.message', { text: uiMsg.text, msgType: uiMsg.msgType });
                     var hud   = document.getElementById('app-hud') || document.querySelector('app-hud');
                     if (!hud) return;
                     if (uiMsg.dismiss) {
@@ -938,6 +959,27 @@
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
+
+        // ── Debug event emitters ──────────────────────────────────────────────────────
+
+        _emitVaultEvent(type, data) {
+            var detail = Object.assign({ type: type, ts: Date.now() }, data || {});
+            document.dispatchEvent(new CustomEvent('app-debug:vault-event', { detail: detail }));
+        }
+
+        _emitBridgeCall(method, detail) {
+            document.dispatchEvent(new CustomEvent('app-debug:bridge-call', {
+                detail: Object.assign({ method: method, ts: Date.now() }, detail || {})
+            }));
+        }
+
+        _maskKey(key) {
+            if (!key || key.length < 6) return '***';
+            var parts = key.split('-');
+            if (parts.length < 2) return key.slice(0, 3) + '***';
+            return parts[0] + '-***';
+        }
+
     }
 
     customElements.define('app-shell', AppShell);

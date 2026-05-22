@@ -1,12 +1,8 @@
 /* =================================================================================
    SGraph App — Debug Pane Component  (app-debug-pane)
-   v0.2.3 — Collapsible right-edge debug panel hosted inside sg-layout.
-
-   When the panel width is ≤ 32px (sg-layout size: 0.0), renders a vertical
-   "▶ Debug" edge button. Click dispatches app-debug:toggle event to the page.
-   When expanded, renders basic diagnostic info.
+   v0.2.3 — Collapsible right-edge debug panel with 4 diagnostic tabs:
+     Vault Trace | Bridge Log | App State | Network
    ================================================================================= */
-
 (function () {
     'use strict';
 
@@ -15,14 +11,14 @@
         constructor() {
             super();
             this.attachShadow({ mode: 'open' });
-            this._collapsed = true;
-            this._ro = null;
+            this._collapsed  = true;
+            this._activeTab  = 'vault-trace';
+            this._ro         = null;
         }
 
         connectedCallback() {
             this._render();
 
-            // Use ResizeObserver to detect collapse/expand driven by sg-layout drag
             if (typeof ResizeObserver !== 'undefined') {
                 this._ro = new ResizeObserver((entries) => {
                     for (const entry of entries) {
@@ -38,12 +34,10 @@
             }
 
             this.shadowRoot.addEventListener('click', (e) => {
-                if (e.target.closest('.dp-edge-btn')) {
-                    this._requestExpand();
-                }
-                if (e.target.closest('.dp-close-btn')) {
-                    this._requestCollapse();
-                }
+                if (e.target.closest('.dp-edge-btn')) this._requestExpand();
+                if (e.target.closest('.dp-close-btn')) this._requestCollapse();
+                var tabBtn = e.target.closest('.dp-tab');
+                if (tabBtn) this._switchTab(tabBtn.dataset.tab);
             });
         }
 
@@ -55,107 +49,99 @@
             if (this._collapsed) {
                 this.shadowRoot.innerHTML = `
                     <style>
-                        :host { display: flex; width: 100%; height: 100%; overflow: hidden; cursor: pointer; }
+                        :host { display:flex; width:100%; height:100%; overflow:hidden; cursor:pointer; }
                         .dp-edge-btn {
-                            display: flex; align-items: center; justify-content: center;
-                            width: 100%; min-width: 16px; height: 100%;
-                            background: #12122a; border-left: 1px solid #2a2a4a;
-                            color: #4a5568; cursor: pointer; user-select: none;
+                            display:flex; align-items:center; justify-content:center;
+                            width:100%; min-width:16px; height:100%;
+                            background:#12122a; border-left:1px solid #2a2a4a;
+                            color:#3a4558; cursor:pointer; user-select:none;
                         }
-                        .dp-edge-btn:hover { background: #1a1a3a; color: #8892a4; }
-                        .dp-label {
-                            writing-mode: vertical-rl; font-size: 0.7rem; letter-spacing: 0.08em;
-                            white-space: nowrap; transform: rotate(180deg);
-                        }
+                        .dp-edge-btn:hover { background:#1a1a3a; color:#6a7888; }
+                        .dp-label { writing-mode:vertical-rl; font-size:0.7rem; letter-spacing:0.08em; white-space:nowrap; transform:rotate(180deg); }
                     </style>
                     <div class="dp-edge-btn" title="Open debug panel">
-                        <span class="dp-label">▶ Debug</span>
+                        <span class="dp-label">&#9654; Debug</span>
                     </div>
                 `;
-            } else {
-                this.shadowRoot.innerHTML = `
-                    <style>
-                        :host { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; }
-                        .dp-header {
-                            display: flex; align-items: center; justify-content: space-between;
-                            padding: 0.5rem 0.75rem;
-                            background: #12122a; border-bottom: 1px solid #2a2a4a;
-                            flex: 0 0 auto;
-                        }
-                        .dp-title { font-size: 0.8rem; font-weight: 600; color: #8892a4; }
-                        .dp-close-btn {
-                            background: none; border: none; color: #4a5568; cursor: pointer;
-                            font-size: 0.75rem; padding: 0.1rem 0.3rem; border-radius: 3px;
-                        }
-                        .dp-close-btn:hover { color: #8892a4; background: #1a1a3a; }
-                        .dp-body {
-                            flex: 1; overflow-y: auto; padding: 0.75rem;
-                            font-size: 0.75rem; font-family: monospace; color: #4a5568;
-                            background: #0a0a18;
-                        }
-                        .dp-section { margin-bottom: 1rem; }
-                        .dp-section h4 { margin: 0 0 0.4rem; color: #6a7888; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
-                        .dp-row { display: flex; gap: 0.5rem; margin-bottom: 0.25rem; }
-                        .dp-key { color: #4a5568; min-width: 80px; }
-                        .dp-val { color: #8892a4; word-break: break-all; }
-                    </style>
-                    <div class="dp-header">
-                        <span class="dp-title">🔍 Debug</span>
-                        <button class="dp-close-btn" title="Collapse debug panel">◀</button>
-                    </div>
-                    <div class="dp-body" id="dp-body">
-                        <div class="dp-section">
-                            <h4>Page</h4>
-                            <div class="dp-row"><span class="dp-key">URL</span><span class="dp-val">${this._escHtml(window.location.href)}</span></div>
-                            <div class="dp-row"><span class="dp-key">Time</span><span class="dp-val">${new Date().toISOString()}</span></div>
-                        </div>
-                        <div class="dp-section">
-                            <h4>App Shell</h4>
-                            <div id="dp-shell-info"><span class="dp-val">Loading…</span></div>
-                        </div>
-                    </div>
-                `;
-                this._refreshShellInfo();
+                return;
             }
+
+            var tabs = [
+                { id: 'vault-trace', label: '🔓 Vault', tag: 'app-debug-vault-trace' },
+                { id: 'bridge-log',  label: '🔌 Bridge', tag: 'app-debug-bridge-log'  },
+                { id: 'app-state',   label: '📊 State',  tag: 'app-debug-app-state'   },
+                { id: 'network',     label: '🌐 Net',    tag: 'app-debug-network'      },
+            ];
+            var activeTab = this._activeTab || 'vault-trace';
+
+            var tabBarHtml = tabs.map(function (t) {
+                return '<button class="dp-tab' + (t.id === activeTab ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</button>';
+            }).join('');
+
+            var panelsHtml = tabs.map(function (t) {
+                return '<div class="dp-panel' + (t.id === activeTab ? ' active' : '') + '" data-panel="' + t.id + '">' +
+                    '<' + t.tag + '></' + t.tag + '>' +
+                    '</div>';
+            }).join('');
+
+            this.shadowRoot.innerHTML = `
+                <style>
+                    :host { display:flex; flex-direction:column; width:100%; height:100%; overflow:hidden; }
+                    .dp-header {
+                        display:flex; align-items:center; gap:0;
+                        background:#12122a; border-bottom:1px solid #2a2a4a; flex:0 0 auto;
+                    }
+                    .dp-tab-bar { display:flex; flex:1; overflow-x:auto; }
+                    .dp-tab-bar::-webkit-scrollbar { height:2px; }
+                    .dp-tab {
+                        flex:0 0 auto; padding:0.4rem 0.6rem;
+                        background:none; border:none; border-bottom:2px solid transparent;
+                        color:#4a5568; cursor:pointer; font-size:0.7rem; white-space:nowrap;
+                        font-family:-apple-system,sans-serif;
+                    }
+                    .dp-tab:hover { color:#8892a4; background:rgba(255,255,255,0.03); }
+                    .dp-tab.active { color:#4ECDC4; border-bottom-color:#4ECDC4; }
+                    .dp-close-btn {
+                        flex:0 0 auto; padding:0.35rem 0.5rem;
+                        background:none; border:none; border-left:1px solid #2a2a4a;
+                        color:#3a4558; cursor:pointer; font-size:0.75rem;
+                    }
+                    .dp-close-btn:hover { color:#8892a4; background:rgba(255,255,255,0.04); }
+                    .dp-content { flex:1; position:relative; overflow:hidden; min-height:0; }
+                    .dp-panel { display:none; width:100%; height:100%; }
+                    .dp-panel.active { display:flex; flex-direction:column; }
+                </style>
+                <div class="dp-header">
+                    <div class="dp-tab-bar">${tabBarHtml}</div>
+                    <button class="dp-close-btn" title="Collapse debug panel">&#9664;</button>
+                </div>
+                <div class="dp-content">${panelsHtml}</div>
+            `;
         }
 
-        _refreshShellInfo() {
-            const container = this.shadowRoot.getElementById('dp-shell-info');
-            if (!container) return;
-
-            const shell = document.querySelector('app-shell');
-            if (!shell) { container.innerHTML = '<span class="dp-val">app-shell not found</span>'; return; }
-
-            const state = typeof shell.getDebugState === 'function' ? shell.getDebugState() : null;
-            if (!state) { container.innerHTML = '<span class="dp-val">getDebugState() not available</span>'; return; }
-
-            const row = (k, v) => `<div class="dp-row"><span class="dp-key">${k}</span><span class="dp-val">${this._escHtml(String(v))}</span></div>`;
-
-            container.innerHTML = [
-                row('iframe',    state.iframeStatus || '—'),
-                row('writable',  state.writable ? 'yes' : 'no'),
-                row('appJson',   state.appJson ? 'present' : 'none'),
-                row('entry',     state.entry    || '—'),
-                row('resources', (state.resourcesLoaded || []).length + ' loaded'),
-            ].join('');
+        _switchTab(tabId) {
+            this._activeTab = tabId;
+            var root = this.shadowRoot;
+            root.querySelectorAll('.dp-tab').forEach(function (btn) {
+                btn.classList.toggle('active', btn.dataset.tab === tabId);
+            });
+            root.querySelectorAll('.dp-panel').forEach(function (pane) {
+                pane.classList.toggle('active', pane.dataset.panel === tabId);
+            });
         }
 
         _requestExpand() {
             this.dispatchEvent(new CustomEvent('app-debug:toggle', {
                 bubbles: true, composed: true,
-                detail: { open: true, split: 0.28 }
+                detail: { open: true, split: 0.32 }
             }));
         }
 
         _requestCollapse() {
             this.dispatchEvent(new CustomEvent('app-debug:toggle', {
                 bubbles: true, composed: true,
-                detail: { open: false, split: 0.28 }
+                detail: { open: false, split: 0.32 }
             }));
-        }
-
-        _escHtml(str) {
-            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
     }
 

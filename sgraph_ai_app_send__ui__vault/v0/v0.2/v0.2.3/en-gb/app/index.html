@@ -1,6 +1,40 @@
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
+    <!-- Debug infrastructure: fetch proxy + event buffer. Must run first. -->
+    <script>
+    (function () {
+        'use strict';
+        // Global debug event buffer — components read history on connect.
+        window._appDebug = { vaultEvents: [], bridgeCalls: [], networkCalls: [], maxItems: 300 };
+        function _bufPush(arr, item) { arr.push(item); if (arr.length > 300) arr.shift(); }
+        document.addEventListener('app-debug:vault-event',   function (e) { _bufPush(window._appDebug.vaultEvents,  e.detail); });
+        document.addEventListener('app-debug:bridge-call',   function (e) { _bufPush(window._appDebug.bridgeCalls,  e.detail); });
+        document.addEventListener('app-debug:network-call',  function (e) { _bufPush(window._appDebug.networkCalls, e.detail); });
+
+        // Fetch proxy — records all outbound fetch() calls
+        var _origFetch = window.fetch;
+        window.fetch = function (input, init) {
+            var url    = typeof input === 'string' ? input : (input && input.url) || String(input);
+            var method = ((init && init.method) || 'GET').toUpperCase();
+            var t0     = performance.now();
+            return _origFetch.apply(this, arguments).then(function (resp) {
+                document.dispatchEvent(new CustomEvent('app-debug:network-call', {
+                    detail: { method: method, url: _maskUrl(url), status: resp.status, ms: Math.round(performance.now() - t0), ok: resp.ok }
+                }));
+                return resp;
+            }, function (err) {
+                document.dispatchEvent(new CustomEvent('app-debug:network-call', {
+                    detail: { method: method, url: _maskUrl(url), status: 0, ms: Math.round(performance.now() - t0), ok: false, err: err.message }
+                }));
+                throw err;
+            });
+        };
+        function _maskUrl(url) {
+            return url.replace(/#.*$/, '#…').replace(/\/obj-[a-f0-9]{20,}/g, '/obj-***');
+        }
+    }());
+    </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SG/App</title>
@@ -27,6 +61,10 @@
     <!-- App shell components -->
     <script src="/_common/js/components/app-shell/app-hud.js"></script>
     <script src="/_common/js/components/app-shell/app-debug-pane.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-vault-trace.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-bridge-log.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-app-state.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-network.js"></script>
     <script src="/_common/js/components/app-shell/app-shell.js"></script>
 
     <style>
