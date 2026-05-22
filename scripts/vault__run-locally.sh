@@ -11,9 +11,18 @@
 # Using 127.0.0.1 will NOT work for Web Crypto.
 # ---------------------------------------------------------------------------
 PORT=10067
+API_PORT=10068   # default port for user__run-locally.sh
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
+
+# Parse flags
+USE_LOCAL_API=0
+for arg in "$@"; do
+    case "$arg" in
+        --local-api) USE_LOCAL_API=1 ;;
+    esac
+done
 
 # Clean up on exit
 cleanup() {
@@ -22,6 +31,12 @@ cleanup() {
     rm -rf "$SERVE_DIR"
 }
 trap cleanup EXIT
+
+# If --local-api, point all vault/app pages at the local API server
+if [ "$USE_LOCAL_API" -eq 1 ]; then
+    export VAULT_DEFAULT_ENDPOINT="http://localhost:$API_PORT"
+    echo "  [local-api] Rewriting default endpoint → $VAULT_DEFAULT_ENDPOINT"
+fi
 
 # Build the static tree — exit loudly on failure so we never serve an empty dir
 bash "$SCRIPT_DIR/build-vault-static.sh" "$SERVE_DIR" || {
@@ -37,13 +52,22 @@ echo ""
 echo "  URLs:"
 echo "    Landing page:   http://localhost:$PORT/en-gb/"
 echo "    Open vault:     http://localhost:$PORT/#your-token"
+echo "    App page:       http://localhost:$PORT/en-gb/app/"
 echo "    (en-gb/browse/ redirects to /#hash automatically)"
 echo ""
 echo "  IMPORTANT: Use 'localhost' not '127.0.0.1' (Web Crypto requires secure context)"
 echo ""
 echo "  Backend:"
-echo "    Default:        https://send.sgraph.ai (production)"
-echo "    Local backend:  Run ./scripts/user__run-locally.sh in another terminal (port $PORT)"
-echo "                    Then set data-endpoint=\"http://localhost:$PORT\" on <vault-entry>"
+if [ "$USE_LOCAL_API" -eq 1 ]; then
+    echo "    Using local API: $VAULT_DEFAULT_ENDPOINT"
+    echo "    Make sure user__run-locally.sh is running on port $API_PORT"
+else
+    echo "    Default:         https://dev.send.sgraph.ai (production)"
+    echo "    Local API:       Run with --local-api flag to point all pages at"
+    echo "                     http://localhost:$API_PORT (requires user__run-locally.sh)"
+    echo ""
+    echo "    Endpoint override (env var):"
+    echo "      VAULT_DEFAULT_ENDPOINT=http://localhost:$API_PORT bash scripts/vault__run-locally.sh"
+fi
 echo ""
 python3 -m http.server $PORT --directory "$SERVE_DIR" --bind localhost

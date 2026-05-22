@@ -79,7 +79,9 @@
             this._t.start = performance.now();
             this._vaultKey = key;
 
-            var endpoint = (window.SG_ENDPOINT || window.location.origin).replace(/\/$/, '');
+            var endpoint = (window.SG_ENDPOINT
+                || (function(){ try{ return sessionStorage.getItem('sg-vault-endpoint'); }catch(_){ return null; } })()
+                || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
             var sgSend   = new SGSend({ endpoint: endpoint });
 
             this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') });
@@ -161,9 +163,11 @@
         _showEntryForm() {
             var self = this;
 
-            // Check for a saved backend access key to auto-fill
+            // Check for a saved backend access key and endpoint to auto-fill
             var savedAccessKey = '';
+            var savedEndpoint   = '';
             try { savedAccessKey = localStorage.getItem('sg-backend-access-key') || ''; } catch (_) {}
+            try { savedEndpoint   = sessionStorage.getItem('sg-vault-endpoint') || ''; } catch (_) {}
 
             this.shadowRoot.innerHTML = `
                 <style>
@@ -256,6 +260,12 @@
                         <div class="ef-hint" style="margin-top:0.5rem">
                             Controls server-side write permission. Separate from the vault encryption key.
                         </div>
+                        <label class="ef-label" for="ef-endpoint-input" style="margin-top:0.85rem">Server endpoint</label>
+                        <input id="ef-endpoint-input" class="ef-input" type="url"
+                            value="${savedEndpoint}"
+                            placeholder="https://dev.send.sgraph.ai"
+                            autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+                        <div class="ef-hint">Leave blank to use the default backend (dev.send.sgraph.ai).</div>
                     </div>
 
                     <div class="ef-err" id="ef-err"></div>
@@ -270,7 +280,8 @@
             var toggle      = root.getElementById('ef-access-toggle');
             var arrow       = root.getElementById('ef-toggle-arrow');
             var section     = root.getElementById('ef-access-section');
-            var accessInput = root.getElementById('ef-access-input');
+            var accessInput   = root.getElementById('ef-access-input');
+            var endpointInput = root.getElementById('ef-endpoint-input');
             var rememberCh  = root.getElementById('ef-remember-check');
             var errEl       = root.getElementById('ef-err');
             var submitBtn   = root.getElementById('ef-submit');
@@ -288,7 +299,7 @@
                 if (!v || !modeEl) { if (modeEl) modeEl.innerHTML = ''; return; }
                 if (v.startsWith('ro-')) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-ro">&#128065; Read-only token</span>';
-                } else if (v.indexOf('-') > 0) {
+                } else if (v.indexOf('-') > 0 || (v.indexOf(':') > 0 && !/\s/.test(v))) {
                     modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-full">&#128273; Full vault key</span>';
                 } else {
                     modeEl.innerHTML = '';
@@ -322,11 +333,19 @@
                 var remember  = rememberCh  ? rememberCh.checked       : false;
                 errEl.textContent = '';
 
+                var customEndpoint = endpointInput ? endpointInput.value.trim() : '';
+
                 if (!vaultKey) {
                     errEl.textContent = 'Please enter a vault key or read-only token.';
                     keyInput.focus();
                     return;
                 }
+
+                // Persist endpoint override
+                try {
+                    if (customEndpoint) sessionStorage.setItem('sg-vault-endpoint', customEndpoint);
+                    else sessionStorage.removeItem('sg-vault-endpoint');
+                } catch (_) {}
 
                 // Persist / clear access key based on remember checkbox
                 if (accessKey) {
@@ -455,7 +474,9 @@
                 var errEl  = root.querySelector('.auth-err');
                 var rCheck = root.querySelector('.auth-rcheck');
                 var btn    = root.querySelector('.auth-submit');
-                var endpoint = (window.SG_ENDPOINT || window.location.origin).replace(/\/$/, '');
+                var endpoint = (window.SG_ENDPOINT
+                    || (function(){ try{ return sessionStorage.getItem('sg-vault-endpoint'); }catch(_){ return null; } })()
+                    || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
 
                 var submit = async () => {
                     var key = input.value.trim();
@@ -804,7 +825,9 @@
                         try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null }, '*'); } catch (_) {}
                     }
                     var vault    = self._vault;
-                    var endpoint = (window.SG_ENDPOINT || window.location.origin).replace(/\/$/, '');
+                    var endpoint = (window.SG_ENDPOINT
+                        || (function(){ try{ return sessionStorage.getItem('sg-vault-endpoint'); }catch(_){ return null; } })()
+                        || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
 
                     if (e.data.__sgCmdType === 'git') {
                         var action = e.data.action;
