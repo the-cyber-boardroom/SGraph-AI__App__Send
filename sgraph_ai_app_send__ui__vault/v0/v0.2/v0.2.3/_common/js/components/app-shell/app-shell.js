@@ -2,9 +2,13 @@
    SGraph App — Shell Component  (app-shell)
    v0.2.3 — Lightweight vault app host for /en-gb/app page.
 
-   Lifecycle:
+   Lifecycle (with hash):
      connectedCallback → parse hash → open vault → read app.json →
      [optional auth intercept] → pre-fetch resources → mount iframe + VFS bridge
+
+   Lifecycle (no hash — entry form):
+     connectedCallback → _showEntryForm() → user submits key →
+     _initWithKey() → same flow as above
 
    No vault-loader scripts are loaded on this page. Credential parsing is inline.
    VFS bridge surface is identical to send-browse so SG/App code runs unchanged.
@@ -33,11 +37,7 @@
         }
 
         connectedCallback() {
-            this._showLoading('Opening vault…');
-            this._init().catch((err) => {
-                console.error('[app-shell] init failed:', err);
-                this._showError(err.message);
-            });
+            this._init();
         }
 
         disconnectedCallback() {
@@ -62,43 +62,51 @@
 
         // ── Init flow ─────────────────────────────────────────────────────────────────
 
-        async _init() {
-            this._t.start = performance.now();
-
+        _init() {
             var rawHash = window.location.hash.slice(1).trim();
             if (!rawHash) {
-                this._showError('No vault key in URL. Use /en-gb/app#your-vault-key');
+                this._showEntryForm();
                 return;
             }
-            this._vaultKey = rawHash;
+            this._showLoading('Opening vault…');
+            this._initWithKey(rawHash, null).catch((err) => {
+                console.error('[app-shell] init failed:', err);
+                this._showError(err.message);
+            });
+        }
 
-            // Parse & open vault
+        async _initWithKey(key, presetAccessKey) {
+            this._t.start = performance.now();
+            this._vaultKey = key;
+
             var endpoint = (window.SG_ENDPOINT || window.location.origin).replace(/\/$/, '');
             var sgSend   = new SGSend({ endpoint: endpoint });
 
             var vault, isRO = false;
             this._setStatus('Opening vault…');
 
-            if (rawHash.startsWith('ro-')) {
-                var creds = await this._resolveROToken(sgSend, rawHash);
+            if (key.startsWith('ro-')) {
+                var creds = await this._resolveROToken(sgSend, key);
                 vault     = await SGVault.openReadOnly(sgSend, creds.vaultId, creds.readKeyB64, creds.refFileId);
                 isRO      = true;
             } else {
-                vault = await SGVault.open(sgSend, rawHash);
+                vault = await SGVault.open(sgSend, key);
             }
 
             this._vault    = vault;
             this._writable = !isRO;
             this._t.vaultOpened = performance.now();
 
-            // Clear hash (key never stays in address bar)
+            // Key never stays in address bar
             if (window.history && window.history.replaceState) {
                 window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
 
-            // Build data source and load all file trees
+            // Build data source — use presetAccessKey if supplied (from entry form)
             this._setStatus('Reading vault…');
-            this._dataSource = new VaultDataSource(vault, null);
+            var accessKey = (!isRO && presetAccessKey) ? presetAccessKey : null;
+            this._dataSource = new VaultDataSource(vault, accessKey);
+            if (accessKey) this._writable = true;
             await this._dataSource.loadAllSubTrees();
             this._t.treeLoaded = performance.now();
 
@@ -119,8 +127,8 @@
                 detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO }
             }));
 
-            // Auth intercept (auth.required with no cached key)
-            if (!isRO && appJson && appJson.auth && appJson.auth.required) {
+            // Auth intercept (auth.required with no cached key and no preset key)
+            if (!isRO && !accessKey && appJson && appJson.auth && appJson.auth.required) {
                 var vaultId   = vault._vaultId || this._vaultKey;
                 var cachedKey = this._getCachedAccessKey(vaultId);
                 if (!cachedKey) {
@@ -135,14 +143,215 @@
         }
 
         async _continue(appJson) {
-            // Pre-fetch resources declared in app.json
             this._setStatus('Loading resources…');
             var resourcesData = await this._fetchResources(appJson);
             this._t.resourcesLoaded = performance.now();
-
-            // Mount iframe
             await this._mountApp(appJson, resourcesData);
         }
+
+
+        // ── Entry form (hashless /en-gb/app) ──────────────────────────────────────────
+
+        _showEntryForm() {
+            var self = this;
+
+            // Check for a saved backend access key to auto-fill
+            var savedAccessKey = '';
+            try { savedAccessKey = localStorage.getItem('sg-backend-access-key') || ''; } catch (_) {}
+
+            this.shadowRoot.innerHTML = `
+                <style>
+                    :host {
+                        display: flex; align-items: center; justify-content: center;
+                        width: 100%; height: 100%;
+                        background: #0a0a18;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    }
+                    .ef-card {
+                        background: #12122a; border: 1px solid #2a2a4a; border-radius: 10px;
+                        padding: 2rem; width: 100%; max-width: 440px; box-sizing: border-box;
+                        margin: 1rem;
+                    }
+                    .ef-brand { font-size: 1.25rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.25rem; }
+                    .ef-brand span { color: #4ECDC4; }
+                    .ef-subtitle { font-size: 0.8rem; color: #4a5568; margin-bottom: 1.75rem; }
+                    .ef-label { display: block; font-size: 0.8rem; font-weight: 600; color: #8892a4; margin-bottom: 0.4rem; }
+                    .ef-input {
+                        width: 100%; padding: 0.6rem 0.75rem; background: #0a0a18;
+                        border: 1px solid #2a2a4a; border-radius: 5px;
+                        color: #e2e8f0; font-size: 0.875rem; font-family: monospace;
+                        outline: none; box-sizing: border-box; transition: border-color 0.15s;
+                    }
+                    .ef-input:focus { border-color: #4ECDC4; box-shadow: 0 0 0 2px rgba(78,205,196,0.15); }
+                    .ef-hint { font-size: 0.75rem; color: #4a5568; margin-top: 0.35rem; }
+                    .ef-mode-badge {
+                        display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.45rem;
+                        border-radius: 9999px; margin-top: 0.35rem; font-weight: 600;
+                    }
+                    .ef-mode-full { background: rgba(78,205,196,0.12); color: #4ECDC4; border: 1px solid rgba(78,205,196,0.3); }
+                    .ef-mode-ro   { background: rgba(100,160,220,0.12); color: #64a0dc; border: 1px solid rgba(100,160,220,0.25); }
+                    .ef-section-toggle {
+                        display: flex; align-items: center; gap: 0.4rem;
+                        margin-top: 1.25rem; cursor: pointer;
+                        font-size: 0.8rem; font-weight: 600; color: #6a7888;
+                        background: none; border: none; padding: 0; text-align: left; width: 100%;
+                    }
+                    .ef-section-toggle:hover { color: #8892a4; }
+                    .ef-toggle-arrow { font-size: 0.65rem; transition: transform 0.15s; }
+                    .ef-toggle-arrow.open { transform: rotate(90deg); }
+                    .ef-access-section { display: none; margin-top: 0.75rem; }
+                    .ef-access-section.open { display: block; }
+                    .ef-saved-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.35rem; }
+                    .ef-saved-badge { font-size: 0.7rem; color: #4ECDC4; white-space: nowrap; }
+                    .ef-clear-btn {
+                        font-size: 0.7rem; color: #4a5568; background: none; border: none;
+                        cursor: pointer; padding: 0; text-decoration: underline;
+                    }
+                    .ef-clear-btn:hover { color: #ff6b6b; }
+                    .ef-remember { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; font-size: 0.8rem; color: #6a7888; cursor: pointer; }
+                    .ef-err { margin-top: 0.75rem; color: #ff6b6b; font-size: 0.8rem; min-height: 1rem; }
+                    .ef-submit {
+                        margin-top: 1.5rem; width: 100%; padding: 0.7rem;
+                        background: #4ECDC4; border: none; border-radius: 5px;
+                        color: #0a0a18; font-weight: 700; font-size: 0.9rem;
+                        cursor: pointer; transition: background 0.15s;
+                    }
+                    .ef-submit:hover:not(:disabled) { background: #3dbdb5; }
+                    .ef-submit:disabled { opacity: 0.55; cursor: default; }
+                    .ef-vault-link { display: block; margin-top: 1rem; text-align: center; font-size: 0.75rem; color: #4a5568; }
+                    .ef-vault-link a { color: #6a7888; text-decoration: none; }
+                    .ef-vault-link a:hover { color: #4ECDC4; }
+                </style>
+                <div class="ef-card">
+                    <div class="ef-brand">SG<span>/</span>App</div>
+                    <div class="ef-subtitle">Open a vault-hosted app</div>
+
+                    <label class="ef-label" for="ef-key-input">Vault key or read-only token</label>
+                    <input id="ef-key-input" class="ef-input" type="text"
+                        placeholder="apple-river-1234  or  ro-coral-stamp-5678"
+                        autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+                    <div class="ef-hint">Paste a full vault key for read+write, or a read-only token (ro-…) for view-only access.</div>
+                    <div class="ef-mode-indicator"></div>
+
+                    <button class="ef-section-toggle" type="button" id="ef-access-toggle">
+                        <span class="ef-toggle-arrow" id="ef-toggle-arrow">&#9654;</span>
+                        Backend access key <span style="font-weight:400;color:#4a5568">(optional)</span>
+                    </button>
+                    <div class="ef-access-section${savedAccessKey ? ' open' : ''}" id="ef-access-section">
+                        <label class="ef-label" for="ef-access-input" style="margin-top:0.5rem">Access key</label>
+                        <input id="ef-access-input" class="ef-input" type="password"
+                            placeholder="e.g. apple-river-1234"
+                            autocomplete="off">
+                        ${savedAccessKey ? '<div class="ef-saved-row"><span class="ef-saved-badge">&#10003; saved locally</span><button class="ef-clear-btn" id="ef-clear-btn" type="button">Clear saved key</button></div>' : ''}
+                        <label class="ef-remember">
+                            <input type="checkbox" id="ef-remember-check"${savedAccessKey ? ' checked' : ''}>
+                            Remember on this device
+                        </label>
+                        <div class="ef-hint" style="margin-top:0.5rem">
+                            Controls server-side write permission. Separate from the vault encryption key.
+                        </div>
+                    </div>
+
+                    <div class="ef-err" id="ef-err"></div>
+                    <button class="ef-submit" id="ef-submit" type="button">Open vault</button>
+                    <div class="ef-vault-link">Vault interface: <a href="/en-gb/vault/" target="_blank">Open SG/Vault &#8599;</a></div>
+                </div>
+            `;
+
+            var root        = this.shadowRoot;
+            var keyInput    = root.getElementById('ef-key-input');
+            var modeEl      = root.querySelector('.ef-mode-indicator');
+            var toggle      = root.getElementById('ef-access-toggle');
+            var arrow       = root.getElementById('ef-toggle-arrow');
+            var section     = root.getElementById('ef-access-section');
+            var accessInput = root.getElementById('ef-access-input');
+            var rememberCh  = root.getElementById('ef-remember-check');
+            var errEl       = root.getElementById('ef-err');
+            var submitBtn   = root.getElementById('ef-submit');
+            var clearBtn    = root.getElementById('ef-clear-btn');
+
+            // Auto-fill saved access key into password field
+            if (savedAccessKey && accessInput) accessInput.value = savedAccessKey;
+
+            // Auto-expand access section if there's a saved key
+            if (savedAccessKey && arrow) arrow.classList.add('open');
+
+            // Mode badge as user types the vault key
+            keyInput.addEventListener('input', function () {
+                var v = keyInput.value.trim();
+                if (!v || !modeEl) { if (modeEl) modeEl.innerHTML = ''; return; }
+                if (v.startsWith('ro-')) {
+                    modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-ro">&#128065; Read-only token</span>';
+                } else if (v.indexOf('-') > 0) {
+                    modeEl.innerHTML = '<span class="ef-mode-badge ef-mode-full">&#128273; Full vault key</span>';
+                } else {
+                    modeEl.innerHTML = '';
+                }
+            });
+
+            // Toggle access key section
+            toggle.addEventListener('click', function () {
+                var open = section.classList.toggle('open');
+                arrow.classList.toggle('open', open);
+                if (open && accessInput) accessInput.focus();
+            });
+
+            // Clear saved key
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    try { localStorage.removeItem('sg-backend-access-key'); } catch (_) {}
+                    if (accessInput) accessInput.value = '';
+                    if (rememberCh)  rememberCh.checked = false;
+                    clearBtn.remove();
+                    var badge = root.querySelector('.ef-saved-badge');
+                    if (badge) badge.remove();
+                });
+            }
+
+            // Submit handler
+            var doSubmit = function () {
+                var vaultKey  = keyInput.value.trim();
+                var accessKey = accessInput ? accessInput.value.trim() : '';
+                var remember  = rememberCh  ? rememberCh.checked       : false;
+                errEl.textContent = '';
+
+                if (!vaultKey) {
+                    errEl.textContent = 'Please enter a vault key or read-only token.';
+                    keyInput.focus();
+                    return;
+                }
+
+                // Persist / clear access key based on remember checkbox
+                if (accessKey) {
+                    if (remember) {
+                        try { localStorage.setItem('sg-backend-access-key', accessKey); } catch (_) {}
+                    } else {
+                        try { localStorage.removeItem('sg-backend-access-key'); } catch (_) {}
+                    }
+                }
+
+                submitBtn.disabled = true;
+                self._showLoading('Opening vault…');
+
+                self._initWithKey(vaultKey, accessKey || null).catch(function (err) {
+                    console.error('[app-shell] initWithKey failed:', err);
+                    // Re-show entry form with error message pre-populated
+                    self._showEntryForm();
+                    var newErr = self.shadowRoot.getElementById('ef-err');
+                    if (newErr) newErr.textContent = err.message;
+                    var newKey = self.shadowRoot.getElementById('ef-key-input');
+                    if (newKey) { newKey.value = vaultKey; newKey.dispatchEvent(new Event('input')); }
+                });
+            };
+
+            submitBtn.addEventListener('click', doSubmit);
+            keyInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSubmit(); });
+            if (accessInput) accessInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSubmit(); });
+
+            keyInput.focus();
+        }
+
 
         // ── Credential helpers ────────────────────────────────────────────────────────
 
