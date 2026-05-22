@@ -16,7 +16,8 @@
         constructor() {
             super();
             this.attachShadow({ mode: 'open' });
-            this._messages = {};  // handle → { el, timer }
+            this._messages  = {};     // handle → { el, timer }
+            this._debugOpen = false;
         }
 
         connectedCallback() {
@@ -32,15 +33,17 @@
                         <span class="hud-msg" style="display:none"></span>
                     </div>
                     <div class="hud-right">
-                        <a class="hud-vault-link" href="#" style="display:none" title="Open vault in a new tab">Open Vault ↗</a>
+                        <a class="hud-vault-link" href="#" style="display:none" title="Open vault">Open Vault</a>
                         <button class="hud-copy-btn" style="display:none" title="Copy app link">⎘ Copy Link</button>
                         <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
+                        <button class="hud-debug-btn" title="Toggle debug panel">🔍 Debug</button>
                     </div>
                 </div>
             `;
 
             this.shadowRoot.addEventListener('click', (e) => {
-                if (e.target.closest('.hud-copy-btn')) this._copyLink();
+                if (e.target.closest('.hud-copy-btn'))  this._copyLink();
+                if (e.target.closest('.hud-debug-btn')) this._toggleDebug();
             });
         }
 
@@ -65,8 +68,7 @@
             }
             if (link && vaultKey) {
                 var base = window.location.pathname.split('/en-gb/')[0];
-                link.href   = base + '/en-gb/vault/#' + vaultKey;
-                link.target = '_blank';
+                link.href  = base + '/#' + vaultKey;
                 link.style.display = '';
             }
             if (copy && vaultKey) {
@@ -113,6 +115,16 @@
             }
             const msgEl = this.shadowRoot.querySelector('.hud-msg');
             if (msgEl) { msgEl.style.display = 'none'; msgEl.textContent = ''; }
+        }
+
+        _toggleDebug() {
+            this._debugOpen = !this._debugOpen;
+            this.dispatchEvent(new CustomEvent('app-debug:toggle', {
+                bubbles: true, composed: true,
+                detail: { open: this._debugOpen, split: 0.32 }
+            }));
+            const btn = this.shadowRoot.querySelector('.hud-debug-btn');
+            if (btn) btn.classList.toggle('active', this._debugOpen);
         }
 
         _copyLink() {
@@ -172,6 +184,13 @@
             background: rgba(100,160,220,0.12); color: #64a0dc;
             border: 1px solid rgba(100,160,220,0.25); white-space: nowrap;
         }
+        .hud-debug-btn {
+            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
+            border: 1px solid #2a2a4a; background: transparent;
+            color: #4a5568; cursor: pointer; white-space: nowrap;
+        }
+        .hud-debug-btn:hover  { color: #4ECDC4; border-color: #4ECDC4; }
+        .hud-debug-btn.active { color: #4ECDC4; border-color: #4ECDC4; background: rgba(78,205,196,0.08); }
     `;
 
     customElements.define('app-hud', AppHud);

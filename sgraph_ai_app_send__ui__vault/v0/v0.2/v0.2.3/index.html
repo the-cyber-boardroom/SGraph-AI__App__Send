@@ -448,6 +448,35 @@
             }
         }
 
+        // Patch VaultEntry._onOpen for Format 3/5 key auto-open failure handling.
+        // The pre-hide block hides .vs-entry when a LS key exists; if _onOpen fails
+        // during auto-open, the inline error would land in the hidden form (blank screen).
+        // This patch detects auto-open and shows the full-page error instead.
+        (function () {
+            var _origOnOpen = VaultEntry.prototype._onOpen;
+            VaultEntry.prototype._onOpen = async function () {
+                var vaultKey = this._keyInput.value.trim();
+                if (!vaultKey) { return _origOnOpen.call(this); }
+
+                var storedToken = (VaultLoader.storage.getCurrentKey() || '').toLowerCase();
+                var isAutoOpen  = !!storedToken && storedToken === vaultKey.toLowerCase();
+                if (!isAutoOpen) { return _origOnOpen.call(this); }
+
+                // Auto-open path: show full-page error on failure
+                this._hideError();
+                this._showStatus('Opening vault…');
+                this._openBtn.disabled = true;
+                try {
+                    await this._openVault(vaultKey);
+                } catch (err) {
+                    _showAutoOpenErrorPage(vaultKey, err);
+                } finally {
+                    this._openBtn.disabled = false;
+                    this._hideStatus();
+                }
+            };
+        }());
+
         // vault-locked: clear the session-scoped vault handle.
         // VaultLoader.lock() (called by _onLock) already removes sg-vault-key via
         // clearCurrentKey(). Only sg-vault-session (the in-tab vault handle) is left

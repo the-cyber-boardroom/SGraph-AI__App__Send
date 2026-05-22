@@ -80,6 +80,8 @@
         #layout-host { flex: 1; min-height: 0; position: relative; }
         sg-layout { display: block; width: 100%; height: 100%; }
         app-hud { display: block; width: 100%; height: 48px; }
+        /* Hide the sg-layout stack chrome on the app page — panels need no title bar */
+        #app-layout { --sgl-panel-header-height: 0px; }
     </style>
 </head>
 <body>
