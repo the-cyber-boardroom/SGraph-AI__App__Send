@@ -79,7 +79,9 @@
             this._t.start = performance.now();
             this._vaultKey = key;
 
-            var endpoint = (window.SG_ENDPOINT || window.location.origin).replace(/\/$/, '');
+            var endpoint = (window.SG_ENDPOINT
+                || (typeof VaultLoader !== 'undefined' && VaultLoader.storage && VaultLoader.storage.getEndpoint && VaultLoader.storage.getEndpoint())
+                || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
             var sgSend   = new SGSend({ endpoint: endpoint });
 
             this._emitVaultEvent('open-start', { label: 'Opening vault', key: this._maskKey(key), isRO: key.startsWith('ro-') });
@@ -455,7 +457,9 @@
                 var errEl  = root.querySelector('.auth-err');
                 var rCheck = root.querySelector('.auth-rcheck');
                 var btn    = root.querySelector('.auth-submit');
-                var endpoint = (window.SG_ENDPOINT || window.location.origin).replace(/\/$/, '');
+                var endpoint = (window.SG_ENDPOINT
+                    || (typeof VaultLoader !== 'undefined' && VaultLoader.storage && VaultLoader.storage.getEndpoint && VaultLoader.storage.getEndpoint())
+                    || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
 
                 var submit = async () => {
                     var key = input.value.trim();
@@ -804,7 +808,9 @@
                         try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null }, '*'); } catch (_) {}
                     }
                     var vault    = self._vault;
-                    var endpoint = (window.SG_ENDPOINT || window.location.origin).replace(/\/$/, '');
+                    var endpoint = (window.SG_ENDPOINT
+                        || (typeof VaultLoader !== 'undefined' && VaultLoader.storage && VaultLoader.storage.getEndpoint && VaultLoader.storage.getEndpoint())
+                        || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
 
                     if (e.data.__sgCmdType === 'git') {
                         var action = e.data.action;
