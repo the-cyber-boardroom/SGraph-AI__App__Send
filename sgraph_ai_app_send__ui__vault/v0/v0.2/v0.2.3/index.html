@@ -16,7 +16,8 @@
     <script src="_common/js/vault-loader/vault-loader.js"></script>
 
     <!-- Routing: root is the only hash inbox; all other paths strip and discard.
-         With #token → save to LS → /en-gb/vault (direct vault open for share-link recipients).
+         With #token → save to LS → /en-gb/app#token (app-shell opens vault; redirects to
+         /en-gb/vault/ if no app.json found).
          Without # → /en-gb/ (landing, user picks from list).
          Anywhere else → strip hash, render page. -->
     <script>
@@ -579,17 +580,6 @@
                 var header = this.querySelector('vault-header');
                 if (header && typeof header.setAppJson === 'function') {
                     header.setAppJson(config, this._vaultKey);
-                }
-
-                // If vault was opened from a direct hash link (/#key → /en-gb/vault),
-                // redirect to /en-gb/app so the user sees the app experience.
-                var _fromHash = false;
-                try { _fromHash = sessionStorage.getItem('sg-vault-incoming-hash') === '1'; } catch (_) {}
-                if (_fromHash) {
-                    try { sessionStorage.removeItem('sg-vault-incoming-hash'); } catch (_) {}
-                    var _appBase = window.location.pathname.split('/en-gb/')[0];
-                    window.location.replace(_appBase + '/en-gb/app#' + this._vaultKey);
-                    return;
                 }
 
                 // Auto-open entry file in the vault file browser

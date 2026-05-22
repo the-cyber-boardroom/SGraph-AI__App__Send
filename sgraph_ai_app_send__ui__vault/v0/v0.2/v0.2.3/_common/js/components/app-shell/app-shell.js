@@ -170,6 +170,12 @@
         }
 
         async _continue(appJson) {
+            if (!appJson) {
+                // No app.json — this vault has no app. Drop back to the vault UI.
+                var base = window.location.pathname.split('/en-gb/')[0];
+                window.location.replace(base + '/en-gb/vault/');
+                return;
+            }
             this._setStatus('Loading resources…');
             var resourcesData = await this._fetchResources(appJson);
             this._t.resourcesLoaded = performance.now();

@@ -5,7 +5,8 @@
 
    Routing table (final design):
      /                   no hash  → redirect to /en-gb/
-     /#token             has hash → save token to LS → redirect to /en-gb/vault
+     /#token             has hash → save token to LS → redirect to /en-gb/app#token
+     /en-gb/app          has hash → app-shell opens vault; redirects to /en-gb/vault/ if no app.json
      /en-gb/             any hash → strip (discard) → render landing
      /en-gb/vault        any hash → strip (discard) → auto-load from LS
      /en-gb/vault/peek   any hash → strip (discard) → render peek page
@@ -13,7 +14,7 @@
    Two rules:
      1. Root (/) is the only hash inbox. All other surfaces strip hashes.
      2. Root routing target is driven by hash PRESENCE only (not content):
-        with hash → /en-gb/vault (share-link recipient lands directly on vault)
+        with hash → /en-gb/app#token (app-shell is the canonical entry point)
         without   → /en-gb/ (user is exploring; let them pick from the list)
 
    Note: these functions implement the NEW design. They are wired up in Phase 2.
@@ -48,11 +49,13 @@
             var token = _extractToken();
             if (token) {
                 VaultLoaderStorage.setCurrentKey(token);
-                // Signal that this was a direct hash open — vault page uses this to
-                // redirect to /en-gb/app when the vault has an app.json.
-                try { sessionStorage.setItem('sg-vault-incoming-hash', '1'); } catch (_) {}
+                // Go directly to app page with the key in the hash.
+                // app-shell will open the vault, check for app.json, and redirect
+                // back to /en-gb/vault/ if no app.json is found.
+                location.replace('/en-gb/app#' + token);
+            } else {
+                location.replace('/en-gb/app');
             }
-            location.replace('/en-gb/vault');
         } else {
             location.replace('/en-gb/');
         }
