@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-05-20 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-05-21 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -174,36 +174,34 @@ All items below are PROPOSED — does not exist yet.
 
 ---
 
-## Vault App CI Pipeline (05/16 brief — doc 419)
+## Nova + AgentCore POC (05/16 briefs — doc 420)
 
-All items below are PROPOSED — does not exist yet.
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-142 | FastAPI service with Nova model invocations | Micro / Lite / Pro / Premier endpoints; mini UI with model selector, prompt, result, cost, history | doc 420 |
+| P-143 | FastAPI service with AgentCore agent invocations | Configurable tools (Browser, Code Interpreter); session management; memory | doc 420 |
+| P-144 | Nova Act SDK integration for browser automation | Nova Act browser sessions against vault demo URLs; >90% accuracy on UI interaction tasks | doc 420 |
+| P-145 | LLM-validated qualitative tests (fifth test layer) | Nova-powered "is this vault OK?" beyond structural assertions; complements unit/integration/QA/browser | doc 420 |
+| P-146 | Per-invocation cost tracking log | Every LLM invocation: tokens in/out, cost estimate, latency, raw API response logged | doc 420 |
 
-| Feature | One-Line Description | Source |
-|---------|---------------------|--------|
-| P-136 | Vault app CI pipeline: 8-stage (commit → unit tests → vault inventory → per-vault tests → build → staging deploy → browser-automation → manual gate) | doc 419 |
-| P-137 | Vault inventory as manager vault: registry of registered vaults with test config, fixture pointers, notification preferences | doc 419 |
-| P-138 | Trigger ephemeral compute (Fargate/container hosts) from CI for isolated test environments (multi-region, browser-automation, load tests) | doc 419 |
-| P-139 | CI cost metering through pre-auth substrate: per-vault and aggregate cost visible; customer vaults billed to their balance | doc 419 |
+## Accountant Demo (05/16 briefs — doc 421)
 
-## Nova + AgentCore POC (05/16 brief — doc 420)
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-147 | Side-by-side two-persona demo environment | Four-pane UI: Actions / Accountant view / Client view / Narrative | doc 421 |
+| P-148 | FastAPI orchestration service for demo lifecycle | sessions, setup, step/N, state, teardown endpoints; holds AWS credentials; idempotent | doc 421 |
+| P-149 | Accountant + client vault apps with role-based routing | Same vault; `/accountant` and `/client` routes; different UX per role | doc 421 |
+| P-150 | 12-step demo workflow | Setup → provisioning → vault loading → role interactions → report → approval → submission → confirmation → teardown | doc 421 |
+| P-151 | Auto-teardown after 15-20 min idle | Prevents orphan demo sessions; reuses reset-on-activity timeout pattern | doc 421 |
+| P-152 | Demo framework pattern | Reusable template for recruitment/news/risk demos; content work once infrastructure established | doc 421 |
 
-All items below are PROPOSED — does not exist yet.
+## AppSec Mini-Tools (05/16 briefs — doc 423)
 
-| Feature | One-Line Description | Source |
-|---------|---------------------|--------|
-| P-140 | FastAPI service with `/nova/invoke` (Nova Micro/Lite/Pro/Premier) and `/agentcore/invoke` (Browser, Code Interpreter, memory) endpoints | doc 420 |
-| P-141 | Mini UI for Nova/AgentCore experimentation: model selector, prompt textarea, cost/latency display, session history | doc 420 |
-| P-142 | Nova Act SDK integration for browser automation experiments against vault demos | doc 420 |
-| P-143 | LLM-validated qualitative tests as a fifth vault test layer: Nova prompt over vault content → JSON score + issue list + recommendations | doc 420 |
-
-## AppSec Mini-Tools (05/16 brief — doc 423)
-
-All items below are PROPOSED — does not exist yet.
-
-| Feature | One-Line Description | Source |
-|---------|---------------------|--------|
-| P-155 | Threat modelling mini-tool: StrideGPT integration (STRIDE + OWASP LLM Top 10 + multi-modal); two modes (pure client-side; ephemeral compute-backed) | doc 423 |
-| P-156 | Vault schema for threat modelling artifacts: system descriptions, threat lists (STRIDE), attack trees, DREAD scores, mitigations, Gherkin tests | doc 423 |
-| P-157 | AppSec mini-tools catalogue: SBOM analysis (syft/cdxgen), dependency scanning (trivy/grype), secrets detection (gitleaks), OWASP assessment, compliance evidence (8 tools mapped) | doc 423 |
-| P-158 | GitHub-driven vault pattern for source-code analysis: vault clones repo, runs analysis, commits results back; triggers on upstream changes | doc 423 |
-| P-159 | "Security manager vault" holding many specialised AppSec vaults; findings cross-reference across vault boundaries | doc 423 |
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-159 | Threat-modelling mini-tool on vaults | StrideGPT (mrwadams) integration; STRIDE + OWASP LLM Top 10 + MAESTRO pattern detection | doc 423 |
+| P-160 | Client-side mode: threat modeller in browser | Runs entirely in vault JS API context; no server-side compute; offline-capable | doc 423 |
+| P-161 | Ephemeral compute-backed mode | FastAPI backend on SG/Compute; Fargate task per session; heavier analysis possible | doc 423 |
+| P-162 | AppSec vault schema for threat artefacts | System descriptions, threat lists, attack trees, mitigations, evidence — all in vault | doc 423 |
+| P-163 | SBOM analysis mini-tool (planned next) | syft/cdxgen integration; vault holds SBOM + change history; planned after threat modelling | doc 423 |
+| P-164 | Dependency scanning mini-tool (planned next) | trivy/grype integration; vault tracks findings and fixes; planned after threat modelling | doc 423 |

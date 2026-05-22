@@ -1,6 +1,6 @@
 # Tools — Proposed Items Index
 
-**Domain:** tools/proposed/ | **Last updated:** 2026-05-18 | **Maintained by:** Librarian (daily run)
+**Domain:** tools/proposed/ | **Last updated:** 2026-05-21 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -106,3 +106,30 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | Variant grid | 2-3 simultaneous generations per submit for easy comparison | doc 390 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 17–32)*
+
+---
+
+## SG Mail — Email Client on Vaults (05/16 briefs — doc 426)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-175 | SG Mail email client on vaults | Vault is system of record for EML files; vault client is the UX; NOT building email infrastructure | doc 426 |
+| P-176 | AWS SES inbound connector | SES receives → drops to S3 → S3 event trigger Lambda → read EML → write to vault via email-fs | doc 426 |
+| P-177 | AWS SES outbound connector | Vault compose UI → outbound service → SES API → recipient; DKIM/SPF managed by SES | doc 426 |
+| P-178 | Email web app UI | Inbox, folders, thread view, compose, reply/forward, search, contacts, attachments, mobile-responsive | doc 426 |
+| P-179 | WorkMail migration tool | Reads mbox/maildir export; parses each EML; commits to vault via email-fs | doc 426 |
+| P-180 | Multi-provider backup for email vault | Cross-account S3 (Tier 1) + non-AWS provider (B2 or R2) (Tier 5) | doc 426 |
+| P-181 | Cloudflare Email Service connector (v2) | Cloudflare Email Routing → Workers → POST EML to vault; agent-native positioning | doc 426 |
+| P-182 | Gmail API connector (v2) | OAuth-based read + mirror of Gmail into vault; optional bidirectional sync | doc 426 |
+
+## Backup and Restore Infrastructure (05/16 briefs — doc 427)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-183 | Backup mini-app with sg-backup-operations vault | Dedicated vault + worker EC2; UI + JS API + audit trail; dogfoods vault-as-mini-app pattern | doc 427 |
+| P-184 | Seven-tier backup storage strategy | Same-account S3 → cross-account S3 → S3-IA → Glacier → multi-provider → offline archive | doc 427 |
+| P-185 | Separate AWS backup account with write-only IAM | Ransomware in account A cannot delete backups in account B; Organizations sub-account | doc 427 |
+| P-186 | Daily automated restore drill | Random vault → scratch environment → hash compare → result committed to backup vault | doc 427 |
+| P-187 | Weekly full-restore + quarterly DR drill | Full vault inventory restore to fresh AWS account; quarterly tabletop exercise | doc 427 |
+| P-188 | Scheduled Claude Code backup health-check sessions | Agentic workflow: reads backup vault JS API; alerts on stale or failed backups | doc 427 |
+| P-189 | Backblaze B2 as first multi-provider backup target | S3-compatible; $6/TB-mo; backup-focused; validates multi-provider architecture | doc 427 |
