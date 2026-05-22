@@ -46,7 +46,12 @@
     function runRoot() {
         if (_hasHash()) {
             var token = _extractToken();
-            if (token) VaultLoaderStorage.setCurrentKey(token);
+            if (token) {
+                VaultLoaderStorage.setCurrentKey(token);
+                // Signal that this was a direct hash open — vault page uses this to
+                // redirect to /en-gb/app when the vault has an app.json.
+                try { sessionStorage.setItem('sg-vault-incoming-hash', '1'); } catch (_) {}
+            }
             location.replace('/en-gb/vault');
         } else {
             location.replace('/en-gb/');

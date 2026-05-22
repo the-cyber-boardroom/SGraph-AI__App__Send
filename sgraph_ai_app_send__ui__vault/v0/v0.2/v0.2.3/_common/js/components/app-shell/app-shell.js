@@ -565,6 +565,12 @@
                 return;
             }
 
+            // _page.json entries are rendered via PageLayoutRenderer, not an HTML iframe
+            if (entryFile.endsWith('_page.json')) {
+                await this._mountPageLayout(entry);
+                return;
+            }
+
             this._setStatus('Loading app…');
 
             var htmlBytes = await this._dataSource.getFileBytes(entry.path);
@@ -609,6 +615,77 @@
             this.shadowRoot.innerHTML = `<style>:host{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#0a0a18;}</style>`;
             this.shadowRoot.appendChild(iframe);
 
+            this._setupVfsBridgeHandlers(iframe, this._dataSource);
+        }
+
+        // _page.json: render via PageLayoutRenderer.
+        // Fetches the renderer + CSS from /_common/ in the parent context (no CSP/CORS
+        // issues), then inlines everything into a self-contained blob iframe.
+        async _mountPageLayout(entry) {
+            this._setStatus('Loading page…');
+
+            var fileList   = this._dataSource.getFileList();
+            var folderPath = entry.path.includes('/')
+                ? entry.path.substring(0, entry.path.lastIndexOf('/') + 1) : '';
+            var bridgeScript = this._buildVfsBridgeScript(entry.path);
+
+            // Fetch renderer JS and all CSS from the parent origin so we can inline them.
+            var plrJs   = await fetch('/_common/js/page-layout-renderer.js').then(function (r) { return r.text(); });
+            var css1    = await fetch('/_common/js/components/send-download/send-browse.css').then(function (r) { return r.text(); });
+            var css2    = await fetch('/_common/js/components/send-download/send-browse-v031.css').then(function (r) { return r.text(); });
+            var css3    = await fetch('/_common/js/components/send-download/send-browse-v031--page-layout.css').then(function (r) { return r.text(); });
+
+            var html = '<!DOCTYPE html><html><head>' +
+                '<meta charset="utf-8">' +
+                '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+                bridgeScript +
+                '<style>' + css1 + '\n' + css2 + '\n' + css3 + '</style>' +
+                '<style>html,body{margin:0;padding:0;height:100%;overflow-x:hidden;}' +
+                'body{background:#0d1117;}#plr-root{min-height:100vh;}</style>' +
+                '</head><body>' +
+                '<div id="plr-root"></div>' +
+                '<script>' + plrJs + '<\/script>' +
+                '<script>(function(){' +
+                  'var fileList=' + JSON.stringify(fileList) + ';' +
+                  'var folderPath=' + JSON.stringify(folderPath) + ';' +
+                  'var entryPath=' + JSON.stringify(entry.path) + ';' +
+                  'var objectUrls=[];' +
+                  'var browseInstance={' +
+                    '_objectUrls:objectUrls,' +
+                    'dataSource:{' +
+                      'getFileList:function(){return fileList;},' +
+                      'getFileBytes:function(p){return sg.vfs.read(p);}' +
+                    '}' +
+                  '};' +
+                  'sg.vfs.read(entryPath).then(function(buf){' +
+                    'var json=new TextDecoder().decode(buf);' +
+                    'var container=document.getElementById("plr-root");' +
+                    'PageLayoutRenderer.render(container,json,folderPath,null,browseInstance);' +
+                  '}).catch(function(err){' +
+                    'document.getElementById("plr-root").innerHTML=' +
+                      '"<div style=\\"padding:2rem;color:#ff6b6b\\">Error: "+err.message+"</div>";' +
+                  '});' +
+                '}());<\/script>' +
+                '</body></html>';
+
+            var blob    = new Blob([html], { type: 'text/html' });
+            var blobUrl = URL.createObjectURL(blob);
+            this._objectUrls.push(blobUrl);
+
+            var iframe         = document.createElement('iframe');
+            iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+            iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
+            iframe.src         = blobUrl;
+            iframe.addEventListener('load', () => {
+                this._iframeStatus  = 'ready';
+                this._t.iframeReady = performance.now();
+                this._emitVaultEvent('iframe-ready', { label: 'Page layout ready', entry: entry.path, ms: Math.round(this._t.iframeReady - this._t.start) });
+            });
+            this._iframeEl     = iframe;
+            this._iframeStatus = 'loading';
+
+            this.shadowRoot.innerHTML = '<style>:host{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#0a0a18;}</style>';
+            this.shadowRoot.appendChild(iframe);
             this._setupVfsBridgeHandlers(iframe, this._dataSource);
         }
 
