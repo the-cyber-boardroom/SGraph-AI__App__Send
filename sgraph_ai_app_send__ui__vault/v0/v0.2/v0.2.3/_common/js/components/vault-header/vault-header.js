@@ -49,7 +49,7 @@
                         </div>
                         <button class="vh-upload-btn">Upload</button>
                         <button class="vh-debug-btn">Debug</button>
-                        <button class="vh-open-app-btn" style="display:none" title="Open app in a new tab">&#9654; Open App</button>
+                        <button class="vh-open-app-btn" style="display:none" title="Open app">&#9654; Open App</button>
                         <a class="vh-raw-link" title="View raw vault data" href="#">raw</a>
                         <button class="vh-lock-btn" style="display:none" title="Return to vault list">&#8646; Vaults</button>
                         <span class="vh-version">v0.2.0</span>
@@ -286,7 +286,7 @@
         _openApp() {
             if (!this._appVaultKey) return;
             const base = window.location.pathname.split('/en-gb/')[0];
-            window.open(base + '/en-gb/app#' + this._appVaultKey, '_blank');
+            window.location.assign(base + '/en-gb/app#' + this._appVaultKey);
         }
     }
 
