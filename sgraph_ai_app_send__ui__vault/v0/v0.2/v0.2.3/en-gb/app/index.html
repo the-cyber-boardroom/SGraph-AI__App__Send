@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <!-- Debug infrastructure: fetch proxy + event buffer. Must run first. -->
+    <script>
+    (function () {
+        'use strict';
+        // Global debug event buffer — components read history on connect.
+        window._appDebug = { vaultEvents: [], bridgeCalls: [], networkCalls: [], maxItems: 300 };
+        function _bufPush(arr, item) { arr.push(item); if (arr.length > 300) arr.shift(); }
+        document.addEventListener('app-debug:vault-event',   function (e) { _bufPush(window._appDebug.vaultEvents,  e.detail); });
+        document.addEventListener('app-debug:bridge-call',   function (e) { _bufPush(window._appDebug.bridgeCalls,  e.detail); });
+        document.addEventListener('app-debug:network-call',  function (e) { _bufPush(window._appDebug.networkCalls, e.detail); });
+
+        // Fetch proxy — records all outbound fetch() calls
+        var _origFetch = window.fetch;
+        window.fetch = function (input, init) {
+            var url    = typeof input === 'string' ? input : (input && input.url) || String(input);
+            var method = ((init && init.method) || 'GET').toUpperCase();
+            var t0     = performance.now();
+            return _origFetch.apply(this, arguments).then(function (resp) {
+                document.dispatchEvent(new CustomEvent('app-debug:network-call', {
+                    detail: { method: method, url: _maskUrl(url), status: resp.status, ms: Math.round(performance.now() - t0), ok: resp.ok }
+                }));
+                return resp;
+            }, function (err) {
+                document.dispatchEvent(new CustomEvent('app-debug:network-call', {
+                    detail: { method: method, url: _maskUrl(url), status: 0, ms: Math.round(performance.now() - t0), ok: false, err: err.message }
+                }));
+                throw err;
+            });
+        };
+        function _maskUrl(url) {
+            return url.replace(/#.*$/, '#…').replace(/\/obj-[a-f0-9]{20,}/g, '/obj-***');
+        }
+    }());
+    </script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/App</title>
+
+    <!-- Vault crypto layer — no vault-loader scripts on this page -->
+    <script src="/_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="/_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--branches.js"></script>
+
+    <!-- VaultDataSource — file I/O adapter (no UI dependency) -->
+    <script src="/_common/js/adapters/vault-data-source.js"></script>
+
+    <!-- sg-layout (fractal window manager) -->
+    <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
+
+    <!-- App shell components -->
+    <script src="/_common/js/components/app-shell/app-hud.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-pane.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-vault-trace.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-bridge-log.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-app-state.js"></script>
+    <script src="/_common/js/components/app-shell/app-debug-network.js"></script>
+    <script src="/_common/js/components/app-shell/app-shell.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body {
+            height: 100%; margin: 0; padding: 0;
+            background: #0a0a18; color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+        }
+        body { display: flex; flex-direction: column; }
+        #hud-host  { flex: 0 0 48px; min-height: 48px; max-height: 48px; overflow: hidden; }
+        #layout-host { flex: 1; min-height: 0; position: relative; }
+        sg-layout { display: block; width: 100%; height: 100%; }
+        app-hud { display: block; width: 100%; height: 48px; }
+    </style>
+</head>
+<body>
+    <div id="hud-host"><app-hud id="app-hud"></app-hud></div>
+    <div id="layout-host"><sg-layout id="app-layout"></sg-layout></div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        // Layout config — kept in scope so debug toggle can update sizes.
+        var _layoutCfg = {
+            type: 'row',
+            sizes: [1.0, 0.0],
+            children: [
+                { type: 'stack', id: 'app-area',   tabs: [{ tag: 'app-shell',      title: 'App',      locked: true  }] },
+                { type: 'stack', id: 'debug-area', tabs: [{ tag: 'app-debug-pane', title: '🔍 Debug', locked: false }] }
+            ]
+        };
+
+        // Restore debug pane state from sessionStorage
+        try {
+            if (sessionStorage.getItem('app-debug-open') === '1') {
+                var savedSplit = parseFloat(sessionStorage.getItem('app-debug-split') || '0.28');
+                _layoutCfg.sizes = [1 - savedSplit, savedSplit];
+            }
+        } catch (_) {}
+
+        Promise.all([
+            customElements.whenDefined('sg-layout'),
+            customElements.whenDefined('app-shell'),
+            customElements.whenDefined('app-debug-pane')
+        ]).then(function () {
+            var layout = document.getElementById('app-layout');
+            layout.setLayout(_layoutCfg);
+        });
+
+        // app-shell → app-hud: wire vault info to HUD once shell is ready
+        document.addEventListener('app-shell:ready', function (e) {
+            var hud = document.getElementById('app-hud');
+            if (hud && typeof hud.setInfo === 'function') {
+                hud.setInfo(e.detail.vaultName, e.detail.appTitle, e.detail.vaultKey, e.detail.isRO);
+            }
+        });
+
+        // Debug pane expand/collapse
+        document.addEventListener('app-debug:toggle', function (e) {
+            var layout = document.getElementById('app-layout');
+            if (!layout || typeof layout.setLayout !== 'function') return;
+            var open  = !!e.detail.open;
+            var split = e.detail.split || 0.28;
+            _layoutCfg = Object.assign({}, _layoutCfg, {
+                sizes: open ? [1 - split, split] : [1.0, 0.0]
+            });
+            layout.setLayout(_layoutCfg);
+            try {
+                sessionStorage.setItem('app-debug-open',  open ? '1' : '0');
+                sessionStorage.setItem('app-debug-split', String(split));
+            } catch (_) {}
+        });
+    }());
+    </script>
+</body>
+</html>

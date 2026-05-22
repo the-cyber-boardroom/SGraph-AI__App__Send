@@ -49,6 +49,7 @@
                         </div>
                         <button class="vh-upload-btn">Upload</button>
                         <button class="vh-debug-btn">Debug</button>
+                        <button class="vh-open-app-btn" style="display:none" title="Open app in a new tab">&#9654; Open App</button>
                         <a class="vh-raw-link" title="View raw vault data" href="#">raw</a>
                         <button class="vh-lock-btn" style="display:none" title="Return to vault list">&#8646; Vaults</button>
                         <span class="vh-version">v0.2.0</span>
@@ -58,7 +59,7 @@
             `;
 
             this.shadowRoot.addEventListener('click', (e) => {
-                if (e.target.closest('.vh-check-btn'))   this._emit('vault-header-check');
+                if (e.target.closest('.vh-check-btn'))    this._emit('vault-header-check');
                 if (e.target.closest('.vh-push-btn'))    this._emit('vault-header-push');
                 if (e.target.closest('.vh-pull-btn'))    this._emit('vault-header-pull');
                 if (e.target.closest('.vh-refresh-btn')) this._emit('vault-header-refresh');
@@ -66,6 +67,7 @@
                 if (e.target.closest('.vh-lock-btn'))    this._emit('vault-header-lock');
                 if (e.target.closest('.vh-debug-btn'))   this._emit('vault-header-debug');
                 if (e.target.closest('.vh-raw-link'))   { e.preventDefault(); this._emit('vault-header-raw'); }
+                if (e.target.closest('.vh-open-app-btn')) this._openApp();
                 if (e.target.closest('.vh-vault-name') && !e.target.closest('input')) this._startNameEdit();
                 if (e.target.closest('.vh-readonly-badge') || e.target.closest('.vh-unlock-btn')) this._showUnlockPanel();
                 if (e.target.closest('.vh-unlock-apply'))  this._applyUnlock();
@@ -268,6 +270,24 @@
                 el.textContent = `${build.appVersion}  .  UI ${build.uiVersion} (IFD)`;
             }
         }
+
+        // Called by vault's _applyAppJson() when app.json is present.
+        // Shows the "▶ Open [title]" button that launches /en-gb/app in a new tab.
+        setAppJson(config, vaultKey) {
+            this._appJsonConfig = config;
+            this._appVaultKey   = vaultKey;
+            const btn   = this.shadowRoot.querySelector('.vh-open-app-btn');
+            if (!btn) return;
+            const title = (config && config.title) ? config.title : 'App';
+            btn.textContent  = '▶ Open ' + title;
+            btn.style.display = '';
+        }
+
+        _openApp() {
+            if (!this._appVaultKey) return;
+            const base = window.location.pathname.split('/en-gb/')[0];
+            window.open(base + '/en-gb/app#' + this._appVaultKey, '_blank');
+        }
     }
 
     VaultHeader.styles = `
@@ -347,6 +367,13 @@
             border-color: var(--color-primary); font-weight: 600;
         }
         .vh-upload-btn:hover { background: var(--color-primary-hover); color: var(--bg-primary); }
+        .vh-open-app-btn {
+            font-size: var(--text-small); padding: 0.25rem 0.75rem; border-radius: var(--radius-sm);
+            border: 1px solid var(--color-primary); background: var(--color-primary);
+            color: var(--bg-primary, #0a0a18); cursor: pointer; font-family: var(--font-family);
+            font-weight: 700; white-space: nowrap;
+        }
+        .vh-open-app-btn:hover { background: var(--color-primary-hover, #3dbdb5); border-color: var(--color-primary-hover, #3dbdb5); }
         .vh-raw-link {
             font-size: 0.625rem; color: var(--color-text-secondary);
             text-decoration: none; opacity: 0.6; padding: 0.25rem 0.375rem;
