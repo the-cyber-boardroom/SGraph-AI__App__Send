@@ -1,6 +1,6 @@
 # ui/proposed — Index
 
-**Domain:** `ui/` | **Last updated:** 2026-04-28
+**Domain:** `ui/` | **Last updated:** 2026-05-22
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16 (lines 1210–1219, 1234–1241), 17 (lines 1541–1551), 29–30 (lines 2720–2830)
 
 ---
@@ -74,3 +74,39 @@ Allow `_page.json` to reference embeddable components (charts, interactive widge
 players) that render inline in the browse/view modes. PROPOSED.
 
 *Full source: `../v0.16.26__what-exists-today.md` Sections 16–17, 29–30 (lines 1210–1551, 2720–2830)*
+
+---
+
+## Vault Demo Capabilities (05/16 brief — doc 417)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-128 | Read-only vault opening polish: visual indicator, mobile-responsive rendering, "make this your own" CTA | doc 417 |
+| P-129 | Cross-vault navigation defaults: new tab for cross-vault links, same tab for intra-vault anchors; share-token carry | doc 417 |
+| P-130 | Session-scoped client-side state shim over JS API: in-memory map of path overrides; read checks session first; writes to session only (no vault commits); survives in-vault nav; discards on refresh/tab-close | doc 417 |
+| P-131 | Session reset capability: clear all session-scoped changes within a tab without reloading | doc 417 |
+
+## Vault Testing Framework (05/16 brief — doc 418)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-132 | Four-layer vault testing framework (unit/integration/QA/browser-automation) using same JS API as production | doc 418 |
+| P-133 | Vitest as unit/integration test runner; Playwright for browser-automation layer | doc 418 |
+| P-134 | Unified test definition format: single file, `layer` option (`'unit'`/`'integration'`/`'qa'`/`'browser'`) routes to correct environment | doc 418 |
+| P-135 | Integration/QA test contexts: fixture vaults in known state; session-scoped mutations for QA; reset between tests | doc 418 |
+
+## Accountant Demo (05/16 brief — doc 421)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-144 | Accountant demo: four-pane UI (Actions / Accountant view / Client view / Narrative); 12-step orchestrated workflow; real EC2 + DNS + vault per session | doc 421 |
+| P-145 | Same-vault two-apps pattern: role-aware vault app with `/accountant` and `/client` routes from same vault | doc 421 |
+| P-146 | Demo FastAPI orchestration service: sessions, setup, step-N, teardown API; holds credentials; idempotent | doc 421 |
+| P-147 | Auto-teardown for demo sessions: idle timeout 15-20 minutes; explicit teardown button; no orphan resources | doc 421 |
+| P-148 | Pre-provisioned shared demo environment mode (instant-start alternative for public-facing demos) | doc 421 |

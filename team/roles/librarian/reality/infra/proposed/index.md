@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-05-20 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-05-22 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -166,3 +166,65 @@ All items below are PROPOSED — does not exist yet.
 | Real benchmark on c8i-flex.large: Docker vs Podman vs Firecracker | Cold-start, memory, CPU for vault app workload; one-day exercise, sub-$5 cost | doc 411 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 16–32)*
+
+---
+
+## SG/Compute Serverless Synthesis (05/16 brief — doc 424)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-160 | SG/Compute framed as serverless environment for agents: serverless cost shape + agent-friendly parallelism + vault-grounded state + customer-controlled substrate + optional confidential compute + isolation per use case | doc 424 |
+| P-161 | Edge router (Lambda + state machine) as serverless address router: checks running instance → routes or triggers cold-start; substrate-routing logic; handles DNS pinning | doc 424 |
+| P-162 | Pre-warmed pool option for container hosts: 5-15s cold-starts via pre-warmed EC2 instances; reserved capacity for high-throughput customers | doc 424 |
+| P-163 | "Serverless lane" in substrate spectrum: documented cold-start budgets and tear-down behaviour per substrate (Fargate 10-30s, container on running host 1-5s, cached container <1s, Firecracker snapshot future <50ms) | doc 424 |
+| P-164 | Enclave-serverless integration path: Nitro Enclave-backed serverless for sensitive workloads; attested code verifiable by customer | doc 424 |
+
+## On-Demand Provisioning Fixes (05/16 brief — doc 428)
+
+All items below are PROPOSED — does not exist yet. **Note:** 50-second EC2 provisioning confirmed EXISTS in production.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-183 | DNS pinning fix: holding-page-detects-readiness Lambda (302 redirect when instance ready); wildcard DNS TTL = 30s as defence | doc 428 |
+| P-184 | Randomised ephemeral address pattern: GUID-like subdomain names for session-scoped instances; unguessable, privacy-friendly, fresh in DNS cache | doc 428 |
+| P-185 | "Found existing instance, want to join?" UX: Lambda checks admin vault for running instance; multi-instance-per-user capability | doc 428 |
+| P-186 | Multi-instance-per-user: user can have multiple simultaneous instances; manager vault as account-level overview | doc 428 |
+
+## Backup and Restore (05/16 brief — doc 427)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-176 | Backup mini-app (sg-backup-operations vault): config, status per vault, drill results, alerts, audit history, UI (dashboard), JS API for agentic access | doc 427 |
+| P-177 | Backup worker EC2 instance: continuous operational loop (backup → read-back verify → restore drills → write results to backup-operations vault) | doc 427 |
+| P-178 | Seven-tier backup storage strategy: Tier 0 (source S3) → Tier 1 (cross-account S3 hot) → Tier 2 (daily snapshot) → Tier 3 (S3 IA) → Tier 4 (Glacier) → Tier 5 (non-AWS provider) → Tier 6 (offline cold) | doc 427 |
+| P-179 | Separate AWS backup account: write-only IAM from account A; SCPs preventing deletion in account B; no interactive console; ransomware in account A cannot delete backups | doc 427 |
+| P-180 | Backblaze B2 as first multi-provider backup target ($6/TB-mo; S3-compatible; backup-focused; non-AWS isolation) | doc 427 |
+| P-181 | Restore drill schedule: daily lightweight, weekly full-vault, monthly full-platform DR to fresh AWS account, quarterly cold-tier (Glacier) | doc 427 |
+| P-182 | Agentic backup health checks: scheduled Claude Code sessions reading backup-operations vault; alerts on stale or failed backups | doc 427 |
+
+## Multi-Cloud Deployment (05/16 brief — doc 426)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-171 | SG/Deploy as separate codebase (GCP Cloud Run + Akamai Cloud commands; not absorbed into SG/Compute; communicates with SG/Compute via shared vaults) | doc 426 |
+| P-172 | Vault-as-communication-medium pattern for agent-to-agent communication: agents write requests to shared vault; other agent processes and writes results; no library imports, no subprocess calls | doc 426 |
+| P-173 | GCP Cloud Run deployment of vault Docker container (first non-AWS cloud target) | doc 426 |
+| P-174 | Akamai Cloud (Linode) deployment of vault Docker container (Dedicated 4GB Linode ~$36/month; Akamai Object Storage S3-compatible) | doc 426 |
+| P-175 | Multi-cloud cost tracking per cloud in unified observability session (comparable cost data across AWS, GCP, Akamai) | doc 426 |
+
+## Admin Interface and Lab Registry (05/16 brief — doc 429)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-187 | Admin UI vault app (sg-labs-admin): list/create/inspect/teardown labs; three-state display (cold/provisioning/live); per-lab cost, TTL, activity log, access control | doc 429 |
+| P-188 | Admin vault as lab registry: source of truth for lab definitions, state, and audit history; DNS records are projection of vault state | doc 429 |
+| P-189 | DNS sync process: admin vault commit → Route 53 A record created/removed; reconciliation job catches drift within 1 hour; admin vault wins on conflict | doc 429 |
+| P-190 | Lab-of-labs: manager labs holding registry of sub-labs; same manager vault pattern extends hierarchically | doc 429 |

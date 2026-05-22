@@ -171,3 +171,39 @@ All items below are PROPOSED — does not exist yet.
 | Specialised Manager Vaults as products | Pre-packaged manager vault templates (customer engagement, investor relations, compliance audit) | doc 413 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 16–32)*
+
+---
+
+## Vault App CI Pipeline (05/16 brief — doc 419)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-136 | Vault app CI pipeline: 8-stage (commit → unit tests → vault inventory → per-vault tests → build → staging deploy → browser-automation → manual gate) | doc 419 |
+| P-137 | Vault inventory as manager vault: registry of registered vaults with test config, fixture pointers, notification preferences | doc 419 |
+| P-138 | Trigger ephemeral compute (Fargate/container hosts) from CI for isolated test environments (multi-region, browser-automation, load tests) | doc 419 |
+| P-139 | CI cost metering through pre-auth substrate: per-vault and aggregate cost visible; customer vaults billed to their balance | doc 419 |
+
+## Nova + AgentCore POC (05/16 brief — doc 420)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-140 | FastAPI service with `/nova/invoke` (Nova Micro/Lite/Pro/Premier) and `/agentcore/invoke` (Browser, Code Interpreter, memory) endpoints | doc 420 |
+| P-141 | Mini UI for Nova/AgentCore experimentation: model selector, prompt textarea, cost/latency display, session history | doc 420 |
+| P-142 | Nova Act SDK integration for browser automation experiments against vault demos | doc 420 |
+| P-143 | LLM-validated qualitative tests as a fifth vault test layer: Nova prompt over vault content → JSON score + issue list + recommendations | doc 420 |
+
+## AppSec Mini-Tools (05/16 brief — doc 423)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-155 | Threat modelling mini-tool: StrideGPT integration (STRIDE + OWASP LLM Top 10 + multi-modal); two modes (pure client-side; ephemeral compute-backed) | doc 423 |
+| P-156 | Vault schema for threat modelling artifacts: system descriptions, threat lists (STRIDE), attack trees, DREAD scores, mitigations, Gherkin tests | doc 423 |
+| P-157 | AppSec mini-tools catalogue: SBOM analysis (syft/cdxgen), dependency scanning (trivy/grype), secrets detection (gitleaks), OWASP assessment, compliance evidence (8 tools mapped) | doc 423 |
+| P-158 | GitHub-driven vault pattern for source-code analysis: vault clones repo, runs analysis, commits results back; triggers on upstream changes | doc 423 |
+| P-159 | "Security manager vault" holding many specialised AppSec vaults; findings cross-reference across vault boundaries | doc 423 |

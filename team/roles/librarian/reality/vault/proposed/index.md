@@ -1,6 +1,6 @@
 # vault/proposed — Index
 
-**Domain:** `vault/` | **Last updated:** 2026-05-18
+**Domain:** `vault/` | **Last updated:** 2026-05-22
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16–17, 19, 29
 
 ---
@@ -127,3 +127,16 @@ from structure-key-split. Currently requires write_key; proposed to accept read_
 | Template vault clone API (`POST /vault/clone`) | Server-side clone of template vault to new customer instance | doc 364 |
 | One-time share token (no PKI Phase 1) | Disposable read access token; expires after single use | doc 364 |
 | Bring-your-own-key commercial pattern | Customer controls encryption key; no data custody by SGraph | doc 360 |
+
+## Vault Discovery and Public Keys (05/16 brief — doc 422)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-149 | `/.well-known/vaults` discovery endpoint: JSON listing of vaults server is willing to expose (id, title, description, public key, visibility, thumbnail) | doc 422 |
+| P-150 | Vault visibility model: `public` / `unlisted` / `private` / `count-only` per vault in vault metadata; default: new vault = private | doc 422 |
+| P-151 | Ed25519 signing + X25519 encryption key pair per vault: public key in discovery; private key encrypted under vault key; industry-standard asymmetric cryptography | doc 422 |
+| P-152 | "Send content to a vault" via public-key encryption: anonymous sender encrypts to X25519 public key → POST to server → stored in inbox → vault owner decrypts; use cases: tip-line, customer uploads, form submissions, inter-vault messaging | doc 422 |
+| P-153 | Self-contained demo server hosting bundled vault catalogue: single Docker image with bundled demo vaults; offline-deployable; USB-stick or air-gapped distribution | doc 422 |
+| P-154 | TXT records for vault public key distribution via DNS (DKIM pattern: `sg-pubkey=ed25519:...` TXT alongside A records at registered slugs) | doc 429 |
