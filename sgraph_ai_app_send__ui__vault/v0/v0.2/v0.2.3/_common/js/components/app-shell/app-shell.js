@@ -65,6 +65,21 @@
         _init() {
             var rawHash = window.location.hash.slice(1).trim();
             if (!rawHash) {
+                // Fall back to the last-used vault key shared with the vault page
+                var saved = '';
+                try { saved = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+                if (saved) {
+                    this._showLoading('Opening vault…');
+                    this._initWithKey(saved, null).catch((err) => {
+                        console.error('[app-shell] init failed:', err);
+                        this._showEntryForm();
+                        var errEl = this.shadowRoot.getElementById('ef-err');
+                        if (errEl) errEl.textContent = err.message;
+                        var keyEl = this.shadowRoot.getElementById('ef-key-input');
+                        if (keyEl) { keyEl.value = saved; keyEl.dispatchEvent(new Event('input')); }
+                    });
+                    return;
+                }
                 this._showEntryForm();
                 return;
             }
@@ -100,6 +115,11 @@
             this._writable = !isRO;
             this._t.vaultOpened = performance.now();
             this._emitVaultEvent('open-ok', { label: 'Vault opened', vaultName: vault.name || '', ms: Math.round(this._t.vaultOpened - this._t.start) });
+
+            // Persist vault key for reload recovery (shared with /en-gb/vault/ via sg-vault-key)
+            if (!isRO) {
+                try { localStorage.setItem('sg-vault-key', key); } catch (_) {}
+            }
 
             // Key never stays in address bar
             if (window.history && window.history.replaceState) {
