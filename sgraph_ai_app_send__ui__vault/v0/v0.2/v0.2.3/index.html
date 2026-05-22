@@ -45,6 +45,8 @@
 <body>
 
     <vault-shell></vault-shell>
+    <!-- sg-app-banner: hidden until app.json present:true activates it -->
+    <sg-app-banner style="display:none"></sg-app-banner>
 
     <!-- ===================================================================
          Script Loading Order — v0.2.1 root shell
@@ -152,6 +154,9 @@
 
     <!-- 7c. Browse edit overlay -->
     <script src="_common/js/components/vault-browse-edit/vault-browse-edit.js"></script>
+
+    <!-- 7d. App banner (present mode — activated by app.json present:true) -->
+    <script src="_common/js/components/sg-app-banner/sg-app-banner.js"></script>
 
     <!-- 8. Debug panels -->
     <script src="_common/js/components/messages-panel/messages-panel.js"></script>
@@ -562,8 +567,13 @@
 
                 var entryFile = config.entry    || 'index.html';
                 var autoOpen  = config.auto_open !== false;
+                var present   = config.present  === true ||
+                                (config.chrome && config.chrome.mode === 'maximised');
 
-                console.log('[app.json] entry:', entryFile, '| title:', config.title || '(none)');
+                // Remember for _onAuthSubmit so entering an access key can re-activate.
+                this._appJsonMode = present;
+
+                console.log('[app.json] entry:', entryFile, '| present:', present, '| title:', config.title || '(none)');
 
                 // Show "▶ Open [App]" button in the vault header
                 var header = this.querySelector('vault-header');
@@ -571,13 +581,40 @@
                     header.setAppJson(config, this._vaultKey);
                 }
 
-                // Auto-open entry file in the vault file browser (preview — unchanged behaviour)
-                if (autoOpen && browse && browse._openFileTab) {
-                    requestAnimationFrame(function () {
+                if (!autoOpen) return;
+
+                var entryExists = fileList.some(function (f) {
+                    return !f.dir && (f.path === entryFile || f.path.endsWith('/' + entryFile));
+                });
+
+                requestAnimationFrame(function () {
+                    if (browse && browse._openFileTab) {
                         browse._openFileTab(entryFile);
-                    });
-                }
+                    }
+                    // Activate present mode in the same frame — only when the entry exists,
+                    // preventing app.json's own code view being lifted by mistake.
+                    if (present && entryExists && !window._sgAppModeUserExited) {
+                        var banner = document.querySelector('sg-app-banner');
+                        if (banner && typeof banner.activate === 'function') banner.activate();
+                    }
+                });
             };
+
+            // ── 3b. Re-activate present mode after access key entry ────────────────────
+            var _origOnAuthSubmit = VaultShell.prototype._onAuthSubmit;
+            if (_origOnAuthSubmit) {
+                VaultShell.prototype._onAuthSubmit = function (key) {
+                    _origOnAuthSubmit.call(this, key);
+                    var banner = document.querySelector('sg-app-banner');
+                    if (this._appJsonMode && this._dataSource && this._browse &&
+                            banner && !banner.isActive() && !window._sgAppModeUserExited) {
+                        var self = this;
+                        requestAnimationFrame(function () {
+                            self._applyAppJson(self._dataSource, self._browse);
+                        });
+                    }
+                };
+            }
 
             // ── 4. _setupVaultLinkHandler ──────────────────────────────────────────────
             // Change 4b: intercept relative <a> clicks in the vault DOM (including markdown
