@@ -81,9 +81,9 @@ suite('VaultLoaderRouting.runRoot — with hash token', ({ test, before, after }
         VaultLoader.storage.clearCurrentKey();
     });
 
-    test('redirects to /en-gb/vault', () => {
+    test('redirects to /en-gb/app#token', () => {
         VaultLoader.routing.runRoot();
-        assert.equal(mock.location.replaced, '/en-gb/vault');
+        assert.equal(mock.location.replaced, '/en-gb/app#apple-river-1234');
     });
 
     test('saves token to localStorage before redirecting', () => {
@@ -110,10 +110,10 @@ suite('VaultLoaderRouting.runRoot — hash with pipe deep-link', ({ test, before
         VaultLoader.storage.clearCurrentKey();
     });
 
-    test('saves token part only and redirects to /en-gb/vault', () => {
+    test('saves token part only and redirects to /en-gb/app#token', () => {
         VaultLoader.routing.runRoot();
         assert.equal(VaultLoader.storage.getCurrentKey(), 'apple-river-1234', 'deep-link suffix stripped from key');
-        assert.equal(mock.location.replaced, '/en-gb/vault', 'redirected to vault');
+        assert.equal(mock.location.replaced, '/en-gb/app#apple-river-1234', 'redirected to app');
     });
 });
 
