@@ -172,6 +172,45 @@ Modules: `vault-credentials.js` (credential parse/resolve/store/get);
 - 'Remove from saved vaults' button on auto-open error page: removes token from `VaultLoaderRecent`, navigates to `/en-gb/` (entry no longer shown in recent-vaults grid)
 - ↗ 'Open in new window' button on vault card: opens `window.location.origin + '/#' + key` in new tab; appears on card hover alongside existing × delete button; explicit affordance (no Ctrl/Cmd-click needed)
 
+**SG/App hosting page — `/en-gb/app/`** (commits 22 May 2026 — `v0.2.3/en-gb/app/index.html`):
+New dedicated route for running vault-hosted apps. Distinct from `/en-gb/vault/` (browser) and `/en-gb/` (landing). Mounts three custom elements: `<app-shell>`, `<app-hud>`, `<app-debug-pane>`.
+
+- **Global debug event buffer** (`window._appDebug`): captures vault events, VFS bridge calls, and network calls (capped at 300 items each); initialised before any component loads.
+- **Fetch proxy**: wraps `window.fetch` to record outbound calls (method, URL masked for vault keys, status, timing) into `window._appDebug.networkCalls`.
+
+**`<app-shell>` Web Component** (`app-shell.js`, 1 154 lines — 22 May 2026):
+Lightweight vault app host. Lifecycle: parse hash → open vault → read `app.json` → optional auth intercept → pre-fetch resources → mount iframe + VFS bridge. No `vault-loader` scripts loaded on this page; credential parsing is inline. VFS bridge surface is identical to `send-browse`, so SG/App code runs unchanged.
+- If no hash: shows entry form (vault key + optional server endpoint field; default endpoint `dev.send.sgraph.ai`).
+- `_page.json` support: renders via inline PageLayoutRenderer (PLR) — PLR dependencies are inlined so the page is self-contained; vault routes with a hash open to `/app` rather than `/vault/`.
+- Vault key persisted to `localStorage` for cross-page reload recovery.
+- Exposes `getDebugState()` for `<app-debug-pane>` (appJson, writable, entry, iframeStatus, resourcesLoaded, timing).
+
+**`<app-hud>` Web Component** (`app-hud.js`, 201 lines — 22 May 2026):
+Fixed 48 px status bar rendered outside `<sg-layout>`. Shows: SG/App brand, vault badge, app title (centre), read-only badge, copy-link button, vault-back link, debug toggle. Handles `sg.ui.message()` notifications dispatched from the app iframe (toast queue with auto-dismiss). Receives vault/app info via `setInfo()` called by the page script on `app-shell:ready`.
+
+**`<app-debug-pane>` Web Component** (`app-debug-pane.js`, 149 lines — 22 May 2026):
+Collapsible right-edge debug panel with 4 tabs: Vault Trace, Bridge Log, App State, Network. Collapses to a narrow edge strip when host width < 40 px (ResizeObserver). Tabs are lazy-loaded sub-components.
+
+**`<app-debug-vault-trace>` Web Component** (`app-debug-vault-trace.js`, 79 lines):
+Renders vault lifecycle events from `window._appDebug.vaultEvents`.
+
+**`<app-debug-bridge-log>` Web Component** (`app-debug-bridge-log.js`, 75 lines):
+Renders VFS bridge message log from `window._appDebug.bridgeCalls`.
+
+**`<app-debug-app-state>` Web Component** (`app-debug-app-state.js`, 123 lines):
+Reads current debug state via `app-shell.getDebugState()` — shows appJson, entry point, writable flag, iframe status, resource load list, and timing.
+
+**`<app-debug-network>` Web Component** (`app-debug-network.js`, 63 lines):
+Renders outbound fetch calls from `window._appDebug.networkCalls` (method, URL, status, timing).
+
+**Routing changes** (`vault-loader-routing.js` — 22 May 2026):
+- `/#key` at root: saves key to `localStorage` → redirects to `/en-gb/app#key` (was: `/en-gb/vault/`). App-shell checks for `app.json`; if absent, falls back to `/en-gb/vault/`.
+- `vault-header.js` change: "Open App" action opens in same tab (was: new tab).
+- `v0.2.3/index.html`: `present:true` activation restored for `_page.json` app.json entries.
+- Route tests updated (`test__routing_decisions.js`): `runRoot` assertions cover `/en-gb/app#token` redirect path.
+
+**`scripts/vault__run-locally.sh`** — helper script to run the vault UI locally.
+
 ---
 
 ### Admin UI (latest: v0.1.7)
