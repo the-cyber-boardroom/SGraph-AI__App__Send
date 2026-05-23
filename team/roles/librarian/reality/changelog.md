@@ -7,6 +7,17 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-23
+
+- `index.md` — Updated: version v0.27.55 → v0.27.59; date 05/22 → 05/23; Browser UIs 6 → 7 (added vault app /en-gb/app/)
+- `ui/index.md` — Added: 10 new EXISTS items (SG/App hosting page, <app-shell>, <app-hud>, <app-debug-pane>, 4 debug tab components, routing changes)
+
+Master index: `team/roles/librarian/reviews/05/23/v0.27.59__master-index__code-changes-22-23-may.md`
+Processed: 0 new human briefs; 10 code commits scanned (vault UI v0.2.3 additions 22 May)
+New EXISTS items: 10 | New PROPOSED items: 0
+
+---
+
 ## 2026-05-20
 
 - `index.md` — Updated: version v0.27.53 → v0.27.54; date 05/19 → 05/20; PROPOSED count 205+ → 237+; documents 405 → 415
