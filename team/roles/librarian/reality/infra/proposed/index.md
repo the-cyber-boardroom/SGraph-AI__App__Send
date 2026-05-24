@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-05-21 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-05-24 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -217,3 +217,13 @@ All items below are PROPOSED — does not exist yet.
 | P-197 | Three lab states with clean transitions | cold (A→Lambda IP) → provisioning (A→Lambda IP) → live (A→instance IP) | doc 429 |
 | P-198 | TXT records for vault public key distribution | DKIM pattern: `"sg-pubkey=ed25519:Mxe..."` at registered slug's DNS name | doc 429 |
 | P-199 | DNS sync process (admin vault → Route 53) | Background process: on admin vault commit, creates/updates/removes A records in Route 53 | doc 429 |
+
+---
+
+## MyFeeds Website Rebuild — Three Primitives Architecture (05/17 briefs — Day 67, doc 437)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-197 | MyFeeds three-primitives publishing architecture | Vault (portable, encrypted), storage substrate (server/S3/ephemeral/zip), management layer (vault-of-vaults holding keys + workflow state); hybrid static + ephemeral recommended; 8-phase delivery | doc 437 |

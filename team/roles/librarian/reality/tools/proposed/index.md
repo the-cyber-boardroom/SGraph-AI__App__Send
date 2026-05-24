@@ -1,6 +1,6 @@
 # Tools — Proposed Items Index
 
-**Domain:** tools/proposed/ | **Last updated:** 2026-05-21 | **Maintained by:** Librarian (daily run)
+**Domain:** tools/proposed/ | **Last updated:** 2026-05-24 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -106,6 +106,34 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 | Variant grid | 2-3 simultaneous generations per submit for easy comparison | doc 390 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 17–32)*
+
+---
+
+## TUI API — Structured Surface for Text UIs (05/17 briefs — Day 67, docs 442–443)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-202 | TUI API: core concept and 7 API surfaces | Development sequence: capability→CLI→TUI→Web API→Web UI; 7 surfaces (status, list, get, invoke, subscribe, stream, reflect); TUI-of-TUIs fractal; LLM-consumable; structured output not human text | doc 442 |
+| P-203 | TUI API extensions (IAM, memfs, orientation) | Multiple TUI APIs per tool; native IAM least-privilege (per-action, vs MCP all-or-nothing); orientation endpoint (now-what?); change-control as first-class surface; memfs virtual filesystem (skills.md/changelog loaded on demand) | doc 443 |
+
+## SG/Edge TUI — Visually-Rich Terminal Interface (05/17 briefs — Day 67, docs 440–441)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-200 | SG/Edge rich TUI (Textual + Rich) | Visually-rich TUI for SG/Edge operations; Textual + Rich recommended over Bubble Tea + Lipgloss; SSH/SSM/docker exec compatible; locale/TERM/terminfo design constraints addressed | doc 440 |
+| P-201 | Five prototype SG/Edge TUI screens | Deployment reality, topology, local-vs-edge-vs-deployed, slug detail, live event stream; ASCII mockups defined; 5-7 days of work; promotes one to canonical after use | doc 441 |
+
+## SG Labs Admin Interface (05/17 briefs — Day 67, doc 436)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-196 | SG Labs admin interface | Management for predetermined labs; 6 UI surfaces; 8 lifecycle states (cold/standby/provisioning/waiting-for-dns/ready/live/stopping/archived); Simple Token access control; templates as vault collections; first 5 labs named; TXT-records settled | doc 436 |
 
 ---
 

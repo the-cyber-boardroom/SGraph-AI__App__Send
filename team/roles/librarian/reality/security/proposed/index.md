@@ -1,6 +1,6 @@
 # Security — Proposed Items Index
 
-**Domain:** security/proposed/ | **Last updated:** 2026-05-20 | **Maintained by:** Librarian (daily run)
+**Domain:** security/proposed/ | **Last updated:** 2026-05-24 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -79,3 +79,65 @@ All items below are PROPOSED — does not exist yet.
 | Enclave-protected tier in vault hosting density modes | Fourth density tier: highest cost, cryptographic isolation from platform operator | doc 414 |
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 10, 11, 16, 17, 31)*
+
+---
+
+## SG/Sentinel — Edge Security, Logging, and Routing Layer (05/22 briefs — Day 68, docs 445–463)
+
+All items below are PROPOSED — does not exist yet.
+
+**SG/Sentinel** is the edge security, logging, and routing layer designed to sit in front of all SGraph servers (via CloudFront). Complete design corpus produced in Day 68 (19 documents). MVP scope scoped and ready to implement.
+
+### Architecture Principles and Execution Model
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-204 | SG/Sentinel founding principles | Substrate-independent; sits-in-front-of-everything; controllable/refactorable; best-layer-for-each-job; make-site-hostile-to-bad-traffic; runaway-cost insurance; PKI + bot-detection + LLM-driven | doc 445 |
+| P-205 | Layered execution model | Layer 1 (CloudFront Functions, sub-ms, no I/O, easy wins), Layer 2 (Lambda@Edge, capable, app-coupled), Layer 3 (async/Nova, off-hot-path); no-invalid-request principle; symmetry principle | doc 446 |
+| P-206 | SG/Sentinel MVP scope | Logging (clean, real-time, to S3, replacing Firehose), blocking (easy-win deterministic), deployment lifecycle; app-coupled WAF; two-way conversation API (ping/query/admin, API-key-protected) | doc 447 |
+
+### Rules Engine
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-207 | SG/Sentinel rules engine | Rules are 98% of code; engine is tiny + high-privilege; rule spectrum (deterministic to LLM); per-rule least privilege (function + IAM scope); rule-set-as-vault; LLM heavy in dev, minimal in prod, NEVER inline; semantic knowledge graphs | doc 448 |
+| P-215 | SG/Sentinel rule architecture (fractal graph) | Rules within rule-sets; packs activated by triggers; rules selecting next rules; rich metadata (semantic, standard, attack-tree, confidence, layer); IDs everywhere; deterministic-to-opinion spectrum | doc 456 |
+
+### Rules Lifecycle and Developer Model
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-208 | SG/Sentinel interactivity and deployment phases | Two-way layer invocation; lambda-as-container local run; dangerous dev-only rules (enable/disable); minimal bundles; dev/main/prod phases (main = production = QA) | doc 449 |
+| P-209 | SG/Sentinel as codebase extension | Python same-code-everywhere (killer feature); Type_Safe runtime validation; security zones/trust boundaries; agentic dev team (AppSec + developer + QA + architect agents) | doc 450 |
+| P-210 | SG/Sentinel delegation and choke-points | No-404s-at-API-layer as correctness signal; every request improves the system; progressive lock-down; deploy-parity (QA-vs-prod diff = major bug) | doc 451 |
+| P-211 | SG/Sentinel time as first-class dimension | Multiple timelines (immediate to historical); fingerprint allowlisting (good-users-faster); detect-before-damage; success = damage prevented, not requests blocked | doc 452 |
+| P-212 | SG/Sentinel developer friendliness and evidence graph | LLM interpretation-based checks; "what do you know about me?" (dev-only); evidence graph (semantic, async-agent-built, per-user/IP vaults); anonymity modes; zero-knowledge bound | doc 453 |
+
+### Standards and Compliance
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-213 | SG/Sentinel standards compatibility | MITRE ATT&CK (T1190), OWASP CRS + SecLang, Coraza (Go, ModSecurity-compatible), STIX/TAXII; AbuseIPDB/GreyNoise/Spamhaus threat-intel on async timelines; IP reputation = context not verdict (residential-proxy finding) | doc 454 |
+| P-214 | SG/Sentinel compliance-as-living-graph | GDPR, ISO 27001, OWASP Top 10, OWASP AI mapped to deployment; dynamic posture (rules enable/disable compliance standards); per-deployment view; standards-as-vaults | doc 455 |
+
+### Architecture and Operator Surfaces
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-216 | SG/Sentinel architecture and data flows | Full component map; logging flow (Layer 1 → S3, Sentinel ends at S3); blocking flow (easy wins L1, app-coupled L2, async L3 feedback); rule engines across layers; dev environment with deploy parity | doc 457 |
+| P-217 | SG/Sentinel TUI mockups (9 surfaces) | Deployment reality, live traffic, blocks, logs+S3, rules management, rule detail+test, deployed code, threat intel, deploy; all TUI-API-friendly; Textual-based | doc 458 |
+
+### Validation (Tabletop Simulations)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-218 | SG/Sentinel behavioural spec | Packet through Steps 0-8; fingerprint/fast-track, anomaly-scoring, detect-before-damage behaviours; the answer key for tabletop simulations | doc 459 |
+| P-219 | SG/Sentinel tabletop simulation 1 (generic + logging) | 5 traced requests; 11 gaps found (2 major: fingerprint-storage-at-L1, symmetry-blocks-new-deploys); gap resolutions documented | doc 460 |
+| P-220 | SG/Sentinel tabletop simulation 2 (blocking) | 6 attack scenarios; 14 gaps (7 major); fast-track reconceived as zero-trust acceleration; per-IP detection defeated by residential proxies; app-must-report-auth-outcomes; in-profile exploits need content rules; defence in depth | doc 461 |
+
+### Consolidation and MVP Path
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-221 | SG/Sentinel prior art and gap resolutions | OPA/Rego, Detection-as-Code/Sigma, deception technology (honeytokens), zero-trust; three graphs are one; replay-from-S3 as test corpus; Sentinel guards its own control plane | doc 462 |
+| P-222 | SG/Sentinel path to MVP (10-step sequence) | L1 logging + easy-win blocks, L2 observe-mode, fingerprint object, 4 TUI surfaces, TUI API foundation, rule engine core, dev environment; 7 memos to record; 5 prior-art deep-dives; parked items | doc 463 |
