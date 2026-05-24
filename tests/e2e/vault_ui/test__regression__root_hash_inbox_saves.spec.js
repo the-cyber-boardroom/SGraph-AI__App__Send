@@ -8,8 +8,8 @@
 
    Fix:        VaultLoaderRouting.runRoot() writes key via VaultLoaderStorage
                (localStorage 'sg-vault-key') before calling location.replace().
-               The vault shell reads localStorage synchronously on DOMContentLoaded,
-               so the key is always present by the time it runs.
+               app-shell reads the key from the hash directly (/en-gb/app#token),
+               with localStorage as a fallback for reload recovery.
    ================================================================================= */
 
 import { test, expect } from '@playwright/test';
@@ -23,11 +23,11 @@ test.beforeEach(async ({ page }) => {
     }));
 });
 
-test('regression 7876c8e — token is in localStorage when vault shell loads', async ({ page }) => {
+test('regression 7876c8e — token is in localStorage when app shell loads', async ({ page }) => {
     // Capture localStorage state immediately after navigation commits (before page JS runs further).
     let keyAfterCommit = null;
     page.on('framenavigated', async frame => {
-        if (frame === page.mainFrame() && frame.url().includes('/en-gb/vault')) {
+        if (frame === page.mainFrame() && frame.url().includes('/en-gb/app')) {
             // Evaluate in the newly-navigated context
             keyAfterCommit = await frame.evaluate(() => localStorage.getItem('sg-vault-key'))
                 .catch(() => null);
@@ -35,16 +35,16 @@ test('regression 7876c8e — token is in localStorage when vault shell loads', a
     });
 
     await page.goto('/#apple-river-1234', { waitUntil: 'domcontentloaded', timeout: 10000 });
-    await page.waitForURL('**/en-gb/vault**', { timeout: 8000 });
+    await page.waitForURL('**/en-gb/app**', { timeout: 8000 });
 
-    // Key must be present at vault shell load time.
+    // Key must be present at app shell load time.
     const finalKey = await page.evaluate(() => localStorage.getItem('sg-vault-key'));
     expect(finalKey).toBe('apple-river-1234');
 });
 
 test('regression 7876c8e — token is preserved in lowercase', async ({ page }) => {
     await page.goto('/#APPLE-RIVER-1234', { waitUntil: 'commit', timeout: 10000 });
-    await page.waitForURL('**/en-gb/vault**', { timeout: 8000 });
+    await page.waitForURL('**/en-gb/app**', { timeout: 8000 });
     const key = await page.evaluate(() => localStorage.getItem('sg-vault-key'));
     // runRoot() lowercases via _extractToken()
     expect(key).toBe('apple-river-1234');

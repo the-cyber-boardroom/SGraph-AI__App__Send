@@ -582,6 +582,52 @@
                     header.setAppJson(config, this._vaultKey);
                 }
 
+                // Resource injection for vault HTML preview.
+                // app.json may list CSS/JS in a "resources" block that are never
+                // referenced by <link>/<script> tags in the HTML — they're loaded
+                // by app-shell on /en-gb/app. Patch dataSource.getFileBytes so that
+                // send-browse's iframe preview also gets them injected, matching
+                // /en-gb/app rendering exactly (same technique as app-shell._mountApp).
+                if (config.resources && autoOpen) {
+                    var _cssPaths = config.resources.css || [];
+                    var _jsPaths  = config.resources.js  || [];
+                    if (_cssPaths.length || _jsPaths.length) {
+                        var _vaultText = async function (p) {
+                            var norm = p.startsWith('/') ? p.slice(1) : p;
+                            var fe   = fileList.find(function (f) { return f.path === norm; });
+                            if (!fe) return '';
+                            try {
+                                var b = await dataSource.getFileBytes(fe.path);
+                                return new TextDecoder().decode(b);
+                            } catch (_) { return ''; }
+                        };
+                        var _cssTexts = await Promise.all(_cssPaths.map(_vaultText));
+                        var _jsTexts  = await Promise.all(_jsPaths.map(_vaultText));
+                        var _resBlock = '';
+                        _cssTexts.forEach(function (css) {
+                            if (css) _resBlock += '<style data-sg-app>' + css.replace(/<\/style>/gi, '<\\/style>') + '</style>';
+                        });
+                        _jsTexts.forEach(function (js) {
+                            if (js) _resBlock += '<script data-sg-app>' + js.replace(/<\/script>/gi, '<\\/script>') + '<\/script>';
+                        });
+                        if (_resBlock) {
+                            var _origGFB = dataSource.getFileBytes.bind(dataSource);
+                            dataSource.getFileBytes = async function (path) {
+                                var bytes = await _origGFB(path);
+                                var norm  = path.startsWith('/') ? path.slice(1) : path;
+                                if (norm === entryFile || norm.endsWith('/' + entryFile)) {
+                                    var html     = new TextDecoder().decode(bytes);
+                                    var injected = html.replace(/(<head[^>]*>)/i, '$1' + _resBlock);
+                                    if (injected === html) injected = _resBlock + html;
+                                    return new TextEncoder().encode(injected).buffer;
+                                }
+                                return bytes;
+                            };
+                            console.log('[app.json] resources injected into vault preview: css=' + _cssPaths.length + ' js=' + _jsPaths.length);
+                        }
+                    }
+                }
+
                 // Auto-open entry file in the vault file browser
                 if (autoOpen && browse && browse._openFileTab) {
                     requestAnimationFrame(function () {
