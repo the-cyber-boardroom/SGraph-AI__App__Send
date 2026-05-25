@@ -70,6 +70,12 @@ The public-vault-about-key is **public by design** (URLs, logs). The question is
 **Mitigation.** The editor strips EXIF and re-encodes to WebP before publish; the size cap forces a re-encode (which drops EXIF anyway). The owner-confirmation step shows the exact rendered card. Disclaimer text is owner-authored — treat as public.
 **Verdict: GO** with EXIF-strip + re-encode on publish as a required editor behaviour.
 
+### R-transparency — Surfacing the SG/Send file + the `/en-gb/preview/<key>` tester
+**Risk.** The transparency disclosure (doc 02 §9, doc 04 §6a) and the `/en-gb/preview/<key>` social-card tester page (doc 02 §6) display the transfer-id, the read-only key, and a `send.sgraph.ai` link, and render the preview as a crawler would.
+**Assessment.** Every value shown is **derivable by anyone from the public-id**, which is public by design; the key is **read-only / decrypt-only** and reaches **only the preview blob** (R3, R-leak). So these surfaces add **zero** new exposure — they make the existing exposure legible/testable. The owner's `delete_auth` (the only write capability) is **never** derivable and **never** shown (doc 03 §3.3). The tester page renders only the public preview — it never opens the vault and never prompts for the vault key.
+**Mitigations.** The transparency disclosure is collapsed by default ("maybe not always visible" — lead). The tester page must, like the OG route, **fail closed** (show "no preview" on any error) and never touch vault contents.
+**Verdict: GO.** Read-only, public-derivable material only.
+
 ### R-expiry — Expiry enforcement
 **Assessment (better than upstream).** In this repo expiry is **server-enforced**, not merely advisory: `expires_at` and `max_downloads` cause the transfer service to return `410` and (with `auto_delete`) wipe the payload (`Transfer__Service.py:151-170`). A viewer who already fetched the ciphertext can still decrypt their copy — true of any delivered content — but the **server stops serving it** at the boundary, and the owner can delete outright.
 **Mitigation.** UX states what is enforced ("the link stops working — server-enforced"). The client also reads `expires_at_ms` to render the expired state before a round-trip.
@@ -88,6 +94,7 @@ The public-vault-about-key is **public by design** (URLs, logs). The question is
 | R-leak — public-id in logs | **GO** | vault key stays in `#` fragment only |
 | **R-deface — modify the preview** | **NO-GO if `delete_auth` from public string; GO on random owner-held `delete_auth`** | mandatory gate |
 | R-thumb — thumbnail/metadata leak | **GO** | EXIF strip + re-encode on publish |
+| R-transparency — show SG/Send file + `/preview` tester | **GO** | read-only, public-derivable only; never shows `delete_auth`; fails closed |
 | R-expiry — enforcement | **GO** | server-enforced (time + open-count) |
 
 **Overall: GO to build v0.1.0** (core module + components + the in-repo route + OG render), with two hard gates: (1) **never derive a write key OR `delete_auth` from the public string**, and (2) **Security ratifies the derivation constants with a known-answer test** before release.

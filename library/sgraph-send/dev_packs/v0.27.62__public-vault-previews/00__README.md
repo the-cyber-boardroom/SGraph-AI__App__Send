@@ -64,6 +64,8 @@ This deliberately creates an exposure — but a bounded, opt-in, user-chosen one
 - **Public page surface + editor:** new Web Components under `…/_common/js/components/` (extend `VaultComponent`).
 - **The `/en-gb/app/<public-id>` route:** the existing `…/en-gb/app/index.html` shell, extended to read the public-id path segment (interim: `?p=<public-id>`).
 - **Crawler OG meta tags:** a small route on the **public User Lambda** (`sgraph_ai_app_send/lambda__user/`) that derives + fetches + decrypts the public preview server-side and returns the OG-tagged shell — in-repo, no edge function required.
+- **`/en-gb/preview/<preview-key>` tester page (debug):** a new top-level page that renders the preview exactly as a WhatsApp/LinkedIn unfurl would, plus a debug strip — the manual-verification surface for the social card (doc 02 §6a).
+- **Transparency disclosure:** a "How this works" expander on the card/editor surfacing the underlying SG/Send transfer-id + read-only key + a `send.sgraph.ai` link to open the raw file (doc 02 §9).
 - **The transfer + delete + expiry backend:** **already exists** (`Routes__Transfers.py`, `Transfer__Service.py`) — nothing to build there.
 
 ---
@@ -74,15 +76,19 @@ The sub-vaults briefing pack's **link card** (`<sg-link-card>`, proposal P-162) 
 
 ---
 
-## Who decides what (still-open items — doc 08)
+## Project-lead decisions folded in (25 May — doc 08)
 
-| Topic | Owner |
+| Topic | Decision |
 |---|---|
-| Default expiry policy (no-expiry vs N-day default) | Dinis / Product |
-| Thumbnail size cap + client downscale | Product / Designer |
-| `/en-gb/app/<public-id>` path-segment rewrite (vs `?p=` interim) | DevOps (CDN/Lambda config) — in this repo |
-| Meta-tag Lambda latency target + measurement | DevOps |
-| Exact composition seam with `<sg-link-card>` | Architect + sub-vaults author |
+| Default expiry | **No expiry by default** (opt-in time / open-count controls ship OFF) |
+| Thumbnail | **~64 KB inline / blob above**; sources = upload **or pick a vault file**; **fully native** WebP encode (no libs/wasm) |
+| `/en-gb/app/<public-id>` route | **Wire the real path segment day one** via a CloudFront rule / CF Function (no `?p=` interim) |
+| Crawler OG meta | **Public User-Lambda route**, + **temporary console/log timing stats** (flagged for removal) |
+| `<sg-link-card>` seam | **Mapped here** (the `exciting-brown` branch is retired) — link-file `public_id` + `fetchPreview` |
+| Surface the SG/Send file | **Yes** — "How this works" disclosure (transfer-id + read-only key + open-on-`send.sgraph.ai` link) |
+| Debug/test card page | **Yes** — new top-level `/en-gb/preview/<preview-key>` rendering the shared-link card |
+
+Still open: PKI smoothing (future); the measured OG-render latency number (Phase 5); DevOps picks the exact CF mechanism.
 
 ---
 

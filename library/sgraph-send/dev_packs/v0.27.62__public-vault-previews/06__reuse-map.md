@@ -33,7 +33,8 @@ Public Vault Previews is **not green-field**: the crypto, the SG/Send transfer f
 | `SendCrypto.encryptFile / decryptFile / importKey / exportKey` | **REUSE/PORT** | `SHARE/_common/js/crypto.js:15-106` | IV-prepended AES-GCM (`IV(12) ‖ ciphertext`) — the exact wire format the read path decrypts and the write path produces. |
 | `UploadConstants.packageWithMetadata` (SGMETA envelope) | **REUSE/PORT** | `SHARE/_common/js/components/send-upload/upload-constants.js:78-91` | `SGMETA[6] ‖ len[4 BE] ‖ json ‖ content`. The read path unwraps it; the write path wraps the preview JSON. |
 | 3-step upload engine | **REUSE as reference** | `SHARE/_common/js/components/send-upload/upload-engine.js` | The `create → upload → complete` driver; mirror its call sequence in `public-preview-write.js`. |
-| `deleteTransfer()` client | **REUSE as reference** | `SHARE/_common/js/api-client.js` and `SGRAPH…__ui__open/v0/v0.4/v0.4.0/en-gb/_common/js/api-client.js` | Already issues `DELETE /api/transfers/delete/{id}` with the delete-auth header — copy the call shape for `updatePreview`/`unpublishPreview`. |
+| `deleteTransfer()` client | **REUSE as reference** | `SHARE/_common/js/api-client.js` and `…__ui__open/v0/v0.4/v0.4.0/en-gb/_common/js/api-client.js` | Already issues `DELETE /api/transfers/delete/{id}` with the delete-auth header — copy the call shape for `updatePreview`/`unpublishPreview`. |
+| Open-UI URL contract (the transparency "open raw file" link) | **REUSE (build link)** | `…__ui__open/v0/v0.4/v0.4.0/en-gb/_common/js/components/send-download/send-download.js:107-134` | The open UI parses `#<transferId>/<key>` (route modes `/view` `/download` `/browse` `/gallery`). The card's "How this works" disclosure builds `send.sgraph.ai/en-gb/open/view#<transferId>/<readKeyB64url>` (doc 02 §9, doc 04 §6a). |
 | `FriendlyCrypto.deriveTransferId / deriveKey` | **REUSE pattern, NOT the function** | `SHARE/_common/js/friendly-crypto.js:18-70` | The proven `SHA-256[:12]` transfer-id + `PBKDF2(salt='sgraph-send-v1',600k)` AES-key pattern. The new derive copies the *shape* with a **distinct salt + transfer-id prefix** (doc 03 §1) — do NOT call it directly (see §F). |
 
 > Decide per the IFD rules whether the read path **imports** `SendCrypto`/`UploadConstants` from a shared location or **ports** the ~40 lines into the `sg-public-preview` module to keep the public page dependency-light. Recommendation: port the decrypt + SGMETA-unwrap into the module (read path stays self-contained); reuse `SendCrypto.encryptFile` in the write path.
@@ -62,6 +63,8 @@ These are used **only** by `public-preview-write.js` (owner path) — the public
 | `app-shell` (the `/en-gb/app` host) | **EXTEND** | `VAULT/en-gb/app/index.html` + `<app-shell>` | The existing app page that parses `#<vault-key>` and mounts the vault app. Extend it to read the public-id path segment (or `?p=`) and mount `sg-public-preview-card` first. |
 | `sg-app-banner` | **REUSE as reference** | `VAULT/_common/js/components/sg-app-banner/sg-app-banner.js` | App Mode activation + "Loading…" overlay pattern — a model for the preview skeleton/loading state. |
 | `vault-upload` | **REUSE as reference** | `VAULT/_common/js/components/vault-upload/vault-upload.js` | File selection pattern for the editor thumbnail picker (the v0.1.2 `vault-upload-dropzone` was not carried into v0.2.3 — model the picker on `vault-upload` or lift the dropzone forward). |
+| Native thumbnail encode (no libs/wasm) | **BUILD NEW (tiny, native)** | Web platform: `createImageBitmap` + `<canvas>`/`OffscreenCanvas` + `canvas.toBlob('image/webp', q)` | Downscale + WebP re-encode + EXIF-strip for the thumbnail. **No external library, no wasm** — all Web Crypto/Canvas built-ins. Both the upload source and the "pick from a vault file" source feed this. |
+| Read a vault file as the thumbnail source | **REUSE** | `VAULT/_common/js/lib/sg-vault/sg-vault.js` (file read) | The editor's "pick from the vault" path reads + decrypts a chosen file from the owner's open vault, then runs the native encode above. |
 
 ---
 
@@ -124,7 +127,7 @@ These are used **only** by `public-preview-write.js` (owner path) — the public
 | edit UX | **NEW** `sg-public-preview-editor` + REUSE thumbnail picker + inline field-name guard |
 | OG meta (humans) | **NEW** `sg-public-preview-meta` |
 | OG meta (crawlers) | **NEW** in-repo `Routes__Public_Preview.py` on the User Lambda |
-| `/app/<public-id>` route | **EXTEND** existing `VAULT/en-gb/app/index.html` (+ CDN rewrite, doc 08 Q-route) |
+| `/app/<public-id>` route | **EXTEND** existing `VAULT/en-gb/app/index.html` + a CloudFront routing rule **or** CF Function serving the shell for `/en-gb/app/*` (wired day one — doc 02 §4.3) |
 | transfer + delete + expiry backend | **REUSE** (already exists) |
 
 ---

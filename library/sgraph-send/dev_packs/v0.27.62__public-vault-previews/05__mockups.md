@@ -184,6 +184,23 @@ Expired and exhausted are **server-enforced** (`410` from the transfer service �
 
 How the OG card looks once the **public-Lambda OG route** (doc 02 §6, Phase 5) injects `og:title` / `og:description` / `og:image` into the served shell. Client-only tags do **not** reach these crawlers.
 
+The **`/en-gb/preview/<preview-key>` tester page** (doc 02 §6a) renders exactly these card styles in-browser — the in-browser twin of the unfurl — plus a debug strip:
+
+```
+┌─ /en-gb/preview/vault-demo-health-data  (card-as-shared tester) ──────────┐
+│  [ WhatsApp card ]   [ LinkedIn card ]   [ Slack card ]                    │  ← live renders of the cards below
+│ ── debug ─────────────────────────────────────────────────────────────── │
+│  og:title        Health Data Demo Vault                                   │
+│  og:description  Public demo materials for the health-data pilot…         │
+│  og:image        data:image/webp;base64,UklGR…  (or derived blob URL)     │
+│  transfer-id     a1b2c3d4e5f6     read-only key  UklGRkq…  (public)        │
+│  raw file ↗      send.sgraph.ai/en-gb/open/view#a1b2c3d4e5f6/UklGRkq…      │
+│  OG render       derive 4ms · fetch 31ms · decrypt 2ms · total 37ms (miss) │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+It never prompts for the vault key and never opens the vault — it only shows "what this looks like when shared."
+
 ```
 WhatsApp / iMessage bubble                LinkedIn / Slack unfurl
 ┌────────────────────────────────┐       ┌────────────────────────────────────┐

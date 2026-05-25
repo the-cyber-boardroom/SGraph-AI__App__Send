@@ -26,30 +26,26 @@ Each item is **RESOLVED** (decided / code-verified here) or **PENDING** (needs a
 
 ---
 
-## Pending — Dinis / Product
+## Decided by the project lead (25 May) — now RESOLVED
 
-| # | Question | Proposal |
+| # | Question | Decision |
 |---|---|---|
-| Q3 | Default expiry policy | Architect proposal: **no expiry by default** (persists until the owner unpublishes), opt-in "expire in N days" and/or "stop after N opens". Confirm the default and whether open-count appears in the v1 editor UI. |
-| Q-thumbnail | Inline-vs-blob cap + client downscale | Default inline, ~64 KB cap, auto-switch to a derived second transfer above the cap. Confirm the exact cap and whether the editor downscales client-side before publish. |
+| Q3 | Default expiry policy | **No expiry by default** (the preview persists until the owner unpublishes). Opt-in "expire in N days" / "stop after N opens" remain available in the editor (both server-enforced, doc 02 §7), but **OFF by default**. |
+| Q-thumbnail | Thumbnail source + cap + downscale | **~64 KB inline cap, auto-switch to a derived blob above it** — confirmed. **Two sources:** (a) upload an image, and (b) **pick an existing file from the vault** (the editor reads + decrypts it via the owner's vault, then re-encodes). Thumbnail generation is **fully native — no external libraries, no wasm**: `createImageBitmap` → `<canvas>` downscale → `canvas.toBlob(…, 'image/webp', q)` (EXIF dropped by the re-encode). Doc 04 §5.3, doc 06 §C/§E. |
+| Q-route | The `/en-gb/app/<public-id>` path-segment route | **Wire the real path segment from day one** — no `?p=` interim needed. Any `/en-gb/app/<public-id>` currently 404s, so there is no conflict to claim it. Served via **a CloudFront routing rule OR a CloudFront Function** (both valid; DevOps picks). `?p=` survives only as a local-dev convenience. Doc 02 §4.3. |
+| Q-meta | OG-render placement + latency + visibility | **Yes — the route on the public User Lambda.** It derives + fetches + decrypts the public preview and injects OG tags; cache by public-id; fail closed. **Also print the timing stats to the console/logs** (temporary instrumentation — flagged for removal). Measure + record the latency. Doc 02 §6. |
+| Q-subvault-seam | Integration with `<sg-link-card>` (sub-vaults) | **Mapped here** (the `exciting-brown` session/branch is retired; the sub-vaults docs remain on `dev`). The concrete contract — link-file `public_id` field + `fetchPreview(apiBase, childPublicId)` + render-before-key — is specified in doc 02 §4.4 and doc 07 Phase 6. |
+| Q-transparency | Surface the underlying SG/Send file on the UIs | **Yes.** Show the transfer-id + read-only key + a `send.sgraph.ai/en-gb/open/view#<tid>/<key>` raw-file link behind a "How this works" disclosure (not always-visible). Safe — all derivable from the public-id, read-only, never the `delete_auth`. Doc 02 §9, doc 04 §6a, doc 09 R-transparency. |
+| Q-preview-page | A debug/test page that renders the shared-link card | **Yes — new top-level page `/en-gb/preview/<preview-key>`** that renders exactly as a WhatsApp/LinkedIn unfurl would (the in-browser twin of the OG card) + a debug strip; never opens the vault; the manual-verification surface for AC#7. Doc 02 §6a, doc 05 §6, doc 07 Phase 5. |
+
+---
+
+## Still pending
+
+| # | Question | Note |
+|---|---|---|
 | Q-pki | How this smooths once PKI lands | Direction noted (preview-then-ask-key → preview-then-auto-access for entitled identities; design already separates the two steps). Not in v1. Revisit with the PKI brief. |
-
----
-
-## Pending — DevOps / infra (in this repo)
-
-| # | Question | Note |
-|---|---|---|
-| Q-route | The `/en-gb/app/<public-id>` **path-segment** rewrite | Static hosting must serve `app/index.html` for `/en-gb/app/<anything>`. A CDN/Lambda-URL rewrite in this repo's deployment. Until it lands, Phases 3–4 use `?p=<public-id>` (zero infra). The route page itself already exists. |
-| Q-meta | OG-render placement + latency | Recommended: a route on the public User Lambda (`Routes__Public_Preview.py`) that derives + fetches + decrypts the public preview and injects OG tags; cache by public-id; fail closed. **Measure and record the latency** (the brief's performance ask). Edge (CloudFront) is the alternative. Doc 02 §6. |
-
----
-
-## Pending — coordination
-
-| # | Question | Note |
-|---|---|---|
-| Q-subvault-seam | Exact integration with `<sg-link-card>` (sub-vaults) | The link card (P-162) is specified to show child public info before the key. Agree the call contract (`fetchPreview(apiBase, childPublicId)`) and where the child's public-id is stored in the `.link.json` / `.vault/owner/` records. Doc 02 §4.4, Phase 6. Coordinate with the `claude/exciting-brown-G2P9Z` author. |
+| Q-meta-latency | The measured OG-render latency number | Produced during Phase 5 (the brief's performance ask); record it here when measured. |
 
 ---
 
@@ -67,12 +63,15 @@ Each item is **RESOLVED** (decided / code-verified here) or **PENDING** (needs a
 | Q-bookkeeping | Owner bookkeeping path | RESOLVED | — |
 | Q-namespace | Read-only / separate namespace | RESOLVED (KAT to run) | Security |
 | Q-deface | No write/delete from public string | RESOLVED | — |
-| Q3 | Default expiry policy | PENDING | Dinis/Product |
-| Q-thumbnail | Cap + downscale | PENDING | Product/Designer |
+| Q3 | Default expiry policy | **RESOLVED — no expiry default** | Dinis |
+| Q-thumbnail | Source + cap + native encode | **RESOLVED — 64 KB, upload or vault file, native WebP** | Dinis |
+| Q-route | Path-segment route | **RESOLVED — wire `/<public-id>` day one via CF rule/Function** | Dinis (DevOps picks CF mechanism) |
+| Q-meta | OG render + latency + console stats | **RESOLVED — User-Lambda route + temp console stats** | Dinis (DevOps measures latency) |
+| Q-subvault-seam | `<sg-link-card>` integration | **RESOLVED — mapped here** (doc 02 §4.4, Phase 6) | — |
+| Q-transparency | Surface the SG/Send file + open-on-send link | **RESOLVED — yes** (doc 02 §9, doc 04 §6a) | — |
+| Q-preview-page | `/en-gb/preview/<key>` card tester | **RESOLVED — yes** (doc 02 §6a, Phase 5) | — |
 | Q-pki | PKI smoothing | PENDING | future |
-| Q-route | Path-segment rewrite | PENDING | DevOps (in-repo) |
-| Q-meta | OG render + latency | PENDING | DevOps |
-| Q-subvault-seam | `<sg-link-card>` integration | PENDING | Architect + sub-vaults author |
+| Q-meta-latency | Measured latency number | PENDING | DevOps (Phase 5) |
 
 ---
 
