@@ -10,6 +10,21 @@ Public Vault Previews is **not green-field**: the crypto, the SG/Send transfer f
 
 > **Path roots.** Vault frontend: `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/` (abbreviated `VAULT/`). Share frontend (crypto + transfer client precedent): `sgraph_ai_app_send__ui__share/v0/v0.4/v0.4.0/en-gb/` (abbreviated `SHARE/`). Backend: `sgraph_ai_app_send/lambda__user/` (abbreviated `LAMBDA/`).
 
+## 0. Verified-on-read corrections (25 May readiness check — these supersede where they differ)
+
+Reading the actual vault-UI source changed three things. **Use the vault-UI primitives below, not the share-UI ones.**
+
+| Topic | Correction |
+|---|---|
+| **Transport + crypto live in the vault UI already** | Use **`SGSend`** (`VAULT/_common/js/lib/sg-send/sg-send.js`) and **`SGSendCrypto`** (`…/sg-send-crypto.js`) — NOT the share-UI `SendCrypto`/`UploadConstants`. `SGSendCrypto.deriveKey(passphrase, salt)` is PBKDF2-SHA256/600k, `encrypt`/`decrypt` are IV(12)-prepended AES-GCM, `exportKey` is base64url. The read key is `deriveKey(publicId, 'sgraph-public-preview-v1')` — distinct salt = the namespace separation. |
+| **No SGMETA envelope** | SGMETA is **not used anywhere in the vault UI** — transfers store raw `IV+ciphertext`. The preview blob is just `encrypt(utf8(JSON))`; the read path is `sgSend.download(transferId)` → `SGSendCrypto.decrypt`. Drop the `packageWithMetadata` step. |
+| **Owner bookkeeping** | Use **`SGVault.addFile(folderPath, fileName, fileData)`** (`VAULT/_common/js/lib/sg-vault/sg-vault--file-ops.js:13`, auto-encrypts with the vault read key + commits) + `updateFile`/`getFile`/`removeFile`. Not a raw pointer `vaultWrite`. |
+| **Two small additive changes to `SGSend`** | (1) `upload()` must pass `transfer_id`/`delete_auth_hash`/`expires_at`/`max_downloads`/`auto_delete` to `/create` (currently sends only size+type); (2) add `deleteTransfer(transferId, deleteAuth)` → `DELETE /api/transfers/delete/{id}` with the `x-sgraph-transfer-delete-auth` header. |
+| **Components** | Each `<sg-foo>` is a triplet `VAULT/_common/js/components/sg-foo/sg-foo.{js,html,css}` resolved by `VaultComponentPaths`; extend `VaultComponent` (`base/vault-component.js`). |
+| **Read-key import** | Per the security gate, the read path imports the derived key **decrypt-only + non-extractable** (a small variant — derive raw bits, `importKey(... ['decrypt'])`), rather than `SGSendCrypto.deriveKey` which yields an extractable encrypt+decrypt key. The writer imports the same bits with `['encrypt']`; the transparency display re-derives the base64url string. |
+| **IFD placement** | New files land in the current latest minor `VAULT/` (v0.2.3) additively; the two `SGSend`/`app` edits are surgical. (If the team prefers a fresh `v0.2.4` minor, the new files move verbatim.) |
+
+
 ---
 
 ## A. Backend transfer flow + delete + expiry — REUSE (nothing to build)

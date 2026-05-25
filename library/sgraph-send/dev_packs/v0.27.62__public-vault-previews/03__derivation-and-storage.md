@@ -176,15 +176,15 @@ Shape:
 
 ---
 
-## 5. SGMETA envelope + wire format (reuse, do not reinvent)
+## 5. Wire format (verified — no SGMETA in the vault UI)
 
-The preview JSON is wrapped and encrypted exactly like any share payload:
+**Correction from the readiness check:** SGMETA is **not used anywhere in the vault UI** (only in the share UI). Vault-UI transfers store **raw `IV(12) ‖ AES-256-GCM ciphertext`**. So the preview is stored as plain `encrypt(utf8(JSON.stringify(preview)))` — no envelope:
 
-- **Envelope:** `UploadConstants.packageWithMetadata(contentBuffer, metadata)` (`…/share/…/components/send-upload/upload-constants.js`) → `SGMETA[6] ‖ len[4 big-endian] ‖ json[len] ‖ content`.
-- **Encryption:** `SendCrypto.encryptFile(key, plaintext)` (`…/share/…/crypto.js`) → `IV(12) ‖ AES-256-GCM ciphertext`.
-- **Read path** reverses: `download-base64` → base64-decode → strip `IV(12)` → `SendCrypto.decryptFile` → strip SGMETA header → parse JSON → `validatePreview`.
+- **Encryption:** `SGSendCrypto.encrypt(bytes, key)` (`VAULT/_common/js/lib/sg-send/sg-send-crypto.js`) → `IV(12) ‖ ciphertext`.
+- **Upload:** `SGSend.upload(cipher, { transferId, deleteAuthHash, expiresAt, maxDownloads, autoDelete, contentType:'application/json' })` (after the small `upload()` extension — doc 06 §0).
+- **Read path:** `SGSend.download(transferId)` → `ArrayBuffer` → `SGSendCrypto.decrypt(buf, readKeyRO)` → `JSON.parse(utf8)` → `validatePreview`. **No vault dependency, no envelope unwrap.**
 
-The read path needs **only these primitives** (copy/port `SendCrypto` decrypt + the SGMETA unwrap into the `sg-public-preview` module, or import them) — no vault dependency.
+(If we later want the transparency "open on the send.sgraph.ai open UI" link to render the blob as a named JSON file, a tiny optional SGMETA wrap can be added — doc 08 Q-transparency. Not needed for the card's own read path.)
 
 ---
 
