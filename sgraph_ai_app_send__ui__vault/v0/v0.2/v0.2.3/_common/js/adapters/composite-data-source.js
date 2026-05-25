@@ -28,8 +28,9 @@ class CompositeDataSource {
     constructor(rootDataSource, opts) {
         opts = opts || {};
         this._root        = rootDataSource;
-        this._keyProvider = opts.keyProvider || null;          // async (mount) -> key|null
-        this._vaultOpener = opts.vaultOpener || _defaultVaultOpener(rootDataSource);
+        this._keyProvider   = opts.keyProvider || null;        // async (mount) -> key|null
+        this._vaultOpener   = opts.vaultOpener   || _defaultVaultOpener(rootDataSource);    // full key  → SGVault.open
+        this._vaultOpenerRO = opts.vaultOpenerRO || _defaultVaultOpenerRO(rootDataSource);  // ro record → SGVault.openReadOnly
         this._mounts      = new Map();                          // mountPath -> mount
         this.onTreeChanged = null;
 
@@ -160,17 +161,28 @@ class CompositeDataSource {
     }
 
     async _openMount(m) {
-        let key = null;
-        try { key = VaultLinks.getStoredChildKey(m.link.vault_id); } catch (_) {}
-        if (!key && this._keyProvider) key = await this._keyProvider(m);
-        if (!key) { m.status = 'locked'; throw new Error('Sub-vault is locked (no key provided)'); }
+        // 1) Owner ro-record (read_key + ref_file_id) → open read-only SILENTLY (no prompt)
+        const parent = this._root && this._root._vault;
+        let rec = null;
+        try { if (parent) rec = await VaultLinks.resolveRef(parent, m.link.ref_id); } catch (_) {}
         try {
-            const childVault = await this._vaultOpener(key);          // Phase 0: full key / simple token
-            const child      = new VaultDataSource(childVault, null); // accessKey=null ⇒ read-only
+            let childVault;
+            if (rec && rec.read_key && rec.ref_file_id) {
+                const vid = rec.vault_id || m.link.vault_id;
+                childVault = await this._vaultOpenerRO(vid, rec.read_key, rec.ref_file_id);
+            } else {
+                // 2) a key saved on this device, else 3) the key provider (prompt)
+                let key = null;
+                try { key = VaultLinks.getStoredChildKey(m.link.vault_id); } catch (_) {}
+                if (!key && this._keyProvider) key = await this._keyProvider(m);
+                if (!key) { m.status = 'locked'; throw new Error('Sub-vault is locked (no key provided)'); }
+                childVault = await this._vaultOpener(key);            // full key / simple token
+            }
+            const child = new VaultDataSource(childVault, null);      // accessKey=null ⇒ read-only
             await child.loadAllSubTrees();
             m.child = child; m.vault = childVault; m.status = 'mounted'; m.access = 'ro'; m.error = null;
         } catch (err) {
-            m.status = 'error'; m.error = (err && err.message) || 'open failed';
+            if (m.status !== 'locked') { m.status = 'error'; m.error = (err && err.message) || 'open failed'; }
             throw err;
         }
     }
@@ -189,12 +201,21 @@ class CompositeDataSource {
     async moveFolder()        { return this._root.moveFolder.apply(this._root, arguments); }
 }
 
-// Default opener: open another vault read-only using the root vault's transport.
+// Default opener: open another vault from a full key, using the root vault's transport.
 function _defaultVaultOpener(rootDataSource) {
     return async function (key) {
         const sgSend = rootDataSource && rootDataSource._vault && rootDataSource._vault._sgSend;
         if (!sgSend) throw new Error('No transport available to open sub-vault');
         return SGVault.open(sgSend, key);   // wrapped read-only by VaultDataSource(accessKey=null)
+    };
+}
+
+// Default RO opener: open a child read-only from an owner ro-record (vaultId + read_key + ref_file_id).
+function _defaultVaultOpenerRO(rootDataSource) {
+    return async function (vaultId, readKeyB64, refFileId) {
+        const sgSend = rootDataSource && rootDataSource._vault && rootDataSource._vault._sgSend;
+        if (!sgSend) throw new Error('No transport available to open sub-vault');
+        return SGVault.openReadOnly(sgSend, vaultId, readKeyB64, refFileId);
     };
 }
 

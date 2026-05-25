@@ -71,5 +71,50 @@ VaultLinks.setStoredChildKey('abcd1234', null);
 ok('child key cleared',          VaultLinks.getStoredChildKey('abcd1234') === null);
 ok('child key: unknown → null',  VaultLinks.getStoredChildKey('nope') === null);
 
-console.log('  ' + pass + ' pass, ' + fail + ' fail\n');
-process.exit(fail === 0 ? 0 : 1);
+// 7. owner records — .vault/owner/ro-links.json (read_key tier), via a fake vault
+function makeFakeVault(writable) {
+    const files = {}, folders = new Set();
+    const norm = p => String(p).replace(/^\//, '').replace(/\/$/, '');
+    return {
+        writable, pushed: 0,
+        needsLoading() { return false; },
+        async loadSubTreeOnDemand() {},
+        listFolder(p) { const k = norm(p); return folders.has(k) ? Object.keys(files[k] || {}).map(n => ({ name: n })) : null; },
+        async createFolder(p) { folders.add(norm(p)); },
+        async getFile(folder, name) { const k = norm(folder); if (!files[k] || !(name in files[k])) throw new Error('ENOENT'); return files[k][name]; },
+        async addFile(folder, name, bytes) { const k = norm(folder); if (!folders.has(k)) throw new Error('Folder not found: ' + folder); (files[k] = files[k] || {})[name] = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes); },
+        async updateFile(folder, name, bytes) { const k = norm(folder); (files[k] = files[k] || {})[name] = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes); },
+        async push() { this.pushed++; }
+    };
+}
+
+(async () => {
+    const v = makeFakeVault(true);
+    eq('loadRoLinks: empty → {}', await VaultLinks.loadRoLinks(v), {});
+    await VaultLinks.saveRoRecord(v, 'lk-1', { type: 'vault', label: 'Alice', pin: { mode: 'latest' }, read_key: 'rk', ref_file_id: 'rf', vault_id: 'cv' });
+    ok('saveRoRecord: pushed to server', v.pushed === 1);
+    const ro = await VaultLinks.loadRoLinks(v);
+    ok('record round-trips (read_key)', !!ro['lk-1'] && ro['lk-1'].read_key === 'rk');
+    const rec = await VaultLinks.resolveRef(v, 'lk-1');
+    ok('resolveRef finds record', !!rec && rec.ref_file_id === 'rf');
+    ok('resolveRef unknown → null', (await VaultLinks.resolveRef(v, 'nope')) === null);
+    await VaultLinks.saveRoRecord(v, 'lk-2', { type: 'vault', read_key: 'rk2', ref_file_id: 'rf2' });
+    const ro2 = await VaultLinks.loadRoLinks(v);
+    ok('second record merged (both present)', !!ro2['lk-1'] && !!ro2['lk-2']);
+
+    const vRO = makeFakeVault(false);
+    let threw = false; try { await VaultLinks.saveRoRecord(vRO, 'lk', {}); } catch (_) { threw = true; }
+    ok('saveRoRecord on read-only vault throws', threw);
+
+    // effectiveLink: override ?? record (key material only from the record)
+    const eff = VaultLinks.effectiveLink(
+        { vault_id: 'v', ref_id: 'lk', label: 'OVERRIDE' },
+        { label: 'REC', pin: { mode: 'commit', commit: 'c' }, read_key: 'rk', ref_file_id: 'rf' });
+    eq('effectiveLink: link label overrides record', eff.label, 'OVERRIDE');
+    eq('effectiveLink: pin from record (no link override)', eff.pin, { mode: 'commit', commit: 'c' });
+    eq('effectiveLink: read_key from record only', eff.read_key, 'rk');
+    eq('effectiveLink: type resolves to vault', eff.type, 'vault');
+
+    console.log('  ' + pass + ' pass, ' + fail + ' fail\n');
+    process.exit(fail === 0 ? 0 : 1);
+})();

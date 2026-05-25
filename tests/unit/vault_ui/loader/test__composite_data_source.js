@@ -145,6 +145,31 @@ const findChild = (tree, name) => tree.children[name];
     try { await comp2.loadFolder('/subvaults/acme'); } catch (_) { threw = true; }
     ok('loadFolder: locks + throws when no key', threw && comp2._mounts.get('subvaults/acme').status === 'locked');
 
+    // 11. owner ro-record → opens read-only SILENTLY (no prompt) via openReadOnly
+    globalThis.VaultDataSource = function (cv, ak) { return new FakeDS(childSpec, ak); };
+    const roLinks = enc(JSON.stringify({ 'lk-1': { type: 'vault', read_key: 'RK', ref_file_id: 'RF', vault_id: 'childvault' } }));
+    const parentVault = {
+        _sgSend: {},
+        needsLoading() { return false; },
+        async loadSubTreeOnDemand() {},
+        async getFile(folder, name) {
+            if (String(folder).replace(/^\//, '') === '.vault/owner' && name === 'ro-links.json') return roLinks;
+            throw new Error('ENOENT');
+        }
+    };
+    const root3 = new FakeDS({ _vault: parentVault, tree: rootSpec.tree, list: rootSpec.list, bytes: rootSpec.bytes });
+    let roArgs = null, prompt3 = 0;
+    const comp3 = new CompositeDataSource(root3, {
+        keyProvider:   async () => { prompt3++; return 'should-not-be-used'; },
+        vaultOpenerRO: async (vid, rk, rf) => { roArgs = { vid, rk, rf }; return { _child: true }; }
+    });
+    await comp3.scan();
+    await comp3.loadFolder('/subvaults/acme');
+    ok('ro-record: opened via openReadOnly (read_key/ref_file_id)', !!roArgs && roArgs.rk === 'RK' && roArgs.rf === 'RF');
+    ok('ro-record: vault_id from record', roArgs && roArgs.vid === 'childvault');
+    ok('ro-record: NO prompt (silent open)', prompt3 === 0);
+    ok('ro-record: mount mounted read-only', comp3._mounts.get('subvaults/acme').status === 'mounted');
+
     console.log('  ' + pass + ' pass, ' + fail + ' fail\n');
     process.exit(fail === 0 ? 0 : 1);
 })();

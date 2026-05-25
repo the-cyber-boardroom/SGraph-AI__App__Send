@@ -22,6 +22,10 @@ const VaultLinks = {
     LINK_SUFFIX:          '.link.json',
     CHILD_KEY_LS_PREFIX:  'sg-child-vault-key:',   // localStorage: per-child-vault-id saved key
     DEFAULT_PIN:          { mode: 'latest' },
+    OWNER_FOLDER:         '.vault/owner',          // single owner-metadata root
+    RO_LINKS_FILE:        'ro-links.json',         // read_key tier (readable by parent readers)
+    // NB: rw-links.json (owner-only, double-encrypted full keys) is deferred until writable
+    // sub-vaults land — v1 opens children read-only, so only ro-links is needed.
 
     // --- suffix recognition -----------------------------------------------------
     isLinkFile(path) {
@@ -89,6 +93,77 @@ const VaultLinks = {
             if (key) localStorage.setItem(this.CHILD_KEY_LS_PREFIX + vaultId, key);
             else     localStorage.removeItem(this.CHILD_KEY_LS_PREFIX + vaultId);
         } catch (_) {}
+    },
+
+    // --- Owner records: .vault/owner/ro-links.json (read_key tier) --------------
+    //     A map { <ref_id>: { type, label, pin, description, url, vault_id,
+    //                         read_key (b64), ref_file_id } }. read_key tier means it's a
+    //     normal vault file (vault.addFile encrypts with read_key) → readable by any holder
+    //     of parent read access. Mirrors vault-token-manager's readonly-tokens.json.
+
+    async loadRoLinks(vault) {
+        if (!vault) return {};
+        try {
+            if (vault.needsLoading && vault.needsLoading('/' + this.OWNER_FOLDER)) {
+                await vault.loadSubTreeOnDemand('/' + this.OWNER_FOLDER);
+            }
+        } catch (_) { /* folder absent — fine */ }
+        try {
+            const buf = await vault.getFile(this.OWNER_FOLDER, this.RO_LINKS_FILE);
+            const obj = JSON.parse(new TextDecoder().decode(buf));
+            return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+        } catch (_) { return {}; }
+    },
+
+    // resolve a ref_id → its ro record (or null)
+    async resolveRef(vault, refId) {
+        if (!vault || !refId) return null;
+        const ro = await this.loadRoLinks(vault);
+        return ro[refId] || null;
+    },
+
+    // effective field value = link-file override ?? owner-record value
+    effectiveLink(linkObj, record) {
+        const l = linkObj || {}, r = record || {};
+        return {
+            type:        l.type        || r.type        || (l.vault_id || r.vault_id ? 'vault' : null),
+            label:       l.label       || r.label       || null,
+            pin:         l.pin         || r.pin          || Object.assign({}, this.DEFAULT_PIN),
+            description: l.description  || r.description || null,
+            url:         l.url         || r.url          || null,
+            public_id:   l.public_id   || r.public_id    || null,
+            vault_id:    l.vault_id    || r.vault_id      || null,
+            // key material comes ONLY from the owner record, never the link file
+            read_key:    r.read_key    || null,
+            ref_file_id: r.ref_file_id || null
+        };
+    },
+
+    async _ensureOwnerFolder(vault) {
+        const parts = this.OWNER_FOLDER.split('/');   // ['.vault','owner']
+        let cur = '';
+        for (const part of parts) {
+            const next = cur ? cur + '/' + part : part;
+            if (!vault.listFolder('/' + next)) {
+                try { await vault.createFolder('/' + next); } catch (_) { /* race / exists */ }
+            }
+            cur = next;
+        }
+    },
+
+    // write/replace one record; requires a writable (owner) vault. Pushes to the server.
+    async saveRoRecord(vault, refId, record) {
+        if (!vault || !vault.writable) throw new Error('Read-only: cannot save a link record');
+        if (!refId) throw new Error('saveRoRecord: refId required');
+        await this._ensureOwnerFolder(vault);
+        const ro = await this.loadRoLinks(vault);
+        ro[refId] = record;
+        const bytes  = new TextEncoder().encode(JSON.stringify(ro, null, 2));
+        const exists = (vault.listFolder('/' + this.OWNER_FOLDER) || []).some(e => e.name === this.RO_LINKS_FILE);
+        if (exists) await vault.updateFile('/' + this.OWNER_FOLDER, this.RO_LINKS_FILE, bytes);
+        else        await vault.addFile('/' + this.OWNER_FOLDER, this.RO_LINKS_FILE, bytes);
+        if (typeof vault.push === 'function') { try { await vault.push(); } catch (_) {} }
+        return ro;
     }
 };
 
