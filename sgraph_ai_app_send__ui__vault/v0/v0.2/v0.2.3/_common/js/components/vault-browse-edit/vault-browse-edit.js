@@ -148,8 +148,39 @@
             var textareaEl = null;
             var isEditing  = false;
 
-            var _mdPrevTimer = null;   // live-preview debounce handle (markdown only)
-            var _mdSplitActive = false; // true while markdown split-view is live
+            var _mdPrevTimer      = null;   // live-preview debounce handle (markdown only)
+            var _mdSplitActive    = false;  // true while markdown split-view is live
+            var _mdPrevObjUrls    = [];     // blob URLs created for preview images (revoked on re-render/exit)
+
+            // Resolve img[data-md-src] in the preview pane using vault dataSource.
+            // Mirrors the resolution that send-browse does for the normal rendered view.
+            // currentDir is the directory prefix for the file being edited (e.g. 'wardley-maps/').
+            function _resolvePrevImages(mdEl, currentDir) {
+                if (!self.dataSource || !mdEl) return;
+                mdEl.querySelectorAll('img[data-md-src]').forEach(function(img) {
+                    var src = img.getAttribute('data-md-src');
+                    if (!src) return;
+                    // Build full path: absolute src is used as-is (strip leading /), relative
+                    // src is resolved against the current file's directory.
+                    var fullPath = src.startsWith('/') ? src.slice(1) : currentDir + src;
+                    self.dataSource.getFileBytes(fullPath).then(function(imgBytes) {
+                        if (!imgBytes) return;
+                        var ext  = fullPath.split('.').pop().toLowerCase();
+                        var mime = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
+                                     gif:'image/gif', svg:'image/svg+xml', webp:'image/webp',
+                                     bmp:'image/bmp', ico:'image/x-icon' }[ext] || 'image/png';
+                        var blob = new Blob([imgBytes], { type: mime });
+                        var url  = URL.createObjectURL(blob);
+                        _mdPrevObjUrls.push(url);
+                        img.src = url;
+                    }).catch(function() { /* image not found — leave broken icon */ });
+                });
+            }
+
+            function _revokePrevUrls() {
+                _mdPrevObjUrls.forEach(function(u) { try { URL.revokeObjectURL(u); } catch (_) {} });
+                _mdPrevObjUrls = [];
+            }
 
             editBtn.addEventListener('click', function() {
                 if (isEditing) return;
@@ -163,6 +194,10 @@
                 if (type === 'markdown' && content) {
                     // ── Markdown split view: textarea (left) + live preview (right) ──
                     _mdSplitActive = true;
+
+                    // Current file's directory — needed to resolve relative image paths.
+                    var _currentDir = fileName.includes('/')
+                        ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
 
                     textareaEl.style.cssText = [
                         'flex:1','min-width:0','min-height:0','margin:0','padding:1rem','resize:none',
@@ -198,13 +233,18 @@
                     content.appendChild(textareaEl);
                     content.appendChild(prevPane);
 
+                    // Resolve images for initial render
+                    _resolvePrevImages(prevMd, _currentDir);
+
                     // Live update (debounced 400 ms)
                     textareaEl.addEventListener('input', function() {
                         clearTimeout(_mdPrevTimer);
                         _mdPrevTimer = setTimeout(function() {
+                            _revokePrevUrls();   // release old blob URLs before re-render
                             prevMd.innerHTML = typeof MarkdownParser !== 'undefined'
                                 ? MarkdownParser.parse(textareaEl.value)
                                 : textareaEl.value;
+                            _resolvePrevImages(prevMd, _currentDir);
                         }, 400);
                     });
 
@@ -234,6 +274,7 @@
                 isEditing = false;
                 clearTimeout(_mdPrevTimer);
                 _mdSplitActive = false;
+                _revokePrevUrls();
                 if (textareaEl) { textareaEl.remove(); textareaEl = null; }
                 // Re-render from original bytes — restores content and resets button state
                 self._renderFileContent(container, bytes, fileName, type);
@@ -267,6 +308,7 @@
                     // Re-render container fully with new bytes (handles markdown, code, text)
                     clearTimeout(_mdPrevTimer);
                     _mdSplitActive = false;
+                    _revokePrevUrls();
                     if (textareaEl) { textareaEl.remove(); textareaEl = null; }
                     isEditing = false;
                     self._renderFileContent(container, newBytes.buffer, fileName, type);
