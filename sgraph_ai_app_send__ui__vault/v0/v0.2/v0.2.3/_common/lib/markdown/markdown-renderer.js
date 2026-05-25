@@ -73,7 +73,10 @@ const MarkdownRenderer = {
 
             var html;
             if (typeof MarkdownParser !== 'undefined') {
-                html = MarkdownParser.parse(body, {
+                // Pass the FULL text so parse() generates the front-matter badge.
+                // parse() strips FM internally — body is derived there too.
+                // pageBreakBefore is passed explicitly so callers can override.
+                html = MarkdownParser.parse(text, {
                     pageBreakBefore: currentConfig.page_break_before
                 });
             } else {

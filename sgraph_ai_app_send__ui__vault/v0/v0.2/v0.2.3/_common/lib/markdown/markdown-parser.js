@@ -32,11 +32,27 @@ const MarkdownParser = {
     parse(markdown, options) {
         if (!markdown) return '';
         options = options || {};
-        const lines  = markdown.split('\n');
-        const blocks = this._parseBlocks(lines);
-        const pbSet  = _normPageBreakLevels(options.pageBreakBefore);
 
-        return blocks.map(function(b, idx) {
+        // Strip front matter (if present) and generate badge.
+        // This ensures parse() works correctly when called directly with raw text
+        // (e.g. send-browse), not just through MarkdownRenderer which pre-strips FM.
+        // Callers that already strip FM (MarkdownRenderer) pass body without ---,
+        // so extractFrontMatter returns { config:{}, body } — zero overhead, no badge.
+        var fm     = this.extractFrontMatter(markdown);
+        var config = fm.config;
+        var body   = fm.body;
+        var badge  = Object.keys(config).length ? _fmBadgeHtml(config) : '';
+
+        // page_break_before: explicit option wins over front matter
+        var pbOpt = (options.pageBreakBefore !== undefined && options.pageBreakBefore !== null)
+            ? options.pageBreakBefore
+            : config.page_break_before;
+
+        const lines  = body.split('\n');
+        const blocks = this._parseBlocks(lines);
+        const pbSet  = _normPageBreakLevels(pbOpt);
+
+        var bodyHtml = blocks.map(function(b, idx) {
             // Insert page-break marker before heading if:
             //  • this heading level is in the break-set
             //  • it is not the very first block (no break at top of document)
@@ -46,6 +62,8 @@ const MarkdownParser = {
             }
             return prefix + MarkdownParser._renderBlock(b);
         }).join('\n');
+
+        return badge + bodyHtml;
     },
 
     // ── Front matter ────────────────────────────────────────────────────────────
@@ -461,6 +479,70 @@ const MarkdownParser = {
 };
 
 // ── Module-level helpers ─────────────────────────────────────────────────────
+
+// HTML-escape a string for use in attributes or text content.
+function _escHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+// Generates a compact front-matter badge shown above the rendered content.
+// Self-contained inline styles — works in vault viewer, sg-print preview, etc.
+// Hidden in print via .md-frontmatter class (sg-print.js + shared-components.css).
+function _fmBadgeHtml(config) {
+    var keys = Object.keys(config);
+    if (!keys.length) return '';
+
+    var wrapStyle = [
+        'display:flex', 'flex-wrap:wrap', 'align-items:center', 'gap:6px',
+        'padding:7px 2px 9px', 'margin-bottom:14px',
+        'border-bottom:1px dashed rgba(128,128,128,0.22)',
+        'font-family:monospace', 'font-size:11px', 'line-height:1.4',
+        'opacity:0.72', 'user-select:none', 'pointer-events:none'
+    ].join(';');
+
+    var labelStyle = [
+        'color:inherit', 'opacity:0.6', 'margin-right:4px',
+        'font-size:10px', 'text-transform:uppercase', 'letter-spacing:0.06em'
+    ].join(';');
+
+    var tagStyle = [
+        'background:rgba(128,128,128,0.09)',
+        'border:1px solid rgba(128,128,128,0.22)',
+        'border-radius:3px', 'padding:1px 7px',
+        'font-family:monospace', 'font-size:10.5px', 'color:inherit'
+    ].join(';');
+
+    var parts = '<span style="' + labelStyle + '">⚙ doc-settings</span>';
+
+    keys.forEach(function(key) {
+        var val = config[key];
+        var label;
+        if (key === 'page_break_before') {
+            // Human-friendly: page_break_before: [h1, h2] → "page breaks: H1 H2"
+            var levels = Array.isArray(val) ? val : [val];
+            var lvlStr = levels.map(function(v) {
+                return String(v).toUpperCase().replace(/^H?([1-6])$/, 'H$1');
+            }).join(' ');
+            label = 'page breaks: ' + (lvlStr || String(val));
+        } else if (key === 'print_css') {
+            label = 'custom print CSS';
+        } else {
+            // Generic: show key: value (truncate long values)
+            var v = typeof val === 'object' ? JSON.stringify(val) : String(val);
+            if (v.length > 40) v = v.slice(0, 37) + '…';
+            label = _escHtml(key) + ': ' + _escHtml(v);
+            parts += '<code style="' + tagStyle + '">' + label + '</code>';
+            return;
+        }
+        parts += '<code style="' + tagStyle + '">' + _escHtml(label) + '</code>';
+    });
+
+    return '<div class="md-frontmatter" style="' + wrapStyle + '">' + parts + '</div>\n';
+}
 
 // Normalise page_break_before to a Set of heading levels (integers 1-6).
 // Accepts: 'h1' | 'h2' | ... | 1 | 2 | ... | true | [h1,h2] | [1,2]

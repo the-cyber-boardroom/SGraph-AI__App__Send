@@ -148,28 +148,77 @@
             var textareaEl = null;
             var isEditing  = false;
 
+            var _mdPrevTimer = null;   // live-preview debounce handle (markdown only)
+            var _mdSplitActive = false; // true while markdown split-view is live
+
             editBtn.addEventListener('click', function() {
                 if (isEditing) return;
                 isEditing = true;
                 // Always decode the original bytes — never read from the rendered DOM.
-                // Reading from <pre> picks up the first code block in rendered markdown,
-                // not the source. For text/code files <pre> matches the file content but
-                // bytes is still the source of truth.
                 var currentText = new TextDecoder().decode(bytes);
 
                 textareaEl = document.createElement('textarea');
                 textareaEl.value = currentText;
-                textareaEl.style.cssText = 'width:100%;height:100%;margin:0;padding:1rem;resize:none;' +
-                    'font-family:var(--font-mono,monospace);font-size:13px;color:var(--color-text,#e2e8f0);' +
-                    'line-height:1.5;background:var(--bg-primary,#0a0a18);border:1px solid var(--accent,#4ECDC4);' +
-                    'border-radius:4px;outline:none;box-sizing:border-box;tab-size:4;flex:1;';
 
-                // No keyboard shortcuts — use Save / Cancel buttons
+                if (type === 'markdown' && content) {
+                    // ── Markdown split view: textarea (left) + live preview (right) ──
+                    _mdSplitActive = true;
 
-                if (content) {
-                    content.style.display = 'none';
+                    textareaEl.style.cssText = [
+                        'flex:1','min-width:0','min-height:0','margin:0','padding:1rem','resize:none',
+                        'font-family:var(--font-mono,monospace)','font-size:13px',
+                        'color:var(--color-text,#e2e8f0)','line-height:1.5',
+                        'background:var(--bg-primary,#0a0a18)',
+                        'border:none','border-right:2px solid rgba(78,205,196,0.18)',
+                        'outline:none','box-sizing:border-box','tab-size:4','overflow-y:auto'
+                    ].join(';');
+
+                    // Preview pane — right side, reuses the same CSS class as the
+                    // normal rendered view so all markdown styles apply identically.
+                    var prevPane = document.createElement('div');
+                    prevPane.style.cssText = [
+                        'flex:1','min-width:0','min-height:0','overflow-y:auto',
+                        'padding:1rem 1.5rem','background:var(--bg-primary,#0a0a18)'
+                    ].join(';');
+                    var prevMd = document.createElement('div');
+                    prevMd.className = 'sb-file__markdown';
+                    // Initial render (includes front-matter badge and page-break markers)
+                    if (typeof MarkdownParser !== 'undefined') {
+                        prevMd.innerHTML = MarkdownParser.parse(currentText);
+                    } else {
+                        prevMd.textContent = currentText;
+                    }
+                    prevPane.appendChild(prevMd);
+
+                    // Convert content area to flex-row split layout
+                    content.style.display = 'flex';
+                    content.style.flexDirection = 'row';
+                    content.style.overflow = 'hidden';
+                    content.innerHTML = '';   // clear old rendered view
+                    content.appendChild(textareaEl);
+                    content.appendChild(prevPane);
+
+                    // Live update (debounced 400 ms)
+                    textareaEl.addEventListener('input', function() {
+                        clearTimeout(_mdPrevTimer);
+                        _mdPrevTimer = setTimeout(function() {
+                            prevMd.innerHTML = typeof MarkdownParser !== 'undefined'
+                                ? MarkdownParser.parse(textareaEl.value)
+                                : textareaEl.value;
+                        }, 400);
+                    });
+
+                } else {
+                    // ── Generic text / code edit: full-width textarea ──
+                    textareaEl.style.cssText = 'width:100%;height:100%;margin:0;padding:1rem;resize:none;' +
+                        'font-family:var(--font-mono,monospace);font-size:13px;color:var(--color-text,#e2e8f0);' +
+                        'line-height:1.5;background:var(--bg-primary,#0a0a18);border:1px solid var(--accent,#4ECDC4);' +
+                        'border-radius:4px;outline:none;box-sizing:border-box;tab-size:4;flex:1;';
+
+                    if (content) { content.style.display = 'none'; }
                     container.appendChild(textareaEl);
                 }
+
                 textareaEl.focus();
                 textareaEl.selectionStart = textareaEl.selectionEnd = 0;
                 textareaEl.scrollTop = 0;
@@ -183,6 +232,8 @@
             function exitEdit() {
                 if (!isEditing) return;
                 isEditing = false;
+                clearTimeout(_mdPrevTimer);
+                _mdSplitActive = false;
                 if (textareaEl) { textareaEl.remove(); textareaEl = null; }
                 // Re-render from original bytes — restores content and resets button state
                 self._renderFileContent(container, bytes, fileName, type);
@@ -214,7 +265,8 @@
 
                 self.dataSource.saveFile(folder === '/' ? '/' : folder, fName, newBytes.buffer).then(function() {
                     // Re-render container fully with new bytes (handles markdown, code, text)
-                    // _renderFileContent calls _origRender then re-attaches edit/delete buttons
+                    clearTimeout(_mdPrevTimer);
+                    _mdSplitActive = false;
                     if (textareaEl) { textareaEl.remove(); textareaEl = null; }
                     isEditing = false;
                     self._renderFileContent(container, newBytes.buffer, fileName, type);
