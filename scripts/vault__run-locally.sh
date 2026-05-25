@@ -71,8 +71,19 @@ else
 fi
 echo ""
 python3 << PYEOF
-import http.server, os
+import http.server, os, re, urllib.parse
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    # SPA fallback: /en-gb/app/<public-id> and /en-gb/preview/<public-id> have no
+    # file on disk (only index.html lives under those dirs). Rewrite a single-segment
+    # path to the dir's index.html so the SPA boots and reads location.pathname.
+    # This mirrors the CloudFront Function used in production (see scripts/cloudfront/).
+    _SPA = re.compile(r'^/en-gb/(app|preview)/[^/]+/?$')
+    def do_GET(self):
+        path = urllib.parse.urlparse(self.path).path
+        m = self._SPA.match(path)
+        if m and not path.rstrip('/').endswith('index.html'):
+            self.path = '/en-gb/%s/index.html' % m.group(1)
+        return super().do_GET()
     def end_headers(self):
         # Disable all caching so the browser always fetches fresh JS/CSS
         self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
