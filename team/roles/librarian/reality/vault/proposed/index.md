@@ -152,20 +152,20 @@ from structure-key-split. Currently requires write_key; proposed to accept read_
 
 ## Sub-Vaults & External Resources via Convention Files (05/24–05/25 briefs — vaults-within-vaults, sub-vaults-workflow, conventions-and-external-resources)
 
-All items below are PROPOSED — does not exist yet. Architecture briefing pack:
+All items below are PROPOSED — does not exist yet. Architecture briefing pack (**Rev 2**, incorporates the project lead's 25 May refinements):
 `team/roles/architect/reviews/05/25/v0.27.62__briefing-pack__sub-vaults-and-external-resources.md`.
 Designer review: `team/roles/designer/reviews/05/25/v0.27.62__designer-review__sub-vaults-and-external-resources-ux.md`.
-Builds on EXISTING foundations: `.vault/owner/*` double-encryption (`vault-hkdf.js`), `SGVault.openReadOnly` (`sg-vault.js:93`), `VaultLoader.openROToken` (`vault-loader.js:122`), the `app.json`/`_page.json` convention mechanism, and lazy sub-tree loading.
+Builds on EXISTING foundations: `.vault/owner/*` double-encryption (`vault-hkdf.js`), `SGVault.openReadOnly` (`sg-vault.js:93`), `SGVault._loadTreeFromCommit` (`sg-vault.js:312`), `VaultLoader.openROToken` (`vault-loader.js:122`), the `app.json`/`_page.json` convention mechanism, and lazy sub-tree loading.
 
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
-| P-159 | Vault-pointer convention file | `.vault/owner/pointers.json` (owner-only, double-encrypted), `type`-discriminated array; records child-vault references (id + read_key + ref_file_id, or full vault_key) | sub-vaults-workflow / conventions briefs |
-| P-160 | Sub-vault traversal in Vault Web UI | "BEYOND THIS VAULT" tree region; open child vault lazily on access via existing `openReadOnly`/`open`; vault back-stack + persistent boundary bar | sub-vaults-workflow brief (Web UI first) |
-| P-161 | External-resource pointers (`type` link/video/app) | Same convention file; embed external URL in a controlled iframe | conventions brief |
-| P-162 | Controlled external iframe (`<sg-embed-frame>`) | Cross-origin src, locked-down sandbox, NO VFS bridge, NO postMessage listener; default-deny; sticky transparency banner | conventions brief (controlled iframe) |
-| P-163 | Selective access grant for external apps | Explicit owner grant of a scoped read channel (narrow, not the full VFS bridge); amber granted-state banner + Revoke | conventions brief (plugin model) — Phase 4 |
-| P-164 | CLI clone-within-clone for sub-vaults | `sgit` resolves `pointers.json` and clones referenced vaults on demand; nested-clone storage tracking | sub-vaults-workflow brief — Phase 4 (deferred) |
-| P-165 | Reader-visible pointer tier | Optional `.vault/pointers.json` (read_key only) so RO-token holders of the parent can see non-sensitive pointers | conventions/workflow briefs — additive option |
+| P-159 | Link-file convention (`*.link.json`) | Dumb, movable pointer file **in the regular tree** (no keys); holds `type`, `vault_id`, `ref_id`, submodule-style `pin` (default latest), description. Same vault may appear in many places; move = move the file | sub-vaults-workflow / conventions briefs (Rev 2) |
+| P-160 | `ro-links.json` / `rw-links.json` in `.vault/owner/` | Keys live here, split by power: `ro-links` = read_key-encrypted (readable by parent read access, read-only child keys); `rw-links` = owner-only double-encrypted (full child keys). Cross-ref by `ref_id` | sub-vaults-workflow brief (Rev 2) |
+| P-161 | Inline sub-vault traversal (read-only in v1) | Sub-vault renders as an **expandable folder**, opens lazily on access, spliced inline; **always read-only in v1 regardless of key**; subtle vault glyph + access chip | sub-vaults-workflow brief (Web UI first; Rev 2) |
+| P-162 | Link card (`<sg-link-card>`) | Miniature open-vault surface: shows **public info before key**, prompts for key, save choice (`.vault` ro/rw · local · ask-each-time), pin, description; "Open here" vs "Open in new window" with parent/sub-vault tracking | conventions/workflow briefs + per-vault public-info brief (Rev 2) |
+| P-163 | External-resource link types + controlled iframe (`<sg-embed-frame>`) | `type` link/video/app embed external URL; cross-origin src, locked sandbox (no `allow-same-origin`), NO bridge/listener; default-deny; sticky transparency banner | conventions brief |
+| P-164 | Opt-in app→vault access grant (**v1**, first-class) | Explicit owner grant of a scoped read-only `requestFile` channel to a named folder; amber granted banner + Revoke; default-deny otherwise. Per-file monitoring/granular grants later | conventions brief (plugin model) + lead Rev 2 |
+| P-165 | CLI clone-within-clone + write-inside-child | Nested clone resolution in `sgit`; commits/recursive write inside a sub-vault | sub-vaults-workflow brief — Phase 4 (deferred) |
 
 ## Vault Discovery and Public Keys (05/16 briefs — doc 422)
 
