@@ -136,11 +136,7 @@
             });
             this.addEventListener('vault-settings-access-key', (e) => {
                 this._accessKey = e.detail.key;
-                if (e.detail.key) {
-                    sessionStorage.setItem('sg-vault-access-key', e.detail.key);
-                } else {
-                    sessionStorage.removeItem('sg-vault-access-key');
-                }
+                VaultLoader.storage.setAccessKey(e.detail.key || null);
                 if (this._vault?._sgSend) this._vault._sgSend.token = e.detail.key;
                 // Update the live dataSource so edit/write buttons activate immediately
                 if (this._dataSource) {
@@ -733,7 +729,7 @@
 
         _onAuthSubmit(key) {
             this._accessKey = key;
-            sessionStorage.setItem('sg-vault-access-key', key);
+            VaultLoader.storage.setAccessKey(key);
             if (this._vault?._sgSend) this._vault._sgSend.token = key;
             if (this._dataSource) {
                 this._dataSource._accessKey = key;
