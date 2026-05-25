@@ -46,15 +46,6 @@
 
         var _ext0 = (fileName || '').split('.').pop().toLowerCase();
 
-        // Re-lift only for HTML files clicked inside an App Mode iframe (in-app navigation).
-        // Non-HTML files opened from the tree (e.g. app.json) must NOT be auto-lifted.
-        var _banner = document.querySelector('sg-app-banner');
-        if (_banner && _banner.style.display !== 'none' && typeof _banner.activate === 'function'
-                && (_ext0 === 'html' || _ext0 === 'htm')) {
-            var _newContentEl = container.querySelector('.sb-file__content') || container;
-            _banner.activate(_newContentEl);
-        }
-
         // App Mode: available for all file types on all vaults (writable or not).
         // Opens the file via /en-gb/app#path in a NEW TAB.
         // Hash = file path (NOT vault key — key comes from localStorage set by /#vault-key).
