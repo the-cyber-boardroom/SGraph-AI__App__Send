@@ -31,6 +31,14 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
             assert self.fast_api            == _.fast_api
             assert self.client              == _.fast_api__client
 
+    def test__cors_allows_transfer_delete(self):                                  # regression: DELETE preflight (x-sgraph-transfer-delete-auth) must pass CORS
+        cors = [m for m in self.fast_api.app().user_middleware if 'CORS' in str(m.cls)]
+        assert cors, 'CORS middleware must be configured'
+        opts    = cors[0].kwargs
+        headers = [h.lower() for h in opts.get('allow_headers', [])]
+        assert 'DELETE' in opts.get('allow_methods', [])
+        assert 'x-sgraph-transfer-delete-auth' in headers                          # else the public-preview update/unpublish DELETE preflight fails
+
     def test__client__no_auth_required(self):
         path     = '/info/health'
         response = self.client.get(url=path)

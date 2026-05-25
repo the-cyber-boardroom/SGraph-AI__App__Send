@@ -39,6 +39,7 @@
             if (typeof SGVault === 'undefined' || typeof SGSend === 'undefined') return null;
             let key = '';
             try { key = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+            this._vaultKey = key;   // captured for the full-access share link
             if (!key)                 { this._setOwnerStatus('no-vault');  return null; }
             if (key.startsWith('ro-')){ this._setOwnerStatus('read-only'); return null; }
             const endpoint = (window.SG_ENDPOINT
@@ -181,19 +182,50 @@
         _status(msg, isErr) { const el = this.$('.ed-status'); if (el) { el.textContent = msg; el.className = 'ed-status' + (isErr ? ' ed-status--err' : ''); } }
 
         async _renderShare(res) {
-            const base = (this._ctx.sgSend && this._ctx.sgSend.endpoint) || 'https://send.sgraph.ai';
-            const appBase = location.origin + '/en-gb/app/';
-            const previewLink = appBase + res.publicId;
+            const previewLink = location.origin + '/en-gb/app/' + res.publicId;
+            const fullLink    = this._vaultKey ? (previewLink + '#' + this._vaultKey) : '';
             this.$('.ed-share').innerHTML =
                 `<div class="ed-sharebox">
-                   <label>Preview link (safe)</label>
-                   <div class="ed-copyrow"><input readonly value="${this._esc(previewLink)}"><button class="ed-copy" data-v="${this._esc(previewLink)}">Copy</button></div>
+                   <label class="ed-l">Preview link (safe)</label>
+                   <div class="ed-copyrow">
+                     <input class="ed-share-input" readonly value="${this._esc(previewLink)}">
+                     <button class="ed-copy" type="button" data-copy="${this._esc(previewLink)}">Copy</button>
+                   </div>
                    <p class="ed-hint">Anyone with this link sees the preview and is asked for the key.</p>
-                   <details><summary>Show full-access link (includes the vault key)</summary>
-                     <p class="ed-warn">⚠ Includes the vault key — anyone with this link can open the FULL vault. Share only with trusted people. (Add <code>#&lt;vault-key&gt;</code> to the preview link.)</p>
-                   </details>
+                   ${fullLink ? `
+                   <details class="ed-full">
+                     <summary>Show full-access link (includes the vault key)</summary>
+                     <p class="ed-warn">⚠ Includes the vault key — anyone with this link can open the FULL vault. Share only with trusted people.</p>
+                     <div class="ed-copyrow">
+                       <input class="ed-full-input" type="password" readonly value="${this._esc(fullLink)}">
+                       <button class="ed-reveal" type="button">View</button>
+                       <button class="ed-copy" type="button" data-copy="${this._esc(fullLink)}">Copy</button>
+                     </div>
+                   </details>` : ''}
                  </div>`;
-            this.shadowRoot.querySelectorAll('.ed-copy').forEach(b => b.addEventListener('click', () => navigator.clipboard?.writeText(b.dataset.v)));
+            this.shadowRoot.querySelectorAll('.ed-copy').forEach(b =>
+                b.addEventListener('click', () => this._copyFlash(b, b.dataset.copy)));
+            const reveal = this.$('.ed-reveal');
+            if (reveal) reveal.addEventListener('click', () => {
+                const inp = this.$('.ed-full-input');
+                const hidden = inp.type === 'password';
+                inp.type = hidden ? 'text' : 'password';
+                reveal.textContent = hidden ? 'Hide' : 'View';
+            });
+        }
+
+        // Copy + briefly swap the button label to "Copied" (nice feedback).
+        _copyFlash(btn, text) {
+            try { navigator.clipboard && navigator.clipboard.writeText(text); } catch (_) {}
+            if (btn._flashTimer) { clearTimeout(btn._flashTimer); }
+            else { btn._origText = btn.textContent; }
+            btn.textContent = 'Copied';
+            btn.classList.add('ed-copied');
+            btn._flashTimer = setTimeout(() => {
+                btn.textContent = btn._origText;
+                btn.classList.remove('ed-copied');
+                btn._flashTimer = null;
+            }, 1500);
         }
 
         render() {
@@ -373,7 +405,12 @@
         .ed-status--err { color: var(--danger, #E94560); }
         .ed-thumb-preview img { max-width: 128px; border-radius: 6px; margin-top: 6px; }
         .ed-sharebox { margin-top: 12px; border-top:1px solid var(--color-border,#2a2a44); padding-top:10px; }
-        .ed-copyrow { display:flex; gap:8px; } .ed-copyrow input { flex:1; }
+        .ed-copyrow { display:flex; gap:8px; align-items:center; } .ed-copyrow input { flex:1; min-width:0; }
+        .ed-copyrow button { padding:8px 12px; border-radius:6px; border:1px solid var(--color-border,#2a2a44);
+            background:var(--bg-secondary,#1c1c33); color:var(--color-text,#e2e8f0); cursor:pointer; font:inherit; white-space:nowrap; flex:0 0 auto; }
+        .ed-copyrow button:hover { background:#23234a; }
+        .ed-copy.ed-copied { background:#22a06b; color:#fff; border-color:transparent; }
+        .ed-full summary { cursor:pointer; font-size:0.85rem; margin:8px 0; }
         .ed-warn { color: var(--danger, #E94560); font-size: 0.8rem; }
         .ed-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex;
             align-items:center; justify-content:center; z-index: 1000; padding: 24px; }
