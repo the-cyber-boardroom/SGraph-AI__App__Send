@@ -18,7 +18,8 @@
     <script src="/_common/js/lib/sg-vault/sg-vault--sync.js"></script>
     <script src="/_common/js/lib/sg-vault/sg-vault--branches.js"></script>
 
-    <!-- Public-preview core + editor -->
+    <!-- Public-preview core + components (self-contained: editor opens the vault from
+         localStorage; the card self-updates from the editor's pvp-preview-changed events) -->
     <script src="/_common/js/lib/sg-public-preview/public-preview-crypto.js"></script>
     <script src="/_common/js/lib/sg-public-preview/public-preview-schema.js"></script>
     <script src="/_common/js/lib/sg-public-preview/public-preview-read.js"></script>
@@ -26,107 +27,54 @@
     <script src="/_common/js/components/sg-public-preview-editor/sg-public-preview-editor.js"></script>
     <script src="/_common/js/components/sg-public-preview-card/sg-public-preview-card.js"></script>
 
+    <!-- sg-layout (fractal window manager) — provides the tabbed panes -->
+    <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
+
     <style>
-        :root { --bg:#0a0a18; --surface:#14142a; --border:#2a2a44; --text:#e2e8f0; --muted:#9aa4bf; --primary:#4f8ff7; --danger:#E94560; }
-        * { box-sizing: border-box; }
-        body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding:24px; }
-        .wrap { max-width: 620px; margin: 0 auto; }
-        h1 { font-size: 1.15rem; margin: 0 0 4px; }
-        .sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 18px; }
-        .status { margin: 12px 0; font-size: 0.88rem; min-height: 1.2em; }
-        .status--err { color: var(--danger); }
-        .access { display:flex; gap:8px; align-items:center; margin: 10px 0 18px; }
-        .access input { flex:1; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font:inherit; }
-        .access label { font-size:0.8rem; color:var(--muted); }
-        .gate { display:none; }
-        .wrap { max-width: 1100px; }
-        .split { display:flex; gap:28px; align-items:flex-start; }
-        .pane { flex:1 1 0; min-width:0; }
-        .pane-live { position: sticky; top: 24px; }
-        .pane-h { font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin:0 0 12px; }
-        @media (max-width: 900px) { .split { flex-direction: column; } .pane-live { position: static; } }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; background: #0a0a18; color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+        body { display: flex; flex-direction: column; }
+        .pvp-top { flex: 0 0 auto; padding: 12px 18px; border-bottom: 1px solid #2a2a44;
+            font-size: 0.95rem; font-weight: 600; }
+        .pvp-top small { color: #9aa4bf; font-weight: 400; margin-left: 8px; }
+        #layout-host { flex: 1; min-height: 0; position: relative; }
+        sg-layout { display: block; width: 100%; height: 100%; }
+        /* editor + card panes scroll independently inside their sg-layout stacks */
+        sg-public-preview-editor, sg-public-preview-card { display: block; padding: 20px; overflow-y: auto; height: 100%; }
     </style>
 </head>
 <body>
-<div class="wrap">
-    <h1>Public preview</h1>
-    <p class="sub" id="vault-name">Loading your vault…</p>
-    <div class="status" id="status">Opening vault from this browser…</div>
+    <div class="pvp-top">Public preview <small id="pvp-vault">— edit &amp; publish a deliberately-public preview for this vault</small></div>
+    <div id="layout-host"><sg-layout id="layout"></sg-layout></div>
 
-    <div class="gate" id="gate">
-        <div class="access">
-            <label>Access key (needed to publish)</label>
-            <input id="access" type="password" placeholder="word-word-1234">
-            <button id="access-set">Use</button>
-        </div>
-        <div class="split">
-            <div class="pane pane-edit">
-                <sg-public-preview-editor id="editor"></sg-public-preview-editor>
-            </div>
-            <div class="pane pane-live">
-                <p class="pane-h">Live preview — how it will look</p>
-                <sg-public-preview-card id="live"></sg-public-preview-card>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-(function () {
-    'use strict';
-    const params   = new URLSearchParams(location.search);
-    const endpoint = (params.get('api') || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
-    const status   = (m, err) => { const el = document.getElementById('status'); el.textContent = m; el.className = 'status' + (err ? ' status--err' : ''); };
-
-    function readVaultKey() {
-        try { return localStorage.getItem('sg-vault-key') || ''; } catch (_) { return ''; }
-    }
-    function readAccessToken(vaultId) {
-        try {
-            return localStorage.getItem('accessKey:' + vaultId)
-                || localStorage.getItem('sg-vault-access-key-saved')
-                || sessionStorage.getItem('sg-vault-access-key') || '';
-        } catch (_) { return ''; }
-    }
-
-    (async function () {
-        const key = readVaultKey();
-        if (!key) { status('No vault is open in this browser. Open your vault first (enter its key on the vault page), then reopen this editor.', true); return; }
-        if (key.startsWith('ro-')) { status('This vault is open read-only. Public previews can only be published by the owner (open with the full vault key).', true); return; }
-
-        const sgSend = new SGSend({ endpoint: endpoint });
-        let vault;
-        try {
-            vault = await SGVault.open(sgSend, key);
-        } catch (e) { status('Could not open the vault: ' + e.message, true); return; }
-
-        document.getElementById('vault-name').textContent = 'Vault: ' + (vault.name || vault._vaultId || '(unnamed)');
-        document.getElementById('gate').style.display = 'block';
-
-        // Recover the write access token (per-vault, shared across tabs via localStorage).
-        const token = readAccessToken(vault._vaultId);
-        if (token) { sgSend.token = token; document.getElementById('access').value = token; }
-        status(token ? 'Vault ready. You can publish.' : 'Vault ready — enter your access key above before publishing.');
-
-        // Allow setting/overriding the access key here (so a fresh tab can still publish).
-        document.getElementById('access-set').addEventListener('click', () => {
-            const v = document.getElementById('access').value.trim();
-            sgSend.token = v;
-            try { if (v && vault._vaultId) localStorage.setItem('accessKey:' + vault._vaultId, v); } catch (_) {}
-            status(v ? 'Access key set. You can publish.' : 'Access key cleared.');
+    <script>
+    (function () {
+        'use strict';
+        // Two tabbed panes side-by-side: Edit | Live preview (the fractal sg-layout
+        // pattern used by /en-gb/app). The editor self-opens the vault; the card
+        // self-updates from the editor's pvp-preview-changed events — no manual wiring.
+        var cfg = {
+            type: 'row', sizes: [0.58, 0.42],
+            children: [
+                { type: 'stack', id: 'edit-area', tabs: [{ tag: 'sg-public-preview-editor', title: 'Edit preview',  locked: true }] },
+                { type: 'stack', id: 'live-area', tabs: [{ tag: 'sg-public-preview-card',    title: 'Live preview', locked: true }] }
+            ]
+        };
+        Promise.all([
+            customElements.whenDefined('sg-layout'),
+            customElements.whenDefined('sg-public-preview-editor'),
+            customElements.whenDefined('sg-public-preview-card')
+        ]).then(function () {
+            document.getElementById('layout').setLayout(cfg);
         });
 
-        document.getElementById('editor').setContext({ sgSend: sgSend, vault: vault });
-
-        // Side-by-side live preview: the editor broadcasts pvp-preview-changed on every
-        // edit; render it in the card exactly as the public page would (no key prompt).
-        const live = document.getElementById('live');
-        live.setState({ status: 'ok', preview: { schema: 'sgraph-public-preview/v1', title: '', description: '' }, showKeyPrompt: false });
-        document.addEventListener('pvp-preview-changed', (e) => {
-            live.setState({ status: 'ok', preview: e.detail.preview, showKeyPrompt: false });
+        // Reflect the opened vault's name in the top bar (editor announces it).
+        document.addEventListener('pvp-vault-ready', function (e) {
+            var el = document.getElementById('pvp-vault');
+            if (el && e.detail && e.detail.name) el.textContent = '— ' + e.detail.name;
         });
     })();
-})();
-</script>
+    </script>
 </body>
 </html>

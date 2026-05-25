@@ -28,7 +28,56 @@
         }
         connectedCallback() { this.render(); }
 
-        setContext({ sgSend, vault }) { this._ctx = { sgSend, vault }; this.render(); }
+        // External wiring (optional). When NOT called (e.g. instantiated by sg-layout),
+        // the editor opens the vault itself from localStorage via _ensureContext().
+        setContext({ sgSend, vault }) { this._ctx = { sgSend, vault }; this._ownerStatus = 'ready'; this.render(); }
+
+        // Self-contained vault open: read the vault key (+ per-vault access token) from
+        // localStorage and open the vault. Returns { sgSend, vault } or null (no owner).
+        async _ensureContext() {
+            if (this._ctx && this._ctx.vault) return this._ctx;
+            if (typeof SGVault === 'undefined' || typeof SGSend === 'undefined') return null;
+            let key = '';
+            try { key = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+            if (!key)                 { this._setOwnerStatus('no-vault');  return null; }
+            if (key.startsWith('ro-')){ this._setOwnerStatus('read-only'); return null; }
+            const endpoint = (window.SG_ENDPOINT
+                || (function(){ try { return sessionStorage.getItem('sg-vault-endpoint'); } catch (_) { return null; } })()
+                || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
+            try {
+                const sgSend = new SGSend({ endpoint });
+                const vault  = await SGVault.open(sgSend, key);
+                let token = '';
+                try { token = localStorage.getItem('accessKey:' + vault._vaultId) || localStorage.getItem('sg-vault-access-key-saved') || ''; } catch (_) {}
+                if (token) sgSend.token = token;
+                this._ctx = { sgSend, vault };
+                this._vaultId = vault._vaultId;
+                this.dispatchEvent(new CustomEvent('pvp-vault-ready', {
+                    detail: { name: vault.name || vault._vaultId }, bubbles: true, composed: true
+                }));
+                this._setOwnerStatus(token ? 'ready' : 'no-token', vault.name || vault._vaultId);
+                return this._ctx;
+            } catch (e) { this._setOwnerStatus('error', e.message); return null; }
+        }
+
+        _setOwnerStatus(state, detail) {
+            this._ownerStatus = state;
+            const map = {
+                'ready':     'Vault ready — you can publish.',
+                'no-token':  'Vault open. Enter your access key below before publishing.',
+                'no-vault':  'No vault is open in this browser. Open your vault first, then reopen this editor.',
+                'read-only': 'This vault is open read-only — only the owner (full key) can publish.',
+                'error':     'Could not open the vault: ' + (detail || '')
+            };
+            const acc = this.shadowRoot && this.shadowRoot.querySelector('.ed-access');
+            if (acc) acc.style.display = (state === 'no-token' || state === 'ready') ? '' : 'none';
+            const el = this.shadowRoot && this.shadowRoot.querySelector('.ed-owner-status');
+            if (el) { el.textContent = map[state] || ''; el.className = 'ed-owner-status' + ((state === 'error' || state === 'no-vault' || state === 'read-only') ? ' ed-status--err' : ''); }
+            if (this._ctx && this._ctx.sgSend && this._ctx.sgSend.token) {
+                const ai = this.shadowRoot && this.shadowRoot.querySelector('.ed-access-input');
+                if (ai && !ai.value) ai.value = this._ctx.sgSend.token;
+            }
+        }
 
         $(s) { return this.shadowRoot.querySelector(s); }
         _val(s) { const el = this.$(s); return el ? el.value.trim() : ''; }
@@ -85,8 +134,9 @@
         }
 
         async _doPublish(isUpdate) {
-            const { sgSend, vault } = this._ctx;
-            if (!sgSend || !vault) { this._status('No vault context — open a vault first.', true); return; }
+            const ctx = await this._ensureContext();
+            if (!ctx) return;                                   // _ensureContext set the status (no-vault / read-only / error)
+            const { sgSend, vault } = ctx;
             const publicId = this._publicId();
             const idCheck  = PublicPreviewSchema.validatePublicId(publicId);
             if (!idCheck.ok) { this._status(idCheck.reason, true); return; }
@@ -108,7 +158,9 @@
         }
 
         async _doUnpublish() {
-            const { sgSend, vault } = this._ctx;
+            const ctx = await this._ensureContext();
+            if (!ctx) return;
+            const { sgSend, vault } = ctx;
             const publicId = this._publicId();
             this._status('Unpublishing…');
             try {
@@ -145,6 +197,14 @@
                 </div>
                 <p class="ed-intro">A public preview lets anyone with the link see the title, description, and thumbnail you choose — even without the vault key. It is deliberately public.</p>
                 <div class="ed-form" style="display:${this._on ? 'block' : 'none'}">
+                  <div class="ed-owner-status"></div>
+                  <div class="ed-access" style="display:none">
+                    <label class="ed-l">Access key (needed to publish)</label>
+                    <div class="ed-copyrow">
+                      <input class="ed-access-input" type="password" placeholder="word-word-1234">
+                      <button class="ed-access-use" type="button">Use</button>
+                    </div>
+                  </div>
                   <fieldset><legend>Public id</legend>
                     <label><input type="radio" name="idmode" class="ed-id-custom-r" checked> Custom</label>
                     <input class="ed-id-custom" placeholder="vault-demo-health-data">
@@ -187,7 +247,19 @@
                 this.$('.ed-unpub').addEventListener('click',   () => this._doUnpublish());
                 this.$('.ed-form').addEventListener('input', () => this._emitChanged());   // live preview
                 this._emitChanged();                                                       // initial paint
+                const accUse = this.$('.ed-access-use');
+                if (accUse) accUse.addEventListener('click', () => this._useAccessKey());
+                // Self-open the vault (or reflect an already-set context).
+                if (this._ctx && this._ctx.vault) this._setOwnerStatus(this._ctx.sgSend && this._ctx.sgSend.token ? 'ready' : 'no-token');
+                else this._ensureContext();
             }
+        }
+
+        _useAccessKey() {
+            const v = (this.$('.ed-access-input') && this.$('.ed-access-input').value || '').trim();
+            if (this._ctx && this._ctx.sgSend) this._ctx.sgSend.token = v;
+            try { if (v && this._vaultId) localStorage.setItem('accessKey:' + this._vaultId, v); } catch (_) {}
+            this._status(v ? 'Access key set — you can publish.' : 'Access key cleared.');
         }
 
         // Broadcast the current preview so a side-by-side <sg-public-preview-card> updates live.
