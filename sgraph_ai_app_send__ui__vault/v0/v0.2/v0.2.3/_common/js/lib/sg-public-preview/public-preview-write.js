@@ -5,7 +5,7 @@
    Storage: the preview is an ordinary SG/Send transfer at the deterministic
    transfer-id, encrypted under the public-derived key. The owner holds a RANDOM
    delete_auth (NEVER derived from the public string) stored inside their own
-   encrypted vault at .sgraph/public-previews/<public-id>.json — so a later edit on
+   encrypted vault at .vault/owner/public-previews/<public-id>.json — so a later edit on
    any device can delete-then-recreate at the same id (the share link never changes).
 
    Depends on: PublicPreviewCrypto, PublicPreviewSchema, an SGSend instance (with the
@@ -14,7 +14,7 @@
 
 const PublicPreviewWrite = {
 
-    BK_FOLDER:  '.sgraph/public-previews',
+    BK_FOLDER:  '.vault/owner/public-previews',
     BK_SCHEMA:  'sgraph-public-preview-bookkeeping/v1',
 
     // --- bookkeeping helpers ---------------------------------------------------
