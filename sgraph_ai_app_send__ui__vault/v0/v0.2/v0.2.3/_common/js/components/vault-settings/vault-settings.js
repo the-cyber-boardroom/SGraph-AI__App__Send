@@ -83,15 +83,6 @@
                         <p class="vset-hint">Opens the Token Manager in a new tab. Your vault will be pre-loaded automatically.</p>
                     </div>
 
-                    <div class="vset-section vset-pvp-section" style="display:none">
-                        <label class="vset-label">Public preview</label>
-                        <p class="vset-hint">A deliberately-public title, description and thumbnail for this vault — shareable as a link with a proper social-share card. Opt-in; the vault's contents stay encrypted.</p>
-                        <div class="vset-row vset-share-row">
-                            <button class="vset-btn vset-btn--primary vset-open-pvp">Create / edit public preview ↗</button>
-                        </div>
-                        <p class="vset-hint">Opens the editor in a new tab. Your vault will be pre-loaded automatically.</p>
-                    </div>
-
                     <div class="vset-section">
                         <label class="vset-label">Statistics</label>
                         <div class="vset-stats"></div>
@@ -104,7 +95,7 @@
                                 <input class="vset-autosync-cb" type="checkbox" checked>
                                 Auto-sync
                             </label>
-                            <p class="vset-hint">When enabled, vault silently pulls new commits from the published branch whenever you switch to the Files view. Only applies when there are no local unpushed commits. No background polling.</p>
+                            <p class="vset-hint">When enabled, vault automatically pushes local commits to the published branch and silently pulls new commits from collaborators whenever you switch to the Files view. Diverged vaults are flagged for manual resolution; no background polling.</p>
                         </div>
                     </div>
 
@@ -166,8 +157,6 @@
             const ownerMode = !!this._vault._passphrase;
             const shareSection = root.querySelector('.vset-share-section');
             if (shareSection) shareSection.style.display = ownerMode ? '' : 'none';
-            const pvpSection = root.querySelector('.vset-pvp-section');
-            if (pvpSection) pvpSection.style.display = ownerMode ? '' : 'none';
 
             const stats = this._vault.getStats();
             const statsEl = root.querySelector('.vset-stats');
@@ -194,7 +183,6 @@
                 if (e.target.closest('.vset-validate-access')) return this._validateAccess();
                 if (e.target.closest('.vset-json-toggle'))        return this._toggleJson(e);
                 if (e.target.closest('.vset-open-token-mgr'))  return this._openTokenManager();
-                if (e.target.closest('.vset-open-pvp'))        return this._openPublicPreview();
             });
         }
 
@@ -301,11 +289,6 @@
         _openTokenManager() {
             const base = window.location.pathname.split('/en-gb/')[0];
             window.open(base + '/en-gb/vault/token/', '_blank');
-        }
-
-        _openPublicPreview() {
-            const base = window.location.pathname.split('/en-gb/')[0];
-            window.open(base + '/en-gb/vault/public-preview/', '_blank');
         }
 
         _toggleJson(e) {

@@ -82,9 +82,22 @@
                                 <div class="vs-view vs-view-sgit" style="display:none">
                                     <vault-sgit-view></vault-sgit-view>
                                 </div>
-                                <!-- Settings view -->
+                                <!-- Settings view: lightweight tabs (Vault Settings | Public preview) -->
                                 <div class="vs-view vs-view-settings" style="display:none">
-                                    <vault-settings></vault-settings>
+                                    <div class="vs-stabs">
+                                        <button class="vs-stab vs-stab--active" data-stab="settings">Vault Settings</button>
+                                        <button class="vs-stab" data-stab="preview">Public preview</button>
+                                    </div>
+                                    <div class="vs-spane" data-spane="settings"><vault-settings></vault-settings></div>
+                                    <div class="vs-spane" data-spane="preview" style="display:none">
+                                        <div class="vs-pvp-split">
+                                            <div class="vs-pvp-edit"><sg-public-preview-editor embedded></sg-public-preview-editor></div>
+                                            <div class="vs-pvp-live">
+                                                <div class="vs-pvp-livehead">Live preview</div>
+                                                <sg-public-preview-card></sg-public-preview-card>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -125,6 +138,12 @@
                 if (e.detail.view === 'files') this._scheduleAutoSyncCheck();
             });
 
+            // Settings sub-tabs: Vault Settings | Public preview
+            this.addEventListener('click', (e) => {
+                const tab = e.target.closest && e.target.closest('.vs-stab');
+                if (tab) this._switchSettingsTab(tab.dataset.stab);
+            });
+
             // Auth events
             this.addEventListener('vault-auth-submit', (e) => this._onAuthSubmit(e.detail.key));
             this.addEventListener('vault-auth-cancel', ()  => { this._pendingAction = null; });
@@ -136,11 +155,7 @@
             });
             this.addEventListener('vault-settings-access-key', (e) => {
                 this._accessKey = e.detail.key;
-                if (e.detail.key) {
-                    sessionStorage.setItem('sg-vault-access-key', e.detail.key);
-                } else {
-                    sessionStorage.removeItem('sg-vault-access-key');
-                }
+                VaultLoader.storage.setAccessKey(e.detail.key || null);
                 if (this._vault?._sgSend) this._vault._sgSend.token = e.detail.key;
                 // Update the live dataSource so edit/write buttons activate immediately
                 if (this._dataSource) {
@@ -210,6 +225,20 @@
 
             // Wire settings
             this.querySelector('vault-settings')?.setVault(vault, vaultKey, this._accessKey);
+
+            // Hand the live vault to the embedded Public-preview editor — no re-open, no
+            // localStorage race. Set the access token on the shared sgSend so publish/delete work.
+            const pvpEditor = this.querySelector('sg-public-preview-editor');
+            if (pvpEditor && typeof pvpEditor.setContext === 'function') {
+                if (vault._sgSend && this._accessKey) vault._sgSend.token = this._accessKey;
+                pvpEditor.setContext({ sgSend: vault._sgSend, vault: vault, vaultKey: vaultKey });
+            }
+            // Seed the side-by-side live card (it self-updates from the editor's
+            // pvp-preview-changed events; this just avoids a stuck loading skeleton).
+            const pvpLive = this.querySelector('.vs-spane[data-spane="preview"] sg-public-preview-card');
+            if (pvpLive && typeof pvpLive.setState === 'function') {
+                pvpLive.setState({ status: 'ok', preview: { schema: 'sgraph-public-preview/v1', title: '' }, showKeyPrompt: false });
+            }
 
             // Wire SGit
             const sgit = this.querySelector('vault-sgit-view');
@@ -665,21 +694,34 @@
             if (!this._vault || !this._accessKey) return
             if (!this._autoSyncEnabled) return
 
+            // --- Auto-push: push local unpushed commits before checking upstream ----
+            // Refresh sync state so ahead/diverged counts are accurate.
+            await this._refreshSyncState()
+            const { ahead, diverged } = this._syncState || {}
+            if (ahead > 0) {
+                if (diverged) {
+                    // Diverged — the banner will show; don't auto-push and risk data loss.
+                    return
+                }
+                // We have local commits ahead of the named branch — push them.
+                window.sgraphVault.messages.info('Auto-sync: pushing local commits\u2026')
+                try {
+                    await this._vault.push()
+                    await this._refreshSyncState()
+                    window.sgraphVault.messages.success('Auto-sync: local commits pushed to published branch')
+                } catch (err) {
+                    window.sgraphVault.messages.error(`Auto-sync push failed: ${err.message}`)
+                }
+                return
+            }
+
+            // --- Auto-pull: check for upstream changes and merge if cleanly behind --
             let liveNamedHead
             try {
                 liveNamedHead = await this._vault._refManager.readRef(this._vault._refFileId)
             } catch (_) { return }
 
             if (!liveNamedHead || liveNamedHead === this._vault._namedHeadId) return
-
-            // There are upstream changes
-            const { ahead } = this._syncState || {}
-            if (ahead > 0) {
-                // We have local commits too — diverged or ahead. Don't auto-merge silently.
-                // Refresh sync state so the banner updates (it will show the diverged notice).
-                await this._refreshSyncState()
-                return
-            }
 
             // We are cleanly behind — safe to auto-pull
             window.sgraphVault.messages.info('Syncing vault\u2026')
@@ -719,6 +761,11 @@
 
         // --- View Switching -------------------------------------------------------
 
+        _switchSettingsTab(name) {
+            this.querySelectorAll('.vs-stab').forEach(b => b.classList.toggle('vs-stab--active', b.dataset.stab === name));
+            this.querySelectorAll('.vs-spane').forEach(p => { p.style.display = (p.dataset.spane === name) ? '' : 'none'; });
+        }
+
         _switchView(viewId) {
             this._activeView = viewId;
 
@@ -749,7 +796,7 @@
 
         _onAuthSubmit(key) {
             this._accessKey = key;
-            sessionStorage.setItem('sg-vault-access-key', key);
+            VaultLoader.storage.setAccessKey(key);
             if (this._vault?._sgSend) this._vault._sgSend.token = key;
             if (this._dataSource) {
                 this._dataSource._accessKey = key;
@@ -1021,6 +1068,24 @@
         .vs-view {
             height: 100%; overflow: auto;
         }
+        .vs-stabs {
+            display: flex; gap: 4px; padding: var(--space-3, 12px) var(--space-4, 16px) 0;
+            border-bottom: 1px solid var(--color-border, #2a2a44); position: sticky; top: 0;
+            background: var(--bg-primary, #0a0a18); z-index: 1;
+        }
+        .vs-stab {
+            padding: 0.55rem 1rem; border: 0; border-bottom: 2px solid transparent; background: transparent;
+            color: var(--color-text-secondary, #9aa4bf); cursor: pointer; font: inherit; font-weight: 600;
+        }
+        .vs-stab:hover { color: var(--color-text, #e2e8f0); }
+        .vs-stab--active { color: var(--color-primary, #4f8ff7); border-bottom-color: var(--color-primary, #4f8ff7); }
+        .vs-spane { padding-top: var(--space-2, 8px); }
+        .vs-pvp-split { display: flex; gap: 8px; align-items: flex-start; }
+        .vs-pvp-edit { flex: 1 1 0; min-width: 0; }
+        .vs-pvp-live { flex: 1 1 0; min-width: 0; position: sticky; top: 48px; padding: 16px 20px; }
+        .vs-pvp-livehead { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--color-text-secondary, #9aa4bf); margin: 0 0 12px; }
+        @media (max-width: 980px) { .vs-pvp-split { flex-direction: column; } .vs-pvp-live { position: static; } }
         .vs-view-files {
             overflow: hidden; /* send-browse manages its own scroll */
         }

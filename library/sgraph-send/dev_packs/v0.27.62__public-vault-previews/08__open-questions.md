@@ -46,6 +46,7 @@ Each item is **RESOLVED** (decided / code-verified here) or **PENDING** (needs a
 |---|---|---|
 | ~~Q-update-blocker~~ | In-place update blocked by delete-tombstone | **RESOLVED — Option A implemented.** Per-transfer opt-in `allow_recreate` flag: when set, `delete_transfer` clears the metadata so the id can be recreated; default (False) keeps the tombstone for all other transfers. `publishPreview` opts in → delete-then-recreate keeps the same share link. Backward-compatible (66/66 existing transfer tests pass). Doc 03 §3. |
 | Q-pki | How this smooths once PKI lands | Direction noted (preview-then-ask-key → preview-then-auto-access for entitled identities; design already separates the two steps). Not in v1. Revisit with the PKI brief. |
+| ~~Q-vault-id-verify~~ | Verify a typed key opens the *right* vault | **RESOLVED — implemented.** `publishPreview` stamps the (non-secret) `vault_id` into the preview JSON; the open page passes it to `_initWithKey(key, _, expectedVaultId)`, which — after opening but **before any side effect** — rejects a valid-but-wrong-vault key (`code:'wrong-vault'`) and the card shows "that key opens a different vault" + a link to `/#<key>` to open the key's actual vault. Older previews (no `vault_id`) skip the check (graceful). Doc 04 §2.0. |
 | Q-meta-latency | The measured OG-render latency number | Produced during Phase 5 (the brief's performance ask); record it here when measured. |
 
 ---
