@@ -22,9 +22,10 @@ function source(file) {
 }
 source('public-preview-crypto.js');
 source('public-preview-schema.js');
+source('public-preview-read.js');
 // Lift the const bindings onto globalThis for this ESM module to read.
-runInThisContext('globalThis.PublicPreviewCrypto = PublicPreviewCrypto; globalThis.PublicPreviewSchema = PublicPreviewSchema;');
-const { PublicPreviewCrypto: PPC, PublicPreviewSchema: PPS } = globalThis;
+runInThisContext('globalThis.PublicPreviewCrypto = PublicPreviewCrypto; globalThis.PublicPreviewSchema = PublicPreviewSchema; globalThis.PublicPreviewRead = PublicPreviewRead;');
+const { PublicPreviewCrypto: PPC, PublicPreviewSchema: PPS, PublicPreviewRead: PPR } = globalThis;
 
 // --- tiny async runner -----------------------------------------------------------
 const tests = [];
@@ -105,6 +106,26 @@ test('validatePublicId — rules + Simple-Token rejection', () => {
     assert.equal(PPS.validatePublicId('Bad_Id!').ok, false);         // charset
     assert.equal(PPS.validatePublicId('apple-mango-5623').ok, false);// Simple Token shape
     assert.match(PPS.randomPublicId(), /^[a-z0-9]{16}$/);
+});
+
+// --- read path (fetchPreview) against real ciphertext + a stubbed fetch ----------
+test('fetchPreview — ok against real ciphertext; 404 -> not-found', async () => {
+    const id      = 'vault-demo-health-data';
+    const preview = { schema: 'sgraph-public-preview/v1', title: 'Health Data Demo', description: 'public demo' };
+    const wk      = await PPC.deriveWriteKey(id);
+    const cipher  = await PPC.encrypt(new TextEncoder().encode(JSON.stringify(preview)).buffer, wk);
+    const tid     = await PPC.deriveTransferId(id);
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => url.endsWith('/download/' + tid)
+        ? { ok: true,  status: 200, arrayBuffer: async () => cipher }
+        : { ok: false, status: 404, text: async () => 'not found' };
+    try {
+        const ok = await PPR.fetchPreview('https://send.sgraph.ai', id);
+        assert.equal(ok.status, 'ok');
+        assert.deepEqual(ok.preview, preview);
+        const nf = await PPR.fetchPreview('https://send.sgraph.ai', 'missing-one');
+        assert.equal(nf.status, 'not-found');
+    } finally { globalThis.fetch = realFetch; }
 });
 
 // --- run -------------------------------------------------------------------------
