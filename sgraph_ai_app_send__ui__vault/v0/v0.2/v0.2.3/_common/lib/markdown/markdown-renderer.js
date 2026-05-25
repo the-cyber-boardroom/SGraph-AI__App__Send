@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph — Markdown Renderer
-   vault/lib/markdown v0.1.0
+   vault/lib/markdown v0.2.0
 
    Thin rendering layer over MarkdownParser. Owns the DOM structure for
    displaying a markdown file, and exposes a clean handle so consumers
@@ -11,6 +11,7 @@
    API:
      const view = MarkdownRenderer.mount(container, bytes, options);
      view.getSource()          → original markdown string (never stale)
+     view.getFrontMatter()     → parsed front matter config object (or {})
      view.refresh(newBytes)    → re-render with new content
      view.toggleSource()       → switch rendered ↔ raw source view
      view.isSourceVisible()    → boolean
@@ -19,6 +20,16 @@
    Options:
      resolveBlobUrl(src)  async fn — converts data-md-src to blob: URL
      onLinkClick(href, e) fn — intercepts relative-path link clicks
+
+   Front matter (in the markdown file, between --- delimiters):
+     page_break_before: h1          — page break before every h1
+     page_break_before: [h1, h2]    — page break before h1 AND h2
+     page_break_before: true        — shorthand for h1
+     print_css: |
+       h2 { color: navy; }          — extra CSS injected into sg-print window
+
+   Inline body directive (standalone line):
+     <!-- page-break -->            — manual page break at this point
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 const MarkdownRenderer = {
@@ -46,14 +57,51 @@ const MarkdownRenderer = {
         wrapper.appendChild(sourcePre);
         container.appendChild(wrapper);
 
-        let currentSource = source;
-        let sourceVisible = false;
+        let currentSource  = source;
+        let currentConfig  = {};
+        let sourceVisible  = false;
 
         function _render(text) {
-            const html = typeof MarkdownParser !== 'undefined'
-                ? MarkdownParser.parse(text)
-                : '<pre>' + text.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</pre>';
+            // Extract front matter (config + body without the --- block).
+            // Falls back gracefully when MarkdownParser lacks extractFrontMatter.
+            var fm = (typeof MarkdownParser !== 'undefined' && MarkdownParser.extractFrontMatter)
+                ? MarkdownParser.extractFrontMatter(text)
+                : { config: {}, body: text };
+
+            currentConfig = fm.config || {};
+            var body      = fm.body;
+
+            var html;
+            if (typeof MarkdownParser !== 'undefined') {
+                html = MarkdownParser.parse(body, {
+                    pageBreakBefore: currentConfig.page_break_before
+                });
+            } else {
+                html = '<pre>' + body.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>';
+            }
+
             rendered.innerHTML = html;
+
+            // Mark the container so CSS can conditionally show/hide the
+            // on-screen page-break indicators.
+            if (currentConfig.page_break_before) {
+                rendered.classList.add('has-page-breaks');
+            } else {
+                rendered.classList.remove('has-page-breaks');
+            }
+
+            // Inject print_css into a <style> scoped to this container.
+            // Allows the author to fine-tune print layout (fonts, margins,
+            // column counts) without touching the vault UI source.
+            var oldStyle = rendered.querySelector('style.md-print-css');
+            if (oldStyle) oldStyle.remove();
+            if (currentConfig.print_css && typeof currentConfig.print_css === 'string') {
+                var styleEl = document.createElement('style');
+                styleEl.className = 'md-print-css';
+                styleEl.textContent = '@media print {\n' + currentConfig.print_css + '\n}';
+                rendered.insertBefore(styleEl, rendered.firstChild);
+            }
+
             sourcePre.textContent = text;
 
             // Resolve blob URLs for images (BRW-005 equivalent)
@@ -84,8 +132,9 @@ const MarkdownRenderer = {
         _render(source);
 
         const view = {
-            getSource()         { return currentSource; },
-            isSourceVisible()   { return sourceVisible; },
+            getSource()      { return currentSource; },
+            getFrontMatter() { return currentConfig;  },
+            isSourceVisible(){ return sourceVisible;  },
 
             refresh(newBytes) {
                 currentSource = new TextDecoder().decode(newBytes);

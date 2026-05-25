@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════════
    SGraph — Standalone Markdown Parser
-   vault/lib/markdown v0.1.0
+   vault/lib/markdown v0.2.0
 
    Derived from Send UI v0.3.0 markdown-parser.js +
    v0.3.1 overlay (BRW-007, BRW-008, BRW-018, BRW-020, BRW-021) +
@@ -9,17 +9,109 @@
    Security: NO arbitrary HTML pass-through. All text content escaped.
    No DOM dependency. No CDN dependency. Ships inside the vault tree.
 
-   API:  MarkdownParser.parse(text) → safe HTML string
+   API:
+     MarkdownParser.parse(text [, options]) → safe HTML string
+     MarkdownParser.extractFrontMatter(text) → { config, body }
+
+   Page-break options (front matter or options object):
+     page_break_before: h1           — break before every h1
+     page_break_before: [h1, h2]     — break before h1 AND h2
+     page_break_before: true         — shorthand for h1
+
+   Inline directive (anywhere in body, on its own line):
+     <!-- page-break -->             — explicit manual page break
+
+   The page-break marker div is visible on screen as a labelled dashed line
+   and becomes an invisible page-break-after element in @media print.
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 const MarkdownParser = {
 
-    parse(markdown) {
+    // ── Public API ──────────────────────────────────────────────────────────────
+
+    parse(markdown, options) {
         if (!markdown) return '';
-        const lines = markdown.split('\n');
+        options = options || {};
+        const lines  = markdown.split('\n');
         const blocks = this._parseBlocks(lines);
-        return blocks.map(b => this._renderBlock(b)).join('\n');
+        const pbSet  = _normPageBreakLevels(options.pageBreakBefore);
+
+        return blocks.map(function(b, idx) {
+            // Insert page-break marker before heading if:
+            //  • this heading level is in the break-set
+            //  • it is not the very first block (no break at top of document)
+            var prefix = '';
+            if (pbSet.size > 0 && b.type === 'heading' && pbSet.has(b.level) && idx > 0) {
+                prefix = _pbMarkerHtml() + '\n';
+            }
+            return prefix + MarkdownParser._renderBlock(b);
+        }).join('\n');
     },
+
+    // ── Front matter ────────────────────────────────────────────────────────────
+    // Extracts a YAML front matter block delimited by --- / --- from the start of
+    // the text. Returns { config: {...}, body: '...' }.  If no front matter, body
+    // is the full text and config is {}.
+    //
+    // Supported YAML subset (flat key: value only — no nesting):
+    //   page_break_before: h1
+    //   page_break_before: [h1, h2]
+    //   page_break_before: true
+    //   print_css: |
+    //     h2 { color: navy; }    ← raw CSS injected into sg-print window
+    //
+    extractFrontMatter(text) {
+        if (!text) return { config: {}, body: '' };
+        // Must start with '---' on the very first line
+        if (!text.startsWith('---\n') && text !== '---') return { config: {}, body: text };
+        // Find closing ---
+        var closeIdx = text.indexOf('\n---', 4);
+        if (closeIdx === -1) return { config: {}, body: text };
+        var yamlBlock = text.slice(4, closeIdx).trim();
+        var body      = text.slice(closeIdx + 4).replace(/^\n/, '');
+        var config    = this._parseSimpleYaml(yamlBlock);
+        return { config: config, body: body };
+    },
+
+    // Simple key: value YAML parser.
+    // Handles: strings, true/false, integers, inline arrays [a, b, c].
+    _parseSimpleYaml(yaml) {
+        var config = {};
+        var lines  = yaml.split('\n');
+        var i = 0;
+        while (i < lines.length) {
+            var line = lines[i];
+            var m    = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.*)$/);
+            if (!m) { i++; continue; }
+            var key = m[1];
+            var val = m[2].trim();
+
+            // Multiline literal block scalar (|)
+            if (val === '|') {
+                i++;
+                var blockLines = [];
+                while (i < lines.length && (lines[i].startsWith('  ') || lines[i] === '')) {
+                    blockLines.push(lines[i].startsWith('  ') ? lines[i].slice(2) : '');
+                    i++;
+                }
+                config[key] = blockLines.join('\n').trimEnd();
+                continue;
+            }
+
+            // Inline array: [h1, h2]
+            if (val.startsWith('[') && val.endsWith(']')) {
+                config[key] = val.slice(1, -1).split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+            } else if (val === 'true')  { config[key] = true;  }
+            else if (val === 'false') { config[key] = false; }
+            else if (/^\d+$/.test(val)) { config[key] = parseInt(val, 10); }
+            else { config[key] = val; }
+
+            i++;
+        }
+        return config;
+    },
+
+    // ── Escape ──────────────────────────────────────────────────────────────────
 
     _escape(str) {
         return str
@@ -30,7 +122,7 @@ const MarkdownParser = {
             .replace(/'/g, '&#39;');
     },
 
-    // ── BRW-008: allow bare relative file paths ─────────────────────────────
+    // ── BRW-008: allow bare relative file paths ─────────────────────────────────
     _sanitizeUrl(url) {
         const trimmed = url.trim();
         const lower   = trimmed.toLowerCase();
@@ -53,6 +145,14 @@ const MarkdownParser = {
 
         while (i < lines.length) {
             const line = lines[i];
+
+            // ── Explicit page-break directive ──────────────────────────────────
+            // <!-- page-break --> (case-insensitive, optional whitespace)
+            if (/^\s*<!--\s*page-?break\s*-->\s*$/i.test(line)) {
+                blocks.push({ type: 'page_break' });
+                i++;
+                continue;
+            }
 
             if (/^```/.test(line)) {
                 const lang = line.slice(3).trim();
@@ -157,7 +257,8 @@ const MarkdownParser = {
                    !/^#{1,6}\s/.test(lines[i]) && !/^```/.test(lines[i]) &&
                    !/^>\s?/.test(lines[i]) && !/^\|/.test(lines[i]) &&
                    !/^[\s]*[-*+]\s+/.test(lines[i]) && !/^[\s]*\d+\.\s+/.test(lines[i]) &&
-                   !/^(\s*[-*_]\s*){3,}$/.test(lines[i])) {
+                   !/^(\s*[-*_]\s*){3,}$/.test(lines[i]) &&
+                   !/^\s*<!--\s*page-?break\s*-->\s*$/i.test(lines[i])) {
                 paraLines.push(lines[i]);
                 i++;
             }
@@ -205,6 +306,8 @@ const MarkdownParser = {
                 return '<hr>';
             case 'table':
                 return this._renderTable(block);
+            case 'page_break':
+                return _pbMarkerHtml();
             default:
                 return `<p>${this._escape(block.content || '')}</p>`;
         }
@@ -230,7 +333,7 @@ const MarkdownParser = {
         return html;
     },
 
-    // ── BRW-007 / BRW-018 / BRW-020 / BRW-021 ──────────────────────────────
+    // ── BRW-007 / BRW-018 / BRW-020 / BRW-021 ──────────────────────────────────
     // Images render as <img data-md-src> (prevents 404 before blob rewrite).
     // Discourse-style dimensions: ![alt|400](img.png) or ![alt|50%](img.png).
     // Code-span guard: backtick spans are passed through first so ![ inside
@@ -356,3 +459,31 @@ const MarkdownParser = {
         return result;
     }
 };
+
+// ── Module-level helpers ─────────────────────────────────────────────────────
+
+// Normalise page_break_before to a Set of heading levels (integers 1-6).
+// Accepts: 'h1' | 'h2' | ... | 1 | 2 | ... | true | [h1,h2] | [1,2]
+function _normPageBreakLevels(option) {
+    if (!option && option !== 0) return new Set();
+    if (option === true)         return new Set([1]);
+    const items = Array.isArray(option) ? option : [option];
+    const s = new Set();
+    for (const x of items) {
+        if (typeof x === 'number' && x >= 1 && x <= 6) { s.add(x); continue; }
+        if (typeof x === 'string') {
+            const m = x.match(/^h?([1-6])$/i);
+            if (m) s.add(parseInt(m[1], 10));
+        }
+    }
+    return s;
+}
+
+// Returns the HTML string for a page-break marker.
+// Screen: renders as a labelled dashed rule so the author can see breaks.
+// Print:  becomes an invisible element with page-break-after:always.
+function _pbMarkerHtml() {
+    return '<div class="md-pb-marker" role="separator" aria-label="page break">' +
+           '<span class="md-pb-marker__label">page break</span>' +
+           '</div>';
+}
