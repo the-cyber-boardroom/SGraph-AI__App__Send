@@ -89,7 +89,15 @@
                                         <button class="vs-stab" data-stab="preview">Public preview</button>
                                     </div>
                                     <div class="vs-spane" data-spane="settings"><vault-settings></vault-settings></div>
-                                    <div class="vs-spane" data-spane="preview" style="display:none"><sg-public-preview-editor embedded></sg-public-preview-editor></div>
+                                    <div class="vs-spane" data-spane="preview" style="display:none">
+                                        <div class="vs-pvp-split">
+                                            <div class="vs-pvp-edit"><sg-public-preview-editor embedded></sg-public-preview-editor></div>
+                                            <div class="vs-pvp-live">
+                                                <div class="vs-pvp-livehead">Live preview</div>
+                                                <sg-public-preview-card></sg-public-preview-card>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -228,6 +236,12 @@
             if (pvpEditor && typeof pvpEditor.setContext === 'function') {
                 if (vault._sgSend && this._accessKey) vault._sgSend.token = this._accessKey;
                 pvpEditor.setContext({ sgSend: vault._sgSend, vault: vault, vaultKey: vaultKey });
+            }
+            // Seed the side-by-side live card (it self-updates from the editor's
+            // pvp-preview-changed events; this just avoids a stuck loading skeleton).
+            const pvpLive = this.querySelector('.vs-spane[data-spane="preview"] sg-public-preview-card');
+            if (pvpLive && typeof pvpLive.setState === 'function') {
+                pvpLive.setState({ status: 'ok', preview: { schema: 'sgraph-public-preview/v1', title: '' }, showKeyPrompt: false });
             }
 
             // Wire SGit
@@ -1041,6 +1055,12 @@
         .vs-stab:hover { color: var(--color-text, #e2e8f0); }
         .vs-stab--active { color: var(--color-primary, #4f8ff7); border-bottom-color: var(--color-primary, #4f8ff7); }
         .vs-spane { padding-top: var(--space-2, 8px); }
+        .vs-pvp-split { display: flex; gap: 8px; align-items: flex-start; }
+        .vs-pvp-edit { flex: 1 1 0; min-width: 0; }
+        .vs-pvp-live { flex: 1 1 0; min-width: 0; position: sticky; top: 48px; padding: 16px 20px; }
+        .vs-pvp-livehead { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--color-text-secondary, #9aa4bf); margin: 0 0 12px; }
+        @media (max-width: 980px) { .vs-pvp-split { flex-direction: column; } .vs-pvp-live { position: static; } }
         .vs-view-files {
             overflow: hidden; /* send-browse manages its own scroll */
         }
