@@ -185,17 +185,28 @@ class SendBrowse extends SendComponent {
         for (const name of folders) {
             const child = node.children[name];
             const childPath = prefix ? `${prefix}/${name}` : name;
-            const fileCount = this._countFiles(child);
+            // v0.2.x sub-vaults: a "lazy" node (e.g. a sub-vault mount) defers loading its
+            // children until the user first expands it (dataSource.loadFolder + re-render).
+            // Backward-compatible: ordinary data sources never set _lazy/_subvault.
+            const isLazy     = !!(child && child._lazy === true && child._folderPath);
+            const isSubvault = !!(child && child._subvault === true);
+            const lazyAttrs  = isLazy ? ` data-lazy="1" data-loaded="0" data-folder-path="${SendHelpers.escapeHtml(child._folderPath)}"` : '';
+            const folderCls  = isSubvault ? 'sb-tree__folder sb-tree__folder--subvault' : 'sb-tree__folder';
+            const folderIcon = isSubvault ? '🗄' : SendIcons.FOLDER_SM;
+            const chip       = isSubvault ? `<span class="sb-tree__subvault-chip">·${SendHelpers.escapeHtml(child._access || 'ro')}</span>` : '';
+            const countHtml  = isLazy ? '' : `<span class="sb-tree__count">${this._countFiles(child)}</span>`;
+            const innerHtml  = isLazy ? '' : this._renderFolderNode(child, childPath);
             html += `
-                <div class="sb-tree__folder" data-path="${SendHelpers.escapeHtml(childPath)}">
+                <div class="${folderCls}" data-path="${SendHelpers.escapeHtml(childPath)}"${lazyAttrs}>
                     <div class="sb-tree__folder-header">
                         <span class="sb-tree__toggle">▸</span>
-                        <span class="sb-tree__folder-icon">${SendIcons.FOLDER_SM}</span>
+                        <span class="sb-tree__folder-icon">${folderIcon}</span>
                         <span class="sb-tree__folder-name">${SendHelpers.escapeHtml(name)}</span>
-                        <span class="sb-tree__count">${fileCount}</span>
+                        ${chip}
+                        ${countHtml}
                     </div>
                     <div class="sb-tree__folder-content" style="display: none;">
-                        ${this._renderFolderNode(child, childPath)}
+                        ${innerHtml}
                     </div>
                 </div>
             `;
@@ -229,11 +240,29 @@ class SendBrowse extends SendComponent {
     _setupTreeListeners(treeEl) {
         // Folder expand/collapse
         treeEl.querySelectorAll('.sb-tree__folder-header').forEach(header => {
-            header.addEventListener('click', () => {
+            header.addEventListener('click', async () => {
                 const folder = header.closest('.sb-tree__folder');
                 const content = folder.querySelector('.sb-tree__folder-content');
                 const toggle = header.querySelector('.sb-tree__toggle');
-                if (content.style.display === 'none') {
+                const opening = content.style.display === 'none';
+                // v0.2.x sub-vaults: load a lazy node's children on first expand, then re-render.
+                // Backward-compatible: only triggers when the node is data-lazy AND the data
+                // source exposes loadFolder() (ordinary trees fall through to plain toggle).
+                if (opening && folder.dataset.lazy === '1' && folder.dataset.loaded !== '1'
+                    && this.dataSource && typeof this.dataSource.loadFolder === 'function') {
+                    const fp = folder.dataset.folderPath;
+                    toggle.textContent = '⋯';
+                    try {
+                        await this.dataSource.loadFolder(fp);
+                        folder.dataset.loaded = '1';
+                        this._populateTree();   // re-render from the now-updated data source + re-bind
+                    } catch (err) {
+                        toggle.textContent = '⚠';
+                        console.warn('[send-browse] lazy expand failed for', fp, err && err.message);
+                    }
+                    return;
+                }
+                if (opening) {
                     content.style.display = 'block';
                     toggle.textContent = '▾';
                 } else {
