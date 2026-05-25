@@ -59,7 +59,8 @@ class Transfer__Service(Type_Safe):                                             
                              max_downloads    = 0     ,                          # 0 = unlimited
                              auto_delete      = False ,                          # Wipe payload after last download
                              expires_at       = 0     ,                          # ms since epoch, 0 = no expiry
-                             delete_auth_hash = ''    ):                         # SHA-256 of delete_auth, empty = delete disabled
+                             delete_auth_hash = ''    ,                          # SHA-256 of delete_auth, empty = delete disabled
+                             allow_recreate   = False ):                         # If True, delete clears the meta too (id reusable); else tombstone
         if transfer_id:                                                          # Client-provided ID — validate format and uniqueness
             if not self.TRANSFER_ID_PATTERN.match(transfer_id):
                 return dict(error = 'invalid_transfer_id_format')
@@ -81,6 +82,7 @@ class Transfer__Service(Type_Safe):                                             
                     auto_delete       = auto_delete       ,
                     expires_at        = expires_at        ,
                     delete_auth_hash  = delete_auth_hash  ,
+                    allow_recreate    = allow_recreate    ,
                     events            = []                )
 
         self.save_meta(transfer_id, meta)
@@ -185,7 +187,10 @@ class Transfer__Service(Type_Safe):                                             
             return dict(status='already_deleted', transfer_id=transfer_id)
         if self.has_payload(transfer_id):
             self.storage_fs.file__delete(self.payload_path(transfer_id))
-        meta['status'] = 'deleted'
+        if meta.get('allow_recreate'):                                           # Creator opted in: clear metadata too so the id can be recreated/overwritten
+            self.storage_fs.file__delete(self.meta_path(transfer_id))
+            return dict(status='deleted', transfer_id=transfer_id, recreatable=True)
+        meta['status'] = 'deleted'                                              # Default: leave a tombstone (id cannot be reused)
         meta['events'].append(dict(action    = 'delete'                        ,
                                    timestamp = datetime.now(timezone.utc).isoformat()))
         self.save_meta(transfer_id, meta)

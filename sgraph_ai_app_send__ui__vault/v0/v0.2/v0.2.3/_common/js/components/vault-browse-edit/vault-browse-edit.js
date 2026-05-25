@@ -55,19 +55,22 @@
             _banner.activate(_newContentEl);
         }
 
-        // App Mode: available for all file types on all vaults (writable or not)
+        // App Mode: available for all file types on all vaults (writable or not).
+        // Opens the file via /en-gb/app#path in a NEW TAB.
+        // Hash = file path (NOT vault key — key comes from localStorage set by /#vault-key).
+        // Rendered as a real <a> link so the browser exposes Copy Link, middle-click,
+        // and Ctrl+click natively. The URL is safe to navigate in the current window too
+        // (app-shell re-opens the vault from localStorage then redirects to /en-gb/vault/).
         var bar = container.querySelector('.sb-file__actions');
         if (bar) {
-            var appModeBtnUniversal = _makeBtn('App Mode');
-            appModeBtnUniversal.title = 'Focus on this file — hide vault chrome';
-            appModeBtnUniversal.addEventListener('click', function() {
-                var banner = document.querySelector('sg-app-banner');
-                if (banner && typeof banner.activate === 'function') {
-                    var contentEl = container.querySelector('.sb-file__content') || container;
-                    banner.activate(contentEl);
-                }
-            });
-            bar.appendChild(appModeBtnUniversal);
+            // Separator between send-browse's buttons (Save/Locate/Source/Print) and ours
+            bar.appendChild(_makeSep());
+
+            var path = (fileName || '').replace(/^\//, '');
+            var openAsAppLink = _makeAppLink('↗ Open as App',
+                window.location.origin + '/en-gb/app#' + encodeURIComponent(path));
+            _addTip(openAsAppLink, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
+            bar.appendChild(openAsAppLink);
         }
 
         // Only add edit/write controls if dataSource is writable
@@ -81,8 +84,7 @@
 
         // --- Set as App: create / update app.json with this file as the vault entry point ---
         // Places this file in App Mode on next vault open (and updates the App Mode URL for sharing).
-        var setAppBtn = _makeBtn('Set as App');
-        setAppBtn.title = 'Make this file the vault App Mode entry (creates/updates app.json)';
+        var setAppBtn = _makeIconBtn('⚡', 'Set as App — make this file the vault App Mode entry (creates/updates app.json)');
         setAppBtn.addEventListener('click', function() {
             if (!self.dataSource) return;
             var fileList = self.dataSource.getFileList();
@@ -114,18 +116,17 @@
         bar.appendChild(setAppBtn);
 
         // --- Refresh button: re-fetch and re-render from vault (all file types) ---
-        var refreshBtn = _makeBtn('↺ Refresh');
-        refreshBtn.title = 'Re-fetch this file from the vault and re-render';
+        var refreshBtn = _makeIconBtn('↺', 'Refresh — re-fetch this file from the vault');
         refreshBtn.addEventListener('click', function() {
             if (!self.dataSource) return;
-            var origText = refreshBtn.textContent;
+            var origOpacity = refreshBtn.style.opacity;
             refreshBtn.disabled = true;
-            refreshBtn.textContent = '↺ …';
+            refreshBtn.style.opacity = '0.35';
             self.dataSource.getFileBytes(fileName).then(function(freshBytes) {
                 self._renderFileContent(container, freshBytes, fileName, type);
             }).catch(function(err) {
                 refreshBtn.disabled = false;
-                refreshBtn.textContent = origText;
+                refreshBtn.style.opacity = origOpacity || '0.75';
                 if (window.sgraphVault && window.sgraphVault.messages) {
                     window.sgraphVault.messages.error('Refresh failed: ' + err.message);
                 }
@@ -148,8 +149,39 @@
             var textareaEl = null;
             var isEditing  = false;
 
-            var _mdPrevTimer = null;   // live-preview debounce handle (markdown only)
-            var _mdSplitActive = false; // true while markdown split-view is live
+            var _mdPrevTimer      = null;   // live-preview debounce handle (markdown only)
+            var _mdSplitActive    = false;  // true while markdown split-view is live
+            var _mdPrevObjUrls    = [];     // blob URLs created for preview images (revoked on re-render/exit)
+
+            // Resolve img[data-md-src] in the preview pane using vault dataSource.
+            // Mirrors the resolution that send-browse does for the normal rendered view.
+            // currentDir is the directory prefix for the file being edited (e.g. 'wardley-maps/').
+            function _resolvePrevImages(mdEl, currentDir) {
+                if (!self.dataSource || !mdEl) return;
+                mdEl.querySelectorAll('img[data-md-src]').forEach(function(img) {
+                    var src = img.getAttribute('data-md-src');
+                    if (!src) return;
+                    // Build full path: absolute src is used as-is (strip leading /), relative
+                    // src is resolved against the current file's directory.
+                    var fullPath = src.startsWith('/') ? src.slice(1) : currentDir + src;
+                    self.dataSource.getFileBytes(fullPath).then(function(imgBytes) {
+                        if (!imgBytes) return;
+                        var ext  = fullPath.split('.').pop().toLowerCase();
+                        var mime = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
+                                     gif:'image/gif', svg:'image/svg+xml', webp:'image/webp',
+                                     bmp:'image/bmp', ico:'image/x-icon' }[ext] || 'image/png';
+                        var blob = new Blob([imgBytes], { type: mime });
+                        var url  = URL.createObjectURL(blob);
+                        _mdPrevObjUrls.push(url);
+                        img.src = url;
+                    }).catch(function() { /* image not found — leave broken icon */ });
+                });
+            }
+
+            function _revokePrevUrls() {
+                _mdPrevObjUrls.forEach(function(u) { try { URL.revokeObjectURL(u); } catch (_) {} });
+                _mdPrevObjUrls = [];
+            }
 
             editBtn.addEventListener('click', function() {
                 if (isEditing) return;
@@ -163,6 +195,10 @@
                 if (type === 'markdown' && content) {
                     // ── Markdown split view: textarea (left) + live preview (right) ──
                     _mdSplitActive = true;
+
+                    // Current file's directory — needed to resolve relative image paths.
+                    var _currentDir = fileName.includes('/')
+                        ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
 
                     textareaEl.style.cssText = [
                         'flex:1','min-width:0','min-height:0','margin:0','padding:1rem','resize:none',
@@ -198,13 +234,18 @@
                     content.appendChild(textareaEl);
                     content.appendChild(prevPane);
 
+                    // Resolve images for initial render
+                    _resolvePrevImages(prevMd, _currentDir);
+
                     // Live update (debounced 400 ms)
                     textareaEl.addEventListener('input', function() {
                         clearTimeout(_mdPrevTimer);
                         _mdPrevTimer = setTimeout(function() {
+                            _revokePrevUrls();   // release old blob URLs before re-render
                             prevMd.innerHTML = typeof MarkdownParser !== 'undefined'
                                 ? MarkdownParser.parse(textareaEl.value)
                                 : textareaEl.value;
+                            _resolvePrevImages(prevMd, _currentDir);
                         }, 400);
                     });
 
@@ -234,6 +275,7 @@
                 isEditing = false;
                 clearTimeout(_mdPrevTimer);
                 _mdSplitActive = false;
+                _revokePrevUrls();
                 if (textareaEl) { textareaEl.remove(); textareaEl = null; }
                 // Re-render from original bytes — restores content and resets button state
                 self._renderFileContent(container, bytes, fileName, type);
@@ -267,6 +309,7 @@
                     // Re-render container fully with new bytes (handles markdown, code, text)
                     clearTimeout(_mdPrevTimer);
                     _mdSplitActive = false;
+                    _revokePrevUrls();
                     if (textareaEl) { textareaEl.remove(); textareaEl = null; }
                     isEditing = false;
                     self._renderFileContent(container, newBytes.buffer, fileName, type);
@@ -286,17 +329,18 @@
             saveBtn.addEventListener('click', doSave);
 
             // --- Copy to clipboard ---
-            var copyBtn = _makeBtn('Copy');
+            var copyBtn = _makeIconBtn('⧉', 'Copy file content to clipboard');
             copyBtn.addEventListener('click', function() {
                 var text = (isEditing && textareaEl)
                     ? textareaEl.value
                     : new TextDecoder('utf-8', { fatal: false }).decode(bytes);
                 var reset = function() {
-                    setTimeout(function() { copyBtn.textContent = 'Copy'; copyBtn.style.color = ''; }, 1500);
+                    setTimeout(function() { copyBtn.innerHTML = '⧉'; copyBtn.style.color = ''; copyBtn.style.opacity = '0.75'; }, 1500);
                 };
                 var flash = function() {
-                    copyBtn.textContent = 'Copied!';
+                    copyBtn.innerHTML = '✓';
                     copyBtn.style.color = 'var(--accent,#4ECDC4)';
+                    copyBtn.style.opacity = '1';
                     reset();
                 };
                 if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -509,8 +553,8 @@
         }
 
         // --- SGit Data button: shows vault blob metadata for the current file view ---
-        var sgitDataBtn = _makeBtn('SGit Data');
-        sgitDataBtn.title = 'Show vault object metadata for this file version';
+        bar.appendChild(_makeSep());
+        var sgitDataBtn = _makeIconBtn('⎇', 'SGit Data — vault object metadata for this file version');
         sgitDataBtn.addEventListener('click', function() {
             var vault = self.dataSource && self.dataSource._vault;
             var normPath = (fileName || '').replace(/^\//, '');
@@ -539,7 +583,8 @@
         bar.appendChild(sgitDataBtn);
 
         // --- Rename button (all file types) ---
-        var renameBtn = _makeBtn('Rename');
+        bar.appendChild(_makeSep());
+        var renameBtn = _makeIconBtn('✏', 'Rename this file');
         renameBtn.addEventListener('click', function() {
             var fName = fileName.split('/').pop();
             var parts = fileName.split('/');
@@ -562,9 +607,9 @@
         bar.appendChild(renameBtn);
 
         // --- Delete button (all file types) ---
-        var deleteBtn = _makeBtn('Delete');
-        deleteBtn.addEventListener('mouseenter', function() { deleteBtn.style.color = '#ff6b6b'; });
-        deleteBtn.addEventListener('mouseleave', function() { deleteBtn.style.color = ''; });
+        var deleteBtn = _makeIconBtn('🗑', 'Delete this file');
+        deleteBtn.addEventListener('mouseenter', function() { deleteBtn.style.opacity = '1'; deleteBtn.style.color = '#ff6b6b'; });
+        deleteBtn.addEventListener('mouseleave', function() { deleteBtn.style.opacity = '0.75'; deleteBtn.style.color = ''; });
         deleteBtn.addEventListener('click', function() {
             var fName = fileName.split('/').pop();
             var parts = fileName.split('/');
@@ -717,18 +762,14 @@
                         detail: { el: renderedView }
                     }));
 
-                    // Add App Mode button to the action bar.
+                    // Add App Mode button to the page-layout action bar.
                     var bar = el.querySelector('.plr-source-bar');
                     if (bar && !bar.dataset.sgAppModeBtn) {
                         bar.dataset.sgAppModeBtn = '1';
-                        var btn = _makeBtn('App Mode');
-                        btn.title = 'Focus on this page — hide vault chrome';
-                        btn.addEventListener('click', function() {
-                            var banner = document.querySelector('sg-app-banner');
-                            if (banner && typeof banner.activate === 'function') {
-                                banner.activate(renderedView);
-                            }
-                        });
+                        var pagePath = (folderPath || '').replace(/^\//, '');
+                        var btn = _makeAppLink('↗ Open as App',
+                            window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath));
+                        _addTip(btn, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
                         bar.appendChild(btn);
                     }
                 });
@@ -1289,6 +1330,99 @@
         btn.className = 'sb-action-btn';
         btn.textContent = label;
         return btn;
+    }
+
+    // A real <a> link styled as sb-action-btn.
+    // Opens in a new tab (target=_blank); also supports Ctrl+click, middle-click,
+    // and right-click → Copy Link natively — unlike a <button> with window.open().
+    // Explicit inline styles ensure it renders identically to a <button> even if
+    // the sb-action-btn CSS selector only targets <button> elements.
+    function _makeAppLink(label, href) {
+        var a = document.createElement('a');
+        a.className = 'sb-action-btn';
+        a.textContent = label;
+        a.href = href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        // Mirror button defaults that <a> doesn't inherit automatically
+        a.style.cssText = 'font-weight:600;text-decoration:none;' +
+            'display:inline-flex;align-items:center;cursor:pointer;';
+        return a;
+    }
+
+    // ── Fast tooltip ─────────────────────────────────────────────────────────────
+    // Native title= tooltips have a ~500 ms OS delay we cannot override with CSS.
+    // Instead, we use a floating div positioned via fixed coordinates so it works
+    // inside shadow DOM (getBoundingClientRect crosses shadow boundaries).
+    var _tip = null;
+    var _tipTimer = null;
+
+    function _ensureTip() {
+        if (_tip) return;
+        _tip = document.createElement('div');
+        _tip.id = 'sg-vault-tip';
+        _tip.style.cssText =
+            'position:fixed;z-index:99999;pointer-events:none;' +
+            'background:#1a1a2e;color:#e0e0e0;border:1px solid rgba(78,205,196,0.3);' +
+            'border-radius:5px;padding:4px 9px;font-size:11.5px;line-height:1.4;' +
+            'font-family:system-ui,sans-serif;white-space:pre;' +
+            'box-shadow:0 2px 8px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.08s;';
+        document.body.appendChild(_tip);
+    }
+
+    // Attach a fast custom tooltip to any element.
+    // Replaces the native title= (removes it so the slow OS tooltip never fires).
+    function _addTip(el, text) {
+        _ensureTip();
+        el.removeAttribute('title');          // prevent native slow tooltip
+        el.setAttribute('data-tip', text);
+        el.addEventListener('mouseenter', function(e) {
+            clearTimeout(_tipTimer);
+            _tipTimer = setTimeout(function() {
+                if (!_tip) return;
+                _tip.textContent = text;
+                var r = el.getBoundingClientRect();
+                // Position above the element, centred, clamped to viewport
+                var tw = Math.min(text.length * 7.5 + 20, 340);
+                var left = Math.max(6, Math.min(r.left + r.width / 2 - tw / 2, window.innerWidth - tw - 6));
+                var top  = r.top - 32;
+                if (top < 6) top = r.bottom + 6;
+                _tip.style.left = left + 'px';
+                _tip.style.top  = top  + 'px';
+                _tip.style.opacity = '1';
+            }, 90);   // 90 ms — fast but avoids flicker on mouse-through
+        });
+        el.addEventListener('mouseleave', function() {
+            clearTimeout(_tipTimer);
+            if (_tip) _tip.style.opacity = '0';
+        });
+        el.addEventListener('click', function() {
+            clearTimeout(_tipTimer);
+            if (_tip) _tip.style.opacity = '0';
+        });
+        return el;
+    }
+
+    // Icon-only button: compact, faded until hover.
+    // Uses _addTip for instant tooltip instead of native title=.
+    function _makeIconBtn(icon, titleText) {
+        var btn = document.createElement('button');
+        btn.className = 'sb-action-btn';
+        btn.innerHTML = icon;
+        btn.style.cssText = 'padding:0 6px;min-width:26px;font-size:14px;opacity:0.7;line-height:1;';
+        btn.addEventListener('mouseenter', function() { btn.style.opacity = '1'; });
+        btn.addEventListener('mouseleave', function() { btn.style.opacity = '0.7'; });
+        _addTip(btn, titleText);
+        return btn;
+    }
+
+    // Thin vertical separator between button groups.
+    function _makeSep() {
+        var sep = document.createElement('span');
+        sep.setAttribute('aria-hidden', 'true');
+        sep.style.cssText = 'display:inline-flex;align-self:center;width:1px;height:14px;' +
+            'background:rgba(255,255,255,0.12);margin:0 3px;flex-shrink:0;';
+        return sep;
     }
 
     function _showTextOverlay(title, text) {

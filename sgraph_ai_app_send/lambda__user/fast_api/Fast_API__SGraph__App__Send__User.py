@@ -5,6 +5,7 @@ from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers          
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned             import Routes__Presigned
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Early_Access          import Routes__Early_Access
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Vault__Pointer        import Routes__Vault__Pointer
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Public_Preview        import Routes__Public_Preview
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Vault__Presigned      import Routes__Vault__Presigned
 from sgraph_ai_app_send.lambda__user.service.Transfer__Service                      import Transfer__Service
 from sgraph_ai_app_send.lambda__user.service.Service__Presigned_Urls               import Service__Presigned_Urls
@@ -136,6 +137,8 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         self.add_routes(Routes__Vault__Presigned,
                         vault_presigned_service = self.vault_presigned_service,
                         admin_service_client    = self.admin_service_client   )
+        self.add_routes(Routes__Public_Preview ,
+                        transfer_service        = self.transfer_service       )
 
         self.setup_mcp()                                                              # Mount MCP server (after all routes registered)
 

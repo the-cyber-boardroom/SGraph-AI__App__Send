@@ -50,13 +50,22 @@ class SGSend {
         const contentType = options.contentType || 'application/octet-stream'
         const sizeBytes   = data.byteLength || data.length || 0
 
-        // Step 1: Create transfer
+        // Step 1: Create transfer. Optional fields (deterministic id, delete auth,
+        // expiry) are passed through when supplied — used by public vault previews.
+        const createBody = {
+            file_size_bytes:   sizeBytes,
+            content_type_hint: contentType
+        }
+        if (options.transferId)              createBody.transfer_id      = options.transferId
+        if (options.deleteAuthHash)          createBody.delete_auth_hash = options.deleteAuthHash
+        if (options.expiresAt != null)       createBody.expires_at       = options.expiresAt
+        if (options.maxDownloads != null)    createBody.max_downloads    = options.maxDownloads
+        if (options.autoDelete != null)      createBody.auto_delete      = options.autoDelete
+        if (options.allowRecreate != null)   createBody.allow_recreate   = options.allowRecreate
+
         const createRes = await this._fetch('POST', '/api/transfers/create', {
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                file_size_bytes:   sizeBytes,
-                content_type_hint: contentType
-            })
+            body: JSON.stringify(createBody)
         })
         const { transfer_id: transferId } = await createRes.json()
 
@@ -80,6 +89,15 @@ class SGSend {
 
     async info(transferId) {
         const response = await this._fetch('GET', `/api/transfers/info/${transferId}`)
+        return response.json()
+    }
+
+    // Sender-controlled hard delete. delete_auth is the secret whose SHA-256 was
+    // supplied as delete_auth_hash at create time (see public vault previews).
+    async deleteTransfer(transferId, deleteAuth) {
+        const response = await this._fetch('DELETE', `/api/transfers/delete/${transferId}`, {
+            headers: { 'x-sgraph-transfer-delete-auth': deleteAuth }
+        })
         return response.json()
     }
 

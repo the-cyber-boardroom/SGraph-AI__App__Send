@@ -70,4 +70,14 @@ else
     echo "      VAULT_DEFAULT_ENDPOINT=http://localhost:$API_PORT bash scripts/vault__run-locally.sh"
 fi
 echo ""
-python3 -m http.server $PORT --directory "$SERVE_DIR" --bind localhost
+python3 << PYEOF
+import http.server, os
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        # Disable all caching so the browser always fetches fresh JS/CSS
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        super().end_headers()
+os.chdir('$SERVE_DIR')
+http.server.HTTPServer(('localhost', $PORT), NoCacheHandler).serve_forever()
+PYEOF
