@@ -56,12 +56,12 @@
         }
 
         // App Mode: available for all file types on all vaults (writable or not).
-        // Opens the file in App Mode in a NEW TAB via /en-gb/vault/app#path.
-        // The vault key is already in localStorage (vault is open), so the new tab
-        // auto-loads the vault and the routing layer saves app:path as a deep link.
-        // We do NOT use /#key|app:path here — that route goes through the app-shell
-        // which expects an app.json; without one it redirects back to the vault and
-        // the stale deep-link triggers "App did not signal ready".
+        // Opens the file via /en-gb/app#path in a NEW TAB.
+        // Hash = file path (NOT vault key — key comes from localStorage set by /#vault-key).
+        // app-shell reads key from LS, checks app.json:
+        //   - If app.json found → the vault's app handles navigation to the file
+        //   - If no app.json  → saves app:path deep-link → redirects to /en-gb/vault/
+        //     → vault opens the file (in App Mode for HTML, as file tab for others)
         var bar = container.querySelector('.sb-file__actions');
         if (bar) {
             // Separator between send-browse's buttons (Save/Locate/Source/Print) and ours
@@ -72,9 +72,8 @@
             openAsAppBtn.style.cssText = 'font-weight:600;';
             openAsAppBtn.addEventListener('click', function() {
                 var path = (fileName || '').replace(/^\//, '');
-                // /en-gb/vault/app#path → runVault() saves app:path to sessionStorage
-                // → vault opens (key from localStorage) → deep link activates sg-app-banner
-                var url = window.location.origin + '/en-gb/vault/app#' + encodeURIComponent(path);
+                // /en-gb/app#path — hash is file path; vault key from localStorage
+                var url = window.location.origin + '/en-gb/app#' + encodeURIComponent(path);
                 window.open(url, '_blank');
             });
             bar.appendChild(openAsAppBtn);
@@ -777,10 +776,9 @@
                         btn.title = 'Open this page in App Mode in a new tab';
                         btn.style.fontWeight = '600';
                         btn.addEventListener('click', function() {
-                            // Use /en-gb/vault/app#path directly — key is in localStorage.
-                            // Do NOT route through /#key|app:path (app-shell path).
+                            // /en-gb/app#path — hash is file path; vault key from localStorage
                             var pagePath = (folderPath || '').replace(/^\//, '');
-                            var url = window.location.origin + '/en-gb/vault/app#' + encodeURIComponent(pagePath);
+                            var url = window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath);
                             window.open(url, '_blank');
                         });
                         bar.appendChild(btn);

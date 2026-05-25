@@ -63,31 +63,33 @@
         // ── Init flow ─────────────────────────────────────────────────────────────────
 
         _init() {
+            // The hash on /en-gb/app is a FILE PATH for App Mode — NOT a vault key.
+            // Vault key always comes from localStorage (set by /#vault-key → root inbox).
+            // /en-gb/app#vault-key is no longer supported; use /#vault-key instead.
             var rawHash = window.location.hash.slice(1).trim();
-            if (!rawHash) {
-                // Fall back to the last-used vault key shared with the vault page
-                var saved = '';
-                try { saved = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
-                if (saved) {
-                    this._showLoading('Opening vault…');
-                    this._initWithKey(saved, null).catch((err) => {
-                        console.error('[app-shell] init failed:', err);
-                        this._showEntryForm();
-                        var errEl = this.shadowRoot.getElementById('ef-err');
-                        if (errEl) errEl.textContent = err.message;
-                        var keyEl = this.shadowRoot.getElementById('ef-key-input');
-                        if (keyEl) { keyEl.value = saved; keyEl.dispatchEvent(new Event('input')); }
-                    });
-                    return;
-                }
-                this._showEntryForm();
+            if (rawHash) {
+                // Save as App Mode deep-link so vault can open this file in App Mode
+                // if app-shell redirects to /en-gb/vault/ (no app.json case).
+                try { sessionStorage.setItem('sg-vault-deep-link', 'app:' + rawHash); } catch (_) {}
+                // Remove the hash — file path is now captured in sessionStorage
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+            // Key always from localStorage (set by root inbox /#vault-key handler)
+            var saved = '';
+            try { saved = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+            if (saved) {
+                this._showLoading('Opening vault…');
+                this._initWithKey(saved, null).catch((err) => {
+                    console.error('[app-shell] init failed:', err);
+                    this._showEntryForm();
+                    var errEl = this.shadowRoot.getElementById('ef-err');
+                    if (errEl) errEl.textContent = err.message;
+                    var keyEl = this.shadowRoot.getElementById('ef-key-input');
+                    if (keyEl) { keyEl.value = saved; keyEl.dispatchEvent(new Event('input')); }
+                });
                 return;
             }
-            this._showLoading('Opening vault…');
-            this._initWithKey(rawHash, null).catch((err) => {
-                console.error('[app-shell] init failed:', err);
-                this._showError(err.message);
-            });
+            this._showEntryForm();
         }
 
         async _initWithKey(key, presetAccessKey) {
@@ -172,10 +174,9 @@
         async _continue(appJson) {
             if (!appJson) {
                 // No app.json — this vault has no app. Drop back to the vault UI.
-                // Clear any pending deep-link so the vault doesn't try to activate
-                // App Mode (which would show "App did not signal ready" since there
-                // is no app to signal).
-                try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+                // Keep any sg-vault-deep-link in sessionStorage: if _init() saved an
+                // app:path deep-link (from /en-gb/app#path), the vault will consume it
+                // and open the file (in App Mode if it's an HTML app, or as a file tab).
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;

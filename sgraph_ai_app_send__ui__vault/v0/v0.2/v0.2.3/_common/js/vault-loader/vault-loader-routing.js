@@ -5,31 +5,30 @@
 
    Routing table (final design):
      /                   no hash  → redirect to /en-gb/
-     /#token             has hash → save token to LS → redirect to /en-gb/app#token
-     /#token|path        has hash with pipe → also save deep-link to sessionStorage
-     /#token|app:path    app: prefix → open vault via app-shell (requires app.json)
-     /en-gb/app          has hash → app-shell opens vault; redirects to /en-gb/vault/ if no app.json
-                                    (clears sg-vault-deep-link before redirect so vault doesn't try App Mode)
+     /#token             has hash → save token to LS → redirect to /en-gb/app (no hash)
+     /#token|path        has hash with pipe → save deep-link to sessionStorage
+                                              → redirect to /en-gb/app (no hash)
+     /en-gb/app          no hash  → app-shell reads key from LS → check app.json
+                                    → if app: run it; if no app: redirect to /en-gb/vault/
+     /en-gb/app#path     hash = file path (NOT vault key) → app-shell saves app:path
+                                    deep-link → reads key from LS → opens vault
+                                    → if app.json: run app; if no app.json: redirect
+                                      to /en-gb/vault/ (deep-link kept so vault opens file)
      /en-gb/             any hash → strip (discard) → render landing
      /en-gb/vault        any hash → strip (discard) → auto-load from LS
-     /en-gb/vault/app    hash = file path → open that file in App Mode (preferred URL for "Open as App")
-                                    key must already be in localStorage (vault was open in another tab)
      /en-gb/vault/peek   any hash → strip (discard) → render peek page
+
+   REMOVED:
+     /en-gb/app#vault-key  — no longer supported; use /#vault-key instead
+     /en-gb/vault/app#path — no longer supported; use /en-gb/app#path instead
 
    Rules:
      1. Root (/) is the only hash inbox for vault tokens.
-     2. Root routing target is driven by hash PRESENCE only (not content):
-        with hash → /en-gb/app#token (app-shell is the canonical entry point)
-        without   → /en-gb/ (user is exploring; let them pick from the list)
-     3. Deep-link path (part after |) is saved to sessionStorage key
-        'sg-vault-deep-link' so the vault shell can restore it after mount.
-        The app: prefix signals App Mode activation.
-     4. /en-gb/vault/app is the preferred URL for "Open as App" from the vault UI.
-        The hash is the file path; key must already be in localStorage.
-        The path is saved as 'sg-vault-deep-link' with the app: prefix.
-        Use this instead of /#token|app:path — the app-shell route expects an
-        app.json; without one it redirects to /en-gb/vault/ and the stale
-        deep-link causes "App did not signal ready" in sg-app-banner.
+     2. Root redirect always goes to /en-gb/app with NO hash (key saved to LS).
+     3. /en-gb/app hash is a file path (for App Mode), not a vault key.
+        Vault key ALWAYS comes from localStorage.
+     4. Deep-link path (part after |) is saved to sessionStorage key
+        'sg-vault-deep-link' so the vault/app-shell can restore it after mount.
 
    Load order: after vault-loader-storage.js.
    ================================================================================= */
@@ -67,9 +66,10 @@
 
     // Called from root (/) head script — the only hash inbox.
     // Supports:
-    //   /#vault-key              → open vault (via app-shell)
-    //   /#vault-key|path         → open vault + deep-link to file
-    //   /#vault-key|app:path     → open vault + file in App Mode
+    //   /#vault-key              → save key to LS → redirect to /en-gb/app (no hash)
+    //   /#vault-key|path         → save key + plain deep-link → redirect to /en-gb/app
+    //   /#vault-key|app:path     → save key + app: deep-link → redirect to /en-gb/app
+    // app-shell reads key from LS (hash on /en-gb/app is a file path, not a key).
     function runRoot() {
         if (_hasHash()) {
             var raw    = '';
@@ -79,10 +79,9 @@
             var deep    = pipeIdx === -1 ? '' : raw.slice(pipeIdx + 1).trim();
             if (token) VaultLoaderStorage.setCurrentKey(token);
             _saveDeepLink(deep);
-            // Go directly to app page with the key in the hash.
-            // app-shell will open the vault, check for app.json, and redirect
-            // back to /en-gb/vault/ if no app.json is found.
-            location.replace('/en-gb/app' + (token ? '#' + token : ''));
+            // Redirect to app page with NO hash — key is now in localStorage.
+            // app-shell reads key from LS; hash on /en-gb/app is a file path, not a key.
+            location.replace('/en-gb/app');
         } else {
             location.replace('/en-gb/');
         }
@@ -92,16 +91,9 @@
     function runLanding() { _stripHash(); }
 
     // Called from /en-gb/vault (and /en-gb/vault/*) head script.
-    // Special case: if the path ends with /app, treat the hash as an App Mode
-    // file path (bookmark-friendly URL, vault key from localStorage).
-    //   /en-gb/vault/app#path/to/file  →  open file in App Mode
-    //   /en-gb/vault/app#/path/to/file →  leading slash is stripped
+    // Strips any hash — vault always reads key from localStorage.
+    // /en-gb/vault/app is no longer a special route; use /en-gb/app#path instead.
     function runVault() {
-        var pathname = location.pathname.replace(/\/$/, '');
-        if (pathname.endsWith('/app') && _hasHash()) {
-            var path = location.hash.slice(1).replace(/^\//, '');
-            if (path) _saveDeepLink('app:' + path);
-        }
         _stripHash();
     }
 
