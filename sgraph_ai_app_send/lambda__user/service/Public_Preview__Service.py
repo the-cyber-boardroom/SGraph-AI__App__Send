@@ -80,17 +80,39 @@ class Public_Preview__Service(Type_Safe):
         return preview
 
     # --- render the OG-tagged HTML shell (crawler-visible) ---------------------
-    def render_og_html(self, public_id, app_url=''):
+    def render_og_html(self, public_id, app_url='', image_url=''):
         preview = self.fetch_preview(public_id)
         if not preview:
             return self._shell(title='SG/Vault', description='An encrypted SGraph vault.', image='', url=app_url)
-        thumb = ''
-        if isinstance(preview.get('thumbnail'), dict) and preview['thumbnail'].get('mode') == 'inline':
-            thumb = preview['thumbnail'].get('data', '')
+        # og:image MUST be an HTTP(S) URL — crawlers (WhatsApp/LinkedIn/…) do NOT fetch
+        # data: URIs. Point it at the og-image endpoint (served by og_image()) only when
+        # the preview actually has a thumbnail.
+        image = image_url if (image_url and self._has_thumbnail(preview)) else ''
         return self._shell(title       = preview.get('title', 'SG/Vault'),
                            description = preview.get('description', ''),
-                           image       = thumb,
+                           image       = image,
                            url         = app_url)
+
+    @staticmethod
+    def _has_thumbnail(preview):
+        t = preview.get('thumbnail')
+        return isinstance(t, dict) and bool(t.get('data'))
+
+    # Decode the (deliberately public) inline thumbnail to raw bytes for the og-image
+    # endpoint. Returns (media_type, bytes) or None.
+    def thumbnail_bytes(self, public_id):
+        preview = self.fetch_preview(public_id)
+        if not preview or not self._has_thumbnail(preview):
+            return None
+        data_url = preview['thumbnail'].get('data', '')
+        import re as _re
+        m = _re.match(r'^data:([^;]+);base64,(.*)$', data_url, _re.DOTALL)
+        if not m:
+            return None
+        try:
+            return (m.group(1), base64.b64decode(m.group(2)))
+        except Exception:
+            return None
 
     def _shell(self, title, description, image, url):
         e = html.escape

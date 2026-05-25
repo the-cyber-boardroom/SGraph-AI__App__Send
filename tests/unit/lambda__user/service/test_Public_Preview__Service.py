@@ -62,11 +62,25 @@ class test_Public_Preview__Service(TestCase):
                    'description': 'Confidential & restricted',
                    'thumbnail': {'mode': 'inline', 'media_type': 'image/webp', 'data': 'data:image/webp;base64,AAAA'}}
         self._publish(NODE_PUBLIC_ID, preview)
-        html = self.service.render_og_html(NODE_PUBLIC_ID, app_url='https://dev.vault.sgraph.ai/en-gb/app/' + NODE_PUBLIC_ID)
+        image_url = 'https://dev.send.sgraph.ai/api/public-preview/og-image/' + NODE_PUBLIC_ID
+        html = self.service.render_og_html(NODE_PUBLIC_ID, app_url='https://dev.vault.sgraph.ai/en-gb/app/' + NODE_PUBLIC_ID, image_url=image_url)
         assert 'og:title' in html
         assert 'Acme &lt;Q3&gt; Board' in html                                   # HTML-escaped (no injection)
         assert 'Confidential &amp; restricted' in html
-        assert 'og:image' in html and 'data:image/webp' in html
+        # og:image is an HTTP URL (crawlers don't fetch data: URIs), NOT the inline data
+        assert image_url in html
+        assert 'data:image/webp' not in html
+
+    def test__thumbnail_bytes_decodes_inline_image(self):
+        png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 16
+        preview = { 'schema': 'sgraph-public-preview/v1', 'title': 'T',
+                    'thumbnail': { 'mode': 'inline', 'media_type': 'image/webp',
+                                   'data': 'data:image/webp;base64,' + base64.b64encode(png).decode() } }
+        self._publish(NODE_PUBLIC_ID, preview)
+        media, raw = self.service.thumbnail_bytes(NODE_PUBLIC_ID)
+        assert media == 'image/webp'
+        assert raw == png
+        assert self.service.thumbnail_bytes('no-such-id') is None             # no preview → None (route returns 404)
 
     # --- fail closed ------------------------------------------------------------
     def test__unknown_preview_fails_closed(self):
