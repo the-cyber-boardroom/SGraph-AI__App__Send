@@ -7,6 +7,17 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-25
+
+- `index.md` — Updated: version v0.27.60 → v0.27.61; date 05/23 → 05/25
+- `ui/index.md` — Added: app.json resource injection into vault HTML preview (commit `09288b20`); E2E test alignment note for /en-gb/app routing
+
+Master index: `team/roles/librarian/reviews/05/25/v0.27.61__master-index__code-changes-24-25-may.md`
+Processed: 0 new human briefs; 1 code commit scanned (vault UI app.json resource injection + 2 E2E test files aligned)
+New EXISTS items: 1 | New PROPOSED items: 0
+
+---
+
 ## 2026-05-23
 
 - `index.md` — Updated: version v0.27.55 → v0.27.59; date 05/22 → 05/23; Browser UIs 6 → 7 (added vault app /en-gb/app/)
