@@ -15,7 +15,7 @@
 (function () {
     'use strict';
 
-    const INLINE_CAP = 64 * 1024;   // ~64 KB encoded data-URL ceiling (Q-thumbnail)
+    const INLINE_CAP = 256 * 1024;  // ~256 KB encoded data-URL ceiling — big enough for the LARGE social-share card
 
     class SgPublicPreviewEditor extends HTMLElement {
         constructor() {
@@ -163,7 +163,7 @@
         // --- native thumbnail encode (no libs / no wasm) -----------------------
         async _encodeThumb(fileOrBlob) {
             const bitmap = await createImageBitmap(fileOrBlob);
-            const max    = 512;
+            const max    = 1200;   // large enough for the big og:image card (WhatsApp/LinkedIn)
             const scale  = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
             const w = Math.round(bitmap.width * scale), h = Math.round(bitmap.height * scale);
             const canvas = document.createElement('canvas');
@@ -171,14 +171,14 @@
             canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
             // quality search to fit the inline cap
             let q = 0.85, dataUrl = canvas.toDataURL('image/webp', q);
-            while (dataUrl.length > INLINE_CAP && q > 0.3) { q -= 0.15; dataUrl = canvas.toDataURL('image/webp', q); }
-            return { mode: 'inline', media_type: 'image/webp', data: dataUrl, oversize: dataUrl.length > INLINE_CAP };
+            while (dataUrl.length > INLINE_CAP && q > 0.3) { q -= 0.12; dataUrl = canvas.toDataURL('image/webp', q); }
+            return { mode: 'inline', media_type: 'image/webp', data: dataUrl, width: w, height: h, oversize: dataUrl.length > INLINE_CAP };
         }
 
         async _onThumbFile(file) {
             try {
                 const t = await this._encodeThumb(file);
-                this._thumb = { mode: 'inline', media_type: t.media_type, data: t.data };
+                this._thumb = { mode: 'inline', media_type: t.media_type, data: t.data, width: t.width, height: t.height };
                 this.$('.ed-thumb-preview').innerHTML = `<img src="${this._esc(t.data)}" alt="">`;
                 this.$('.ed-thumb-note').textContent = t.oversize
                     ? 'Still larger than 64 KB after re-encode — consider a simpler image.'
