@@ -77,6 +77,16 @@
             // Key always from localStorage (set by root inbox /#vault-key handler)
             var saved = '';
             try { saved = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+
+            // Public Vault Preview: /en-gb/app/<public-id> (or ?p=<id>) with NO key yet
+            // renders the deliberately-public preview + a key prompt, instead of the
+            // bare entry form. Submitting the key hands off to the normal open flow.
+            var publicId = this._publicIdFromPath();
+            if (publicId && !saved && typeof PublicPreviewRead !== 'undefined') {
+                this._initPublicPreview(publicId);
+                return;
+            }
+
             if (saved) {
                 this._showLoading('Opening vault…');
                 this._initWithKey(saved, null).catch((err) => {
@@ -90,6 +100,52 @@
                 return;
             }
             this._showEntryForm();
+        }
+
+        // ── Public Vault Preview (Mode A: preview + ask for the key) ───────────────────
+
+        _sendEndpoint() {
+            return (window.SG_ENDPOINT
+                || (function(){ try{ return sessionStorage.getItem('sg-vault-endpoint'); }catch(_){ return null; } })()
+                || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
+        }
+
+        _publicIdFromPath() {
+            try {
+                var m   = window.location.pathname.match(/\/app\/([^\/?#]+)/);   // /en-gb/app/<public-id>
+                var seg = m && decodeURIComponent(m[1]);
+                if (seg && seg !== 'index.html') return seg;
+                return new URLSearchParams(window.location.search).get('p') || '';  // ?p=<id> (local dev)
+            } catch (_) { return ''; }
+        }
+
+        async _initPublicPreview(publicId) {
+            var self     = this;
+            var endpoint = this._sendEndpoint();
+            this.shadowRoot.innerHTML =
+                '<style>.pvp-host{min-height:100vh;display:flex;align-items:center;justify-content:center;'
+                + 'padding:24px;background:#0a0a18;box-sizing:border-box}</style><div class="pvp-host"></div>';
+            var card = document.createElement('sg-public-preview-card');
+            this.shadowRoot.querySelector('.pvp-host').appendChild(card);
+
+            var transferId = '', readKey = '';
+            try {
+                transferId = await PublicPreviewCrypto.deriveTransferId(publicId);
+                readKey    = await PublicPreviewCrypto.readKeyBase64url(publicId);
+            } catch (_) {}
+            var common = { publicId: publicId, transferId: transferId, readKey: readKey, apiBase: endpoint, showKeyPrompt: true };
+            card.setState(Object.assign({ status: 'loading' }, common));
+
+            var res = { status: 'error', preview: null };
+            try { res = await PublicPreviewRead.fetchPreview(endpoint, publicId); } catch (_) {}
+            var render = function (extra) { card.setState(Object.assign({ status: res.status, preview: res.preview }, common, extra || {})); };
+            render();
+
+            card.addEventListener('pvp-open-vault', function (e) {
+                self._initWithKey(e.detail.key, null).catch(function () {
+                    render({ keyError: "That key didn't open this vault. Check it and try again." });
+                });
+            });
         }
 
         async _initWithKey(key, presetAccessKey) {
