@@ -82,9 +82,14 @@
                                 <div class="vs-view vs-view-sgit" style="display:none">
                                     <vault-sgit-view></vault-sgit-view>
                                 </div>
-                                <!-- Settings view -->
+                                <!-- Settings view: lightweight tabs (Vault Settings | Public preview) -->
                                 <div class="vs-view vs-view-settings" style="display:none">
-                                    <vault-settings></vault-settings>
+                                    <div class="vs-stabs">
+                                        <button class="vs-stab vs-stab--active" data-stab="settings">Vault Settings</button>
+                                        <button class="vs-stab" data-stab="preview">Public preview</button>
+                                    </div>
+                                    <div class="vs-spane" data-spane="settings"><vault-settings></vault-settings></div>
+                                    <div class="vs-spane" data-spane="preview" style="display:none"><sg-public-preview-editor embedded></sg-public-preview-editor></div>
                                 </div>
                             </div>
                         </div>
@@ -123,6 +128,12 @@
             this.addEventListener('vault-nav-switch', (e) => {
                 this._switchView(e.detail.view);
                 if (e.detail.view === 'files') this._scheduleAutoSyncCheck();
+            });
+
+            // Settings sub-tabs: Vault Settings | Public preview
+            this.addEventListener('click', (e) => {
+                const tab = e.target.closest && e.target.closest('.vs-stab');
+                if (tab) this._switchSettingsTab(tab.dataset.stab);
             });
 
             // Auth events
@@ -210,6 +221,14 @@
 
             // Wire settings
             this.querySelector('vault-settings')?.setVault(vault, vaultKey, this._accessKey);
+
+            // Hand the live vault to the embedded Public-preview editor — no re-open, no
+            // localStorage race. Set the access token on the shared sgSend so publish/delete work.
+            const pvpEditor = this.querySelector('sg-public-preview-editor');
+            if (pvpEditor && typeof pvpEditor.setContext === 'function') {
+                if (vault._sgSend && this._accessKey) vault._sgSend.token = this._accessKey;
+                pvpEditor.setContext({ sgSend: vault._sgSend, vault: vault, vaultKey: vaultKey });
+            }
 
             // Wire SGit
             const sgit = this.querySelector('vault-sgit-view');
@@ -703,6 +722,11 @@
 
         // --- View Switching -------------------------------------------------------
 
+        _switchSettingsTab(name) {
+            this.querySelectorAll('.vs-stab').forEach(b => b.classList.toggle('vs-stab--active', b.dataset.stab === name));
+            this.querySelectorAll('.vs-spane').forEach(p => { p.style.display = (p.dataset.spane === name) ? '' : 'none'; });
+        }
+
         _switchView(viewId) {
             this._activeView = viewId;
 
@@ -1005,6 +1029,18 @@
         .vs-view {
             height: 100%; overflow: auto;
         }
+        .vs-stabs {
+            display: flex; gap: 4px; padding: var(--space-3, 12px) var(--space-4, 16px) 0;
+            border-bottom: 1px solid var(--color-border, #2a2a44); position: sticky; top: 0;
+            background: var(--bg-primary, #0a0a18); z-index: 1;
+        }
+        .vs-stab {
+            padding: 0.55rem 1rem; border: 0; border-bottom: 2px solid transparent; background: transparent;
+            color: var(--color-text-secondary, #9aa4bf); cursor: pointer; font: inherit; font-weight: 600;
+        }
+        .vs-stab:hover { color: var(--color-text, #e2e8f0); }
+        .vs-stab--active { color: var(--color-primary, #4f8ff7); border-bottom-color: var(--color-primary, #4f8ff7); }
+        .vs-spane { padding-top: var(--space-2, 8px); }
         .vs-view-files {
             overflow: hidden; /* send-browse manages its own scroll */
         }
