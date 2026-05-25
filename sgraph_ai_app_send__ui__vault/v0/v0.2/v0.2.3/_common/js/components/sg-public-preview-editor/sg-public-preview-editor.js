@@ -56,6 +56,7 @@
                     detail: { name: vault.name || vault._vaultId }, bubbles: true, composed: true
                 }));
                 this._setOwnerStatus(token ? 'ready' : 'no-token', vault.name || vault._vaultId);
+                this._prefillFromVault(vault);
                 return this._ctx;
             } catch (e) { this._setOwnerStatus('error', e.message); return null; }
         }
@@ -253,6 +254,22 @@
                 if (this._ctx && this._ctx.vault) this._setOwnerStatus(this._ctx.sgSend && this._ctx.sgSend.token ? 'ready' : 'no-token');
                 else this._ensureContext();
             }
+        }
+
+        // Seed empty fields from the vault: the preview Title defaults to the vault
+        // name, and the Custom public-id to a slug of it. Both only fill when empty
+        // (never overwrite the owner's input); the publish modal is the confirmation.
+        _prefillFromVault(vault) {
+            const name = (vault && vault.name) || '';
+            if (!name) return;
+            const titleEl = this.$('.ed-title');
+            if (titleEl && !titleEl.value.trim()) titleEl.value = name;
+            const idEl = this.$('.ed-id-custom');
+            if (idEl && !idEl.value.trim()) {
+                const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63).replace(/-+$/, '');
+                if (slug.length >= 4) idEl.value = slug;
+            }
+            this._emitChanged();
         }
 
         _useAccessKey() {
