@@ -42,8 +42,9 @@
                 const key = this.shadowRoot.querySelector('.pvp-keyinput').value.trim();
                 if (key) this.dispatchEvent(new CustomEvent('pvp-open-vault', { detail: { key }, bubbles: true, composed: true }));
             });
-            const how = this.shadowRoot.querySelector('.pvp-how summary');
-            if (how) how.addEventListener('click', () => {/* native <details> toggle */});
+            const local = this.shadowRoot.querySelector('.pvp-open-local');
+            if (local) local.addEventListener('click', () =>
+                this.dispatchEvent(new CustomEvent('pvp-open-local', { bubbles: true, composed: true })));
         }
 
         _body(s) {
@@ -65,7 +66,7 @@
 
         _notice(message, s) {
             const support = this._support(s.preview);
-            return `<div class="pvp-card"><div class="pvp-notice">${this._esc(message)}</div>${support}${this._keyPrompt(s)}${this._how(s)}</div>`;
+            return `<div class="pvp-card"><div class="pvp-notice">${this._esc(message)}</div>${support}${this._keyPrompt(s)}</div>`;
         }
 
         _card({ preview = {}, notFound = false }) {
@@ -74,7 +75,7 @@
                 return `<div class="pvp-card">
                     <div class="pvp-notice">No preview here yet.</div>
                     <p class="pvp-sub">If you have the vault key you can still open the vault below.</p>
-                    ${this._keyPrompt(s)}${this._how(s)}</div>`;
+                    ${this._keyPrompt(s)}</div>`;
             }
             const thumb = (preview.thumbnail && preview.thumbnail.mode === 'inline' && preview.thumbnail.data)
                 ? `<img class="pvp-thumb" alt="" src="${this._esc(preview.thumbnail.data)}">`
@@ -95,39 +96,38 @@
                 ${disclaimer}
                 ${this._keyPrompt(s)}
                 ${this._support(preview)}
-                ${footer}
-                ${this._how(s)}</div>`;
+                ${footer}</div>`;
         }
 
         _keyPrompt(s) {
             if (s.showKeyPrompt === false) return '';
-            const err = s.keyError ? `<div class="pvp-err" role="alert">${this._esc(s.keyError)}</div>` : '';
-            return `<form class="pvp-keyform">
-                <label class="pvp-klabel" for="pvpk">Enter the vault key to open the contents</label>
-                <div class="pvp-krow">
+            let err = '';
+            if (s.wrongVaultKey) {
+                const href = location.origin + '/#' + s.wrongVaultKey;   // root inbox opens whatever vault this key is for
+                err = `<div class="pvp-err" role="alert">⚠ That key is valid, but it opens a <b>different</b> vault — not the one this preview is about.</div>
+                       <a class="pvp-wrongvault" href="${this._esc(href)}">Open that vault instead →</a>`;
+            } else if (s.keyError) {
+                err = `<div class="pvp-err" role="alert">${this._esc(s.keyError)}</div>`;
+            }
+            // If this device already holds the key for this vault, offer a one-click open.
+            const local = s.hasLocalKey ? `
+                <button class="pvp-open-local" type="button">🔓 Open this vault — key saved on this device</button>
+                <div class="pvp-or"><span>or enter the key</span></div>` : '';
+            return `<section class="pvp-keybox">
+                ${local}
+                <h2 class="pvp-klabel">🔑 Enter the vault key to open the contents</h2>
+                <form class="pvp-keyform">
                     <input id="pvpk" class="pvp-keyinput" type="text" autocomplete="off"
-                           placeholder="passphrase:vaultId or read-key…" aria-describedby="pvperr">
+                           placeholder="passphrase:vaultId  or  read-key…" aria-describedby="pvperr">
                     <button class="pvp-open" type="submit">Open vault ▶</button>
-                </div><div id="pvperr">${err}</div></form>`;
+                </form>
+                <div id="pvperr">${err}</div>
+            </section>`;
         }
 
         _support(preview) {
             if (!preview || !preview.support || !preview.support.href) return '';
             return `<a class="pvp-support" href="${this._esc(preview.support.href)}">✉ ${this._esc(preview.support.label || 'Contact')}</a>`;
-        }
-
-        // The transparency "How this works" disclosure (collapsed). Public-derivable only.
-        _how(s) {
-            if (!s.transferId) return '';
-            const base = s.apiBase || 'https://send.sgraph.ai';
-            const open = s.readKey ? `${base}/en-gb/open/view#${s.transferId}/${s.readKey}` : '';
-            return `<details class="pvp-how"><summary>How this works</summary>
-                <div class="pvp-howbody">
-                    <p>This preview is an ordinary SG/Send file, addressed deterministically by the public id in this URL. Nothing extra is stored on the server.</p>
-                    <div class="pvp-kv"><span>Transfer id</span><code>${this._esc(s.transferId)}</code></div>
-                    ${s.readKey ? `<div class="pvp-kv"><span>Read-only key</span><code>${this._esc(s.readKey)}</code></div>` : ''}
-                    ${open ? `<a class="pvp-rawlink" href="${this._esc(open)}">Open the raw file ↗</a>` : ''}
-                </div></details>`;
         }
     }
 
@@ -147,24 +147,28 @@
         .pvp-disclaimer--warning { border-left-color: #E9C445; } .pvp-disclaimer--warning strong { color: #E9C445; }
         .pvp-disclaimer--info    { border-left-color: #4f8ff7; } .pvp-disclaimer--info strong    { color: #4f8ff7; }
         .pvp-disclaimer--neutral { border-left-color: #9aa4bf; } .pvp-disclaimer--neutral strong { color: #cbd5e1; }
-        .pvp-keyform { margin-top: 16px; }
-        .pvp-klabel { display: block; font-size: 0.82rem; margin-bottom: 6px; color: var(--color-text-secondary, #9aa4bf); }
-        .pvp-krow { display: flex; gap: 8px; }
-        .pvp-keyinput { flex: 1; padding: 9px 11px; border-radius: 6px; border: 1px solid var(--color-border, #2a2a44);
-            background: var(--bg-secondary, #1c1c33); color: var(--color-text, #e2e8f0); font: inherit; }
-        .pvp-open { padding: 9px 14px; border: 0; border-radius: 6px; cursor: pointer; font-weight: 600;
-            background: var(--color-primary, #4f8ff7); color: #fff; }
-        .pvp-err { color: var(--danger, #E94560); font-size: 0.82rem; margin-top: 6px; }
-        .pvp-support { display: inline-block; margin-top: 12px; color: var(--color-primary, #4f8ff7); text-decoration: none; }
-        .pvp-foot, .pvp-sub { font-size: 0.76rem; color: var(--color-text-secondary, #9aa4bf); margin-top: 12px; }
+        /* Prominent, separated call-to-action for the vault key */
+        .pvp-keybox { margin-top: 20px; padding: 18px; border-radius: 10px;
+            background: rgba(79,143,247,0.06); border: 1px solid rgba(79,143,247,0.30); }
+        .pvp-klabel { display: block; margin: 0 0 12px; font-size: 1.05rem; font-weight: 700; color: var(--color-text, #e2e8f0); }
+        .pvp-keyform { display: flex; gap: 10px; }
+        .pvp-keyinput { flex: 1; min-width: 0; padding: 13px 14px; font-size: 1rem; border-radius: 8px;
+            border: 1px solid var(--color-border, #2a2a44); background: var(--bg-primary, #0a0a18); color: var(--color-text, #e2e8f0); font-family: inherit; }
+        .pvp-keyinput:focus { outline: none; border-color: var(--color-primary, #4f8ff7); box-shadow: 0 0 0 3px rgba(79,143,247,0.18); }
+        .pvp-open { padding: 13px 22px; border: 0; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 1rem;
+            white-space: nowrap; background: var(--color-primary, #4f8ff7); color: #fff; }
+        .pvp-open:hover { filter: brightness(1.08); }
+        .pvp-open-local { display: block; width: 100%; padding: 13px 16px; margin-bottom: 4px; border: 0; border-radius: 8px;
+            cursor: pointer; font-weight: 700; font-size: 1rem; background: var(--color-primary, #4f8ff7); color: #fff; }
+        .pvp-open-local:hover { filter: brightness(1.08); }
+        .pvp-or { display: flex; align-items: center; gap: 10px; margin: 12px 0; color: var(--color-text-secondary, #9aa4bf); font-size: 0.82rem; }
+        .pvp-or::before, .pvp-or::after { content: ""; flex: 1; height: 1px; background: var(--color-border, #2a2a44); }
+        .pvp-err { color: var(--danger, #E94560); font-size: 0.86rem; margin-top: 8px; }
+        .pvp-wrongvault { display: inline-block; margin-top: 10px; padding: 10px 16px; border-radius: 8px;
+            background: var(--color-primary, #4f8ff7); color: #fff; font-weight: 700; text-decoration: none; }
+        .pvp-support { display: inline-block; margin-top: 14px; color: var(--color-primary, #4f8ff7); text-decoration: none; }
+        .pvp-foot, .pvp-sub { font-size: 0.76rem; color: var(--color-text-secondary, #9aa4bf); margin-top: 14px; }
         .pvp-notice { font-size: 1.05rem; padding: 8px 0; }
-        .pvp-how { margin-top: 16px; border-top: 1px solid var(--color-border, #2a2a44); padding-top: 10px; }
-        .pvp-how summary { cursor: pointer; font-size: 0.82rem; color: var(--color-text-secondary, #9aa4bf); }
-        .pvp-howbody { font-size: 0.78rem; color: var(--color-text-secondary, #9aa4bf); margin-top: 8px; }
-        .pvp-kv { display: flex; gap: 8px; margin: 4px 0; align-items: baseline; }
-        .pvp-kv span { flex: 0 0 110px; }
-        .pvp-kv code, .pvp-rawlink { font-family: ui-monospace, monospace; font-size: 0.72rem; word-break: break-all; }
-        .pvp-rawlink { display: inline-block; margin-top: 6px; color: var(--color-primary, #4f8ff7); }
         .sk { background: linear-gradient(90deg, #1c1c33 25%, #25254010 50%, #1c1c33 75%); border-radius: 6px; }
         .sk-line { height: 12px; margin: 8px 0; }
         .pvp-skeleton .pvp-thumb.sk { background: #1c1c33; }

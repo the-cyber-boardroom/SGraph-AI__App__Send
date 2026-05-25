@@ -26,11 +26,31 @@
             this._thumb = null;     // { mode:'inline', media_type, data }
             this._published = null; // last publish result { transferId, publicId, deleteAuth }
         }
-        connectedCallback() { this.render(); }
+        connectedCallback() {
+            this.render();
+            // Standalone hosts self-open + auto-load an existing preview. Embedded hosts
+            // (vault settings) carry `embedded` and call setContext() with the live vault.
+            if (!this.hasAttribute('embedded')) this._ensureContext();
+        }
 
-        // External wiring (optional). When NOT called (e.g. instantiated by sg-layout),
-        // the editor opens the vault itself from localStorage via _ensureContext().
-        setContext({ sgSend, vault }) { this._ctx = { sgSend, vault }; this._ownerStatus = 'ready'; this.render(); }
+        // External wiring (used when embedded in the vault settings). Hands the editor the
+        // already-open vault (+ its key/token) so it neither re-opens nor races localStorage.
+        setContext({ sgSend, vault, vaultKey }) {
+            this._ctx = { sgSend: sgSend, vault: vault };
+            this._ownerStatus = 'ready';
+            if (vault && vault._vaultId) this._vaultId = vault._vaultId;
+            try { this._vaultKey = vaultKey || localStorage.getItem('sg-vault-key') || this._vaultKey || ''; } catch (_) { this._vaultKey = vaultKey || ''; }
+            this.render();
+            this._afterContext();
+        }
+
+        // Runs once after the vault context is available (self-opened or set): load any
+        // already-published preview so the editor opens in "edit existing" mode.
+        _afterContext() {
+            if (this._afterDone) return;
+            this._afterDone = true;
+            this._loadExisting();
+        }
 
         // Self-contained vault open: read the vault key (+ per-vault access token) from
         // localStorage and open the vault. Returns { sgSend, vault } or null (no owner).
@@ -57,9 +77,64 @@
                     detail: { name: vault.name || vault._vaultId }, bubbles: true, composed: true
                 }));
                 this._setOwnerStatus(token ? 'ready' : 'no-token', vault.name || vault._vaultId);
-                this._prefillFromVault(vault);
+                this._afterContext();                                   // load any existing published preview
                 return this._ctx;
             } catch (e) { this._setOwnerStatus('error', e.message); return null; }
+        }
+
+        // Scan the owner vault for an already-published preview and load it for editing.
+        async _loadExisting() {
+            const vault = this._ctx && this._ctx.vault;
+            if (!vault || typeof PublicPreviewRead === 'undefined') return;
+            let entries = null;
+            try { entries = vault.listFolder('.vault/owner/public-previews'); } catch (_) {}
+            if (!entries || !entries.length) return;
+            for (const entry of entries) {
+                if (!entry.name || !entry.name.endsWith('.json')) continue;
+                let bk = null;
+                try { bk = JSON.parse(new TextDecoder().decode(await vault.getFile('.vault/owner/public-previews', entry.name))); }
+                catch (_) { continue; }
+                if (!bk || bk.active === false || !bk.public_id) continue;
+                let res = null;
+                const api = bk.api_base || (this._ctx.sgSend && this._ctx.sgSend.endpoint);
+                try { res = await PublicPreviewRead.fetchPreview(api, bk.public_id); } catch (_) {}
+                if (res && res.status === 'ok' && res.preview) {
+                    this._on = true;
+                    this._existing = true;
+                    this.render();
+                    this._populateForm(res.preview, bk.public_id);
+                    this._setOwnerStatus((this._ctx.sgSend && this._ctx.sgSend.token) ? 'ready' : 'no-token');
+                    this._status('Loaded your published preview — edit and "Update (same link)", or "Unpublish".');
+                    return;
+                }
+            }
+        }
+
+        _populateForm(preview, publicId) {
+            const set = (sel, v) => { const el = this.$(sel); if (el) el.value = (v == null ? '' : v); };
+            const cr = this.$('.ed-id-custom-r'); if (cr) cr.checked = true;
+            set('.ed-id-custom', publicId);
+            set('.ed-title', preview.title);
+            set('.ed-desc', preview.description);
+            set('.ed-disclaimer', preview.disclaimer);
+            set('.ed-disclaimer-label', preview.disclaimer_label != null ? preview.disclaimer_label : 'Confidential');
+            const dv = this.$('.ed-disclaimer-variant'); if (dv && preview.disclaimer_variant) dv.value = preview.disclaimer_variant;
+            if (preview.support) { set('.ed-support-label', preview.support.label); set('.ed-support-href', preview.support.href); }
+            const sf = this.$('.ed-show-footer'); if (sf) sf.checked = preview.show_footer !== false;
+            set('.ed-footer-text', preview.footer_text);
+            if (preview.expiry && preview.expiry.expires_at_ms) {
+                const t = this.$('.ed-exp-time-on'); if (t) t.checked = true;
+                set('.ed-exp-days', Math.max(1, Math.round((preview.expiry.expires_at_ms - Date.now()) / 86400000)));
+            }
+            if (preview.expiry && preview.expiry.max_access_count) {
+                const o = this.$('.ed-exp-opens-on'); if (o) o.checked = true;
+                set('.ed-exp-opens', preview.expiry.max_access_count);
+            }
+            if (preview.thumbnail && preview.thumbnail.mode === 'inline' && preview.thumbnail.data) {
+                this._thumb = preview.thumbnail;
+                const tp = this.$('.ed-thumb-preview'); if (tp) tp.innerHTML = `<img src="${this._esc(preview.thumbnail.data)}" alt="">`;
+            }
+            this._emitChanged();
         }
 
         _setOwnerStatus(state, detail) {
@@ -158,6 +233,9 @@
                 const fn = isUpdate ? PublicPreviewWrite.updatePreview : PublicPreviewWrite.publishPreview;
                 const res = await fn.call(PublicPreviewWrite, { sgSend, vault, publicId: idCheck.id, preview, expiry: this._collectExpiry() });
                 this._published = res;
+                // Remember this vault's key for this public-id, so revisiting /app/<id>
+                // on this device offers a one-click "key saved on this device" open.
+                try { if (this._vaultKey) localStorage.setItem('sg-pvp-key:' + idCheck.id, this._vaultKey); } catch (_) {}
                 this._status(isUpdate ? 'Updated. Your share link is unchanged.' : 'Published.');
                 this._renderShare(res);
             } catch (e) {
@@ -301,9 +379,12 @@
                 this._emitChanged();                                                        // initial paint
                 const accUse = this.$('.ed-access-use');
                 if (accUse) accUse.addEventListener('click', () => this._useAccessKey());
-                // Self-open the vault (or reflect an already-set context).
-                if (this._ctx && this._ctx.vault) this._setOwnerStatus(this._ctx.sgSend && this._ctx.sgSend.token ? 'ready' : 'no-token');
-                else this._ensureContext();
+                // Reflect context (or self-open). Seed vault-name defaults only when NOT
+                // editing an existing preview (which _loadExisting populated authoritatively).
+                if (this._ctx && this._ctx.vault) {
+                    this._setOwnerStatus(this._ctx.sgSend && this._ctx.sgSend.token ? 'ready' : 'no-token');
+                    if (!this._existing) this._prefillFromVault(this._ctx.vault);
+                } else { this._ensureContext(); }
             }
         }
 
