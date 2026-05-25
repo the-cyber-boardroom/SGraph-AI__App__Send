@@ -60,7 +60,8 @@ class test_Public_Preview__Service(TestCase):
     def test__render_og_html_contains_title_and_description(self):
         preview = {'schema': 'sgraph-public-preview/v1', 'title': 'Acme <Q3> Board',
                    'description': 'Confidential & restricted',
-                   'thumbnail': {'mode': 'inline', 'media_type': 'image/webp', 'data': 'data:image/webp;base64,AAAA'}}
+                   'thumbnail': {'mode': 'inline', 'media_type': 'image/webp', 'data': 'data:image/webp;base64,AAAA',
+                                 'width': 1200, 'height': 630}}
         self._publish(NODE_PUBLIC_ID, preview)
         image_url = 'https://dev.send.sgraph.ai/api/public-preview/og-image/' + NODE_PUBLIC_ID
         html = self.service.render_og_html(NODE_PUBLIC_ID, app_url='https://dev.vault.sgraph.ai/en-gb/app/' + NODE_PUBLIC_ID, image_url=image_url)
@@ -70,6 +71,9 @@ class test_Public_Preview__Service(TestCase):
         # og:image is an HTTP URL (crawlers don't fetch data: URIs), NOT the inline data
         assert image_url in html
         assert 'data:image/webp' not in html
+        # declared dimensions → crawlers pick the LARGE image card
+        assert 'og:image:width' in html and '1200' in html
+        assert 'og:image:height' in html and '630' in html
 
     def test__thumbnail_bytes_decodes_inline_image(self):
         png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 16

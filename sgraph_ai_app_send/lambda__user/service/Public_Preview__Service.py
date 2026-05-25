@@ -88,10 +88,13 @@ class Public_Preview__Service(Type_Safe):
         # data: URIs. Point it at the og-image endpoint (served by og_image()) only when
         # the preview actually has a thumbnail.
         image = image_url if (image_url and self._has_thumbnail(preview)) else ''
+        thumb = preview.get('thumbnail') if isinstance(preview.get('thumbnail'), dict) else {}
         return self._shell(title       = preview.get('title', 'SG/Vault'),
                            description = preview.get('description', ''),
                            image       = image,
-                           url         = app_url)
+                           url         = app_url,
+                           img_w       = thumb.get('width'),
+                           img_h       = thumb.get('height'))
 
     @staticmethod
     def _has_thumbnail(preview):
@@ -114,7 +117,7 @@ class Public_Preview__Service(Type_Safe):
         except Exception:
             return None
 
-    def _shell(self, title, description, image, url):
+    def _shell(self, title, description, image, url, img_w=None, img_h=None):
         e = html.escape
         tags = [
             f'<meta property="og:title" content="{e(title)}">',
@@ -125,8 +128,13 @@ class Public_Preview__Service(Type_Safe):
             f'<meta name="twitter:description" content="{e(description)}">',
         ]
         if url:   tags.append(f'<meta property="og:url" content="{e(url)}">')
-        if image: tags += [f'<meta property="og:image" content="{e(image)}">',
-                           f'<meta name="twitter:image" content="{e(image)}">']
+        if image:
+            tags += [f'<meta property="og:image" content="{e(image)}">',
+                     f'<meta name="twitter:image" content="{e(image)}">']
+            # Declaring dimensions nudges crawlers (WhatsApp/LinkedIn) to the LARGE image card.
+            if img_w and img_h:
+                tags += [f'<meta property="og:image:width" content="{int(img_w)}">',
+                         f'<meta property="og:image:height" content="{int(img_h)}">']
         return ('<!doctype html><html lang="en-GB"><head><meta charset="utf-8">'
                 f'<title>{e(title)}</title>' + ''.join(tags) +
                 '</head><body><div id="app"></div></body></html>')

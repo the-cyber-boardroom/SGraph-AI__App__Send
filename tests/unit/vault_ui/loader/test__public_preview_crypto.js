@@ -94,7 +94,7 @@ test('validatePreview — accepts minimal, rejects unknown schema / banned field
     assert.equal(PPS.validatePreview({ schema: 'sgraph-public-preview/v1', title: 'T' }).ok, true);
     assert.equal(PPS.validatePreview({ schema: 'nope', title: 'T' }).ok, false);
     assert.equal(PPS.validatePreview({ schema: 'sgraph-public-preview/v1', title: 'T', extra: { write_key: 'x' } }).ok, false);
-    const big = { schema: 'sgraph-public-preview/v1', title: 'T', thumbnail: { mode: 'inline', data: 'a'.repeat(70000) } };
+    const big = { schema: 'sgraph-public-preview/v1', title: 'T', thumbnail: { mode: 'inline', data: 'a'.repeat(400000) } };  // > 300 KB cap
     assert.equal(PPS.validatePreview(big).ok, false);
 });
 

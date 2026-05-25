@@ -15,7 +15,7 @@
 (function () {
     'use strict';
 
-    const INLINE_CAP = 64 * 1024;   // ~64 KB encoded data-URL ceiling (Q-thumbnail)
+    const INLINE_CAP = 256 * 1024;  // ~256 KB encoded data-URL ceiling — big enough for the LARGE social-share card
 
     class SgPublicPreviewEditor extends HTMLElement {
         constructor() {
@@ -132,6 +132,7 @@
             }
             if (preview.thumbnail && preview.thumbnail.mode === 'inline' && preview.thumbnail.data) {
                 this._thumb = preview.thumbnail;
+                this._thumbSource = preview.thumbnail.data;   // allow re-fitting the existing image on toggle
                 const tp = this.$('.ed-thumb-preview'); if (tp) tp.innerHTML = `<img src="${this._esc(preview.thumbnail.data)}" alt="">`;
             }
             this._emitChanged();
@@ -161,29 +162,52 @@
         _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
         // --- native thumbnail encode (no libs / no wasm) -----------------------
-        async _encodeThumb(fileOrBlob) {
-            const bitmap = await createImageBitmap(fileOrBlob);
-            const max    = 512;
-            const scale  = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-            const w = Math.round(bitmap.width * scale), h = Math.round(bitmap.height * scale);
+        // src = a File/Blob (upload) or a data-URL string (re-fitting an existing thumb).
+        // social=true → frame to 1200×630 (mode 'cover' crops to fill, 'pad' letterboxes);
+        // social=false → just downscale to ≤1200px keeping aspect.
+        async _encodeThumb(src, social, mode) {
+            const blob   = (typeof src === 'string') ? await (await fetch(src)).blob() : src;
+            const bitmap = await createImageBitmap(blob);
             const canvas = document.createElement('canvas');
-            canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
-            // quality search to fit the inline cap
+            const ctx    = canvas.getContext('2d');
+            if (social) {
+                const W = 1200, H = 630;
+                canvas.width = W; canvas.height = H;
+                if (mode === 'pad') {
+                    ctx.fillStyle = '#14142a'; ctx.fillRect(0, 0, W, H);                 // card-bg letterbox
+                    const s = Math.min(W / bitmap.width, H / bitmap.height);
+                    const dw = bitmap.width * s, dh = bitmap.height * s;
+                    ctx.drawImage(bitmap, (W - dw) / 2, (H - dh) / 2, dw, dh);
+                } else {                                                                  // cover: scale up + centre-crop
+                    const s = Math.max(W / bitmap.width, H / bitmap.height);
+                    const dw = bitmap.width * s, dh = bitmap.height * s;
+                    ctx.drawImage(bitmap, (W - dw) / 2, (H - dh) / 2, dw, dh);
+                }
+            } else {
+                const max = 1200, scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+                canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            }
             let q = 0.85, dataUrl = canvas.toDataURL('image/webp', q);
-            while (dataUrl.length > INLINE_CAP && q > 0.3) { q -= 0.15; dataUrl = canvas.toDataURL('image/webp', q); }
-            return { mode: 'inline', media_type: 'image/webp', data: dataUrl, oversize: dataUrl.length > INLINE_CAP };
+            while (dataUrl.length > INLINE_CAP && q > 0.3) { q -= 0.12; dataUrl = canvas.toDataURL('image/webp', q); }
+            return { mode: 'inline', media_type: 'image/webp', data: dataUrl, width: canvas.width, height: canvas.height, oversize: dataUrl.length > INLINE_CAP };
         }
 
-        async _onThumbFile(file) {
+        _onThumbFile(file) { this._thumbSource = file; this._applyThumb(); }
+
+        // (Re)encode the current thumbnail source with the current social-fit settings.
+        async _applyThumb() {
+            if (!this._thumbSource) return;
+            const social = this.$('.ed-social-fit') ? this.$('.ed-social-fit').checked : true;
+            const mode   = this.$('.ed-social-mode') ? this.$('.ed-social-mode').value : 'cover';
             try {
-                const t = await this._encodeThumb(file);
-                this._thumb = { mode: 'inline', media_type: t.media_type, data: t.data };
+                const t = await this._encodeThumb(this._thumbSource, social, mode);
+                this._thumb = { mode: 'inline', media_type: t.media_type, data: t.data, width: t.width, height: t.height };
                 this.$('.ed-thumb-preview').innerHTML = `<img src="${this._esc(t.data)}" alt="">`;
                 this.$('.ed-thumb-note').textContent = t.oversize
-                    ? 'Still larger than 64 KB after re-encode — consider a simpler image.'
-                    : `Encoded to WebP (${Math.round(t.data.length / 1024)} KB, EXIF stripped).`;
-                this._emitChanged();   // live preview shows the new thumbnail
+                    ? 'Still over the size cap — try a simpler image.'
+                    : `Encoded to WebP ${t.width}×${t.height} (${Math.round(t.data.length / 1024)} KB, EXIF stripped).`;
+                this._emitChanged();
             } catch (e) { this.$('.ed-thumb-note').textContent = 'Could not read that image.'; }
         }
 
@@ -334,6 +358,13 @@
                   <label class="ed-l">Description<textarea class="ed-desc" rows="2"></textarea></label>
                   <label class="ed-l">Thumbnail</label>
                   <input type="file" accept="image/*" class="ed-thumb-file">
+                  <label class="ed-l" style="margin-top:8px">
+                    <input type="checkbox" class="ed-social-fit" checked> Fit to social-share card (1200×630)
+                    <select class="ed-social-mode" style="margin-left:8px">
+                      <option value="cover">Crop to fill</option>
+                      <option value="pad">Pad to fit</option>
+                    </select>
+                  </label>
                   <div class="ed-thumb-preview"></div><p class="ed-thumb-note ed-hint"></p>
                   <label class="ed-l">Disclaimer / badge</label>
                   <div class="ed-disclaimer-row">
@@ -371,6 +402,9 @@
             if (this._on) {
                 this.$('.ed-regen').addEventListener('click', () => { this.$('.ed-id-rnd').value = PublicPreviewSchema.randomPublicId(); });
                 this.$('.ed-thumb-file').addEventListener('change', (e) => { if (e.target.files[0]) this._onThumbFile(e.target.files[0]); });
+                const sFit = this.$('.ed-social-fit'), sMode = this.$('.ed-social-mode');
+                if (sFit)  sFit.addEventListener('change', () => this._applyThumb());     // re-fit on toggle
+                if (sMode) sMode.addEventListener('change', () => this._applyThumb());     // re-fit on crop/pad change
                 this.$('.ed-publish').addEventListener('click', () => this._confirmThenPublish(false));
                 this.$('.ed-update').addEventListener('click',  () => this._confirmThenPublish(true));
                 this.$('.ed-unpub').addEventListener('click',   () => this._doUnpublish());
@@ -484,7 +518,7 @@
         .ed-update, .ed-unpub { background: var(--bg-secondary, #1c1c33); color: var(--color-text, #e2e8f0); border:1px solid var(--color-border,#2a2a44); }
         .ed-status { margin-top: 10px; font-size: 0.85rem; }
         .ed-status--err { color: var(--danger, #E94560); }
-        .ed-thumb-preview img { max-width: 128px; border-radius: 6px; margin-top: 6px; }
+        .ed-thumb-preview img { max-width: 100%; width: 320px; border-radius: 6px; margin-top: 8px; display: block; }
         .ed-sharebox { margin-top: 12px; border-top:1px solid var(--color-border,#2a2a44); padding-top:10px; }
         .ed-copyrow { display:flex; gap:8px; align-items:center; } .ed-copyrow input { flex:1; min-width:0; }
         .ed-copyrow button { padding:8px 12px; border-radius:6px; border:1px solid var(--color-border,#2a2a44);
