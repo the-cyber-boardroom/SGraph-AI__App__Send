@@ -30,6 +30,48 @@
             return { blobId, fileName, folderPath }
         },
 
+        // --- Batch add: encrypt+store all files, then commit once -----------------
+        // items: Array<{ folderPath, fileName, fileData }>
+        // Returns: Array<{ blobId, fileName, folderPath }>
+
+        async addFiles(items) {
+            if (!items || items.length === 0) return []
+
+            const results = []
+
+            // Encrypt and store all blobs, then mutate the in-memory tree
+            for (const item of items) {
+                const data = item.fileData instanceof ArrayBuffer
+                    ? new Uint8Array(item.fileData) : item.fileData
+
+                const encrypted   = await this._sgSend.encrypt(data, this._readKey)
+                const blobId      = await this._objectStore.store(encrypted)
+                const contentHash = await this._commitManager.computeContentHash(data)
+
+                const folder = this._findNode(item.folderPath)
+                if (!folder || folder.type !== 'folder') {
+                    throw new Error(`Folder not found: ${item.folderPath}`)
+                }
+
+                folder.children[item.fileName] = {
+                    type: 'file', blob_id: blobId,
+                    size: data.byteLength || data.length, content_hash: contentHash
+                }
+
+                this._markDirty(item.folderPath)
+                results.push({ blobId, fileName: item.fileName, folderPath: item.folderPath })
+            }
+
+            // Single commit for all files
+            const names = items.map(i => i.fileName)
+            const message = names.length === 1
+                ? `Add ${names[0]}`
+                : `Add ${names.length} files: ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}`
+            await this._commit(message)
+
+            return results
+        },
+
         async updateFile(folderPath, fileName, fileData) {
             const data   = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData
             const folder = this._findNode(folderPath)
