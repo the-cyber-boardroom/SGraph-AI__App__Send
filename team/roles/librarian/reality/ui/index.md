@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-05-19 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-05-25 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -208,6 +208,18 @@ Renders outbound fetch calls from `window._appDebug.networkCalls` (method, URL, 
 - `vault-header.js` change: "Open App" action opens in same tab (was: new tab).
 - `v0.2.3/index.html`: `present:true` activation restored for `_page.json` app.json entries.
 - Route tests updated (`test__routing_decisions.js`): `runRoot` assertions cover `/en-gb/app#token` redirect path.
+
+**`app.json` resource injection into vault HTML preview** (commit `09288b20`, 25 May 2026 — `v0.2.3/index.html`):
+When `_applyAppJson` encounters a `resources` block in `app.json` (with `css` and/or `js` arrays) and `autoOpen` is active, the vault file browser now:
+- Pre-fetches each listed CSS/JS file from the vault
+- Patches `dataSource.getFileBytes` for the entry file to prepend `<style data-sg-app>` and `<script data-sg-app>` blocks inline, using the same injection convention as `<app-shell>._mountApp()`
+- Falls back gracefully if any resource file is missing
+- Logs: `[app.json] resources injected into vault preview: css=N js=N`
+
+**Significance:** App HTMLs in SG/App vaults carry no `<link>`/`<script>` tags — resources are delivered entirely via `app.json`. Before this fix, the vault browser's BRW-020 inlining had nothing to process and the preview rendered as a blank placeholder div. After this fix, vault HTML previews are at rendering parity with `/en-gb/app`.
+
+**E2E test alignment** (commits `e2f05030`, 25 May 2026 — `test__routing.spec.js`, `test__regression__root_hash_inbox_saves.spec.js`):
+Updated test assertions from `/en-gb/vault` to `/en-gb/app` routing targets, confirming the `/#key` → `/en-gb/app#token` redirect (shipped 22 May, commits `bfcb8ad7`/`4cf41ba2`/`d3daa2ac`) is now fully mirrored in E2E test expectations.
 
 **`scripts/vault__run-locally.sh`** — helper script to run the vault UI locally.
 

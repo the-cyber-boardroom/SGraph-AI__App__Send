@@ -2,7 +2,14 @@
 
 | Date | Version | Commit | Review | Description |
 |------|---------|--------|--------|-------------|
-| 2026-05-04 | v0.27.2 | — | *(this session)* | No new briefs (none after 04/29); backlog task B-010: activity log catch-up 03/19–05/03 completed |
+| 2026-05-25 | v0.27.61 | — | [Master Index: Code Changes 24–25 May](reviews/05/25/v0.27.61__master-index__code-changes-24-25-may.md) | No new briefs; 1 code commit (vault UI app.json resource injection); E2E test alignment; B-008: ROLE.md broken link fixed |
+| 2026-05-24 | v0.27.60 | — | [Master Index: Briefs 17–22 May](reviews/05/24/v0.27.60__master-index__briefs-17-22-may.md) | 34 docs from 05/17 + 05/22; SG/Sentinel complete design (19 docs); TUI API briefs; 32 new PROPOSED items |
+| 2026-05-23 | v0.27.59 | — | [Master Index: Code Changes 22–23 May](reviews/05/23/v0.27.59__master-index__code-changes-22-23-may.md) | No new briefs; vault app-shell code changes (10 EXISTS items); SG/App hosting page, <app-shell>, routing changes |
+| 2026-05-20 | v0.27.54 | — | [Master Index: Briefs 15 May](reviews/05/20/v0.27.54__master-index__briefs-15-may.md) | 10 docs from 05/15; Firecracker microVMs, Nitro Enclaves, USDC payments, AgentCore; 32 new PROPOSED items |
+| 2026-05-19 | v0.27.53 | — | [Master Index: Code Changes 14–15 May](reviews/05/19/v0.27.53__master-index__code-changes-14-15-may.md) | No new briefs; v0.4.0 Share + Open UI trees folded; Vault UI v0.2.3 additions; QA_START_HERE.md updated (B-007) |
+| 2026-05-17 | v0.27.52 | — | [Master Index: Briefs 10–13 May](reviews/05/17/v0.27.52__master-index__briefs-10-13-may.md) | 32 docs from 05/10-13; SG/Compute, infra proposals, vault publishing, agentic tools; 47 new PROPOSED items |
+| 2026-05-09 | v0.27.18 | — | [Master Index: Code Changes 08–09 May](reviews/05/09/v0.27.18__master-index__code-changes-08-09-may.md) | No new briefs; v0.3.2 overlay changes (vault-picker, secret share, options step); SnapStart S3 fix |
+| 2026-05-04 | v0.27.2 | — | [Master Index: No New Briefs 04 May](reviews/05/04/v0.27.2__master-index__no-new-briefs-04-may.md) | No new briefs (none after 04/29); backlog task B-010: activity log catch-up 03/19–05/03 completed |
 | 2026-05-03 | v0.27.2 | — | [Master Index: 29 Apr Late Batch](reviews/05/03/v0.27.2__master-index__briefs-29-apr-late-batch.md) | 4 docs from 04/29 (v0.22.19): ephemeral infra next-phase (7 features), Firefox plugin, SGit four-layer refactoring; docs 333–336 |
 | 2026-05-02 | v0.27.2 | — | [Master Index: 29 Apr Early Batch](reviews/05/02/v0.27.2__master-index__briefs-29-apr-early.md) | 4 docs from 04/29 (v0.22.19 early); daily brief + ephemeral infra, Firefox, SGit themes; reality domain tree updated |
 | 2026-04-30 | v0.25.2 | — | [Master Index: 29 Apr Email-FS](reviews/04/30/v0.25.2__master-index__briefs-29-apr.md) | 4 docs from 04/29 Email-FS v0.6 set (v0.22.23); architecture, simulation, skill, specification; 8 code items from CI pipeline |
