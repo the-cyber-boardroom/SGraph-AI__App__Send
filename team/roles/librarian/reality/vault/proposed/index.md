@@ -1,6 +1,6 @@
 # vault/proposed — Index
 
-**Domain:** `vault/` | **Last updated:** 2026-05-21
+**Domain:** `vault/` | **Last updated:** 2026-05-25
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16–17, 19, 29
 
 ---
@@ -166,6 +166,21 @@ Builds on EXISTING foundations: `.vault/owner/*` double-encryption (`vault-hkdf.
 | P-163 | External-resource link types + controlled iframe (`<sg-embed-frame>`) | `type` link/video/app embed external URL; cross-origin src, locked sandbox (no `allow-same-origin`), NO bridge/listener; default-deny; sticky transparency banner | conventions brief |
 | P-164 | Opt-in app→vault access grant (**v1**, first-class) | Explicit owner grant of a scoped read-only `requestFile` channel to a named folder; amber granted banner + Revoke; default-deny otherwise. Per-file monitoring/granular grants later | conventions brief (plugin model) + lead Rev 2 |
 | P-165 | CLI clone-within-clone + write-inside-child | Nested clone resolution in `sgit`; commits/recursive write inside a sub-vault | sub-vaults-workflow brief — Phase 4 (deferred) |
+
+## Public Vault Previews (05/25 brief — public-vault-previews)
+
+All items below are PROPOSED — does not exist yet. Dev pack (architecture → derivation → UX → mockups → reuse map → phases → security):
+`library/sgraph-send/dev_packs/v0.27.62__public-vault-previews/`. This **supplies the "public info before key" capability** that the sub-vaults link card (P-162) depends on.
+Builds entirely on EXISTING foundations: the SG/Send transfer flow + **DELETE** (`Routes__Transfers.py:249`, `Transfer__Service.delete_transfer:174`), native expiry (`expires_at`/`max_downloads`/`auto_delete`, `Schema__Transfer.py:20-23`), `SendCrypto.encryptFile` (`crypto.js`), the SGMETA envelope (`upload-constants.js`), the `FriendlyCrypto` derivation pattern (`friendly-crypto.js`), and the `/en-gb/app` route (`…__ui__vault/v0/v0.2/v0.2.3/en-gb/app/index.html`). **No new server-side store** — the only exposure is the public-vault-about-key in the URL/logs.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-166 | Public-vault-about-key + deterministic derivation | A public string in the URL deterministically yields a 12-hex SG/Send transfer-id (`SHA-256('pvp-transfer-v1:'+id)[:12]`) and a **read-only, decrypt-only** AES key (PBKDF2 salt `sgraph-public-preview-v1` — a namespace distinct from Simple Tokens and vault keys). Not a Simple Token | public-vault-previews dev pack |
+| P-167 | Public-preview convention JSON (`sgraph-public-preview/v1`) | Deliberately-public title / description / thumbnail (inline ≤~64 KB or derived blob) / disclaimer / support / expiry, stored as an ordinary SG/Send transfer; field-name guard bans `write_key`/`read_key`/`passphrase` | dev pack doc 02 §5 |
+| P-168 | Two access modes on `/en-gb/app/<public-id>` | No `#` → render preview + ask for key; `#<vault-key>` → render preview fast, auto-load the vault (key stays in the hash, never sent to the server). Needs a path-segment CDN rewrite (interim `?p=`) | dev pack doc 02 §3, doc 04 |
+| P-169 | Delete-then-recreate update via owner-held random `delete_auth` | Update/unpublish = `DELETE` the transfer (with a **random** `delete_auth` stored in the owner vault at `.sgraph/public-previews/<id>.json`) then recreate at the same id; same share link across edits. `delete_auth` is NEVER derived from the public string (defacement gate) | dev pack doc 03 §3-4, doc 09 R-deface |
+| P-170 | Crawler social-share cards via in-repo OG-render | A route on the public User Lambda derives + fetches + decrypts the public preview server-side and injects OG/Twitter meta tags into the served shell (cached by public-id, fails closed). `sg-public-preview-meta` covers JS-capable humans | dev pack doc 02 §6 |
+| P-171 | `sg-public-preview-editor` on the vault settings surface | Opt-in (default OFF); custom/random public-id chooser; fields + thumbnail (EXIF-strip + WebP); "THIS WILL BE PUBLIC" confirm; expiry by time and by open-count; share-link copy with key-inclusion warning | dev pack doc 04 §5, doc 05 §5 |
 
 ## Vault Discovery and Public Keys (05/16 briefs — doc 422)
 
