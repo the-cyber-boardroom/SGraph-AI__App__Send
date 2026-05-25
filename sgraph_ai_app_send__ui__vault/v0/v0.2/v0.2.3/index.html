@@ -41,8 +41,39 @@
     <!-- Browse component styles (from SG/Send CDN — patched to /_common/ locally) -->
     <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse.css">
     <link rel="stylesheet" href="https://dev.send.sgraph.ai/_common/js/components/send-download/send-browse-v031.css">
+
+    <!-- Loading screen: inline CSS so it renders before any external stylesheet -->
+    <style>
+    #sg-vault-loading {
+        position: fixed; inset: 0; z-index: 9990;
+        background: #0d1117;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 0.6rem; font-family: system-ui, sans-serif; text-align: center; padding: 2rem;
+        transition: opacity 0.35s ease;
+    }
+    #sg-vault-loading.sg-vl--hidden { opacity: 0; pointer-events: none; }
+    #sg-vl-icon  { font-size: 2.5rem; margin-bottom: 0.25rem; }
+    #sg-vl-title { color: #4ecdc4; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em; }
+    #sg-vl-track {
+        width: 260px; height: 4px; background: rgba(255,255,255,0.08);
+        border-radius: 2px; overflow: hidden; margin-top: 0.35rem;
+    }
+    #sg-vl-bar {
+        height: 100%; width: 8%; background: #4ecdc4; border-radius: 2px;
+        transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+    }
+    #sg-vl-step { color: rgba(255,255,255,0.38); font-size: 0.78rem; margin-top: 0.35rem; }
+    </style>
 </head>
 <body>
+
+    <!-- Loading screen (shown immediately, hidden once vault is mounted) -->
+    <div id="sg-vault-loading" role="status" aria-live="polite">
+        <div id="sg-vl-icon">🔐</div>
+        <div id="sg-vl-title">Loading Vault UI</div>
+        <div id="sg-vl-track"><div id="sg-vl-bar"></div></div>
+        <div id="sg-vl-step">Initialising…</div>
+    </div>
 
     <!-- sg-app-banner: hidden until app.json chrome.mode = "maximised" activates it -->
     <sg-app-banner style="display:none"></sg-app-banner>
@@ -189,6 +220,71 @@
         VaultComponentPaths.init('/_common');
         VaultI18n.init();
         window.sgraphVault.events.emit('app-init', { version: 'v0.2.2' });
+    </script>
+
+    <!-- 11b. Loading screen controller
+         Updates the #sg-vault-loading progress bar through the vault open lifecycle.
+         Steps: UI loaded → checking key → opening → loading structure → done. -->
+    <script>
+    (function () {
+        'use strict';
+
+        var bar   = document.getElementById('sg-vl-bar');
+        var step  = document.getElementById('sg-vl-step');
+        var title = document.getElementById('sg-vl-title');
+        var panel = document.getElementById('sg-vault-loading');
+        if (!panel) return;
+
+        function _set(pct, stepText, titleText) {
+            if (bar)   bar.style.width  = pct + '%';
+            if (step)  step.textContent = stepText;
+            if (title && titleText) title.textContent = titleText;
+        }
+
+        function _hide() {
+            if (!panel) return;
+            panel.classList.add('sg-vl--hidden');
+            setTimeout(function() { if (panel) panel.remove(); }, 400);
+        }
+
+        // Step 1: UI scripts loaded (we're running now)
+        // Check if we're opening in App Mode from URL — show appropriate title.
+        var isAppMode = false;
+        try {
+            var dl = sessionStorage.getItem('sg-vault-deep-link') || '';
+            isAppMode = dl.startsWith('app:');
+        } catch (_) {}
+        _set(20, 'Checking vault key…', isAppMode ? 'Loading Vault App' : 'Loading Vault');
+
+        // If no vault key in localStorage, we'll show the entry form — hide loading
+        // after a short delay so the vault-entry component can render.
+        var hasKey = false;
+        try { hasKey = !!(VaultLoader && VaultLoader.storage && VaultLoader.storage.getCurrentKey()); } catch (_) {}
+        if (!hasKey) {
+            setTimeout(function() { _hide(); }, 300);
+            return;
+        }
+
+        // Step 2: vault open in progress
+        _set(35, 'Opening vault…');
+
+        var events = window.sgraphVault && window.sgraphVault.events;
+        if (!events) { setTimeout(_hide, 4000); return; }
+
+        events.on('vault-opened', function() {
+            _set(70, 'Loading vault structure…');
+        });
+
+        // Step 3: shell signals it finished mounting browse — hide loading screen.
+        // We hook onto 'vault-browse-mounted' (fired by the _mountBrowse patch below).
+        events.on('vault-browse-mounted', function() {
+            _set(100, 'Ready');
+            setTimeout(_hide, 250);
+        });
+
+        // Fallback: if vault-browse-mounted never fires (e.g. error), hide after 12s.
+        setTimeout(function() { _hide(); }, 12000);
+    }());
     </script>
 
     <!-- 12. v0.2.1 patch: create vault from simple token + vault-not-found error page -->
@@ -472,8 +568,34 @@
                 window._vaultBrowseElement = browse || null;
                 window._vaultDeepLinkPath  = null;
 
-                // app.json auto-open
-                if (this._dataSource && browse) {
+                // ── URL deep-link override (set by root routing or /en-gb/vault/app route) ──
+                // Format:  'app:path/to/file'  → open file in App Mode (overrides app.json)
+                //          'path/to/file'       → open file tab, then still run app.json
+                var deepLinkOverride = typeof VaultLoaderRouting !== 'undefined' &&
+                    VaultLoaderRouting.consumeDeepLink ? VaultLoaderRouting.consumeDeepLink() : '';
+
+                var deepLinkHandled = false;
+                if (deepLinkOverride && browse) {
+                    if (deepLinkOverride.startsWith('app:')) {
+                        // App Mode override — open specific file in App Mode regardless of app.json
+                        var appPath = deepLinkOverride.slice(4);
+                        deepLinkHandled = true; // skip app.json so it doesn't fight for focus
+                        requestAnimationFrame(function() {
+                            if (browse._openFileTab) browse._openFileTab(appPath);
+                            var banner = document.querySelector('sg-app-banner');
+                            if (banner && typeof banner.activate === 'function') banner.activate();
+                        });
+                    } else {
+                        // Plain file deep-link — open tab, then fall through to app.json
+                        var plainPath = deepLinkOverride;
+                        requestAnimationFrame(function() {
+                            if (browse._openFileTab) browse._openFileTab(plainPath);
+                        });
+                    }
+                }
+
+                // app.json auto-open (skip if URL app: override already handled it)
+                if (!deepLinkHandled && this._dataSource && browse) {
                     await this._applyAppJson(this._dataSource, browse);
                 }
 
@@ -481,6 +603,9 @@
                 if (this._dataSource && browse) {
                     this._setupVaultLinkHandler(this._dataSource, browse);
                 }
+
+                // Signal loading screen that browse is mounted and ready.
+                window.sgraphVault.events.emit('vault-browse-mounted', {});
             };
 
             // ── 2. _onLock ─────────────────────────────────────────────────────────────

@@ -79,6 +79,40 @@
         // HTML files get their own split-view editor below; exclude from simple textarea edit.
         var isEditable = (type === 'text' || type === 'code' || type === 'markdown') && _ext0 !== 'html' && _ext0 !== 'htm';
 
+        // --- Set as App: create / update app.json with this file as the vault entry point ---
+        // Places this file in App Mode on next vault open (and updates the App Mode URL for sharing).
+        var setAppBtn = _makeBtn('Set as App');
+        setAppBtn.title = 'Make this file the vault App Mode entry (creates/updates app.json)';
+        setAppBtn.addEventListener('click', function() {
+            if (!self.dataSource) return;
+            var fileList = self.dataSource.getFileList();
+            var hasAppJson = fileList.some(function(f) {
+                return f.path === 'app.json' || f.path === '/app.json';
+            });
+            var msg = hasAppJson
+                ? 'app.json already exists. Overwrite it so "' + fileName + '" becomes the App Mode entry?'
+                : 'Create app.json so "' + fileName + '" opens in App Mode automatically?';
+            if (!confirm(msg)) return;
+
+            var appJson = JSON.stringify({ entry: fileName, auto_open: true, present: true }, null, 2);
+            var bytes   = new TextEncoder().encode(appJson);
+            self.dataSource.saveFile('/', 'app.json', bytes.buffer)
+                .then(function() {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.success(
+                            '"' + fileName + '" is now the App Mode entry — ' +
+                            'share your vault link to open it directly in App Mode'
+                        );
+                    }
+                })
+                .catch(function(err) {
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.error('Could not save app.json: ' + err.message);
+                    }
+                });
+        });
+        bar.appendChild(setAppBtn);
+
         // --- Refresh button: re-fetch and re-render from vault (all file types) ---
         var refreshBtn = _makeBtn('↺ Refresh');
         refreshBtn.title = 'Re-fetch this file from the vault and re-render';
