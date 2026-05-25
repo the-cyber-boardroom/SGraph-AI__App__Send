@@ -10,6 +10,7 @@
 # ===============================================================================
 
 from fastapi                                                                       import Request, Response
+from osbot_utils.utils.Env                                                         import get_env
 from osbot_fast_api.api.routes.Fast_API__Routes                                    import Fast_API__Routes
 from osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id    import Safe_Str__Id
 from sgraph_ai_app_send.lambda__user.service.Public_Preview__Service               import Public_Preview__Service
@@ -31,8 +32,12 @@ class Routes__Public_Preview(Fast_API__Routes):
         return self.preview_service
 
     def og__public_id(self, public_id: Safe_Str__Id, request: Request) -> Response:   # GET /api/public-preview/og/{public_id}
-        app_url = f"{request.headers.get('x-forwarded-proto', 'https')}://{request.headers.get('host', 'dev.vault.sgraph.ai')}/en-gb/app/{public_id}"
-        html    = self.service().render_og_html(str(public_id), app_url=app_url)
+        # og:url must point at the canonical VAULT app page, not this API host — a
+        # crawler may reach this route via a cross-host 302 (CloudFront bot rule), so
+        # build it from PUBLIC_VAULT_APP_HOST (default dev.vault.sgraph.ai), not Host.
+        app_host = get_env('PUBLIC_VAULT_APP_HOST', '') or 'dev.vault.sgraph.ai'
+        app_url  = f"https://{app_host}/en-gb/app/{public_id}"
+        html     = self.service().render_og_html(str(public_id), app_url=app_url)
         return Response(content = html, media_type = 'text/html')
 
     def info__public_id(self, public_id: Safe_Str__Id) -> dict:                  # GET /api/public-preview/info/{public_id} (tester page data)

@@ -3,55 +3,59 @@
 //
 // This is the UPDATED body for the EXISTING function already associated with the
 // distribution's viewer-request (named "url-rewrite-index-html"). A cache behavior
-// can only have ONE viewer-request function, so do NOT add a second one — replace
-// the existing function's code with this and re-publish + re-associate.
+// can only have ONE viewer-request function, so replace the existing function's
+// code with this and re-publish.
 //
-// What's new: the two leading lines handle the SPA path routes
-//   /en-gb/app/<public-id>      (public vault previews)
-//   /en-gb/preview/<public-id>  (the card-tester page)
-// These have NO object in S3 (only index.html lives in those dirs). We rewrite the
-// origin URI to the dir's index.html so the SPA shell loads; the browser URL is
-// unchanged, so the app reads location.pathname to extract the <public-id>.
+// Two SPA concerns, in order:
+//   1. CRAWLERS (WhatsApp/LinkedIn/Slack/…) requesting /en-gb/app|preview/<id>
+//      are 302'd to the User Lambda's server-rendered Open Graph card, so the
+//      link unfurls with the real title/description/thumbnail. Bots follow 302s;
+//      humans never match this branch.
+//   2. HUMANS requesting /en-gb/app|preview/<id> get the static SPA shell
+//      (the dir's index.html); the browser URL is unchanged, so the app reads
+//      location.pathname to extract the <public-id>.
 //
-// IMPORTANT: the SPA check must run BEFORE the trailing-slash / extensionless logic.
-// Otherwise /en-gb/app/<id> would 302 → /en-gb/app/<id>/ → /en-gb/app/<id>/index.html
-// (which does not exist) → 404.
+// Then the original behaviour (trailing-slash → index.html; extensionless → 302
+// add-trailing-slash) is preserved for everything else.
 //
-// (Unchanged below the SPA block: the original trailing-slash → index.html behaviour
-//  and the extensionless → add-trailing-slash 302 that keeps relative paths resolving.)
-//
-// Crawler social cards (separate, optional): to give non-JS bots real Open Graph
-// tags, route bot User-Agents for /en-gb/app/* to the User Lambda OG route
-// (GET /api/public-preview/og/<public-id>) via a dedicated cache behavior or
-// Lambda@Edge origin-request. Humans keep hitting the static shell above.
+// SET FOR YOUR STAGE: OG_ORIGIN is the SG/Send API host that serves the OG route
+// (Routes__Public_Preview). dev = https://dev.send.sgraph.ai ; prod = https://send.sgraph.ai
+// The OG route sets og:url back to the canonical vault app URL (env
+// PUBLIC_VAULT_APP_HOST on the Lambda), so the card still links to the app page.
 // ============================================================================
+var OG_ORIGIN = 'https://dev.send.sgraph.ai';
+
 function handler(event) {
     var request = event.request;
     var uri = request.uri;
 
-    // --- SPA path routes (must come first) ---
-    // /en-gb/app/<seg> or /en-gb/preview/<seg> → serve that dir's index.html.
-    var spa = uri.match(/^\/en-gb\/(app|preview)\/[^\/]+\/?$/);
+    // /en-gb/app/<seg> or /en-gb/preview/<seg> — capture the section + the <public-id>
+    var spa = uri.match(/^\/en-gb\/(app|preview)\/([^\/]+)\/?$/);
     if (spa) {
+        var ua = (request.headers['user-agent'] && request.headers['user-agent'].value || '').toLowerCase();
+        var isBot = /whatsapp|facebookexternalhit|twitterbot|linkedinbot|slackbot|telegrambot|discordbot|googlebot|bingbot|embedly|redditbot|pinterest|skypeuripreview|vkshare|w3c_validator/.test(ua);
+        if (isBot) {
+            // Crawlers → server-rendered Open Graph card (the Lambda fetches + decrypts
+            // the deliberately-public preview only; never touches vault contents).
+            return {
+                statusCode: 302, statusDescription: 'Found',
+                headers: { location: { value: OG_ORIGIN + '/api/public-preview/og/' + spa[2] } }
+            };
+        }
+        // Humans → the static SPA shell.
         request.uri = '/en-gb/' + spa[1] + '/index.html';
         return request;
     }
 
     // --- existing behaviour (unchanged) ---
-    // If URI ends with '/', append index.html
     if (uri.endsWith('/')) {
         request.uri += 'index.html';
-    }
-    // If URI has no file extension, redirect to add trailing slash.
-    // This ensures the browser URL updates so relative paths resolve correctly.
-    // Without this, /product loads index.html but ../fonts/ resolves one level too high.
-    else if (!uri.includes('.')) {
+    } else if (!uri.includes('.')) {
         return {
             statusCode: 302,
             statusDescription: 'Found',
             headers: { location: { value: uri + '/' } }
         };
     }
-
     return request;
 }
