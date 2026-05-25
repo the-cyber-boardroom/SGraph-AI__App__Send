@@ -50,7 +50,7 @@ jobs:
   e2e:
     name: E2E tests (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 2          # healthy run is ~1 min; fail fast if the Playwright install hangs
     needs: [unit, integration]
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +64,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
+        timeout-minutes: 1      # the step that occasionally hangs — bound it explicitly
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
