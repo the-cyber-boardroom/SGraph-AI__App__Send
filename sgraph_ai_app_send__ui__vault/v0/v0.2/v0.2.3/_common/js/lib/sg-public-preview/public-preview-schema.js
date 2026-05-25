@@ -16,7 +16,7 @@ const PublicPreviewSchema = {
     SCHEMA_ID:        'sgraph-public-preview/v1',
     VERSION:          1,
     BANNED_KEYS:      ['write_key', 'read_key', 'passphrase', 'delete_auth', 'vault_key'],
-    INLINE_THUMB_MAX: 64 * 1024,              // ~64 KB encoded data-URL ceiling
+    INLINE_THUMB_MAX: 300 * 1024,             // ~300 KB encoded data-URL ceiling (big enough for the large social card)
     ID_RE:            /^[a-z0-9]([a-z0-9-]{2,61})[a-z0-9]$/,   // 4–63 chars, no leading/trailing/double hyphen handled below
     SIMPLE_TOKEN_RE:  /^[a-z]+-[a-z]+-\d{4}$/,                  // reserved — Simple Token shape
 
