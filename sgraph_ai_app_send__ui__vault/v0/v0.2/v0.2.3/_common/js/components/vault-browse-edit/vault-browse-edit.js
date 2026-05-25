@@ -58,25 +58,19 @@
         // App Mode: available for all file types on all vaults (writable or not).
         // Opens the file via /en-gb/app#path in a NEW TAB.
         // Hash = file path (NOT vault key — key comes from localStorage set by /#vault-key).
-        // app-shell reads key from LS, checks app.json:
-        //   - If app.json found → the vault's app handles navigation to the file
-        //   - If no app.json  → saves app:path deep-link → redirects to /en-gb/vault/
-        //     → vault opens the file (in App Mode for HTML, as file tab for others)
+        // Rendered as a real <a> link so the browser exposes Copy Link, middle-click,
+        // and Ctrl+click natively. The URL is safe to navigate in the current window too
+        // (app-shell re-opens the vault from localStorage then redirects to /en-gb/vault/).
         var bar = container.querySelector('.sb-file__actions');
         if (bar) {
             // Separator between send-browse's buttons (Save/Locate/Source/Print) and ours
             bar.appendChild(_makeSep());
 
-            var openAsAppBtn = _makeBtn('↗ Open as App');
-            openAsAppBtn.title = 'Open this file in App Mode in a new tab';
-            openAsAppBtn.style.cssText = 'font-weight:600;';
-            openAsAppBtn.addEventListener('click', function() {
-                var path = (fileName || '').replace(/^\//, '');
-                // /en-gb/app#path — hash is file path; vault key from localStorage
-                var url = window.location.origin + '/en-gb/app#' + encodeURIComponent(path);
-                window.open(url, '_blank');
-            });
-            bar.appendChild(openAsAppBtn);
+            var path = (fileName || '').replace(/^\//, '');
+            var openAsAppLink = _makeAppLink('↗ Open as App',
+                window.location.origin + '/en-gb/app#' + encodeURIComponent(path));
+            openAsAppLink.title = 'Open this file in App Mode — right-click to Copy Link';
+            bar.appendChild(openAsAppLink);
         }
 
         // Only add edit/write controls if dataSource is writable
@@ -772,15 +766,10 @@
                     var bar = el.querySelector('.plr-source-bar');
                     if (bar && !bar.dataset.sgAppModeBtn) {
                         bar.dataset.sgAppModeBtn = '1';
-                        var btn = _makeBtn('↗ Open as App');
-                        btn.title = 'Open this page in App Mode in a new tab';
-                        btn.style.fontWeight = '600';
-                        btn.addEventListener('click', function() {
-                            // /en-gb/app#path — hash is file path; vault key from localStorage
-                            var pagePath = (folderPath || '').replace(/^\//, '');
-                            var url = window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath);
-                            window.open(url, '_blank');
-                        });
+                        var pagePath = (folderPath || '').replace(/^\//, '');
+                        var btn = _makeAppLink('↗ Open as App',
+                            window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath));
+                        btn.title = 'Open this page in App Mode — right-click to Copy Link';
                         bar.appendChild(btn);
                     }
                 });
@@ -1341,6 +1330,20 @@
         btn.className = 'sb-action-btn';
         btn.textContent = label;
         return btn;
+    }
+
+    // A real <a> link styled as sb-action-btn.
+    // Opens in a new tab (target=_blank); also supports Ctrl+click, middle-click,
+    // and right-click → Copy Link natively — unlike a <button> with window.open().
+    function _makeAppLink(label, href) {
+        var a = document.createElement('a');
+        a.className = 'sb-action-btn';
+        a.textContent = label;
+        a.href = href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.style.cssText = 'font-weight:600;text-decoration:none;';
+        return a;
     }
 
     // Icon-only button: compact, faded until hover, tooltip via title attribute.
