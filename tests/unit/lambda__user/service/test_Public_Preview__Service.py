@@ -86,6 +86,25 @@ class test_Public_Preview__Service(TestCase):
         assert raw == png
         assert self.service.thumbnail_bytes('no-such-id') is None             # no preview → None (route returns 404)
 
+    def test__og_image_dimensions_parsed_from_bytes(self):
+        import struct
+        # minimal PNG header carrying 1200x630 (no stored width/height in the preview JSON)
+        png = b'\x89PNG\r\n\x1a\n' + b'\x00\x00\x00\x0dIHDR' + struct.pack('>II', 1200, 630) + b'\x08\x02\x00\x00\x00' + b'\x00' * 16
+        assert self.service._image_dimensions(png) == (1200, 630)
+        data_url = 'data:image/png;base64,' + base64.b64encode(png).decode()
+        preview = {'schema': 'sgraph-public-preview/v1', 'title': 'T',
+                   'thumbnail': {'mode': 'inline', 'media_type': 'image/png', 'data': data_url}}   # no width/height stored
+        self._publish(NODE_PUBLIC_ID, preview)
+        html = self.service.render_og_html(NODE_PUBLIC_ID, image_url='https://dev.send.sgraph.ai/api/public-preview/og-image/' + NODE_PUBLIC_ID)
+        assert 'og:image:width' in html and '1200' in html
+        assert 'og:image:height' in html and '630' in html
+
+    def test__description_fallback_meta(self):
+        self._publish(NODE_PUBLIC_ID, {'schema': 'sgraph-public-preview/v1', 'title': 'T', 'description': 'hello world'})
+        html = self.service.render_og_html(NODE_PUBLIC_ID)
+        assert '<meta name="description"' in html and 'hello world' in html
+        assert 'og:site_name' in html
+
     # --- fail closed ------------------------------------------------------------
     def test__unknown_preview_fails_closed(self):
         html = self.service.render_og_html('no-such-preview-here')
