@@ -1,6 +1,6 @@
 # vault/proposed — Index
 
-**Domain:** `vault/` | **Last updated:** 2026-04-28
+**Domain:** `vault/` | **Last updated:** 2026-05-21
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16–17, 19, 29
 
 ---
@@ -87,3 +87,76 @@ Collaborative vault features: presence indicators, merge request workflow, comme
 from structure-key-split. Currently requires write_key; proposed to accept read_key or structure_key.
 
 *Source: monolith Section 23 lines 2172–2190.*
+
+---
+
+## Publishing Layer (05/11–05/12 briefs — docs 366, 375, 376)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Published readonly vault URLs (`*.sgraph.app/en-gb/#<share-token>`) | Public-facing vault with no read key required in URL | doc 366 |
+| Auto-publish on commit (opt-in, free tier) | Vault publish triggered automatically on sgit push | doc 366 |
+| SEO layer for published vaults (metadata only) | Server-side sitemap, robots.txt, meta tags — content stays encrypted | doc 366 |
+| Analytics for published vaults | View counts, referrer data per published vault | doc 366 |
+| Custom domain support for published vaults (paid tier) | Bring-your-own-domain with DNS delegation | doc 366 |
+
+## GitHub-as-Vault-Projection (05/11 brief — doc 359)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Two-layer VCS pattern | Git (developer surface) + SGit (consumer distribution) — separate concerns | doc 359 |
+| GitHub Action for bidirectional vault sync (Phase 3) | Auto-sync: vault changes propagate back to Git | doc 359 |
+| CLAUDE.md injection for customer AI dev context | Inject project-aware CLAUDE.md into customer Git repo from vault template | doc 359 |
+
+## Manager Vaults and Credential Manager (05/14 briefs — docs 386, 387)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Manager vault pattern | Vaults whose purpose is to manage other vaults; same architecture as content vaults, different operational scope | doc 386 |
+| Credential manager vault | First manager vault instantiation; distributes scoped API credentials via Simple Tokens | doc 387 |
+| Simple Token format `tok_<random>` | API credential proxy token; distinct from vault key-derivation word-word-NNNN tokens | doc 387 |
+| Token lifecycle operations | issue, revoke, rotate, adjust scope, quota enforcement — all tracked in vault audit trail | doc 387 |
+| Token resolution service: proxy mode | API calls routed through credential manager; actual keys never exposed to callers | doc 387 |
+| Token resolution service: direct mode | Token resolved to actual key at request time; simpler but exposes keys to callers | doc 387 |
+| Cross-vault API surface for manager vault operations | Manager vault exposes API for other vaults to request credentials and report usage | doc 386 |
+
+## Customer Workflow Primitives (05/11 briefs — docs 364, 360)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Template vault clone API (`POST /vault/clone`) | Server-side clone of template vault to new customer instance | doc 364 |
+| One-time share token (no PKI Phase 1) | Disposable read access token; expires after single use | doc 364 |
+| Bring-your-own-key commercial pattern | Customer controls encryption key; no data custody by SGraph | doc 360 |
+
+---
+
+## Vault Demo Capabilities (05/16 briefs — docs 417)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-128 | Read-only vault opening — polished | Visual read-only badge/banner, mobile responsive, polished load, "make this your own" CTA | doc 417 |
+| P-129 | Session-scoped client-side changes | In-memory state shim over JS API; overrides reads; writes land in-session; discarded on refresh/tab-close | doc 417 |
+| P-130 | Cross-vault navigation defaults | New tab for cross-vault links; same tab for in-vault anchors; share tokens carried in cross-vault links | doc 417 |
+| P-131 | "Make this your own" CTA on read-only views | Conversion path from read-only visitor to account holder | doc 417 |
+| P-132 | Session change reset capability | Clear session-scoped changes without reloading the page | doc 417 |
+
+## Vault Testing Framework (05/16 briefs — doc 418)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-133 | Four-layer vault testing model | Unit / integration / QA / browser-automation, all via the vault JS API surface | doc 418 |
+| P-134 | Vitest-based test runner for unit/integration layers | Vitest wrapping with vault-aware context helpers | doc 418 |
+| P-135 | Playwright-based test runner for browser-automation layer | Playwright driving real browsers against deployed vault URLs | doc 418 |
+| P-136 | Unified test definition format with `layer` option | Single test file format routes tests to correct execution environment | doc 418 |
+| P-137 | Per-vault test fixture support | Committed test data in vault; reproducible across runs; lives in vault for portability | doc 418 |
+
+## Vault Discovery and Public Keys (05/16 briefs — doc 422)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-153 | Discovery endpoint at `/.well-known/vaults` | Returns structured JSON listing of public vaults with metadata | doc 422 |
+| P-154 | Vault visibility model | Four levels: public / unlisted / private / count-only | doc 422 |
+| P-155 | Ed25519 signing + X25519 encryption key pair per vault | New PKI layer — public key safe to expose; private key never leaves owner | doc 422 |
+| P-156 | Public key in vault metadata for discovery and cryptographic addressing | Serialized in discovery endpoint output and vault metadata | doc 422 |
+| P-157 | "Send content to a vault" via public-key encryption | One-way anonymous submission: encrypt to vault's X25519 public key; only owner can decrypt | doc 422 |
+| P-158 | Self-contained demo server with vault catalogue UI | Portable Docker image or VM with bundled vaults; works offline/air-gapped | doc 422 |

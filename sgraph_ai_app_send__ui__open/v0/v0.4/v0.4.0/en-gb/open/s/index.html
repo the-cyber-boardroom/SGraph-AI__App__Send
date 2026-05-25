@@ -10,16 +10,16 @@
     <meta http-equiv="Cache-Control" content="no-store">
 
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="../../../_common/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
 
     <!-- Fonts -->
-    <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+    <link rel="stylesheet" href="../../_common/fonts/fonts.css">
 
     <!-- Design tokens -->
-    <link rel="stylesheet" href="../../../_common/css/design-tokens.css">
+    <link rel="stylesheet" href="../../_common/css/design-tokens.css">
 
     <!-- Secret view styles -->
-    <link rel="stylesheet" href="../../../_common/js/components/send-secret-view/send-secret-view.css">
+    <link rel="stylesheet" href="../../_common/js/components/send-secret-view/send-secret-view.css">
 </head>
 <body>
 
@@ -40,14 +40,14 @@
 
          The #fragment is NEVER sent in HTTP requests — zero-knowledge guarantee.
 
-         Path note: ../../../_common/ (three levels up to tree root).
+         Path note: ../../_common/ (three levels up to tree root).
 
          Phase B: api-client-v032.js extension is inlined into api-client.js.
          downloadBase64() and deleteTransfer() are now native methods on ApiClient.
          ═══════════════════════════════════════════════════════════════════════ -->
 
     <!-- Build info -->
-    <script src="../../../_common/js/build-info.js"></script>
+    <script src="../../_common/js/build-info.js"></script>
     <script>
         if (!window.SGRAPH_BUILD) {
             window.SGRAPH_BUILD = { appVersion: 'dev', uiVersion: 'v0.4.0' };
@@ -55,19 +55,19 @@
     </script>
 
     <!-- Crypto + API utilities -->
-    <script src="../../../_common/js/crypto.js"></script>
-    <script src="../../../_common/js/api-client.js"></script>
+    <script src="../../_common/js/crypto.js"></script>
+    <script src="../../_common/js/api-client.js"></script>
 
     <!-- Base system -->
-    <script src="../../../_common/js/base/send-helpers.js"></script>
-    <script src="../../../_common/js/base/send-component-paths.js"></script>
+    <script src="../../_common/js/base/send-helpers.js"></script>
+    <script src="../../_common/js/base/send-component-paths.js"></script>
     <script>
-        SendComponentPaths.init('../../../_common');
+        SendComponentPaths.init('../../_common');
     </script>
-    <script src="../../../_common/js/base/send-component.js"></script>
+    <script src="../../_common/js/base/send-component.js"></script>
 
     <!-- Secret receive component -->
-    <script src="../../../_common/js/components/send-secret-view/send-secret-view.js"></script>
+    <script src="../../_common/js/components/send-secret-view/send-secret-view.js"></script>
 
     <script>
         document.body.setAttribute('data-ready', 'true');

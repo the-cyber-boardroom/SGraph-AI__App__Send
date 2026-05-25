@@ -5,9 +5,10 @@
 
    Routing table (final design):
      /                   no hash  → redirect to /en-gb/
-     /#token             has hash → save token to LS → redirect to /en-gb/vault
+     /#token             has hash → save token to LS → redirect to /en-gb/app#token
      /#token|path        has hash with pipe → also save deep-link to sessionStorage
      /#token|app:path    app: prefix → open file in App Mode
+     /en-gb/app          has hash → app-shell opens vault; redirects to /en-gb/vault/ if no app.json
      /en-gb/             any hash → strip (discard) → render landing
      /en-gb/vault        any hash → strip (discard) → auto-load from LS
      /en-gb/vault/app    hash = file path → open that file in App Mode (bookmark URL)
@@ -16,7 +17,7 @@
    Rules:
      1. Root (/) is the only hash inbox for vault tokens.
      2. Root routing target is driven by hash PRESENCE only (not content):
-        with hash → /en-gb/vault (share-link recipient lands directly on vault)
+        with hash → /en-gb/app#token (app-shell is the canonical entry point)
         without   → /en-gb/ (user is exploring; let them pick from the list)
      3. Deep-link path (part after |) is saved to sessionStorage key
         'sg-vault-deep-link' so the vault shell can restore it after mount.
@@ -61,7 +62,7 @@
 
     // Called from root (/) head script — the only hash inbox.
     // Supports:
-    //   /#vault-key              → open vault
+    //   /#vault-key              → open vault (via app-shell)
     //   /#vault-key|path         → open vault + deep-link to file
     //   /#vault-key|app:path     → open vault + file in App Mode
     function runRoot() {
@@ -73,7 +74,10 @@
             var deep    = pipeIdx === -1 ? '' : raw.slice(pipeIdx + 1).trim();
             if (token) VaultLoaderStorage.setCurrentKey(token);
             _saveDeepLink(deep);
-            location.replace('/en-gb/vault');
+            // Go directly to app page with the key in the hash.
+            // app-shell will open the vault, check for app.json, and redirect
+            // back to /en-gb/vault/ if no app.json is found.
+            location.replace('/en-gb/app' + (token ? '#' + token : ''));
         } else {
             location.replace('/en-gb/');
         }

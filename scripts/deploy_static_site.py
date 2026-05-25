@@ -284,6 +284,44 @@ def clean_latest(bucket, site, deploy_env=None):
     )
 
 
+def clean_prefixes(bucket, site, prefixes, deploy_env=None):
+    """Delete only specific sub-paths under latest/ (scoped clean).
+
+    Unlike clean_latest(), which wipes the ENTIRE latest/ prefix, this removes
+    only the named sub-prefixes. Use it when several independent pipelines share
+    one site's latest/ and each owns a DISJOINT slice of the URL namespace.
+
+    Concretely: the sgraph-send site is published by three pipelines — the
+    legacy user tree (root + /en-gb/ landing + legacy receiver pages), the
+    share tree (/en-gb/share/), and the open tree (/en-gb/open/). A full
+    clean_latest() from any one of them deletes the other two pipelines' files,
+    which is what caused the site-wide 404. Scoping the clean to each pipeline's
+    own prefixes lets the trees coexist in latest/.
+
+    A prefix that looks like a file (has an extension) is removed as a single
+    key; otherwise it is removed recursively. Missing prefixes are not an error.
+    """
+    env_segment   = f"{deploy_env}/" if deploy_env else ""
+    latest_prefix = f"s3://{bucket}/websites/{site}/{env_segment}latest"
+
+    print(f"\n{'='*60}")
+    print(f"SCOPED CLEAN: removing {len(prefixes)} prefix(es) under {latest_prefix}/")
+    print(f"{'='*60}")
+
+    for prefix in prefixes:
+        rel = prefix.strip().lstrip("/")
+        if not rel:
+            continue
+        if Path(rel).suffix:                                     # looks like a file → remove single key
+            target = f"{latest_prefix}/{rel}"
+            run_cmd(["aws", "s3", "rm", target],
+                    description=f"Removing object {target}", check=False)
+        else:                                                    # directory prefix → recursive remove
+            target = f"{latest_prefix}/{rel.rstrip('/')}/"
+            run_cmd(["aws", "s3", "rm", "--recursive", target],
+                    description=f"Removing prefix {target}", check=False)
+
+
 def list_releases(bucket, site, deploy_env=None):
     """List all release versions deployed to S3, sorted by version number.
 
@@ -395,11 +433,12 @@ def sync_all_types_to_s3(source_dir, s3_prefix, delete=False):
                     FONT_EXTENSIONS, CACHE_CONTROL["image"])
 
 
-def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None, do_clean_latest=False):
+def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None, do_clean_latest=False,
+                 clean_prefixes_list=None):
     """Deploy the static site to S3 using the versioned deployment model.
 
     Step 1: Sync to websites/{site}/{env}/releases/{ifd_path}/  (IFD versioning)
-    Step 2: Optionally clean latest/ (--clean-latest)
+    Step 2: Optionally clean latest/ — scoped (--clean-prefixes) or full (--clean-latest)
     Step 3: Copy the release to websites/{site}/{env}/latest/
 
     When deploy_env is provided (e.g. 'dev', 'main', 'prod'), files are isolated
@@ -420,7 +459,12 @@ def deploy_to_s3(source_dir, bucket, site, version, deploy_env=None, do_clean_la
     sync_all_types_to_s3(source_dir, release_prefix, delete=True)
 
     # ----- Optionally clean latest/ before overlay -----
-    if do_clean_latest:
+    # Scoped clean (--clean-prefixes) takes precedence over the full clean.
+    # Shared-site pipelines (sgraph-send: user/share/open) MUST use scoped clean
+    # so they only remove their own URL slice and never the sibling trees'.
+    if clean_prefixes_list:
+        clean_prefixes(bucket, site, clean_prefixes_list, deploy_env)
+    elif do_clean_latest:
         clean_latest(bucket, site, deploy_env)
 
     # ----- Overlay release onto latest/ -----
@@ -567,6 +611,17 @@ def parse_args():
              "latest/ — use --rebuild-latest instead to replay all versions.",
     )
     parser.add_argument(
+        "--clean-prefixes",
+        nargs="+",
+        default=None,
+        help="Scoped clean: delete only these sub-paths under latest/ before overlaying "
+             "(instead of wiping the whole latest/ like --clean-latest). Each entry is "
+             "relative to latest/ — directory prefixes are removed recursively, paths with "
+             "a file extension are removed as a single key. Use this when several pipelines "
+             "share one site's latest/ (e.g. sgraph-send user/share/open trees). "
+             "Takes precedence over --clean-latest.",
+    )
+    parser.add_argument(
         "--rebuild-latest",
         action="store_true",
         help="Rebuild latest/ from scratch by replaying all releases in version order. "
@@ -626,7 +681,10 @@ def main():
         if args.rebuild_latest:
             print(f"\n[dry-run] Would rebuild latest/ from all releases in s3://{bucket}/websites/{args.site}/{env_segment}releases/")
         else:
-            if args.clean_latest:
+            if args.clean_prefixes:
+                for prefix in args.clean_prefixes:
+                    print(f"\n[dry-run] Would delete s3://{bucket}/websites/{args.site}/{env_segment}latest/{prefix.lstrip('/')}")
+            elif args.clean_latest:
                 print(f"\n[dry-run] Would delete all files in s3://{bucket}/websites/{args.site}/{env_segment}latest/")
             print(f"[dry-run] Would deploy {source_dir} to s3://{bucket}/websites/{args.site}/{env_segment}releases/{ifd_path}/")
             print(f"[dry-run] Would copy release to s3://{bucket}/websites/{args.site}/{env_segment}latest/")
@@ -642,7 +700,8 @@ def main():
         rebuild_latest_from_releases(bucket, args.site, deploy_env=args.deploy_env)
     else:
         deploy_to_s3(source_dir, bucket, args.site, args.version,
-                     deploy_env=args.deploy_env, do_clean_latest=args.clean_latest)
+                     deploy_env=args.deploy_env, do_clean_latest=args.clean_latest,
+                     clean_prefixes_list=args.clean_prefixes)
 
     # --- Version file ---
     if args.version_file:

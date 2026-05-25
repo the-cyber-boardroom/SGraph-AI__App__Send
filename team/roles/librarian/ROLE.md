@@ -187,7 +187,7 @@ After every incident, ask: "How come this runbook was out of date?" or "How come
 
 | Document | Location |
 |----------|----------|
-| Project brief | `library/docs/_to_process/01-project-brief.md` |
+| Project brief | `library/docs/_to_process/project - Secure Send Service brief.md` |
 | Specs index | `library/docs/specs/README.md` |
 | Phase roadmap | `library/roadmap/phases/v0.1.1__phase-overview.md` |
 | Current brief | `team/humans/dinis_cruz/briefs/` (latest date folder) |

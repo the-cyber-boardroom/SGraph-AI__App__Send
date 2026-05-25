@@ -1,6 +1,6 @@
 # Identity — Proposed Items Index
 
-**Domain:** identity/proposed/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** identity/proposed/ | **Last updated:** 2026-05-22 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -67,4 +67,48 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 
 ---
 
+## Pre-Authorisation and Micropayments (05/14 brief — doc 396)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Pre-authorisation + micropayments model | Stripe hold (£5 default) + internal micropayment ledger; replaces bring-your-own-key and subscription models | doc 396 |
+| Internal micropayment ledger | Per-action cost tracking; vault-backed for auditability | doc 396 |
+| Settlement scheduling | Periodic (weekly), threshold-driven, or pre-expiry settlement of accumulated micropayments to Stripe charge | doc 396 |
+| Hold renewal automation | Continuous coverage signal; renews hold before expiry to avoid charge gaps | doc 396 |
+
+## Dynamic Credential Delivery Service (05/17 brief — doc 397)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Dynamic credential delivery service | STS AssumeRole pattern; just-in-time narrowly-scoped AWS credentials per CLI operation | doc 397 |
+| Scope catalogue versioned in vault | Per-operation IAM scope definitions versioned in vault for audit and rollback | doc 397 |
+| Per-action credential caching with auto-refresh | Cache per (caller, scope) tuple; auto-refresh before STS credential expiry | doc 397 |
+
+---
+
+## USDC and Agentic Commerce (05/15 brief — doc 415)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| AgentCore Payments prototype (agent-buys-from-third-party via x402) | Integration with one external x402-capable service; validates scenario 3 (cross-org transactions) end-to-end | doc 415 |
+| x402 micropayment receiver on one SG service | HTTP 402 + payment validation + access grant for one SG service (e.g. per-vault-open at $0.001) | doc 415 |
+| USDC backend treasury for inter-org settlements | Circle Mint or Coinbase Business account; sub-cent settlements to third parties; customer stays fiat-fronted | doc 415 |
+
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 6, 16, 20, 31)*
+
+---
+
+## SG Mail Email Client (05/16 brief — doc 425)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-165 | SG Mail email client: vault client on email-fs; standard inbox/threads/compose/search UX; vault-grounded properties (versioned history, cross-vault references, per-message audit trail, encrypted at rest) | doc 425 |
+| P-166 | AWS SES connectors v1: SES inbound (SES → S3 event trigger → email-fs reader → vault) + SES outbound (vault compose → SES API → recipient); domain MX → SES; DKIM/SPF/DMARC via SES | doc 425 |
+| P-167 | Cloudflare Email Service connector v2 (agent-native; April 2026 launch; Email Routing → Worker → POST EML to endpoint) | doc 425 |
+| P-168 | Gmail API connector v2 (bidirectional sync; OAuth scoped to read + send; mirrors Gmail mailbox into vault) | doc 425 |
+| P-169 | WorkMail migration tool: export mbox/maildir from WorkMail → parse → commit to email-fs vault; reusable for future customers | doc 425 |
+| P-170 | Private email vault isolation: dedicated vault per user; separate encryption key, S3 bucket/account, access path, and backup cadence from public vaults | doc 425 |

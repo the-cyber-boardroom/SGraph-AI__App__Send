@@ -280,10 +280,10 @@
         align-items: center;
         gap: 0.25rem;
     }
-    .vp-vault-card__del {
+    .vp-vault-card__del,
+    .vp-vault-card__new-win {
         position: absolute;
         top: 0.6rem;
-        right: 0.7rem;
         background: none;
         border: none;
         color: var(--muted);
@@ -295,8 +295,12 @@
         border-radius: 4px;
         line-height: 1;
     }
-    .vp-vault-card:hover .vp-vault-card__del { opacity: 1; }
+    .vp-vault-card__del { right: 0.7rem; }
+    .vp-vault-card__new-win { right: 2rem; }
+    .vp-vault-card:hover .vp-vault-card__del,
+    .vp-vault-card:hover .vp-vault-card__new-win { opacity: 1; }
     .vp-vault-card__del:hover { color: #e06c75; background: rgba(224,108,117,0.1); }
+    .vp-vault-card__new-win:hover { color: #4ecdc4; background: rgba(78,205,196,0.08); }
     .vp-vault-card--current { border-color: rgba(78,205,196,0.4); background: var(--teal-dim); }
 
     /* ── Create CTA ────────────────────────────────────────────────────── */
@@ -772,17 +776,26 @@
                     '<span class="vp-vault-card__time">' + _timeAgo(v.lastOpened) + '</span>' +
                     '<span class="vp-vault-card__open">Open →</span>' +
                 '</div>' +
+                '<button class="vp-vault-card__new-win" data-new-win="' + _esc(v.key) + '" title="Open in new window">↗</button>' +
                 '<button class="vp-vault-card__del" data-del="' + _esc(v.key) + '" title="Remove from list">×</button>' +
             '</div>';
         }).join('');
 
         grid.querySelectorAll('.vp-vault-card').forEach(function (card) {
             card.addEventListener('click', function (e) {
-                if (e.target.dataset.del) return;
+                if (e.target.dataset.del || e.target.dataset.newWin) return;
                 var key  = card.getAttribute('data-key');
                 var name = card.querySelector('.vp-vault-card__name').textContent;
                 VaultLoaderRecent.add(key, name);
                 _navigateToBrowse(key);
+            });
+        });
+
+        grid.querySelectorAll('[data-new-win]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var key = btn.getAttribute('data-new-win');
+                window.open(window.location.origin + '/#' + encodeURIComponent(key), '_blank');
             });
         });
 

@@ -16,7 +16,8 @@
     <script src="_common/js/vault-loader/vault-loader.js"></script>
 
     <!-- Routing: root is the only hash inbox; all other paths strip and discard.
-         With #token → save to LS → /en-gb/vault (direct vault open for share-link recipients).
+         With #token → save to LS → /en-gb/app#token (app-shell opens vault; redirects to
+         /en-gb/vault/ if no app.json found).
          Without # → /en-gb/ (landing, user picks from list).
          Anywhere else → strip hash, render page. -->
     <script>
@@ -75,9 +76,9 @@
         <div id="sg-vl-step">Initialising…</div>
     </div>
 
-    <!-- sg-app-banner: hidden until app.json chrome.mode = "maximised" activates it -->
-    <sg-app-banner style="display:none"></sg-app-banner>
     <vault-shell></vault-shell>
+    <!-- sg-app-banner: hidden until app.json present:true activates it -->
+    <sg-app-banner style="display:none"></sg-app-banner>
 
     <!-- ===================================================================
          Script Loading Order — v0.2.1 root shell
@@ -186,7 +187,7 @@
     <!-- 7c. Browse edit overlay -->
     <script src="_common/js/components/vault-browse-edit/vault-browse-edit.js"></script>
 
-    <!-- 7d. App banner (maximised chrome mode) -->
+    <!-- 7d. App banner (present mode — activated by app.json present:true) -->
     <script src="_common/js/components/sg-app-banner/sg-app-banner.js"></script>
 
     <!-- 8. Debug panels -->
@@ -510,6 +511,13 @@
                 ? 'This vault does not exist on this server:'
                 : 'The token may be invalid or in the wrong format:';
 
+            var isInRecent = (function () {
+                try {
+                    if (typeof VaultLoaderRecent === 'undefined') return false;
+                    return VaultLoaderRecent.list().some(function (e) { return e.key === token; });
+                } catch (_) { return false; }
+            }());
+
             document.body.innerHTML =
                 '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
                 'flex-direction:column;gap:1.25rem;padding:2rem;background:#0d1117;' +
@@ -524,11 +532,52 @@
                 'border:1px solid rgba(78,205,196,0.15);border-radius:6px;padding:0.5rem 1.25rem">' +
                 _escHtml(token) + '</code>' +
                 '</div>' +
+                (isInRecent
+                    ? '<button id="sg-forget-btn" style="background:transparent;border:1px solid rgba(110,122,138,0.4);' +
+                      'color:#6e7a8a;border-radius:8px;padding:0.5rem 1.25rem;font-size:0.82rem;cursor:pointer;' +
+                      'font-family:system-ui,sans-serif">Remove from saved vaults</button>'
+                    : '') +
                 '<a href="/en-gb/" style="display:inline-block;background:#4ecdc4;color:#0a1a18;' +
                 'font-weight:700;text-decoration:none;border-radius:8px;padding:0.65rem 1.5rem;' +
                 'font-size:0.9rem;margin-top:0.25rem">← Back to vault home</a>' +
                 '</div>';
+
+            if (isInRecent) {
+                document.getElementById('sg-forget-btn').addEventListener('click', function () {
+                    try { VaultLoaderRecent.remove(token); } catch (_) {}
+                    window.location.assign('/en-gb/');
+                });
+            }
         }
+
+        // Patch VaultEntry._onOpen for Format 3/5 key auto-open failure handling.
+        // The pre-hide block hides .vs-entry when a LS key exists; if _onOpen fails
+        // during auto-open, the inline error would land in the hidden form (blank screen).
+        // This patch detects auto-open and shows the full-page error instead.
+        (function () {
+            var _origOnOpen = VaultEntry.prototype._onOpen;
+            VaultEntry.prototype._onOpen = async function () {
+                var vaultKey = this._keyInput.value.trim();
+                if (!vaultKey) { return _origOnOpen.call(this); }
+
+                var storedToken = (VaultLoader.storage.getCurrentKey() || '').toLowerCase();
+                var isAutoOpen  = !!storedToken && storedToken === vaultKey.toLowerCase();
+                if (!isAutoOpen) { return _origOnOpen.call(this); }
+
+                // Auto-open path: show full-page error on failure
+                this._hideError();
+                this._showStatus('Opening vault…');
+                this._openBtn.disabled = true;
+                try {
+                    await this._openVault(vaultKey);
+                } catch (err) {
+                    _showAutoOpenErrorPage(vaultKey, err);
+                } finally {
+                    this._openBtn.disabled = false;
+                    this._hideStatus();
+                }
+            };
+        }());
 
         // vault-locked: clear the session-scoped vault handle.
         // VaultLoader.lock() (called by _onLock) already removes sg-vault-key via
@@ -616,14 +665,21 @@
             };
 
             // ── 3. _applyAppJson ───────────────────────────────────────────────────────
-            // Schema: { "entry": "index.html", "auto_open": true, "present": true }
-            // "present": true  — auto-opens entry file in App Mode (sg-app-banner).
-            // "chrome": { "mode": "maximised" }  — legacy alias for the same behaviour.
+            // Checks for app.json (at .vault/app.json or legacy app.json at root).
+            // When found: auto-opens the entry file in the vault file browser (unchanged),
+            // and shows the "▶ Open [title]" button in vault-header that launches /en-gb/app.
+            // sg-app-banner / chrome.mode activation is removed — the app page is the new
+            // delivery mechanism. chrome.mode field is silently ignored (no-op).
             VaultShell.prototype._applyAppJson = async function (dataSource, browse) {
                 var fileList = dataSource.getFileList();
-                var entry = fileList.find(function (e) {
-                    return e.path === 'app.json' || e.path === '/app.json';
-                });
+                // Check .vault/app.json first (new location), fall back to app.json (legacy)
+                var candidates = ['.vault/app.json', 'app.json'];
+                var entry = null;
+                for (var i = 0; i < candidates.length; i++) {
+                    var p = candidates[i];
+                    entry = fileList.find(function (f) { return f.path === p || f.path === p.replace(/^\//, ''); });
+                    if (entry) break;
+                }
                 if (!entry) return;
 
                 var config;
@@ -635,54 +691,77 @@
                     return;
                 }
 
-                var entryFile  = config.entry    || 'index.html';
-                var autoOpen   = config.auto_open !== false;
-                var appMode    = config.present  === true ||
-                                 (config.chrome && config.chrome.mode === 'maximised');
+                var entryFile = config.entry    || 'index.html';
+                var autoOpen  = config.auto_open !== false;
+                var present   = config.present  === true ||
+                                (config.chrome && config.chrome.mode === 'maximised');
 
                 // Remember for _onAuthSubmit so entering an access key can re-activate.
-                this._appJsonMode = appMode;
+                this._appJsonMode = present;
 
-                if (!autoOpen) return;
+                console.log('[app.json] entry:', entryFile, '| present:', present, '| title:', config.title || '(none)');
 
-                // Only activate App Mode when the entry file actually exists in the vault.
-                // If it doesn't exist the tab open will fail and _waitForIframeAndLift would
-                // then lift the next .sb-file__content that appears (e.g. app.json itself).
-                var entryExists = fileList.some(function (e) {
-                    return !e.dir && (e.path === entryFile || e.path.endsWith('/' + entryFile));
-                });
-                console.log('[app.json] entry:', entryFile, '| appMode:', appMode, '| exists:', entryExists);
+                // Show "▶ Open [App]" button in the vault header
+                var header = this.querySelector('vault-header');
+                if (header && typeof header.setAppJson === 'function') {
+                    header.setAppJson(config, this._vaultKey);
+                }
 
-                requestAnimationFrame(function () {
-                    if (browse._openFileTab) {
+                // Resource injection for vault HTML preview.
+                // app.json may list CSS/JS in a "resources" block that are never
+                // referenced by <link>/<script> tags in the HTML — they're loaded
+                // by app-shell on /en-gb/app. Patch dataSource.getFileBytes so that
+                // send-browse's iframe preview also gets them injected, matching
+                // /en-gb/app rendering exactly (same technique as app-shell._mountApp).
+                if (config.resources && autoOpen) {
+                    var _cssPaths = config.resources.css || [];
+                    var _jsPaths  = config.resources.js  || [];
+                    if (_cssPaths.length || _jsPaths.length) {
+                        var _vaultText = async function (p) {
+                            var norm = p.startsWith('/') ? p.slice(1) : p;
+                            var fe   = fileList.find(function (f) { return f.path === norm; });
+                            if (!fe) return '';
+                            try {
+                                var b = await dataSource.getFileBytes(fe.path);
+                                return new TextDecoder().decode(b);
+                            } catch (_) { return ''; }
+                        };
+                        var _cssTexts = await Promise.all(_cssPaths.map(_vaultText));
+                        var _jsTexts  = await Promise.all(_jsPaths.map(_vaultText));
+                        var _resBlock = '';
+                        _cssTexts.forEach(function (css) {
+                            if (css) _resBlock += '<style data-sg-app>' + css.replace(/<\/style>/gi, '<\\/style>') + '</style>';
+                        });
+                        _jsTexts.forEach(function (js) {
+                            if (js) _resBlock += '<script data-sg-app>' + js.replace(/<\/script>/gi, '<\\/script>') + '<\/script>';
+                        });
+                        if (_resBlock) {
+                            var _origGFB = dataSource.getFileBytes.bind(dataSource);
+                            dataSource.getFileBytes = async function (path) {
+                                var bytes = await _origGFB(path);
+                                var norm  = path.startsWith('/') ? path.slice(1) : path;
+                                if (norm === entryFile || norm.endsWith('/' + entryFile)) {
+                                    var html     = new TextDecoder().decode(bytes);
+                                    var injected = html.replace(/(<head[^>]*>)/i, '$1' + _resBlock);
+                                    if (injected === html) injected = _resBlock + html;
+                                    return new TextEncoder().encode(injected).buffer;
+                                }
+                                return bytes;
+                            };
+                            console.log('[app.json] resources injected into vault preview: css=' + _cssPaths.length + ' js=' + _jsPaths.length);
+                        }
+                    }
+                }
+
+                // Auto-open entry file in the vault file browser
+                if (autoOpen && browse && browse._openFileTab) {
+                    requestAnimationFrame(function () {
                         browse._openFileTab(entryFile);
-                    }
-                    // Activate App Mode in the same frame as the tab open, and only when
-                    // the entry file exists — prevents app.json's own code view being lifted.
-                    if (appMode && entryExists && !window._sgAppModeUserExited) {
-                        var banner = document.querySelector('sg-app-banner');
-                        if (banner) banner.activate();
-                    }
-                });
-            };
-
-            // ── 4. _onAuthSubmit ───────────────────────────────────────────────────────
-            // After the access key is accepted, re-activate App Mode if app.json
-            // configured it and the user hasn't explicitly exited App Mode.
-            var _origOnAuthSubmit = VaultShell.prototype._onAuthSubmit;
-            VaultShell.prototype._onAuthSubmit = function(key) {
-                _origOnAuthSubmit.call(this, key);
-                var banner = document.querySelector('sg-app-banner');
-                if (this._appJsonMode && this._dataSource && this._browse &&
-                    banner && !banner.isActive() && !window._sgAppModeUserExited) {
-                    var self = this;
-                    requestAnimationFrame(function() {
-                        self._applyAppJson(self._dataSource, self._browse);
                     });
                 }
             };
 
-            // ── 5. _setupVaultLinkHandler ──────────────────────────────────────────────
+            // ── 4. _setupVaultLinkHandler ──────────────────────────────────────────────
             // Change 4b: intercept relative <a> clicks in the vault DOM (including markdown
             // present-mode / page-layout-renderer) and open the target in send-browse.
             // Only fires for paths that exist in the vault file list.

@@ -154,13 +154,18 @@ jobs:
 
             EXTRA_FLAGS=""
 
-            # First version (v0.3.0): clean latest/ to remove stale v0.2.x files.
+            # Scoped clean: the legacy user tree shares the sgraph-send latest/
+            # prefix with the v0.4.x share (/en-gb/share/) and open (/en-gb/open/)
+            # trees. A full --clean-latest here would delete those sibling trees —
+            # the cause of the site-wide 404. Clean only the URL slices this tree
+            # owns: the root redirect, the /en-gb/ landing, and the legacy receiver
+            # pages. Never touch en-gb/share, en-gb/open, or _common.
             # For push-triggered deploys, always clean on first version.
             # For manual dispatch, respect the clean_latest input.
             if [ "$VERSION" == "$FIRST" ]; then
               if [ "$CLEAN_REQUESTED" != "false" ]; then
-                EXTRA_FLAGS="--clean-latest"
-                echo "  → Cleaning latest/ (replacing previous version)"
+                EXTRA_FLAGS="--clean-prefixes index.html en-gb/index.html en-gb/welcome en-gb/browse en-gb/download en-gb/gallery en-gb/v en-gb/view en-gb/s"
+                echo "  → Cleaning the legacy user tree's own slices only (root + /en-gb/ pages)"
               fi
             fi
 

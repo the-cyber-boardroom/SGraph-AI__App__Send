@@ -1,167 +1,239 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-05-09 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-05-25 | **Maintained by:** Librarian (daily run)
 
-The browser UIs served by the User Lambda. Each uses IFD versioning (no framework,
-Shadow DOM Web Components, surgical overlays). The latest user UI is v0.3.2. The vault
-browser UI (`sgraph_ai_app_send__ui__vault`) is a distinct UI product at v0.2.2.
+As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
+(`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
+UI package remains in the repo for rollback. All browser UIs use IFD versioning (no
+framework, Shadow DOM Web Components, surgical overlays).
+
+> **DEPLOY INCIDENT (2026-05-25):** `dev.send.sgraph.ai` was serving 404 site-wide. The
+> three user-facing pipelines (`deploy-ui-{user,share,open}.yml`) all publish to the same
+> `--site sgraph-send` `latest/` prefix and each ran a full `--clean-latest` (whole-prefix
+> `rm`), so each deploy deleted the other two trees' files. **FIX (branch
+> `claude/tender-tesla-AxZJX`):** (1) scoped per-tree clean instead of whole-prefix `rm`;
+> (2) v0.4.0's `_common/`/`i18n/`/`test-files/` relocated under `en-gb/` so v0.4.0 serves
+> `latest/en-gb/_common/` and the v0.3.x user tree keeps `latest/_common/` — disjoint, so
+> v0.3.x and v0.4.0 now coexist with no collision (deploy order irrelevant). The "Public
+> URL" lines below describe the routing that is restored once the redeploy runbook runs.
+> Root cause + full fix:
+> `team/roles/architect/reviews/05/25/v0.27.61__architect-review__user-ui-v0.4.0-deploy-collision.md`.
 
 ---
 
 ## EXISTS (Code-Verified)
 
-### User UI (latest: v0.3.2 IFD overlay, base: v0.3.0)
+### User Share UI — v0.4.0 (sender)
 
-**v0.3.0** — IFD major version, full architectural rewrite. Code at
-`sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.0/`. Completed 22 March 2026.
+**Package:** `sgraph_ai_app_send__ui__share/v0/v0.4/v0.4.0/`
+**Public URL:** `send.sgraph.ai/en-gb/share/` | **CI workflow:** `deploy-ui-share.yml`
+**Phase A (scaffold):** 2026-05-12 | **Phase B (inlining complete):** 2026-05-14
+**Predecessor:** `sgraph_ai_app_send__ui__user/` (v0.3.x — retained for rollback, not yet deleted)
 
-**v0.3.1** — IFD overlay on v0.3.0. Code at `sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.1/`.
-3 overlay files: `en-gb/index.html`, `en-gb/browse/index.html`,
-`_common/js/components/send-download/send-browse-v031.js`.
+IFD major release. All v0.3.x overlays inlined into a clean, self-contained tree with no
+prototype-patch files. Only `en-gb/` locale ships (multi-locale deferred to a future release).
 
-**v0.3.1 fixes (04/27–04/28):**
-- Text selection visibility fix (commit `b82b4a4`): `::selection` changed from
-  `rgba(78,205,196,0.25) + color:inherit` to solid `#1a73e8` + white text
-- Dark mode `_page.json` background fix (commit `231fcc9`): `page-layout-renderer.js` was
-  unconditionally setting `container.style.background = '#ffffff'`; now removes inline
-  background in dark mode so CSS class wins
+**UX defaults (ephemeral-by-default):**
+- File mode: `max_views=20`, `expires=7d`, kill link visible on Done screen
+- Secret mode: `max_views=2`, `expires=24h`, kill link visible on Done screen
 
-**v0.3.2** — IFD overlay on v0.3.0 + v0.3.1. Code at `sgraph_ai_app_send__ui__user/v0/v0.3/v0.3.2/`.
-First committed 2026-05-07 (commits `e3d010c`, `0404827`). Contains 8 surgical overlay scripts +
-a new page (`en-gb/s/index.html`). Version stamp: `send-browse v0.3.2-vfs-4`.
+**5-step wizard (file + secret flows unified):**
+Upload → Options → Confirm → Encrypt & Upload → Done
 
-**v0.3.2 Feature 1 — Share a Secret** (commit `e3d010c`, 07 May):
-- New page: `en-gb/s/{transferId}#{keyHex}` — ephemeral encrypted text viewer
-- `send-secret-view.js/.css` — `<send-secret-view>` Web Component; handles view flow and kill-confirm flow
-- Secret is fetched via download-base64 endpoint, decrypted AES-256-GCM client-side, displayed inline
-- Kill flow: DELETE `/api/transfers/delete/{id}` on confirm
-- Ephemerality notice shown after view (D1 or D2 delivery modes)
+**Key inlining changes from v0.3.x:**
+- `_common/js/api-client.js`: `createTransfer(fileSize, contentType, secretConfig)` (optional 3rd arg); `downloadBase64` and `deleteTransfer` promoted to native methods
+- `upload-step-select.js`: Secret tab native (pill toggles, textarea, Views/Expires pills, "Review →")
+- `upload-step-options/`: relocated to its own directory
+- `send-upload.js`: single orchestrator, native 5-step state machine; `_isSecretMode`, `_secretConfig`, `_deleteAuth` native fields
+- `upload-engine.js`: `_pendingSecretConfig` contract; secret-mode URL builder
+- `upload-step-done/`: unified component renders both file + secret Done screens (kill link, ephemerality notice)
+- `upload-folder.js` + `upload-thumbnails.js`: `__gallery__{8-char hash}` naming inlined (no v0.3.1 folder overlay)
 
-**v0.3.2 Feature 2 — Options Step / 5-step wizard** (commit `0404827`, 07 May):
-- Delivery + Share steps consolidated into a single Options step (6-step → 5-step wizard)
-- `upload-step-options.js/.css` — `<upload-step-options>` Web Component
-- `send-upload-options.js` — patches `SendUpload` for 5-step flow
-- `upload-constants-patch.js` — patches `TOTAL_STEPS` constant (6 → 5)
+**Components (in `_common/js/components/`):**
+`send-upload`, `send-header`, `send-footer`, `send-locale`, `send-access-gate`,
+`send-transparency`, `send-test-files`, `send-step-indicator`, `send-welcome`, `sg-vault-picker`
 
-**v0.3.2 Secret Tab UX** (commit `3144b38`, 08 May):
-- Pill toggles for Secret/File mode in UploadStepSelect
-- Secret mode Send button disabled until text is entered
-- `upload-step-select-secret.js` — patches `UploadStepSelect`
-- `send-upload-secret.js` — patches `SendUpload` (secret fast-path)
-- `upload-engine-secret.js` — patches `UploadEngine` (secret params)
-- `upload-step-done-secret.js` — registers `<upload-step-done-secret>` element
+**Checksum drift guard:** `scripts/check_common_checksums.py` — 15 `_common/` files must
+stay byte-identical between the share and open trees.
 
-**v0.3.2 sg-vault-picker** (commit range, 07–08 May):
-- `sg-vault-picker.js/.css` — `<sg-vault-picker>` Web Component (vault selection; enter key, browse recent, create new)
-- Previously PROPOSED; now EXISTS at `v0.3.2/_common/js/components/sg-vault-picker/`
+**Architect plan:** `team/roles/architect/reviews/05/10/v0.27.29__plan__v0.4.0-major-release.md`
 
-**v0.3.2 VFS asset inlining in send-browse** (commit `85d3d16`, 09 May):
-- `send-browse--v0.3.2.js`: `_inlineHtmlAssets()` + `_replaceAsync()` helpers
-- Before creating a blob-URL iframe for HTML vault files, all relative `<script src>` and
-  `<link rel="stylesheet" href>` tags are asynchronously resolved to their vault file contents
-  and inlined. This is required because browser-native resource loading bypasses `window.fetch()`,
-  so the VFS bridge cannot intercept these tags at runtime.
-- VFS bridge (`window.fetch()` override) preserved for dynamic runtime fetch() calls
-- `_loadHtmlIntoIframe()` extracted (commit `c448bc9`) — used by both view and edit preview
-
-#### Pages
+#### Pages (Share tree)
 
 | Page | URL Path | What It Does |
 |------|----------|-------------|
-| Upload | `v0/v0.3/v0.3.0/index.html` | 6-step wizard (Select→Delivery→Share→Confirm→Encrypt & Upload→Done), drag-drop, multi-file paste, smart skip, AES-256-GCM, direct + multipart (up to 1GB) |
-| Download | `v0/v0.3/v0.3.0/en-gb/download/index.html` | Decrypt with key from URL hash or manual input; gallery view, browse view, PDF + present mode, markdown, SgPrint, save/download |
-| Browse | `v0/v0.3/v0.3.0/en-gb/browse/index.html` | Direct browse-mode URL alias |
-| Gallery | `v0/v0.3/v0.3.0/en-gb/gallery/index.html` | Direct gallery-mode URL alias |
+| Share wizard | `en-gb/share/index.html` | 5-step upload wizard (file + secret modes, ephemeral-by-default) |
+
+---
+
+### User Open UI — v0.4.0 (receiver)
+
+**Package:** `sgraph_ai_app_send__ui__open/v0/v0.4/v0.4.0/`
+**Public URL base:** `send.sgraph.ai/en-gb/open/` | **CI workflow:** `deploy-ui-open.yml`
+**Phase A (scaffold):** 2026-05-12 | **Phase B (inlining complete):** 2026-05-14
+
+Self-contained receiver tree with the same inlining discipline as the share tree. Own
+`_common/` copy (extraction to tools.sgraph.ai is the next architectural milestone).
+
+#### Pages (Open tree)
+
+| Page | URL Path | What It Does |
+|------|----------|-------------|
+| Open (default) | `en-gb/open/index.html` | Default receiver landing |
+| Secret view | `en-gb/open/s/index.html` | Ephemeral encrypted text viewer (fetch + AES-GCM decrypt + kill flow) |
+| View (short) | `en-gb/open/v/index.html` | Short-form URL alias |
+| Download | `en-gb/open/download/index.html` | File decryption + download |
+| Gallery | `en-gb/open/gallery/index.html` | Grid of type-aware thumbnails |
+| View (full) | `en-gb/open/view/index.html` | Full-name URL alias |
+| Browse | `en-gb/open/browse/index.html` | sg-layout file explorer (folder tree, multi-pane) |
+
+---
+
+### User UI Legacy — v0.3.x
+
+**Package:** `sgraph_ai_app_send__ui__user/` — IFD overlay chain on v0.3.0 base.
+**Status:** LEGACY. Replaced by v0.4.0 share/open trees. Retained for rollback; deletion
+scheduled in the follow-up commit after v0.4.0 stabilises.
+
+**v0.3.0** — IFD major base. `v0/v0.3/v0.3.0/`. Completed 22 March 2026. 6-step wizard,
+drag-drop, multi-file paste, AES-256-GCM, direct + multipart (up to 1GB), 17 locales.
+
+**v0.3.1** — IFD overlay on v0.3.0. 3 overlay files: `en-gb/index.html`, `en-gb/browse/index.html`,
+`_common/js/components/send-download/send-browse-v031.js`. Fixes: text selection visibility,
+dark mode background.
+
+**v0.3.2** — IFD overlay on v0.3.0 + v0.3.1. 8 surgical overlay scripts + new secret page.
+- Share a Secret: `<send-secret-view>` Web Component; ephemeral text viewer; kill flow
+- Options Step: `<upload-step-options>` consolidates Delivery + Share into one step (6→5 steps)
+- Secret Tab UX: pill toggles, textarea, Views/Expires pills; `<upload-step-done-secret>`
+- `<sg-vault-picker>`: vault selection Web Component (NOW EXISTS; was PROPOSED)
+- VFS inlining: `_inlineHtmlAssets()` + `_replaceAsync()` in `send-browse--v0.3.2.js`
+
+#### Pages (v0.3.x tree)
+
+| Page | URL Path | What It Does |
+|------|----------|-------------|
+| Upload | `v0/v0.3/v0.3.0/index.html` | 6-step wizard (Select→Delivery→Share→Confirm→Encrypt & Upload→Done) |
+| Download | `v0/v0.3/v0.3.0/en-gb/download/index.html` | Decrypt, gallery, browse, PDF/present, markdown |
+| Browse | `v0/v0.3/v0.3.0/en-gb/browse/index.html` | Direct browse-mode alias |
+| Gallery | `v0/v0.3/v0.3.0/en-gb/gallery/index.html` | Direct gallery-mode alias |
 | View (short) | `v0/v0.3/v0.3.0/en-gb/v/index.html` | Short-form URL alias |
 | View (full) | `v0/v0.3/v0.3.0/en-gb/view/index.html` | Full-name URL alias |
-| Welcome | `v0/v0.3/v0.3.0/en-gb/welcome/index.html` | Token activation from URL hash, Stripe redirect target |
+| Secret view | `v0/v0.3/v0.3.2/en-gb/s/index.html` | Ephemeral secret viewer (v0.3.2 overlay) |
+| Welcome | `v0/v0.3/v0.3.0/en-gb/welcome/index.html` | Token activation from URL hash |
 | Room Join | `v0/v0.1/v0.1.8/join.html` | Enter data room via invite code (v0.2.x base, not yet migrated) |
-| Room View | `v0/v0.1/v0.1.8/room.html` | Room file browser, upload/download, invite generation (v0.2.x base) |
-| Vault | `v0/v0.1/v0.1.7/vault.html` | Personal encrypted vault with RSA-4096 (v0.2.x base, not yet migrated) |
+| Room View | `v0/v0.1/v0.1.8/room.html` | Room file browser, upload/download, invite generation |
+| Vault | `v0/v0.1/v0.1.7/vault.html` | Personal encrypted vault with RSA-4096 (v0.2.x base) |
 | SSH KeyGen | `/tools/ssh-keygen/` | Browser-based SSH key generation |
 
-#### Web Components (v0.3.0 — unified SendComponent base class)
-
-- `send-upload` — state machine orchestrator, 6-step wizard, delegates to 6 sub-components + 6 modules
-- `send-download` — decrypt, auto-decrypt from URL hash, gallery/browse/lightbox
-- `send-browse` — sg-layout file explorer (folder tree, tabbed multi-pane, drag-to-resize)
-- `send-gallery` — grid of type-aware thumbnails (image, PDF first page, markdown); 3 density modes
-- `send-viewer` — file content viewer (PDF, markdown, code, image, JSON, text)
-- `send-welcome` — token activation, SGMETA parsing, token verification
-- `send-access-gate` — token validation gate
-- `send-transparency` — shows what server stored vs. never saw; decryption timing
-- `send-test-files` — 5 built-in test file types
-
-**Encryption:** AES-256-GCM via Web Crypto API (transfers + rooms); RSA-4096 + AES hybrid (vault);
-SGMETA envelope for filenames. Key never sent to server.
-
-**Localisation:** 17 locales. All locale pages include Welcome translations (v0.12.3).
-
 ---
 
----
+### Vault Browser UI (latest: v0.2.3)
 
-### Vault Browser UI (latest: v0.2.2)
+**Package:** `sgraph_ai_app_send__ui__vault/` — distinct UI product.
 
-**Package:** `sgraph_ai_app_send__ui__vault/` — distinct UI product from the user UI.
-**v0.2.1** — landing page (EXISTS since ~04/15): `en-gb/index.html` + `browse/index.html`.
-"Open a vault." hero, auto-detect input (vault key or share token), recent vaults localStorage.
+**v0.2.1** — landing page: `en-gb/index.html` + `browse/index.html`. "Open a vault." hero,
+auto-detect input (vault key or share token), recent vaults localStorage.
 
-**v0.2.3** — overlay/extension on v0.2.2. Code at `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/`.
-First committed 2026-05-12.
+**v0.2.2** — overlay on v0.2.1. Code at `v0/v0.2/v0.2.2/`. First committed 2026-05-08.
+Files: `index.html`, `sg-app-banner.js`, `vault-browse-edit.js`.
 
-New page: `/en-gb/vault/token` — **Token Test Harness** developer page.
-6 files in `en-gb/vault/token/`: `index.html`, `vault-token-harness.js`, `vault-credentials.js`,
-`vault-hkdf.js`, `vault-token-manager.js`, `vault-api-log.js`.
+**`<sg-app-banner>`** Web Component (v0.2.2, commit `891f645`):
+- `activate(liftEl?)`: hides vault chrome (Layer 1 CSS), lifts content frame (Layer 2 fixed positioning)
+- `present:true` in app.json: auto-activates App Mode on file open
+- Deactivate: `Open Vault` button restores all saved styles
 
-Custom elements defined:
-- `<vt-vault-loader>` — enter a vault key or ro-token, resolves & stores credentials
-- `<vt-vault-frame>` — iframe vault panel (owner teal border / RO orange border)
-- `<vt-token-manager>` — create, list, revoke read-only tokens; writes `.vault/owner/readonly-tokens.json`
-- `<vt-crypto-lab>` — HKDF derivation inspector, owner-namespace file inspector, token check
-- `<vt-storage-inspector>` — localStorage / sessionStorage viewer; access-token management
-- `<vt-api-log>` — scrolling log of all fetch() calls; masks token values as `***`
+**vault-browse-edit.js** (v0.2.2):
 
-New modules (Phase 2 will move to `_common/`):
-- `vault-credentials.js` — `parseCredential`, `resolveCredential`, `storeCredentials`, `getCredentials`, `clearCredentials`
-- `vault-hkdf.js` — HKDF-SHA256 key derivation + AES-256-GCM inner encryption (`deriveVaultSecretKey`, `ownerEncrypt`, `ownerDecrypt`)
+| Feature | Detail |
+|---------|--------|
+| App Mode button (all types) | Added to file action bar on ALL file types + ALL vaults |
+| HTML auto-re-lift | Re-lifts on navigation to HTML file inside iframe |
+| HTML split-view editor | Raw source textarea + sandboxed live-preview iframe (600ms debounce) |
+| Text/code/markdown edit | Edit/Save/Cancel for non-HTML text (writable vaults) |
+| Upload Files button | Multi-file upload to vault (writable) |
+| New File button (BRW-024) | Creates new empty file; name prompt; writable vaults |
+| Refresh button | Re-fetches current file from vault |
 
-Routing entry added to `peek/index.html` routing table.
+**v0.2.2 iframe bug fixes (commit range, 09 May):**
+- data-URI inlining in `send-browse--v0.3.2.js` (eliminates `</script>`/`</style>` HTML parser bugs)
+- Edit-mode preview reuses the main `.sb-file__html-frame` iframe (single iframe across view + edit)
+- iframe gets `background:#fff; color-scheme:light`
+- Duplicate App Mode button removed; `_ext0` hoisting fixed
 
-**v0.2.2** — overlay on v0.2.1. Code at `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.2/`.
-3 files: `index.html`, `sg-app-banner.js`, `vault-browse-edit.js`. First committed 2026-05-08.
+**v0.2.3** — consolidation + extension on v0.2.2. Code at `v0/v0.2/v0.2.3/`. First committed
+2026-05-12. All v0.2.2 overlays inlined.
 
-#### sg-app-banner (v0.2.2, commit `891f645`, 08 May)
+**Token Test Harness** (05/12): `/en-gb/vault/token/` developer page.
+Custom elements: `<vt-vault-loader>`, `<vt-vault-frame>`, `<vt-token-manager>`,
+`<vt-crypto-lab>`, `<vt-storage-inspector>`, `<vt-api-log>`.
+Modules: `vault-credentials.js` (credential parse/resolve/store/get);
+`vault-hkdf.js` (HKDF-SHA256 key derivation, AES-256-GCM owner encrypt/decrypt).
 
-**`<sg-app-banner>`** Web Component — fixed-position banner activated in App Mode.
+**App Mode loading overlay** (commit `20c7a52c`, 15 May — `sg-app-banner.js`):
+- `activate()` shows "Loading app…" in the status bar
+- Clears immediately on `window.parent.postMessage({ type: 'sg-app-ready' }, '*')` (also accepts `{ type: 'ui-ready' }`)
+- 8s timeout: shows red error "App did not signal ready — it may have an error"; body-hide `display:none` detected and reported in detail text
+- iframe onerror capture (same-origin only): forwards as `{ type: 'sg-app-error', message }`, stored as timeout detail
 
-| Property | Detail |
-|----------|--------|
-| Default state | Hidden (`display:none`). Must call `activate()` to show. |
-| Activation | `activate(liftEl?)` — hides vault chrome (Layer 1 CSS), lifts content frame (Layer 2 fixed positioning) |
-| Layer 1 CSS | Hides `vault-header`, `vault-nav`, `vault-status-bar`, `.sb-header`, `.sb-file__actions`, `.sb-file__markdown` max-width |
-| Layer 2 (frame lift) | Applies `position:fixed` to the provided element (or `.sb-file__html-frame` for HTML auto-activate). No DOM move — avoids iframe reload. |
-| Shadow CSS | `sgl-tab-bar`, `sgl-resize-handle`, `plr-source-bar` hidden via injected shadow DOM CSS |
-| Deactivate | `Open Vault` button calls `_deactivate()` — restores all saved styles, removes CSS, removes banner |
-| App Mode label | Non-clickable badge in top-right of banner |
-| `present:true` in app.json | Auto-activates App Mode when `app.json` entry has `present: true` |
+**Re-activate App Mode after auth** (commit `20c7a52c`, 15 May — `v0.2.3/index.html`):
+- After vault-auth banner's key accepted via `_onAuthSubmit`, if `app.json` had `present:true` and user has not explicitly exited App Mode, `_applyAppJson` is re-run automatically
+- Fixes the "blank form stays open" case when a protected App Mode vault requires auth
 
-#### vault-browse-edit (v0.2.2)
+**Vault card UX improvements** (commit `ac68a3e6`, 15 May — `v0.2.3/en-gb/index.html`):
+- 'Remove from saved vaults' button on auto-open error page: removes token from `VaultLoaderRecent`, navigates to `/en-gb/` (entry no longer shown in recent-vaults grid)
+- ↗ 'Open in new window' button on vault card: opens `window.location.origin + '/#' + key` in new tab; appears on card hover alongside existing × delete button; explicit affordance (no Ctrl/Cmd-click needed)
 
-Patches `SendBrowse.prototype._renderFileContent` (loaded after `send-browse--v0.3.2.js`).
+**SG/App hosting page — `/en-gb/app/`** (commits 22 May 2026 — `v0.2.3/en-gb/app/index.html`):
+New dedicated route for running vault-hosted apps. Distinct from `/en-gb/vault/` (browser) and `/en-gb/` (landing). Mounts three custom elements: `<app-shell>`, `<app-hud>`, `<app-debug-pane>`.
 
-| Feature | Detail | Commit |
-|---------|--------|--------|
-| **App Mode button (all types)** | "App Mode" button added to file action bar on ALL file types (PDF, markdown, images, video, page layouts, HTML) on ALL vaults (read-only and writable). Lifts `.sb-file__content`. | `124a81b`, `cdcff8b` (08 May) |
-| **HTML auto-re-lift** | When App Mode is active and user navigates to an HTML file inside the iframe, banner re-lifts on the new content element | `vault-browse-edit.js` |
-| **HTML split-view editor** | HTML files: raw source textarea (left) + sandboxed live-preview iframe (right). Preview updates 600ms after typing stops. Edit button in action bar; Save/Cancel. | `85d3d16` (09 May) |
-| **Text/code/markdown edit** | Edit/Save/Cancel for non-HTML text files (writable vaults only) | pre-v0.2.2 |
-| **Upload Files button** | Opens file picker for multi-file upload to vault (writable vaults) | pre-v0.2.2 |
-| **New File button (BRW-024)** | Creates new empty file in vault; name prompt; writable vaults | `e56da6a` (08 May) |
-| **Refresh button** | Re-fetches current file from vault and re-renders; all file types, writable vaults | pre-v0.2.2 |
+- **Global debug event buffer** (`window._appDebug`): captures vault events, VFS bridge calls, and network calls (capped at 300 items each); initialised before any component loads.
+- **Fetch proxy**: wraps `window.fetch` to record outbound calls (method, URL masked for vault keys, status, timing) into `window._appDebug.networkCalls`.
 
-**VFS pipeline for edit preview** (commit `2a079ee`, 08 May): identical `_inlineHtmlAssets` VFS
-pipeline used for both the view iframe and the edit split-view live preview.
+**`<app-shell>` Web Component** (`app-shell.js`, 1 154 lines — 22 May 2026):
+Lightweight vault app host. Lifecycle: parse hash → open vault → read `app.json` → optional auth intercept → pre-fetch resources → mount iframe + VFS bridge. No `vault-loader` scripts loaded on this page; credential parsing is inline. VFS bridge surface is identical to `send-browse`, so SG/App code runs unchanged.
+- If no hash: shows entry form (vault key + optional server endpoint field; default endpoint `dev.send.sgraph.ai`).
+- `_page.json` support: renders via inline PageLayoutRenderer (PLR) — PLR dependencies are inlined so the page is self-contained; vault routes with a hash open to `/app` rather than `/vault/`.
+- Vault key persisted to `localStorage` for cross-page reload recovery.
+- Exposes `getDebugState()` for `<app-debug-pane>` (appJson, writable, entry, iframeStatus, resourcesLoaded, timing).
+
+**`<app-hud>` Web Component** (`app-hud.js`, 201 lines — 22 May 2026):
+Fixed 48 px status bar rendered outside `<sg-layout>`. Shows: SG/App brand, vault badge, app title (centre), read-only badge, copy-link button, vault-back link, debug toggle. Handles `sg.ui.message()` notifications dispatched from the app iframe (toast queue with auto-dismiss). Receives vault/app info via `setInfo()` called by the page script on `app-shell:ready`.
+
+**`<app-debug-pane>` Web Component** (`app-debug-pane.js`, 149 lines — 22 May 2026):
+Collapsible right-edge debug panel with 4 tabs: Vault Trace, Bridge Log, App State, Network. Collapses to a narrow edge strip when host width < 40 px (ResizeObserver). Tabs are lazy-loaded sub-components.
+
+**`<app-debug-vault-trace>` Web Component** (`app-debug-vault-trace.js`, 79 lines):
+Renders vault lifecycle events from `window._appDebug.vaultEvents`.
+
+**`<app-debug-bridge-log>` Web Component** (`app-debug-bridge-log.js`, 75 lines):
+Renders VFS bridge message log from `window._appDebug.bridgeCalls`.
+
+**`<app-debug-app-state>` Web Component** (`app-debug-app-state.js`, 123 lines):
+Reads current debug state via `app-shell.getDebugState()` — shows appJson, entry point, writable flag, iframe status, resource load list, and timing.
+
+**`<app-debug-network>` Web Component** (`app-debug-network.js`, 63 lines):
+Renders outbound fetch calls from `window._appDebug.networkCalls` (method, URL, status, timing).
+
+**Routing changes** (`vault-loader-routing.js` — 22 May 2026):
+- `/#key` at root: saves key to `localStorage` → redirects to `/en-gb/app#key` (was: `/en-gb/vault/`). App-shell checks for `app.json`; if absent, falls back to `/en-gb/vault/`.
+- `vault-header.js` change: "Open App" action opens in same tab (was: new tab).
+- `v0.2.3/index.html`: `present:true` activation restored for `_page.json` app.json entries.
+- Route tests updated (`test__routing_decisions.js`): `runRoot` assertions cover `/en-gb/app#token` redirect path.
+
+**`app.json` resource injection into vault HTML preview** (commit `09288b20`, 25 May 2026 — `v0.2.3/index.html`):
+When `_applyAppJson` encounters a `resources` block in `app.json` (with `css` and/or `js` arrays) and `autoOpen` is active, the vault file browser now:
+- Pre-fetches each listed CSS/JS file from the vault
+- Patches `dataSource.getFileBytes` for the entry file to prepend `<style data-sg-app>` and `<script data-sg-app>` blocks inline, using the same injection convention as `<app-shell>._mountApp()`
+- Falls back gracefully if any resource file is missing
+- Logs: `[app.json] resources injected into vault preview: css=N js=N`
+
+**Significance:** App HTMLs in SG/App vaults carry no `<link>`/`<script>` tags — resources are delivered entirely via `app.json`. Before this fix, the vault browser's BRW-020 inlining had nothing to process and the preview rendered as a blank placeholder div. After this fix, vault HTML previews are at rendering parity with `/en-gb/app`.
+
+**E2E test alignment** (commits `e2f05030`, 25 May 2026 — `test__routing.spec.js`, `test__regression__root_hash_inbox_saves.spec.js`):
+Updated test assertions from `/en-gb/vault` to `/en-gb/app` routing targets, confirming the `/#key` → `/en-gb/app#token` redirect (shipped 22 May, commits `bfcb8ad7`/`4cf41ba2`/`d3daa2ac`) is now fully mirrored in E2E test expectations.
+
+**`scripts/vault__run-locally.sh`** — helper script to run the vault UI locally.
 
 ---
 
@@ -200,13 +272,8 @@ pipeline used for both the view iframe and the edit split-view live preview.
 | Settings | llm-connection | Provider management (OpenRouter, Ollama), API key input, model selector |
 | Data | prompt-library | 5 built-in prompts (Improve Clarity, Executive Summary, Extract Actions, Simplify, Convert to Markdown) |
 
-**LLM providers:** OpenRouter (`https://openrouter.ai/api/v1`, SSE streaming, confirmed 4 Mar)
-and Ollama (`http://localhost:11434`, NDJSON streaming, confirmed with Gemma3:4b 4 Mar).
-
-**Key property:** No LLM traffic touches the SG/Send server — browser goes directly to provider.
-Zero-knowledge maintained throughout.
-
-**Theme:** Aurora (dark, `#1A1A2E` background, `#4ECDC4` teal accent).
+**LLM providers:** OpenRouter (`https://openrouter.ai/api/v1`, SSE streaming) and Ollama
+(`http://localhost:11434`, NDJSON streaming). No LLM traffic touches the SG/Send server.
 
 ---
 
@@ -217,52 +284,5 @@ Full list: [proposed/index.md](proposed/index.md)
 - **Upload UX redesign** — 3-step flow (upload→distribution→credentials), 3 sharing modes, 10GB limit
 - **Gallery editor** — per-image comments, multi-language, layout customisation, rich preview
 - **v0.3.0 deferred issues** (47 items) — post-release bug backlog from the v0.3.0 launch
-- **Vault upload beta** in main SG/Send UI (doc 281) — integrate vault-push into upload wizard
-- **Room + Vault pages** migrated to v0.3.0 IFD architecture
-- **`<sg-vault-picker>`** — vault selection Web Component (doc 297)
-
----
-
-## Recent Activity (not yet folded into the curated EXISTS section)
-
-- **2026-05-12 → 2026-05-14** — **v0.4.0 share tree** (sender wizard, file + secret).
-  New tree at `sgraph_ai_app_send__ui__share/v0/v0.4/v0.4.0/`. v0.4.0 is the IFD
-  major base for the share tree; v0.4.1+ surgical overlays land at
-  `__share/v0/v0.4/v0.4.x/`. Phase A copied/laid out the v0.3.0 base + v0.3.1
-  folder patch + v0.3.2 overlays under the new path structure (`en-gb/share/`
-  shell, two levels deep, `_common/` lives at the tree root). Phase B inlined
-  every overlay into its parent file (one commit per merge group):
-    1. `api-client-v032.js` → `api-client.js` (BOTH trees: `secretConfig`
-       optional 3rd arg on `createTransfer`, `downloadBase64` and
-       `deleteTransfer` promoted to native methods).
-    2. `upload-constants-patch.js` → `upload-constants.js` + 5-step
-       `STEP_LABELS` written natively into `send-step-indicator.js`.
-       `upload-step-select-secret.js` → `upload-step-select.js` (Secret tab,
-       textarea + Views/Expires pills + "Review →").
-    3. `upload-step-options.{js,css}` relocated into `upload-step-options/`.
-    4. `send-upload-secret.js` + `send-upload-options.js` → `send-upload.js`
-       (single orchestrator, native 5-step state machine, secret-mode
-       `_isSecretMode` + `_secretConfig` + `_deleteAuth`).
-    5. `upload-engine-secret.js` → `upload-engine.js` (`_pendingSecretConfig`
-       contract; secret-mode URL builder).
-    6. `upload-step-done-secret.js` → `upload-step-done.js` (new `mode`
-       property; share + kill links + ephemerality notice render natively
-       under shadow DOM).
-    7. `upload-folder-v031.js` → `upload-folder.js` + `upload-thumbnails.js`
-       (`__gallery__{8-char hash}` naming inlined; flat shell, no overlays).
-  Phase B also published a new sibling **open tree** at
-  `sgraph_ai_app_send__ui__open/v0/v0.4/v0.4.0/` containing the receiver
-  routes (`en-gb/open/{,s,v,download,gallery,view,browse}/`). `welcome/` is
-  deferred and stays on v0.3.x during retention. Checksum drift checker
-  (`scripts/check_common_checksums.py`) covers 15 files that must stay
-  byte-identical between trees. Plan: `team/roles/architect/reviews/05/10/v0.27.29__plan__v0.4.0-major-release.md`.
-  Librarian: please fold into the curated EXISTS section on next daily run
-  when v0.4.0 ships.
-
-- **2026-05-09** — Vault UI `v0.2.2` HTML iframe rendering bug fixes: data-URI inlining
-  (eliminates `</script>`/`</style>` parser bugs), edit-mode preview now reuses the main
-  `.sb-file__html-frame` iframe (single iframe across view + edit), iframe gets
-  `background:#fff; color-scheme:light`, duplicate `App Mode` button removed, `_ext0`
-  hoisting fixed. Files: `send-browse--v0.3.2.js`, `vault-browse-edit.js`. See
-  [`team/comms/changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md`](../../../comms/changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md).
-  Librarian: please fold into the curated EXISTS section on next daily run.
+- **Vault upload beta** in main SG/Send UI — integrate vault-push into upload wizard
+- **Room + Vault pages** migrated to v0.4.0 IFD architecture (currently on v0.3.x legacy)
