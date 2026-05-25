@@ -95,6 +95,12 @@ Self-contained receiver tree with the same inlining discipline as the share tree
 **Status:** LEGACY. Replaced by v0.4.0 share/open trees. Retained for rollback; deletion
 scheduled in the follow-up commit after v0.4.0 stabilises.
 
+**Secret option REMOVED (2026-05-25):** the v0.3.x upload wizard now serves File mode only.
+The "🔒 Secret" toggle is hidden (the secret-share flow was incomplete — `/en-gb/s/` 404s)
+via `v0.3.2/_common/js/components/send-upload/upload-step-select-file-only.js`, loaded last
+in `v0.3.2/en-gb/index.html`. Secret returns as a v0.4.x launch feature (the `__share`/`__open`
+secret code is untouched).
+
 **v0.3.0** — IFD major base. `v0/v0.3/v0.3.0/`. Completed 22 March 2026. 6-step wizard,
 drag-drop, multi-file paste, AES-256-GCM, direct + multipart (up to 1GB), 17 locales.
 

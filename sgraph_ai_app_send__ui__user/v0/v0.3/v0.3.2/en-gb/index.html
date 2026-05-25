@@ -155,6 +155,11 @@
     <script src="../_common/js/components/send-upload/upload-engine-secret.js"></script>
     <script src="../_common/js/components/send-upload/send-upload-options.js"></script>
 
+    <!-- v0.3.x: remove the (incomplete) Secret option — lock the selector to File.
+         Secret returns as a v0.4.x launch feature. Must load LAST so it overrides
+         the secret overlay's _renderIdle. -->
+    <script src="../_common/js/components/send-upload/upload-step-select-file-only.js"></script>
+
     <!-- 5. Init -->
     <script>
         I18n.init();
