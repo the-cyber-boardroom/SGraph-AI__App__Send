@@ -326,11 +326,27 @@
             if (!filesView) return;
             filesView.innerHTML = '<div style="padding:2rem;color:var(--color-text-secondary);">Loading vault files...</div>';
 
-            const dataSource = new VaultDataSource(this._vault, this._accessKey);
-            dataSource.onTreeChanged = () => this._onTreeChanged();
+            const rootDataSource = new VaultDataSource(this._vault, this._accessKey);
 
             // Load all lazy sub-trees before building the Browse tree
-            await dataSource.loadAllSubTrees();
+            await rootDataSource.loadAllSubTrees();
+
+            // Wrap so `*.link.json` sub-vaults splice in as inline, expandable folders.
+            // Phase 0: key comes from localStorage (VaultLinks) or a prompt; child opens
+            // read-only. Falls back to the plain data source if the script isn't loaded.
+            const dataSource = (typeof CompositeDataSource !== 'undefined')
+                ? new CompositeDataSource(rootDataSource, {
+                    keyProvider: async (mount) => {
+                        const label = (mount.link && mount.link.label) || mount.nodeName;
+                        const key = window.prompt('Enter the key for linked vault "' + label + '" (opens read-only):', '');
+                        return key && key.trim() ? key.trim() : null;
+                    }
+                  })
+                : rootDataSource;
+            dataSource.onTreeChanged = () => this._onTreeChanged();
+            if (typeof dataSource.scan === 'function') {
+                try { await dataSource.scan(); } catch (err) { console.warn('[vault-shell] sub-vault scan failed:', err && err.message); }
+            }
 
             filesView.innerHTML = '';
 
