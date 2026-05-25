@@ -623,20 +623,12 @@
                 var deepLinkOverride = typeof VaultLoaderRouting !== 'undefined' &&
                     VaultLoaderRouting.consumeDeepLink ? VaultLoaderRouting.consumeDeepLink() : '';
 
+                // Plain file deep-link — strip any 'app:' prefix (App Mode lives on /en-gb/app only)
                 var deepLinkHandled = false;
                 if (deepLinkOverride && browse) {
-                    if (deepLinkOverride.startsWith('app:')) {
-                        // App Mode override — open specific file in App Mode regardless of app.json
-                        var appPath = deepLinkOverride.slice(4);
-                        deepLinkHandled = true; // skip app.json so it doesn't fight for focus
-                        requestAnimationFrame(function() {
-                            if (browse._openFileTab) browse._openFileTab(appPath);
-                            var banner = document.querySelector('sg-app-banner');
-                            if (banner && typeof banner.activate === 'function') banner.activate();
-                        });
-                    } else {
-                        // Plain file deep-link — open tab, then fall through to app.json
-                        var plainPath = deepLinkOverride;
+                    var plainPath = deepLinkOverride.startsWith('app:')
+                        ? deepLinkOverride.slice(4) : deepLinkOverride;
+                    if (plainPath) {
                         requestAnimationFrame(function() {
                             if (browse._openFileTab) browse._openFileTab(plainPath);
                         });

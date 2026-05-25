@@ -229,10 +229,17 @@
 
         async _continue(appJson) {
             if (!appJson) {
-                // No app.json — this vault has no app. Drop back to the vault UI.
-                // Keep any sg-vault-deep-link in sessionStorage: if _init() saved an
-                // app:path deep-link (from /en-gb/app#path), the vault will consume it
-                // and open the file (in App Mode if it's an HTML app, or as a file tab).
+                // No app.json — check if a file path was given (from /en-gb/app#path).
+                // If so, render that file directly here; do NOT redirect to /en-gb/vault/.
+                // App Mode lives on /en-gb/app, not on the vault page.
+                var deepLink = '';
+                try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
+                try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+                if (deepLink.startsWith('app:')) {
+                    await this._mountVaultFile(deepLink.slice(4));
+                    return;
+                }
+                // No file path either — open the vault UI
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
@@ -796,6 +803,147 @@
             this.shadowRoot.innerHTML = '<style>:host{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#0a0a18;}</style>';
             this.shadowRoot.appendChild(iframe);
             this._setupVfsBridgeHandlers(iframe, this._dataSource);
+        }
+
+        // ── Render a single vault file on /en-gb/app (no app.json) ───────────────────
+        // Supports: .md / .markdown (inline render), .html / .htm (VFS bridge iframe),
+        // everything else (shows a plain "cannot preview" message).
+
+        async _mountVaultFile(filePath) {
+            this._setStatus('Loading…');
+
+            var fileList = this._dataSource ? this._dataSource.getFileList() : [];
+            var entry = fileList.find(function (f) {
+                return !f.dir && (f.path === filePath || f.path.endsWith('/' + filePath));
+            });
+            if (!entry) {
+                // Try a loose filename match
+                var filename = filePath.split('/').pop();
+                entry = fileList.find(function (f) { return !f.dir && f.path.split('/').pop() === filename; });
+            }
+            if (!entry) {
+                this._showError('File not found: ' + filePath);
+                return;
+            }
+
+            var ext = entry.path.split('.').pop().toLowerCase();
+            var bridgeScript = this._buildVfsBridgeScript(entry.path);
+
+            // ── HTML / HTM — inject VFS bridge and render in iframe ──────────────────
+            if (ext === 'html' || ext === 'htm') {
+                this._setStatus('Loading app…');
+                var htmlBytes = await this._dataSource.getFileBytes(entry.path);
+                var htmlText  = new TextDecoder().decode(htmlBytes);
+                var injected  = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript);
+                if (injected === htmlText) injected = bridgeScript + htmlText;
+                var blob    = new Blob([injected], { type: 'text/html' });
+                var blobUrl = URL.createObjectURL(blob);
+                this._objectUrls.push(blobUrl);
+                var iframe         = document.createElement('iframe');
+                iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+                iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
+                iframe.src         = blobUrl;
+                iframe.addEventListener('load', () => {
+                    this._iframeStatus  = 'ready';
+                    this._t.iframeReady = performance.now();
+                });
+                this._iframeEl     = iframe;
+                this._iframeStatus = 'loading';
+                this.shadowRoot.innerHTML = '<style>:host{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#0a0a18;}</style>';
+                this.shadowRoot.appendChild(iframe);
+                this._setupVfsBridgeHandlers(iframe, this._dataSource);
+                return;
+            }
+
+            // ── Markdown — inline render ─────────────────────────────────────────────
+            if (ext === 'md' || ext === 'markdown') {
+                function _fetchText(url) { return fetch(url).then(function (r) { return r.text(); }); }
+                var deps = await Promise.all([
+                    _fetchText('/_common/lib/markdown/markdown-parser.js'),
+                    _fetchText('/_common/lib/markdown/markdown-renderer.js'),
+                    _fetchText('/_common/js/components/send-download/send-browse.css'),
+                    _fetchText('/_common/css/shared-components.css')
+                ]);
+                var mdParserJs = deps[0], mdRendererJs = deps[1], css1 = deps[2], css2 = deps[3];
+
+                var mdBytes = await this._dataSource.getFileBytes(entry.path);
+                var mdText  = new TextDecoder().decode(mdBytes);
+                // Escape for inline JSON string embedding
+                var mdEscaped = JSON.stringify(mdText);
+
+                var html = '<!DOCTYPE html><html><head>' +
+                    '<meta charset="utf-8">' +
+                    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+                    bridgeScript +
+                    '<style>' + css1 + '\n' + css2 + '</style>' +
+                    '<style>' +
+                        'html,body{margin:0;padding:0;background:#0d1117;color:#e2e8f0;' +
+                            'font-family:var(--font-sans,system-ui,sans-serif);}' +
+                        '#md-root{max-width:860px;margin:0 auto;padding:2rem 1.5rem;}' +
+                        'img{max-width:100%;height:auto;}' +
+                        'pre,code{background:#1a1f2e;border-radius:4px;}' +
+                        'pre{padding:1rem;overflow-x:auto;}' +
+                        'code{padding:0.15em 0.35em;}' +
+                    '</style>' +
+                    '</head><body>' +
+                    '<div id="md-root"></div>' +
+                    '<script>' + mdParserJs + '<\/script>' +
+                    '<script>' + mdRendererJs + '<\/script>' +
+                    '<script>(function(){' +
+                        'var md=' + mdEscaped + ';' +
+                        'var html=new MarkdownParser().parse(md);' +
+                        'var root=document.getElementById("md-root");' +
+                        'root.innerHTML=html;' +
+                        // Resolve images via VFS bridge: img[data-md-src] → blob URL
+                        'var imgs=root.querySelectorAll("img[data-md-src]");' +
+                        'var pending=imgs.length;' +
+                        'function _done(){' +
+                            'if(--pending<=0){' +
+                                'window.parent.postMessage({type:"sg-app-ready"},"*");' +
+                            '}' +
+                        '}' +
+                        'if(!pending){window.parent.postMessage({type:"sg-app-ready"},"*");}' +
+                        'for(var i=0;i<imgs.length;i++){' +
+                            '(function(img){' +
+                                'var src=img.getAttribute("data-md-src");' +
+                                'sg.vfs.read(src).then(function(buf){' +
+                                    'var blob=new Blob([buf]);' +
+                                    'img.src=URL.createObjectURL(blob);' +
+                                    '_done();' +
+                                '}).catch(function(){_done();});' +
+                            '})(imgs[i]);' +
+                        '}' +
+                    '}());<\/script>' +
+                    '</body></html>';
+
+                var blob    = new Blob([html], { type: 'text/html' });
+                var blobUrl = URL.createObjectURL(blob);
+                this._objectUrls.push(blobUrl);
+                var iframe         = document.createElement('iframe');
+                iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+                iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
+                iframe.src         = blobUrl;
+                iframe.addEventListener('load', () => {
+                    this._iframeStatus  = 'ready';
+                    this._t.iframeReady = performance.now();
+                    this._emitVaultEvent('iframe-ready', { label: 'Vault file ready', entry: entry.path, ms: Math.round(this._t.iframeReady - this._t.start) });
+                });
+                this._iframeEl     = iframe;
+                this._iframeStatus = 'loading';
+                this.shadowRoot.innerHTML = '<style>:host{display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#0a0a18;}</style>';
+                this.shadowRoot.appendChild(iframe);
+                this._setupVfsBridgeHandlers(iframe, this._dataSource);
+                return;
+            }
+
+            // ── Unsupported type — show a helpful message ────────────────────────────
+            this.shadowRoot.innerHTML =
+                '<style>:host{display:flex;align-items:center;justify-content:center;' +
+                'width:100%;height:100%;background:#0a0a18;color:#e2e8f0;font-family:system-ui,sans-serif;}</style>' +
+                '<div style="text-align:center;padding:2rem;">' +
+                    '<p style="color:#94a3b8;">Cannot preview <strong>' + entry.path + '</strong> as an app.</p>' +
+                    '<p style="font-size:13px;color:#64748b;">Supported: .md, .markdown, .html, .htm</p>' +
+                '</div>';
         }
 
         // ── VFS bridge (injected into iframe) ─────────────────────────────────────────
