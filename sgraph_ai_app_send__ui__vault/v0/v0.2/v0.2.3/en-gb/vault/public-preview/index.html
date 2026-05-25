@@ -24,6 +24,7 @@
     <script src="/_common/js/lib/sg-public-preview/public-preview-read.js"></script>
     <script src="/_common/js/lib/sg-public-preview/public-preview-write.js"></script>
     <script src="/_common/js/components/sg-public-preview-editor/sg-public-preview-editor.js"></script>
+    <script src="/_common/js/components/sg-public-preview-card/sg-public-preview-card.js"></script>
 
     <style>
         :root { --bg:#0a0a18; --surface:#14142a; --border:#2a2a44; --text:#e2e8f0; --muted:#9aa4bf; --primary:#4f8ff7; --danger:#E94560; }
@@ -38,6 +39,12 @@
         .access input { flex:1; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font:inherit; }
         .access label { font-size:0.8rem; color:var(--muted); }
         .gate { display:none; }
+        .wrap { max-width: 1100px; }
+        .split { display:flex; gap:28px; align-items:flex-start; }
+        .pane { flex:1 1 0; min-width:0; }
+        .pane-live { position: sticky; top: 24px; }
+        .pane-h { font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin:0 0 12px; }
+        @media (max-width: 900px) { .split { flex-direction: column; } .pane-live { position: static; } }
     </style>
 </head>
 <body>
@@ -52,7 +59,15 @@
             <input id="access" type="password" placeholder="word-word-1234">
             <button id="access-set">Use</button>
         </div>
-        <sg-public-preview-editor id="editor"></sg-public-preview-editor>
+        <div class="split">
+            <div class="pane pane-edit">
+                <sg-public-preview-editor id="editor"></sg-public-preview-editor>
+            </div>
+            <div class="pane pane-live">
+                <p class="pane-h">Live preview — how it will look</p>
+                <sg-public-preview-card id="live"></sg-public-preview-card>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -102,6 +117,14 @@
         });
 
         document.getElementById('editor').setContext({ sgSend: sgSend, vault: vault });
+
+        // Side-by-side live preview: the editor broadcasts pvp-preview-changed on every
+        // edit; render it in the card exactly as the public page would (no key prompt).
+        const live = document.getElementById('live');
+        live.setState({ status: 'ok', preview: { schema: 'sgraph-public-preview/v1', title: '', description: '' }, showKeyPrompt: false });
+        document.addEventListener('pvp-preview-changed', (e) => {
+            live.setState({ status: 'ok', preview: e.detail.preview, showKeyPrompt: false });
+        });
     })();
 })();
 </script>

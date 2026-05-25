@@ -57,6 +57,7 @@
                 this.$('.ed-thumb-note').textContent = t.oversize
                     ? 'Still larger than 64 KB after re-encode — consider a simpler image.'
                     : `Encoded to WebP (${Math.round(t.data.length / 1024)} KB, EXIF stripped).`;
+                this._emitChanged();   // live preview shows the new thumbnail
             } catch (e) { this.$('.ed-thumb-note').textContent = 'Could not read that image.'; }
         }
 
@@ -177,22 +178,60 @@
                 </div>
               </div>`;
 
-            this.$('.ed-on').addEventListener('change', (e) => { this._on = e.target.checked; this.render(); });
+            this.$('.ed-on').addEventListener('change', (e) => { this._on = e.target.checked; this.render(); this._emitChanged(); });
             if (this._on) {
                 this.$('.ed-regen').addEventListener('click', () => { this.$('.ed-id-rnd').value = PublicPreviewSchema.randomPublicId(); });
                 this.$('.ed-thumb-file').addEventListener('change', (e) => { if (e.target.files[0]) this._onThumbFile(e.target.files[0]); });
                 this.$('.ed-publish').addEventListener('click', () => this._confirmThenPublish(false));
                 this.$('.ed-update').addEventListener('click',  () => this._confirmThenPublish(true));
                 this.$('.ed-unpub').addEventListener('click',   () => this._doUnpublish());
+                this.$('.ed-form').addEventListener('input', () => this._emitChanged());   // live preview
+                this._emitChanged();                                                       // initial paint
             }
         }
 
+        // Broadcast the current preview so a side-by-side <sg-public-preview-card> updates live.
+        _emitChanged() {
+            if (!this._on) return;
+            this.dispatchEvent(new CustomEvent('pvp-preview-changed', {
+                detail: { preview: this._collectPreview() }, bubbles: true, composed: true
+            }));
+        }
+
+        // In-page confirmation (NOT window.confirm). Cancel is default-focused; Publish is not.
         _confirmThenPublish(isUpdate) {
             const preview = this._collectPreview();
             if (!preview.title) { this._status('A title is required.', true); return; }
-            const msg = `This will be publicly readable by anyone with the link …/app/${this._publicId()}\n`
-                      + `The id appears in URLs and server logs. The vault's contents stay encrypted.\n\nPublish "${preview.title}"?`;
-            if (window.confirm(msg)) this._doPublish(isUpdate);   // confirm is the gate; [Publish] is not default-focused in a real modal (TODO: shadow modal)
+            this._showConfirmModal(
+                `Publish “${preview.title}”?`,
+                [`This will be publicly readable by anyone with the link …/app/${this._publicId()}`,
+                 `The id appears in URLs and server logs. The vault's contents stay encrypted.`],
+                isUpdate ? 'Update — republish' : 'Publish — make this public',
+                () => this._doPublish(isUpdate)
+            );
+        }
+
+        _showConfirmModal(title, lines, okLabel, onOk) {
+            const prev = this.shadowRoot.querySelector('.ed-modal-overlay');
+            if (prev) prev.remove();
+            const wrap = document.createElement('div');
+            wrap.className = 'ed-modal-overlay';
+            wrap.innerHTML =
+                `<div class="ed-modal" role="dialog" aria-modal="true" aria-label="${this._esc(title)}">
+                    <h3>${this._esc(title)}</h3>
+                    ${lines.map(l => `<p>${this._esc(l)}</p>`).join('')}
+                    <div class="ed-modal-actions">
+                        <button type="button" class="ed-modal-cancel">Cancel</button>
+                        <button type="button" class="ed-modal-ok">${this._esc(okLabel)}</button>
+                    </div>
+                </div>`;
+            this.shadowRoot.appendChild(wrap);
+            const close = () => wrap.remove();
+            wrap.querySelector('.ed-modal-cancel').addEventListener('click', close);
+            wrap.querySelector('.ed-modal-ok').addEventListener('click', () => { close(); onOk(); });
+            wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });            // click backdrop to dismiss
+            wrap.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+            wrap.querySelector('.ed-modal-cancel').focus();                                        // Cancel default-focused
         }
     }
 
@@ -217,6 +256,16 @@
         .ed-sharebox { margin-top: 12px; border-top:1px solid var(--color-border,#2a2a44); padding-top:10px; }
         .ed-copyrow { display:flex; gap:8px; } .ed-copyrow input { flex:1; }
         .ed-warn { color: var(--danger, #E94560); font-size: 0.8rem; }
+        .ed-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex;
+            align-items:center; justify-content:center; z-index: 1000; padding: 24px; }
+        .ed-modal { background: var(--surface, #14142a); border: 1px solid var(--border, #2a2a44);
+            border-radius: 12px; padding: 22px; max-width: 460px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+        .ed-modal h3 { margin: 0 0 10px; font-size: 1.05rem; }
+        .ed-modal p { margin: 6px 0; font-size: 0.86rem; color: var(--color-text-secondary, #9aa4bf); }
+        .ed-modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top: 18px; }
+        .ed-modal-actions button { padding: 9px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font: inherit; }
+        .ed-modal-cancel { background: var(--bg-secondary, #1c1c33); color: var(--color-text, #e2e8f0); border: 1px solid var(--border, #2a2a44); }
+        .ed-modal-ok { background: var(--color-primary, #4f8ff7); color: #fff; border: 0; }
     `;
 
     customElements.define('sg-public-preview-editor', SgPublicPreviewEditor);
