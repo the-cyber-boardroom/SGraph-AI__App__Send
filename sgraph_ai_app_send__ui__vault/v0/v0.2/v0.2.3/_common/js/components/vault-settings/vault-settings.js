@@ -83,6 +83,15 @@
                         <p class="vset-hint">Opens the Token Manager in a new tab. Your vault will be pre-loaded automatically.</p>
                     </div>
 
+                    <div class="vset-section vset-pvp-section" style="display:none">
+                        <label class="vset-label">Public preview</label>
+                        <p class="vset-hint">A deliberately-public title, description and thumbnail for this vault — shareable as a link with a proper social-share card. Opt-in; the vault's contents stay encrypted.</p>
+                        <div class="vset-row vset-share-row">
+                            <button class="vset-btn vset-btn--primary vset-open-pvp">Create / edit public preview ↗</button>
+                        </div>
+                        <p class="vset-hint">Opens the editor in a new tab. Your vault will be pre-loaded automatically.</p>
+                    </div>
+
                     <div class="vset-section">
                         <label class="vset-label">Statistics</label>
                         <div class="vset-stats"></div>
@@ -153,9 +162,12 @@
             const accessInput = root.querySelector('.vset-access-input');
             if (accessInput) accessInput.value = this._accessKey || '';
 
-            // Share section: only visible when vault was opened with a passphrase (owner mode, not ro-token)
+            // Share + public-preview sections: only visible in owner mode (opened with a passphrase, not an ro-token)
+            const ownerMode = !!this._vault._passphrase;
             const shareSection = root.querySelector('.vset-share-section');
-            if (shareSection) shareSection.style.display = this._vault._passphrase ? '' : 'none';
+            if (shareSection) shareSection.style.display = ownerMode ? '' : 'none';
+            const pvpSection = root.querySelector('.vset-pvp-section');
+            if (pvpSection) pvpSection.style.display = ownerMode ? '' : 'none';
 
             const stats = this._vault.getStats();
             const statsEl = root.querySelector('.vset-stats');
@@ -182,6 +194,7 @@
                 if (e.target.closest('.vset-validate-access')) return this._validateAccess();
                 if (e.target.closest('.vset-json-toggle'))        return this._toggleJson(e);
                 if (e.target.closest('.vset-open-token-mgr'))  return this._openTokenManager();
+                if (e.target.closest('.vset-open-pvp'))        return this._openPublicPreview();
             });
         }
 
@@ -288,6 +301,11 @@
         _openTokenManager() {
             const base = window.location.pathname.split('/en-gb/')[0];
             window.open(base + '/en-gb/vault/token/', '_blank');
+        }
+
+        _openPublicPreview() {
+            const base = window.location.pathname.split('/en-gb/')[0];
+            window.open(base + '/en-gb/vault/public-preview/', '_blank');
         }
 
         _toggleJson(e) {

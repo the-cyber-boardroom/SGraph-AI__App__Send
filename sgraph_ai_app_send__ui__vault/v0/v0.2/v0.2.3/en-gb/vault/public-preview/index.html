@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — Public Preview Editor</title>
+
+    <!-- Crypto + transport + vault libs (same set as the App page) -->
+    <script src="/_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="/_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--branches.js"></script>
+
+    <!-- Public-preview core + editor -->
+    <script src="/_common/js/lib/sg-public-preview/public-preview-crypto.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-schema.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-read.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-write.js"></script>
+    <script src="/_common/js/components/sg-public-preview-editor/sg-public-preview-editor.js"></script>
+
+    <style>
+        :root { --bg:#0a0a18; --surface:#14142a; --border:#2a2a44; --text:#e2e8f0; --muted:#9aa4bf; --primary:#4f8ff7; --danger:#E94560; }
+        * { box-sizing: border-box; }
+        body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding:24px; }
+        .wrap { max-width: 620px; margin: 0 auto; }
+        h1 { font-size: 1.15rem; margin: 0 0 4px; }
+        .sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 18px; }
+        .status { margin: 12px 0; font-size: 0.88rem; min-height: 1.2em; }
+        .status--err { color: var(--danger); }
+        .access { display:flex; gap:8px; align-items:center; margin: 10px 0 18px; }
+        .access input { flex:1; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font:inherit; }
+        .access label { font-size:0.8rem; color:var(--muted); }
+        .gate { display:none; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1>Public preview</h1>
+    <p class="sub" id="vault-name">Loading your vault…</p>
+    <div class="status" id="status">Opening vault from this browser…</div>
+
+    <div class="gate" id="gate">
+        <div class="access">
+            <label>Access key (needed to publish)</label>
+            <input id="access" type="password" placeholder="word-word-1234">
+            <button id="access-set">Use</button>
+        </div>
+        <sg-public-preview-editor id="editor"></sg-public-preview-editor>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+    const params   = new URLSearchParams(location.search);
+    const endpoint = (params.get('api') || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
+    const status   = (m, err) => { const el = document.getElementById('status'); el.textContent = m; el.className = 'status' + (err ? ' status--err' : ''); };
+
+    function readVaultKey() {
+        try { return localStorage.getItem('sg-vault-key') || ''; } catch (_) { return ''; }
+    }
+    function readAccessToken(vaultId) {
+        try {
+            return localStorage.getItem('accessKey:' + vaultId)
+                || localStorage.getItem('sg-vault-access-key-saved')
+                || sessionStorage.getItem('sg-vault-access-key') || '';
+        } catch (_) { return ''; }
+    }
+
+    (async function () {
+        const key = readVaultKey();
+        if (!key) { status('No vault is open in this browser. Open your vault first (enter its key on the vault page), then reopen this editor.', true); return; }
+        if (key.startsWith('ro-')) { status('This vault is open read-only. Public previews can only be published by the owner (open with the full vault key).', true); return; }
+
+        const sgSend = new SGSend({ endpoint: endpoint });
+        let vault;
+        try {
+            vault = await SGVault.open(sgSend, key);
+        } catch (e) { status('Could not open the vault: ' + e.message, true); return; }
+
+        document.getElementById('vault-name').textContent = 'Vault: ' + (vault.name || vault._vaultId || '(unnamed)');
+        document.getElementById('gate').style.display = 'block';
+
+        // Recover the write access token (per-vault, shared across tabs via localStorage).
+        const token = readAccessToken(vault._vaultId);
+        if (token) { sgSend.token = token; document.getElementById('access').value = token; }
+        status(token ? 'Vault ready. You can publish.' : 'Vault ready — enter your access key above before publishing.');
+
+        // Allow setting/overriding the access key here (so a fresh tab can still publish).
+        document.getElementById('access-set').addEventListener('click', () => {
+            const v = document.getElementById('access').value.trim();
+            sgSend.token = v;
+            try { if (v && vault._vaultId) localStorage.setItem('accessKey:' + vault._vaultId, v); } catch (_) {}
+            status(v ? 'Access key set. You can publish.' : 'Access key cleared.');
+        });
+
+        document.getElementById('editor').setContext({ sgSend: sgSend, vault: vault });
+    })();
+})();
+</script>
+</body>
+</html>
