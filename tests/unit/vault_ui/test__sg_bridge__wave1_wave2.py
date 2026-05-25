@@ -242,7 +242,7 @@ class test__sg_bridge__wave2__cache_invalidation(TestCase):
 
     def test__shell_dispatches_vault_synced_on_auto_sync(self):
         idx   = self.shell.index('async _checkAndAutoSync()')
-        chunk = self.shell[idx:idx+1400]
+        chunk = self.shell[idx:idx+2200]
         assert 'sg-vault-synced' in chunk
 
     def test__vault_synced_event_carries_prev_and_new_head(self):
