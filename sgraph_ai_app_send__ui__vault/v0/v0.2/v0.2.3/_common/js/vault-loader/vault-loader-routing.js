@@ -7,11 +7,13 @@
      /                   no hash  → redirect to /en-gb/
      /#token             has hash → save token to LS → redirect to /en-gb/app#token
      /#token|path        has hash with pipe → also save deep-link to sessionStorage
-     /#token|app:path    app: prefix → open file in App Mode
+     /#token|app:path    app: prefix → open vault via app-shell (requires app.json)
      /en-gb/app          has hash → app-shell opens vault; redirects to /en-gb/vault/ if no app.json
+                                    (clears sg-vault-deep-link before redirect so vault doesn't try App Mode)
      /en-gb/             any hash → strip (discard) → render landing
      /en-gb/vault        any hash → strip (discard) → auto-load from LS
-     /en-gb/vault/app    hash = file path → open that file in App Mode (bookmark URL)
+     /en-gb/vault/app    hash = file path → open that file in App Mode (preferred URL for "Open as App")
+                                    key must already be in localStorage (vault was open in another tab)
      /en-gb/vault/peek   any hash → strip (discard) → render peek page
 
    Rules:
@@ -22,9 +24,12 @@
      3. Deep-link path (part after |) is saved to sessionStorage key
         'sg-vault-deep-link' so the vault shell can restore it after mount.
         The app: prefix signals App Mode activation.
-     4. /en-gb/vault/app is a bookmark-friendly variant: the hash (#) is the
-        file path (no vault token — key must already be in localStorage).
+     4. /en-gb/vault/app is the preferred URL for "Open as App" from the vault UI.
+        The hash is the file path; key must already be in localStorage.
         The path is saved as 'sg-vault-deep-link' with the app: prefix.
+        Use this instead of /#token|app:path — the app-shell route expects an
+        app.json; without one it redirects to /en-gb/vault/ and the stale
+        deep-link causes "App did not signal ready" in sg-app-banner.
 
    Load order: after vault-loader-storage.js.
    ================================================================================= */

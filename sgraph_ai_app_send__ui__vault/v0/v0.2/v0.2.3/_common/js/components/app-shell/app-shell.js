@@ -172,6 +172,10 @@
         async _continue(appJson) {
             if (!appJson) {
                 // No app.json — this vault has no app. Drop back to the vault UI.
+                // Clear any pending deep-link so the vault doesn't try to activate
+                // App Mode (which would show "App did not signal ready" since there
+                // is no app to signal).
+                try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
