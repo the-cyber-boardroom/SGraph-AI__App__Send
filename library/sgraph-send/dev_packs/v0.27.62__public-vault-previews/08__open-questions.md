@@ -46,6 +46,7 @@ Each item is **RESOLVED** (decided / code-verified here) or **PENDING** (needs a
 |---|---|---|
 | ~~Q-update-blocker~~ | In-place update blocked by delete-tombstone | **RESOLVED — Option A implemented.** Per-transfer opt-in `allow_recreate` flag: when set, `delete_transfer` clears the metadata so the id can be recreated; default (False) keeps the tombstone for all other transfers. `publishPreview` opts in → delete-then-recreate keeps the same share link. Backward-compatible (66/66 existing transfer tests pass). Doc 03 §3. |
 | Q-pki | How this smooths once PKI lands | Direction noted (preview-then-ask-key → preview-then-auto-access for entitled identities; design already separates the two steps). Not in v1. Revisit with the PKI brief. |
+| Q-vault-id-verify | Verify a manually-typed key opens the *right* vault | The public-id carries no vault id, so a typed key opens whatever vault it's for — we can't confirm it matches "the vault this preview is about". The per-public-id stored key (`sg-pvp-key:<id>`, doc 04 §2.0) is correct by construction; for typed keys, putting the (non-secret) `vault_id` in the public preview JSON would let the card check the derived vault id and warn on mismatch. Deferred — small exposure trade-off to confirm. |
 | Q-meta-latency | The measured OG-render latency number | Produced during Phase 5 (the brief's performance ask); record it here when measured. |
 
 ---

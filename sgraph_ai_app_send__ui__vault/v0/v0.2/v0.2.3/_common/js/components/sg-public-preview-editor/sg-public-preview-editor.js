@@ -158,6 +158,9 @@
                 const fn = isUpdate ? PublicPreviewWrite.updatePreview : PublicPreviewWrite.publishPreview;
                 const res = await fn.call(PublicPreviewWrite, { sgSend, vault, publicId: idCheck.id, preview, expiry: this._collectExpiry() });
                 this._published = res;
+                // Remember this vault's key for this public-id, so revisiting /app/<id>
+                // on this device offers a one-click "key saved on this device" open.
+                try { if (this._vaultKey) localStorage.setItem('sg-pvp-key:' + idCheck.id, this._vaultKey); } catch (_) {}
                 this._status(isUpdate ? 'Updated. Your share link is unchanged.' : 'Published.');
                 this._renderShare(res);
             } catch (e) {
