@@ -457,7 +457,7 @@
     }
 
     SgPublicPreviewEditor.styles = `
-        :host { display:block; font-family: var(--font-body, system-ui, sans-serif); color: var(--color-text, #e2e8f0); }
+        :host { display:block; box-sizing:border-box; padding: 16px 20px; font-family: var(--font-body, system-ui, sans-serif); color: var(--color-text, #e2e8f0); }
         .ed { max-width: 560px; }
         .ed-intro, .ed-hint { color: var(--color-text-secondary, #9aa4bf); font-size: 0.82rem; }
         .ed-switch { font-size: 0.95rem; }
