@@ -20,9 +20,13 @@ const PublicPreviewSchema = {
     ID_RE:            /^[a-z0-9]([a-z0-9-]{2,61})[a-z0-9]$/,   // 4–63 chars, no leading/trailing/double hyphen handled below
     SIMPLE_TOKEN_RE:  /^[a-z]+-[a-z]+-\d{4}$/,                  // reserved — Simple Token shape
 
+    DISCLAIMER_VARIANTS: ['danger', 'warning', 'info', 'neutral'],
+
     emptyPreview() {
         return { schema: this.SCHEMA_ID, title: '', description: '', thumbnail: null,
-                 disclaimer: '', support: null, expiry: null, created_at_ms: Date.now() }
+                 disclaimer: '', disclaimer_label: 'Confidential', disclaimer_variant: 'danger',
+                 show_footer: true, footer_text: '',
+                 support: null, expiry: null, created_at_ms: Date.now() }
     },
 
     // --- public-id format ------------------------------------------------------

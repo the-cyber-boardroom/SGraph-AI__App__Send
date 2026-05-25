@@ -157,6 +157,10 @@ A single known file the UI understands. `PREVIEW_SCHEMA_VERSION = 1`.
     "data": "data:image/webp;base64,UklGR... (≤ ~64 KB recommended)"
   },
   "disclaimer": "Confidential. Do not use unless authorised.",
+  "disclaimer_label": "Confidential",
+  "disclaimer_variant": "danger",
+  "show_footer": true,
+  "footer_text": "",
   "support": { "label": "No key? Contact Dinis", "href": "mailto:dinis.cruz@owasp.org" },
   "expiry": {
     "expires_at_ms": 1748908800000,
@@ -171,6 +175,8 @@ A single known file the UI understands. `PREVIEW_SCHEMA_VERSION = 1`.
 **Thumbnail encoding — inline vs blob.**
 - **Default: inline data URL** (one fetch, one decrypt, simplest social-card story). Cap ~64 KB encoded to keep the transfer small and the card fast.
 - **Larger images: a second transfer** whose id is derived from `"<public-id>:thumb"` under the same domain-separated derivation, referenced as `{ "mode": "transfer", "transfer_ref": "<derived-id>", "media_type": "..." }`. Costs one extra fetch; keeps the JSON small. Decided per preview by the editor based on size.
+
+The disclaimer badge is owner-styled: `disclaimer_label` (default `"Confidential"`) + `disclaimer_variant` (`danger` red / `warning` amber / `info` blue / `neutral` grey). The footer note is owner-controlled: `show_footer` (default `true`) toggles it; `footer_text` overrides the default "This is a public preview…" copy.
 
 `validatePreview()` rejects: an unknown `schema`, oversized inline thumbnails, and any field literally named `write_key` / `read_key` / `passphrase` (defence-in-depth, doc 09 R2). Required: `schema`, `title`. All else optional.
 

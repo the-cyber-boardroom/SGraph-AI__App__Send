@@ -79,10 +79,14 @@
             const thumb = (preview.thumbnail && preview.thumbnail.mode === 'inline' && preview.thumbnail.data)
                 ? `<img class="pvp-thumb" alt="" src="${this._esc(preview.thumbnail.data)}">`
                 : `<div class="pvp-thumb pvp-thumb--empty">🔒</div>`;
+            const dvar   = ['danger', 'warning', 'info', 'neutral'].indexOf(preview.disclaimer_variant) >= 0 ? preview.disclaimer_variant : 'danger';
+            const dlabel = (preview.disclaimer_label != null) ? preview.disclaimer_label : 'Confidential';
             const disclaimer = preview.disclaimer
-                ? `<div class="pvp-disclaimer"><strong>Confidential</strong> ${this._esc(preview.disclaimer)}</div>` : '';
+                ? `<div class="pvp-disclaimer pvp-disclaimer--${dvar}">${dlabel ? `<strong>${this._esc(dlabel)}</strong> ` : ''}${this._esc(preview.disclaimer)}</div>` : '';
             const expiry = (preview.expiry && preview.expiry.expires_at_ms)
                 ? `<div class="pvp-expnote">Available until ${new Date(preview.expiry.expires_at_ms).toLocaleDateString()}</div>` : '';
+            const footer = (preview.show_footer === false) ? ''
+                : `<p class="pvp-foot">${this._esc(preview.footer_text || "This is a public preview. The vault's contents stay encrypted.")}</p>`;
             return `<div class="pvp-card">
                 <div class="pvp-row">${thumb}<div class="pvp-meta">
                     <h1 class="pvp-title">${this._esc(preview.title)}</h1>
@@ -91,7 +95,7 @@
                 ${disclaimer}
                 ${this._keyPrompt(s)}
                 ${this._support(preview)}
-                <p class="pvp-foot">This is a public preview. The vault's contents stay encrypted.</p>
+                ${footer}
                 ${this._how(s)}</div>`;
         }
 
@@ -138,7 +142,11 @@
         .pvp-desc { margin: 0; color: var(--color-text-secondary, #9aa4bf); font-size: 0.92rem; }
         .pvp-expnote { margin-top: 6px; font-size: 0.78rem; color: var(--color-text-secondary, #9aa4bf); }
         .pvp-disclaimer { margin: 14px 0; padding: 10px 12px; border: 1px solid var(--color-border, #2a2a44);
-            border-left: 3px solid var(--danger, #E94560); border-radius: 6px; font-size: 0.86rem; }
+            border-left: 3px solid #E94560; border-radius: 6px; font-size: 0.86rem; }
+        .pvp-disclaimer--danger  { border-left-color: #E94560; } .pvp-disclaimer--danger strong  { color: #E94560; }
+        .pvp-disclaimer--warning { border-left-color: #E9C445; } .pvp-disclaimer--warning strong { color: #E9C445; }
+        .pvp-disclaimer--info    { border-left-color: #4f8ff7; } .pvp-disclaimer--info strong    { color: #4f8ff7; }
+        .pvp-disclaimer--neutral { border-left-color: #9aa4bf; } .pvp-disclaimer--neutral strong { color: #cbd5e1; }
         .pvp-keyform { margin-top: 16px; }
         .pvp-klabel { display: block; font-size: 0.82rem; margin-bottom: 6px; color: var(--color-text-secondary, #9aa4bf); }
         .pvp-krow { display: flex; gap: 8px; }

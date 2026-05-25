@@ -115,7 +115,13 @@
             const p = PublicPreviewSchema.emptyPreview();
             p.title       = this._val('.ed-title');
             p.description = this._val('.ed-desc');
-            p.disclaimer  = this._val('.ed-disclaimer');
+            p.disclaimer       = this._val('.ed-disclaimer');
+            p.disclaimer_label = this._val('.ed-disclaimer-label');
+            const sel = this.$('.ed-disclaimer-variant');
+            p.disclaimer_variant = sel ? sel.value : 'danger';
+            const sf = this.$('.ed-show-footer');
+            p.show_footer = sf ? sf.checked : true;
+            p.footer_text = this._val('.ed-footer-text');
             const sl = this._val('.ed-support-label'), sh = this._val('.ed-support-href');
             if (sh) p.support = { label: sl || 'Contact', href: sh };
             if (this._thumb) p.thumbnail = this._thumb;
@@ -219,7 +225,17 @@
                   <label class="ed-l">Thumbnail</label>
                   <input type="file" accept="image/*" class="ed-thumb-file">
                   <div class="ed-thumb-preview"></div><p class="ed-thumb-note ed-hint"></p>
-                  <label class="ed-l">Disclaimer<textarea class="ed-disclaimer" rows="2" placeholder="Confidential. Do not use unless authorised."></textarea></label>
+                  <label class="ed-l">Disclaimer / badge</label>
+                  <div class="ed-disclaimer-row">
+                    <input class="ed-disclaimer-label" placeholder="Confidential" value="Confidential">
+                    <select class="ed-disclaimer-variant">
+                      <option value="danger">Danger (red)</option>
+                      <option value="warning">Warning (amber)</option>
+                      <option value="info">Info (blue)</option>
+                      <option value="neutral">Neutral (grey)</option>
+                    </select>
+                  </div>
+                  <textarea class="ed-disclaimer" rows="2" placeholder="Badge text. Leave empty for no badge."></textarea>
                   <div class="ed-support">
                     <label class="ed-l">Support label<input class="ed-support-label" placeholder="No key? Contact…"></label>
                     <label class="ed-l">Support href<input class="ed-support-href" placeholder="mailto:…"></label>
@@ -229,6 +245,8 @@
                     <label><input type="checkbox" class="ed-exp-opens-on"> Stop after <input class="ed-exp-opens" type="number" min="1" value="50" style="width:64px"> opens</label>
                     <p class="ed-hint">Server-enforced. Both off = no expiry.</p>
                   </fieldset>
+                  <label class="ed-l"><input type="checkbox" class="ed-show-footer" checked> Show the "public preview" footer note</label>
+                  <input class="ed-footer-text" placeholder="This is a public preview. The vault's contents stay encrypted.">
                   <div class="ed-actions">
                     <button class="ed-publish" type="button">Review &amp; publish →</button>
                     <button class="ed-update"  type="button">Update (same link)</button>
@@ -246,8 +264,9 @@
                 this.$('.ed-publish').addEventListener('click', () => this._confirmThenPublish(false));
                 this.$('.ed-update').addEventListener('click',  () => this._confirmThenPublish(true));
                 this.$('.ed-unpub').addEventListener('click',   () => this._doUnpublish());
-                this.$('.ed-form').addEventListener('input', () => this._emitChanged());   // live preview
-                this._emitChanged();                                                       // initial paint
+                this.$('.ed-form').addEventListener('input', () => this._emitChanged());    // text / textarea
+                this.$('.ed-form').addEventListener('change', () => this._emitChanged());   // select / checkbox
+                this._emitChanged();                                                        // initial paint
                 const accUse = this.$('.ed-access-use');
                 if (accUse) accUse.addEventListener('click', () => this._useAccessKey());
                 // Self-open the vault (or reflect an already-set context).
@@ -330,9 +349,20 @@
         .ed-intro, .ed-hint { color: var(--color-text-secondary, #9aa4bf); font-size: 0.82rem; }
         .ed-switch { font-size: 0.95rem; }
         .ed-l { display:block; margin: 10px 0 4px; font-size: 0.85rem; }
-        .ed input[type=text], .ed input:not([type]), .ed textarea, .ed-id-custom, .ed-id-rnd, .ed-title, .ed-desc, .ed-disclaimer, .ed-support-label, .ed-support-href {
+        .ed input[type=text], .ed input[type=password], .ed input:not([type]), .ed textarea, .ed-id-custom, .ed-id-rnd, .ed-title, .ed-desc, .ed-disclaimer, .ed-disclaimer-label, .ed-footer-text, .ed-support-label, .ed-support-href {
             width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--color-border, #2a2a44);
             background: var(--bg-secondary, #1c1c33); color: var(--color-text, #e2e8f0); font: inherit; }
+        .ed input[type=number], .ed select {
+            padding: 8px 10px; border-radius: 6px; border: 1px solid var(--color-border, #2a2a44);
+            background: var(--bg-secondary, #1c1c33); color: var(--color-text, #e2e8f0); font: inherit; }
+        .ed input[type=file] { color: var(--color-text-secondary, #9aa4bf); font: inherit; max-width: 100%; }
+        .ed input[type=file]::file-selector-button {
+            padding: 7px 12px; border-radius: 6px; border: 1px solid var(--color-border, #2a2a44);
+            background: var(--bg-secondary, #1c1c33); color: var(--color-text, #e2e8f0); font: inherit; cursor: pointer; margin-right: 10px; }
+        .ed input[type=checkbox], .ed input[type=radio] { accent-color: var(--color-primary, #4f8ff7); }
+        .ed-disclaimer-row { display: flex; gap: 8px; margin: 4px 0 6px; }
+        .ed-disclaimer-row .ed-disclaimer-label { flex: 1; }
+        .ed-disclaimer-row .ed-disclaimer-variant { flex: 0 0 auto; }
         fieldset { border: 1px solid var(--color-border, #2a2a44); border-radius: 8px; margin: 14px 0; padding: 10px 12px; }
         legend { font-size: 0.8rem; color: var(--color-text-secondary, #9aa4bf); }
         .ed-actions { display:flex; gap:8px; margin-top: 14px; flex-wrap: wrap; }
