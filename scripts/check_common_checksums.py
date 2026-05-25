@@ -18,8 +18,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT  = Path(__file__).resolve().parent.parent
-SHARE_BASE = REPO_ROOT / "sgraph_ai_app_send__ui__share/v0/v0.4/v0.4.0/_common"
-OPEN_BASE  = REPO_ROOT / "sgraph_ai_app_send__ui__open/v0/v0.4/v0.4.0/_common"
+SHARE_BASE = REPO_ROOT / "sgraph_ai_app_send__ui__share/v0/v0.4/v0.4.0/en-gb/_common"
+OPEN_BASE  = REPO_ROOT / "sgraph_ai_app_send__ui__open/v0/v0.4/v0.4.0/en-gb/_common"
 
 # Files expected to be byte-identical between the two trees' `_common/`.
 # Keep this list in sync with §3.3 and §9 of the v0.4.0 plan.

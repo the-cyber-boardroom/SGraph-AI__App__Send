@@ -7,25 +7,25 @@
     <meta name="description" content="Share files and secrets securely with zero-knowledge encryption. Your data is encrypted in your browser before upload. The server never sees your data.">
 
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="../../_common/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="../_common/favicon.svg">
 
     <!-- Fonts -->
-    <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+    <link rel="stylesheet" href="../_common/fonts/fonts.css">
 
     <!-- Design tokens + shared styles -->
-    <link rel="stylesheet" href="../../_common/css/design-tokens.css">
-    <link rel="stylesheet" href="../../_common/css/shared-components.css">
+    <link rel="stylesheet" href="../_common/css/design-tokens.css">
+    <link rel="stylesheet" href="../_common/css/shared-components.css">
 
     <!-- Component styles -->
-    <link rel="stylesheet" href="../../_common/js/components/send-upload/send-upload.css">
-    <link rel="stylesheet" href="../../_common/js/components/send-transparency/send-transparency.css">
-    <link rel="stylesheet" href="../../_common/js/components/send-header/send-header.css">
-    <link rel="stylesheet" href="../../_common/js/components/send-footer/send-footer.css">
-    <link rel="stylesheet" href="../../_common/js/components/send-locale/send-locale.css">
-    <link rel="stylesheet" href="../../_common/js/components/send-test-files/send-test-files.css">
+    <link rel="stylesheet" href="../_common/js/components/send-upload/send-upload.css">
+    <link rel="stylesheet" href="../_common/js/components/send-transparency/send-transparency.css">
+    <link rel="stylesheet" href="../_common/js/components/send-header/send-header.css">
+    <link rel="stylesheet" href="../_common/js/components/send-footer/send-footer.css">
+    <link rel="stylesheet" href="../_common/js/components/send-locale/send-locale.css">
+    <link rel="stylesheet" href="../_common/js/components/send-test-files/send-test-files.css">
 
     <!-- Options step CSS (light-DOM component — stylesheet must live in document scope) -->
-    <link rel="stylesheet" href="../../_common/js/components/send-upload/upload-step-options/upload-step-options.css">
+    <link rel="stylesheet" href="../_common/js/components/send-upload/upload-step-options/upload-step-options.css">
 </head>
 <body>
 
@@ -50,7 +50,7 @@
          v0.4.1+ surgical overlays land at __share/v0/v0.4/v0.4.x/
 
          Path note: en-gb/share/ is two levels deep under the tree root, so
-         all _common/ paths use ../../_common/ (vs ../_common/ in v0.3.x).
+         all _common/ paths use ../_common/ (vs ../_common/ in v0.3.x).
 
          All v0.3.x overlays (api-client-v032, upload-constants-patch,
          upload-folder-v031, upload-step-select-secret, upload-step-done-secret,
@@ -61,7 +61,7 @@
          ═══════════════════════════════════════════════════════════════════════ -->
 
     <!-- 0. Build info -->
-    <script src="../../_common/js/build-info.js"></script>
+    <script src="../_common/js/build-info.js"></script>
     <script>
         if (!window.SGRAPH_BUILD) {
             window.SGRAPH_BUILD = { appVersion: 'dev', uiVersion: 'v0.4.0' };
@@ -71,52 +71,52 @@
     </script>
 
     <!-- 1. Utilities -->
-    <script src="../../_common/js/i18n.js"></script>
-    <script src="../../_common/js/crypto.js"></script>
-    <script src="../../_common/js/friendly-crypto.js"></script>
-    <script src="../../_common/js/api-client.js"></script>
+    <script src="../_common/js/i18n.js"></script>
+    <script src="../_common/js/crypto.js"></script>
+    <script src="../_common/js/friendly-crypto.js"></script>
+    <script src="../_common/js/api-client.js"></script>
 
     <!-- 2. Base system -->
-    <script src="../../_common/js/base/send-helpers.js"></script>
-    <script src="../../_common/js/base/send-component-paths.js"></script>
+    <script src="../_common/js/base/send-helpers.js"></script>
+    <script src="../_common/js/base/send-component-paths.js"></script>
     <script>
-        SendComponentPaths.init('../../_common');
+        SendComponentPaths.init('../_common');
         SendComponentPaths.alias('upload-step-options',  'send-upload/upload-step-options');
     </script>
-    <script src="../../_common/js/base/send-component.js"></script>
+    <script src="../_common/js/base/send-component.js"></script>
 
     <!-- 3. Shared components -->
-    <script src="../../_common/js/components/send-locale/send-locale.js"></script>
-    <script src="../../_common/js/components/send-header/send-header.js"></script>
-    <script src="../../_common/js/components/send-header/send-header-beta.js"></script>
-    <script src="../../_common/js/components/send-footer/send-footer.js"></script>
-    <script src="../../_common/js/components/send-transparency/send-transparency.js"></script>
+    <script src="../_common/js/components/send-locale/send-locale.js"></script>
+    <script src="../_common/js/components/send-header/send-header.js"></script>
+    <script src="../_common/js/components/send-header/send-header-beta.js"></script>
+    <script src="../_common/js/components/send-footer/send-footer.js"></script>
+    <script src="../_common/js/components/send-transparency/send-transparency.js"></script>
 
     <!-- 4. Upload components -->
-    <script src="../../_common/js/components/send-step-indicator/send-step-indicator.js"></script>
-    <script src="../../_common/js/qr-code.js"></script>
-    <script src="../../_common/js/components/send-access-gate/send-access-gate.js"></script>
+    <script src="../_common/js/components/send-step-indicator/send-step-indicator.js"></script>
+    <script src="../_common/js/qr-code.js"></script>
+    <script src="../_common/js/components/send-access-gate/send-access-gate.js"></script>
 
     <!-- Upload shared modules -->
-    <script src="../../_common/js/components/send-upload/upload-constants.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-crypto.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-file-utils.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-thumbnails.js"></script>
+    <script src="../_common/js/components/send-upload/upload-constants.js"></script>
+    <script src="../_common/js/components/send-upload/upload-crypto.js"></script>
+    <script src="../_common/js/components/send-upload/upload-file-utils.js"></script>
+    <script src="../_common/js/components/send-upload/upload-thumbnails.js"></script>
 
     <!-- Upload business logic -->
-    <script src="../../_common/js/components/send-upload/upload-folder.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-engine.js"></script>
+    <script src="../_common/js/components/send-upload/upload-folder.js"></script>
+    <script src="../_common/js/components/send-upload/upload-engine.js"></script>
 
     <!-- Upload step sub-components -->
-    <script src="../../_common/js/components/send-upload/upload-step-select/upload-step-select.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-step-options/upload-step-options.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-step-confirm/upload-step-confirm.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-step-progress/upload-step-progress.js"></script>
-    <script src="../../_common/js/components/send-upload/upload-step-done/upload-step-done.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-select/upload-step-select.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-options/upload-step-options.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-confirm/upload-step-confirm.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-progress/upload-step-progress.js"></script>
+    <script src="../_common/js/components/send-upload/upload-step-done/upload-step-done.js"></script>
 
     <!-- Upload orchestrator -->
-    <script src="../../_common/js/components/send-upload/send-upload.js"></script>
-    <script src="../../_common/js/components/send-test-files/send-test-files.js"></script>
+    <script src="../_common/js/components/send-upload/send-upload.js"></script>
+    <script src="../_common/js/components/send-test-files/send-test-files.js"></script>
 
     <!-- 5. Init -->
     <script>

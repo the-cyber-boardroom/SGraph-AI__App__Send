@@ -7,12 +7,16 @@ As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate pac
 UI package remains in the repo for rollback. All browser UIs use IFD versioning (no
 framework, Shadow DOM Web Components, surgical overlays).
 
-> **DEPLOY INCIDENT (2026-05-25):** `dev.send.sgraph.ai` is serving 404 site-wide. The
+> **DEPLOY INCIDENT (2026-05-25):** `dev.send.sgraph.ai` was serving 404 site-wide. The
 > three user-facing pipelines (`deploy-ui-{user,share,open}.yml`) all publish to the same
 > `--site sgraph-send` `latest/` prefix and each ran a full `--clean-latest` (whole-prefix
-> `rm`), so each deploy deleted the other two trees' files. The "Public URL" lines below
-> describe the INTENDED routing; until the redeploy runbook runs, only the last-deployed
-> tree's slice is actually live. Root cause + structural CI fix (scoped clean):
+> `rm`), so each deploy deleted the other two trees' files. **FIX (branch
+> `claude/tender-tesla-AxZJX`):** (1) scoped per-tree clean instead of whole-prefix `rm`;
+> (2) v0.4.0's `_common/`/`i18n/`/`test-files/` relocated under `en-gb/` so v0.4.0 serves
+> `latest/en-gb/_common/` and the v0.3.x user tree keeps `latest/_common/` — disjoint, so
+> v0.3.x and v0.4.0 now coexist with no collision (deploy order irrelevant). The "Public
+> URL" lines below describe the routing that is restored once the redeploy runbook runs.
+> Root cause + full fix:
 > `team/roles/architect/reviews/05/25/v0.27.61__architect-review__user-ui-v0.4.0-deploy-collision.md`.
 
 ---
