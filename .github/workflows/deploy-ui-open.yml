@@ -150,10 +150,14 @@ jobs:
 
             EXTRA_FLAGS=""
 
+            # Scoped clean: the open tree only owns /en-gb/open/ in the shared
+            # sgraph-send latest/ prefix. A full --clean-latest would delete the
+            # sibling user (/, /en-gb/) and share (/en-gb/share/) trees — that is what
+            # caused the site-wide 404. Only clean our own slice.
             if [ "$VERSION" == "$FIRST" ]; then
               if [ "$CLEAN_REQUESTED" != "false" ]; then
-                EXTRA_FLAGS="--clean-latest"
-                echo "  → Cleaning latest/ (replacing previous version)"
+                EXTRA_FLAGS="--clean-prefixes en-gb/open"
+                echo "  → Cleaning latest/en-gb/open/ (this tree's slice only)"
               fi
             fi
 

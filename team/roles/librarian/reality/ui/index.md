@@ -7,6 +7,14 @@ As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate pac
 UI package remains in the repo for rollback. All browser UIs use IFD versioning (no
 framework, Shadow DOM Web Components, surgical overlays).
 
+> **DEPLOY INCIDENT (2026-05-25):** `dev.send.sgraph.ai` is serving 404 site-wide. The
+> three user-facing pipelines (`deploy-ui-{user,share,open}.yml`) all publish to the same
+> `--site sgraph-send` `latest/` prefix and each ran a full `--clean-latest` (whole-prefix
+> `rm`), so each deploy deleted the other two trees' files. The "Public URL" lines below
+> describe the INTENDED routing; until the redeploy runbook runs, only the last-deployed
+> tree's slice is actually live. Root cause + structural CI fix (scoped clean):
+> `team/roles/architect/reviews/05/25/v0.27.61__architect-review__user-ui-v0.4.0-deploy-collision.md`.
+
 ---
 
 ## EXISTS (Code-Verified)
