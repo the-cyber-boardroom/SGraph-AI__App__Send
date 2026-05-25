@@ -48,6 +48,22 @@ const PublicPreviewWrite = {
         else        await vault.addFile(this.BK_FOLDER, fileName, bytes)
     },
 
+    // All bookkeeping records in the vault (a vault may carry several previews).
+    // Returns parsed records (active and unpublished alike) for a management list.
+    async listBookkeeping(vault) {
+        let entries = []
+        try { entries = vault.listFolder(this.BK_FOLDER) || [] } catch (_) { return [] }
+        const out = []
+        for (const entry of entries) {
+            if (!entry.name || !entry.name.endsWith('.json')) continue
+            try {
+                const bk = JSON.parse(new TextDecoder().decode(await vault.getFile(this.BK_FOLDER, entry.name)))
+                if (bk && bk.public_id) out.push(bk)
+            } catch (_) { /* skip unreadable */ }
+        }
+        return out
+    },
+
     // --- publish ---------------------------------------------------------------
     // expiry: { expiresAtMs?: number|null, maxAccessCount?: number|null, autoDelete?: bool }
     async publishPreview({ sgSend, vault, publicId, preview, expiry = {} }) {
@@ -130,6 +146,22 @@ const PublicPreviewWrite = {
             bk.unpublished_at_ms = Date.now()
             await this._writeBookkeeping(vault, id, bk)
         }
+        return { publicId: id }
+    },
+
+    // --- delete (take the preview down AND remove the bookkeeping record) ------
+    // Unlike unpublish (which keeps an inactive record so the same link can be
+    // republished), this fully removes the entry. Best-effort on the transfer:
+    // a 404/already-gone is fine — we still drop the local record.
+    async deletePreview({ sgSend, vault, publicId }) {
+        const id = PublicPreviewSchema.validatePublicId(publicId).id || publicId
+        const bk = await this.readBookkeeping(vault, id)
+        if (bk && bk.transfer_id && bk.delete_auth) {
+            try { await sgSend.deleteTransfer(bk.transfer_id, bk.delete_auth) }
+            catch (err) { if (!/\(404\)|not_found/.test(err.message)) throw err }
+        }
+        try { await vault.removeFile(this.BK_FOLDER, `${id}.json`) }
+        catch (_) { /* already gone */ }
         return { publicId: id }
     }
 }

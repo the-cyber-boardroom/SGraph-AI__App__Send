@@ -82,31 +82,69 @@
             } catch (e) { this._setOwnerStatus('error', e.message); return null; }
         }
 
-        // Scan the owner vault for an already-published preview and load it for editing.
+        // Scan the owner vault for published previews. Always paint the manage list;
+        // auto-load into the form ONLY when there's exactly one active preview
+        // (with several, the owner picks one from the list instead).
         async _loadExisting() {
             const vault = this._ctx && this._ctx.vault;
             if (!vault || typeof PublicPreviewRead === 'undefined') return;
-            let entries = null;
-            try { entries = vault.listFolder('.vault/owner/public-previews'); } catch (_) {}
-            if (!entries || !entries.length) return;
-            for (const entry of entries) {
-                if (!entry.name || !entry.name.endsWith('.json')) continue;
-                let bk = null;
-                try { bk = JSON.parse(new TextDecoder().decode(await vault.getFile('.vault/owner/public-previews', entry.name))); }
-                catch (_) { continue; }
-                if (!bk || bk.active === false || !bk.public_id) continue;
-                let res = null;
-                const api = bk.api_base || (this._ctx.sgSend && this._ctx.sgSend.endpoint);
-                try { res = await PublicPreviewRead.fetchPreview(api, bk.public_id); } catch (_) {}
-                if (res && res.status === 'ok' && res.preview) {
-                    this._on = true;
-                    this._existing = true;
-                    this.render();
-                    this._populateForm(res.preview, bk.public_id);
-                    this._setOwnerStatus((this._ctx.sgSend && this._ctx.sgSend.token) ? 'ready' : 'no-token');
-                    this._status('Loaded your published preview — edit and "Update (same link)", or "Unpublish".');
-                    return;
-                }
+            let list = [];
+            try { list = await PublicPreviewWrite.listBookkeeping(vault); } catch (_) {}
+            await this._renderManage();
+            const active = list.filter(bk => bk.active !== false && bk.public_id);
+            if (active.length !== 1) return;
+            await this._editEntry(active[0].public_id, true);
+        }
+
+        // Render the per-preview management list (edit / delete each record).
+        async _renderManage() {
+            const host = this.$('.ed-manage');
+            if (!host) return;
+            const vault = this._ctx && this._ctx.vault;
+            if (!vault) { host.innerHTML = ''; return; }
+            let list = [];
+            try { list = await PublicPreviewWrite.listBookkeeping(vault); } catch (_) {}
+            if (!list.length) { host.innerHTML = ''; return; }
+            const rows = list.map(bk => {
+                const active = bk.active !== false;
+                return `<li class="ed-mrow">
+                    <span class="ed-mid" title="${this._esc(bk.public_id)}">${this._esc(bk.public_id)}</span>
+                    <span class="ed-mbadge ${active ? 'ed-mbadge--on' : 'ed-mbadge--off'}">${active ? 'published' : 'unpublished'}</span>
+                    <span class="ed-mbtns">
+                      <button type="button" class="ed-medit" data-id="${this._esc(bk.public_id)}">Edit</button>
+                      <button type="button" class="ed-mdel"  data-id="${this._esc(bk.public_id)}">Delete</button>
+                    </span>
+                  </li>`;
+            }).join('');
+            host.innerHTML = `<div class="ed-manage-box">
+                <div class="ed-manage-h">Your previews in this vault (${list.length})</div>
+                <ul class="ed-mlist">${rows}</ul>
+                <p class="ed-hint">“Unpublish” takes a preview offline but keeps the record so you can republish at the same link. “Delete” removes the public file and the record from this vault.</p>
+              </div>`;
+            host.querySelectorAll('.ed-medit').forEach(b => b.addEventListener('click', () => this._editEntry(b.dataset.id)));
+            host.querySelectorAll('.ed-mdel').forEach(b  => b.addEventListener('click', () => this._confirmDelete(b.dataset.id)));
+        }
+
+        // Load a specific preview (by public-id) into the form for editing.
+        async _editEntry(publicId, quiet) {
+            const vault = this._ctx && this._ctx.vault;
+            if (!vault) return;
+            const bk  = await PublicPreviewWrite.readBookkeeping(vault, publicId);
+            const api = (bk && bk.api_base) || (this._ctx.sgSend && this._ctx.sgSend.endpoint);
+            let res = null;
+            try { res = await PublicPreviewRead.fetchPreview(api, publicId); } catch (_) {}
+            this._on = true;
+            this._existing = true;
+            this.render();
+            if (res && res.status === 'ok' && res.preview) {
+                this._populateForm(res.preview, publicId);
+                this._setOwnerStatus((this._ctx.sgSend && this._ctx.sgSend.token) ? 'ready' : 'no-token');
+                this._status(quiet ? 'Loaded your published preview — edit and "Update (same link)", or "Unpublish".'
+                                   : `Loaded “${publicId}” — edit and "Update (same link)", or "Unpublish".`);
+            } else {
+                const cr = this.$('.ed-id-custom-r'); if (cr) cr.checked = true;
+                const c  = this.$('.ed-id-custom');   if (c)  c.value = publicId;
+                this._status('This preview is unpublished. Edit and republish, or delete it from the list above.');
             }
         }
 
@@ -281,6 +319,35 @@
             } catch (e) { this._status('Unpublish failed: ' + e.message, true); }
         }
 
+        _confirmDelete(publicId) {
+            this._showConfirmModal(
+                `Delete preview “${publicId}”?`,
+                [`This removes the public file at …/app/${publicId} AND the bookkeeping record from this vault.`,
+                 `The vault's contents are unaffected. You can re-create a preview under the same id later.`],
+                'Delete permanently',
+                () => this._doDelete(publicId)
+            );
+        }
+
+        async _doDelete(publicId) {
+            const ctx = await this._ensureContext();
+            if (!ctx) return;
+            const { sgSend, vault } = ctx;
+            this._status('Deleting…');
+            try {
+                await PublicPreviewWrite.deletePreview({ sgSend, vault, publicId });
+                // If the form was showing the one we just deleted, reset it.
+                let current = null;
+                try { current = this.$('.ed-id-custom') ? this._publicId() : null; } catch (_) {}
+                if (current === publicId) {
+                    this._existing = false;
+                    const share = this.$('.ed-share'); if (share) share.innerHTML = '';
+                }
+                this._status(`Deleted “${publicId}”.`);
+                await this._renderManage();
+            } catch (e) { this._status('Delete failed: ' + e.message, true); }
+        }
+
         _status(msg, isErr) { const el = this.$('.ed-status'); if (el) { el.textContent = msg; el.className = 'ed-status' + (isErr ? ' ed-status--err' : ''); } }
 
         async _renderShare(res) {
@@ -337,6 +404,7 @@
                   <label class="ed-switch"><input type="checkbox" class="ed-on" ${this._on ? 'checked' : ''}> Public preview: <strong>${this._on ? 'ON' : 'OFF'}</strong></label>
                 </div>
                 <p class="ed-intro">A public preview lets anyone with the link see the title, description, and thumbnail you choose — even without the vault key. It is deliberately public.</p>
+                <div class="ed-manage"></div>
                 <div class="ed-form" style="display:${this._on ? 'block' : 'none'}">
                   <div class="ed-owner-status"></div>
                   <div class="ed-access" style="display:none">
@@ -420,6 +488,7 @@
                     if (!this._existing) this._prefillFromVault(this._ctx.vault);
                 } else { this._ensureContext(); }
             }
+            if (this._ctx && this._ctx.vault) this._renderManage();   // (re)paint the per-preview manage list
         }
 
         // Seed empty fields from the vault: the preview Title defaults to the vault
@@ -519,6 +588,20 @@
         .ed-status { margin-top: 10px; font-size: 0.85rem; }
         .ed-status--err { color: var(--danger, #E94560); }
         .ed-thumb-preview img { max-width: 100%; width: 320px; border-radius: 6px; margin-top: 8px; display: block; }
+        .ed-manage-box { margin: 8px 0 14px; border: 1px solid var(--color-border,#2a2a44); border-radius: 8px; padding: 10px 12px; background: var(--bg-secondary,#1c1c33); }
+        .ed-manage-h { font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+        .ed-mlist { list-style:none; margin:0; padding:0; }
+        .ed-mrow { display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--color-border,#2a2a44); }
+        .ed-mrow:first-child { border-top:0; }
+        .ed-mid { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family: var(--font-mono, ui-monospace, monospace); font-size:0.83rem; }
+        .ed-mbadge { font-size:0.68rem; padding:2px 8px; border-radius:999px; flex:0 0 auto; }
+        .ed-mbadge--on  { background: rgba(34,160,107,0.18); color:#3ddc97; }
+        .ed-mbadge--off { background: rgba(154,164,191,0.16); color: var(--color-text-secondary,#9aa4bf); }
+        .ed-mbtns { display:flex; gap:6px; flex:0 0 auto; }
+        .ed-mbtns button { padding:5px 11px; border-radius:6px; border:1px solid var(--color-border,#2a2a44);
+            background:var(--surface,#14142a); color:var(--color-text,#e2e8f0); cursor:pointer; font:inherit; font-size:0.8rem; }
+        .ed-mbtns button:hover { background:#23234a; }
+        .ed-mdel:hover { background: rgba(233,69,96,0.16) !important; border-color: var(--danger,#E94560); color:#ff8095; }
         .ed-sharebox { margin-top: 12px; border-top:1px solid var(--color-border,#2a2a44); padding-top:10px; }
         .ed-copyrow { display:flex; gap:8px; align-items:center; } .ed-copyrow input { flex:1; min-width:0; }
         .ed-copyrow button { padding:8px 12px; border-radius:6px; border:1px solid var(--color-border,#2a2a44);
