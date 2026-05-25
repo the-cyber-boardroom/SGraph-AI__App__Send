@@ -19,7 +19,14 @@
             this.attachShadow({ mode: 'open' });
             this._state = { status: 'loading' };
         }
-        connectedCallback() { this.render(); }
+        connectedCallback() {
+            // Live-preview wiring: when a <sg-public-preview-editor> on the page broadcasts an
+            // edit, render it here. Harmless on the public page (no editor → event never fires).
+            this._onLive = (e) => this.setState({ status: 'ok', preview: e.detail.preview, showKeyPrompt: false });
+            document.addEventListener('pvp-preview-changed', this._onLive);
+            this.render();
+        }
+        disconnectedCallback() { if (this._onLive) document.removeEventListener('pvp-preview-changed', this._onLive); }
 
         // host calls: setState({ status, preview, publicId, transferId, readKey, apiBase, showKeyPrompt })
         setState(next) { this._state = Object.assign({}, this._state, next); this.render(); }
