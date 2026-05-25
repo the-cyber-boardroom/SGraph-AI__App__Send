@@ -56,8 +56,12 @@
         }
 
         // App Mode: available for all file types on all vaults (writable or not).
-        // Opens the file in App Mode in a NEW TAB using the /#key|app:path deep-link
-        // so the user gets a clean app view without leaving their editing session.
+        // Opens the file via /en-gb/app#path in a NEW TAB.
+        // Hash = file path (NOT vault key — key comes from localStorage set by /#vault-key).
+        // app-shell reads key from LS, checks app.json:
+        //   - If app.json found → the vault's app handles navigation to the file
+        //   - If no app.json  → saves app:path deep-link → redirects to /en-gb/vault/
+        //     → vault opens the file (in App Mode for HTML, as file tab for others)
         var bar = container.querySelector('.sb-file__actions');
         if (bar) {
             // Separator between send-browse's buttons (Save/Locate/Source/Print) and ours
@@ -68,12 +72,8 @@
             openAsAppBtn.style.cssText = 'font-weight:600;';
             openAsAppBtn.addEventListener('click', function() {
                 var path = (fileName || '').replace(/^\//, '');
-                var key  = (typeof VaultLoaderStorage !== 'undefined')
-                    ? VaultLoaderStorage.getCurrentKey() : '';
-                // /#key|app:path → root inbox saves key to LS + deep link to SS
-                var url = key
-                    ? (window.location.origin + '/#' + encodeURIComponent(key) + '|app:' + encodeURIComponent(path))
-                    : (window.location.origin + '/en-gb/vault/app#' + encodeURIComponent(path));
+                // /en-gb/app#path — hash is file path; vault key from localStorage
+                var url = window.location.origin + '/en-gb/app#' + encodeURIComponent(path);
                 window.open(url, '_blank');
             });
             bar.appendChild(openAsAppBtn);
@@ -776,13 +776,9 @@
                         btn.title = 'Open this page in App Mode in a new tab';
                         btn.style.fontWeight = '600';
                         btn.addEventListener('click', function() {
-                            var key = (typeof VaultLoaderStorage !== 'undefined')
-                                ? VaultLoaderStorage.getCurrentKey() : '';
-                            // For page layouts, use the folderPath as the file path
+                            // /en-gb/app#path — hash is file path; vault key from localStorage
                             var pagePath = (folderPath || '').replace(/^\//, '');
-                            var url = key
-                                ? (window.location.origin + '/#' + encodeURIComponent(key) + '|app:' + encodeURIComponent(pagePath))
-                                : (window.location.origin + '/en-gb/vault/app#' + encodeURIComponent(pagePath));
+                            var url = window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath);
                             window.open(url, '_blank');
                         });
                         bar.appendChild(btn);

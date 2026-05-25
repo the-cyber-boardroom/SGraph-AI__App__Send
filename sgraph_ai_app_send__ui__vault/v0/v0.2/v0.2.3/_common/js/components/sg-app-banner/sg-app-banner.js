@@ -154,12 +154,20 @@
                 self._readyMsgHandler = null;
                 if (!self.isActive()) return;
 
+                // Only show the error if there is an actual HTML iframe.
+                // Non-iframe content (markdown, images, PDFs) has no frame to post
+                // sg-app-ready — the "loading" status should just clear silently.
+                var iframe = document.querySelector('.sb-file__html-frame');
+                if (!iframe) {
+                    self.clearStatus();
+                    return;
+                }
+
                 var detail = self._lastIframeError || null;
                 // Inspect iframe body visibility as an additional clue.
                 if (!detail) {
                     try {
-                        var iframe = document.querySelector('.sb-file__html-frame');
-                        if (iframe && iframe.contentDocument && iframe.contentDocument.body) {
+                        if (iframe.contentDocument && iframe.contentDocument.body) {
                             var bs = iframe.contentWindow.getComputedStyle(iframe.contentDocument.body);
                             if (bs.display === 'none') {
                                 detail = 'App body is hidden (display:none) — the app initialisation script may have failed. Check browser console for errors.';
