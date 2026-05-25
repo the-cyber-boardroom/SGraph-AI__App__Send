@@ -464,7 +464,7 @@
         // localStorage('sg-vault-key') before this runs.
         (function () {
             var token = '';
-            try { token = (localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
+            try { token = (sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
             if (!token) return;
             var shell    = document.querySelector('vault-shell');
             var entryDiv = shell && shell.querySelector('.vs-entry');
@@ -476,7 +476,7 @@
         // crypto key derivation and initial commit network call complete.
         (function () {
             var token = '';
-            try { token = (localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
+            try { token = (sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
             if (!token) return;
             var creating = sessionStorage.getItem('sg-vault-creating');
             if (!creating || creating !== token) return;

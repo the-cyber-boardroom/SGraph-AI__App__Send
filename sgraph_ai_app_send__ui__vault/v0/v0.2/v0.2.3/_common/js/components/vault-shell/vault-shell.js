@@ -280,7 +280,7 @@
             header?.showLockButton(false);
 
             window.history.replaceState(null, '', window.location.pathname);
-            try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
+            try { sessionStorage.removeItem('sg-vault-key'); localStorage.removeItem('sg-vault-key'); } catch (_) {}
             window.sgraphVault.events.emit('vault-locked', {});
 
             // Refresh the entry screen so recent vaults list is up to date
