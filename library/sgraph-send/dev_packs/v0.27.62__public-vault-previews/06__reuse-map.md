@@ -61,7 +61,7 @@ Reading the actual vault-UI source changed three things. **Use the vault-UI prim
 | Building block | Verb | Exact path | What it gives you |
 |---|---|---|---|
 | `SGVaultCrypto.deriveKeys` / `deriveKeysFromSimpleToken` | **REUSE** | `VAULT/_common/js/lib/sg-vault/sg-vault-crypto.js:55-175` | Open the owner vault (Mode A/B real-key open). Salts: read `sg-vault-v1:{id}`, write `sg-vault-v1:write:{id}`; simple-token PBKDF2 `sgraph-send-v1` → HKDF `vault-read-key`/`vault-write-key`. |
-| `SGVault` open + tree + file read/write | **REUSE** | `VAULT/_common/js/lib/sg-vault/sg-vault.js` | Open the owner vault and read/write the bookkeeping file `.sgraph/public-previews/<public-id>.json` (doc 03 §4). |
+| `SGVault` open + tree + file read/write | **REUSE** | `VAULT/_common/js/lib/sg-vault/sg-vault.js` | Open the owner vault and read/write the bookkeeping file `.vault/owner/public-previews/<public-id>.json` (doc 03 §4). |
 | `vault-credentials.js` parse/resolve | **REUSE** | `VAULT/en-gb/vault/token/vault-credentials.js:27-62` | Parse the `#`-fragment vault key (vault key / RO token / simple token) for the Mode A/B open. |
 | `vault-hkdf.js` (`ownerEncrypt`/`ownerDecrypt`) | **REUSE if double-encrypting bookkeeping** | `VAULT/en-gb/vault/token/vault-hkdf.js:25/61/79` | Owner-tier double encryption (info `sgraph-vault-secret-v1`) — optional extra protection for the `delete_auth` in bookkeeping. |
 

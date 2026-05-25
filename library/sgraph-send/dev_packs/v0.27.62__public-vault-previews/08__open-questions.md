@@ -20,7 +20,7 @@ Each item is **RESOLVED** (decided / code-verified here) or **PENDING** (needs a
 | Q-expiry | Can the exposure be time- AND access-limited? | **RESOLVED — both native.** `expires_at`, `max_downloads`, `auto_delete` accepted at create, enforced on download (`Transfer__Service.py:151-170`). Doc 02 §7. |
 | Q-read-auth | Does reading the preview need a token? | **RESOLVED — no.** `download`/`download-base64` do not call `check_access_token` (`Routes__Transfers.py:167,194`). Publishing needs the owner token; reading is open. |
 | Q-route-exists | Does `/en-gb/app` exist? | **RESOLVED — yes, in this repo.** `VAULT/en-gb/app/index.html` mounts `<app-shell>` and parses `#<vault-key>`. Only the public-id **path segment** rewrite is outstanding (Q-route below). |
-| Q-bookkeeping | Where does the owner store id/`delete_auth`/expiry? | Inside the owner's encrypted vault at `.sgraph/public-previews/<public-id>.json` via the vault client. `delete_auth` never leaves the vault. Doc 03 §4. |
+| Q-bookkeeping | Where does the owner store id/`delete_auth`/expiry? | Inside the owner's encrypted vault at `.vault/owner/public-previews/<public-id>.json` via the vault client. `delete_auth` never leaves the vault. Doc 03 §4. |
 | Q-namespace (R3) | Is the derived key provably read-only & public-layer-only? | Yes — distinct salt + id prefix; decrypt-only import; unrelated to the secret-passphrase vault key. Security to ratify with a KAT. Doc 03 §1.3, doc 09 R3. |
 | Q-deface | Can the public string grant write/delete? | **No, by design** — `delete_auth` is random and owner-held, never derived from the public string. Doc 03 §3.3, doc 09 R-deface. |
 
