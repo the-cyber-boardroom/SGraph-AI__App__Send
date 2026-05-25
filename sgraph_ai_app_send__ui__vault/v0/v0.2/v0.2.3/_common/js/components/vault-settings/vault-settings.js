@@ -104,7 +104,7 @@
                                 <input class="vset-autosync-cb" type="checkbox" checked>
                                 Auto-sync
                             </label>
-                            <p class="vset-hint">When enabled, vault silently pulls new commits from the published branch whenever you switch to the Files view. Only applies when there are no local unpushed commits. No background polling.</p>
+                            <p class="vset-hint">When enabled, vault automatically pushes local commits to the published branch and silently pulls new commits from collaborators whenever you switch to the Files view. Diverged vaults are flagged for manual resolution; no background polling.</p>
                         </div>
                     </div>
 
