@@ -155,11 +155,7 @@
             });
             this.addEventListener('vault-settings-access-key', (e) => {
                 this._accessKey = e.detail.key;
-                if (e.detail.key) {
-                    sessionStorage.setItem('sg-vault-access-key', e.detail.key);
-                } else {
-                    sessionStorage.removeItem('sg-vault-access-key');
-                }
+                VaultLoader.storage.setAccessKey(e.detail.key || null);
                 if (this._vault?._sgSend) this._vault._sgSend.token = e.detail.key;
                 // Update the live dataSource so edit/write buttons activate immediately
                 if (this._dataSource) {
@@ -682,21 +678,34 @@
             if (!this._vault || !this._accessKey) return
             if (!this._autoSyncEnabled) return
 
+            // --- Auto-push: push local unpushed commits before checking upstream ----
+            // Refresh sync state so ahead/diverged counts are accurate.
+            await this._refreshSyncState()
+            const { ahead, diverged } = this._syncState || {}
+            if (ahead > 0) {
+                if (diverged) {
+                    // Diverged — the banner will show; don't auto-push and risk data loss.
+                    return
+                }
+                // We have local commits ahead of the named branch — push them.
+                window.sgraphVault.messages.info('Auto-sync: pushing local commits\u2026')
+                try {
+                    await this._vault.push()
+                    await this._refreshSyncState()
+                    window.sgraphVault.messages.success('Auto-sync: local commits pushed to published branch')
+                } catch (err) {
+                    window.sgraphVault.messages.error(`Auto-sync push failed: ${err.message}`)
+                }
+                return
+            }
+
+            // --- Auto-pull: check for upstream changes and merge if cleanly behind --
             let liveNamedHead
             try {
                 liveNamedHead = await this._vault._refManager.readRef(this._vault._refFileId)
             } catch (_) { return }
 
             if (!liveNamedHead || liveNamedHead === this._vault._namedHeadId) return
-
-            // There are upstream changes
-            const { ahead } = this._syncState || {}
-            if (ahead > 0) {
-                // We have local commits too — diverged or ahead. Don't auto-merge silently.
-                // Refresh sync state so the banner updates (it will show the diverged notice).
-                await this._refreshSyncState()
-                return
-            }
 
             // We are cleanly behind — safe to auto-pull
             window.sgraphVault.messages.info('Syncing vault\u2026')
@@ -771,7 +780,7 @@
 
         _onAuthSubmit(key) {
             this._accessKey = key;
-            sessionStorage.setItem('sg-vault-access-key', key);
+            VaultLoader.storage.setAccessKey(key);
             if (this._vault?._sgSend) this._vault._sgSend.token = key;
             if (this._dataSource) {
                 this._dataSource._accessKey = key;

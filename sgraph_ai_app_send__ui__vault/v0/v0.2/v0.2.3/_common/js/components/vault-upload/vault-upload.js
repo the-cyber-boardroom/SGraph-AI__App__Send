@@ -35,11 +35,54 @@ class VaultUpload extends VaultComponent {
         this.addTrackedListener(this._dropArea,   'drop',     this._onDrop)
     }
 
-    _onDrop(e) {
+    async _onDrop(e) {
         e.preventDefault()
         this._dropArea.classList.remove('active')
+
+        // Use DataTransferItemList when available to support folder drops
+        const items = e.dataTransfer?.items
+        if (items && items.length > 0) {
+            const entries = []
+            for (const item of items) {
+                if (item.webkitGetAsEntry) {
+                    const entry = item.webkitGetAsEntry()
+                    if (entry) entries.push(entry)
+                }
+            }
+            if (entries.length > 0) {
+                const files = await this._collectFromEntries(entries)
+                if (files.length > 0) this._addFiles(files)
+                return
+            }
+        }
+
+        // Fallback: plain FileList (no folder support)
         const files = e.dataTransfer?.files
         if (files && files.length > 0) this._addFiles(files)
+    }
+
+    // Recursively collect all File objects from a list of FileSystemEntry objects
+    async _collectFromEntries(entries) {
+        const files = []
+        const readEntry = (entry) => new Promise((resolve) => {
+            if (entry.isFile) {
+                entry.file((f) => { files.push(f); resolve(); }, () => resolve())
+            } else if (entry.isDirectory) {
+                const reader = entry.createReader()
+                const readBatch = () => {
+                    reader.readEntries(async (batch) => {
+                        if (!batch || batch.length === 0) { resolve(); return }
+                        for (const child of batch) await readEntry(child)
+                        readBatch()  // readEntries may return partial batches
+                    }, () => resolve())
+                }
+                readBatch()
+            } else {
+                resolve()
+            }
+        })
+        for (const entry of entries) await readEntry(entry)
+        return files
     }
 
     _onFilesSelected() {
@@ -75,38 +118,61 @@ class VaultUpload extends VaultComponent {
         this._uploading = true
         this._progressArea.hidden = false
 
-        for (let i = 0; i < this._queue.length; i++) {
-            const item = this._queue[i]
-            if (item.status !== 'pending') continue
+        // Collect all pending items to process as a single batch commit
+        const pending = this._queue.filter(i => i.status === 'pending')
+        if (pending.length === 0) { this._uploading = false; return }
 
-            item.status = 'active'
-            this._renderQueue()
+        // Mark all as active
+        pending.forEach(i => { i.status = 'active' })
+        this._renderQueue()
 
+        // Step 1: Read all files into memory
+        this._setProgress(0, this.t('vault.upload.encrypting'))
+        const batchItems = []
+        for (const item of pending) {
             try {
-                // Read file
-                this._setProgress(0, this.t('vault.upload.encrypting'))
                 const arrayBuffer = await this._readFile(item.file)
-
-                // Encrypt + upload via vault
-                this._setProgress(50, this.t('vault.upload.uploading'))
-                await this._vault.addFile(this._targetPath, item.file.name, new Uint8Array(arrayBuffer))
-
-                item.status = 'done'
-                this._setProgress(100, this.t('vault.upload.success', { name: item.file.name }))
-
-                this.emit('vault-file-added', {
+                batchItems.push({
+                    folderPath: this._targetPath,
                     fileName:   item.file.name,
-                    folderPath: this._targetPath
+                    fileData:   new Uint8Array(arrayBuffer),
+                    _queueItem: item
                 })
-
             } catch (err) {
                 item.status = 'error'
                 this._setProgress(0, this.t('vault.upload.failed', { error: err.message }))
             }
-
-            this._renderQueue()
         }
 
+        // Step 2: Encrypt, upload, and commit all files in a single batch
+        if (batchItems.length > 0) {
+            this._setProgress(50, this.t('vault.upload.uploading'))
+            try {
+                await this._vault.addFiles(batchItems.map(b => ({
+                    folderPath: b.folderPath,
+                    fileName:   b.fileName,
+                    fileData:   b.fileData
+                })))
+
+                batchItems.forEach(b => { b._queueItem.status = 'done' })
+                const successMsg = batchItems.length === 1
+                    ? this.t('vault.upload.success', { name: batchItems[0].fileName })
+                    : `Uploaded ${batchItems.length} files`
+                this._setProgress(100, successMsg)
+
+                // Emit one event to signal the tree changed
+                this.emit('vault-file-added', {
+                    fileNames:  batchItems.map(b => b.fileName),
+                    folderPath: this._targetPath
+                })
+
+            } catch (err) {
+                batchItems.forEach(b => { b._queueItem.status = 'error' })
+                this._setProgress(0, this.t('vault.upload.failed', { error: err.message }))
+            }
+        }
+
+        this._renderQueue()
         this._uploading = false
 
         // Clear completed items after a short delay
