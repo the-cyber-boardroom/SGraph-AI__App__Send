@@ -56,6 +56,7 @@ const PublicPreviewWrite = {
         const id = idCheck.id
 
         const full = Object.assign(PublicPreviewSchema.emptyPreview(), preview, { schema: PublicPreviewSchema.SCHEMA_ID })
+        if (vault && vault._vaultId) full.vault_id = vault._vaultId   // lets the open page reject a valid-but-WRONG-vault key
         if (expiry.expiresAtMs || expiry.maxAccessCount) {
             full.expiry = { expires_at_ms: expiry.expiresAtMs || null, max_access_count: expiry.maxAccessCount || null }
         }

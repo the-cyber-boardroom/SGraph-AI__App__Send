@@ -101,7 +101,14 @@
 
         _keyPrompt(s) {
             if (s.showKeyPrompt === false) return '';
-            const err = s.keyError ? `<div class="pvp-err" role="alert">${this._esc(s.keyError)}</div>` : '';
+            let err = '';
+            if (s.wrongVaultKey) {
+                const href = location.origin + '/#' + s.wrongVaultKey;   // root inbox opens whatever vault this key is for
+                err = `<div class="pvp-err" role="alert">⚠ That key is valid, but it opens a <b>different</b> vault — not the one this preview is about.</div>
+                       <a class="pvp-wrongvault" href="${this._esc(href)}">Open that vault instead →</a>`;
+            } else if (s.keyError) {
+                err = `<div class="pvp-err" role="alert">${this._esc(s.keyError)}</div>`;
+            }
             // If this device already holds the key for this vault, offer a one-click open.
             const local = s.hasLocalKey ? `
                 <button class="pvp-open-local" type="button">🔓 Open this vault — key saved on this device</button>
@@ -157,6 +164,8 @@
         .pvp-or { display: flex; align-items: center; gap: 10px; margin: 12px 0; color: var(--color-text-secondary, #9aa4bf); font-size: 0.82rem; }
         .pvp-or::before, .pvp-or::after { content: ""; flex: 1; height: 1px; background: var(--color-border, #2a2a44); }
         .pvp-err { color: var(--danger, #E94560); font-size: 0.86rem; margin-top: 8px; }
+        .pvp-wrongvault { display: inline-block; margin-top: 10px; padding: 10px 16px; border-radius: 8px;
+            background: var(--color-primary, #4f8ff7); color: #fff; font-weight: 700; text-decoration: none; }
         .pvp-support { display: inline-block; margin-top: 14px; color: var(--color-primary, #4f8ff7); text-decoration: none; }
         .pvp-foot, .pvp-sub { font-size: 0.76rem; color: var(--color-text-secondary, #9aa4bf); margin-top: 14px; }
         .pvp-notice { font-size: 1.05rem; padding: 8px 0; }

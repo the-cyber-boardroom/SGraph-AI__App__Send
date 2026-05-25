@@ -149,6 +149,7 @@ A single known file the UI understands. `PREVIEW_SCHEMA_VERSION = 1`.
 ```json
 {
   "schema": "sgraph-public-preview/v1",
+  "vault_id": "a1b2c3d4e5f6",
   "title": "Health Data Demo Vault",
   "description": "Public demo materials for the health-data pilot. Confidential where marked.",
   "thumbnail": {

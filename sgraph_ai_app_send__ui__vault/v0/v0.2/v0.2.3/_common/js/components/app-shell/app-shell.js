@@ -151,24 +151,32 @@
             var render = function (extra) { card.setState(Object.assign({ status: res.status, preview: res.preview }, common, extra || {})); };
             render();
 
-            // Manual key entry → open, and remember it for this public-id on success.
+            // The vault this preview is ABOUT (stamped at publish). Used to reject a
+            // valid-but-wrong-vault key. Absent on older previews → no check (graceful).
+            var expectedVaultId = (res.preview && res.preview.vault_id) || '';
+
+            // Manual key entry → open (verifying it's the right vault), remember on success.
             card.addEventListener('pvp-open-vault', function (e) {
-                self._initWithKey(e.detail.key, null)
+                self._initWithKey(e.detail.key, null, expectedVaultId)
                     .then(function () { try { localStorage.setItem(lsKey, e.detail.key); } catch (_) {} })
-                    .catch(function () { render({ keyError: "That key didn't open this vault. Check it and try again." }); });
+                    .catch(function (err) {
+                        if (err && err.code === 'wrong-vault') render({ wrongVaultKey: e.detail.key });
+                        else render({ keyError: "That key didn't open this vault. Check it and try again." });
+                    });
             });
 
             // "Open — key saved on this device" → open with the stored key for this id.
             card.addEventListener('pvp-open-local', function () {
-                self._initWithKey(localKey, null).catch(function () {
-                    try { localStorage.removeItem(lsKey); } catch (_) {}           // stale (vault rekeyed) — drop it
+                self._initWithKey(localKey, null, expectedVaultId).catch(function (err) {
+                    try { localStorage.removeItem(lsKey); } catch (_) {}           // stale/wrong — drop it
                     common.hasLocalKey = false;
-                    render({ keyError: "The saved key didn't open this vault. Enter the current key." });
+                    if (err && err.code === 'wrong-vault') render({ wrongVaultKey: localKey });
+                    else render({ keyError: "The saved key didn't open this vault. Enter the current key." });
                 });
             });
         }
 
-        async _initWithKey(key, presetAccessKey) {
+        async _initWithKey(key, presetAccessKey, expectedVaultId) {
             this._t.start = performance.now();
             this._vaultKey = key;
 
@@ -187,6 +195,13 @@
                 isRO      = true;
             } else {
                 vault = await SGVault.open(sgSend, key);
+            }
+
+            // Wrong-vault guard: the key is valid but opens a DIFFERENT vault than the
+            // one this public preview is about. Refuse BEFORE any side effects (no key
+            // persisted, no UI built) so the user can't land in the wrong vault.
+            if (expectedVaultId && vault._vaultId && vault._vaultId !== expectedVaultId) {
+                throw Object.assign(new Error('This key opens a different vault.'), { code: 'wrong-vault' });
             }
 
             this._vault    = vault;
