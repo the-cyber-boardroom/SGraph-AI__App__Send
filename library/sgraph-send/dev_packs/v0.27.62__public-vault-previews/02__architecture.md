@@ -138,7 +138,7 @@ The sub-vaults pack's `<sg-link-card>` (proposal P-162) is specified to **show a
 3. **Graceful absence.** If `public_id` is missing, or `fetchPreview` returns not-found/expired, the card shows its existing minimal info and proceeds straight to the key prompt — no error surface.
 4. **Owner side.** When an owner publishes a preview for a vault that is (or will be) referenced as a sub-vault, the editor offers "copy this vault's `public_id`" so it can be pasted into a parent's link file. (A later convenience: the link-card editor can look up the child's `public_id` automatically.)
 
-The `delete_auth`/bookkeeping convention (`.sgraph/public-previews/<id>.json`, doc 03 §4) sits alongside the sub-vaults `.vault/owner/` convention — a natural neighbour, not a conflict. **No core public-preview code changes are needed for this seam** — it is purely the link card consuming `fetchPreview` (doc 07 Phase 6).
+The `delete_auth`/bookkeeping convention (`.vault/owner/public-previews/<id>.json`, doc 03 §4) sits alongside the sub-vaults `.vault/owner/` convention — a natural neighbour, not a conflict. **No core public-preview code changes are needed for this seam** — it is purely the link card consuming `fetchPreview` (doc 07 Phase 6).
 
 ---
 

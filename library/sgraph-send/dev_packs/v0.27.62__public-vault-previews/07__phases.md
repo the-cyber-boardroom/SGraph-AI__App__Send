@@ -49,7 +49,7 @@ The cryptographic heart. Fully testable with no UI and no owner vault.
 The owner-side write path. Needs an owner vault + an SG/Send access token (integration test against the in-memory stack).
 
 **New files**
-- `public-preview-write.js` — `publishPreview` / `updatePreview` / `unpublishPreview` (doc 03 §3): random `delete_auth`; `SendCrypto.encryptFile` + SGMETA + `create`(with `delete_auth_hash`, `expires_at`, `max_downloads`, `auto_delete`)/`upload`/`complete`; `DELETE` on update/unpublish; bookkeeping at `.sgraph/public-previews/<public-id>.json` via `SGVault`.
+- `public-preview-write.js` — `publishPreview` / `updatePreview` / `unpublishPreview` (doc 03 §3): random `delete_auth`; `SendCrypto.encryptFile` + SGMETA + `create`(with `delete_auth_hash`, `expires_at`, `max_downloads`, `auto_delete`)/`upload`/`complete`; `DELETE` on update/unpublish; bookkeeping at `.vault/owner/public-previews/<public-id>.json` via `SGVault`.
 
 **Acceptance:**
 - `publishPreview` runs create→upload→complete; a subsequent `fetchPreview` (Phase 1) returns the published JSON. **AC1**, **AC2**.

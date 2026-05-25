@@ -154,7 +154,7 @@ It is tempting to derive `delete_auth` from the public-vault-about-key (then no 
 The owner already has a zero-knowledge vault; that is the right place for the private bookkeeping (public-id ↔ transfer-id ↔ delete_auth ↔ expiry). Convention path **inside the owner's vault** (encrypted like any vault file):
 
 ```
-.sgraph/public-previews/<public-id>.json
+.vault/owner/public-previews/<public-id>.json
 ```
 
 Shape:
@@ -174,7 +174,7 @@ Shape:
 
 - Written via the vault client's file-write into the owner's tree (`SGVault` write path; the same mechanism the vault UI uses for any file). It is just a conventional path — no vault schema change.
 - The **`delete_auth` never appears in any public artefact, URL, or log** — only inside the owner's encrypted vault. This is what makes delete-then-recreate possible across devices while keeping the public layer truly public-and-read-only.
-- Composes cleanly with the sub-vaults `.vault/owner/` convention (doc 02 §4.4): `.sgraph/public-previews/` is a sibling conventional subtree.
+- Lives **under the same `.vault/owner/` subtree** as the sub-vaults owner convention (doc 02 §4.4) — `ro-links.json` / `rw-links.json` (P-160) and `public-previews/` are neighbours in `.vault/owner/`, unifying all owner-only metadata in one place.
 
 ---
 
