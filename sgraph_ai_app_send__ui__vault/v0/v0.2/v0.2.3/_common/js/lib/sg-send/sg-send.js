@@ -61,6 +61,7 @@ class SGSend {
         if (options.expiresAt != null)       createBody.expires_at       = options.expiresAt
         if (options.maxDownloads != null)    createBody.max_downloads    = options.maxDownloads
         if (options.autoDelete != null)      createBody.auto_delete      = options.autoDelete
+        if (options.allowRecreate != null)   createBody.allow_recreate   = options.allowRecreate
 
         const createRes = await this._fetch('POST', '/api/transfers/create', {
             headers: { 'Content-Type': 'application/json' },

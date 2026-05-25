@@ -17,14 +17,15 @@ class test_Transfer__Service__public_preview(TestCase):
         self.auth    = 'random-owner-held-delete-secret'
         self.hash    = hashlib.sha256(self.auth.encode()).hexdigest()
 
-    def _publish(self, payload=b'cipher-bytes', max_downloads=0, expires_at=0):
+    def _publish(self, payload=b'cipher-bytes', max_downloads=0, expires_at=0, allow_recreate=False):
         self.service.create_transfer(file_size_bytes   = len(payload),
                                      content_type_hint = 'application/json',
                                      sender_ip         = '',
                                      transfer_id       = self.tid,
                                      delete_auth_hash  = self.hash,
                                      max_downloads     = max_downloads,
-                                     expires_at        = expires_at)
+                                     expires_at        = expires_at,
+                                     allow_recreate    = allow_recreate)
         self.service.upload_payload(self.tid, payload)
         self.service.complete_transfer(self.tid)
 
@@ -54,13 +55,22 @@ class test_Transfer__Service__public_preview(TestCase):
         gone = self.service.get_download_payload(self.tid, '', '')                       # 2nd exhausted
         assert isinstance(gone, dict) and gone.get('status') == 410
 
-    # --- THE CONSTRAINT: delete leaves a tombstone; recreate at same id fails ----
-    #     This is why "delete-then-recreate at the same transfer-id" does NOT work
-    #     as-is. See dev pack doc 03 §3 (BLOCKER). Resolution is pending a decision.
-    def test__recreate_after_delete_is_blocked_by_tombstone(self):
-        self._publish()
+    # --- default (allow_recreate=False): delete leaves a tombstone; id NOT reusable
+    def test__default_delete_leaves_tombstone(self):
+        self._publish(allow_recreate=False)
         self.service.delete_transfer(self.tid, self.auth)
         assert self.service.has_transfer(self.tid) is True                              # meta tombstone remains
         recreate = self.service.create_transfer(file_size_bytes=1, content_type_hint='application/json',
                                                 sender_ip='', transfer_id=self.tid, delete_auth_hash=self.hash)
-        assert recreate == {'error': 'transfer_id_exists'}                              # <-- blocks in-place update
+        assert recreate == {'error': 'transfer_id_exists'}                              # cannot reuse the id
+
+    # --- allow_recreate=True: delete clears the meta; delete-then-recreate works -----
+    #     This is what the public-preview in-place update (same share link) relies on.
+    def test__allow_recreate_enables_delete_then_recreate(self):
+        self._publish(payload=b'v1-cipher', allow_recreate=True)
+        result = self.service.delete_transfer(self.tid, self.auth)
+        assert result.get('recreatable') is True
+        assert self.service.has_transfer(self.tid) is False                             # meta cleared, not a tombstone
+        # recreate at the SAME id with new content
+        self._publish(payload=b'v2-cipher', allow_recreate=True)
+        assert self.service.get_download_payload(self.tid, '', '') == b'v2-cipher'       # same id, updated content

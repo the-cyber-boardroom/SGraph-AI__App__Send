@@ -74,6 +74,7 @@ const PublicPreviewWrite = {
             await sgSend.upload(cipher, {
                 transferId,
                 deleteAuthHash,
+                allowRecreate: true,                                 // delete clears the meta → delete-then-recreate works (same share link on edit)
                 contentType:  'application/json',
                 expiresAt:    expiry.expiresAtMs || 0,
                 maxDownloads: expiry.maxAccessCount || 0,
@@ -104,14 +105,9 @@ const PublicPreviewWrite = {
     },
 
     // --- update (delete-then-recreate at the same id; same share link) ---------
-    // ⚠ BLOCKED by the current backend: delete_transfer leaves a status:'deleted'
-    //   metadata tombstone, so create at the same transfer-id returns
-    //   transfer_id_exists (409). Verified in
-    //   tests/unit/lambda__user/service/test_Transfer__Service__public_preview.py.
-    //   In-place update needs one of the resolutions in dev pack doc 03 §3 (a small
-    //   backend tweak so a deleted id can be recreated, OR versioned-id, OR the
-    //   vault-pointer mutable-ref route). Until then publishPreview (first publish),
-    //   read, and unpublish work; updatePreview will throw 'id-taken' on recreate.
+    // Works because publishPreview creates with allow_recreate:true, so
+    // delete_transfer clears the metadata (not just a tombstone) and the same
+    // transfer-id can be recreated. The share link is unchanged across edits.
     async updatePreview({ sgSend, vault, publicId, preview, expiry = {} }) {
         const id = PublicPreviewSchema.validatePublicId(publicId).id || publicId
         const bk = await this.readBookkeeping(vault, id)

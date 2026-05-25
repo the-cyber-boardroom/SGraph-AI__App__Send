@@ -21,6 +21,7 @@ class Schema__Transfer__Create(Type_Safe):                                      
     auto_delete       : bool                                                     # Wipe payload after last allowed download
     expires_at        : int                                                      # Expiry as ms since epoch (0 = no expiry)
     delete_auth_hash  : Safe_Str__Id                                             # SHA-256(delete_auth), empty = delete disabled
+    allow_recreate    : bool                                                     # If True, delete clears metadata too (id can be recreated/overwritten); else delete leaves a tombstone
 
 
 class Schema__Transfer__Initiated(Type_Safe):                                    # Response: transfer created
