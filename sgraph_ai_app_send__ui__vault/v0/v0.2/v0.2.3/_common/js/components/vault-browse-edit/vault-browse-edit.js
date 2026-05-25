@@ -69,7 +69,7 @@
             var path = (fileName || '').replace(/^\//, '');
             var openAsAppLink = _makeAppLink('↗ Open as App',
                 window.location.origin + '/en-gb/app#' + encodeURIComponent(path));
-            openAsAppLink.title = 'Open this file in App Mode — right-click to Copy Link';
+            _addTip(openAsAppLink, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
             bar.appendChild(openAsAppLink);
         }
 
@@ -769,7 +769,7 @@
                         var pagePath = (folderPath || '').replace(/^\//, '');
                         var btn = _makeAppLink('↗ Open as App',
                             window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath));
-                        btn.title = 'Open this page in App Mode — right-click to Copy Link';
+                        _addTip(btn, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
                         bar.appendChild(btn);
                     }
                 });
@@ -1335,6 +1335,8 @@
     // A real <a> link styled as sb-action-btn.
     // Opens in a new tab (target=_blank); also supports Ctrl+click, middle-click,
     // and right-click → Copy Link natively — unlike a <button> with window.open().
+    // Explicit inline styles ensure it renders identically to a <button> even if
+    // the sb-action-btn CSS selector only targets <button> elements.
     function _makeAppLink(label, href) {
         var a = document.createElement('a');
         a.className = 'sb-action-btn';
@@ -1342,20 +1344,75 @@
         a.href = href;
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
-        a.style.cssText = 'font-weight:600;text-decoration:none;';
+        // Mirror button defaults that <a> doesn't inherit automatically
+        a.style.cssText = 'font-weight:600;text-decoration:none;' +
+            'display:inline-flex;align-items:center;cursor:pointer;';
         return a;
     }
 
-    // Icon-only button: compact, faded until hover, tooltip via title attribute.
-    // Used for secondary/management actions to keep the toolbar scannable on mobile.
+    // ── Fast tooltip ─────────────────────────────────────────────────────────────
+    // Native title= tooltips have a ~500 ms OS delay we cannot override with CSS.
+    // Instead, we use a floating div positioned via fixed coordinates so it works
+    // inside shadow DOM (getBoundingClientRect crosses shadow boundaries).
+    var _tip = null;
+    var _tipTimer = null;
+
+    function _ensureTip() {
+        if (_tip) return;
+        _tip = document.createElement('div');
+        _tip.id = 'sg-vault-tip';
+        _tip.style.cssText =
+            'position:fixed;z-index:99999;pointer-events:none;' +
+            'background:#1a1a2e;color:#e0e0e0;border:1px solid rgba(78,205,196,0.3);' +
+            'border-radius:5px;padding:4px 9px;font-size:11.5px;line-height:1.4;' +
+            'font-family:system-ui,sans-serif;white-space:pre;' +
+            'box-shadow:0 2px 8px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.08s;';
+        document.body.appendChild(_tip);
+    }
+
+    // Attach a fast custom tooltip to any element.
+    // Replaces the native title= (removes it so the slow OS tooltip never fires).
+    function _addTip(el, text) {
+        _ensureTip();
+        el.removeAttribute('title');          // prevent native slow tooltip
+        el.setAttribute('data-tip', text);
+        el.addEventListener('mouseenter', function(e) {
+            clearTimeout(_tipTimer);
+            _tipTimer = setTimeout(function() {
+                if (!_tip) return;
+                _tip.textContent = text;
+                var r = el.getBoundingClientRect();
+                // Position above the element, centred, clamped to viewport
+                var tw = Math.min(text.length * 7.5 + 20, 340);
+                var left = Math.max(6, Math.min(r.left + r.width / 2 - tw / 2, window.innerWidth - tw - 6));
+                var top  = r.top - 32;
+                if (top < 6) top = r.bottom + 6;
+                _tip.style.left = left + 'px';
+                _tip.style.top  = top  + 'px';
+                _tip.style.opacity = '1';
+            }, 90);   // 90 ms — fast but avoids flicker on mouse-through
+        });
+        el.addEventListener('mouseleave', function() {
+            clearTimeout(_tipTimer);
+            if (_tip) _tip.style.opacity = '0';
+        });
+        el.addEventListener('click', function() {
+            clearTimeout(_tipTimer);
+            if (_tip) _tip.style.opacity = '0';
+        });
+        return el;
+    }
+
+    // Icon-only button: compact, faded until hover.
+    // Uses _addTip for instant tooltip instead of native title=.
     function _makeIconBtn(icon, titleText) {
         var btn = document.createElement('button');
         btn.className = 'sb-action-btn';
         btn.innerHTML = icon;
-        btn.title = titleText;
         btn.style.cssText = 'padding:0 6px;min-width:26px;font-size:14px;opacity:0.7;line-height:1;';
         btn.addEventListener('mouseenter', function() { btn.style.opacity = '1'; });
         btn.addEventListener('mouseleave', function() { btn.style.opacity = '0.7'; });
+        _addTip(btn, titleText);
         return btn;
     }
 
