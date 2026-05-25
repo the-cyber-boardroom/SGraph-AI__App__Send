@@ -94,6 +94,8 @@ The read path imports the key **decrypt-only**, so the public page cannot encryp
 
 ## 3. The update / delete flow (correction 3 — RESOLVED: delete is implemented)
 
+> **⚠ BLOCKER found during implementation (25 May, verified by test).** DELETE exists, but its semantics block in-place recreate: `delete_transfer` removes the payload yet **leaves a `status:'deleted'` metadata tombstone**, so `create_transfer` at the same id returns `transfer_id_exists` (409), and `upload_payload` rejects a non-`pending` transfer. **So "delete-then-recreate at the same transfer-id" does NOT work as-is.** Verified in `tests/unit/lambda__user/service/test_Transfer__Service__public_preview.py::test__recreate_after_delete_is_blocked_by_tombstone`. First-publish, read, and unpublish all work; only the in-place **update** (same share link) is blocked. Resolution options (needs a project-lead/backend decision): **(A)** a small backend tweak so a deleted id can be recreated (delete also clears the meta, or create overwrites a `deleted` meta); **(B)** versioned public-id (link changes on edit); **(C)** store the preview via the vault **pointer API** mutable ref (`PUT /api/vault/write`, overwrite-in-place; tokenless read), with a random owner-held write key (not derived from the public string). See doc 08 Q-update-blocker.
+
 ### 3.1 Finding: transfer **bytes** are write-once, but **DELETE exists** (with sender-held auth)
 
 The transfer lifecycle is `create` → `upload` → `complete`; once completed, the bytes are fixed (`Transfer__Service.upload_payload` only accepts `status == 'pending'`, line 95). **But this repo also implements a sender-controlled hard delete:**

@@ -44,6 +44,7 @@ Each item is **RESOLVED** (decided / code-verified here) or **PENDING** (needs a
 
 | # | Question | Note |
 |---|---|---|
+| **Q-update-blocker** | **In-place update is blocked by delete-tombstone semantics** | **NEEDS A DECISION.** Verified by test: `delete_transfer` leaves a `status:'deleted'` meta tombstone, so recreate at the same transfer-id returns 409 and re-upload is rejected. First-publish/read/unpublish work; same-link in-place **edit** does not. Options: **(A)** small backend tweak so a deleted id can be recreated (delete clears the meta, or create overwrites a `deleted` meta) — most faithful to correction (b), but a backend/Villager change; **(B)** versioned public-id (no backend change; link changes on edit); **(C)** vault-pointer mutable-ref storage (overwrite-in-place, tokenless read, random owner-held write key — not the public string). Doc 03 §3. |
 | Q-pki | How this smooths once PKI lands | Direction noted (preview-then-ask-key → preview-then-auto-access for entitled identities; design already separates the two steps). Not in v1. Revisit with the PKI brief. |
 | Q-meta-latency | The measured OG-render latency number | Produced during Phase 5 (the brief's performance ask); record it here when measured. |
 

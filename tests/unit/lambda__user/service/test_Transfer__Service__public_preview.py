@@ -1,0 +1,66 @@
+# ===============================================================================
+# SGraph Send - Transfer__Service: Public Vault Preview usage
+# Confirms the transport contract the public-preview write path relies on, AND
+# documents the delete-then-recreate constraint (the tombstone blocks recreate).
+# ===============================================================================
+
+import hashlib
+from unittest                                                  import TestCase
+from sgraph_ai_app_send.lambda__user.service.Transfer__Service import Transfer__Service
+
+
+class test_Transfer__Service__public_preview(TestCase):
+
+    def setUp(self):
+        self.service = Transfer__Service()
+        self.tid     = 'a1b2c3d4e5f6'                                   # deterministic 12-hex (derived from public-id)
+        self.auth    = 'random-owner-held-delete-secret'
+        self.hash    = hashlib.sha256(self.auth.encode()).hexdigest()
+
+    def _publish(self, payload=b'cipher-bytes', max_downloads=0, expires_at=0):
+        self.service.create_transfer(file_size_bytes   = len(payload),
+                                     content_type_hint = 'application/json',
+                                     sender_ip         = '',
+                                     transfer_id       = self.tid,
+                                     delete_auth_hash  = self.hash,
+                                     max_downloads     = max_downloads,
+                                     expires_at        = expires_at)
+        self.service.upload_payload(self.tid, payload)
+        self.service.complete_transfer(self.tid)
+
+    # --- the happy path the write/read path depends on -------------------------
+    def test__publish_and_download(self):
+        self._publish(b'the-encrypted-preview')
+        payload = self.service.get_download_payload(self.tid, '', '')
+        assert payload == b'the-encrypted-preview'
+
+    def test__client_provided_id_must_be_12_hex(self):
+        bad = self.service.create_transfer(file_size_bytes=1, content_type_hint='', sender_ip='',
+                                           transfer_id='NOT-HEX', delete_auth_hash=self.hash)
+        assert bad == {'error': 'invalid_transfer_id_format'}
+
+    # --- delete auth model ------------------------------------------------------
+    def test__delete_requires_correct_auth(self):
+        self._publish()
+        assert self.service.delete_transfer(self.tid, 'wrong')['error']  == 'auth_mismatch'
+        assert self.service.delete_transfer(self.tid, self.auth)['status'] == 'deleted'
+        # payload gone; subsequent download not available
+        assert self.service.get_download_payload(self.tid, '', '') is None
+
+    # --- expiry (native) --------------------------------------------------------
+    def test__max_downloads_exhausts(self):
+        self._publish(max_downloads=1)
+        assert self.service.get_download_payload(self.tid, '', '') == b'cipher-bytes'   # 1st ok
+        gone = self.service.get_download_payload(self.tid, '', '')                       # 2nd exhausted
+        assert isinstance(gone, dict) and gone.get('status') == 410
+
+    # --- THE CONSTRAINT: delete leaves a tombstone; recreate at same id fails ----
+    #     This is why "delete-then-recreate at the same transfer-id" does NOT work
+    #     as-is. See dev pack doc 03 §3 (BLOCKER). Resolution is pending a decision.
+    def test__recreate_after_delete_is_blocked_by_tombstone(self):
+        self._publish()
+        self.service.delete_transfer(self.tid, self.auth)
+        assert self.service.has_transfer(self.tid) is True                              # meta tombstone remains
+        recreate = self.service.create_transfer(file_size_bytes=1, content_type_hint='application/json',
+                                                sender_ip='', transfer_id=self.tid, delete_auth_hash=self.hash)
+        assert recreate == {'error': 'transfer_id_exists'}                              # <-- blocks in-place update
