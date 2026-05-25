@@ -480,10 +480,41 @@ function _normPageBreakLevels(option) {
 }
 
 // Returns the HTML string for a page-break marker.
+// Self-contained: uses inline styles so it renders correctly in ANY window
+// (vault viewer, sg-print preview, standalone HTML) without needing external CSS.
+//
 // Screen: renders as a labelled dashed rule so the author can see breaks.
 // Print:  becomes an invisible element with page-break-after:always.
 function _pbMarkerHtml() {
-    return '<div class="md-pb-marker" role="separator" aria-label="page break">' +
-           '<span class="md-pb-marker__label">page break</span>' +
+    // Outer div — screen style via inline; print style via class (for @media print override)
+    var outerStyle = [
+        'display:flex',
+        'align-items:center',
+        'gap:0.75rem',
+        'margin:2rem 0 0.5rem',
+        'color:#aaa',
+        'font-size:10px',
+        'font-family:monospace',
+        'letter-spacing:0.12em',
+        'text-transform:uppercase',
+        'user-select:none',
+        'pointer-events:none'
+    ].join(';');
+
+    var lineStyle = 'flex:1;border:none;border-top:1px dashed #ccc;margin:0;padding:0;height:0;display:block;';
+    var labelStyle = [
+        'flex-shrink:0',
+        'padding:1px 6px',
+        'border:1px dashed #ccc',
+        'border-radius:3px',
+        'color:#bbb',
+        'font-size:10px',
+        'font-family:monospace'
+    ].join(';');
+
+    return '<div class="md-pb-marker" role="separator" aria-label="page break" style="' + outerStyle + '">' +
+           '<span style="' + lineStyle + '"></span>' +
+           '<span class="md-pb-marker__label" style="' + labelStyle + '">page break</span>' +
+           '<span style="' + lineStyle + '"></span>' +
            '</div>';
 }
