@@ -21,6 +21,7 @@ from sgraph_ai_app_send.lambda__user.user__config                               
                                                                                             HEADER__SGRAPH_VAULT__WRITE_KEY         ,
                                                                                             HEADER__SGRAPH_VAULT__PUBLIC            ,
                                                                                             HEADER__SGRAPH_VAULT__READ_KEY          ,
+                                                                                            HEADER__SGRAPH_TRANSFER__DELETE_AUTH    ,
                                                                                             ENV_VAR__N8N_WEBHOOK_URL                ,
                                                                                             ENV_VAR__N8N_WEBHOOK_SECRET             )
 from sgraph_ai_app_send.utils.MCP__Setup                                            import MCP__Setup
@@ -116,7 +117,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                                       allow_origins     = ["*"]                                                                                                      ,
                                       allow_credentials = True                                                                                                       ,
                                       allow_methods     = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]                                                          ,
-                                      allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization", HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY, HEADER__SGRAPH_VAULT__PUBLIC, HEADER__SGRAPH_VAULT__READ_KEY],
+                                      allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization", HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY, HEADER__SGRAPH_VAULT__PUBLIC, HEADER__SGRAPH_VAULT__READ_KEY, HEADER__SGRAPH_TRANSFER__DELETE_AUTH],
                                       expose_headers    = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization"]                                  )
 
     def setup_routes(self):
