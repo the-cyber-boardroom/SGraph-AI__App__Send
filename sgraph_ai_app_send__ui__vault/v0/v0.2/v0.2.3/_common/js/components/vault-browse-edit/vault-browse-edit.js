@@ -803,6 +803,17 @@
         newFileBtn.innerHTML = '&#43; New File';
         newFileBtn.addEventListener('click', function() { _showNewFile(self); });
         headerRight.prepend(newFileBtn);
+
+        // Add link button (sub-vaults + external resources) — only when the convention
+        // reader is loaded (VaultLinks). Creates a *.link.json the composite renders inline.
+        if (typeof VaultLinks !== 'undefined') {
+            var addLinkBtn = document.createElement('button');
+            addLinkBtn.className = 'sb-action-btn';
+            addLinkBtn.innerHTML = '&#128279; Add link';   // 🔗
+            addLinkBtn.title = 'Link another vault, or embed an external resource';
+            addLinkBtn.addEventListener('click', function() { _showAddLink(self); });
+            headerRight.prepend(addLinkBtn);
+        }
     };
 
     // --- Upload file picker ---
@@ -875,6 +886,119 @@
                     window.sgraphVault.messages.error('Create failed: ' + err.message);
                 }
             });
+        });
+    }
+
+    // --- Add link (sub-vault or external resource) ---
+
+    function _slugify(label) {
+        var s = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        return s || ('link-' + Math.random().toString(36).slice(2, 8));
+    }
+    function _genRefId() {
+        var b = (crypto.getRandomValues(new Uint8Array(6)));
+        var hex = ''; for (var i = 0; i < b.length; i++) hex += b[i].toString(16).padStart(2, '0');
+        return 'lk-' + hex;
+    }
+    function _sgSendOf(ds) {
+        if (!ds) return null;
+        if (ds._vault && ds._vault._sgSend) return ds._vault._sgSend;            // plain data source
+        if (ds._root && ds._root._vault && ds._root._vault._sgSend) return ds._root._vault._sgSend;  // composite
+        return null;
+    }
+
+    function _showAddLink(browse) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg-secondary,#12122a);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:1.5rem 1.75rem;min-width:340px;max-width:440px;color:var(--color-text,#e2e8f0);font-size:14px;';
+        var inS = 'width:100%;padding:0.5rem 0.7rem;background:var(--bg-primary,#0a0a18);border:1px solid var(--border,#2a2a4a);border-radius:4px;color:var(--color-text,#e2e8f0);font-size:14px;box-sizing:border-box;outline:none;margin:0.15rem 0 0.75rem;';
+        box.innerHTML =
+            '<p style="margin:0 0 0.9rem;font-weight:700;">Add a link</p>' +
+            '<label style="font-size:12px;color:#8892a4;">Type</label>' +
+            '<select id="al-type" style="' + inS + '">' +
+                '<option value="vault">Linked vault (opens read-only inline)</option>' +
+                '<option value="link">Web page</option>' +
+                '<option value="video">Video (YouTube / file)</option>' +
+                '<option value="image">Image</option>' +
+                '<option value="app">External app</option>' +
+            '</select>' +
+            '<label style="font-size:12px;color:#8892a4;">Label</label>' +
+            '<input id="al-label" type="text" placeholder="e.g. Patient: Alice" style="' + inS + '">' +
+            '<div id="al-vault-row">' +
+                '<label style="font-size:12px;color:#8892a4;">Vault key or read-only token</label>' +
+                '<input id="al-key" type="password" placeholder="apple-river-1234  or  ro-coral-stamp-5678" autocomplete="off" style="' + inS + '">' +
+                '<div style="font-size:12px;color:#4a5568;margin:-0.4rem 0 0.6rem;">Validated + saved on this device. Opens read-only.</div>' +
+            '</div>' +
+            '<div id="al-url-row" style="display:none;">' +
+                '<label style="font-size:12px;color:#8892a4;">URL</label>' +
+                '<input id="al-url" type="url" placeholder="https://…" autocomplete="off" style="' + inS + '">' +
+                '<div style="font-size:12px;color:#4a5568;margin:-0.4rem 0 0.6rem;">Loads in a controlled embed that cannot read this vault.</div>' +
+            '</div>' +
+            '<div id="al-err" style="color:#ff6b6b;font-size:12px;min-height:1rem;"></div>' +
+            '<div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.6rem;">' +
+                '<button id="al-cancel" class="sb-action-btn">Cancel</button>' +
+                '<button id="al-add" class="sb-action-btn" style="font-weight:700;color:var(--accent,#4ECDC4);">Add</button>' +
+            '</div>';
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+
+        var typeEl  = box.querySelector('#al-type');
+        var labelEl = box.querySelector('#al-label');
+        var keyEl   = box.querySelector('#al-key');
+        var urlEl   = box.querySelector('#al-url');
+        var errEl   = box.querySelector('#al-err');
+        var vaultRow = box.querySelector('#al-vault-row');
+        var urlRow   = box.querySelector('#al-url-row');
+
+        function syncRows() {
+            var isVault = typeEl.value === 'vault';
+            vaultRow.style.display = isVault ? '' : 'none';
+            urlRow.style.display   = isVault ? 'none' : '';
+        }
+        typeEl.addEventListener('change', syncRows);
+        syncRows();
+        labelEl.focus();
+
+        box.querySelector('#al-cancel').addEventListener('click', function() { overlay.remove(); });
+
+        box.querySelector('#al-add').addEventListener('click', async function() {
+            errEl.textContent = '';
+            var type  = typeEl.value;
+            var label = (labelEl.value || '').trim();
+            if (!label) { errEl.textContent = 'Please enter a label.'; return; }
+            var fileName = _slugify(label) + '.link.json';
+            var refId = _genRefId();
+
+            try {
+                if (type === 'vault') {
+                    var key = (keyEl.value || '').trim();
+                    if (!key) { errEl.textContent = 'Please enter the vault key or token.'; return; }
+                    var sgSend = _sgSendOf(browse.dataSource);
+                    if (!sgSend || typeof SGVault === 'undefined') { errEl.textContent = 'Cannot open vaults from here.'; return; }
+                    errEl.style.color = '#8892a4'; errEl.textContent = 'Validating…';
+                    var child = await SGVault.open(sgSend, key);     // validate + get the real vault_id
+                    var vaultId = child._vaultId;
+                    try { VaultLinks.setStoredChildKey(vaultId, key); } catch (_) {}
+                    var linkObj = { vault_id: vaultId, ref_id: refId, label: label };
+                    await browse.dataSource.saveFile('/', fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+                } else {
+                    var url = (urlEl.value || '').trim();
+                    if (!url || !/^https?:\/\//i.test(url)) { errEl.textContent = 'Please enter an http(s) URL.'; return; }
+                    var det = VaultLinks.detectResourceType(url);
+                    var resObj = { ref_id: refId, type: type, url: url, label: label };
+                    if (det.provider) resObj.provider = det.provider;
+                    await browse.dataSource.saveFile('/', fileName, new TextEncoder().encode(JSON.stringify(resObj, null, 2)).buffer);
+                }
+                if (browse.dataSource.scan) { try { await browse.dataSource.scan(); } catch (_) {} }
+                overlay.remove();
+                if (window.sgraphVault && window.sgraphVault.messages) window.sgraphVault.messages.success('Added "' + label + '"');
+                _refreshBrowseTree(browse);
+            } catch (err) {
+                errEl.style.color = '#ff6b6b';
+                errEl.textContent = (type === 'vault' ? 'Could not open that vault: ' : 'Add failed: ') + (err && err.message ? err.message : err);
+            }
         });
     }
 
