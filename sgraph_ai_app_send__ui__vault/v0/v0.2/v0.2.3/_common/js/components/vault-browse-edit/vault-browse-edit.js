@@ -906,6 +906,12 @@
         if (ds._root && ds._root._vault && ds._root._vault._sgSend) return ds._root._vault._sgSend;  // composite
         return null;
     }
+    function _vaultOf(ds) {
+        if (!ds) return null;
+        if (ds._vault) return ds._vault;                       // plain data source
+        if (ds._root && ds._root._vault) return ds._root._vault;  // composite → the parent (root) vault
+        return null;
+    }
 
     function _showAddLink(browse) {
         var overlay = document.createElement('div');
@@ -976,13 +982,41 @@
                     var key = (keyEl.value || '').trim();
                     if (!key) { errEl.textContent = 'Please enter the vault key or token.'; return; }
                     var sgSend = _sgSendOf(browse.dataSource);
-                    if (!sgSend || typeof SGVault === 'undefined') { errEl.textContent = 'Cannot open vaults from here.'; return; }
+                    var parentVault = _vaultOf(browse.dataSource);
+                    if (!sgSend || !parentVault || typeof SGVault === 'undefined') { errEl.textContent = 'Cannot open vaults from here.'; return; }
                     errEl.style.color = '#8892a4'; errEl.textContent = 'Validating…';
-                    var child = await SGVault.open(sgSend, key);     // validate + get the real vault_id
-                    var vaultId = child._vaultId;
-                    try { VaultLinks.setStoredChildKey(vaultId, key); } catch (_) {}
+                    var child;
+                    try {
+                        child = await SGVault.open(sgSend, key);      // validate + get the real vault_id + read key
+                    } catch (eOpen) {
+                        if (/^ro-/i.test(key)) { errEl.style.color = '#ff6b6b'; errEl.textContent = "Paste the vault's full key or simple token (read-only tokens aren't supported here yet)."; return; }
+                        throw eOpen;
+                    }
+                    var vaultId = child.vaultId;
+                    // Write the pointer file first…
                     var linkObj = { vault_id: vaultId, ref_id: refId, label: label };
                     await browse.dataSource.saveFile('/', fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+                    // …then write a PORTABLE owner record (read-only triplet) into .vault/owner/ro-links.json,
+                    // so the sub-vault opens silently on ANY device that has the parent vault (not just this one).
+                    var portable = false;
+                    try {
+                        var rawRk = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
+                        var record = { type: 'vault', label: label, pin: { mode: 'latest' },
+                                       vault_id: vaultId, read_key: btoa(String.fromCharCode.apply(null, rawRk)),
+                                       ref_file_id: child._refFileId };
+                        await VaultLinks.saveRoRecord(parentVault, refId, record);   // commits + pushes (portable)
+                        portable = true;
+                    } catch (eRec) {
+                        console.warn('[add-link] portable ro-record failed, falling back to device key:', eRec && eRec.message);
+                        try { VaultLinks.setStoredChildKey(vaultId, key); } catch (_) {}   // this-device fallback
+                    }
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.success('Linked vault "' + label + '"' + (portable ? ' (opens on any device)' : ' (saved on this device)'));
+                    }
+                    if (browse.dataSource.scan) { try { await browse.dataSource.scan(); } catch (_) {} }
+                    overlay.remove();
+                    _refreshBrowseTree(browse);
+                    return;
                 } else {
                     var url = (urlEl.value || '').trim();
                     if (!url || !/^https?:\/\//i.test(url)) { errEl.textContent = 'Please enter an http(s) URL.'; return; }
