@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-26
+
+- `index.md` — Updated: version v0.27.61 → v0.27.79; date 05/25 → 05/26; doc count 463 → 488; PROPOSED count 341+ → 365+
+- `identity/index.md` — Added: P-223 to P-226, P-230, P-233 (SG/Send tiered business model, identity-creation rule, OAuth + user-dedicated mode)
+- `vault/index.md` — Added: P-227 (vault-per-user storage substrate), P-231 (vaults within vaults)
+- `security/proposed/index.md` — Added: SG/Sentinel batch-2 section (P-234 to P-247): test-driving, cost attribution, UX designer role, control-flow graphs, passive mode, SGS portable spec, development workflow, surrogate dependencies, rule packs, MVA + feature flags, vault-aware logging, agent governance, interoperability, commercial model
+- `ai-agents/index.md` — Added: P-240 (SG/Sentinel in development workflow), P-245 (agent governance as coherent capability)
+
+Master index: `team/roles/librarian/reviews/05/26/v0.27.79__master-index__briefs-24-may.md`
+Processed: 25 new human briefs (briefs/05/24/ — sg-send-thread + sg-sentinel-batch2 + day-wrap)
+New EXISTS items: 1 (Wardley map render toolchain via Mermaid v11.14.0 + Playwright Chromium — verified) | New PROPOSED items: 24 (P-223 to P-246; note P-247 = commercial model)
+
+---
+
 ## 2026-05-25
 
 - `index.md` — Updated: version v0.27.60 → v0.27.61; date 05/23 → 05/25

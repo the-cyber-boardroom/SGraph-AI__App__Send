@@ -75,6 +75,17 @@ This domain covers credentials, authentication, OAuth, and billing. This is a mo
 - Move from WorkMail to SES for sending (Section 16)
 - Welcome page flow improvements for post-purchase activation (existing welcome page serves Stripe redirect target)
 
+### SG/Send Tiered Business Model (05/24 briefs — docs 466–468, Day 69–70)
+
+**PROPOSED — does not exist yet.** All items below require SG/Sentinel to be deployed first.
+
+- **P-223: Open-evaluation tiered deployment model** — free/non-private mode (max-visibility, educational fingerprint display, X transfers/day limit); paid/non-tracking mode (SG/Sentinel rules remove tracking, Stripe-only data, published per-tier rules); ephemeral per-customer EC2 for confidential data (doc 466)
+- **P-224: No anonymous users via SG/Sentinel identity-creation rule** — fingerprint identity for every visitor including bots; no cookies, local storage fair game; fingerprint hash from local-storage + browser + environment; prerequisite for budget model and hostile-to-bad-traffic (doc 467)
+- **P-225: Ephemeral-by-default policy** — public cloud shares expire 2-3 days; paid vaults separate workflow for >1 week; persistent vaults manual+custom initially; save-key mechanism under consideration (doc 467)
+- **P-226: Per-account budget model** — every account ~£1 initial budget; every action has attributed cost; budget consumed via SG/Sentinel rules; educates users; enables capability gating (doc 467)
+- **P-230: Client-side OAuth + user-dedicated mode** — provider apps (Google, GitHub); vault-key from Google appDataFolder (recommended) or derived from OAuth secret; user-dedicated mode (vault keys + personal LLM key + vault info); vault-sharing as key-sharing; the hinge from anonymous trial to paying vault-owning user (doc 471)
+- **P-233: SG/Sentinel identity-creation rule (new SG/Sentinel rule type)** — creates fingerprint identity for every request from available signals; broadly useful beyond SG/Send; surfaced by SG/Send thread but belongs in SG/Sentinel corpus (doc 467)
+
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 
 ---

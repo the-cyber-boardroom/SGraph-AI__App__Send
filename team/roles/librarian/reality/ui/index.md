@@ -241,6 +241,14 @@ Updated test assertions from `/en-gb/vault` to `/en-gb/app` routing targets, con
 
 **`scripts/vault__run-locally.sh`** — helper script to run the vault UI locally.
 
+**Vault header redesign + access-key fix** (26 May 2026 — `vault-header.js`, `vault-shell.js`, `vault-browse-edit.js`, `app-shell.js`):
+- `vault-header.js` rebuilt: the four separate sync buttons (Check / Push / Pull / Refresh) collapse into a **single status pill** whose colour/label reflects state — `● Synced` (green), `↑N to push` / `↓N to pull` (amber/blue), `⇅ Diverged` (amber), `🔒 Read-only` (amber), `👁 Read-only` (blue, RO-token). Clicking the pill opens a dropdown with the explicit Push/Pull/Check/Refresh actions and a "last checked" line. The public setter API (`setAheadCount`/`setBehindCount`/`setDiverged`/`setPushBusy`/`setPullBusy`/`setCheckBusy`/`setRefreshAvailable`/`setReadOnly`/`setROMode`/`showLockButton`/`setVaultName`/`setAppJson`/`showLoading`/`hideLoading`) and emitted events are unchanged — `vault-shell` needs no rewiring.
+- **Access-key entry is now validated.** The read-only pill's dropdown carries an access-key input that calls `GET /api/transfers/check-token/{key}` and only emits `vault-settings-access-key` on a valid, non-exhausted token (previously the header set the key silently with no validation). Same logic as `vault-settings._validateAccess`.
+- **Single Upload.** The top-header Upload button was removed; upload lives only in the Files action bar (`Upload Files`, injected by `vault-browse-edit`). The dead `vault-header-upload` shell listener was removed (`_onUploadRequest` is still reached via `vault-upload-request`). Debug / raw-vault / version moved into an overflow (`⋯`) menu; "Return to vaults" stays a visible nav button (`.vh-lock-btn`, relabelled by `index.html`).
+- **Toolbar de-dup.** `vault-browse-edit.js` no longer adds its own "View Source" button when send-browse already rendered a native source toggle (`.sb-file__view-source`, present for html/csv/markdown).
+- **`check_token` 404 fix.** `app-shell.js` had three calls to `/api/transfers/check_token/` (underscore) — the registered route is `check-token` (hyphen). All corrected; the access-key/auth-bridge validation paths now resolve instead of 404ing.
+- **Second-row (send-browse action bar) removed.** `vault-shell.js` now hides the whole `.sb-header` row (`.vs-view-files .sb-header { display:none }`) — it duplicated the vault name and carried Copy Link / email (covered on Settings) and the non-vault Gallery-view link. The `New File / New Folder / Upload` actions moved from `.sb-header__right` to the **left tree panel** — `vault-browse-edit.js` wraps `SendBrowse.prototype._populateTree` to inject 📄/📁/⮋ icon buttons into `.sb-tree__controls` (writable vaults only, re-injected on tree refresh). The `✓ Decrypted` badge that was on that row is no longer shown; file size still appears in the bottom `vault-status-bar`.
+
 ---
 
 ### Admin UI (latest: v0.1.7)
