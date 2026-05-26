@@ -98,6 +98,7 @@ const findChild = (tree, name) => tree.children[name];
     ok('getTree: mount is _subvault',        !!acme && acme._subvault === true);
     ok('getTree: mount is _lazy (collapsed)', !!acme && acme._lazy === true);
     ok('getTree: mount _folderPath',         !!acme && acme._folderPath === '/subvaults/acme');
+    ok('getTree: mount carries _linkPath (move + edit)', !!acme && acme._linkPath === 'subvaults/acme.link.json');
     ok('getTree: link file NOT shown as a file', sv && sv.files.every(f => !/\.link\.json$/.test(f.path)));
 
     // 3. getFileList hides the raw link file, adds the mount dir
@@ -169,6 +170,18 @@ const findChild = (tree, name) => tree.children[name];
     ok('ro-record: vault_id from record', roArgs && roArgs.vid === 'childvault');
     ok('ro-record: NO prompt (silent open)', prompt3 === 0);
     ok('ro-record: mount mounted read-only', comp3._mounts.get('subvaults/acme').status === 'mounted');
+
+    // 11b. transparency: reading a path under a collapsed mount AUTO-OPENS it (no expand, no prompt)
+    globalThis.VaultDataSource = function (cv, ak) { return new FakeDS(childSpec, ak); };
+    let promptB = 0, roArgsB = null;
+    const comp3b = new CompositeDataSource(
+        new FakeDS({ _vault: parentVault, tree: rootSpec.tree, list: rootSpec.list, bytes: rootSpec.bytes }),
+        { keyProvider: async () => { promptB++; return null; },
+          vaultOpenerRO: async (vid, rk, rf) => { roArgsB = { vid, rk, rf }; return { _child: true }; } });
+    await comp3b.scan();
+    const ab = await comp3b.getFileBytes('subvaults/acme/health.md');   // no loadFolder first
+    ok('transparency: read auto-opens the sub-vault (no expand)', new TextDecoder().decode(ab) === 'score: 87');
+    ok('transparency: auto-open used the ro-record (no prompt)', promptB === 0 && !!roArgsB);
 
     // 12. external-resource link → resource leaf (NOT a vault mount)
     const resBytes = enc(JSON.stringify({ ref_id: 'lk-vid', type: 'video', url: 'https://youtu.be/xyz', label: 'Intro video' }));

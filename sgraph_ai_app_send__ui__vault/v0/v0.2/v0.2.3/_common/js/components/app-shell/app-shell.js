@@ -227,9 +227,14 @@
                 window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
 
-            // Build data source — use presetAccessKey if supplied (from entry form)
+            // Build data source. Resolve the server access token (write gate): the entry-form
+            // preset, else a saved per-vault / backend key. Thread it onto the write transport so
+            // write PUTs carry x-sgraph-access-token (reads are tokenless).
             this._setStatus('Reading vault…');
-            var accessKey = (!isRO && presetAccessKey) ? presetAccessKey : null;
+            var accessKey = !isRO
+                ? (presetAccessKey || this._resolveAccessToken(vault._vaultId || this._vaultKey))
+                : null;
+            this._applyAccessToken(accessKey);
             this._dataSource = new VaultDataSource(vault, accessKey);
             if (accessKey) this._writable = true;
             await this._dataSource.loadAllSubTrees();
@@ -263,6 +268,7 @@
                     await this._showAuthPrompt(vault, appJson);
                     return;  // _showAuthPrompt calls _continue() when key accepted
                 }
+                this._applyAccessToken(cachedKey);
                 this._dataSource = new VaultDataSource(vault, cachedKey);
                 this._writable   = true;
             }
@@ -572,6 +578,22 @@
             } catch (_) { return null; }
         }
 
+        // Resolve a server access token for this vault: per-vault cache → generic backend key.
+        _resolveAccessToken(vaultId) {
+            var t = this._getCachedAccessKey(vaultId);
+            if (t) return t;
+            try { return localStorage.getItem('sg-backend-access-key') || null; } catch (_) { return null; }
+        }
+
+        // Thread the access token onto the vault's transport so write PUTs carry
+        // x-sgraph-access-token. The VaultDataSource accessKey only flips the `writable`
+        // flag; the actual write requests authorise via vault._sgSend.token (read at request
+        // time by SGSend._authHeaders). Without this, writes 401 "Access token required".
+        _applyAccessToken(token) {
+            try { if (token && this._vault && this._vault._sgSend) this._vault._sgSend.token = token; }
+            catch (_) {}
+        }
+
         _setCachedAccessKey(vaultId, key, persist) {
             try {
                 if (persist) localStorage.setItem('sg-access-key:' + vaultId, key);
@@ -650,6 +672,7 @@
                         var data = await resp.json();
                         if (!data.valid) throw new Error('Access key is invalid or has expired');
                         this._setCachedAccessKey(vaultId, key, rCheck.checked);
+                        this._applyAccessToken(key);
                         this._dataSource = new VaultDataSource(vault, key);
                         this._writable   = true;
                         resolve();
@@ -1097,6 +1120,14 @@
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
+                    // sg.history.* — read past commits / trees / blobs (read-only)
+                    'history:{' +
+                      'log:function(o){return _sgCmd("history",{action:"log",opts:o||{}});},' +
+                      'list:function(c,p){return _sgCmd("history",{action:"list",commitId:c,path:p||""});},' +
+                      'read:function(c,p){return _sgCmd("history",{action:"read",commitId:c,path:p});},' +
+                      'readText:function(c,p){return _sgCmd("history",{action:"read",commitId:c,path:p}).then(function(b){return new TextDecoder().decode(b);});},' +
+                      'readBlob:function(id){return _sgCmd("history",{action:"readBlob",blobId:id});}' +
+                    '},' +
                     'app:{' +
                       'selfPath:'  + JSON.stringify(currentPath) + ',' +
                       'writable:'  + (writable  ? 'true' : 'false') + ',' +
@@ -1187,6 +1218,19 @@
 
         _setupVfsBridgeHandlers(iframeEl, dataSource) {
             var self = this;
+
+            // Transparency for sub-vaults: wrap the data source in a CompositeDataSource so the
+            // app's runtime sg.vfs.* calls can read inner-vault files by path (auto-opened
+            // read-only via stored ro-records — no prompt). Identical behaviour when the vault
+            // has no sub-vaults (the composite delegates everything to the root). Degrades
+            // gracefully if the script isn't loaded.
+            if (typeof CompositeDataSource !== 'undefined' && !(dataSource instanceof CompositeDataSource)) {
+                try {
+                    var composite = new CompositeDataSource(dataSource, { keyProvider: null });  // null = no prompt in app context
+                    composite.scan().catch(function () {});   // async; getFileBytes also auto-opens on access
+                    dataSource = composite;
+                } catch (_) { /* keep the plain data source */ }
+            }
 
             var handler = function (e) {
                 if (!e.data)                              return;
@@ -1308,6 +1352,28 @@
                         || (function(){ try{ return sessionStorage.getItem('sg-vault-endpoint'); }catch(_){ return null; } })()
                         || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
 
+                    if (e.data.__sgCmdType === 'history') {
+                        var ha = e.data.action;
+                        if (ha === 'log') {
+                            vault.logCommits(e.data.opts || {}).then(function (r) { cmdReply(true, r); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'list') {
+                            vault.listTreeAt(e.data.commitId, e.data.path || '').then(function (r) { cmdReply(true, r); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'read') {
+                            vault.readFileAt(e.data.commitId, e.data.path).then(function (buf) { cmdReply(true, buf); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'readBlob') {
+                            vault.readBlob(e.data.blobId).then(function (buf) { cmdReply(true, buf); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unknown history action: ' + ha);
+                        return;
+                    }
+
                     if (e.data.__sgCmdType === 'git') {
                         var action = e.data.action;
                         if (action === 'status') {
@@ -1340,6 +1406,8 @@
                         if (authAction === 'setKey') {
                             var newKey = String(e.data.key || '').trim();
                             if (!newKey) { cmdReply(true, { ok: true, valid: false }); return; }
+                            self._applyAccessToken(newKey);   // thread token onto write transport (the fix)
+                            try { self._setCachedAccessKey(vault._vaultId || self._vaultKey, newKey, false); } catch (_) {}
                             self._dataSource = new VaultDataSource(vault, newKey);
                             dataSource       = self._dataSource;
                             self._writable   = true;

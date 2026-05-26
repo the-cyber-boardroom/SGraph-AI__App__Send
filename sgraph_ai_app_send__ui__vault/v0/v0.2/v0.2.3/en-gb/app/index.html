@@ -50,10 +50,14 @@
     <script src="/_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
     <script src="/_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
     <script src="/_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--history.js"></script>
     <script src="/_common/js/lib/sg-vault/sg-vault--branches.js"></script>
 
     <!-- VaultDataSource — file I/O adapter (no UI dependency) -->
     <script src="/_common/js/adapters/vault-data-source.js"></script>
+    <!-- Sub-vaults: link reader + composite, so apps can read inner-vault data via sg.vfs -->
+    <script src="/_common/js/lib/links/vault-links.js"></script>
+    <script src="/_common/js/adapters/composite-data-source.js"></script>
 
     <!-- Public Vault Preview (read path + card) — renders /en-gb/app/<public-id> -->
     <script src="/_common/js/lib/sg-public-preview/public-preview-crypto.js"></script>

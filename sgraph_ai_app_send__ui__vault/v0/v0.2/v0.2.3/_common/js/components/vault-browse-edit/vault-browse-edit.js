@@ -1281,7 +1281,14 @@
             header.addEventListener('dragstart', function(e) {
                 e.stopPropagation();
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'folder', path: folderEl.dataset.path }));
+                // A sub-vault folder moves by relocating its underlying *.link.json (a file),
+                // not the virtual folder itself.
+                var linkPath = folderEl.dataset.linkPath;
+                if (linkPath) {
+                    e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'file', path: linkPath }));
+                } else {
+                    e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'folder', path: folderEl.dataset.path }));
+                }
                 folderEl.classList.add('sb-dnd--dragging');
             });
             header.addEventListener('dragend', function() {
@@ -1396,6 +1403,7 @@
     }
 
     function _executeDrop(browse, drag, destFolderPath) {
+        if (!drag || !drag.path) return;   // guard: resource/sub-vault nodes without a real path → no-op (no crash)
         if (drag.type === 'file') {
             // drag.path = e.g. "images/photo.jpg" or "photo.jpg"
             var parts      = drag.path.split('/');
