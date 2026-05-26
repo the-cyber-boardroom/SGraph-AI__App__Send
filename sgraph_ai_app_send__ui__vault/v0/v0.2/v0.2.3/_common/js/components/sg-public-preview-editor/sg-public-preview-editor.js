@@ -39,7 +39,7 @@
             this._ctx = { sgSend: sgSend, vault: vault };
             this._ownerStatus = 'ready';
             if (vault && vault._vaultId) this._vaultId = vault._vaultId;
-            try { this._vaultKey = vaultKey || localStorage.getItem('sg-vault-key') || this._vaultKey || ''; } catch (_) { this._vaultKey = vaultKey || ''; }
+            try { this._vaultKey = vaultKey || sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || this._vaultKey || ''; } catch (_) { this._vaultKey = vaultKey || ''; }
             this.render();
             this._afterContext();
         }
@@ -58,7 +58,7 @@
             if (this._ctx && this._ctx.vault) return this._ctx;
             if (typeof SGVault === 'undefined' || typeof SGSend === 'undefined') return null;
             let key = '';
-            try { key = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+            try { key = sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
             this._vaultKey = key;   // captured for the full-access share link
             if (!key)                 { this._setOwnerStatus('no-vault');  return null; }
             if (key.startsWith('ro-')){ this._setOwnerStatus('read-only'); return null; }

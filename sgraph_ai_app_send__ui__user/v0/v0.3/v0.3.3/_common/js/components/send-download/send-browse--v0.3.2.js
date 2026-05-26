@@ -215,6 +215,22 @@ class SendBrowse extends SendComponent {
         // BRW-001: Files — show basename only, sorted alphanumerically
         const sortedFiles = [...node.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         for (const file of sortedFiles) {
+            // v0.2.x external resource (sub-vaults): a controlled embed, not a vault file
+            if (file._resource) {
+                const rIcon = file._resourceType === 'image' ? '🖼' : file._resourceType === 'video' ? '▶' : file._resourceType === 'app' ? '🧩' : '🌐';
+                html += `
+                    <div class="sb-tree__file sb-tree__resource" data-resource="1"
+                         data-res-url="${SendHelpers.escapeHtml(file._url || '')}"
+                         data-res-type="${SendHelpers.escapeHtml(file._resourceType || 'link')}"
+                         data-res-provider="${SendHelpers.escapeHtml(file._provider || '')}"
+                         data-res-label="${SendHelpers.escapeHtml(file._label || file.name)}">
+                        <span class="sb-tree__file-icon">${rIcon}</span>
+                        <span class="sb-tree__file-name">${SendHelpers.escapeHtml(file._label || file.name)}</span>
+                        <span class="sb-tree__file-name" style="opacity:.5">↗</span>
+                    </div>
+                `;
+                continue;
+            }
             var basename = file.name.includes('/') ? file.name.split('/').pop() : file.name;
             const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(basename, null) : null;
             const icon = SendBrowse.FILE_ICONS[type] || SendBrowse.FILE_ICONS.other;
@@ -272,12 +288,20 @@ class SendBrowse extends SendComponent {
             });
         });
 
-        // File click → open in tab
+        // File click → open in tab (or open a controlled embed for external resources)
         treeEl.querySelectorAll('.sb-tree__file').forEach(fileEl => {
             fileEl.addEventListener('click', () => {
-                const path = fileEl.dataset.path;
-                if (path) this._openFileTab(path);
-
+                if (fileEl.dataset.resource === '1') {
+                    this._openResourceTab({
+                        url:      fileEl.dataset.resUrl,
+                        type:     fileEl.dataset.resType || 'link',
+                        provider: fileEl.dataset.resProvider || null,
+                        label:    fileEl.dataset.resLabel || ''
+                    });
+                } else {
+                    const path = fileEl.dataset.path;
+                    if (path) this._openFileTab(path);
+                }
                 // Highlight active file
                 treeEl.querySelectorAll('.sb-tree__file').forEach(f => f.classList.remove('sb-tree__file--active'));
                 fileEl.classList.add('sb-tree__file--active');
@@ -462,6 +486,34 @@ class SendBrowse extends SendComponent {
             if (self._sgLayout && self._sgLayout.shadowRoot) {
                 var newTabEl = self._sgLayout.shadowRoot.querySelector('.sgl-tab[data-tab-id="' + newId + '"]');
                 if (newTabEl) newTabEl.scrollIntoView({ inline: 'end', block: 'nearest', behavior: 'smooth' });
+            }
+        });
+    }
+
+    // Open an external resource (sub-vaults) in a controlled embed tab.
+    // Uses <sg-embed-frame> when available (default-deny iframe / media element, click-to-load).
+    _openResourceTab(res) {
+        if (!this._sgLayout || !res || !res.url) return;
+        _injectTabBarScrollCSS(this._sgLayout);
+        const title = res.label || res.url;
+        this._ensurePreviewStack();
+        const newId = this._sgLayout.addTabToStack('s-preview', { tag: 'div', title: title }, true);
+        if (!newId) return;
+        const self = this;
+        requestAnimationFrame(function () {
+            const el = self._sgLayout.getPanelElement(newId);
+            if (!el) return;
+            el.style.cssText = 'display:flex;flex-direction:column;height:100%;overflow:hidden;';
+            if (window.customElements && customElements.get('sg-embed-frame')) {
+                el.innerHTML = '';
+                const frame = document.createElement('sg-embed-frame');
+                el.appendChild(frame);
+                frame.setResource(res);
+            } else {
+                // Fallback: a plain external link (no embed component loaded)
+                el.innerHTML = '<div style="padding:1rem;font-size:0.85rem;">External resource: '
+                    + '<a href="' + SendHelpers.escapeHtml(res.url) + '" target="_blank" rel="noopener noreferrer">'
+                    + SendHelpers.escapeHtml(res.label || res.url) + ' ↗</a></div>';
             }
         });
     }

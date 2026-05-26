@@ -227,7 +227,7 @@
                 var sgSend = this._getSGSend();
                 var vault  = await SGVault.createFromToken(sgSend, token, { name: token });
                 window.history.replaceState(null, '', '#' + token);
-                try { localStorage.setItem('sg-vault-key', token); } catch (_) {}
+                try { sessionStorage.setItem('sg-vault-key', token); localStorage.setItem('sg-vault-key', token); } catch (_) {}
                 this._saveToHistory(vault, token);
                 this.emit('vault-created', { vault, vaultKey: token });
             } catch (err) {
