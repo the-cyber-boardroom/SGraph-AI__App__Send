@@ -1224,12 +1224,29 @@
             // read-only via stored ro-records — no prompt). Identical behaviour when the vault
             // has no sub-vaults (the composite delegates everything to the root). Degrades
             // gracefully if the script isn't loaded.
+            var compositeReady = Promise.resolve();
             if (typeof CompositeDataSource !== 'undefined' && !(dataSource instanceof CompositeDataSource)) {
                 try {
                     var composite = new CompositeDataSource(dataSource, { keyProvider: null });  // null = no prompt in app context
-                    composite.scan().catch(function () {});   // async; getFileBytes also auto-opens on access
+                    compositeReady = composite.scan().catch(function () {});   // register *.link.json mounts
                     dataSource = composite;
                 } catch (_) { /* keep the plain data source */ }
+            }
+
+            // Sub-vault transparency for app reads: before serving a list/read, make sure the
+            // sub-vault covering that path is opened (read-only, silent). getFileList only exposes
+            // an OPENED mount's inner files, so without this a read of a collapsed sub-vault path
+            // would ENOENT at the file-list pre-check before getFileBytes (which auto-opens) runs.
+            // No-op for ordinary paths and when there are no sub-vaults.
+            function ensureMountOpen(p) {
+                try {
+                    if (dataSource && typeof dataSource._mountForPath === 'function'
+                        && typeof dataSource.loadFolder === 'function'
+                        && dataSource._mountForPath(p)) {
+                        return Promise.resolve(dataSource.loadFolder(p)).catch(function () {});
+                    }
+                } catch (_) {}
+                return Promise.resolve();
             }
 
             var handler = function (e) {
@@ -1297,24 +1314,26 @@
                 // ── List ──────────────────────────────────────────────────────
                 if (e.data.__sgVfsListReq) {
                     var listId  = e.data.__sgVfsListReq;
-                    var entries = fileList;
                     var prefix  = (e.data.path || '').replace(/^\//, '');
-                    if (prefix) {
-                        var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
-                        var filtered = entries.filter(function (f) {
-                            return f.path === prefix || f.path.startsWith(normPfx);
-                        });
-                        if (filtered.length === 0) {
-                            try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {}
-                            return;
+                    compositeReady.then(function () { return prefix ? ensureMountOpen(prefix) : null; }).then(function () {
+                        var entries = dataSource.getFileList();   // re-read: now includes any opened mount's files
+                        if (prefix) {
+                            var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
+                            var filtered = entries.filter(function (f) {
+                                return f.path === prefix || f.path === normPfx || f.path.startsWith(normPfx);
+                            });
+                            if (filtered.length === 0) {
+                                try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {}
+                                return;
+                            }
+                            entries = filtered;
                         }
-                        entries = filtered;
-                    }
-                    var listed = entries.map(function (f) {
-                        return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                        var listed = entries.map(function (f) {
+                            return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                        });
+                        self._emitBridgeCall('vfs.list', { path: (e.data.path || ''), count: listed.length, ok: true });
+                        try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
                     });
-                    self._emitBridgeCall('vfs.list', { path: (e.data.path || ''), count: listed.length, ok: true });
-                    try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
                     return;
                 }
 
@@ -1327,15 +1346,17 @@
                     }
                     var rPath     = e.data.path || '';
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
-                    var rMatch    = self._findEntryStrict(fileList, rResolved);
-                    if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
-                    var _t0r = performance.now();
-                    dataSource.getFileBytes(rMatch.path).then(function (buf) {
-                        rReply(true, { buf: buf, path: rMatch.path });
-                        self._emitBridgeCall('vfs.read', { path: rResolved, bytes: buf.byteLength, ms: Math.round(performance.now() - _t0r), ok: true });
-                    }).catch(function (err) {
-                        rReply(false, { err: err.message || 'Read failed' });
-                        self._emitBridgeCall('vfs.read', { path: rResolved, ms: Math.round(performance.now() - _t0r), ok: false, err: err.message });
+                    compositeReady.then(function () { return ensureMountOpen(rResolved); }).then(function () {
+                        var rMatch = self._findEntryStrict(dataSource.getFileList(), rResolved);
+                        if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
+                        var _t0r = performance.now();
+                        return dataSource.getFileBytes(rMatch.path).then(function (buf) {
+                            rReply(true, { buf: buf, path: rMatch.path });
+                            self._emitBridgeCall('vfs.read', { path: rResolved, bytes: buf.byteLength, ms: Math.round(performance.now() - _t0r), ok: true });
+                        }).catch(function (err) {
+                            rReply(false, { err: err.message || 'Read failed' });
+                            self._emitBridgeCall('vfs.read', { path: rResolved, ms: Math.round(performance.now() - _t0r), ok: false, err: err.message });
+                        });
                     });
                     return;
                 }
