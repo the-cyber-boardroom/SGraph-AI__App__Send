@@ -1097,6 +1097,14 @@
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
+                    // sg.history.* — read past commits / trees / blobs (read-only)
+                    'history:{' +
+                      'log:function(o){return _sgCmd("history",{action:"log",opts:o||{}});},' +
+                      'list:function(c,p){return _sgCmd("history",{action:"list",commitId:c,path:p||""});},' +
+                      'read:function(c,p){return _sgCmd("history",{action:"read",commitId:c,path:p});},' +
+                      'readText:function(c,p){return _sgCmd("history",{action:"read",commitId:c,path:p}).then(function(b){return new TextDecoder().decode(b);});},' +
+                      'readBlob:function(id){return _sgCmd("history",{action:"readBlob",blobId:id});}' +
+                    '},' +
                     'app:{' +
                       'selfPath:'  + JSON.stringify(currentPath) + ',' +
                       'writable:'  + (writable  ? 'true' : 'false') + ',' +
@@ -1187,6 +1195,19 @@
 
         _setupVfsBridgeHandlers(iframeEl, dataSource) {
             var self = this;
+
+            // Transparency for sub-vaults: wrap the data source in a CompositeDataSource so the
+            // app's runtime sg.vfs.* calls can read inner-vault files by path (auto-opened
+            // read-only via stored ro-records — no prompt). Identical behaviour when the vault
+            // has no sub-vaults (the composite delegates everything to the root). Degrades
+            // gracefully if the script isn't loaded.
+            if (typeof CompositeDataSource !== 'undefined' && !(dataSource instanceof CompositeDataSource)) {
+                try {
+                    var composite = new CompositeDataSource(dataSource, { keyProvider: null });  // null = no prompt in app context
+                    composite.scan().catch(function () {});   // async; getFileBytes also auto-opens on access
+                    dataSource = composite;
+                } catch (_) { /* keep the plain data source */ }
+            }
 
             var handler = function (e) {
                 if (!e.data)                              return;
@@ -1307,6 +1328,28 @@
                     var endpoint = (window.SG_ENDPOINT
                         || (function(){ try{ return sessionStorage.getItem('sg-vault-endpoint'); }catch(_){ return null; } })()
                         || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
+
+                    if (e.data.__sgCmdType === 'history') {
+                        var ha = e.data.action;
+                        if (ha === 'log') {
+                            vault.logCommits(e.data.opts || {}).then(function (r) { cmdReply(true, r); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'list') {
+                            vault.listTreeAt(e.data.commitId, e.data.path || '').then(function (r) { cmdReply(true, r); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'read') {
+                            vault.readFileAt(e.data.commitId, e.data.path).then(function (buf) { cmdReply(true, buf); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'readBlob') {
+                            vault.readBlob(e.data.blobId).then(function (buf) { cmdReply(true, buf); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unknown history action: ' + ha);
+                        return;
+                    }
 
                     if (e.data.__sgCmdType === 'git') {
                         var action = e.data.action;

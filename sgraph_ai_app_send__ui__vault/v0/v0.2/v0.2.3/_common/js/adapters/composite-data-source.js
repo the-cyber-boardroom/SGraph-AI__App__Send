@@ -164,12 +164,20 @@ class CompositeDataSource {
     }
 
     // ── Required: file bytes (route mounted paths to the child) ──────────────
+    // Transparency: a read of a path under a sub-vault AUTO-OPENS that sub-vault (read-only,
+    // using a stored ro-record / device key — no prompt here). So an app can `sg.vfs.read` an
+    // inner-vault file by path without the user first expanding it. If no key is available the
+    // mount stays locked and the read falls through to the root (→ ENOENT), preserving the
+    // zero-knowledge boundary.
     async getFileBytes(path) {
         const norm = String(path).replace(/^\//, '');
         const m = this._mountForPath(norm);
-        if (m && m.status === 'mounted' && m.child) {
-            const rel = norm === m.mountPath ? '' : norm.slice(m.mountPath.length + 1);
-            return m.child.getFileBytes(rel);
+        if (m) {
+            if (m.status !== 'mounted') { try { await this._openMount(m); } catch (_) { /* locked / no key */ } }
+            if (m.status === 'mounted' && m.child) {
+                const rel = norm === m.mountPath ? '' : norm.slice(m.mountPath.length + 1);
+                return m.child.getFileBytes(rel);
+            }
         }
         return this._root.getFileBytes(path);
     }
