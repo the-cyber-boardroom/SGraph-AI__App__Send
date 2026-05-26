@@ -1019,8 +1019,11 @@
         .vs-view-files send-browse {
             display: block; height: 100%;
         }
-        /* Gallery view link doesn't apply in the vault context */
-        .vs-view-files a.sb-action-btn { display: none; }
+        /* The send-browse action-bar row is redundant in the vault: the vault name is
+           in the top header, file size is in the bottom status bar, copy-link/email
+           live on the Settings page, and the Gallery view doesn't apply here. File
+           create actions move to the tree-panel controls (vault-browse-edit). */
+        .vs-view-files .sb-header { display: none; }
         .vs-view-sgit {
             padding: var(--space-4); box-sizing: border-box;
         }
