@@ -98,6 +98,7 @@ const findChild = (tree, name) => tree.children[name];
     ok('getTree: mount is _subvault',        !!acme && acme._subvault === true);
     ok('getTree: mount is _lazy (collapsed)', !!acme && acme._lazy === true);
     ok('getTree: mount _folderPath',         !!acme && acme._folderPath === '/subvaults/acme');
+    ok('getTree: mount carries _linkPath (move + edit)', !!acme && acme._linkPath === 'subvaults/acme.link.json');
     ok('getTree: link file NOT shown as a file', sv && sv.files.every(f => !/\.link\.json$/.test(f.path)));
 
     // 3. getFileList hides the raw link file, adds the mount dir

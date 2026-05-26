@@ -191,18 +191,21 @@ class SendBrowse extends SendComponent {
             const isLazy     = !!(child && child._lazy === true && child._folderPath);
             const isSubvault = !!(child && child._subvault === true);
             const lazyAttrs  = isLazy ? ` data-lazy="1" data-loaded="0" data-folder-path="${SendHelpers.escapeHtml(child._folderPath)}"` : '';
+            const linkAttr   = (child && child._linkPath) ? ` data-link-path="${SendHelpers.escapeHtml(child._linkPath)}"` : '';
             const folderCls  = isSubvault ? 'sb-tree__folder sb-tree__folder--subvault' : 'sb-tree__folder';
             const folderIcon = isSubvault ? '🗄' : SendIcons.FOLDER_SM;
             const chip       = isSubvault ? `<span class="sb-tree__subvault-chip">·${SendHelpers.escapeHtml(child._access || 'ro')}</span>` : '';
+            const editBtn    = (child && child._linkPath) ? `<span class="sb-link-edit" data-link-path="${SendHelpers.escapeHtml(child._linkPath)}" title="Edit link file">&#9998;</span>` : '';
             const countHtml  = isLazy ? '' : `<span class="sb-tree__count">${this._countFiles(child)}</span>`;
             const innerHtml  = isLazy ? '' : this._renderFolderNode(child, childPath);
             html += `
-                <div class="${folderCls}" data-path="${SendHelpers.escapeHtml(childPath)}"${lazyAttrs}>
+                <div class="${folderCls}" data-path="${SendHelpers.escapeHtml(childPath)}"${lazyAttrs}${linkAttr}>
                     <div class="sb-tree__folder-header">
                         <span class="sb-tree__toggle">▸</span>
                         <span class="sb-tree__folder-icon">${folderIcon}</span>
                         <span class="sb-tree__folder-name">${SendHelpers.escapeHtml(name)}</span>
                         ${chip}
+                        ${editBtn}
                         ${countHtml}
                     </div>
                     <div class="sb-tree__folder-content" style="display: none;">
@@ -220,12 +223,15 @@ class SendBrowse extends SendComponent {
                 const rIcon = file._resourceType === 'image' ? '🖼' : file._resourceType === 'video' ? '▶' : file._resourceType === 'app' ? '🧩' : '🌐';
                 html += `
                     <div class="sb-tree__file sb-tree__resource" data-resource="1"
+                         data-path="${SendHelpers.escapeHtml(file.path)}"
+                         data-link-path="${SendHelpers.escapeHtml(file.path)}"
                          data-res-url="${SendHelpers.escapeHtml(file._url || '')}"
                          data-res-type="${SendHelpers.escapeHtml(file._resourceType || 'link')}"
                          data-res-provider="${SendHelpers.escapeHtml(file._provider || '')}"
                          data-res-label="${SendHelpers.escapeHtml(file._label || file.name)}">
                         <span class="sb-tree__file-icon">${rIcon}</span>
                         <span class="sb-tree__file-name">${SendHelpers.escapeHtml(file._label || file.name)}</span>
+                        <span class="sb-link-edit" data-link-path="${SendHelpers.escapeHtml(file.path)}" title="Edit link file">&#9998;</span>
                         <span class="sb-tree__file-name" style="opacity:.5">↗</span>
                     </div>
                 `;
@@ -267,11 +273,22 @@ class SendBrowse extends SendComponent {
                 if (opening && folder.dataset.lazy === '1' && folder.dataset.loaded !== '1'
                     && this.dataSource && typeof this.dataSource.loadFolder === 'function') {
                     const fp = folder.dataset.folderPath;
+                    const dp = folder.dataset.path;   // to re-expand after the re-render
                     toggle.textContent = '⋯';
                     try {
                         await this.dataSource.loadFolder(fp);
                         folder.dataset.loaded = '1';
                         this._populateTree();   // re-render from the now-updated data source + re-bind
+                        // Auto-expand the just-loaded node so it opens on the FIRST click
+                        try {
+                            const nf = treeEl.querySelector('.sb-tree__folder[data-path="' + (window.CSS && CSS.escape ? CSS.escape(dp) : dp) + '"]');
+                            if (nf) {
+                                const nc = nf.querySelector('.sb-tree__folder-content');
+                                const nt = nf.querySelector('.sb-tree__toggle');
+                                if (nc) nc.style.display = 'block';
+                                if (nt) nt.textContent = '▾';
+                            }
+                        } catch (_) {}
                     } catch (err) {
                         toggle.textContent = '⚠';
                         console.warn('[send-browse] lazy expand failed for', fp, err && err.message);
@@ -305,6 +322,16 @@ class SendBrowse extends SendComponent {
                 // Highlight active file
                 treeEl.querySelectorAll('.sb-tree__file').forEach(f => f.classList.remove('sb-tree__file--active'));
                 fileEl.classList.add('sb-tree__file--active');
+            });
+        });
+
+        // v0.2.x: edit the raw *.link.json behind a sub-vault / resource node (✎)
+        treeEl.querySelectorAll('.sb-link-edit').forEach(ed => {
+            ed.style.cursor = 'pointer';
+            ed.addEventListener('click', e => {
+                e.stopPropagation();
+                const lp = ed.dataset.linkPath;
+                if (lp) this._openFileTab(lp);   // composite serves the raw link bytes from the root vault
             });
         });
 
