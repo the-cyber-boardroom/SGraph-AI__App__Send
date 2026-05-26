@@ -476,4 +476,6 @@ If a typo accidentally introduces a declarative `<link>` or `<script src>`, the 
 
 ## See also
 
+- [Creating vaults-in-vaults and external-resource links](./SUB-VAULTS-AND-LINKS.md) — the `*.link.json` + `.vault/owner/ro-links.json` file formats and how to set them up from `sgit`
+- [Driving a vault app's `sg.*` from Playwright](./PLAYWRIGHT-VAULT-APP-ACCESS.md) — open a vault by key, reach the app iframe, call `sg.vfs`/`sg.history` headless
 - [Service Worker future architecture](./service-worker-future.md) — the planned upgrade that will lift the declarative-tag restriction
