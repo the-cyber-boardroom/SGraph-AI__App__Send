@@ -57,7 +57,7 @@ The project lead ratified **"everything in the two briefs as one programme."** T
 | **04 — Execution center** | Tool policies, tool-list compilation, CONFIRM UI, the budget governor |
 | **05 — VFS, persistence & memory** | sg-vfs memory working set, ephemeral/snapshot/synced, flush controller, every-message-as-file, self-prune, context-layers inspector |
 | **06 — Cognition (Track B)** | Sidecars, multi-LLM consensus, semantic knowledge graph, facts/hypotheses/evidence |
-| **07 — UX & mockups** | The surfaces (right pane, standalone, inspector, CONFIRM, next-chat) grounded in app-shell |
+| **07 — UX, flows & mockups** | User journey + turn-lifecycle / key-at-boot / persistence / consensus **flow diagrams**, plus mockups of every surface and state (pane, empty/loading, CONFIRM incl. budget-refused & read-only, fenced untrusted content, tools/loadout, inspector tabs, standalone harness, next-chat, created-apps) |
 | **08 — Reuse map** | REUSE / EXTEND / BUILD-NEW against `__Send` and `__Tools`, with real paths |
 | **09 — Security review** | Keys, reserved-prefix exclusion, prompt-injection fencing, CDN supply-chain, threat model |
 | **10 — Phases & acceptance** | Phase plan with gates; both briefs' ACs mapped |
