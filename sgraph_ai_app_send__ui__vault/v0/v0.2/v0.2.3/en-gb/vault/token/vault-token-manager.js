@@ -133,10 +133,14 @@ async function createTransferToken(vault, roToken, expiresAt, maxUses) {
     const deleteAuthHashBuf = await crypto.subtle.digest('SHA-256', deleteAuthBytes);
     const deleteAuthHash  = Array.from(new Uint8Array(deleteAuthHashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-    // 1. Create transfer slot — schema requires: file_size_bytes, delete_auth_hash,
-    //    expires_at (ms epoch int), max_downloads (not max_uses)
+    // 1. Create transfer slot at a DETERMINISTIC id derived from the token, so a
+    //    recipient holding only `ro-word-word-NNNN` can re-derive it and download the
+    //    creds (no server token→id registry). schema requires: file_size_bytes,
+    //    delete_auth_hash, expires_at (ms epoch int), max_downloads (not max_uses)
+    const roTransferId = await SGVaultCrypto.deriveRoTokenTransferId(roToken);
     const createBody = {
         file_size_bytes:   0,
+        transfer_id:       roTransferId,
         delete_auth_hash:  deleteAuthHash,
         max_downloads:     maxUses ? Number(maxUses) : 0,
         auto_delete:       false,

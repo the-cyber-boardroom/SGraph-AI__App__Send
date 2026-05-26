@@ -548,15 +548,19 @@
 
         // ── Credential helpers ────────────────────────────────────────────────────────
 
+        // Resolve `ro-word-word-NNNN` → read creds. The encrypted { vault_id, read_key,
+        // ref_file_id } payload lives at a deterministic transfer-id derived from the
+        // (bare) token; download it and decrypt with the token as PBKDF2 passphrase.
         async _resolveROToken(sgSend, token) {
-            var endpoint = sgSend.endpoint || window.location.origin;
-            var resp = await fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(token));
+            var endpoint   = sgSend.endpoint || window.location.origin;
+            var bare       = String(token || '').replace(/^ro-/, '');
+            var transferId = await SGVaultCrypto.deriveRoTokenTransferId(bare);
+            var resp = await fetch(endpoint + '/api/transfers/download/' + encodeURIComponent(transferId));
             if (!resp.ok) throw new Error('RO token not found or expired (HTTP ' + resp.status + ')');
-            var data = await resp.json();
-            if (!data.ciphertext) throw new Error('Invalid RO token response');
+            var cipherBytes = new Uint8Array(await resp.arrayBuffer());
 
             var enc         = new TextEncoder();
-            var keyMaterial = await crypto.subtle.importKey('raw', enc.encode(token), 'PBKDF2', false, ['deriveKey']);
+            var keyMaterial = await crypto.subtle.importKey('raw', enc.encode(bare), 'PBKDF2', false, ['deriveKey']);
             var aesKey      = await crypto.subtle.deriveKey(
                 { name: 'PBKDF2', salt: enc.encode('sgraph-ro-token-v1'), iterations: 100000, hash: 'SHA-256' },
                 keyMaterial,
@@ -564,11 +568,11 @@
                 false,
                 ['decrypt']
             );
-            var cipherBytes = Uint8Array.from(atob(data.ciphertext), function (c) { return c.charCodeAt(0); });
-            var iv          = cipherBytes.slice(0, 12);
-            var ct          = cipherBytes.slice(12);
-            var plain       = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, aesKey, ct);
-            return JSON.parse(new TextDecoder().decode(plain)); // { vaultId, readKeyB64, refFileId }
+            var iv    = cipherBytes.slice(0, 12);
+            var ct    = cipherBytes.slice(12);
+            var plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, aesKey, ct);
+            var p     = JSON.parse(new TextDecoder().decode(plain)); // stored snake_case
+            return { vaultId: p.vault_id, readKeyB64: p.read_key, refFileId: p.ref_file_id };
         }
 
         _getCachedAccessKey(vaultId) {
