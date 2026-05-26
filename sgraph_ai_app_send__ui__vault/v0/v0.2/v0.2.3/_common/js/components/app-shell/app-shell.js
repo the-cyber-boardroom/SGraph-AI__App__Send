@@ -227,9 +227,14 @@
                 window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
 
-            // Build data source — use presetAccessKey if supplied (from entry form)
+            // Build data source. Resolve the server access token (write gate): the entry-form
+            // preset, else a saved per-vault / backend key. Thread it onto the write transport so
+            // write PUTs carry x-sgraph-access-token (reads are tokenless).
             this._setStatus('Reading vault…');
-            var accessKey = (!isRO && presetAccessKey) ? presetAccessKey : null;
+            var accessKey = !isRO
+                ? (presetAccessKey || this._resolveAccessToken(vault._vaultId || this._vaultKey))
+                : null;
+            this._applyAccessToken(accessKey);
             this._dataSource = new VaultDataSource(vault, accessKey);
             if (accessKey) this._writable = true;
             await this._dataSource.loadAllSubTrees();
@@ -263,6 +268,7 @@
                     await this._showAuthPrompt(vault, appJson);
                     return;  // _showAuthPrompt calls _continue() when key accepted
                 }
+                this._applyAccessToken(cachedKey);
                 this._dataSource = new VaultDataSource(vault, cachedKey);
                 this._writable   = true;
             }
@@ -572,6 +578,22 @@
             } catch (_) { return null; }
         }
 
+        // Resolve a server access token for this vault: per-vault cache → generic backend key.
+        _resolveAccessToken(vaultId) {
+            var t = this._getCachedAccessKey(vaultId);
+            if (t) return t;
+            try { return localStorage.getItem('sg-backend-access-key') || null; } catch (_) { return null; }
+        }
+
+        // Thread the access token onto the vault's transport so write PUTs carry
+        // x-sgraph-access-token. The VaultDataSource accessKey only flips the `writable`
+        // flag; the actual write requests authorise via vault._sgSend.token (read at request
+        // time by SGSend._authHeaders). Without this, writes 401 "Access token required".
+        _applyAccessToken(token) {
+            try { if (token && this._vault && this._vault._sgSend) this._vault._sgSend.token = token; }
+            catch (_) {}
+        }
+
         _setCachedAccessKey(vaultId, key, persist) {
             try {
                 if (persist) localStorage.setItem('sg-access-key:' + vaultId, key);
@@ -650,6 +672,7 @@
                         var data = await resp.json();
                         if (!data.valid) throw new Error('Access key is invalid or has expired');
                         this._setCachedAccessKey(vaultId, key, rCheck.checked);
+                        this._applyAccessToken(key);
                         this._dataSource = new VaultDataSource(vault, key);
                         this._writable   = true;
                         resolve();
@@ -1383,6 +1406,8 @@
                         if (authAction === 'setKey') {
                             var newKey = String(e.data.key || '').trim();
                             if (!newKey) { cmdReply(true, { ok: true, valid: false }); return; }
+                            self._applyAccessToken(newKey);   // thread token onto write transport (the fix)
+                            try { self._setCachedAccessKey(vault._vaultId || self._vaultKey, newKey, false); } catch (_) {}
                             self._dataSource = new VaultDataSource(vault, newKey);
                             dataSource       = self._dataSource;
                             self._writable   = true;
