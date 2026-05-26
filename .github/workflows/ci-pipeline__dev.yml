@@ -14,5 +14,5 @@ jobs:
       target_deploy           : 'dev'
       should_increment_tag    : true
       should_publish_pypi     : false
-      should_publish_dockerhub: true
+      should_publish_dockerhub: false
     secrets: inherit

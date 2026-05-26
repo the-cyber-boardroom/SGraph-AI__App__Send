@@ -141,3 +141,50 @@ All items below are PROPOSED — does not exist yet.
 |---|---------|---------------------|--------|
 | P-221 | SG/Sentinel prior art and gap resolutions | OPA/Rego, Detection-as-Code/Sigma, deception technology (honeytokens), zero-trust; three graphs are one; replay-from-S3 as test corpus; Sentinel guards its own control plane | doc 462 |
 | P-222 | SG/Sentinel path to MVP (10-step sequence) | L1 logging + easy-win blocks, L2 observe-mode, fingerprint object, 4 TUI surfaces, TUI API foundation, rule engine core, dev environment; 7 memos to record; 5 prior-art deep-dives; parked items | doc 463 |
+
+---
+
+## SG/Sentinel — Implementation Batch-2 (05/24 briefs — Day 70, docs 473–488)
+
+All items below are PROPOSED — does not exist yet.
+
+Batch-2 takes SG/Sentinel from a designed system (batch-1, day 68, 19 docs) to one with a clear implementation philosophy, productising path, and governance role. The single most architecturally significant addition is control-flow graphs (P-237), which solve the WAF Achilles heel. IFD versioning correction (P-247/addendum): the frozen day-68 corpus used RFD; the correct scheme is IFD (Iterative Flow Development). Read all frozen docs as IFD.
+
+### Test-Driving, Cost, and UX
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-234 | SG/Sentinel test-driving + dogfooding | Locked-down dev/QA (only-my-IP/London/UK/Europe progression); prod-more-relaxed-than-dev test-drive stance; agentic red-team + bug-bounty leaderboard; independent Sentinel for admin; bare-EC2 reverse-proxy form factor (near-term concrete need); over-index-on-visibility principle | doc 474 |
+| P-235 | Cost attribution accountant agent | Every action/request/stream/layer/LLM-call has attributed cost; billing structural; cost tied to request ID in S3 log; cost-as-benchmark vs CloudWatch+Firehose+WAF; Wardley-map control + cost flows together | doc 475 |
+| P-236 | SG/Sentinel UX designer role + acid test | 6 personas; complexity-removal north star; add-Sentinel onboarding; proactive gap detection; acid test = teams use SG/Sentinel primitives for their own integration tests (app-coupling through adoption) | doc 476 |
+
+### The Architectural Heart
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-237 | Control-flow graphs for business-logic enforcement | Layer 2 shares state with app; state machines enforce valid request sequences; hyper-jump blocking; WAF Achilles heel solved; app declares control flow; deterministic + explainable | doc 477 |
+| P-238 | Outbound-traffic observation + passive mode + per-deployment PKI | Sees outbound traffic (enables agent governance); passive/observe-only first milestone (no side effects, rule reverse-engineering from logs, zero-risk on-ramp); Prometheus pull endpoints; per-deployment PKI (agent-to-agent trust layer) | doc 478 |
+| P-239 | SGS as portable spec / embedded baked-in firewall | RFC-worthy standard like sgit; thin rule layer embeddable in any FastAPI/Python service; location-agnostic universally-compatible rules ("a rule has no idea where it runs"); headers as inter-layer signalling; dev-to-prod abstraction path | doc 479 |
+
+### Development, Testing, and Packs
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-240 | SG/Sentinel in development workflow | Dev agents talk to SG/Sentinel protecting their app; rules = attack surface + app definition; AppSec agent reviews rules; controls agent blast radius; every team (sgit, vault-web, tools) interacts with SG/Sentinel | doc 480 |
+| P-241 | Surrogate dependencies + traffic replay + chaos engineering | Web service replacing dependencies with real-looking traffic; record-and-replay; create a different reality; chaos engineering drills the MVA in running code; especially powerful for agentic workflows | doc 481 |
+| P-242 | Rule packs + architecture-as-a-pack | Super-light to super-full packs; architecture itself is a pack (fractal nesting — SGS protecting SGS); per-environment differences baked in; IFD-versioned; self-contained deploy-from-zero; commercial tiering axis | doc 482 |
+
+### Resilience, Data, and Governance
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-243 | Minimal Viable Application (MVA) + feature flags as rules | Never take whole app offline for one part; two-way app conversation; automatic isolation of compromised parts; SGS-in-sequence resilience baseline; feature flags as rules (killer feature — identical to rule machinery; potential standalone product feature) | doc 483 |
+| P-244 | Vault-aware SG/Sentinel + maximum-governance logging | Outbound data validation (encryption-aware, selective); logging-modes spectrum (log-nothing to maximum-governance); vault-per-request supply-chain pattern; vault as SG/Sentinel's data substrate throughout | doc 484 |
+| P-245 | Agent governance as coherent SG/Sentinel capability | One substrate governs production agents (outbound actions, sequences); mediates authenticated agent-to-agent communication (PKI); controls development-agent blast radius; serves surrogates for testing; major future surface | doc 485 |
+
+### Interoperability and Commercial Model
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-246 | SG/Sentinel interoperability (collaborators not competitors) | Work in front/behind/alongside other WAFs; develop-in-SG/Sentinel-export-to-existing-infra (AWS WAF, ModSecurity, Akamai, Cloudflare, GCP); consume + export rules (YARA, Sigma); bidirectional log integration (Splunk, Datadog, CloudWatch); never require removing what works | doc 486 |
+| P-247 | SG/Sentinel commercial model | SaaS; custom versions; hosted reverse-proxy service; passive mode as zero-risk on-ramp; cost comparison vs Firehose/analytics/logging; agentic-native as differentiator; designed for someone else to commercialise | doc 487 |

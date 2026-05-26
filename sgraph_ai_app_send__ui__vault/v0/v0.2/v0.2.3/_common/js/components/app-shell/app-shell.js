@@ -195,6 +195,13 @@
                 isRO      = true;
             } else {
                 vault = await SGVault.open(sgSend, key);
+                // App Mode is a viewer. SGVault.open() loads the tree from this browser's
+                // working clone ref, which can lag behind the published (named) head when
+                // commits were pushed from another clone — e.g. the sgit CLI or another
+                // session. The vault UI hides this via auto-sync; app-shell has none, so it
+                // would render stale content. Reload the view from the published head when
+                // the clone is cleanly behind it.
+                await this._syncViewToPublishedHead(vault);
             }
 
             // Wrong-vault guard: the key is valid but opens a DIFFERENT vault than the
@@ -260,6 +267,31 @@
             }
 
             await this._continue(appJson);
+        }
+
+        // ── Sync view to published head ────────────────────────────────────────────────
+        // SGVault.open() loads the tree from this browser's working clone ref (ref-pid-snw-*),
+        // which can be behind the published named ref (ref-pid-muw-*) when commits were pushed
+        // from another clone — e.g. the sgit CLI or another browser session. App Mode is a
+        // read-only viewer and should always reflect the latest published content, so reload
+        // the tree from the named head when the clone is cleanly behind it.
+        //
+        // No-op when already in sync, or when the clone is ahead / diverged (those keep the
+        // working head so previews of unpushed local edits still work). Writes no refs — this
+        // is purely a view operation, safe for read-only opens too.
+        async _syncViewToPublishedHead(vault) {
+            try {
+                if (!vault || !vault._namedHeadId) return;
+                if (vault._headCommitId === vault._namedHeadId) return;
+                // clone head reachable from named head ⇒ clone is a clean ancestor (behind)
+                var cloneBehind = await vault._isAncestor(vault._headCommitId, vault._namedHeadId);
+                if (!cloneBehind) return;
+                await vault._loadTreeFromCommit(vault._namedHeadId);
+                vault._headCommitId = vault._namedHeadId;
+                this._emitVaultEvent('view-synced', { label: 'View synced to published head', head: vault._namedHeadId });
+            } catch (e) {
+                console.warn('[app-shell] sync-to-published failed:', e.message);
+            }
         }
 
         async _continue(appJson) {
@@ -613,7 +645,7 @@
                     btn.disabled = true;
                     errEl.textContent = '';
                     try {
-                        var resp = await fetch(endpoint + '/api/transfers/check_token/' + encodeURIComponent(key));
+                        var resp = await fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(key));
                         var data = await resp.json();
                         if (!data.valid) throw new Error('Access key is invalid or has expired');
                         this._setCachedAccessKey(vaultId, key, rCheck.checked);
@@ -989,6 +1021,10 @@
             var vaultId   = (this._vault && this._vault._vaultId) || '';
             var fileList  = this._dataSource ? this._dataSource.getFileList() : [];
             var fileCount = fileList.filter(function (f) { return !f.dir; }).length;
+            // htmlDir: directory prefix of the entry HTML file (e.g. "pages/" for "pages/index.html",
+            // "" for root-level "index.html"). Injected into the bridge so the img.src patch can
+            // resolve relative image paths to absolute vault paths before sending to the parent.
+            var htmlDir   = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/') + 1) : '';
 
             return '<script>(function(){' +
 
@@ -1088,6 +1124,59 @@
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
+
+                  // ── img.src auto-patch ────────────────────────────────────────────────
+                  // Intercept HTMLImageElement.prototype.src setter so vault-relative paths
+                  // like  img.src = "photos/web/hero.webp"  are transparently decrypted and
+                  // served as blob: URLs — without the HTML author needing to call sg.vfs.read.
+                  //
+                  // Path logic:
+                  //   • Absolute-protocol URLs (blob:, data:, http:, https:, //) → pass through
+                  //   • Absolute vault paths  (/photos/…)  → strip leading /, exact VFS match
+                  //   • Relative paths        (photos/…)   → resolve against this page's dir
+                  //     (_hd injected at bridge-build time), then prefix "/" so the parent
+                  //     handler treats the result as absolute (avoids double-resolution).
+                  //
+                  // The resolved path is sent to the parent via _read() which postMessages
+                  // {__sgVfsReadReq, path} — this call will appear in the Bridge debug tab.
+                  '(function(){' +
+                    'var _hd=' + JSON.stringify(htmlDir) + ';' +
+                    'function _rp(b,r){if(!b)return r;var p=(b+r).split("/"),o=[];' +
+                      'for(var i=0;i<p.length;i++){if(p[i]==="..")o.pop();' +
+                      'else if(p[i]!=="."&&p[i]!=="")o.push(p[i]);}return o.join("/");}' +
+                    'function _mt(e){return({webp:"image/webp",jpg:"image/jpeg",jpeg:"image/jpeg",' +
+                      'png:"image/png",gif:"image/gif",svg:"image/svg+xml",' +
+                      'avif:"image/avif",ico:"image/x-icon",bmp:"image/bmp",tiff:"image/tiff",' +
+                      'tif:"image/tiff",heic:"image/heic",heif:"image/heif"}[e]||"application/octet-stream");}' +
+                    'try{' +
+                      'var _d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");' +
+                      'if(_d&&_d.set){' +
+                        'Object.defineProperty(HTMLImageElement.prototype,"src",{' +
+                          'get:_d.get,' +
+                          'configurable:true,' +
+                          'set:function(v){' +
+                            'var _i=this;' +
+                            // Pass through anything with a protocol scheme or protocol-relative URL
+                            'if(!v||v.indexOf(":")!==-1||v.slice(0,2)==="//"){_d.set.call(_i,v);return;}' +
+                            // Resolve to absolute vault path (prefix "/" = absolute, skip parent re-resolution)
+                            'var vp=v.charAt(0)==="/"?v:("/"+_rp(_hd,v));' +
+                            '_read(vp)' +
+                              '.then(function(b){' +
+                                'var ext=vp.split("/").pop().split(".").pop().toLowerCase();' +
+                                'var u=URL.createObjectURL(new Blob([b],{type:_mt(ext)}));' +
+                                '_d.set.call(_i,u);' +
+                              '})' +
+                              '.catch(function(err){' +
+                                // Fall back to native so non-vault images (CDN, etc.) still work
+                                'console.warn("[sg-vfs] img.src not in vault, falling back:",vp,err.message);' +
+                                '_d.set.call(_i,v);' +
+                              '});' +
+                          '}' +
+                        '});' +
+                      '}' +
+                    '}catch(e){console.warn("[sg-vfs] img.src patch failed:",e.message);}' +
+                  '})();' +
+
                   'console.log("[sg-vfs] ready | writable=' + (writable ? 'true' : 'false') + ' | vaultName=' + vaultName.replace(/'/g, "\\'") + ' | page: /en-gb/app");' +
                 '})();' +
               '})();<\/script>';
@@ -1253,7 +1342,7 @@
                             self._dataSource = new VaultDataSource(vault, newKey);
                             dataSource       = self._dataSource;
                             self._writable   = true;
-                            fetch(endpoint + '/api/transfers/check_token/' + encodeURIComponent(newKey))
+                            fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(newKey))
                                 .then(function (r) { return r.json(); })
                                 .then(function (d) { cmdReply(true, { ok: true, valid: !!d.valid, remaining: d.remaining }); })
                                 .catch(function () { cmdReply(true, { ok: true, valid: null }); });
@@ -1262,7 +1351,7 @@
                         if (authAction === 'check') {
                             var checkKey = String(e.data.key || '').trim();
                             if (!checkKey) { cmdReply(true, { valid: false }); return; }
-                            fetch(endpoint + '/api/transfers/check_token/' + encodeURIComponent(checkKey))
+                            fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(checkKey))
                                 .then(function (r) { return r.json(); })
                                 .then(function (d) { cmdReply(true, { valid: !!d.valid }); })
                                 .catch(function (err) { cmdReply(false, null, err.message); });

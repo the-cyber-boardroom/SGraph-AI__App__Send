@@ -45,21 +45,35 @@
             _emit(VaultLoaderEvents.VAULT_KEY_CLEARED, {});
         },
 
-        // --- Server access token (sessionStorage) ----------------------------------
+        // --- Server access token (sessionStorage + localStorage fallback) ----------
+        // sessionStorage holds the active-session token; localStorage holds a
+        // durable copy so the key survives tab close / new-session restore.
 
         getAccessKey: function () {
-            try { return sessionStorage.getItem('sg-vault-access-key'); } catch (_) { return null; }
+            try {
+                return sessionStorage.getItem('sg-vault-access-key')
+                    || localStorage.getItem('sg-vault-access-key-saved')
+                    || null;
+            } catch (_) { return null; }
         },
 
         setAccessKey: function (key) {
             try {
-                if (key) { sessionStorage.setItem('sg-vault-access-key', key); }
-                else      { sessionStorage.removeItem('sg-vault-access-key'); }
+                if (key) {
+                    sessionStorage.setItem('sg-vault-access-key', key);
+                    localStorage.setItem('sg-vault-access-key-saved', key);
+                } else {
+                    sessionStorage.removeItem('sg-vault-access-key');
+                    localStorage.removeItem('sg-vault-access-key-saved');
+                }
             } catch (_) {}
         },
 
         clearAccessKey: function () {
-            try { sessionStorage.removeItem('sg-vault-access-key'); } catch (_) {}
+            try {
+                sessionStorage.removeItem('sg-vault-access-key');
+                localStorage.removeItem('sg-vault-access-key-saved');
+            } catch (_) {}
         },
 
         // --- API endpoint (sessionStorage) -----------------------------------------

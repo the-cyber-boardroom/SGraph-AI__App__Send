@@ -623,7 +623,9 @@
         bar.appendChild(deleteBtn);
 
         // --- View Source button (unrecognised file types only) ---
-        if (!isEditable && type !== 'image' && type !== 'pdf') {
+        // send-browse already renders a native source toggle (.sb-file__view-source)
+        // for csv/html/markdown — don't add a second one for those types.
+        if (!isEditable && type !== 'image' && type !== 'pdf' && !bar.querySelector('.sb-file__view-source')) {
             var sourceBtn = _makeBtn('View Source');
             var sourceShowing = false;
             var sourceEl = null;
@@ -770,39 +772,38 @@
         };
     }
 
-    // --- Patch header: add Upload Files button ---
+    // --- Patch tree controls: add New file / New folder / Upload (writable vaults) ---
+    // The send-browse action-bar row is hidden in the vault (vault-shell CSS), so the
+    // file-create actions live with the folder tree instead. send-browse builds
+    // .sb-tree__controls (the +/− expand-collapse row) inside _populateTree, which also
+    // re-runs on every tree refresh — so we inject here to survive refreshes.
 
-    var _origBuild = SendBrowse.prototype._build;
+    var _origPopulateTree = SendBrowse.prototype._populateTree;
 
-    SendBrowse.prototype._build = function() {
-        _origBuild.call(this);
+    SendBrowse.prototype._populateTree = function() {
+        _origPopulateTree.call(this);
 
         if (!this.dataSource || !this.dataSource.writable) return;
-
-        var headerRight = this.querySelector('.sb-header__right');
-        if (!headerRight) return;
+        var controls = this.querySelector('.sb-tree__controls');
+        if (!controls || controls.querySelector('.sb-tree-create-btn')) return;
 
         var self = this;
-        var uploadBtn = document.createElement('button');
-        uploadBtn.className = 'sb-action-btn';
-        uploadBtn.innerHTML = '&#8683; Upload Files';
-        uploadBtn.style.cssText = 'font-weight:600;';
-        uploadBtn.addEventListener('click', function() { _showUploadPicker(self); });
-        headerRight.prepend(uploadBtn);
+        var spacer = document.createElement('span');
+        spacer.style.cssText = 'flex:1;';
+        controls.appendChild(spacer);
 
-        // New Folder button
-        var folderBtn = document.createElement('button');
-        folderBtn.className = 'sb-action-btn';
-        folderBtn.innerHTML = '&#128193; New Folder';
-        folderBtn.addEventListener('click', function() { _showNewFolder(self); });
-        headerRight.prepend(folderBtn);
+        function _treeBtn(icon, titleText, onClick) {
+            var b = document.createElement('button');
+            b.className = 'sb-tree__ctrl-btn sb-tree-create-btn';
+            b.innerHTML = icon;
+            b.title = titleText;
+            b.addEventListener('click', function(e) { e.stopPropagation(); onClick(); });
+            return b;
+        }
 
-        // New File button
-        var newFileBtn = document.createElement('button');
-        newFileBtn.className = 'sb-action-btn';
-        newFileBtn.innerHTML = '&#43; New File';
-        newFileBtn.addEventListener('click', function() { _showNewFile(self); });
-        headerRight.prepend(newFileBtn);
+        controls.appendChild(_treeBtn('&#128196;', 'New file',     function() { _showNewFile(self); }));
+        controls.appendChild(_treeBtn('&#128193;', 'New folder',   function() { _showNewFolder(self); }));
+        controls.appendChild(_treeBtn('&#8683;',   'Upload files', function() { _showUploadPicker(self); }));
     };
 
     // --- Upload file picker ---

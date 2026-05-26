@@ -9,6 +9,7 @@
  */
 
 const SS_KEY = 'vt-vault-credentials';
+const LS_KEY = 'vt-vault-credentials-saved';
 
 /* ── Format patterns ──────────────────────────────────────────────────────── */
 const RE_SIMPLE_TOKEN  = /^[a-z]+-[a-z]+-\d{4}$/;
@@ -114,25 +115,41 @@ export async function resolveCredential(credential) {
 }
 
 /**
- * Store resolved credentials in sessionStorage. Clears URL hash.
+ * Store resolved credentials in both sessionStorage and localStorage.
+ * sessionStorage gives fast same-tab access; localStorage persists across
+ * tab switches and new browser sessions until the user explicitly clears.
+ * Clears URL hash so the key never appears in the browser history or referrer.
  */
 export function storeCredentials(resolved) {
-    sessionStorage.setItem(SS_KEY, JSON.stringify(resolved));
+    const serialised = JSON.stringify(resolved);
+    sessionStorage.setItem(SS_KEY, serialised);
+    try { localStorage.setItem(LS_KEY, serialised); } catch (_) {}
     if (location.hash && location.hash !== '#') {
         history.replaceState(null, '', location.pathname + location.search);
     }
 }
 
-/** Retrieve credentials from sessionStorage. Returns null if not set. */
+/**
+ * Retrieve credentials. Checks sessionStorage first (fast path for the same
+ * tab), then falls back to localStorage so new tabs and new browser sessions
+ * can restore without asking the user to re-enter the vault key.
+ * Returns null if not set in either store.
+ */
 export function getCredentials() {
-    const raw = sessionStorage.getItem(SS_KEY);
+    const raw = sessionStorage.getItem(SS_KEY)
+             || (() => { try { return localStorage.getItem(LS_KEY); } catch (_) { return null; } })();
     if (!raw) return null;
     try { return JSON.parse(raw); } catch (_) { return null; }
 }
 
-/** Clear credentials from sessionStorage. */
+/**
+ * Clear credentials from both sessionStorage and localStorage.
+ * Called explicitly from the Settings UI when the user wants to remove
+ * the stored vault key.
+ */
 export function clearCredentials() {
     sessionStorage.removeItem(SS_KEY);
+    try { localStorage.removeItem(LS_KEY); } catch (_) {}
 }
 
 /** Per-vault access key (write token) stored in localStorage. */

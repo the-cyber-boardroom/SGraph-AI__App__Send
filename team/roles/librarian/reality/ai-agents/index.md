@@ -115,6 +115,13 @@ Published 2026-05-06 by `@Email-FS (architect.spec)`. These are protocol specifi
 - Pyodide browser vault (`sgit` via WebAssembly) (Section 16)
 - Serverless Playwright API / Lambda (Section 23)
 
+### SG/Sentinel Agent Governance (05/24 briefs — docs 480, 485, Day 70)
+
+**PROPOSED — does not exist yet.** SG/Sentinel batch-2 added two items directly relevant to agentic workflows:
+
+- **P-240: SG/Sentinel in development workflow** — dev agents talk to SG/Sentinel protecting the app they build; rules = attack surface + app definition; AppSec agent reviews rules; controls agent blast radius (rules are analysable); every team (sgit, vault-web, tools) interacts with SG/Sentinel (doc 480, 05/24)
+- **P-245: Agent governance as coherent SG/Sentinel capability** — one substrate governs production agents (outbound actions controlled; sequences enforced via control-flow graphs); mediates authenticated agent-to-agent communication via PKI layer; controls development-agent blast radius (rules are analysable); serves surrogates for agent testing; sequenced as a major future surface as agentic systems proliferate (doc 485, 05/24)
+
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 
 ---
