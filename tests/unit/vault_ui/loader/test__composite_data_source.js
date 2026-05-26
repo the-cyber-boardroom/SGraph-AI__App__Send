@@ -107,6 +107,15 @@ const findChild = (tree, name) => tree.children[name];
     ok('getFileList: mount dir present', list.some(e => e.path === 'subvaults/acme/' && e.dir));
     ok('getFileList: root file kept',    list.some(e => e.path === 'readme.md'));
 
+    // 3b. BRIDGE INVARIANT (app-side sg.vfs read/list of a sub-vault):
+    //     while collapsed, an inner file is ABSENT from the flat list — so a naive strict-match
+    //     pre-check (as the app-shell VFS bridge used to do) would ENOENT before auto-open.
+    //     The bridge fix keys off _mountForPath(path) → loadFolder(path) to open the covering
+    //     mount first, after which the inner file appears (asserted post-mount at step 8).
+    ok('collapsed: inner file absent from flat list', !comp.getFileList().some(e => e.path === 'subvaults/acme/health.md'));
+    ok('_mountForPath finds the covering mount (bridge ensureMountOpen key)',
+       !!comp._mountForPath('subvaults/acme/health.md') && comp._mountForPath('readme.md') === null);
+
     // 4. getFileBytes of a root file → root
     ok('getFileBytes: root file routes to root', new TextDecoder().decode(await comp.getFileBytes('readme.md')) === 'hi\n');
 
