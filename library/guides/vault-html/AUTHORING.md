@@ -193,7 +193,7 @@ If you have a long stylesheet or a real script, split them into separate vault f
       sg.loadCss('theme.css'),
       sg.loadJs('chart-lib.js'),
     ]).then(() => sg.loadJs('app.js'))
-      .then(() => { document.body.style.display = ''; })
+      .then(() => { document.body.style.display = 'block'; })
       .catch(err => console.error('[demo] load failed:', err));
   </script>
 </head>
@@ -206,6 +206,7 @@ If you have a long stylesheet or a real script, split them into separate vault f
 
 Notes:
 - The `body { display: none }` rule is critical. Without it, the page renders unstyled before `theme.css` arrives, then jumps when the styles apply (FOUC). Hide first, reveal after load.
+- **Reveal with `display = 'block'`, not `''`.** Setting `style.display = ''` only clears the *inline* style, so it falls back to your `body { display: none }` stylesheet rule and the page stays hidden. Set the explicit value (`'block'`, or whatever your layout needs — `'flex'`, `'grid'`, …).
 - Use `Promise.all` to load independent assets in parallel.
 - Use chained `.then` for assets that depend on each other (e.g. `app.js` depends on `chart-lib.js` already being on the page).
 - The loaders inject `<style>` / `<script>` elements into `document.head` with a `data-sg-loaded="<path>"` attribute, so you can inspect them in DevTools.
@@ -426,7 +427,7 @@ const w = new Worker('w.js');
 <head>
   <style>body { display: none; }</style>
   <script>
-    sg.loadCss('theme.css').then(() => { document.body.style.display = ''; });
+    sg.loadCss('theme.css').then(() => { document.body.style.display = 'block'; });
   </script>
 </head>
 ```
