@@ -80,6 +80,22 @@ const VaultLinks = {
         return !!link && (link.type === 'vault' || (!link.type && !!link.vault_id));
     },
 
+    // is this link an external resource (not a vault)?
+    isResourceLink(link) {
+        return !!link && !this.isVaultLink(link) && (!!link.url || ['link', 'video', 'image', 'app'].indexOf(link.type) !== -1);
+    },
+
+    // --- URL → resource type/provider (for Add UI + resource links w/o explicit type) ---
+    detectResourceType(url) {
+        const u = String(url || '').toLowerCase().trim();
+        if (!u) return { type: 'link', provider: null };
+        if (/(?:youtube\.com|youtu\.be)\//.test(u))                    return { type: 'video', provider: 'youtube' };
+        if (/vimeo\.com\//.test(u))                                    return { type: 'video', provider: 'vimeo' };
+        if (/\.(png|jpe?g|gif|webp|svg|avif|bmp)(?:[?#]|$)/.test(u))    return { type: 'image', provider: null };
+        if (/\.(mp4|webm|ogv|mov|m4v)(?:[?#]|$)/.test(u))              return { type: 'video', provider: null };
+        return { type: 'link', provider: null };
+    },
+
     // --- Phase 0 key store: "save on this device" (localStorage) ----------------
     //     Real owner records (.vault/owner/ro-links|rw-links) arrive in Phase 1.
     getStoredChildKey(vaultId) {
