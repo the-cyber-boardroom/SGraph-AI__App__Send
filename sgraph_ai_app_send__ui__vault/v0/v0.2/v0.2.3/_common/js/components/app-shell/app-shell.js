@@ -167,6 +167,13 @@
                 isRO      = true;
             } else {
                 vault = await SGVault.open(sgSend, key);
+                // App Mode is a viewer. SGVault.open() loads the tree from this browser's
+                // working clone ref, which can lag behind the published (named) head when
+                // commits were pushed from another clone — e.g. the sgit CLI or another
+                // session. The vault UI hides this via auto-sync; app-shell has none, so it
+                // would render stale content. Reload the view from the published head when
+                // the clone is cleanly behind it.
+                await this._syncViewToPublishedHead(vault);
             }
 
             this._vault    = vault;
@@ -225,6 +232,31 @@
             }
 
             await this._continue(appJson);
+        }
+
+        // ── Sync view to published head ────────────────────────────────────────────────
+        // SGVault.open() loads the tree from this browser's working clone ref (ref-pid-snw-*),
+        // which can be behind the published named ref (ref-pid-muw-*) when commits were pushed
+        // from another clone — e.g. the sgit CLI or another browser session. App Mode is a
+        // read-only viewer and should always reflect the latest published content, so reload
+        // the tree from the named head when the clone is cleanly behind it.
+        //
+        // No-op when already in sync, or when the clone is ahead / diverged (those keep the
+        // working head so previews of unpushed local edits still work). Writes no refs — this
+        // is purely a view operation, safe for read-only opens too.
+        async _syncViewToPublishedHead(vault) {
+            try {
+                if (!vault || !vault._namedHeadId) return;
+                if (vault._headCommitId === vault._namedHeadId) return;
+                // clone head reachable from named head ⇒ clone is a clean ancestor (behind)
+                var cloneBehind = await vault._isAncestor(vault._headCommitId, vault._namedHeadId);
+                if (!cloneBehind) return;
+                await vault._loadTreeFromCommit(vault._namedHeadId);
+                vault._headCommitId = vault._namedHeadId;
+                this._emitVaultEvent('view-synced', { label: 'View synced to published head', head: vault._namedHeadId });
+            } catch (e) {
+                console.warn('[app-shell] sync-to-published failed:', e.message);
+            }
         }
 
         async _continue(appJson) {
