@@ -989,6 +989,10 @@
             var vaultId   = (this._vault && this._vault._vaultId) || '';
             var fileList  = this._dataSource ? this._dataSource.getFileList() : [];
             var fileCount = fileList.filter(function (f) { return !f.dir; }).length;
+            // htmlDir: directory prefix of the entry HTML file (e.g. "pages/" for "pages/index.html",
+            // "" for root-level "index.html"). Injected into the bridge so the img.src patch can
+            // resolve relative image paths to absolute vault paths before sending to the parent.
+            var htmlDir   = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/') + 1) : '';
 
             return '<script>(function(){' +
 
@@ -1088,6 +1092,59 @@
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
+
+                  // ── img.src auto-patch ────────────────────────────────────────────────
+                  // Intercept HTMLImageElement.prototype.src setter so vault-relative paths
+                  // like  img.src = "photos/web/hero.webp"  are transparently decrypted and
+                  // served as blob: URLs — without the HTML author needing to call sg.vfs.read.
+                  //
+                  // Path logic:
+                  //   • Absolute-protocol URLs (blob:, data:, http:, https:, //) → pass through
+                  //   • Absolute vault paths  (/photos/…)  → strip leading /, exact VFS match
+                  //   • Relative paths        (photos/…)   → resolve against this page's dir
+                  //     (_hd injected at bridge-build time), then prefix "/" so the parent
+                  //     handler treats the result as absolute (avoids double-resolution).
+                  //
+                  // The resolved path is sent to the parent via _read() which postMessages
+                  // {__sgVfsReadReq, path} — this call will appear in the Bridge debug tab.
+                  '(function(){' +
+                    'var _hd=' + JSON.stringify(htmlDir) + ';' +
+                    'function _rp(b,r){if(!b)return r;var p=(b+r).split("/"),o=[];' +
+                      'for(var i=0;i<p.length;i++){if(p[i]==="..")o.pop();' +
+                      'else if(p[i]!=="."&&p[i]!=="")o.push(p[i]);}return o.join("/");}' +
+                    'function _mt(e){return({webp:"image/webp",jpg:"image/jpeg",jpeg:"image/jpeg",' +
+                      'png:"image/png",gif:"image/gif",svg:"image/svg+xml",' +
+                      'avif:"image/avif",ico:"image/x-icon",bmp:"image/bmp",tiff:"image/tiff",' +
+                      'tif:"image/tiff",heic:"image/heic",heif:"image/heif"}[e]||"application/octet-stream");}' +
+                    'try{' +
+                      'var _d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");' +
+                      'if(_d&&_d.set){' +
+                        'Object.defineProperty(HTMLImageElement.prototype,"src",{' +
+                          'get:_d.get,' +
+                          'configurable:true,' +
+                          'set:function(v){' +
+                            'var _i=this;' +
+                            // Pass through anything with a protocol scheme or protocol-relative URL
+                            'if(!v||v.indexOf(":")!==-1||v.slice(0,2)==="//"){_d.set.call(_i,v);return;}' +
+                            // Resolve to absolute vault path (prefix "/" = absolute, skip parent re-resolution)
+                            'var vp=v.charAt(0)==="/"?v:("/"+_rp(_hd,v));' +
+                            '_read(vp)' +
+                              '.then(function(b){' +
+                                'var ext=vp.split("/").pop().split(".").pop().toLowerCase();' +
+                                'var u=URL.createObjectURL(new Blob([b],{type:_mt(ext)}));' +
+                                '_d.set.call(_i,u);' +
+                              '})' +
+                              '.catch(function(err){' +
+                                // Fall back to native so non-vault images (CDN, etc.) still work
+                                'console.warn("[sg-vfs] img.src not in vault, falling back:",vp,err.message);' +
+                                '_d.set.call(_i,v);' +
+                              '});' +
+                          '}' +
+                        '});' +
+                      '}' +
+                    '}catch(e){console.warn("[sg-vfs] img.src patch failed:",e.message);}' +
+                  '})();' +
+
                   'console.log("[sg-vfs] ready | writable=' + (writable ? 'true' : 'false') + ' | vaultName=' + vaultName.replace(/'/g, "\\'") + ' | page: /en-gb/app");' +
                 '})();' +
               '})();<\/script>';
