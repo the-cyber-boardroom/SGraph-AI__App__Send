@@ -76,7 +76,7 @@
             }
             // Key always from localStorage (set by root inbox /#vault-key handler)
             var saved = '';
-            try { saved = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+            try { saved = sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
 
             // Public Vault Preview: /en-gb/app/<public-id> (or ?p=<id>) ALWAYS renders the
             // deliberately-public preview + a key prompt — even if a key is saved.
@@ -216,9 +216,10 @@
             this._t.vaultOpened = performance.now();
             this._emitVaultEvent('open-ok', { label: 'Vault opened', vaultName: vault.name || '', ms: Math.round(this._t.vaultOpened - this._t.start) });
 
-            // Persist vault key for reload recovery (shared with /en-gb/vault/ via sg-vault-key)
+            // Persist vault key for reload recovery. Per-tab: sessionStorage is this tab's
+            // truth; localStorage holds the last-opened key as a fresh-tab fallback.
             if (!isRO) {
-                try { localStorage.setItem('sg-vault-key', key); } catch (_) {}
+                try { sessionStorage.setItem('sg-vault-key', key); localStorage.setItem('sg-vault-key', key); } catch (_) {}
             }
 
             // Key never stays in address bar

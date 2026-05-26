@@ -279,7 +279,7 @@
             header?.showLockButton(false);
 
             window.history.replaceState(null, '', window.location.pathname);
-            try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
+            try { sessionStorage.removeItem('sg-vault-key'); localStorage.removeItem('sg-vault-key'); } catch (_) {}
             window.sgraphVault.events.emit('vault-locked', {});
 
             // Refresh the entry screen so recent vaults list is up to date
@@ -360,16 +360,40 @@
             await rootDataSource.loadAllSubTrees();
 
             // Wrap so `*.link.json` sub-vaults splice in as inline, expandable folders.
-            // Phase 0: key comes from localStorage (VaultLinks) or a prompt; child opens
-            // read-only. Falls back to the plain data source if the script isn't loaded.
+            // Key comes from an ro-links record (silent), else localStorage, else the
+            // <sg-link-card> prompt (public-info-before-key); child opens read-only.
+            // Falls back to the plain data source if the composite script isn't loaded.
+            const _endpoint = (this._vault && this._vault._sgSend && this._vault._sgSend.endpoint)
+                || (window.VaultLoaderStorage && VaultLoaderStorage.getEndpoint && VaultLoaderStorage.getEndpoint())
+                || 'https://dev.send.sgraph.ai';
+            const _keyProvider = (mount) => new Promise((resolve) => {
+                const label = (mount.link && mount.link.label) || mount.nodeName;
+                // Rich surface: the link card (public info → key → save choice → open / new window)
+                if (window.customElements && customElements.get('sg-link-card')) {
+                    const card = document.createElement('sg-link-card');
+                    const done = (val) => { try { card.remove(); } catch (_) {} resolve(val); };
+                    card.addEventListener('sg-link-open', (e) => {
+                        if (e.detail.save === 'local' && mount.link && mount.link.vault_id) {
+                            try { VaultLinks.setStoredChildKey(mount.link.vault_id, e.detail.key); } catch (_) {}
+                        }
+                        done(e.detail.key);
+                    });
+                    card.addEventListener('sg-link-open-new-window', (e) => {
+                        if (e.detail.key) window.open('/#' + encodeURIComponent(e.detail.key), '_blank', 'noopener');
+                        done(null);   // opened elsewhere; cancel the inline open
+                    });
+                    card.addEventListener('sg-link-cancel', () => done(null));
+                    document.body.appendChild(card);
+                    card.openCard({ label: label, vaultId: mount.link && mount.link.vault_id,
+                                    publicId: mount.link && mount.link.public_id, apiBase: _endpoint });
+                    return;
+                }
+                // Fallback: plain prompt
+                const key = window.prompt('Enter the key for linked vault "' + label + '" (opens read-only):', '');
+                resolve(key && key.trim() ? key.trim() : null);
+            });
             const dataSource = (typeof CompositeDataSource !== 'undefined')
-                ? new CompositeDataSource(rootDataSource, {
-                    keyProvider: async (mount) => {
-                        const label = (mount.link && mount.link.label) || mount.nodeName;
-                        const key = window.prompt('Enter the key for linked vault "' + label + '" (opens read-only):', '');
-                        return key && key.trim() ? key.trim() : null;
-                    }
-                  })
+                ? new CompositeDataSource(rootDataSource, { keyProvider: _keyProvider })
                 : rootDataSource;
             dataSource.onTreeChanged = () => this._onTreeChanged();
             if (typeof dataSource.scan === 'function') {

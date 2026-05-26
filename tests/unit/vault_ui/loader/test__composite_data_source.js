@@ -170,6 +170,33 @@ const findChild = (tree, name) => tree.children[name];
     ok('ro-record: NO prompt (silent open)', prompt3 === 0);
     ok('ro-record: mount mounted read-only', comp3._mounts.get('subvaults/acme').status === 'mounted');
 
+    // 12. external-resource link → resource leaf (NOT a vault mount)
+    const resBytes = enc(JSON.stringify({ ref_id: 'lk-vid', type: 'video', url: 'https://youtu.be/xyz', label: 'Intro video' }));
+    const rootSpecR = {
+        _vault: { _sgSend: {} },
+        tree: { name: '', children: {}, files: [
+            { path: 'intro.link.json', name: 'intro.link.json', size: resBytes.length },
+            { path: 'readme.md', name: 'readme.md', size: 3 }
+        ] },
+        list: [
+            { path: 'readme.md', name: 'readme.md', dir: false, size: 3 },
+            { path: 'intro.link.json', name: 'intro.link.json', dir: false, size: resBytes.length }
+        ],
+        bytes: { 'intro.link.json': resBytes, 'readme.md': enc('hi\n') }
+    };
+    const compR = new CompositeDataSource(new FakeDS(rootSpecR), {});
+    await compR.scan();
+    ok('resource: registered (1 resource, 0 mounts)', compR._resources.size === 1 && compR._mounts.size === 0);
+    const rtree = compR.getTree();
+    const leaf = rtree.files.find(f => f._resource);
+    ok('getTree: resource rendered as a leaf', !!leaf);
+    ok('getTree: resource type = video', leaf && leaf._resourceType === 'video');
+    ok('getTree: resource provider = youtube', leaf && leaf._provider === 'youtube');
+    ok('getTree: resource url carried', leaf && leaf._url === 'https://youtu.be/xyz');
+    ok('getTree: .link.json not shown as a plain file (only as the resource leaf)', rtree.files.every(f => f._resource || !/\.link\.json$/.test(f.path)));
+    ok('getFileList: raw resource link hidden', compR.getFileList().every(e => !/intro\.link\.json$/.test(e.path)));
+    ok('getFileList: normal file kept', compR.getFileList().some(e => e.path === 'readme.md'));
+
     console.log('  ' + pass + ' pass, ' + fail + ' fail\n');
     process.exit(fail === 0 ? 0 : 1);
 })();

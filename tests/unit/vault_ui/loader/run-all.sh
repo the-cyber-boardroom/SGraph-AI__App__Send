@@ -12,5 +12,6 @@ node tests/unit/vault_ui/loader/test__routing_decisions.js
 node tests/unit/vault_ui/loader/test__public_preview_crypto.js
 node tests/unit/vault_ui/loader/test__vault_links.js
 node tests/unit/vault_ui/loader/test__composite_data_source.js
+node tests/unit/vault_ui/loader/test__storage_pertab.js
 echo ""
 echo "=== All vault unit tests passed ==="
