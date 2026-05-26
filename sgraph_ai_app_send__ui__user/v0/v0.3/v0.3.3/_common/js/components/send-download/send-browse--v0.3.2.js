@@ -155,6 +155,16 @@ class SendBrowse extends SendComponent {
         const treeEl = this._sgLayout.getPanelElement('t-tree');
         if (!treeEl) return;
 
+        // Preserve which folders are open across the rebuild. A lazy sub-vault expand
+        // re-renders the whole tree from scratch (all folders default collapsed); without
+        // this, expanding a child collapses its ancestors and the child appears to vanish.
+        const cssEsc   = p => (window.CSS && CSS.escape) ? CSS.escape(p) : p;
+        const expanded = [];
+        treeEl.querySelectorAll('.sb-tree__folder').forEach(f => {
+            const c = f.querySelector('.sb-tree__folder-content');
+            if (f.dataset.path && c && c.style.display !== 'none') expanded.push(f.dataset.path);
+        });
+
         treeEl.style.cssText = 'overflow-y: auto; height: 100%; padding: 0.5rem;';
         treeEl.innerHTML = '';
 
@@ -170,6 +180,16 @@ class SendBrowse extends SendComponent {
         `;
 
         this._setupTreeListeners(treeEl);
+
+        // Restore the open folders captured above.
+        expanded.forEach(p => {
+            const f = treeEl.querySelector('.sb-tree__folder[data-path="' + cssEsc(p) + '"]');
+            if (!f) return;
+            const c = f.querySelector('.sb-tree__folder-content');
+            const t = f.querySelector('.sb-tree__toggle');
+            if (c) c.style.display = 'block';
+            if (t) t.textContent = '▾';
+        });
     }
 
     _buildFolderTree() {
