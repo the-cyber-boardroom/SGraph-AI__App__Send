@@ -610,7 +610,7 @@
                     btn.disabled = true;
                     errEl.textContent = '';
                     try {
-                        var resp = await fetch(endpoint + '/api/transfers/check_token/' + encodeURIComponent(key));
+                        var resp = await fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(key));
                         var data = await resp.json();
                         if (!data.valid) throw new Error('Access key is invalid or has expired');
                         this._setCachedAccessKey(vaultId, key, rCheck.checked);
@@ -1307,7 +1307,7 @@
                             self._dataSource = new VaultDataSource(vault, newKey);
                             dataSource       = self._dataSource;
                             self._writable   = true;
-                            fetch(endpoint + '/api/transfers/check_token/' + encodeURIComponent(newKey))
+                            fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(newKey))
                                 .then(function (r) { return r.json(); })
                                 .then(function (d) { cmdReply(true, { ok: true, valid: !!d.valid, remaining: d.remaining }); })
                                 .catch(function () { cmdReply(true, { ok: true, valid: null }); });
@@ -1316,7 +1316,7 @@
                         if (authAction === 'check') {
                             var checkKey = String(e.data.key || '').trim();
                             if (!checkKey) { cmdReply(true, { valid: false }); return; }
-                            fetch(endpoint + '/api/transfers/check_token/' + encodeURIComponent(checkKey))
+                            fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(checkKey))
                                 .then(function (r) { return r.json(); })
                                 .then(function (d) { cmdReply(true, { valid: !!d.valid }); })
                                 .catch(function (err) { cmdReply(false, null, err.message); });

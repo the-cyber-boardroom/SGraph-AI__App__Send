@@ -623,7 +623,9 @@
         bar.appendChild(deleteBtn);
 
         // --- View Source button (unrecognised file types only) ---
-        if (!isEditable && type !== 'image' && type !== 'pdf') {
+        // send-browse already renders a native source toggle (.sb-file__view-source)
+        // for csv/html/markdown — don't add a second one for those types.
+        if (!isEditable && type !== 'image' && type !== 'pdf' && !bar.querySelector('.sb-file__view-source')) {
             var sourceBtn = _makeBtn('View Source');
             var sourceShowing = false;
             var sourceEl = null;

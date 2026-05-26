@@ -113,7 +113,6 @@
             this.addEventListener('vault-header-push',    () => this._onPush());
             this.addEventListener('vault-header-pull',    () => this._onPull());
             this.addEventListener('vault-header-refresh', () => this._onRefresh());
-            this.addEventListener('vault-header-upload',  () => this._onUploadRequest());
             this.addEventListener('vault-header-lock',    () => this._onLock());
             this.addEventListener('vault-header-debug',   () => this._toggleDebug());
             this.addEventListener('vault-header-raw',     () => this._showRawVault());
