@@ -5,7 +5,7 @@
 **from** Architect (Explorer team)
 **to** Dev (lead) + the coding session
 **type** Implementation plan — hand-off spec
-**reads with** the briefing pack `team/roles/architect/reviews/05/26/v0.27.80__briefing-pack__vault-chat.md` (the *why* + decisions) and the dev pack `library/sgraph-send/dev_packs/v0.27.80__vault-chat/` (the depth)
+**reads with** the briefing pack `11__briefing-pack.md` (the *why* + decisions) and the rest of this dev pack, docs 00–10 (the depth)
 **status** PROPOSED — nothing here exists. Cited code is in `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/` (`VAULT/`). Build into the next IFD minor of the vault UI.
 
 ## 0. Read-me for the coding session (house rules — do not skip)

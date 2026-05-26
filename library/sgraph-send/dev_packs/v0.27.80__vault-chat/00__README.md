@@ -61,10 +61,10 @@ The project lead ratified **"everything in the two briefs as one programme."** T
 | **08 — Reuse map** | REUSE / EXTEND / BUILD-NEW against `__Send` and `__Tools`, with real paths |
 | **09 — Security review** | Keys, reserved-prefix exclusion, prompt-injection fencing, CDN supply-chain, threat model |
 | **10 — Phases & acceptance** | Phase plan with gates; both briefs' ACs mapped |
+| **11 — Briefing pack** | Architect entry point: the *why* + the narrative + the settled decisions. Read first if you want the story before the detail. |
+| **12 — Implementation plan** | Dev build hand-off: house rules, data contracts, module signatures, bridge extensions, per-phase task lists + DoD, test plan, files-touched. |
 
-**Companion role docs (entry points):**
-- Architect briefing pack: `team/roles/architect/reviews/05/26/v0.27.80__briefing-pack__vault-chat.md` (the *why* + decisions; read first if you want the narrative)
-- Dev implementation plan: `team/roles/dev/reviews/05/26/v0.27.80__implementation-plan__vault-chat.md` (the build hand-off: contracts, modules, phase DoD, tests)
+> **One location.** The whole pack — including the architect briefing pack (11) and the dev implementation plan (12) — lives in this folder. (Per the team convention these would normally sit in `team/roles/architect/reviews/` and `team/roles/dev/reviews/`; consolidated here at the project lead's request.)
 
 ---
 

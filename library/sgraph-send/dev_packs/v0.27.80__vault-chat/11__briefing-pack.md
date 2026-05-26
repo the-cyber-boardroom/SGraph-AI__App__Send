@@ -9,7 +9,7 @@
 
 > **Reality check.** The reality document (`team/roles/librarian/reality/`) has **no** "Vault Chat" entry — this pack proposes it. What is REUSED and code-verified: the Vault App / app-shell iframe + `window.sg` bridge, the vault file-ops/commit/sync library, `vault-generate`'s LLM-over-`data-llm-bus`, and the `SGraph-AI__Tools` component library (`sg-vfs`, `sg-agentic-loop`, `sg-tool-runner`, `sg-tool-definition`, `sg-llm-*`) served from `tools.sgraph.ai`.
 
-**This is the narrative + decisions entry point. The full specification is the dev pack:** `library/sgraph-send/dev_packs/v0.27.80__vault-chat/` (docs 00–10). The build hand-off is `team/roles/dev/reviews/05/26/v0.27.80__implementation-plan__vault-chat.md`.
+**This is the narrative + decisions entry point** (doc 11 in this pack). The full specification is the rest of this folder (docs 00–10); the build hand-off is `12__implementation-plan.md`.
 
 ---
 
