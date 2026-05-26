@@ -24,8 +24,8 @@ class test_Container__App__Auth(TestCase):
         response = self.client.get('/info/health')
         assert response.status_code == 401
 
-    def test__2__static_ui_blocked_without_token(self):
-        response = self.client.get('/send/v0/v0.2/v0.2.0/index.html')
+    def test__2__vault_ui_blocked_without_token(self):
+        response = self.client.get('/en-gb/')
         assert response.status_code == 401
 
     def test__3__invalid_token_rejected(self):
@@ -42,9 +42,9 @@ class test_Container__App__Auth(TestCase):
         response = self.client.get('/info/health', headers=headers)
         assert response.status_code == 200
 
-    def test__6__authenticated_static_ui(self):
+    def test__6__authenticated_vault_ui(self):
         headers = {'x-sgraph-access-token': 'test-secret-token'}
-        response = self.client.get('/send/v0/v0.2/v0.2.0/index.html', headers=headers)
+        response = self.client.get('/en-gb/', headers=headers)
         assert response.status_code == 200
 
     def test__7__cookie_auth_works(self):

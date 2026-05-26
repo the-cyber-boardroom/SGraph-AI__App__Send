@@ -1,12 +1,12 @@
-import sgraph_ai_app_send__ui__user
+import os
 
 from osbot_fast_api.api.routes.Routes__Set_Cookie                               import Routes__Set_Cookie
 from osbot_utils.utils.Env                                                      import get_env
-from starlette.responses                                                        import RedirectResponse
+from starlette.responses                                                        import FileResponse
 from starlette.staticfiles                                                      import StaticFiles
 from osbot_fast_api.api.decorators.route_path                                   import route_path
 from sgraph_ai_app_send.lambda__user.fast_api.Fast_API__SGraph__App__Send__User  import Fast_API__SGraph__App__Send__User
-from sgraph_ai_app_send.lambda__user.user__config                               import APP_SEND__UI__USER__ROUTE__PATH__CONSOLE, APP_SEND__UI__USER__MAJOR__VERSION, APP_SEND__UI__USER__LATEST__VERSION, APP_SEND__UI__USER__START_PAGE, ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN
+from sgraph_ai_app_send.lambda__user.user__config                               import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, ENV_VAR__SEND__VAULT_STATIC_DIR, SEND__VAULT_STATIC_DIR__DEFAULT
 
 ENV_VAR__SEND__ENABLE_AUTH = 'SEND__ENABLE_AUTH'
 
@@ -20,7 +20,6 @@ class Fast_API__SGraph__Send__Container(Fast_API__SGraph__App__Send__User):
         return result
 
     def enable_global_auth(self):
-        import os
         from osbot_fast_api.api.schemas.consts.consts__Fast_API  import ENV_VAR__FAST_API__AUTH__API_KEY__NAME, ENV_VAR__FAST_API__AUTH__API_KEY__VALUE
         from osbot_fast_api.api.middlewares.Middleware__Check_API_Key import Middleware__Check_API_Key
         os.environ[ENV_VAR__FAST_API__AUTH__API_KEY__NAME ] = 'x-sgraph-access-token'
@@ -38,22 +37,27 @@ class Fast_API__SGraph__Send__Container(Fast_API__SGraph__App__Send__User):
 
     def setup_routes(self):
         super().setup_routes()
-        self.setup_static_routes()
         self.add_routes(Routes__Set_Cookie)
+        # NOTE: do NOT call self.setup_static_routes() here — the base
+        # Fast_API.setup() already invokes it polymorphically (line 142
+        # of osbot_fast_api/api/Fast_API.py), and an explicit call would
+        # register every static route twice.
 
     def setup_static_routes(self):
-        path_static_folder  = sgraph_ai_app_send__ui__user.path
-        path_static         = f"/{APP_SEND__UI__USER__ROUTE__PATH__CONSOLE}"
-        path_name           = APP_SEND__UI__USER__ROUTE__PATH__CONSOLE
-        major_version       = APP_SEND__UI__USER__MAJOR__VERSION
-        latest_version      = APP_SEND__UI__USER__LATEST__VERSION
-        start_page          = APP_SEND__UI__USER__START_PAGE
-        path_latest_version = f"/{path_name}/{major_version}/{latest_version}/{start_page}.html"
-        self.app().mount(path_static, StaticFiles(directory=path_static_folder), name=path_name)
+        vault_static_dir = get_env(ENV_VAR__SEND__VAULT_STATIC_DIR, SEND__VAULT_STATIC_DIR__DEFAULT)
+
+        # Mount specific sub-paths so /api/* and /info/* routes are not shadowed.
+        # A catch-all Mount('/') would intercept everything including FastAPI routes.
+        for sub_path in ('_common', 'en-gb', 'i18n'):
+            sub_dir = os.path.join(vault_static_dir, sub_path)
+            if os.path.isdir(sub_dir):
+                self.app().mount(f'/{sub_path}', StaticFiles(directory=sub_dir, html=True), name=f'vault-{sub_path}')
+
+        # Root: serve the vault index.html directly
+        index_html = os.path.join(vault_static_dir, 'index.html')
 
         @route_path(path='/')
-        def redirect_to_send():
-            return RedirectResponse(url=path_latest_version)
+        def serve_vault_root():
+            return FileResponse(index_html)
 
-        self.add_route_get(redirect_to_send)
-
+        self.add_route_get(serve_vault_root)

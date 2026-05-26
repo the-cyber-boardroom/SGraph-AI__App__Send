@@ -1,0 +1,180 @@
+name: Deploy Open UI to S3
+
+# Publishes v0.4.x OPEN (receiver) UI to S3.
+# v0.4.0 is the major IFD base for the open tree — no overlay chain yet.
+# v0.4.1+ patches will overlay on top in version order.
+# CloudFront separation: /api/* → Lambda origin, /* → S3 static files.
+#
+# i18n locale generation is DROPPED for v0.4.x — only en-gb/ ships.
+#
+# S3 path isolation by branch/environment:
+#   websites/sgraph-send/dev/    — dev branch (automatic)
+#   websites/sgraph-send/main/   — main branch (automatic)
+#   websites/sgraph-send/prod/   — production (manual dispatch)
+#
+# Environments:
+#   - dev:        dev.send.sgraph.ai/en-gb/open/
+#   - main:       main.send.sgraph.ai/en-gb/open/
+#   - production: send.sgraph.ai/en-gb/open/   (manual dispatch)
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'sgraph_ai_app_send__ui__open/v0/v0.4/**'
+      - 'sgraph_ai_app_send/version'
+      - 'scripts/inject_build_version.py'
+      - '.github/workflows/deploy-ui-open.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - production
+      clean_latest:
+        description: 'Clean latest/ before deploying (removes stale files from previous versions)'
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: "ui-open-deploy-${{ inputs.environment || github.ref_name || 'dev' }}"
+  cancel-in-progress: false
+
+env:
+  AWS_REGION      : eu-west-2
+  UI_BASE_DIR     : sgraph_ai_app_send__ui__open/v0/v0.4
+
+jobs:
+  deploy:
+    name: "Publish Open UI to S3 + CloudFront (${{ inputs.environment || github.ref_name || 'dev' }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment || (github.ref_name == 'main' && 'main') || 'dev' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Discover IFD versions
+        id: discover
+        run: |
+          # Find all v0.4.x directories, sort by patch version (v0.4.0 base, v0.4.1+ overlay)
+          VERSIONS=$(ls -d ${{ env.UI_BASE_DIR }}/v0.4.* 2>/dev/null | xargs -n1 basename | sort -t. -k3 -n || true)
+          echo "Found v0.4.x versions:"
+          echo "$VERSIONS"
+          echo "versions=$(echo $VERSIONS | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+          COUNT=$(echo "$VERSIONS" | wc -w)
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+          FIRST=$(echo "$VERSIONS" | head -n1 | xargs)
+          echo "first=$FIRST" >> $GITHUB_OUTPUT
+
+      - name: Inject build version into all IFD versions
+        run: |
+          for VERSION in ${{ steps.discover.outputs.versions }}; do
+            echo "Injecting build version into $VERSION"
+            python scripts/inject_build_version.py --version "$VERSION"
+          done
+
+      # NOTE: i18n locale generation step is intentionally absent.
+      # v0.4.x ships en-gb/ only; multi-locale generation returns in a future release.
+
+      - name: Check AWS credentials
+        id: check-creds
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+            echo "WARNING: AWS credentials not configured — skipping deployment"
+          else
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region            : ${{ env.AWS_REGION }}
+
+      - name: Resolve deployment environment
+        id: env
+        run: |
+          DEPLOY_ENV="${{ inputs.environment || github.ref_name }}"
+          if [ "$DEPLOY_ENV" == "production" ]; then
+            echo "deploy_env=prod" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_SEND__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying Open UI to PRODUCTION (send.sgraph.ai) → S3: websites/sgraph-send/prod/"
+          elif [ "$DEPLOY_ENV" == "main" ]; then
+            echo "deploy_env=main" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_SEND__DEV__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying Open UI to MAIN → S3: websites/sgraph-send/main/"
+          else
+            echo "deploy_env=dev" >> $GITHUB_OUTPUT
+            echo "dist_id=${{ secrets.SGRAPH_SEND__DEV__CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
+            echo "Deploying Open UI to DEV (dev.send.sgraph.ai) → S3: websites/sgraph-send/dev/"
+          fi
+
+      - name: Deploy v0.4.x Open UI to S3
+        if: steps.check-creds.outputs.has-credentials == 'true'
+        run: |
+          VERSIONS=(${{ steps.discover.outputs.versions }})
+          TOTAL=${#VERSIONS[@]}
+          FIRST="${{ steps.discover.outputs.first }}"
+          CLEAN_REQUESTED="${{ inputs.clean_latest }}"
+
+          if [ "$TOTAL" -eq "0" ]; then
+            echo "No v0.4.x versions found under ${{ env.UI_BASE_DIR }}; nothing to deploy."
+            exit 0
+          fi
+
+          for i in "${!VERSIONS[@]}"; do
+            VERSION="${VERSIONS[$i]}"
+            SOURCE_DIR="${{ env.UI_BASE_DIR }}/$VERSION"
+            STEP=$((i + 1))
+            echo ""
+            echo "=== Deploying Open $VERSION ($SOURCE_DIR) [$STEP/$TOTAL] ==="
+
+            EXTRA_FLAGS=""
+
+            # Scoped clean: the open tree only owns /en-gb/open/ in the shared
+            # sgraph-send latest/ prefix. A full --clean-latest would delete the
+            # sibling user (/, /en-gb/) and share (/en-gb/share/) trees — that is what
+            # caused the site-wide 404. Only clean our own slice.
+            if [ "$VERSION" == "$FIRST" ]; then
+              if [ "$CLEAN_REQUESTED" != "false" ]; then
+                EXTRA_FLAGS="--clean-prefixes en-gb/open"
+                echo "  → Cleaning latest/en-gb/open/ (this tree's slice only)"
+              fi
+            fi
+
+            if [ "$STEP" -eq "$TOTAL" ]; then
+              EXTRA_FLAGS="$EXTRA_FLAGS --cloudfront-distribution-id ${{ steps.env.outputs.dist_id }} --version-file sgraph_ai_app_send/version"
+            fi
+
+            python scripts/deploy_static_site.py \
+              --site sgraph-send \
+              --version "$VERSION" \
+              --source-dir "$SOURCE_DIR" \
+              --bucket ${{ secrets.SGRAPH_SEND__UI_S3_BUCKET }} \
+              --region ${{ env.AWS_REGION }} \
+              --deploy-env ${{ steps.env.outputs.deploy_env }} \
+              --skip-validation \
+              $EXTRA_FLAGS
+          done
+
+          echo ""
+          echo "=== Deployed Open $TOTAL version(s): ${VERSIONS[*]} ==="

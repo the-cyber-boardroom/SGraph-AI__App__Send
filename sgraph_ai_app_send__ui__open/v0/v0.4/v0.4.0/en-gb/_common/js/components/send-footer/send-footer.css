@@ -1,0 +1,31 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Footer Styles
+   v0.2.0 — Aurora dark theme
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.sg-footer {
+    text-align: center;
+    padding: 0.75rem var(--space-6, 1.5rem);
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.8;
+}
+
+.sg-footer__link {
+    color: var(--accent, #4ECDC4);
+    text-decoration: none;
+    font-weight: var(--weight-semibold, 600);
+}
+
+.sg-footer__link:hover {
+    text-decoration: underline;
+}
+
+.sg-footer__version {
+    display: inline;
+    margin-left: 0.5rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    color: var(--color-text-secondary, #8892A0);
+    opacity: 0.8;
+}

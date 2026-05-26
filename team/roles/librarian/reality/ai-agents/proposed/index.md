@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-05-21 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -97,4 +97,111 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 
 ---
 
+## Communication Vault Pattern (05/11 brief — doc 362)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Communication vault template | Structured vault: initial prompt + SKILL.md + messages folder for agent-to-agent messaging | doc 362 |
+| Email-FS-light bidirectional protocol | Standardised bidirectional agent-to-agent message format in vault | doc 362 |
+| Per-agent protocol pages | Audience-specific agent pages (Lovable, Claude Code, Cursor, ChatGPT) | doc 362 |
+
+## Observable LLM Orchestration Tool (05/12 brief — doc 373)
+
+Full 6-component tool built as SG/App, stored as vault:
+
+| Component | One-Line Description | Source |
+|-----------|---------------------|--------|
+| Prompt inspector | Decompose and inspect prompt structure; token breakdown | doc 373 |
+| Compression workbench | Test compression strategies on context windows | doc 373 |
+| Tool router | Visualise tool selection decisions per request | doc 373 |
+| Conversation graph | Non-linear conversation as graph (not linear chat) | doc 373 |
+| Parallel analyst | Run same prompt against multiple models in parallel | doc 373 |
+| Replay surface | Rerun prior conversations from any checkpoint | doc 373 |
+
+## QA Stack on SG/Compute (05/12 brief — doc 374)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Vault-driven QA control surface (SG/App) | Test definition, execution, results — all stored in vault | doc 374 |
+| iframe injection test runner | Fast in-process tests for our own pages | doc 374 |
+| Playwright integration | Real browser automation for any site | doc 374 |
+| Scheduling layer (cron-equivalent) | Run tests on intervals; requires SG/Compute cron support | doc 374 |
+
+---
+
+## Unified Observability Session (05/17 brief — doc 398)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Unified observability session REPL | Interactive session querying S3/CloudWatch/CloudTrail/billing/vault in one interface; no consolidated backend in v1 | doc 398 |
+| Agent-trace feature | `agent-trace <agent> --session <id>`: pulls Bedrock calls + S3 reads + vault commits + costs into one trace | doc 398 |
+
+## Bedrock CLI Native Support (05/17 brief — doc 404)
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Bedrock CLI command tree | chat, agent, tool, kb, guardrail, eval, observe, meta sub-commands; abstracts Bedrock complexity behind clean CLI | doc 404 |
+| Vault-grounded Bedrock sessions | Chat sessions, agent definitions, memory (short+long), tool traces, eval results, token usage all stored in vault | doc 404 |
+
+---
+
+## Observability Pipeline Concrete Sources (05/15 addendum — doc 407)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| CloudFront → Firehose → S3 as named observability source | Already-existing pipeline; source contract for the unified observability REPL to consume it | doc 407 |
+| CloudTrail → S3 as named observability source | Already-existing pipeline; source contract for REPL; all AWS API call audit data | doc 407 |
+| CloudWatch dashboard screenshot integration | `dashboard fetch/list/screenshot` commands; attaches AWS-rendered dashboard images to investigation records | doc 407 |
+| Product analytics layer (layer 2 observability) | Distinct from infra observability: vault clones, downloads, conversion funnel, churn, feature usage | doc 407 |
+| SG billing emission pipeline | Pre-auth micropayment events flowing into observability session as a first-class source | doc 407 |
+| Per-customer reporting surface (layer 3 observability) | Customer-facing filtered view of their own usage and billing; depends on layer 2 substrate | doc 407 |
+
+## AgentCore Resell Products (05/15 brief — doc 413)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| Vault-Grounded Agent Hosting | AgentCore Runtime + vault-bound state, audit trail, and portability as a managed product | doc 413 |
+| Multi-Region Agent Test Fleet | Container hosts + AgentCore Runtime + Evaluations + vault — QA-as-a-service product | doc 413 |
+| Compliance-Bundled Agent Deployment | AgentCore Policy + Evaluations + vault audit trail packaged for regulated-industry customers | doc 413 |
+| Multi-Provider Token Brokerage | Single Simple Token routes to AgentCore / OpenAI / Anthropic; one bill from SG | doc 413 |
+| Specialised Manager Vaults as products | Pre-packaged manager vault templates (customer engagement, investor relations, compliance audit) | doc 413 |
+
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 16–32)*
+
+---
+
+## Nova + AgentCore POC (05/16 briefs — doc 420)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-142 | FastAPI service with Nova model invocations | Micro / Lite / Pro / Premier endpoints; mini UI with model selector, prompt, result, cost, history | doc 420 |
+| P-143 | FastAPI service with AgentCore agent invocations | Configurable tools (Browser, Code Interpreter); session management; memory | doc 420 |
+| P-144 | Nova Act SDK integration for browser automation | Nova Act browser sessions against vault demo URLs; >90% accuracy on UI interaction tasks | doc 420 |
+| P-145 | LLM-validated qualitative tests (fifth test layer) | Nova-powered "is this vault OK?" beyond structural assertions; complements unit/integration/QA/browser | doc 420 |
+| P-146 | Per-invocation cost tracking log | Every LLM invocation: tokens in/out, cost estimate, latency, raw API response logged | doc 420 |
+
+## Accountant Demo (05/16 briefs — doc 421)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-147 | Side-by-side two-persona demo environment | Four-pane UI: Actions / Accountant view / Client view / Narrative | doc 421 |
+| P-148 | FastAPI orchestration service for demo lifecycle | sessions, setup, step/N, state, teardown endpoints; holds AWS credentials; idempotent | doc 421 |
+| P-149 | Accountant + client vault apps with role-based routing | Same vault; `/accountant` and `/client` routes; different UX per role | doc 421 |
+| P-150 | 12-step demo workflow | Setup → provisioning → vault loading → role interactions → report → approval → submission → confirmation → teardown | doc 421 |
+| P-151 | Auto-teardown after 15-20 min idle | Prevents orphan demo sessions; reuses reset-on-activity timeout pattern | doc 421 |
+| P-152 | Demo framework pattern | Reusable template for recruitment/news/risk demos; content work once infrastructure established | doc 421 |
+
+## AppSec Mini-Tools (05/16 briefs — doc 423)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-159 | Threat-modelling mini-tool on vaults | StrideGPT (mrwadams) integration; STRIDE + OWASP LLM Top 10 + MAESTRO pattern detection | doc 423 |
+| P-160 | Client-side mode: threat modeller in browser | Runs entirely in vault JS API context; no server-side compute; offline-capable | doc 423 |
+| P-161 | Ephemeral compute-backed mode | FastAPI backend on SG/Compute; Fargate task per session; heavier analysis possible | doc 423 |
+| P-162 | AppSec vault schema for threat artefacts | System descriptions, threat lists, attack trees, mitigations, evidence — all in vault | doc 423 |
+| P-163 | SBOM analysis mini-tool (planned next) | syft/cdxgen integration; vault holds SBOM + change history; planned after threat modelling | doc 423 |
+| P-164 | Dependency scanning mini-tool (planned next) | trivy/grype integration; vault tracks findings and fixes; planned after threat modelling | doc 423 |

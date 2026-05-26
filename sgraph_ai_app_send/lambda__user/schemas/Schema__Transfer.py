@@ -19,8 +19,9 @@ class Schema__Transfer__Create(Type_Safe):                                      
     transfer_id       : Safe_Str__Id                                             # Optional client-provided transfer ID (PBKDF2 simple-token mode)
     max_downloads     : Safe_UInt                                                # Max downloads before exhausted (0 = unlimited)
     auto_delete       : bool                                                     # Wipe payload after last allowed download
-    expires_at        : str                                                      # ISO-8601 UTC expiry timestamp, empty = no expiry
+    expires_at        : int                                                      # Expiry as ms since epoch (0 = no expiry)
     delete_auth_hash  : Safe_Str__Id                                             # SHA-256(delete_auth), empty = delete disabled
+    allow_recreate    : bool                                                     # If True, delete clears metadata too (id can be recreated/overwritten); else delete leaves a tombstone
 
 
 class Schema__Transfer__Initiated(Type_Safe):                                    # Response: transfer created
@@ -41,7 +42,7 @@ class Schema__Transfer__Info(Type_Safe):                                        
     created_at          : str                                                    # Creation timestamp
     download_count      : Safe_UInt                                              # Number of downloads
     max_downloads       : Safe_UInt                                              # Limit (0 = unlimited)
-    expires_at          : str                                                    # ISO-8601 UTC expiry, empty = none
+    expires_at          : int                                                    # Expiry as ms since epoch (0 = no expiry)
     downloads_remaining : Safe_UInt                                              # Remaining downloads (0 = unlimited)
     is_expired          : bool                                                   # Computed: True if expires_at is set and passed
 

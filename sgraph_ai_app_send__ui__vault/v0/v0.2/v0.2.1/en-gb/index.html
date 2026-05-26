@@ -32,92 +32,31 @@
         min-height: 100vh;
     }
 
-    /* ── Navbar ────────────────────────────────────────────────────────── */
-    .vp-nav {
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem 2rem;
-        background: rgba(13,17,23,0.92);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid var(--border);
-    }
-
-    .vp-nav__brand {
-        font-size: 1rem;
-        font-weight: 400;
-        color: var(--muted);
-        letter-spacing: -0.01em;
-        flex: 1;
-    }
-    .vp-nav__brand strong { color: var(--teal); font-weight: 700; }
-
-    .vp-nav__cta {
-        padding: 0.4rem 1rem;
-        background: none;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        color: var(--text);
-        font-size: 0.82rem;
-        font-family: var(--font-sans);
-        cursor: pointer;
-        transition: border-color 0.15s, color 0.15s;
-        white-space: nowrap;
-    }
-    .vp-nav__cta:hover { border-color: var(--teal); color: var(--teal); }
-
     /* ── Hero ──────────────────────────────────────────────────────────── */
     .vp-hero {
         display: flex;
         flex-direction: column;
         align-items: center;
         text-align: center;
-        padding: 4.5rem 1.5rem 3.5rem;
+        padding: 2.25rem 1.5rem 1.75rem;
         max-width: 720px;
         margin: 0 auto;
     }
 
-    .vp-trust-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        font-size: 0.7rem;
-        font-weight: 600;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
-        color: var(--muted);
-        background: var(--teal-glow);
-        border: 1px solid rgba(78,205,196,0.15);
-        border-radius: 99px;
-        padding: 0.3rem 0.9rem;
-        margin-bottom: 2rem;
-    }
-    .vp-trust-badge__dot {
-        width: 6px; height: 6px;
-        border-radius: 50%;
-        background: var(--teal);
-        flex-shrink: 0;
-    }
-    .vp-trust-badge__sep { opacity: 0.35; margin: 0 0.1rem; }
-
     .vp-hero__title {
-        font-size: clamp(2.8rem, 7vw, 4.5rem);
+        font-size: clamp(2.2rem, 6vw, 3.8rem);
         font-weight: 800;
         line-height: 1.05;
         letter-spacing: -0.03em;
         color: #ffffff;
-        margin-bottom: 0.6rem;
+        margin-bottom: 0.5rem;
     }
 
-    /* Steal from Design 01 — the differentiator line in teal */
     .vp-hero__tagline {
-        font-size: clamp(1rem, 2.5vw, 1.2rem);
+        font-size: clamp(0.95rem, 2.2vw, 1.1rem);
         color: var(--teal);
         font-weight: 500;
-        margin-bottom: 2.5rem;
+        margin-bottom: 1.75rem;
         letter-spacing: -0.01em;
     }
 
@@ -403,7 +342,7 @@
     }
     .vp-create-cta__btn:hover { background: rgba(78,205,196,0.2); border-color: rgba(78,205,196,0.5); }
 
-    /* ── Recovery modal ────────────────────────────────────────────────── */
+    /* ── Create vault modal ────────────────────────────────────────────── */
     .vp-recovery {
         position: fixed;
         inset: 0;
@@ -419,37 +358,152 @@
         border: 1px solid rgba(78,205,196,0.3);
         border-radius: 12px;
         padding: 2rem;
-        max-width: 460px;
+        max-width: 480px;
         width: 100%;
-        text-align: center;
     }
-    .vp-recovery__icon { font-size: 2rem; margin-bottom: 0.75rem; }
-    .vp-recovery__title { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
-    .vp-recovery__body { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.6; }
-    .vp-recovery__key {
-        font-family: var(--font-mono);
+    .vp-recovery__header {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.5rem;
+        position: relative;
+    }
+    .vp-recovery__close {
+        position: absolute;
+        top: -1rem;
+        right: -1rem;
+        background: none;
+        border: none;
+        color: var(--muted);
         font-size: 1.1rem;
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        line-height: 1;
+        transition: color 0.15s;
+    }
+    .vp-recovery__close:hover { color: var(--text); }
+
+    /* Access token row inside create modal */
+    .vp-recovery__access {
+        margin-bottom: 1rem;
+    }
+    .vp-recovery__access-label {
+        display: block;
+        font-size: 0.73rem;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+    }
+    .vp-recovery__access-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .vp-recovery__access-input {
+        flex: 1;
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.6rem 2.4rem 0.6rem 0.85rem;
+        color: var(--text);
+        font-size: 0.85rem;
+        font-family: var(--font-mono);
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.15s;
+    }
+    .vp-recovery__access-input:focus { border-color: var(--teal); }
+    .vp-recovery__access-input::placeholder { color: var(--muted); opacity: 0.6; }
+    .vp-recovery__access-toggle {
+        position: absolute;
+        right: 0.6rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--muted);
+        padding: 0.2rem;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        transition: color 0.15s;
+    }
+    .vp-recovery__access-toggle:hover { color: var(--text); }
+    .vp-recovery__badge {
+        font-size: 0.6rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 2px 7px;
+        border-radius: 3px;
+        background: var(--teal);
+        color: #0a2e2c;
+    }
+    .vp-recovery__title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .vp-recovery__body {
+        font-size: 0.83rem;
+        color: var(--muted);
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+
+    /* Token field + regenerate row */
+    .vp-recovery__token-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        align-items: stretch;
+    }
+    .vp-recovery__key {
+        flex: 1;
+        font-family: var(--font-mono);
+        font-size: 1.05rem;
         font-weight: 700;
         color: var(--teal);
         background: var(--teal-glow);
-        border: 1px solid rgba(78,205,196,0.2);
+        border: 1px solid rgba(78,205,196,0.25);
         border-radius: 8px;
-        padding: 0.75rem 1rem;
-        margin: 0.75rem 0 1.25rem;
-        word-break: break-all;
-        letter-spacing: 0.04em;
+        padding: 0.7rem 0.85rem;
+        outline: none;
+        min-width: 0;
+        transition: border-color 0.15s;
     }
+    .vp-recovery__key:focus { border-color: var(--teal); }
+    .vp-recovery__regen {
+        padding: 0 0.85rem;
+        background: rgba(78,205,196,0.08);
+        border: 1px solid rgba(78,205,196,0.25);
+        border-radius: 8px;
+        color: var(--teal);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        line-height: 1;
+    }
+    .vp-recovery__regen:hover { background: rgba(78,205,196,0.15); }
+    .vp-recovery__token-hint {
+        font-size: 0.73rem;
+        color: var(--muted);
+        margin-bottom: 1.25rem;
+    }
+    .vp-recovery__token-hint strong { color: #e06c75; }
+
     .vp-recovery__actions {
         display: flex;
         gap: 0.5rem;
-        justify-content: center;
-        flex-wrap: wrap;
         margin-bottom: 1rem;
     }
     .vp-recovery__btn {
-        padding: 0.5rem 1rem;
+        padding: 0.45rem 0.9rem;
         border-radius: 6px;
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         font-family: var(--font-sans);
         cursor: pointer;
         transition: background 0.15s;
@@ -479,7 +533,12 @@
         cursor: pointer;
         transition: background 0.15s;
     }
-    .vp-recovery__confirm:hover { background: #3dbdb5; }
+    .vp-recovery__confirm:hover:not(:disabled) { background: #3dbdb5; }
+    .vp-recovery__confirm:disabled {
+        background: rgba(78,205,196,0.25);
+        color: rgba(10,26,24,0.5);
+        cursor: not-allowed;
+    }
 
     /* ── Responsive ────────────────────────────────────────────────────── */
     @media (max-width: 768px) {
@@ -487,7 +546,6 @@
         .vp-sec-card:nth-child(2) { border-right: none; }
         .vp-sec-card:nth-child(3) { border-top: 1px solid var(--border); border-right: 1px solid var(--border); }
         .vp-sec-card:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
-        .vp-nav { padding: 0.65rem 1rem; }
         .vp-hero { padding: 3rem 1rem 2.5rem; }
     }
     @media (max-width: 480px) {
@@ -501,21 +559,11 @@
 </head>
 <body>
 
-<!-- ── Navbar ──────────────────────────────────────────────────────────── -->
-<nav class="vp-nav">
-    <span class="vp-nav__brand">SG/<strong>Vault</strong></span>
-    <button class="vp-nav__cta" id="navOpenBtn">Open with token →</button>
-</nav>
+<script type="module" src="https://dev.sgraph.ai/_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
+<sg-site-header site="Send"></sg-site-header>
 
 <!-- ── Hero ────────────────────────────────────────────────────────────── -->
 <section class="vp-hero">
-    <div class="vp-trust-badge">
-        <span class="vp-trust-badge__dot"></span>
-        BROWSER · AES-256-GCM · ZERO-KNOWLEDGE
-        <span class="vp-trust-badge__sep">/</span>
-        server holds ciphertext only
-    </div>
-
     <h1 class="vp-hero__title">Open a vault.</h1>
 
     <!-- Steal from Design 01 -->
@@ -593,21 +641,43 @@
     </div>
 </div>
 
-<!-- ── Recovery modal (shown after vault creation) ─────────────────────── -->
+<!-- ── Create vault modal ───────────────────────────────────────────────── -->
 <div class="vp-recovery" id="recoveryModal" style="display:none">
     <div class="vp-recovery__box">
-        <div class="vp-recovery__icon">🔐</div>
-        <div class="vp-recovery__title">Vault created</div>
-        <div class="vp-recovery__body">
-            This is your vault key. It is the only way to open your vault on any device.
-            <strong>If you lose it, the vault cannot be recovered</strong> — there is no reset link, by design.
+        <div class="vp-recovery__header">
+            <span class="vp-recovery__badge">New vault</span>
+            <span class="vp-recovery__title">Your vault key</span>
+            <button class="vp-recovery__close" id="recoveryCloseBtn" title="Close">✕</button>
         </div>
-        <div class="vp-recovery__key" id="recoveryKey"></div>
+        <p class="vp-recovery__body">
+            This token opens your vault on any device. Your browser stores it locally and you can always find it in vault Settings.
+            <strong style="color:#e06c75;">Save a copy somewhere safe — the server has no way to recover it for you.</strong>
+        </p>
+        <div class="vp-recovery__token-row">
+            <input class="vp-recovery__key" id="recoveryKey" type="text"
+                   autocomplete="off" spellcheck="false" readonly>
+            <button class="vp-recovery__regen" id="recoveryRegenBtn" title="Generate a different token">↻</button>
+        </div>
+        <p class="vp-recovery__token-hint">
+            You can edit the token or click ↻ to get a new one.
+        </p>
+        <div class="vp-recovery__access">
+            <label class="vp-recovery__access-label">Access key (required to create a vault)</label>
+            <div class="vp-recovery__access-row">
+                <input class="vp-recovery__access-input" id="recoveryAccessKey" type="password"
+                       placeholder="Paste your access key" autocomplete="off" spellcheck="false">
+                <button class="vp-recovery__access-toggle" id="recoveryAccessToggle" type="button" title="Show / hide">
+                    <svg id="recoveryAccessEyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
         <div class="vp-recovery__actions">
-            <button class="vp-recovery__btn vp-recovery__btn--copy" id="recoveryCopyBtn">📋 Copy key</button>
-            <button class="vp-recovery__btn vp-recovery__btn--dl"   id="recoveryDlBtn">📥 Download .txt</button>
+            <button class="vp-recovery__btn vp-recovery__btn--copy" id="recoveryCopyBtn">📋 Copy</button>
+            <button class="vp-recovery__btn vp-recovery__btn--dl"   id="recoveryDlBtn">📥 Save .txt</button>
         </div>
-        <button class="vp-recovery__confirm" id="recoveryConfirmBtn">Got it, open my vault →</button>
+        <button class="vp-recovery__confirm" id="recoveryConfirmBtn" disabled>Create vault &amp; open →</button>
     </div>
 </div>
 
@@ -672,7 +742,7 @@
 
     /* ── Navigation ──────────────────────────────────────────────────── */
     function _navigateToBrowse(key) {
-        window.location.href = './browse/#' + encodeURIComponent(key);
+        window.location.href = '/#' + encodeURIComponent(key);
     }
 
     /* ── Open vault from input ────────────────────────────────────────── */
@@ -732,25 +802,85 @@
     }
 
     /* ── Create vault flow ────────────────────────────────────────────── */
-    var _pendingKey = null;
+    var ACCESS_KEY_STORAGE = 'sg-vault-access-key-saved';
+
+    function _updateConfirmBtn() {
+        var hasKey = document.getElementById('recoveryAccessKey').value.trim().length > 0;
+        document.getElementById('recoveryConfirmBtn').disabled = !hasKey;
+    }
+
+    function _closeModal() {
+        document.getElementById('recoveryModal').style.display = 'none';
+        document.getElementById('recoveryAccessKey').value = '';
+        _updateConfirmBtn();
+    }
 
     function _startCreate() {
-        _pendingKey = _generateKey();
-        document.getElementById('recoveryKey').textContent = _pendingKey;
+        var keyInput = document.getElementById('recoveryKey');
+        keyInput.value = _generateKey();
+        keyInput.readOnly = false;
+        // Pre-fill access key from localStorage if previously saved
+        var savedKey = localStorage.getItem(ACCESS_KEY_STORAGE) || '';
+        document.getElementById('recoveryAccessKey').value = savedKey;
+        _updateConfirmBtn();
         document.getElementById('recoveryModal').style.display = 'flex';
+        if (savedKey) {
+            keyInput.focus();
+            keyInput.select();
+        } else {
+            document.getElementById('recoveryAccessKey').focus();
+        }
     }
+
+    function _currentKey() {
+        var v = document.getElementById('recoveryKey').value.trim();
+        return v || null;
+    }
+
+    document.getElementById('recoveryCloseBtn').addEventListener('click', _closeModal);
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && document.getElementById('recoveryModal').style.display !== 'none') {
+            _closeModal();
+        }
+    });
+
+    document.getElementById('recoveryAccessKey').addEventListener('input', _updateConfirmBtn);
+
+    document.getElementById('recoveryAccessToggle').addEventListener('click', function () {
+        var input = document.getElementById('recoveryAccessKey');
+        var icon  = document.getElementById('recoveryAccessEyeIcon');
+        var show  = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        // eye-off SVG when showing, eye SVG when hidden
+        icon.innerHTML = show
+            ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>' +
+              '<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>' +
+              '<line x1="1" y1="1" x2="23" y2="23"/>'
+            : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    });
+
+    document.getElementById('recoveryRegenBtn').addEventListener('click', function () {
+        var keyInput = document.getElementById('recoveryKey');
+        keyInput.value = _generateKey();
+        keyInput.focus();
+        keyInput.select();
+    });
 
     document.getElementById('recoveryCopyBtn').addEventListener('click', function () {
         var btn = document.getElementById('recoveryCopyBtn');
-        navigator.clipboard && navigator.clipboard.writeText(_pendingKey).catch(function () {});
+        var key = _currentKey();
+        if (!key) return;
+        navigator.clipboard && navigator.clipboard.writeText(key).catch(function () {});
         btn.textContent = '✓ Copied!';
-        setTimeout(function () { btn.textContent = '📋 Copy key'; }, 2000);
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
     });
 
     document.getElementById('recoveryDlBtn').addEventListener('click', function () {
-        if (!_pendingKey) return;
+        var key = _currentKey();
+        if (!key) return;
         var blob = new Blob(
-            ['SG/Vault key\n\n' + _pendingKey + '\n\nCreated: ' + new Date().toISOString() + '\n\nKeep this file safe. There is no recovery path.\n'],
+            ['SG/Vault key\n\n' + key + '\n\nCreated: ' + new Date().toISOString() + '\n\nKeep this file safe. There is no recovery path.\n'],
             { type: 'text/plain' }
         );
         var url = URL.createObjectURL(blob);
@@ -760,21 +890,22 @@
     });
 
     document.getElementById('recoveryConfirmBtn').addEventListener('click', function () {
-        if (!_pendingKey) return;
-        _storeVault(_pendingKey, 'My vault');
-        document.getElementById('recoveryModal').style.display = 'none';
-        _navigateToBrowse(_pendingKey);
+        var key = _currentKey();
+        if (!key) return;
+        var accessKey = document.getElementById('recoveryAccessKey').value.trim();
+        if (!accessKey) return; // button should be disabled, belt-and-suspenders
+        sessionStorage.setItem('sg-vault-access-key', accessKey);
+        sessionStorage.setItem('sg-vault-creating', key);
+        try { localStorage.setItem(ACCESS_KEY_STORAGE, accessKey); } catch (_) {}
+        _storeVault(key, key);
+        _closeModal();
+        _navigateToBrowse(key);
     });
 
     /* ── Wire up events ──────────────────────────────────────────────── */
     document.getElementById('openVaultBtn').addEventListener('click', _openVaultFromInput);
     document.getElementById('vaultKeyInput').addEventListener('keydown', function (e) {
         if (e.key === 'Enter') _openVaultFromInput();
-    });
-
-    document.getElementById('navOpenBtn').addEventListener('click', function () {
-        document.getElementById('vaultKeyInput').focus();
-        document.getElementById('vaultKeyInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
     document.getElementById('createLink').addEventListener('click', _startCreate);

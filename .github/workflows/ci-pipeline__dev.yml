@@ -9,9 +9,10 @@ jobs:
   deploy-dev:
     uses: ./.github/workflows/ci-pipeline.yml
     with:
-      git_branch          : 'dev'
-      release_type        : 'minor'
-      target_deploy       : 'dev'
-      should_increment_tag: true
-      should_publish_pypi : false
+      git_branch              : 'dev'
+      release_type            : 'minor'
+      target_deploy           : 'dev'
+      should_increment_tag    : true
+      should_publish_pypi     : false
+      should_publish_dockerhub: false
     secrets: inherit

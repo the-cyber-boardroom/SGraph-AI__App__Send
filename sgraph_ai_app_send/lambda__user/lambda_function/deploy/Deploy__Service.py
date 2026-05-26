@@ -10,13 +10,20 @@ from sgraph_ai_app_send.lambda__user.user__config                           impo
 from sgraph_ai_app_send.lambda__user.user__config                           import ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__NAME
 from sgraph_ai_app_send.lambda__user.user__config                           import ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE
 from sgraph_ai_app_send.lambda__user.lambda_function.lambda_handler__user   import run
-from sgraph_ai_app_send.lambda__user.storage.Send__Config                   import ENV_VAR__SEND__STORAGE_MODE, ENV_VAR__SEND__S3_BUCKET, SEND__S3_BUCKET__INFIX
+from sgraph_ai_app_send.lambda__user.storage.Send__Config                   import (ENV_VAR__SEND__STORAGE_MODE              ,
+                                                                                    ENV_VAR__SEND__S3_BUCKET                   ,
+                                                                                    ENV_VAR__SEND__PUBLIC_VAULT__S3_BUCKET     ,
+                                                                                    SEND__S3_BUCKET__INFIX                     ,
+                                                                                    SEND__PUBLIC_VAULT__S3_BUCKET__INFIX       )
 
 
 class Deploy__Service(Deploy__Serverless__Fast_API):
 
     def deploy_lambda(self):
-        s3_bucket = f'{aws_config.account_id()}--{SEND__S3_BUCKET__INFIX}--{aws_config.region_name()}'
+        account_id        = aws_config.account_id()
+        region            = aws_config.region_name()
+        s3_bucket         = f'{account_id}--{SEND__S3_BUCKET__INFIX}--{region}'
+        public_vault_bucket = f'{account_id}--{SEND__PUBLIC_VAULT__S3_BUCKET__INFIX}--{region}'
         with super().deploy_lambda() as _:
             _.add_folder(sgraph_ai_app_send__ui__user.path)
             _.set_env_variable(ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL      , get_env(ENV_VAR__SGRAPH_SEND__ADMIN__BASE_URL      ))
@@ -25,6 +32,7 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
             _.set_env_variable(ENV_VAR__CACHE__SERVICE__BUCKET_NAME       , get_env(ENV_VAR__CACHE__SERVICE__BUCKET_NAME        ))
             _.set_env_variable(ENV_VAR__SEND__STORAGE_MODE                , 's3'                                                )  # Explicit — bypasses aws_configured() which has no credentials during SnapStart snapshot creation
             _.set_env_variable(ENV_VAR__SEND__S3_BUCKET                   , s3_bucket                                          )  # Explicit — bypasses aws_config.account_id() STS call which also has no credentials during SnapStart snapshot creation
+            _.set_env_variable(ENV_VAR__SEND__PUBLIC_VAULT__S3_BUCKET     , public_vault_bucket                                )  # Public vault bucket — same account/region, different infix
             return _
 
     def handler(self):
@@ -42,6 +50,12 @@ class Deploy__Service(Deploy__Serverless__Fast_API):
         return builder.upload(force=force)
 
     SNAPSTART_ALIAS = 'snapstart'
+
+    def disable_snapstart(self):                                                   # Disable SnapStart — set ApplyOn=None, wait for update
+        lf = self.lambda_function()
+        lf.configuration_update(SnapStart={'ApplyOn': 'None'})
+        lf.wait_for_function_update_to_complete()
+        return dict(snapstart = 'disabled')
 
     def enable_snapstart(self):                                                   # Enable SnapStart: configure → wait → publish version → alias → alias Function URL
         lf = self.lambda_function()

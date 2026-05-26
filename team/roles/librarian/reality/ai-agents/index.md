@@ -1,6 +1,6 @@
 # AI Agents — Reality Index
 
-**Domain:** ai-agents/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/ | **Last updated:** 2026-05-07 | **Maintained by:** Librarian (daily run)
 
 This domain covers agentic workflows, LLM components, Claude integration with vaults, MCP (Model Context Protocol), and the vault-as-communication-channel primitives. The SG/Send architecture is explicitly designed for agents as first-class users alongside humans.
 
@@ -78,6 +78,22 @@ The `sgit-ai` CLI (PyPI) is the primary way agents interact with vaults. Full co
 
 ---
 
+## Email-FS Protocol Specifications (Spec EXISTS, Implementation PARTIAL)
+
+Published 2026-05-06 by `@Email-FS (architect.spec)`. These are protocol specifications that agents can adopt manually today; automated tooling remains PROPOSED.
+
+| Artifact | Status | Notes |
+|----------|--------|-------|
+| Email-FS-lite v0.6 — user manual + Issues-FS-lite | **SPEC EXISTS** | `briefs/05/06/email-fs-lite-v0.6.md` (doc 350). Full protocol manual covering vault layout, sessions, messages, commit cadence, task tracking. Manual operation requires no tooling beyond sgit. |
+| Email-FS (full) v0.6 — four-document set | **SPEC EXISTS** | Lives in the Email-FS specs vault (external). Covers programmatic operation, per-message signing, ULID filenames, sidecar metadata. |
+| Email-FS comparison reference | **SPEC EXISTS** | `briefs/05/06/email-fs-comparison.md` (doc 349). Decision guide: lite for manual chat workflows, full for programmatic/CLI operation. |
+| `email-fs` CLI (automates ULID generation, sidecar lifecycle) | **PROPOSED** | Referenced in comparison doc; not yet built |
+| Per-message S/MIME cryptographic signing | **PROPOSED** | Requires full Email-FS CLI; lite uses commit-level signing only |
+| SMTP bridge (vault email → real email client) | **PROPOSED** | Protocol-compatible (RFC 2822 format) but no bridge built |
+| `mail/` folder structure deployed in a SGraph Send comms vault | **PROPOSED** | No comms vault created yet; pending decision OQ-email-2 |
+
+---
+
 ## PROPOSED (Not Yet Implemented)
 
 - sg-llm component family (`sg-llm-connection`, `sg-llm-reality`, `sg-llm-request`, `sg-llm-output`, `sg-llm-stats`, `sg-llm-debug`, `sg-llm-bundle`, `sg-llm-bundle-list`, `sg-llm-attachments`) (Section 19)
@@ -92,13 +108,19 @@ The `sgit-ai` CLI (PyPI) is the primary way agents interact with vaults. Full co
 - Intelligence tiers framework — five-tier LLM routing (Tier 1 Frontier → Tier 5 Browser) (Section 23)
 - Agentic team setup pack creator (doc 243)
 - Vault-driven CI — agent-managed CI triggered by vault commits (Section 31)
-- Agent communication via signed EML messages in vaults (Section 16)
 - Sequential workflow enforcement via PKI handoffs (Section 16)
 - `sgit-ai sync` — pull + push in one operation (Section 19)
 - MCP `secrets_create` / `secrets_status` tools (Section 6, DOES NOT EXIST)
 - MCP `rooms_create` / `rooms_add_user` / `rooms_revoke_user` tools (Section 6, DOES NOT EXIST)
 - Pyodide browser vault (`sgit` via WebAssembly) (Section 16)
 - Serverless Playwright API / Lambda (Section 23)
+
+### SG/Sentinel Agent Governance (05/24 briefs — docs 480, 485, Day 70)
+
+**PROPOSED — does not exist yet.** SG/Sentinel batch-2 added two items directly relevant to agentic workflows:
+
+- **P-240: SG/Sentinel in development workflow** — dev agents talk to SG/Sentinel protecting the app they build; rules = attack surface + app definition; AppSec agent reviews rules; controls agent blast radius (rules are analysable); every team (sgit, vault-web, tools) interacts with SG/Sentinel (doc 480, 05/24)
+- **P-245: Agent governance as coherent SG/Sentinel capability** — one substrate governs production agents (outbound actions controlled; sequences enforced via control-flow graphs); mediates authenticated agent-to-agent communication via PKI layer; controls development-agent blast radius (rules are analysable); serves surrogates for agent testing; sequenced as a major future surface as agentic systems proliferate (doc 485, 05/24)
 
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 

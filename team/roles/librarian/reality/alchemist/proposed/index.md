@@ -1,6 +1,6 @@
 # Alchemist — Proposed Items Index
 
-**Domain:** alchemist/proposed/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** alchemist/proposed/ | **Last updated:** 2026-05-24 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -65,3 +65,27 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 ---
 
 *Full content for all items: `../v0.16.26__what-exists-today.md` (Sections 15, 16, 20, 30)*
+
+---
+
+## Vertical Positioning and Commercial Strategy (05/17 briefs — Day 67, docs 431–434, 439)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-191 | Next-generation accountant companies positioning | Empowerment-not-replacement thesis; compliance engine to strategic partner; tier pricing £10-20/£40-60/£100-150 per active client per month; go-to-market through the firms | doc 431 |
+| P-192 | Startup-idea vaults as Creative Commons business templates | 3-layer structure (investor pack template, startup-idea vaults, platform); 7 seed companies (CV, pitch, health score, evidence-research, accountant, lawyer, local AI enablement) | doc 432 |
+| P-193 | MyFeeds B2B repositioning as evidence-pack research briefings | "Feed = evidence pack"; 5 pricing tiers (£2k–£50k+); information-overload-trust-gap frame; configurable depth = configurable cost | doc 433 |
+| P-194 | SME GenAI adoption framework (external article) | Workflow-first go-to-market; democratising for senior experts; four prior tech transitions framing; "stop pitching the AI; start pitching the workflows" | doc 434 |
+| P-199 | 33N Ventures research-vault programme | 4-vault structure (meta-vault, company research vaults, strategic outlook vault, private collaboration vault); 3 public + 1 private deliverable for Porto VC meeting | doc 439 |
+
+## De-Commoditisation and Publishing (05/17 briefs — Day 67, docs 435, 437–438)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-195 | De-commoditising article (Wardley positioning) | Build-the-shield decision framework (5 factors); AI-era reframe (build economics dropped); shield is where operational expertise lives; external publication | doc 435 |
+| P-197 | MyFeeds website rebuild — three-primitives architecture | Vault, storage substrate (server/S3/ephemeral/zip), management layer (vault-of-vaults); hybrid static + ephemeral recommended; 8-phase delivery | doc 437 |
+| P-198 | Articles-as-vaults publishing workflow | Each article is a vault (evidence, semantic graph, source materials, multilingual, agentic provenance); website as presentation layer; our articles as canonical B2B examples | doc 438 |

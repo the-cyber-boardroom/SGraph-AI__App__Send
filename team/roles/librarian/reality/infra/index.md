@@ -1,6 +1,6 @@
 # Infrastructure — Reality Index
 
-**Domain:** infra/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/ | **Last updated:** 2026-05-13 | **Maintained by:** Librarian (daily run)
 
 This domain covers deployment infrastructure: storage backends, Lambda functions, CI/CD pipelines, container deployments, and the 7 deployment targets. It does not cover the application API (see `../api/`) or security properties (see `../security/`).
 
@@ -30,24 +30,31 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 
 ### Docker Container Deployment
 
-- **`sgraph_ai_app_send__docker/` package** — code-verified: commits `bbaaddb`, `ea06040`
-- `Dockerfile` — Python 3.12-slim, uvicorn port 8080, supports MEMORY/DISK/S3 storage modes
-- `Fast_API__SGraph__Send__Container` — extends User FastAPI app with conditional global auth middleware (`x-sgraph-access-token` header, `/auth/set-cookie-form` excluded)
+- **`sgraph_ai_app_send__docker/` package** — code-verified: commits `bbaaddb`, `ea06040`, `cecfed4`
+- `Dockerfile` — Python 3.12-slim + bash; runs `scripts/build-vault-static.sh /app/static_vault` at build time; uvicorn port 8080; supports MEMORY/DISK/S3 storage modes
+- **Default UI — vault app.** Container serves the vault UI (`sgraph_ai_app_send__ui__vault`) at the root, not the send UI. The send UI is not mounted in the container.
+- **Build pipeline** — `scripts/build-vault-static.sh` flattens the IFD vault v0.2.3 tree, merges user-UI `_common/` layers (send-browse, sg-site-header, etc.), patches CDN URLs to local `/_common/`, and writes to `OUT_DIR` (default `.local-server-vault`). Called by Dockerfile (`/app/static_vault`) and by `scripts/vault__run-locally.sh`.
+- **Static URL structure** — `GET /` → vault index.html; `GET /en-gb/` → vault landing page; `GET /en-gb/vault/` → vault shell (clean URL); `GET /_common/*` → shared assets; `GET /en-gb/browse/` → browse page
+- **Explicit sub-path mounts** — static files mounted at `/_common`, `/en-gb`, `/i18n` (not a catch-all `/`). API routes (`/api/*`, `/info/*`, `/auth/*`) take precedence.
+- `Fast_API__SGraph__Send__Container` — extends User FastAPI app with conditional global auth middleware (`x-sgraph-access-token` header/cookie, `/auth/set-cookie-form` excluded)
 - `create_app()` factory function
-- **16 container tests** — 9 in `test_Container__App.py` (health, status, root, static UI, transfers, vault read/write, auth cookie form, disk storage) + 7 in `test_Container__App__Auth.py` (auth enforcement, header token, cookie token, form exclusion). Code-verified: commit `bbaaddb`
+- **`SEND__VAULT_STATIC_DIR`** env var — overrides static dir path (default `/app/static_vault`). Used to point tests at a tmpdir.
+- **Native TLS** — `Fast_API__TLS__Launcher` (`sgraph_ai_app_send__docker/Fast_API__TLS__Launcher.py`) reads the `FAST_API__TLS__*` env contract (`ENABLED` / `CERT_FILE` / `KEY_FILE` / `PORT`). TLS off (default) → plain HTTP on `:8080`. TLS on → binds `:443` with the mounted cert/key. TLS on but files missing → fails loud (non-zero exit), never silent HTTP fallback. Container entrypoint is `sgraph_ai_app_send__docker/serve.py` (`python -m sgraph_ai_app_send__docker.serve`), replacing the previous direct `uvicorn` CMD. No cert generation in-container — a sidecar owns acquisition. Vendored from the `SGraph-AI__Service__Playwright` reference launcher; destined for `OSBot__Fast_API`.
+- **31 container tests** — 13 in `test_Container__App.py` + 7 in `test_Container__App__Auth.py` + 9 in `test_Fast_API__TLS__Launcher.py` (env→config, truthy/falsy switch, custom paths/port, uvicorn kwargs for on/off, fail-loud on missing cert/key). Code-verified: this commit.
 
-### sg-send-ec2 CLI
+### Docker Hub Publish CI Job
 
-- `sgraph_ai_app_send__docker/provision_ec2.py` — Typer CLI for EC2/ECR provisioning
-- Commands: `create`, `wait`, `health`, `connect`, `exec`, `forward`, `list`, `info`, `delete`
-- IAM instance profile, security groups, SSM-based shell, tag-based metadata store
-- Code-verified: commit `bbaaddb`
+- `.github/workflows/ci-pipeline.yml` — `publish-to-dockerhub` + `publish-to-dockerhub-manifest` jobs
+- Multi-arch build (`linux/amd64`, `linux/arm64`) via matrix strategy: each leg builds ONE platform, pushes by digest (no tag), uploads digest as artifact. `publish-to-dockerhub-manifest` (depends on both legs) downloads both digests and assembles a multi-arch manifest via `docker buildx imagetools create`. Both legs run in parallel (commit `c21cb5c`, 15 May 2026).
+- Triggered by `should_publish_dockerhub: true` input on the calling workflow:
+  - `ci-pipeline__dev.yml` — pushes `diniscruz/sg-send-vault:{version}` only
+  - `ci-pipeline__main.yml` — pushes `diniscruz/sg-send-vault:{version}` + `:latest`
+- Smoke test: `/info/health` + `/` both return 200 against the just-pushed image
+- Secrets required: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`
 
-### Docker ECR CI Job
+### EC2 / ECR removed
 
-- `.github/workflows/ci-pipeline.yml` gains Docker ECR build+push job
-- Auto-create ECR repo, parameterised by ECR repo name
-- Code-verified: commits `9e1ea2a`, `3438122`, `945d622`
+The `sg-send-ec2` CLI (`provision_ec2.py`) and the ECR CI push job were removed in v0.27.45 (this commit). EC2 integration is now handled by the separate **SG/Compute** project. Container deployments pull from Docker Hub.
 
 ### Static Website Deployment
 
@@ -60,6 +67,24 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 - **Target:** S3 bucket (`WEBSITE_S3_BUCKET` secret) + CloudFront distribution (`WEBSITE_CF_DIST` secret)
 - **Region:** eu-west-2
 
+### SnapStart S3 Client Fix (08 May 2026)
+
+**`Storage_FS__S3`** — boto3 client now created lazily to prevent SnapStart stale-connection timeouts.
+Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a181`).
+
+| Before | After |
+|--------|-------|
+| `setup()` called `bucket_exists()` at Lambda init, creating and caching a boto3 S3 client | `setup()` returns `self` immediately — no boto3 client at snapshot time |
+| boto3 client serialised into SnapStart snapshot including urllib3 connection pool | `_s3()` method creates `S3()` lazily on first actual request after restore |
+| After SnapStart restore, pooled TCP connections dead → requests hang until Lambda timeout | Fresh boto3 client created on demand; stale-connection timeout eliminated |
+| Presigned services also affected | Presigned services receive fresh `S3()` instances (lazily initialised via `@cache_on_self`) |
+
+`_ensure_bucket()` extracted from `setup()` for explicit use in dev/deploy contexts.
+
+### CI Configuration Notes
+
+- **Admin Lambda deploy skipped on `main` and `prod`** — Admin Lambda is not active on main/prod targets. CI steps for admin lambda deploy are bypassed on both (commits `c792383`, `a06a112`, 01 May 2026). Admin Lambda still deploys to `dev`.
+
 ### CI Python Scripts
 
 | Script | What It Does |
@@ -68,17 +93,18 @@ This domain covers deployment infrastructure: storage backends, Lambda functions
 | `scripts/generate_i18n_pages.py` | Reads en-GB HTML + locale JSON, produces pre-rendered locale folder trees |
 | `scripts/store_ci_artifacts.py` | Stores build artifacts to S3 under `ci/{date}/{version}/` |
 
-### Deployment Targets (7 Total)
+### Deployment Targets
 
 | Target | Pattern | Status |
 |--------|---------|--------|
 | AWS Lambda (User + Admin) | Lambda | EXISTS |
-| Docker container (local/EC2) | Container | EXISTS |
-| ECR + ECS Fargate | Container | EXISTS (ECR CI job) |
-| GCP (container) | Container | INFRASTRUCTURE READY |
-| EC2/AMI | Server | EXISTS (sg-send-ec2 CLI) |
+| Docker container (Docker Hub) | Container | EXISTS — `diniscruz/sg-send-vault` (multi-arch) |
+| Docker container (local build) | Container | EXISTS |
+| GCP (container) | Container | PROPOSED — image is portable, no GCP wiring in this repo |
+| ECS / Fargate | Container | PROPOSED — image is published, no task definition in this repo |
+| EC2 provisioning | Server | MOVED to SG/Compute project |
 | CLI | CLI | EXISTS (sgit-ai PyPI) |
-| Memory/Disk (local dev) | CLI | EXISTS |
+| Memory/Disk (local dev) | Container | EXISTS |
 
 ### Deployment Tests
 

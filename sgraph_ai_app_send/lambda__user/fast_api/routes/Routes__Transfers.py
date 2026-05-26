@@ -95,8 +95,9 @@ class Routes__Transfers(Fast_API__Routes):                                      
                                                        transfer_id       = request.transfer_id      ,
                                                        max_downloads     = int(request.max_downloads)   ,
                                                        auto_delete       = request.auto_delete          ,
-                                                       expires_at        = str(request.expires_at)      ,
-                                                       delete_auth_hash  = str(request.delete_auth_hash))
+                                                       expires_at        = int(request.expires_at or 0) ,
+                                                       delete_auth_hash  = str(request.delete_auth_hash),
+                                                       allow_recreate    = request.allow_recreate       )
         if 'error' in result:
             if result['error'] == 'transfer_id_exists':
                 raise HTTPException(status_code = 409, detail = 'Transfer ID already exists')

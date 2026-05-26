@@ -58,8 +58,9 @@ class Transfer__Service(Type_Safe):                                             
                              transfer_id      = ''    ,                          # Optional client-provided ID (PBKDF2 simple-token mode)
                              max_downloads    = 0     ,                          # 0 = unlimited
                              auto_delete      = False ,                          # Wipe payload after last download
-                             expires_at       = ''    ,                          # ISO-8601 UTC, empty = no expiry
-                             delete_auth_hash = ''    ):                         # SHA-256 of delete_auth, empty = delete disabled
+                             expires_at       = 0     ,                          # ms since epoch, 0 = no expiry
+                             delete_auth_hash = ''    ,                          # SHA-256 of delete_auth, empty = delete disabled
+                             allow_recreate   = False ):                         # If True, delete clears the meta too (id reusable); else tombstone
         if transfer_id:                                                          # Client-provided ID — validate format and uniqueness
             if not self.TRANSFER_ID_PATTERN.match(transfer_id):
                 return dict(error = 'invalid_transfer_id_format')
@@ -81,6 +82,7 @@ class Transfer__Service(Type_Safe):                                             
                     auto_delete       = auto_delete       ,
                     expires_at        = expires_at        ,
                     delete_auth_hash  = delete_auth_hash  ,
+                    allow_recreate    = allow_recreate    ,
                     events            = []                )
 
         self.save_meta(transfer_id, meta)
@@ -133,7 +135,7 @@ class Transfer__Service(Type_Safe):                                             
                     created_at          = meta['created_at']               ,
                     download_count      = meta['download_count']           ,
                     max_downloads       = meta.get('max_downloads', 0)     ,
-                    expires_at          = meta.get('expires_at', '')       ,
+                    expires_at          = meta.get('expires_at', 0)        ,
                     downloads_remaining = self._downloads_remaining(meta)  ,
                     is_expired          = self._is_expired(meta)           )
 
@@ -185,18 +187,22 @@ class Transfer__Service(Type_Safe):                                             
             return dict(status='already_deleted', transfer_id=transfer_id)
         if self.has_payload(transfer_id):
             self.storage_fs.file__delete(self.payload_path(transfer_id))
-        meta['status'] = 'deleted'
+        if meta.get('allow_recreate'):                                           # Creator opted in: clear metadata too so the id can be recreated/overwritten
+            self.storage_fs.file__delete(self.meta_path(transfer_id))
+            return dict(status='deleted', transfer_id=transfer_id, recreatable=True)
+        meta['status'] = 'deleted'                                              # Default: leave a tombstone (id cannot be reused)
         meta['events'].append(dict(action    = 'delete'                        ,
                                    timestamp = datetime.now(timezone.utc).isoformat()))
         self.save_meta(transfer_id, meta)
         return dict(status='deleted', transfer_id=transfer_id)
 
     @staticmethod
-    def _is_expired(meta):                                                       # Check if transfer has passed its expiry timestamp
-        exp = meta.get('expires_at', '')
+    def _is_expired(meta):                                                       # Check if transfer has passed its expiry (ms since epoch)
+        exp = meta.get('expires_at', 0)
         if not exp:
             return False
-        return datetime.now(timezone.utc) > datetime.fromisoformat(exp)
+        import time
+        return (time.time() * 1000) > exp
 
     @staticmethod
     def _downloads_remaining(meta):                                              # Remaining downloads (0 = unlimited)

@@ -502,11 +502,11 @@ class test_Routes__Vault__Pointer(TestCase):
                                    headers = {'x-sgraph-vault-write-key': 'key'})
         assert response.status_code == 400
 
-    def test__delete__missing_file_id__returns_400(self):
-        """DELETE /api/vault/delete/{vault_id} (no file_id) returns 400."""
+    def test__delete__missing_file_id__no_longer_returns_400(self):
+        """DELETE /api/vault/delete/{vault_id} (no file_id) no longer returns 400 — catch route removed."""
         response = self.client.delete('/api/vault/delete/aaaabbp1',
                                       headers = {'x-sgraph-vault-write-key': 'key'})
-        assert response.status_code == 400
+        assert response.status_code != 400                               # The 400-stub is gone
 
     # === Vault ID format validation ===
 
@@ -587,13 +587,12 @@ class test_Routes__Vault__Pointer(TestCase):
         assert self._read(vault_id=vault, file_id='bare/data/obj-a').status_code == 404
         assert self._read(vault_id=vault, file_id='bare/refs/ref-1').status_code == 404
 
-    def test__destroy__already_deleted_returns_success(self):
+    def test__destroy__already_deleted_blocked_by_tombstone(self):
         vault = 'destroyvlt02'
         self._write(vault_id=vault, file_id='bare/data/obj-a', payload=b'blob')
         self._destroy(vault_id=vault)
         response = self._destroy(vault_id=vault)
-        assert response.status_code              == 200
-        assert response.json()['files_deleted']  == 0
+        assert response.status_code == 403                               # Tombstone blocks second delete
 
     def test__destroy__never_existed_returns_success(self):
         response = self._destroy(vault_id='destroyvlt03')
@@ -644,10 +643,55 @@ class test_Routes__Vault__Pointer(TestCase):
         for fid in file_ids:
             assert self._read(vault_id=vault, file_id=fid).status_code == 404
 
-    def test__destroy__vault_reusable_after_delete(self):
+    def test__destroy__vault_not_reusable_after_delete(self):
         vault = 'destroyvlt09'
         self._write(vault_id=vault, file_id='old-file', payload=b'old')
         self._destroy(vault_id=vault)
         response = self._write(vault_id=vault, file_id='new-file', write_key='newkey456789', payload=b'new')
+        assert response.status_code == 403                               # Tombstone blocks re-creation with any key
+
+    def _destroy_purge(self, vault_id, write_key=WRITE_KEY):
+        payload = {'vault_id': vault_id, 'purge': True}
+        return self.client.request('DELETE', f'/api/vault/destroy/{vault_id}',
+                                   content = json.dumps(payload),
+                                   headers = {'content-type'             : 'application/json',
+                                              'x-sgraph-vault-write-key' : write_key         })
+
+    def test__destroy__purge_false_writes_tombstone(self):
+        vault = 'purgevlt01'
+        self._write(vault_id=vault, file_id='f1', payload=b'data')
+        response = self._destroy(vault_id=vault)
         assert response.status_code == 200
-        assert self._read(vault_id=vault, file_id='new-file').content == b'new'
+        data = response.json()
+        assert data['tombstone_written'] is True
+
+    def test__destroy__purge_true_no_tombstone(self):
+        vault = 'purgevlt02'
+        self._write(vault_id=vault, file_id='f1', payload=b'data')
+        response = self._destroy_purge(vault_id=vault)
+        assert response.status_code == 200
+        data = response.json()
+        assert data['tombstone_written'] is False
+        assert data['status']           == 'deleted'
+        # vault_id is fully reusable — write with a new key succeeds
+        write_response = self._write(vault_id=vault, file_id='new-file', write_key='freshkey9876', payload=b'fresh')
+        assert write_response.status_code == 200
+
+    def test__destroy__purge_requires_write_key(self):
+        vault = 'purgevlt03'
+        self._write(vault_id=vault, file_id='f1', payload=b'data')
+        response = self.client.request('DELETE', f'/api/vault/destroy/{vault}',
+                                       content = json.dumps({'vault_id': vault, 'purge': True}),
+                                       headers = {'content-type': 'application/json'})
+        assert response.status_code == 400                               # Missing write key still rejected
+
+    def test__destroy__purge_response_has_tombstone_written_field(self):
+        vault = 'purgevlt04'
+        self._write(vault_id=vault, file_id='f1', payload=b'data')
+        r1 = self._destroy(vault_id=vault)
+        assert 'tombstone_written' in r1.json()
+
+        vault2 = 'purgevlt05'
+        self._write(vault_id=vault2, file_id='f1', payload=b'data')
+        r2 = self._destroy_purge(vault_id=vault2)
+        assert 'tombstone_written' in r2.json()

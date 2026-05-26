@@ -2,18 +2,8 @@
 # ---------------------------------------------------------------------------
 # Local dev server for the vault UI (dev.vault.sgraph.ai)
 #
-# In production, the CI deploy script flattens the versioned IFD structure:
-#   vault/v0/v0.1/v0.1.2/en-gb/   →  latest/en-gb/
-#   vault/v0/v0.1/v0.1.2/_common/  →  latest/_common/
-#   vault/v0/v0.1/v0.1.2/i18n/     →  latest/i18n/
-#
-# This script replicates that locally by creating symlinks in a temporary
-# directory that mirrors the production URL structure.
-#
-# LOCAL CDN OVERRIDE: The vault index.html loads shared components from
-# dev.send.sgraph.ai. This script merges all user UI IFD layers (v0.3.0,
-# v0.3.1, v0.3.2) on top of the vault _common/ and patches index.html to
-# use local URLs so that local code changes are visible without a CDN deploy.
+# Calls build-vault-static.sh to produce .local-server-vault/, then serves
+# it with Python's built-in HTTP server.
 #
 # The vault UI uses Web Crypto API (AES-256-GCM) which requires either:
 #   - https:// (production)
@@ -21,22 +11,18 @@
 # Using 127.0.0.1 will NOT work for Web Crypto.
 # ---------------------------------------------------------------------------
 PORT=10067
+API_PORT=10068   # default port for user__run-locally.sh
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
-UI_VERSION="v0.2.1"
-IFD_PATH="v0/v0.2/$UI_VERSION"
-VAULT_BASE_VERSION="v0.2.0"   # IFD base layer — provides vault-shell, vault-browse-edit, etc.
 SERVE_DIR="$REPO_ROOT/.local-server-vault"
 
-# User UI IFD layers — merged in order (base first, latest last) to replicate
-# what the CDN serves. Each version only contains files changed in that version.
-USER_UI_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
-USER_UI_LAYERS=(
-    "v0/v0.3/v0.3.0/_common"
-    "v0/v0.3/v0.3.1/_common"
-    "v0/v0.3/v0.3.2/_common"
-)
+# Parse flags
+USE_LOCAL_API=0
+for arg in "$@"; do
+    case "$arg" in
+        --local-api) USE_LOCAL_API=1 ;;
+    esac
+done
 
 # Clean up on exit
 cleanup() {
@@ -46,123 +32,63 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Build the local serve directory with symlinks
-echo "Building local server directory (mirroring production URL structure)..."
-rm -rf "$SERVE_DIR"
-mkdir -p "$SERVE_DIR"
+# If --local-api, point all vault/app pages at the local API server
+if [ "$USE_LOCAL_API" -eq 1 ]; then
+    export VAULT_DEFAULT_ENDPOINT="http://localhost:$API_PORT"
+    echo "  [local-api] Rewriting default endpoint → $VAULT_DEFAULT_ENDPOINT"
+fi
 
-# Versioned content → root (en-gb/, _common/, i18n/, etc.)
-CONTENT_DIR="$STATIC_DIR/$IFD_PATH"
-if [ ! -d "$CONTENT_DIR" ]; then
-    echo "ERROR: Content directory not found: $CONTENT_DIR"
+# Build the static tree — exit loudly on failure so we never serve an empty dir
+bash "$SCRIPT_DIR/build-vault-static.sh" "$SERVE_DIR" || {
+    echo ""
+    echo "ERROR: build-vault-static.sh failed — server not started."
     exit 1
-fi
-
-# Copy locale folders (not symlink) so we can patch index.html inside them
-for locale_dir in "$CONTENT_DIR"/*/; do
-    dirname=$(basename "$locale_dir")
-    if [ "$dirname" != "_common" ] && [ "$dirname" != "i18n" ] && [ -d "$locale_dir" ]; then
-        cp -r "$locale_dir" "$SERVE_DIR/$dirname"
-    fi
-done
-
-# Build _common: start with vault IFD base layer (vault-shell, vault-browse-edit, etc.)
-# then apply the current version's overlay (IFD delta — only changed files).
-BASE_COMMON_DIR="$STATIC_DIR/v0/v0.2/$VAULT_BASE_VERSION/_common"
-if [ -d "$BASE_COMMON_DIR" ]; then
-    echo "Merging vault base layer: $VAULT_BASE_VERSION ..."
-    cp -r "$BASE_COMMON_DIR" "$SERVE_DIR/_common"
-else
-    mkdir -p "$SERVE_DIR/_common/js"
-fi
-
-if [ -d "$CONTENT_DIR/_common" ]; then
-    echo "Merging vault overlay layer: $UI_VERSION ..."
-    cp -r "$CONTENT_DIR/_common"/. "$SERVE_DIR/_common/"
-fi
-
-# Merge user UI IFD layers in order (v0.3.0 → v0.3.1 → v0.3.2) — replicates
-# the CDN's flattened view. Each layer only contains files changed in that
-# version; later layers override earlier ones. Local changes take effect
-# without a CDN deploy.
-for layer in "${USER_UI_LAYERS[@]}"; do
-    layer_dir="$USER_UI_DIR/$layer"
-    if [ -d "$layer_dir" ]; then
-        echo "Merging user UI layer: $layer ..."
-        cp -r "$layer_dir"/. "$SERVE_DIR/_common/"
-    else
-        echo "WARNING: user UI layer not found: $layer_dir (skipping)"
-    fi
-done
-
-# Symlink i18n/
-[ -d "$CONTENT_DIR/i18n" ] && ln -sf "$CONTENT_DIR/i18n" "$SERVE_DIR/i18n"
-
-# Copy root files (index.html, etc.)
-for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
-    [ -f "$f" ] && [ "$(basename "$f")" != "index.html" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
-done
-
-
-# Inject /api/health for local dev — vault-header.js calls window.location.origin/api/health
-# to display the backend version. Python http.server has no API routes, so this
-# provides a static JSON response that prevents a noisy 404 in DevTools.
-mkdir -p "$SERVE_DIR/api"
-cat > "$SERVE_DIR/api/health" <<HEALTHEOF
-{"status":"ok","version":"local-dev","mode":"local-static"}
-HEALTHEOF
-
-# Inject build-info.js for local dev (CI generates this in production)
-mkdir -p "$SERVE_DIR/_common/js"
-cat > "$SERVE_DIR/_common/js/build-info.js" <<JSEOF
-/* Generated by vault__run-locally.sh — local development only */
-window.SGRAPH_BUILD = {
-    appVersion : 'local-dev',
-    uiVersion  : '$UI_VERSION',
-    buildTime  : '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
-};
-JSEOF
-
-# Patch index.html files: replace https://dev.send.sgraph.ai/_common/ with
-# local /_common/ so the browser loads our local send-browse, markdown-parser,
-# etc. instead of the deployed CDN versions.
-echo "Patching index.html: CDN URLs → local /_common/ ..."
-for index_html in "$SERVE_DIR"/*/index.html "$SERVE_DIR"/*/*/index.html; do
-    [ -f "$index_html" ] || continue
-    python3 -c "
-import sys, re
-path = sys.argv[1]
-with open(path) as f: html = f.read()
-patched = html.replace('https://dev.send.sgraph.ai/_common/', '/_common/')
-with open(path, 'w') as f: f.write(patched)
-print('  Patched:', path)
-" "$index_html"
-done
-
-# Create a root index.html that redirects to /en-gb/
-cat > "$SERVE_DIR/index.html" <<'HTMLEOF'
-<!DOCTYPE html>
-<html>
-<head><meta http-equiv="refresh" content="0;url=/en-gb/"></head>
-<body><a href="/en-gb/">Redirecting to /en-gb/...</a></body>
-</html>
-HTMLEOF
+}
 
 echo ""
 echo "Starting vault.sgraph.ai local server..."
-echo "  Root:       $SERVE_DIR"
-echo "  Content:    $CONTENT_DIR"
-echo "  CDN override: $USER_UI_DIR (v0.3.0 → v0.3.1 → v0.3.2 merged)"
+echo "  Root:    $SERVE_DIR"
 echo ""
 echo "  URLs:"
-echo "    Home:           http://localhost:$PORT/"
-echo "    Vault:          http://localhost:$PORT/en-gb/"
+echo "    Landing page:   http://localhost:$PORT/en-gb/"
+echo "    Open vault:     http://localhost:$PORT/#your-token"
+echo "    App page:       http://localhost:$PORT/en-gb/app/"
+echo "    (en-gb/browse/ redirects to /#hash automatically)"
 echo ""
 echo "  IMPORTANT: Use 'localhost' not '127.0.0.1' (Web Crypto requires secure context)"
 echo ""
 echo "  Backend:"
-echo "    Default:        https://send.sgraph.ai (production)"
-echo "    Local backend:  Run ./scripts/user__run-locally.sh in another terminal (port $PORT)"
-echo "                    Then set data-endpoint=\"http://localhost:$PORT\" on <vault-entry>"
+if [ "$USE_LOCAL_API" -eq 1 ]; then
+    echo "    Using local API: $VAULT_DEFAULT_ENDPOINT"
+    echo "    Make sure user__run-locally.sh is running on port $API_PORT"
+else
+    echo "    Default:         https://dev.send.sgraph.ai (production)"
+    echo "    Local API:       Run with --local-api flag to point all pages at"
+    echo "                     http://localhost:$API_PORT (requires user__run-locally.sh)"
+    echo ""
+    echo "    Endpoint override (env var):"
+    echo "      VAULT_DEFAULT_ENDPOINT=http://localhost:$API_PORT bash scripts/vault__run-locally.sh"
+fi
 echo ""
-python3 -m http.server $PORT --directory "$SERVE_DIR" --bind localhost
+python3 << PYEOF
+import http.server, os, re, urllib.parse
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    # SPA fallback: /en-gb/app/<public-id> and /en-gb/preview/<public-id> have no
+    # file on disk (only index.html lives under those dirs). Rewrite a single-segment
+    # path to the dir's index.html so the SPA boots and reads location.pathname.
+    # This mirrors the CloudFront Function used in production (see scripts/cloudfront/).
+    _SPA = re.compile(r'^/en-gb/(app|preview)/[^/]+/?$')
+    def do_GET(self):
+        path = urllib.parse.urlparse(self.path).path
+        m = self._SPA.match(path)
+        if m and not path.rstrip('/').endswith('index.html'):
+            self.path = '/en-gb/%s/index.html' % m.group(1)
+        return super().do_GET()
+    def end_headers(self):
+        # Disable all caching so the browser always fetches fresh JS/CSS
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        super().end_headers()
+os.chdir('$SERVE_DIR')
+http.server.HTTPServer(('localhost', $PORT), NoCacheHandler).serve_forever()
+PYEOF

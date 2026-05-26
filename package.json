@@ -1,0 +1,17 @@
+{
+  "name": "sgraph-ai-app-send",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "jsdom": "^25.0.1",
+    "@playwright/test": "^1.48.0"
+  },
+  "scripts": {
+    "test:vault-unit": "bash tests/unit/vault_ui/loader/run-all.sh",
+    "test:vault-integration": "bash tests/integration/vault_ui/loader/run-all.sh",
+    "test:vault-e2e": "npx playwright test tests/e2e/vault_ui/"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

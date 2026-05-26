@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — Encrypted vaults, opened in your browser</title>
+    <meta name="description" content="Open an encrypted vault. Decryption happens in your browser — the server never sees a key.">
+    <style>
+    /* ── Reset + base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --bg:        #0d1117;
+        --bg2:       #111820;
+        --bg3:       #161d27;
+        --border:    rgba(255,255,255,0.08);
+        --text:      #e0e6f0;
+        --muted:     #6e7a8a;
+        --teal:      #4ecdc4;
+        --teal-dim:  rgba(78,205,196,0.12);
+        --teal-glow: rgba(78,205,196,0.08);
+        --font-sans: 'Inter','Segoe UI',system-ui,sans-serif;
+        --font-mono: 'SF Mono','Fira Code',monospace;
+    }
+
+    html { font-size: 16px; }
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        line-height: 1.6;
+        min-height: 100vh;
+    }
+
+    /* ── Hero ──────────────────────────────────────────────────────────── */
+    .vp-hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 2.25rem 1.5rem 1.75rem;
+        max-width: 720px;
+        margin: 0 auto;
+    }
+
+    .vp-hero__title {
+        font-size: clamp(2.2rem, 6vw, 3.8rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        color: #ffffff;
+        margin-bottom: 0.5rem;
+    }
+
+    .vp-hero__tagline {
+        font-size: clamp(0.95rem, 2.2vw, 1.1rem);
+        color: var(--teal);
+        font-weight: 500;
+        margin-bottom: 1.75rem;
+        letter-spacing: -0.01em;
+    }
+
+    /* ── Unified input ─────────────────────────────────────────────────── */
+    .vp-input-card {
+        width: 100%;
+        max-width: 560px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.25rem 1.25rem 1rem;
+    }
+
+    .vp-input-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-bottom: 0.75rem;
+    }
+    .vp-input-label__key {
+        width: 14px; height: 14px;
+        opacity: 0.5;
+    }
+    .vp-input-label__auto {
+        margin-left: auto;
+        font-style: italic;
+        font-size: 0.68rem;
+        opacity: 0.6;
+    }
+
+    .vp-input-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .vp-input-field {
+        flex: 1;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        color: var(--text);
+        font-size: 0.95rem;
+        font-family: var(--font-mono);
+        outline: none;
+        transition: border-color 0.15s;
+        min-width: 0;
+    }
+    .vp-input-field::placeholder { color: var(--muted); opacity: 0.6; }
+    .vp-input-field:focus { border-color: var(--teal); }
+
+    .vp-open-btn {
+        padding: 0.75rem 1.25rem;
+        background: var(--teal);
+        color: #0a1a18;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s, transform 0.1s;
+        flex-shrink: 0;
+    }
+    .vp-open-btn:hover { background: #3dbdb5; }
+    .vp-open-btn:active { transform: scale(0.97); }
+
+    .vp-input-hint {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.6rem;
+    }
+    .vp-input-error {
+        font-size: 0.75rem;
+        color: #e06c75;
+        margin-top: 0.4rem;
+        min-height: 1em;
+    }
+
+    .vp-create-link {
+        display: inline-block;
+        margin-top: 1.1rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        text-decoration: none;
+        cursor: pointer;
+        transition: color 0.15s;
+    }
+    .vp-create-link:hover { color: var(--teal); }
+
+    /* ── Security cards ────────────────────────────────────────────────── */
+    .vp-security {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--bg2);
+    }
+    .vp-security__grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        max-width: 1040px;
+        margin: 0 auto;
+    }
+    .vp-sec-card {
+        padding: 1.5rem 1.75rem;
+        border-right: 1px solid var(--border);
+    }
+    .vp-sec-card:last-child { border-right: none; }
+    .vp-sec-card__label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--teal);
+        margin-bottom: 0.4rem;
+    }
+    .vp-sec-card__title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 0.35rem;
+        line-height: 1.3;
+    }
+    .vp-sec-card__desc {
+        font-size: 0.8rem;
+        color: var(--muted);
+        line-height: 1.5;
+    }
+
+    /* ── Recent vaults ─────────────────────────────────────────────────── */
+    .vp-recent {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 3rem 1.5rem;
+    }
+    .vp-recent__header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 1.25rem;
+    }
+    .vp-recent__label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--teal);
+        margin-bottom: 0.25rem;
+    }
+    .vp-recent__title {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .vp-recent__meta {
+        font-size: 0.78rem;
+        color: var(--muted);
+        cursor: pointer;
+        text-decoration: none;
+        transition: color 0.15s;
+    }
+    .vp-recent__meta:hover { color: var(--teal); }
+
+    .vp-vault-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .vp-vault-card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1rem 1rem 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        transition: border-color 0.15s, background 0.15s;
+        cursor: pointer;
+        position: relative;
+    }
+    .vp-vault-card:hover { border-color: rgba(78,205,196,0.3); background: var(--bg3); }
+
+    .vp-vault-card__name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 1.5rem;
+    }
+    .vp-vault-card__id {
+        font-size: 0.7rem;
+        font-family: var(--font-mono);
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .vp-vault-card__footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--border);
+    }
+    .vp-vault-card__time {
+        font-size: 0.72rem;
+        color: var(--muted);
+    }
+    .vp-vault-card__open {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--teal);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .vp-vault-card__del,
+    .vp-vault-card__new-win {
+        position: absolute;
+        top: 0.6rem;
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 0.8rem;
+        opacity: 0;
+        transition: opacity 0.15s, color 0.15s;
+        padding: 0.15rem 0.3rem;
+        border-radius: 4px;
+        line-height: 1;
+    }
+    .vp-vault-card__del { right: 0.7rem; }
+    .vp-vault-card__new-win { right: 2rem; }
+    .vp-vault-card:hover .vp-vault-card__del,
+    .vp-vault-card:hover .vp-vault-card__new-win { opacity: 1; }
+    .vp-vault-card__del:hover { color: #e06c75; background: rgba(224,108,117,0.1); }
+    .vp-vault-card__new-win:hover { color: #4ecdc4; background: rgba(78,205,196,0.08); }
+    .vp-vault-card--current { border-color: rgba(78,205,196,0.4); background: var(--teal-dim); }
+
+    /* ── Create CTA ────────────────────────────────────────────────────── */
+    .vp-create-cta {
+        border-top: 1px solid var(--border);
+        background: var(--bg2);
+    }
+    .vp-create-cta__inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+    }
+    .vp-create-cta__text { flex: 1; min-width: 200px; }
+    .vp-create-cta__label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--teal);
+        margin-bottom: 0.3rem;
+    }
+    .vp-create-cta__title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.2;
+    }
+    .vp-create-cta__btn {
+        padding: 0.75rem 1.5rem;
+        background: var(--teal-dim);
+        border: 1px solid rgba(78,205,196,0.3);
+        border-radius: 8px;
+        color: var(--teal);
+        font-size: 0.9rem;
+        font-weight: 700;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        white-space: nowrap;
+    }
+    .vp-create-cta__btn:hover { background: rgba(78,205,196,0.2); border-color: rgba(78,205,196,0.5); }
+
+    /* ── Create vault modal ────────────────────────────────────────────── */
+    .vp-recovery {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+    .vp-recovery__box {
+        background: #161d27;
+        border: 1px solid rgba(78,205,196,0.3);
+        border-radius: 12px;
+        padding: 2rem;
+        max-width: 480px;
+        width: 100%;
+    }
+    .vp-recovery__header {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.5rem;
+        position: relative;
+    }
+    .vp-recovery__close {
+        position: absolute;
+        top: -1rem;
+        right: -1rem;
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 1.1rem;
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        line-height: 1;
+        transition: color 0.15s;
+    }
+    .vp-recovery__close:hover { color: var(--text); }
+
+    /* Access token row inside create modal */
+    .vp-recovery__access {
+        margin-bottom: 1rem;
+    }
+    .vp-recovery__access-label {
+        display: block;
+        font-size: 0.73rem;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+    }
+    .vp-recovery__access-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .vp-recovery__access-input {
+        flex: 1;
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.6rem 2.4rem 0.6rem 0.85rem;
+        color: var(--text);
+        font-size: 0.85rem;
+        font-family: var(--font-mono);
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.15s;
+    }
+    .vp-recovery__access-input:focus { border-color: var(--teal); }
+    .vp-recovery__access-input::placeholder { color: var(--muted); opacity: 0.6; }
+    .vp-recovery__access-toggle {
+        position: absolute;
+        right: 0.6rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--muted);
+        padding: 0.2rem;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        transition: color 0.15s;
+    }
+    .vp-recovery__access-toggle:hover { color: var(--text); }
+    .vp-recovery__badge {
+        font-size: 0.6rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 2px 7px;
+        border-radius: 3px;
+        background: var(--teal);
+        color: #0a2e2c;
+    }
+    .vp-recovery__title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .vp-recovery__body {
+        font-size: 0.83rem;
+        color: var(--muted);
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+
+    /* Token field + regenerate row */
+    .vp-recovery__token-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        align-items: stretch;
+    }
+    .vp-recovery__key {
+        flex: 1;
+        font-family: var(--font-mono);
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--teal);
+        background: var(--teal-glow);
+        border: 1px solid rgba(78,205,196,0.25);
+        border-radius: 8px;
+        padding: 0.7rem 0.85rem;
+        outline: none;
+        min-width: 0;
+        transition: border-color 0.15s;
+    }
+    .vp-recovery__key:focus { border-color: var(--teal); }
+    .vp-recovery__regen {
+        padding: 0 0.85rem;
+        background: rgba(78,205,196,0.08);
+        border: 1px solid rgba(78,205,196,0.25);
+        border-radius: 8px;
+        color: var(--teal);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        line-height: 1;
+    }
+    .vp-recovery__regen:hover { background: rgba(78,205,196,0.15); }
+    .vp-recovery__token-hint {
+        font-size: 0.73rem;
+        color: var(--muted);
+        margin-bottom: 1.25rem;
+    }
+    .vp-recovery__token-hint strong { color: #e06c75; }
+
+    .vp-recovery__actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .vp-recovery__btn {
+        padding: 0.45rem 0.9rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .vp-recovery__btn--copy {
+        background: var(--teal-dim);
+        border: 1px solid rgba(78,205,196,0.3);
+        color: var(--teal);
+    }
+    .vp-recovery__btn--copy:hover { background: rgba(78,205,196,0.2); }
+    .vp-recovery__btn--dl {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        color: var(--muted);
+    }
+    .vp-recovery__btn--dl:hover { background: rgba(255,255,255,0.1); }
+    .vp-recovery__confirm {
+        width: 100%;
+        padding: 0.7rem;
+        background: var(--teal);
+        border: none;
+        border-radius: 8px;
+        color: #0a1a18;
+        font-size: 0.92rem;
+        font-weight: 700;
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .vp-recovery__confirm:hover:not(:disabled) { background: #3dbdb5; }
+    .vp-recovery__confirm:disabled {
+        background: rgba(78,205,196,0.25);
+        color: rgba(10,26,24,0.5);
+        cursor: not-allowed;
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+        .vp-security__grid { grid-template-columns: repeat(2, 1fr); }
+        .vp-sec-card:nth-child(2) { border-right: none; }
+        .vp-sec-card:nth-child(3) { border-top: 1px solid var(--border); border-right: 1px solid var(--border); }
+        .vp-sec-card:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
+        .vp-hero { padding: 3rem 1rem 2.5rem; }
+    }
+    @media (max-width: 480px) {
+        .vp-security__grid { grid-template-columns: 1fr; }
+        .vp-sec-card { border-right: none; border-top: 1px solid var(--border); }
+        .vp-sec-card:first-child { border-top: none; }
+        .vp-input-row { flex-direction: column; }
+        .vp-trust-badge { font-size: 0.6rem; }
+    }
+    </style>
+
+    <!-- vault-loader: events + storage + format + recent + routing only.
+         Loaded in <head> so runLanding() runs synchronously before body renders.
+         Paths are root-absolute (/_common/) so they work regardless of URL depth. -->
+    <script src="/_common/js/vault-loader/vault-loader-events.js"></script>
+    <script src="/_common/js/vault-loader/vault-loader-storage.js"></script>
+    <script src="/_common/js/vault-loader/vault-loader-format.js"></script>
+    <script src="/_common/js/vault-loader/vault-loader-recent.js"></script>
+    <script src="/_common/js/vault-loader/vault-loader-routing.js"></script>
+    <!-- Strip any stray hash before the page renders -->
+    <script>VaultLoaderRouting.runLanding();</script>
+</head>
+<body>
+
+<script type="module" src="https://dev.sgraph.ai/_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
+<sg-site-header site="Send"></sg-site-header>
+
+<!-- ── Hero ────────────────────────────────────────────────────────────── -->
+<section class="vp-hero">
+    <h1 class="vp-hero__title">Open a vault.</h1>
+
+    <!-- Steal from Design 01 -->
+    <p class="vp-hero__tagline">The server never sees a key.</p>
+
+    <div class="vp-input-card">
+        <div class="vp-input-label">
+            <svg class="vp-input-label__key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6M15.5 7.5l3 3"/>
+            </svg>
+            Have a share token or full key?
+            <span class="vp-input-label__auto">auto-detected on paste</span>
+        </div>
+        <div class="vp-input-row">
+            <input class="vp-input-field" id="vaultKeyInput"
+                   type="text"
+                   placeholder="word-word-1234  or  passphrase + vault-id"
+                   autocomplete="off"
+                   spellcheck="false">
+            <button class="vp-open-btn" id="openVaultBtn">Decrypt &amp; open →</button>
+        </div>
+        <div class="vp-input-error" id="inputError"></div>
+        <div class="vp-input-hint">No account needed · opens instantly</div>
+    </div>
+
+    <a class="vp-create-link" id="createLink">+ Create a new vault instead</a>
+</section>
+
+<!-- ── Security cards ──────────────────────────────────────────────────── -->
+<div class="vp-security">
+    <div class="vp-security__grid">
+        <div class="vp-sec-card">
+            <div class="vp-sec-card__label">In-browser</div>
+            <div class="vp-sec-card__title">AES-256-GCM</div>
+            <div class="vp-sec-card__desc">Files encrypted before they leave your device.</div>
+        </div>
+        <div class="vp-sec-card">
+            <div class="vp-sec-card__label">Keys</div>
+            <div class="vp-sec-card__title">Never transmitted</div>
+            <div class="vp-sec-card__desc">Derived from your passphrase, held only in this tab.</div>
+        </div>
+        <div class="vp-sec-card">
+            <div class="vp-sec-card__label">Server stores</div>
+            <div class="vp-sec-card__title">Ciphertext only</div>
+            <div class="vp-sec-card__desc">No filenames, no plaintext, no recovery path.</div>
+        </div>
+        <div class="vp-sec-card">
+            <div class="vp-sec-card__label">Identifiers</div>
+            <div class="vp-sec-card__title">Daily-salted hash</div>
+            <div class="vp-sec-card__desc">IPs are hashed; we cannot reverse them.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Recent vaults ───────────────────────────────────────────────────── -->
+<section class="vp-recent" id="recentSection" style="display:none">
+    <div class="vp-recent__header">
+        <div>
+            <div class="vp-recent__label">Stored locally · never synced</div>
+            <h2 class="vp-recent__title">Pick up where you left off</h2>
+        </div>
+        <a class="vp-recent__meta" id="manageLink">manage ›</a>
+    </div>
+    <div class="vp-vault-grid" id="vaultGrid"></div>
+</section>
+
+<!-- ── Create CTA ──────────────────────────────────────────────────────── -->
+<div class="vp-create-cta">
+    <div class="vp-create-cta__inner">
+        <div class="vp-create-cta__text">
+            <div class="vp-create-cta__label">New here?</div>
+            <div class="vp-create-cta__title">Create a vault.<br>Share a token. That's it.</div>
+        </div>
+        <button class="vp-create-cta__btn" id="createCtaBtn">Create a new vault →</button>
+    </div>
+</div>
+
+<!-- ── Create vault modal ───────────────────────────────────────────────── -->
+<div class="vp-recovery" id="recoveryModal" style="display:none">
+    <div class="vp-recovery__box">
+        <div class="vp-recovery__header">
+            <span class="vp-recovery__badge">New vault</span>
+            <span class="vp-recovery__title">Your vault key</span>
+            <button class="vp-recovery__close" id="recoveryCloseBtn" title="Close">✕</button>
+        </div>
+        <p class="vp-recovery__body">
+            This token opens your vault on any device. Your browser stores it locally and you can always find it in vault Settings.
+            <strong style="color:#e06c75;">Save a copy somewhere safe — the server has no way to recover it for you.</strong>
+        </p>
+        <div class="vp-recovery__token-row">
+            <input class="vp-recovery__key" id="recoveryKey" type="text"
+                   autocomplete="off" spellcheck="false" readonly>
+            <button class="vp-recovery__regen" id="recoveryRegenBtn" title="Generate a different token">↻</button>
+        </div>
+        <p class="vp-recovery__token-hint">
+            You can edit the token or click ↻ to get a new one.
+        </p>
+        <div class="vp-recovery__access">
+            <label class="vp-recovery__access-label">Access key (required to create a vault)</label>
+            <div class="vp-recovery__access-row">
+                <input class="vp-recovery__access-input" id="recoveryAccessKey" type="password"
+                       placeholder="Paste your access key" autocomplete="off" spellcheck="false">
+                <button class="vp-recovery__access-toggle" id="recoveryAccessToggle" type="button" title="Show / hide">
+                    <svg id="recoveryAccessEyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="vp-recovery__actions">
+            <button class="vp-recovery__btn vp-recovery__btn--copy" id="recoveryCopyBtn">📋 Copy</button>
+            <button class="vp-recovery__btn vp-recovery__btn--dl"   id="recoveryDlBtn">📥 Save .txt</button>
+        </div>
+        <button class="vp-recovery__confirm" id="recoveryConfirmBtn" disabled>Create vault &amp; open →</button>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ── Word lists (same as sg-vault-picker.js) ─────────────────────── */
+    var ADJ  = ['apple','amber','azure','brass','cedar','cobalt','coral','crimson',
+                'dusk','ember','fern','gold','jade','lapis','maple','mint',
+                'ocean','pearl','pine','rose','ruby','sage','sand','stone'];
+    var NOUN = ['arch','bank','bay','brook','cliff','cove','creek','dale',
+                'dell','dune','fell','ford','glen','hill','lake','moor',
+                'peak','plain','reef','ridge','river','shore','vale','wood'];
+
+    function _generateKey() {
+        var buf = new Uint32Array(3);
+        crypto.getRandomValues(buf);
+        return ADJ[buf[0] % ADJ.length] + '-' + NOUN[buf[1] % NOUN.length] + '-' + ((buf[2] % 9000) + 1000);
+    }
+
+    function _timeAgo(ts) {
+        var s = Math.floor((Date.now() - ts) / 1000);
+        if (s < 60)   return s + 's ago';
+        if (s < 3600) return Math.floor(s / 60)  + 'm ago';
+        if (s < 86400)return Math.floor(s / 3600) + 'h ago';
+        return Math.floor(s / 86400) + 'd ago';
+    }
+
+    function _esc(str) {
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function _truncateKey(key) {
+        if (!key) return '';
+        var parts = key.split('-');
+        return parts.length >= 3 ? parts[0] + '-' + parts[1] + '-···' : key.slice(0, 12) + '···';
+    }
+
+    /* ── Navigation ──────────────────────────────────────────────────── */
+    function _navigateToBrowse(key) {
+        VaultLoaderStorage.setCurrentKey(key);
+        window.location.assign('/en-gb/vault');
+    }
+
+    /* ── Open vault from input ────────────────────────────────────────── */
+    function _openVaultFromInput() {
+        var input = document.getElementById('vaultKeyInput');
+        var errorEl = document.getElementById('inputError');
+        var key = input.value.trim().replace(/^["']|["']$/g, '');
+        errorEl.textContent = '';
+        if (!key) {
+            errorEl.textContent = 'Paste your vault key or share token above.';
+            input.focus();
+            return;
+        }
+        VaultLoaderRecent.add(key, key);
+        _navigateToBrowse(key);
+    }
+
+    /* ── Recent vaults ────────────────────────────────────────────────── */
+    function _renderRecentVaults() {
+        var list    = VaultLoaderRecent.list();
+        var section = document.getElementById('recentSection');
+        var grid    = document.getElementById('vaultGrid');
+        var mgr     = document.getElementById('manageLink');
+
+        if (list.length === 0) { section.style.display = 'none'; return; }
+        section.style.display = '';
+        if (mgr) mgr.textContent = list.length + ' vault' + (list.length !== 1 ? 's' : '') + ' · manage ›';
+
+        grid.innerHTML = list.slice(0, 12).map(function (v) {
+            var cls = 'vp-vault-card' + (v.isCurrent ? ' vp-vault-card--current' : '');
+            return '<div class="' + cls + '" data-key="' + _esc(v.key) + '">' +
+                '<div class="vp-vault-card__name">' + _esc(v.name) + '</div>' +
+                '<div class="vp-vault-card__id">' + _esc(_truncateKey(v.key)) + '</div>' +
+                '<div class="vp-vault-card__footer">' +
+                    '<span class="vp-vault-card__time">' + _timeAgo(v.lastOpened) + '</span>' +
+                    '<span class="vp-vault-card__open">Open →</span>' +
+                '</div>' +
+                '<button class="vp-vault-card__new-win" data-new-win="' + _esc(v.key) + '" title="Open in new window">↗</button>' +
+                '<button class="vp-vault-card__del" data-del="' + _esc(v.key) + '" title="Remove from list">×</button>' +
+            '</div>';
+        }).join('');
+
+        grid.querySelectorAll('.vp-vault-card').forEach(function (card) {
+            card.addEventListener('click', function (e) {
+                if (e.target.dataset.del || e.target.dataset.newWin) return;
+                var key  = card.getAttribute('data-key');
+                var name = card.querySelector('.vp-vault-card__name').textContent;
+                VaultLoaderRecent.add(key, name);
+                _navigateToBrowse(key);
+            });
+        });
+
+        grid.querySelectorAll('[data-new-win]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var key = btn.getAttribute('data-new-win');
+                window.open(window.location.origin + '/#' + encodeURIComponent(key), '_blank');
+            });
+        });
+
+        grid.querySelectorAll('[data-del]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                VaultLoaderRecent.remove(btn.getAttribute('data-del'));
+                _renderRecentVaults();
+            });
+        });
+    }
+
+    /* ── Create vault flow ────────────────────────────────────────────── */
+    var ACCESS_KEY_STORAGE = 'sg-vault-access-key-saved';
+
+    function _updateConfirmBtn() {
+        var hasKey = document.getElementById('recoveryAccessKey').value.trim().length > 0;
+        document.getElementById('recoveryConfirmBtn').disabled = !hasKey;
+    }
+
+    function _closeModal() {
+        document.getElementById('recoveryModal').style.display = 'none';
+        document.getElementById('recoveryAccessKey').value = '';
+        _updateConfirmBtn();
+    }
+
+    function _startCreate() {
+        var keyInput = document.getElementById('recoveryKey');
+        keyInput.value = _generateKey();
+        keyInput.readOnly = false;
+        // Pre-fill access key from localStorage if previously saved
+        var savedKey = localStorage.getItem(ACCESS_KEY_STORAGE) || '';
+        document.getElementById('recoveryAccessKey').value = savedKey;
+        _updateConfirmBtn();
+        document.getElementById('recoveryModal').style.display = 'flex';
+        if (savedKey) {
+            keyInput.focus();
+            keyInput.select();
+        } else {
+            document.getElementById('recoveryAccessKey').focus();
+        }
+    }
+
+    function _currentKey() {
+        var v = document.getElementById('recoveryKey').value.trim();
+        return v || null;
+    }
+
+    document.getElementById('recoveryCloseBtn').addEventListener('click', _closeModal);
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && document.getElementById('recoveryModal').style.display !== 'none') {
+            _closeModal();
+        }
+    });
+
+    document.getElementById('recoveryAccessKey').addEventListener('input', _updateConfirmBtn);
+
+    document.getElementById('recoveryAccessToggle').addEventListener('click', function () {
+        var input = document.getElementById('recoveryAccessKey');
+        var icon  = document.getElementById('recoveryAccessEyeIcon');
+        var show  = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        // eye-off SVG when showing, eye SVG when hidden
+        icon.innerHTML = show
+            ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>' +
+              '<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>' +
+              '<line x1="1" y1="1" x2="23" y2="23"/>'
+            : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    });
+
+    document.getElementById('recoveryRegenBtn').addEventListener('click', function () {
+        var keyInput = document.getElementById('recoveryKey');
+        keyInput.value = _generateKey();
+        keyInput.focus();
+        keyInput.select();
+    });
+
+    document.getElementById('recoveryCopyBtn').addEventListener('click', function () {
+        var btn = document.getElementById('recoveryCopyBtn');
+        var key = _currentKey();
+        if (!key) return;
+        navigator.clipboard && navigator.clipboard.writeText(key).catch(function () {});
+        btn.textContent = '✓ Copied!';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+    });
+
+    document.getElementById('recoveryDlBtn').addEventListener('click', function () {
+        var key = _currentKey();
+        if (!key) return;
+        var blob = new Blob(
+            ['SG/Vault key\n\n' + key + '\n\nCreated: ' + new Date().toISOString() + '\n\nKeep this file safe. There is no recovery path.\n'],
+            { type: 'text/plain' }
+        );
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'sg-vault-key.txt'; a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('recoveryConfirmBtn').addEventListener('click', function () {
+        var key = _currentKey();
+        if (!key) return;
+        var accessKey = document.getElementById('recoveryAccessKey').value.trim();
+        if (!accessKey) return; // button should be disabled, belt-and-suspenders
+        VaultLoaderStorage.setAccessKey(accessKey);
+        VaultLoaderStorage.setCreatingFlag(key);
+        try { localStorage.setItem(ACCESS_KEY_STORAGE, accessKey); } catch (_) {}
+        VaultLoaderRecent.add(key, key);
+        _closeModal();
+        _navigateToBrowse(key);
+    });
+
+    /* ── Wire up events ──────────────────────────────────────────────── */
+    document.getElementById('openVaultBtn').addEventListener('click', _openVaultFromInput);
+    document.getElementById('vaultKeyInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') _openVaultFromInput();
+    });
+
+    document.getElementById('createLink').addEventListener('click', _startCreate);
+    document.getElementById('createCtaBtn').addEventListener('click', _startCreate);
+    document.getElementById('manageLink').addEventListener('click', function () {
+        VaultLoaderRecent.clear();
+        _renderRecentVaults();
+    });
+
+    /* ── Init ─────────────────────────────────────────────────────────── */
+    VaultLoaderRecent.migrate();
+    _renderRecentVaults();
+
+    // Focus input on load if no recent vaults
+    if (VaultLoaderRecent.list().length === 0) {
+        document.getElementById('vaultKeyInput').focus();
+    }
+})();
+</script>
+
+<!-- D4: low-visibility peek link (debug/support entry point) -->
+<div style="text-align:center;padding:1rem 0 0.5rem;border-top:1px solid rgba(255,255,255,0.06)">
+    <a href="/en-gb/vault/peek"
+       style="font-size:0.7rem;color:rgba(110,122,138,0.6);text-decoration:none;opacity:0.6"
+       title="Debug: inspect localStorage and vault key format">peek</a>
+</div>
+
+</body>
+</html>

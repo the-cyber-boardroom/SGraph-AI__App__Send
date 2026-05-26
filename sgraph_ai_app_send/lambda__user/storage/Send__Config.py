@@ -4,8 +4,8 @@
 # ===============================================================================
 
 from memory_fs.storage_fs.Storage_FS                                            import Storage_FS
-from memory_fs.storage_fs.providers.Storage_FS__Local_Disk                      import Storage_FS__Local_Disk
 from memory_fs.storage_fs.providers.Storage_FS__Memory                          import Storage_FS__Memory
+from sgraph_ai_app_send.lambda__user.storage.Storage_FS__Local_Disk             import Storage_FS__Local_Disk
 from osbot_aws.AWS_Config                                                       import aws_config
 from osbot_utils.type_safe.Type_Safe                                            import Type_Safe
 from osbot_utils.utils.Env                                                      import get_env
@@ -16,7 +16,9 @@ ENV_VAR__SEND__STORAGE_MODE    = 'SEND__STORAGE_MODE'                           
 ENV_VAR__SEND__S3_BUCKET       = 'SEND__S3_BUCKET'                             # S3 bucket name override
 ENV_VAR__SEND__DISK_PATH       = 'SEND__DISK_PATH'                             # Local disk path for DISK mode
 SEND__S3_BUCKET__INFIX         = 'sgraph-send-transfers'                       # Bucket name infix (used between account-id and region)
+SEND__PUBLIC_VAULT__S3_BUCKET__INFIX = 'sgraph-send-public'                    # Public vault bucket infix
 SEND__DISK_PATH__DEFAULT       = '/data'                                        # Default disk storage path (Docker volume mount point)
+ENV_VAR__SEND__PUBLIC_VAULT__S3_BUCKET = 'SEND__PUBLIC_VAULT__S3_BUCKET'       # Public vault S3 bucket (optional; enables public vault routing)
 
 # todo: s3_bucket should not be an str (it should be type safe primitive)
 class Send__Config(Type_Safe):                                                  # Storage configuration for Send
@@ -73,3 +75,9 @@ class Send__Config(Type_Safe):                                                  
                 raise ValueError("S3 bucket name required for S3 storage mode")
             return Storage_FS__S3(s3_bucket=self.s3_bucket).setup()
         return Storage_FS__Memory()
+
+    def create_public_vault_storage_backend(self) -> Storage_FS:                # Factory: public vault backend (S3 only; None if not configured)
+        public_bucket = get_env(ENV_VAR__SEND__PUBLIC_VAULT__S3_BUCKET)
+        if not public_bucket:
+            return None
+        return Storage_FS__S3(s3_bucket=public_bucket).setup()

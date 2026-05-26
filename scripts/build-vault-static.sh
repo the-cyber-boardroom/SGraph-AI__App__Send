@@ -1,0 +1,194 @@
+#!/bin/bash
+# ---------------------------------------------------------------------------
+# Build the flattened vault static tree for serving.
+#
+# Replicates the production URL structure used at dev.vault.sgraph.ai:
+#   vault/v0/v0.2/v0.2.3/en-gb/   →  {OUT_DIR}/en-gb/
+#   vault/v0/v0.2/v0.2.3/_common/  →  {OUT_DIR}/_common/
+#   vault/v0/v0.2/v0.2.3/i18n/     →  {OUT_DIR}/i18n/
+#
+# User UI IFD layers are merged on top of _common/ so send-browse,
+# sg-site-header, and other shared components are available without
+# a CDN deploy.
+#
+# CDN URLs in index.html files are patched to local /_common/ so the
+# browser does not load anything from dev.send.sgraph.ai.
+#
+# Usage:
+#   build-vault-static.sh [OUT_DIR]
+#
+# OUT_DIR defaults to .local-server-vault in the repo root.
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+STATIC_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__vault"
+UI_VERSION="v0.2.3"
+IFD_PATH="v0/v0.2/$UI_VERSION"
+VAULT_BASE_VERSION="v0.2.3"   # Full self-contained snapshot — no overlays needed.
+# v0.2.3 consolidates v0.2.0 + v0.2.1 + v0.2.2 into one complete tree.
+# Future deltas (v0.2.4, v0.2.5, ...) can be added back here as overlays.
+VAULT_IFD_OVERLAYS=()
+
+# User UI IFD layers — merged in order (base first, latest last) to replicate
+# what the CDN serves. Each version only contains files changed in that version.
+USER_UI_DIR="$REPO_ROOT/sgraph_ai_app_send__ui__user"
+USER_UI_LAYERS=(
+    "v0/v0.3/v0.3.0/_common"
+    "v0/v0.3/v0.3.1/_common"
+    "v0/v0.3/v0.3.2/_common"
+    "v0/v0.3/v0.3.3/_common"
+)
+
+SERVE_DIR="${1:-$REPO_ROOT/.local-server-vault}"
+
+echo "Building vault static tree → $SERVE_DIR"
+
+rm -rf "$SERVE_DIR"
+mkdir -p "$SERVE_DIR"
+
+CONTENT_DIR="$STATIC_DIR/$IFD_PATH"
+if [ ! -d "$CONTENT_DIR" ]; then
+    echo "ERROR: Content directory not found: $CONTENT_DIR"
+    exit 1
+fi
+
+# Merge locale dirs (en-gb/, etc.) from ALL vault IFD layers base→latest.
+# Guard with length check so macOS system bash (3.2) does not treat an empty
+# VAULT_IFD_OVERLAYS array as unbound under set -u.
+_vault_locale_versions=("$VAULT_BASE_VERSION")
+if [ ${#VAULT_IFD_OVERLAYS[@]} -gt 0 ]; then
+    _vault_locale_versions=("${_vault_locale_versions[@]}" "${VAULT_IFD_OVERLAYS[@]}")
+fi
+for ver in "${_vault_locale_versions[@]}"; do
+    for locale_dir in "$STATIC_DIR/v0/v0.2/$ver"/*/; do
+        [ -d "$locale_dir" ] || continue
+        dirname=$(basename "$locale_dir")
+        [ "$dirname" = "_common" ] && continue
+        [ "$dirname" = "i18n"    ] && continue
+        cp -r "$locale_dir" "$SERVE_DIR/$dirname"
+    done
+done
+
+# Build _common: start with vault base layer, apply overlays in order.
+BASE_COMMON_DIR="$STATIC_DIR/v0/v0.2/$VAULT_BASE_VERSION/_common"
+if [ -d "$BASE_COMMON_DIR" ]; then
+    echo "Merging vault base layer: $VAULT_BASE_VERSION ..."
+    cp -r "$BASE_COMMON_DIR" "$SERVE_DIR/_common"
+else
+    mkdir -p "$SERVE_DIR/_common/js"
+fi
+
+if [ ${#VAULT_IFD_OVERLAYS[@]} -gt 0 ]; then
+    for ver in "${VAULT_IFD_OVERLAYS[@]}"; do
+        overlay_dir="$STATIC_DIR/v0/v0.2/$ver/_common"
+        if [ -d "$overlay_dir" ]; then
+            echo "Merging vault overlay: $ver ..."
+            cp -r "$overlay_dir"/. "$SERVE_DIR/_common/"
+        fi
+    done
+fi
+
+# Merge user UI IFD layers — provides send-browse, sg-site-header, etc.
+for layer in "${USER_UI_LAYERS[@]}"; do
+    layer_dir="$USER_UI_DIR/$layer"
+    if [ -d "$layer_dir" ]; then
+        echo "Merging user UI layer: $layer ..."
+        cp -r "$layer_dir"/. "$SERVE_DIR/_common/"
+    else
+        echo "WARNING: user UI layer not found: $layer_dir (skipping)"
+    fi
+done
+
+# Symlink i18n/
+[ -d "$CONTENT_DIR/i18n" ] && ln -sf "$CONTENT_DIR/i18n" "$SERVE_DIR/i18n"
+
+# Copy root files (index.html, etc.)
+for f in "$CONTENT_DIR"/*.html "$CONTENT_DIR"/*.json; do
+    [ -f "$f" ] && cp "$f" "$SERVE_DIR/$(basename "$f")"
+done
+
+# Generate en-gb/vault/index.html — vault shell at clean /en-gb/vault/ URL.
+# Paths are made root-absolute so assets resolve from two directories deep.
+mkdir -p "$SERVE_DIR/en-gb/vault"
+sed -e 's|href="_common/|href="/_common/|g' \
+    -e 's|src="_common/|src="/_common/|g' \
+    "$SERVE_DIR/index.html" > "$SERVE_DIR/en-gb/vault/index.html"
+echo "  Created: en-gb/vault/index.html"
+
+# Inject static /api/health — vault-header.js calls window.location.origin/api/health.
+# When served behind the FastAPI container this is shadowed by the real API routes.
+# When served by a plain HTTP server (local dev) this static file provides a fallback.
+mkdir -p "$SERVE_DIR/api"
+cat > "$SERVE_DIR/api/health" <<HEALTHEOF
+{"status":"ok","version":"local-dev","mode":"local-static"}
+HEALTHEOF
+
+# Inject build-info.js (CI generates this in production).
+mkdir -p "$SERVE_DIR/_common/js"
+cat > "$SERVE_DIR/_common/js/build-info.js" <<JSEOF
+/* Generated by build-vault-static.sh */
+window.SGRAPH_BUILD = {
+    appVersion : 'local-dev',
+    uiVersion  : '$UI_VERSION',
+    buildTime  : '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+};
+JSEOF
+
+# Patch index.html files: replace CDN URLs with local /_common/
+echo "Patching index.html: CDN URLs → local /_common/ ..."
+for index_html in "$SERVE_DIR/index.html" "$SERVE_DIR"/*/index.html "$SERVE_DIR"/*/*/index.html; do
+    [ -f "$index_html" ] || continue
+    python3 -c "
+import sys
+path = sys.argv[1]
+with open(path) as f: html = f.read()
+patched = html.replace('https://dev.send.sgraph.ai/_common/', '/_common/')
+patched = patched.replace('https://dev.sgraph.ai/_common/', '/_common/')
+with open(path, 'w') as f: f.write(patched)
+print('  Patched:', path)
+" "$index_html"
+done
+
+# Optionally rewrite the default backend endpoint to a different value.
+# Set VAULT_DEFAULT_ENDPOINT to override the hardcoded 'https://dev.send.sgraph.ai'
+# defaults in vault-entry, vault-loader-storage, vault-settings, etc.
+#   VAULT_DEFAULT_ENDPOINT=""                              → relative paths (same-origin)
+#   VAULT_DEFAULT_ENDPOINT="http://localhost:8080"         → explicit local
+#   (unset)                                                → leave production default in place
+if [ -n "${VAULT_DEFAULT_ENDPOINT+x}" ]; then
+    echo "Rewriting default backend endpoint → '${VAULT_DEFAULT_ENDPOINT}' ..."
+    python3 - <<PYEOF
+import os
+target = "${VAULT_DEFAULT_ENDPOINT}"
+old    = "https://dev.send.sgraph.ai"
+for root, dirs, files in os.walk("${SERVE_DIR}"):
+    for name in files:
+        if not (name.endswith(".js") or name.endswith(".html")):
+            continue
+        path = os.path.join(root, name)
+        try:
+            with open(path) as f: data = f.read()
+        except UnicodeDecodeError:
+            continue
+        if old not in data:
+            continue
+        with open(path, "w") as f: f.write(data.replace(old, target))
+        print(f"  Rewrote endpoint in: {path}")
+PYEOF
+fi
+
+# Sanity check: confirm which send-browse version survived the merge.
+SEND_BROWSE_FILE="$SERVE_DIR/_common/js/components/send-download/send-browse--v0.3.2.js"
+echo ""
+echo "Merged send-browse version stamp:"
+if [ -f "$SEND_BROWSE_FILE" ]; then
+    BANNER=$(grep -m1 "loaded OK" "$SEND_BROWSE_FILE" || echo "  (no banner found)")
+    echo "  $BANNER"
+else
+    echo "  (file missing — no user UI layer wrote it)"
+fi
+
+echo ""
+echo "Build complete: $SERVE_DIR"

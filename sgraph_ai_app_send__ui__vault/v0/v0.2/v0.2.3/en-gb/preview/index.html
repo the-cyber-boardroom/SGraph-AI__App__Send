@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — Public Preview (tester)</title>
+
+    <!-- Public-preview core (read path only — light, no vault deps) -->
+    <script src="/_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-crypto.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-schema.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-read.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-meta.js"></script>
+    <script src="/_common/js/components/sg-public-preview-card/sg-public-preview-card.js"></script>
+
+    <style>
+        :root { --bg:#0a0a18; --surface:#14142a; --border:#2a2a44; --text:#e2e8f0; --muted:#9aa4bf; --primary:#4f8ff7; }
+        * { box-sizing: border-box; }
+        body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding:24px; }
+        h2 { font-size:0.9rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin:28px 0 10px; }
+        .wrap { max-width:760px; margin:0 auto; }
+        .cards { display:flex; gap:16px; flex-wrap:wrap; }
+        .uc { width:300px; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); }
+        .uc .img { height:150px; background:#1c1c33 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:36px; color:var(--muted); }
+        .uc .body { padding:10px 12px; }
+        .uc .t { font-weight:600; font-size:0.92rem; margin:0 0 4px; }
+        .uc .d { font-size:0.8rem; color:var(--muted); margin:0 0 6px; }
+        .uc .u { font-size:0.72rem; color:var(--muted); }
+        .li { display:flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); width:460px; }
+        .li .img { width:110px; background:#1c1c33 center/cover no-repeat; flex:0 0 110px; display:flex; align-items:center; justify-content:center; font-size:30px; color:var(--muted); }
+        .li .body { padding:10px 12px; }
+        .dbg { margin-top:8px; font-family:ui-monospace,monospace; font-size:0.75rem; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; }
+        .dbg .row { display:flex; gap:10px; margin:3px 0; }
+        .dbg .row span { flex:0 0 140px; color:var(--muted); }
+        .dbg code { word-break:break-all; }
+        a { color:var(--primary); }
+        .hint { color:var(--muted); font-size:0.82rem; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <p class="hint">Card-as-shared tester — renders the preview the way a link unfurls on WhatsApp / LinkedIn / Slack, then loads the live card. It never opens the vault. (Reads the public preview only.)</p>
+
+    <h2>The card (live)</h2>
+    <sg-public-preview-card id="card"></sg-public-preview-card>
+
+    <h2>How it unfurls when shared</h2>
+    <div class="cards">
+        <div class="uc"><div class="img" id="uc-img">🔒</div><div class="body">
+            <p class="t" id="uc-t">…</p><p class="d" id="uc-d"></p><p class="u" id="uc-u"></p></div></div>
+        <div class="li"><div class="img" id="li-img">🔒</div><div class="body">
+            <p class="t" id="li-t">…</p><p class="d" id="li-d"></p><p class="u" id="li-u"></p></div></div>
+    </div>
+
+    <h2>Debug</h2>
+    <div class="dbg" id="dbg">loading…</div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+    const params   = new URLSearchParams(location.search);
+    // public-id: last path segment after /preview/, else ?p=
+    const m        = location.pathname.match(/\/preview\/([^\/?#]+)/);
+    const publicId = (m && decodeURIComponent(m[1])) || params.get('p') || '';
+    const apiBase  = params.get('api') || 'https://send.sgraph.ai';
+    const card     = document.getElementById('card');
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+    function setImg(id, dataUrl) {
+        const el = document.getElementById(id);
+        if (el && dataUrl) { el.style.backgroundImage = `url("${dataUrl}")`; el.textContent = ''; }
+    }
+
+    (async function () {
+        if (!publicId) { card.setState({ status: 'not-found' }); document.getElementById('dbg').textContent = 'No public-id in URL (/preview/<id> or ?p=<id>).'; return; }
+
+        const transferId = await PublicPreviewCrypto.deriveTransferId(publicId);
+        const readKey    = await PublicPreviewCrypto.readKeyBase64url(publicId);
+        const t0  = performance.now();
+        const res = await PublicPreviewRead.fetchPreview(apiBase, publicId);
+        const ms  = Math.round(performance.now() - t0);
+
+        card.setState({ status: res.status, preview: res.preview, publicId, transferId, readKey, apiBase, showKeyPrompt: false });
+
+        const p = res.preview || {};
+        if (res.status === 'ok') {
+            PublicPreviewMeta.inject(p, `${location.origin}/en-gb/app/${publicId}`);
+            set('uc-t', p.title); set('uc-d', p.description || ''); set('uc-u', 'dev.vault.sgraph.ai');
+            set('li-t', p.title); set('li-d', p.description || ''); set('li-u', 'dev.vault.sgraph.ai');
+            const thumb = (p.thumbnail && p.thumbnail.mode === 'inline') ? p.thumbnail.data : '';
+            setImg('uc-img', thumb); setImg('li-img', thumb);
+        } else {
+            set('uc-t', '(no preview)'); set('li-t', '(no preview)');
+        }
+
+        const rawLink = `${apiBase}/en-gb/open/view#${transferId}/${readKey}`;
+        document.getElementById('dbg').innerHTML =
+            `<div class="row"><span>status</span><code>${res.status}</code></div>` +
+            `<div class="row"><span>public-id</span><code>${publicId}</code></div>` +
+            `<div class="row"><span>transfer-id</span><code>${transferId}</code></div>` +
+            `<div class="row"><span>read-key</span><code>${readKey}</code> <em>(public, read-only)</em></div>` +
+            `<div class="row"><span>og:title</span><code>${(p.title || '').replace(/</g,'&lt;')}</code></div>` +
+            `<div class="row"><span>og:description</span><code>${(p.description || '').replace(/</g,'&lt;')}</code></div>` +
+            `<div class="row"><span>fetch</span><code>${ms} ms</code></div>` +
+            `<div class="row"><span>raw file</span><a href="${rawLink}">open ↗</a></div>`;
+    })();
+})();
+</script>
+</body>
+</html>

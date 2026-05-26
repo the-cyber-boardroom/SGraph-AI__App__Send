@@ -248,3 +248,11 @@ modules/
 
 .local-server-website
 .idea
+
+# Node.js
+node_modules/
+
+# Playwright test artifacts (generated on failure; uploaded as CI artifact)
+test-results/
+playwright-report/
+_sg-send_data

@@ -521,19 +521,48 @@ class test_Service__Vault__Pointer(TestCase):
         assert result['status']        == 'deleted'
         assert result['files_deleted'] == 0
 
-    def test__delete_vault__clears_manifest_cache(self):
+    def test__delete_vault__caches_tombstone(self):
         self.service.write(self.vault_id, 'file-1', self.write_key, b'data')
         assert self.vault_id in self.service._manifest_cache              # Cache populated after write
         self.service.delete_vault(self.vault_id, self.write_key)
-        assert self.vault_id not in self.service._manifest_cache          # Cache cleared after delete
+        cached = self.service._manifest_cache.get(self.vault_id)
+        assert cached is not None                                         # Cache holds tombstone (not cleared)
+        assert cached['status'] == 'deleted'
 
-    def test__delete_vault__vault_reusable_after_delete(self):
+    def test__delete_vault__blocks_recreation_same_key(self):
         self.service.write(self.vault_id, 'old-file', self.write_key, b'old')
         self.service.delete_vault(self.vault_id, self.write_key)
-        result = self.service.write(self.vault_id, 'new-file', 'new-key', b'new')
-        assert result is not None
-        assert result['status'] == 'completed'
-        assert self.service.read(self.vault_id, 'new-file') == b'new'
+        result = self.service.write(self.vault_id, 'new-file', self.write_key, b'new')
+        assert result is None                                             # Tombstone blocks re-creation with same key
+
+    def test__delete_vault__blocks_recreation_different_key(self):
+        self.service.write(self.vault_id, 'old-file', self.write_key, b'old')
+        self.service.delete_vault(self.vault_id, self.write_key)
+        result = self.service.write(self.vault_id, 'new-file', 'completely-different-key', b'new')
+        assert result is None                                             # Tombstone blocks re-creation with any key
+
+    def test__delete_vault__tombstone_persists_across_cache_miss(self):
+        self.service.write(self.vault_id, 'file-1', self.write_key, b'data')
+        self.service.delete_vault(self.vault_id, self.write_key)
+        self.service._manifest_cache.clear()                             # Simulate cold Lambda — no in-memory cache
+        result = self.service.write(self.vault_id, 'new-file', self.write_key, b'new')
+        assert result is None                                             # Tombstone loaded from storage, write still blocked
+
+    def test__delete_vault__tombstone_fields(self):
+        self.service.write(self.vault_id, 'file-1', self.write_key, b'data')
+        self.service.delete_vault(self.vault_id, self.write_key)
+        self.service._manifest_cache.clear()
+        cached = self.service._load_manifest(self.vault_id)
+        assert cached['status']    == 'deleted'
+        assert cached['vault_id']  == self.vault_id
+        assert 'deleted_at'        in cached
+        assert 'write_key_hash'    not in cached                         # No key material in tombstone
+
+    def test__delete_vault__double_delete_rejected(self):
+        self.service.write(self.vault_id, 'file-1', self.write_key, b'data')
+        self.service.delete_vault(self.vault_id, self.write_key)
+        result = self.service.delete_vault(self.vault_id, self.write_key)
+        assert result is None                                             # Second delete returns None (tombstone blocks it)
 
     def test__delete_vault__files_deleted_count(self):
         for i in range(5):

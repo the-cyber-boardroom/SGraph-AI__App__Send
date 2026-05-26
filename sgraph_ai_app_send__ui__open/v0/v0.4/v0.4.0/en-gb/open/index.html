@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Send — Open</title>
+    <meta name="description" content="Open an encrypted file or secret shared via SG/Send.">
+
+    <!-- Short-link redirect: /en-gb/open/#token → /en-gb/open/browse/#token -->
+    <script>
+    (function() {
+        var h = window.location.hash.slice(1);
+        if (!h) return;
+        var friendly = /^[a-z]+-[a-z]+-\d+$/i.test(h);
+        var raw = /^[a-zA-Z0-9+/=_-]{8,}(\/[a-zA-Z0-9+/=_-]+)?$/.test(h);
+        if (friendly || raw) {
+            window.location.replace('browse/' + window.location.hash);
+        }
+    })();
+    </script>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="../_common/favicon.svg">
+</head>
+<body>
+    <!-- PROPOSED — open-side landing page.
+         For v0.4.0 this simply redirects to browse/ when a hash token is
+         present, mirroring the v0.3.x root redirect. A richer landing
+         page (with instructions for recipients) is a follow-up. -->
+
+    <p>Redirecting… if you are not redirected automatically,
+       <a href="browse/">open browse</a>.</p>
+
+    <script>
+        if (!window.location.hash) {
+            window.location.replace('browse/');
+        }
+    </script>
+</body>
+</html>

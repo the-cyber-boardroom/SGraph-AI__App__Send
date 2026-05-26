@@ -1,0 +1,79 @@
+name: Vault UI Tests (reusable)
+
+# Reusable workflow — invoked by deploy-ui-vault.yml as a test gate before deploy.
+# Defines the unit → integration → E2E pipeline once so the gate cannot drift.
+
+on:
+  workflow_call:
+
+jobs:
+  # ── Unit tests (~5s): pure JS, Node + jsdom, zero network ─────────────────
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:vault-unit
+
+  # ── Integration tests (~10s): Node + jsdom + in-memory SGVault stub ───────
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:vault-integration
+
+  # ── E2E tests (~60s): Playwright + local file server ──────────────────────
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2          # healthy run is ~1 min; fail fast if the Playwright install hangs
+    needs: [unit, integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        timeout-minutes: 1      # the step that occasionally hangs — bound it explicitly
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:vault-e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

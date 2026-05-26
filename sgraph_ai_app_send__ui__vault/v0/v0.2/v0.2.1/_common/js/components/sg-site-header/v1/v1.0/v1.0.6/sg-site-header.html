@@ -1,0 +1,35 @@
+<header class="site-header">
+  <div class="container">
+    <a class="site-logo" id="logo-link" href="/">
+      <span class="brand-prefix">SG</span><span class="brand-slash">/</span><span id="site-label" class="brand-product"></span>
+    </a>
+
+    <nav class="site-nav" id="nav"></nav>
+
+    <!-- Token bar: rendered when host has [token-bar] attribute -->
+    <div class="token-inline-bar" id="token-bar">
+      <button class="token-inline-bar__trigger" id="tb-trigger" type="button" aria-label="Open a vault with a token">
+        Open with token →
+      </button>
+      <div class="token-inline-bar__input-wrap" id="tb-wrap">
+        <input
+          id="tb-input"
+          class="token-inline-bar__input"
+          type="text"
+          placeholder="e.g. coral-stamp-5678"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Vault token"
+        >
+        <button id="tb-go" class="token-inline-bar__go" type="button">Open →</button>
+        <button id="tb-cancel" class="token-inline-bar__cancel" type="button" aria-label="Cancel">✕</button>
+      </div>
+    </div>
+
+    <!-- Optional CTA slot for custom widgets (token bar is built-in above) -->
+    <slot name="cta"></slot>
+    <slot name="locale"></slot>
+
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+  </div>
+</header>

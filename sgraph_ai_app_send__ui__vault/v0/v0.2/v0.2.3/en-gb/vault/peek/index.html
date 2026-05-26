@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — Peek</title>
+    <meta name="robots" content="noindex">
+    <!-- Standalone: no _common/ deps. Survives _common/ regressions by design. -->
+
+    <!-- Strip any stray hash before the page renders (no VaultLoader dep needed) -->
+    <script>
+    (function () {
+        var h = location.hash;
+        if (h && h !== '#') history.replaceState(null, '', location.pathname + location.search);
+    }());
+    </script>
+
+    <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --bg:       #0d1117;
+        --bg2:      #111820;
+        --bg3:      #161d27;
+        --border:   rgba(255,255,255,0.08);
+        --text:     #e0e6f0;
+        --muted:    #6e7a8a;
+        --teal:     #4ecdc4;
+        --teal-dim: rgba(78,205,196,0.12);
+        --warn:     #e0ac4e;
+        --warn-dim: rgba(224,172,78,0.10);
+        --err:      #e06c75;
+    }
+
+    html { font-size: 15px; }
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, sans-serif;
+        line-height: 1.5;
+        min-height: 100vh;
+        padding-bottom: 3rem;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .pk-wrap {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 1.5rem 1rem;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .pk-header {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        margin-bottom: 1.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+    }
+    .pk-header__title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .pk-header__badge {
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--warn);
+        background: var(--warn-dim);
+        border: 1px solid rgba(224,172,78,0.25);
+        border-radius: 4px;
+        padding: 0.15rem 0.45rem;
+    }
+    .pk-header__nav {
+        margin-left: auto;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+    .pk-header__nav a {
+        color: var(--muted);
+        font-size: 0.8rem;
+        text-decoration: none;
+    }
+    .pk-header__nav a:hover { color: var(--teal); }
+
+    /* ── Section ────────────────────────────────────────────────────────── */
+    .pk-section {
+        margin-bottom: 1.25rem;
+    }
+    .pk-section__label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--muted);
+        margin-bottom: 0.5rem;
+    }
+    .pk-card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .pk-card--empty {
+        padding: 0.6rem 0.9rem;
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-style: italic;
+    }
+
+    /* ── Key rows ───────────────────────────────────────────────────────── */
+    .pk-row {
+        display: grid;
+        grid-template-columns: 220px 1fr auto;
+        gap: 0.5rem;
+        align-items: start;
+        padding: 0.5rem 0.9rem;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.8rem;
+    }
+    .pk-row:last-child { border-bottom: none; }
+    .pk-row__key {
+        color: var(--muted);
+        font-family: monospace;
+        font-size: 0.75rem;
+        word-break: break-all;
+        padding-top: 0.05rem;
+    }
+    .pk-row__val {
+        color: var(--text);
+        font-family: monospace;
+        font-size: 0.75rem;
+        word-break: break-all;
+    }
+    .pk-row__val--muted  { color: var(--muted); font-style: italic; }
+    .pk-row__val--masked { color: var(--muted); }
+    .pk-row__val--teal   { color: var(--teal); }
+    .pk-row__val--warn   { color: var(--warn); }
+    .pk-row__actions {
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    .pk-btn {
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        font-size: 0.68rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .pk-btn:hover { border-color: rgba(78,205,196,0.4); color: var(--teal); }
+    .pk-btn--primary {
+        border-color: rgba(78,205,196,0.4);
+        color: var(--teal);
+    }
+    .pk-btn--danger { color: var(--err); border-color: rgba(224,108,117,0.3); }
+    .pk-btn--danger:hover { background: rgba(224,108,117,0.08); }
+
+    /* ── Current vault card ─────────────────────────────────────────────── */
+    .pk-current {
+        padding: 0.9rem 1rem;
+    }
+    .pk-current__key-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.6rem;
+    }
+    .pk-current__label {
+        font-size: 0.65rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        min-width: 90px;
+    }
+    .pk-current__value {
+        font-family: monospace;
+        font-size: 0.88rem;
+        color: var(--teal);
+        flex: 1;
+        word-break: break-all;
+    }
+    .pk-current__value--none {
+        color: var(--muted);
+        font-style: italic;
+        font-size: 0.8rem;
+    }
+    .pk-current__meta {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-bottom: 0.5rem;
+        padding-left: 0;
+    }
+    .pk-current__actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    /* ── Badge ──────────────────────────────────────────────────────────── */
+    .badge {
+        display: inline-block;
+        font-size: 0.6rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+        vertical-align: middle;
+    }
+    .badge--legacy  { background: rgba(224,172,78,0.15);  color: var(--warn); border: 1px solid rgba(224,172,78,0.3); }
+    .badge--current { background: rgba(78,205,196,0.12); color: var(--teal); border: 1px solid rgba(78,205,196,0.3); }
+    .badge--fmt     { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid var(--border); }
+
+    /* ── Inspect textarea ────────────────────────────────────────────────── */
+    .pk-inspect {
+        padding: 0.9rem 1rem;
+    }
+    .pk-inspect__input-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+    .pk-inspect__input {
+        flex: 1;
+        background: var(--bg3);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: monospace;
+        font-size: 0.8rem;
+        padding: 0.4rem 0.7rem;
+        outline: none;
+    }
+    .pk-inspect__input:focus { border-color: rgba(78,205,196,0.4); }
+    .pk-inspect__result {
+        font-size: 0.8rem;
+        line-height: 1.6;
+    }
+    .pk-inspect__result--empty { color: var(--muted); font-style: italic; }
+
+    /* ── Probe section ───────────────────────────────────────────────────── */
+    .pk-probe {
+        padding: 0.9rem 1rem;
+    }
+    .pk-probe__row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.8rem;
+        margin-bottom: 0.4rem;
+    }
+    .pk-probe__key { color: var(--muted); min-width: 140px; }
+    .pk-probe__val { font-family: monospace; }
+
+    /* ── Routing table ───────────────────────────────────────────────────── */
+    .pk-routing {
+        padding: 0.75rem 1rem;
+        font-size: 0.78rem;
+        line-height: 1.9;
+    }
+    .pk-routing__row {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 0.5rem;
+    }
+    .pk-routing__path { font-family: monospace; color: var(--teal); }
+    .pk-routing__desc { color: var(--muted); }
+
+    /* ── Expand block ────────────────────────────────────────────────────── */
+    .pk-expand { display: none; margin-top: 0.4rem; }
+    .pk-expand.open { display: block; }
+    .pk-expand__entry {
+        padding: 0.3rem 0;
+        border-top: 1px solid var(--border);
+        font-size: 0.73rem;
+        color: var(--muted);
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.5rem;
+    }
+    .pk-expand__entry-name { color: var(--text); }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    .pk-footer {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border);
+        flex-wrap: wrap;
+    }
+    .pk-footer__spacer { flex: 1; }
+
+    /* ── Divider ─────────────────────────────────────────────────────────── */
+    .pk-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 0.25rem 0;
+    }
+    </style>
+</head>
+<body>
+<div class="pk-wrap">
+
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <div class="pk-header">
+        <span class="pk-header__title">SG/Vault — Peek</span>
+        <span class="pk-header__badge">debug</span>
+        <nav class="pk-header__nav">
+            <a href="/en-gb/">Landing</a>
+            <a href="/en-gb/vault">Vault shell</a>
+        </nav>
+    </div>
+
+    <!-- ── Current vault ──────────────────────────────────────────────── -->
+    <div class="pk-section">
+        <div class="pk-section__label">Current vault — what /en-gb/vault would auto-open</div>
+        <div class="pk-card" id="currentVaultCard"></div>
+    </div>
+
+    <!-- ── Raw localStorage ───────────────────────────────────────────── -->
+    <div class="pk-section">
+        <div class="pk-section__label">Raw localStorage</div>
+        <div class="pk-card" id="lsCard"></div>
+    </div>
+
+    <!-- ── Raw sessionStorage ─────────────────────────────────────────── -->
+    <div class="pk-section">
+        <div class="pk-section__label">Raw sessionStorage</div>
+        <div class="pk-card" id="ssCard"></div>
+    </div>
+
+    <!-- ── Recent vaults list ─────────────────────────────────────────── -->
+    <div class="pk-section">
+        <div class="pk-section__label">Recent vaults (sg-vault-recent)</div>
+        <div class="pk-card" id="recentCard"></div>
+    </div>
+
+    <!-- ── Paste to inspect ───────────────────────────────────────────── -->
+    <div class="pk-section">
+        <div class="pk-section__label">Paste a key to inspect — does not save</div>
+        <div class="pk-card">
+            <div class="pk-inspect">
+                <div class="pk-inspect__input-row">
+                    <input class="pk-inspect__input" id="inspectInput"
+                           placeholder="word-word-NNNN  /  passphrase:vault_id  /  vault_id 64hex"
+                           autocomplete="off" spellcheck="false">
+                    <button class="pk-btn pk-btn--primary" onclick="runInspect()">Inspect</button>
+                    <button class="pk-btn" onclick="clearInspect()">Clear</button>
+                </div>
+                <div class="pk-inspect__result pk-inspect__result--empty" id="inspectResult">
+                    Paste a vault key above and click Inspect.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Server probe ───────────────────────────────────────────────── -->
+    <div class="pk-section">
+        <div class="pk-section__label">Server metadata <span class="badge badge--fmt">opt-in · no vault data</span></div>
+        <div class="pk-card">
+            <div class="pk-probe" id="probeSection">
+                <div class="pk-probe__row">
+                    <span class="pk-probe__key">Endpoint</span>
+                    <span class="pk-probe__val" id="probeEndpoint"></span>
+                </div>
+                <div class="pk-probe__row">
+                    <span class="pk-probe__key">Vault exists on server</span>
+                    <span class="pk-probe__val" id="probeExists" style="color:var(--muted);font-style:italic">
+                        — click Probe to check
+                    </span>
+                </div>
+                <div style="margin-top:0.6rem">
+                    <button class="pk-btn pk-btn--primary" onclick="runProbe()">Probe</button>
+                    <span style="font-size:0.7rem;color:var(--muted);margin-left:0.5rem">
+                        Sends HEAD request to server. No decryption.
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Routing table ──────────────────────────────────────────────── -->
+    <div class="pk-section">
+        <div class="pk-section__label">Routing table (this build)</div>
+        <div class="pk-card">
+            <div class="pk-routing">
+                <div class="pk-routing__row">
+                    <span class="pk-routing__path">/</span>
+                    <span class="pk-routing__desc">Redirect to /en-gb/ (no hash)</span>
+                </div>
+                <div class="pk-routing__row">
+                    <span class="pk-routing__path">/#token</span>
+                    <span class="pk-routing__desc">Save token to LS → redirect to /en-gb/vault</span>
+                </div>
+                <div class="pk-routing__row">
+                    <span class="pk-routing__path">/en-gb/</span>
+                    <span class="pk-routing__desc">Landing: recent vaults grid, strip any hash</span>
+                </div>
+                <div class="pk-routing__row">
+                    <span class="pk-routing__path">/en-gb/vault</span>
+                    <span class="pk-routing__desc">Vault shell: auto-open from LS, strip hash</span>
+                </div>
+                <div class="pk-routing__row">
+                    <span class="pk-routing__path">/en-gb/vault/peek</span>
+                    <span class="pk-routing__desc">This page: inspect LS/SS, strip hash</span>
+                </div>
+                <div class="pk-routing__row">
+                    <span class="pk-routing__path">/en-gb/vault/token</span>
+                    <span class="pk-routing__desc">Token test harness: issue/revoke RO tokens, HKDF lab, multi-frame vault views</span>
+                </div>
+                <div class="pk-routing__row">
+                    <span class="pk-routing__path">/en-gb/vault/sgit</span>
+                    <span class="pk-routing__desc">SGit performance harness: side-by-side vault API call measurement, per-optimisation toggles</span>
+                </div>
+                <div class="pk-routing__row">
+                    <span class="pk-routing__path">/en-gb/vault/markdown</span>
+                    <span class="pk-routing__desc">Markdown harness: automated tests + live playground for the refactored lib/markdown module (NOT yet wired to main vault)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Build info ─────────────────────────────────────────────────── -->
+    <div class="pk-section">
+        <div class="pk-section__label">Build info</div>
+        <div class="pk-card">
+            <div class="pk-routing" id="buildInfo" style="color:var(--muted);font-size:0.78rem"></div>
+        </div>
+    </div>
+
+    <!-- ── Footer ─────────────────────────────────────────────────────── -->
+    <div class="pk-footer">
+        <a href="/en-gb/" class="pk-btn">← Back to landing</a>
+        <button class="pk-btn pk-btn--primary" onclick="location.assign('/en-gb/vault')">Open vault shell</button>
+        <div class="pk-footer__spacer"></div>
+        <button class="pk-btn pk-btn--danger" onclick="clearAllState()">Clear all vault state</button>
+    </div>
+
+</div><!-- /pk-wrap -->
+
+<script>
+(function () {
+'use strict';
+
+/* ── Format detection (inlined from vault-loader-format.js — no deps) ── */
+var RE_SIMPLE_TOKEN = /^[a-z]+-[a-z]+-\d{4}$/;
+var RE_HEX_ID_PART  = /^[a-f0-9]{12}$/;
+var RE_ALNUM_PART   = /^[a-z0-9]{4,24}$/;
+var RE_READ_ONLY    = /^([a-z0-9]{4,24})\s+([a-f0-9]{64})$/;
+
+function detectFormat(input) {
+    var s = (input || '').trim();
+    if (!s) return null;
+    if (RE_SIMPLE_TOKEN.test(s)) {
+        return { format: 1, kind: 'Simple token', access: 'read + write',
+                 passphrase: s, vaultId: null, raw: s };
+    }
+    var lastColon = s.lastIndexOf(':');
+    if (lastColon > 0) {
+        var maybePp = s.slice(0, lastColon);
+        var maybeId = s.slice(lastColon + 1);
+        if (maybePp && !/\s/.test(maybePp)) {
+            if (RE_HEX_ID_PART.test(maybeId)) {
+                return { format: 2, kind: 'Passphrase + 12-hex vault_id', access: 'read + write',
+                         passphrase: maybePp, vaultId: maybeId, raw: s };
+            }
+            if (RE_ALNUM_PART.test(maybeId)) {
+                return { format: 3, kind: 'Passphrase + alnum vault_id', access: 'read + write',
+                         passphrase: maybePp, vaultId: maybeId, raw: s };
+            }
+        }
+    }
+    var m = RE_READ_ONLY.exec(s);
+    if (m) {
+        return { format: 4, kind: 'Read-only credential', access: 'read only',
+                 passphrase: null, vaultId: m[1], readKeyHex: m[2], raw: s };
+    }
+    return null; // unrecognised
+}
+
+/* ── SHA-256 vault_id derivation for format 1 (Web Crypto, no libs) ── */
+async function deriveSimpleTokenVaultId(token) {
+    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+    return Array.from(new Uint8Array(buf)).map(function (b) {
+        return b.toString(16).padStart(2, '0');
+    }).join('').slice(0, 12);
+}
+
+/* ── Masking helpers ─────────────────────────────────────────────────── */
+function maskVaultKey(key) {
+    if (!key) return '';
+    var parts = key.split('-');
+    if (parts.length === 3 && /^\d{4}$/.test(parts[2])) {
+        return parts[0] + '-' + parts[1] + '-' + '····';
+    }
+    if (key.length <= 8) return '·'.repeat(key.length);
+    return key.slice(0, Math.min(8, Math.floor(key.length * 0.4))) + '···';
+}
+
+function maskSecret(val) {
+    if (!val) return '';
+    return '●'.repeat(Math.min(10, val.length)) + ' (' + val.length + ' chars)';
+}
+
+/* ── HTML escape ──────────────────────────────────────────────────────── */
+function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = String(s == null ? '' : s);
+    return d.innerHTML;
+}
+
+/* ── Storage read helpers ─────────────────────────────────────────────── */
+var KNOWN_LS_KEYS = [
+    'sg-vault-key',
+    'sg-vault-recent',
+    'sg-vault-recent:migrated-at',
+    'sg-vault-history',
+    'sg-vault-picker:credentials',
+    'sg-vault-access-key-saved'
+];
+var KNOWN_SS_KEYS = [
+    'sg-vault-access-key',
+    'sg-vault-creating',
+    'sg-vault-session',
+    'sg-vault-endpoint'
+];
+
+function lsGet(k)  { try { return localStorage.getItem(k);   } catch (_) { return null; } }
+function ssGet(k)  { try { return sessionStorage.getItem(k); } catch (_) { return null; } }
+function lsRemove(k) { try { localStorage.removeItem(k);   } catch (_) {} }
+function ssRemove(k) { try { sessionStorage.removeItem(k); } catch (_) {} }
+
+function parseJson(raw) {
+    try { return JSON.parse(raw); } catch (_) { return null; }
+}
+
+function timeAgo(ts) {
+    if (!ts) return '';
+    var s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60)    return s + 's ago';
+    if (s < 3600)  return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+}
+
+/* ── renderCurrentVault ───────────────────────────────────────────────── */
+function renderCurrentVault() {
+    var card  = document.getElementById('currentVaultCard');
+    var key   = lsGet('sg-vault-key') || '';
+    var fmt   = key ? detectFormat(key) : null;
+
+    if (!key) {
+        card.innerHTML = '<div class="pk-card--empty">No vault loaded — sg-vault-key is not set.</div>';
+        return;
+    }
+
+    var fmtLabel = fmt
+        ? '#' + fmt.format + ' · ' + fmt.kind + ' · ' + fmt.access
+        : '<span style="color:var(--err)">unrecognised format</span>';
+
+    var vaultIdHtml = '';
+    if (fmt) {
+        if (fmt.format === 2 || fmt.format === 3) {
+            vaultIdHtml = '<div class="pk-current__meta">vault_id (from key): ' +
+                '<code style="color:var(--teal)">' + esc(fmt.vaultId) + '</code></div>';
+        } else if (fmt.format === 4) {
+            vaultIdHtml = '<div class="pk-current__meta">vault_id: ' +
+                '<code style="color:var(--teal)">' + esc(fmt.vaultId) + '</code></div>';
+        } else if (fmt.format === 1) {
+            vaultIdHtml = '<div class="pk-current__meta" id="derivedVaultIdRow">vault_id (derived): ' +
+                '<span id="derivedVaultId" style="color:var(--muted);font-style:italic">computing…</span></div>';
+        }
+    }
+
+    card.innerHTML =
+        '<div class="pk-current">' +
+        '<div class="pk-current__key-row">' +
+            '<span class="pk-current__label">sg-vault-key</span>' +
+            '<span class="pk-current__value" id="currentKeyVal">' + esc(maskVaultKey(key)) + '</span>' +
+            '<div style="display:flex;gap:0.4rem">' +
+                '<button class="pk-btn" id="currentShowBtn" onclick="toggleCurrentKey()">Show</button>' +
+                '<button class="pk-btn" onclick="copyCurrentKey()">Copy</button>' +
+            '</div>' +
+        '</div>' +
+        '<div class="pk-current__meta">Detected format: ' + fmtLabel + '</div>' +
+        vaultIdHtml +
+        '<div class="pk-current__actions">' +
+            '<button class="pk-btn pk-btn--primary" onclick="location.assign(\'/en-gb/vault\')">Open vault →</button>' +
+            '<button class="pk-btn pk-btn--danger" onclick="clearCurrentKey()">Clear key</button>' +
+        '</div>' +
+        '</div>';
+
+    if (fmt && fmt.format === 1) {
+        deriveSimpleTokenVaultId(key).then(function (id) {
+            var el = document.getElementById('derivedVaultId');
+            if (el) el.innerHTML = '<code style="color:var(--teal)">' + esc(id) + '</code> <span style="color:var(--muted);font-size:0.68rem">(SHA-256[:12])</span>';
+        }).catch(function () {});
+    }
+}
+
+/* ── Current key interactions ─────────────────────────────────────────── */
+var _currentKeyRevealed = false;
+function toggleCurrentKey() {
+    var key = lsGet('sg-vault-key') || '';
+    var valEl = document.getElementById('currentKeyVal');
+    var btn   = document.getElementById('currentShowBtn');
+    if (!valEl || !btn) return;
+    _currentKeyRevealed = !_currentKeyRevealed;
+    valEl.textContent = _currentKeyRevealed ? key : maskVaultKey(key);
+    valEl.style.color = _currentKeyRevealed ? 'var(--text)' : 'var(--teal)';
+    btn.textContent   = _currentKeyRevealed ? 'Hide' : 'Show';
+}
+
+function copyCurrentKey() {
+    var key = lsGet('sg-vault-key') || '';
+    if (!key) return;
+    navigator.clipboard && navigator.clipboard.writeText(key).catch(function () {});
+}
+
+function clearCurrentKey() {
+    if (!confirm('Remove sg-vault-key from localStorage? The vault shell will show the entry form on next load.')) return;
+    lsRemove('sg-vault-key');
+    render();
+}
+
+/* ── renderLocalStorage ──────────────────────────────────────────────── */
+function renderLocalStorage() {
+    var card = document.getElementById('lsCard');
+    var rows = '';
+
+    /* Collect all LS keys */
+    var allKeys = [];
+    try {
+        for (var i = 0; i < localStorage.length; i++) {
+            allKeys.push(localStorage.key(i));
+        }
+    } catch (_) {}
+
+    var unknownKeys = allKeys.filter(function (k) { return KNOWN_LS_KEYS.indexOf(k) === -1; });
+    var hasAny = allKeys.length > 0;
+
+    if (!hasAny) {
+        card.innerHTML = '<div class="pk-card--empty">localStorage is empty.</div>';
+        return;
+    }
+
+    /* Known keys in defined order */
+    KNOWN_LS_KEYS.forEach(function (key) {
+        var raw = lsGet(key);
+        if (raw === null) return;
+
+        var valHtml = '';
+        var actHtml = '';
+
+        if (key === 'sg-vault-key') {
+            valHtml = '<span class="pk-row__val pk-row__val--teal">' + esc(maskVaultKey(raw)) + '</span>';
+            actHtml = '<button class="pk-btn" onclick="copyCurrentKey()">Copy</button>';
+        } else if (key === 'sg-vault-access-key-saved') {
+            valHtml = '<span class="pk-row__val pk-row__val--masked">' + esc(maskSecret(raw)) + '</span>';
+        } else if (key === 'sg-vault-recent:migrated-at') {
+            valHtml = '<span class="pk-row__val">' + esc(raw) + '</span>';
+        } else if (key === 'sg-vault-recent' || key === 'sg-vault-history' || key === 'sg-vault-picker:credentials') {
+            var isLegacy = (key === 'sg-vault-history' || key === 'sg-vault-picker:credentials');
+            var parsed   = parseJson(raw);
+            var count    = Array.isArray(parsed) ? parsed.length : '?';
+            var badge    = isLegacy ? '<span class="badge badge--legacy">legacy</span> ' : '';
+            var expandId = 'expand_' + key.replace(/[^a-z0-9]/g, '_');
+
+            valHtml = '<span class="pk-row__val">' + badge + count + ' entries ' +
+                '<button class="pk-btn" style="font-size:0.65rem" onclick="toggleExpand(\'' + expandId + '\')">▾ expand</button>' +
+                '</span>' +
+                '<div class="pk-expand" id="' + expandId + '">' +
+                buildListExpand(parsed, key) +
+                '</div>';
+
+            if (isLegacy) {
+                actHtml = '<button class="pk-btn pk-btn--danger" onclick="removeLsKey(\'' + esc(key) + '\')">Remove</button>';
+            }
+        }
+
+        if (!valHtml) {
+            valHtml = '<span class="pk-row__val">' + esc(raw.slice(0, 120)) + (raw.length > 120 ? '…' : '') + '</span>';
+        }
+
+        rows += '<div class="pk-row">' +
+            '<span class="pk-row__key">' + esc(key) + '</span>' +
+            '<div>' + valHtml + '</div>' +
+            '<div class="pk-row__actions">' + actHtml + '</div>' +
+            '</div>';
+    });
+
+    /* Unknown keys */
+    if (unknownKeys.length > 0) {
+        rows += '<div class="pk-row" style="grid-template-columns:1fr;background:var(--bg3)">' +
+            '<span style="font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">Other keys</span>' +
+            '</div>';
+        unknownKeys.forEach(function (key) {
+            var raw = lsGet(key);
+            rows += '<div class="pk-row">' +
+                '<span class="pk-row__key">' + esc(key) + '</span>' +
+                '<span class="pk-row__val pk-row__val--muted">' + esc((raw || '').slice(0, 80)) + ((raw || '').length > 80 ? '…' : '') + '</span>' +
+                '<div class="pk-row__actions"><button class="pk-btn pk-btn--danger" onclick="removeLsKey(\'' + esc(key) + '\')">Remove</button></div>' +
+                '</div>';
+        });
+    }
+
+    /* Footer buttons */
+    rows += '<div class="pk-row" style="grid-template-columns:1fr;justify-items:end;border-top:1px solid var(--border)">' +
+        '<div style="display:flex;gap:0.5rem">' +
+        '<button class="pk-btn" onclick="exportLs()">Export JSON</button>' +
+        '<button class="pk-btn pk-btn--danger" onclick="clearAllLs()">Clear all LS</button>' +
+        '</div></div>';
+
+    card.innerHTML = rows;
+}
+
+function buildListExpand(parsed, key) {
+    if (!Array.isArray(parsed) || parsed.length === 0) return '<div class="pk-expand__entry">empty</div>';
+    var isRecent  = (key === 'sg-vault-recent');
+    var isHistory = (key === 'sg-vault-history');
+    var isPicker  = (key === 'sg-vault-picker:credentials');
+    return parsed.map(function (e) {
+        var displayKey = isRecent || isHistory ? (e.key || '') : (e.vaultKey || '');
+        var displayName = isRecent || isHistory ? (e.name || '') : (e.vaultName || '');
+        var ts = isRecent || isHistory ? e.lastOpened : e.savedAt;
+        var fmt = isRecent ? (e.format ? ' · fmt #' + e.format : '') : '';
+        return '<div class="pk-expand__entry">' +
+            '<div><span class="pk-expand__entry-name">' + esc(displayName || displayKey) + '</span>' +
+            ' <span style="color:var(--muted);font-size:0.68rem">' + esc(maskVaultKey(displayKey)) + fmt + '</span></div>' +
+            '<span style="color:var(--muted)">' + timeAgo(ts) + '</span>' +
+            '</div>';
+    }).join('');
+}
+
+/* ── renderSessionStorage ────────────────────────────────────────────── */
+function renderSessionStorage() {
+    var card = document.getElementById('ssCard');
+    var rows = '';
+    var hasAny = false;
+
+    KNOWN_SS_KEYS.forEach(function (key) {
+        var raw = ssGet(key);
+        var val = raw !== null ? raw : '';
+        hasAny = hasAny || raw !== null;
+
+        var valHtml;
+        if (raw === null) {
+            valHtml = '<span class="pk-row__val pk-row__val--muted">(not set)</span>';
+        } else if (key === 'sg-vault-access-key' || key === 'sg-vault-session') {
+            valHtml = '<span class="pk-row__val pk-row__val--masked">' + esc(maskSecret(raw)) +
+                ' <button class="pk-btn" style="font-size:0.65rem" onclick="revealSs(\'' + key + '\',this)">Show</button></span>';
+        } else {
+            valHtml = '<span class="pk-row__val">' + esc(raw) + '</span>';
+        }
+
+        rows += '<div class="pk-row">' +
+            '<span class="pk-row__key">' + esc(key) + '</span>' +
+            '<div>' + valHtml + '</div>' +
+            '<div class="pk-row__actions">' +
+            (raw !== null ? '<button class="pk-btn pk-btn--danger" onclick="removeSsKey(\'' + esc(key) + '\')">Clear</button>' : '') +
+            '</div>' +
+            '</div>';
+    });
+
+    if (!hasAny) {
+        card.innerHTML = '<div class="pk-card--empty">sessionStorage is empty (normal if this tab has not opened a vault).</div>';
+        return;
+    }
+
+    card.innerHTML = rows;
+}
+
+/* ── renderRecent ────────────────────────────────────────────────────── */
+function renderRecent() {
+    var card = document.getElementById('recentCard');
+    var raw  = lsGet('sg-vault-recent');
+    var list = raw ? parseJson(raw) : null;
+
+    if (!Array.isArray(list) || list.length === 0) {
+        card.innerHTML = '<div class="pk-card--empty">sg-vault-recent is empty or not set.</div>';
+        return;
+    }
+
+    var currentKey = (lsGet('sg-vault-key') || '').trim();
+    var rows = '';
+
+    list.forEach(function (e, i) {
+        var isCurrent = e.key && e.key === currentKey;
+        var fmtBadge  = e.format ? '<span class="badge badge--fmt">fmt #' + e.format + '</span> ' : '';
+        var curBadge  = isCurrent ? '<span class="badge badge--current">current</span> ' : '';
+
+        rows += '<div class="pk-row">' +
+            '<span class="pk-row__key" style="color:var(--muted)">' + (i + 1) + '. ' + esc(maskVaultKey(e.key || '')) + '</span>' +
+            '<div>' +
+                '<span class="pk-row__val">' + curBadge + fmtBadge + esc(e.name || e.key || '') + '</span>' +
+                '<div style="font-size:0.7rem;color:var(--muted);margin-top:0.15rem">' + timeAgo(e.lastOpened) + '</div>' +
+            '</div>' +
+            '<div class="pk-row__actions">' +
+                '<button class="pk-btn pk-btn--danger" onclick="removeRecentEntry(' + i + ')">Remove</button>' +
+            '</div>' +
+            '</div>';
+    });
+
+    card.innerHTML = rows;
+}
+
+/* ── renderBuildInfo ─────────────────────────────────────────────────── */
+function renderBuildInfo() {
+    var el = document.getElementById('buildInfo');
+    var build = window.SGRAPH_BUILD;
+    var html = '';
+    if (build) {
+        html += '<div class="pk-routing__row"><span class="pk-routing__path">App version</span><span class="pk-routing__desc">' + esc(build.appVersion) + '</span></div>';
+        html += '<div class="pk-routing__row"><span class="pk-routing__path">UI version</span><span class="pk-routing__desc">' + esc(build.uiVersion) + '</span></div>';
+        html += '<div class="pk-routing__row"><span class="pk-routing__path">Build time</span><span class="pk-routing__desc">' + esc(build.buildTime) + '</span></div>';
+    } else {
+        html = '<span style="color:var(--muted);font-style:italic">Build info unavailable (local dev or CI not run).</span>';
+    }
+    el.innerHTML = html;
+}
+
+/* ── renderProbeEndpoint ──────────────────────────────────────────────── */
+function renderProbeEndpoint() {
+    var ep = ssGet('sg-vault-endpoint') || 'https://dev.send.sgraph.ai';
+    document.getElementById('probeEndpoint').textContent = ep;
+}
+
+/* ── Interactive helpers ──────────────────────────────────────────────── */
+window.toggleExpand = function (id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('open');
+};
+
+window.revealSs = function (key, btn) {
+    var raw = ssGet(key) || '';
+    var span = btn.parentElement;
+    span.textContent = raw;
+    span.className = 'pk-row__val';
+};
+
+window.removeLsKey = function (key) {
+    lsRemove(key);
+    render();
+};
+
+window.removeSsKey = function (key) {
+    ssRemove(key);
+    render();
+};
+
+window.removeRecentEntry = function (idx) {
+    var raw  = lsGet('sg-vault-recent');
+    var list = raw ? parseJson(raw) : [];
+    if (!Array.isArray(list)) return;
+    list.splice(idx, 1);
+    try { localStorage.setItem('sg-vault-recent', JSON.stringify(list)); } catch (_) {}
+    render();
+};
+
+window.clearCurrentKey = clearCurrentKey;
+
+window.clearAllLs = function () {
+    if (!confirm('Clear ALL localStorage entries? This removes the current vault key and recent list.')) return;
+    try { localStorage.clear(); } catch (_) {}
+    render();
+};
+
+window.clearAllState = function () {
+    if (!confirm('Clear ALL vault-related localStorage and sessionStorage? This signs you out of all vaults.')) return;
+    KNOWN_LS_KEYS.forEach(lsRemove);
+    KNOWN_SS_KEYS.forEach(ssRemove);
+    render();
+};
+
+window.exportLs = function () {
+    var snapshot = {};
+    try {
+        for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            snapshot[k] = localStorage.getItem(k);
+        }
+    } catch (_) {}
+    var blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.download = 'sg-vault-localstorage.json'; a.click();
+    URL.revokeObjectURL(url);
+};
+
+/* ── Inspect ─────────────────────────────────────────────────────────── */
+window.runInspect = function () {
+    var input  = document.getElementById('inspectInput').value.trim();
+    var result = document.getElementById('inspectResult');
+
+    if (!input) {
+        result.className = 'pk-inspect__result pk-inspect__result--empty';
+        result.textContent = 'Paste a vault key above and click Inspect.';
+        return;
+    }
+
+    var fmt = detectFormat(input);
+    result.className = 'pk-inspect__result';
+
+    if (!fmt) {
+        result.innerHTML = '<span style="color:var(--err)">✗ Unrecognised format.</span> ' +
+            'Expected: <code>word-word-NNNN</code>, <code>passphrase:vault_id</code>, ' +
+            'or <code>vault_id&nbsp;64hex_read_key</code>.';
+        return;
+    }
+
+    var html = '<strong style="color:var(--teal)">#' + fmt.format + ' · ' + esc(fmt.kind) + '</strong>' +
+        ' <span style="color:var(--muted)">(' + esc(fmt.access) + ')</span><br>';
+
+    if (fmt.vaultId) {
+        html += 'vault_id: <code style="color:var(--teal)">' + esc(fmt.vaultId) + '</code><br>';
+    }
+    if (fmt.passphrase) {
+        html += 'passphrase: <code style="color:var(--muted)">' + esc(maskVaultKey(fmt.passphrase)) +
+            '</code> (' + fmt.passphrase.length + ' chars)<br>';
+    }
+    if (fmt.readKeyHex) {
+        html += 'read_key (hex): <code style="color:var(--muted)">' + esc(fmt.readKeyHex.slice(0,8) + '…') +
+            '</code> (64 chars)<br>';
+    }
+
+    if (fmt.format === 1) {
+        html += '<span id="derivedIdLine" style="color:var(--muted)">vault_id: computing…</span>';
+        result.innerHTML = html;
+        deriveSimpleTokenVaultId(fmt.passphrase).then(function (id) {
+            var el = document.getElementById('derivedIdLine');
+            if (el) el.innerHTML = 'vault_id (derived): <code style="color:var(--teal)">' + esc(id) + '</code> <span style="color:var(--muted);font-size:0.7rem">(SHA-256[:12])</span>';
+        }).catch(function () {});
+        return;
+    }
+
+    result.innerHTML = html;
+};
+
+window.clearInspect = function () {
+    document.getElementById('inspectInput').value = '';
+    var result = document.getElementById('inspectResult');
+    result.className = 'pk-inspect__result pk-inspect__result--empty';
+    result.textContent = 'Paste a vault key above and click Inspect.';
+};
+
+document.getElementById('inspectInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') window.runInspect();
+});
+
+/* ── Server probe ────────────────────────────────────────────────────── */
+window.runProbe = function () {
+    var ep        = ssGet('sg-vault-endpoint') || 'https://dev.send.sgraph.ai';
+    var key       = lsGet('sg-vault-key') || '';
+    var existsEl  = document.getElementById('probeExists');
+
+    if (!key) {
+        existsEl.innerHTML = '<span style="color:var(--muted);font-style:italic">No vault key set — cannot probe.</span>';
+        return;
+    }
+
+    var fmt = detectFormat(key);
+    if (!fmt || !fmt.vaultId && fmt.format !== 1) {
+        existsEl.textContent = 'Cannot derive vault_id from current key format.';
+        return;
+    }
+
+    existsEl.innerHTML = '<span style="color:var(--muted);font-style:italic">Probing…</span>';
+
+    function probe(vaultId) {
+        fetch(ep + '/api/v1/vault/' + encodeURIComponent(vaultId) + '/exists', {
+            method: 'HEAD', mode: 'cors'
+        }).then(function (r) {
+            if (r.ok || r.status === 200 || r.status === 204) {
+                existsEl.innerHTML = '<span style="color:var(--teal)">✓ exists</span> ' +
+                    '<span style="color:var(--muted);font-size:0.75rem">vault_id: ' + esc(vaultId) + '</span>';
+            } else if (r.status === 404) {
+                existsEl.innerHTML = '<span style="color:var(--warn)">✗ 404 not found</span> ' +
+                    '<span style="color:var(--muted);font-size:0.75rem">vault_id: ' + esc(vaultId) + '</span>';
+            } else {
+                existsEl.textContent = 'HTTP ' + r.status + ' (vault_id: ' + vaultId + ')';
+            }
+        }).catch(function (err) {
+            existsEl.textContent = 'Fetch error: ' + (err.message || err);
+        });
+    }
+
+    if (fmt.vaultId) {
+        probe(fmt.vaultId);
+    } else {
+        // Format 1: derive vault_id first
+        deriveSimpleTokenVaultId(key).then(function (id) { probe(id); });
+    }
+};
+
+/* ── Full render ─────────────────────────────────────────────────────── */
+function render() {
+    renderCurrentVault();
+    renderLocalStorage();
+    renderSessionStorage();
+    renderRecent();
+    renderBuildInfo();
+    renderProbeEndpoint();
+}
+
+/* ── Expose to onclick handlers outside the IIFE ───────────────────── */
+window.toggleCurrentKey = toggleCurrentKey;
+window.copyCurrentKey   = copyCurrentKey;
+window.clearCurrentKey  = clearCurrentKey;
+
+/* ── Boot ────────────────────────────────────────────────────────────── */
+render();
+
+}());
+</script>
+</body>
+</html>

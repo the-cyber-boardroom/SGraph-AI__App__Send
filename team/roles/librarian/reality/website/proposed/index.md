@@ -1,6 +1,6 @@
 # website/proposed — Index
 
-**Domain:** `website/` | **Last updated:** 2026-04-28
+**Domain:** `website/` | **Last updated:** 2026-05-17
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16 (lines 1480–1509), 17 (lines 1516–1543), 19 (lines 1640–1738)
 
 ---
@@ -67,3 +67,42 @@ Vocabulary alignment for investor vs. user audiences. PROPOSED — partially del
 redesign shipped; subhead not yet decided).
 
 *Full source: `../v0.16.26__what-exists-today.md` Sections 16–17 (lines 1480–1543), 19 (lines 1640–1738)*
+
+---
+
+## Agentic Newsroom / Publishing Products (05/12 briefs — docs 372, 378, 379, 380, 381)
+
+### Newsroom Layout (doc 372)
+
+| Proposed Feature | Status |
+|-----------------|--------|
+| 15 visible newsroom departments (inbox → corrections) | PROPOSED — does not exist yet |
+| Provenance pages per story (production history, AI contributions) | PROPOSED — does not exist yet |
+| Live newsroom view (current pipeline status) | PROPOSED — does not exist yet |
+| Cost tracking per story | PROPOSED — does not exist yet |
+| Department pages showing recent work | PROPOSED — does not exist yet |
+
+### CV / Portfolio Products (doc 379)
+
+| Proposed Feature | Status |
+|-----------------|--------|
+| `cv.sgraph.app` — hosted CV product | PROPOSED — does not exist yet |
+| `portfolio.sgraph.app` — hosted portfolio product | PROPOSED — does not exist yet |
+| Onboarding interview agent (builds first CV version) | PROPOSED — does not exist yet |
+| CV/portfolio starter templates | PROPOSED — does not exist yet |
+| Agency white-label dashboard (4th pricing tier) | PROPOSED — does not exist yet |
+
+### Portugal Bilingual GenAI Publication (docs 380, 381)
+
+| Proposed Feature | Status |
+|-----------------|--------|
+| Bilingual (PT+EN) vault-driven publication | PROPOSED — does not exist yet |
+| Portuguese GenAI ecosystem knowledge graph | PROPOSED — does not exist yet |
+| Daily publication cadence with agent + human review | PROPOSED — does not exist yet |
+| Knowledge graph infographics (ecosystem map, funding flows, talent graph) | PROPOSED — does not exist yet |
+
+## UI Proposed Items (05/12 brief — doc 377)
+
+| Proposed Feature | Status |
+|-----------------|--------|
+| `<sg-video>` Web Component for encrypted vault video playback | PROPOSED — does not exist yet; cipher mode research required |

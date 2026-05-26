@@ -51,15 +51,22 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION  : eu-west-2
-  UI_VERSION  : v0.2.0
-  SOURCE_DIR  : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.0
+  AWS_REGION        : eu-west-2
+  UI_VERSION        : v0.2.3
+  SOURCE_DIR        : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3
 
 jobs:
+  # Gate: vault UI tests must pass before deploy runs.
+  # Same reusable workflow as test-ui-vault.yml so the deploy gate cannot drift
+  # apart from the standalone CI signal.
+  tests:
+    uses: ./.github/workflows/_test-ui-vault.yml
+
   deploy:
     name: "Publish Vault UI to S3 + CloudFront (${{ inputs.environment || github.ref_name || 'dev' }})"
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: tests
     environment: ${{ inputs.environment || (github.ref_name == 'main' && 'main') || 'dev' }}
 
     steps:
@@ -73,6 +80,18 @@ jobs:
 
       - name: Generate i18n locale pages
         run: python scripts/generate_vault_i18n_pages.py --version ${{ env.UI_VERSION }}
+
+      - name: Generate en-gb/vault/index.html (vault shell at clean /en-gb/vault URL)
+        # history.replaceState sets the URL to /en-gb/vault after a vault opens.
+        # S3 needs a real file there so a page refresh doesn't 404.
+        # Generated from root index.html with _common/ paths made root-absolute
+        # so assets resolve correctly from two directories deep.
+        run: |
+          mkdir -p ${{ env.SOURCE_DIR }}/en-gb/vault
+          sed -e 's|href="_common/|href="/_common/|g' \
+              -e 's|src="_common/|src="/_common/|g' \
+              "${{ env.SOURCE_DIR }}/index.html" > "${{ env.SOURCE_DIR }}/en-gb/vault/index.html"
+          echo "Generated en-gb/vault/index.html"
 
       - name: Check AWS credentials
         id: check-creds

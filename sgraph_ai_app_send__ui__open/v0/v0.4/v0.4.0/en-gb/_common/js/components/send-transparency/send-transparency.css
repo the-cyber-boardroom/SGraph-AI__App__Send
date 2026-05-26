@@ -1,0 +1,66 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   SGraph Send — Transparency Panel Styles
+   v0.2.0 — Aurora dark theme
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.transparency {
+    margin-top: var(--space-6, 1.5rem);
+    padding: var(--space-4, 1rem) var(--space-6, 1.5rem);
+    background: var(--bg-secondary, #16213E);
+    border: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    border-radius: var(--radius-md, 12px);
+}
+
+.transparency__title {
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--accent, #4ECDC4);
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.transparency__section-label {
+    text-transform: uppercase;
+    font-size: var(--text-micro, 0.625rem);
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary, #8892A0);
+    margin-top: var(--space-3, 0.75rem);
+    margin-bottom: var(--space-1, 0.25rem);
+}
+
+.transparency__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: var(--space-1, 4px) 0;
+    gap: var(--space-2, 8px);
+}
+
+.transparency__label {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--color-text-secondary, #8892A0);
+}
+
+.transparency__value {
+    font-size: var(--text-sm, 0.875rem);
+    font-family: var(--font-mono, monospace);
+    color: var(--color-text, #E0E0E0);
+    text-align: right;
+}
+
+.transparency__value--encrypted {
+    color: var(--accent, #4ECDC4);
+}
+
+.transparency__value--not-stored {
+    color: var(--color-text-secondary, #8892A0);
+    font-style: italic;
+}
+
+.transparency__footer {
+    margin-top: var(--space-3, 0.75rem);
+    padding-top: var(--space-3, 0.75rem);
+    border-top: 1px solid var(--color-border, rgba(78, 205, 196, 0.15));
+    font-size: var(--text-small, 0.8rem);
+    color: var(--color-text-secondary, #8892A0);
+    font-style: italic;
+}
