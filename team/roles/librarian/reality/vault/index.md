@@ -106,6 +106,8 @@ Key proposals for this domain. Full details: see sub-files in `proposed/`.
 - **PKI Modes 2–4** — device provenance, author-identified, countersigned (Mode 1 exists) → `proposed/pki-modes.md`
 - **Vault migration / multi-remote** — pull from multiple remotes, migration tooling → `proposed/multi-remote.md`
 - **Named branch private key re-keying** — move from `read_key` to `write_key` (deferred, low current impact) → `proposed/structure-key-split.md`
+- **P-227: Vault-per-user as SG/Send storage substrate** — PROPOSED: one vault per user for SG/Send; SG/Sentinel rules write user activity to their vault; removes backend complexity; zero-knowledge nuance preserved (activity visible, content unseen). Requires SG/Sentinel deployed. Source: doc 468, 05/24 briefs.
+- **P-231: Vaults within vaults** — PROPOSED: open + create child vaults from inside a parent vault in the vault browser; parent/admin vault reads referenced children; fractal vault-of-vaults operational; no backend changes; respects zero-knowledge model. Client-side UI feature. Source: doc 472, 05/24 briefs.
 
 ---
 
