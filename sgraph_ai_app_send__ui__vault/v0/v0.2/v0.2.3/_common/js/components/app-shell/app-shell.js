@@ -318,18 +318,25 @@
         }
 
         async _continue(appJson) {
+            // A specific file was requested ("Open as App" on a file, via /#key|app:path or the
+            // legacy /en-gb/app#path) — honour it OVER the vault's default app. Previously the
+            // deep-link was only read in the no-app.json branch, so any vault WITH an app.json
+            // always opened its default entry and the requested file was silently dropped.
+            var deepLink = '';
+            try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
+            try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+            var deepPath = deepLink.indexOf('app:') === 0 ? deepLink.slice(4) : '';
+
+            // Exception: if the requested file IS the app.json entry, fall through to the full app
+            // mount so its declared resources (css/js) load — not the bare file.
+            if (deepPath && !(appJson && appJson.entry && deepPath === appJson.entry)) {
+                await this._mountVaultFile(deepPath);
+                return;
+            }
+
             if (!appJson) {
-                // No app.json — check if a file path was given (from /en-gb/app#path).
-                // If so, render that file directly here; do NOT redirect to /en-gb/vault/.
+                // No default app and no file path — open the vault UI.
                 // App Mode lives on /en-gb/app, not on the vault page.
-                var deepLink = '';
-                try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
-                try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
-                if (deepLink.startsWith('app:')) {
-                    await this._mountVaultFile(deepLink.slice(4));
-                    return;
-                }
-                // No file path either — open the vault UI
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;

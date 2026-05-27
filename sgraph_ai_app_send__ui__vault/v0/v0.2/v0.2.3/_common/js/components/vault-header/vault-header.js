@@ -357,8 +357,12 @@
 
         _openApp() {
             if (!this._appVaultKey) return;
+            // Route through the root hash inbox (/#key): it saves the key to localStorage and
+            // redirects to /en-gb/app, which auto-mounts the vault's default app. Do NOT use
+            // /en-gb/app#key — that hash is now read as a FILE PATH, not a vault key, so the key
+            // would be misread as a deep-link file (see vault-loader-routing.js).
             const base = window.location.pathname.split('/en-gb/')[0];
-            window.location.assign(base + '/en-gb/app#' + this._appVaultKey);
+            window.location.assign(base + '/#' + this._appVaultKey);
         }
     }
 
