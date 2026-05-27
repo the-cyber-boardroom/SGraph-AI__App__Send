@@ -679,6 +679,61 @@
             return next;
         }
 
+        // ── Vault lifecycle helpers (vault.create / vault.unlink) ───────────────────────
+        // High-entropy passphrase that NEVER matches the simple-token shape ^[a-z]+-[a-z]+-\d{4}$,
+        // so SGVault.open derives via the strong PBKDF2 path (proper vault key, never a simple token).
+        _genVaultPassphrase() {
+            var b = crypto.getRandomValues(new Uint8Array(20)), s = '';
+            for (var i = 0; i < b.length; i++) s += b[i].toString(36);
+            return 'k' + s;
+        }
+        _genRefId() {
+            var b = crypto.getRandomValues(new Uint8Array(6)), hex = '';
+            for (var i = 0; i < b.length; i++) hex += b[i].toString(16).padStart(2, '0');
+            return 'lk-' + hex;
+        }
+        _slugify(label) {
+            var s = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            return s || ('link-' + Math.random().toString(36).slice(2, 8));
+        }
+
+        // Create a new child vault and wire it into folder `path` as a read-through sub-vault:
+        // keyless <slug>.link.json in the tree + a portable read-only owner record (read_key tier).
+        // Mirrors the host "Add link" flow (vault-browse-edit _showAddLink). v1 = read-through only.
+        async _createChildVault(path, label) {
+            var parentVault = this._vault;
+            var sgSend = parentVault && parentVault._sgSend;
+            if (!sgSend || typeof SGVault === 'undefined' || typeof VaultLinks === 'undefined') throw new Error('Cannot create vaults here');
+            var child   = await SGVault.create(sgSend, this._genVaultPassphrase(), { name: label });   // proper-vault-key derivation
+            var vaultId = child._vaultId;
+            var refId   = this._genRefId();
+
+            var dir = path ? ('/' + path) : '/';
+            if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
+            var fileName = this._slugify(label) + '.link.json';
+            var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
+            await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+
+            var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
+            var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
+                           read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
+            await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
+            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+            return { vault_id: vaultId, ref_id: refId, ref_file_id: child._refFileId };
+        }
+
+        // Remove a sub-vault pointer (the <name>.link.json). The child vault stays on the server
+        // (reversible). The orphaned read-tier owner record is harmless and left in place.
+        async _unlinkChildVault(path) {
+            var norm  = AppPermissions.normalizePath(path);
+            var slash = norm.lastIndexOf('/');
+            var dir   = slash > 0 ? '/' + norm.slice(0, slash) : '/';
+            var name  = norm.slice(slash + 1);
+            await this._dataSource.deleteFile(dir, name);
+            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+            return { unlinked: true };
+        }
+
         // Clear this app's cached consents for the current vault (HUD permissions panel "reset").
         _resetConsents() {
             var prefix = 'sg-app-grant:' + ((this._vault && this._vault._vaultId) || this._vaultKey || '') + ':' + (this._appId || '') + ':';
@@ -1220,6 +1275,12 @@
                       'delete:function(path){return _sgCmd("fs",{action:"delete",path:path});},' +
                       'mkdir:function(path){return _sgCmd("fs",{action:"mkdir",path:path});}' +
                     '},' +
+                    // sg.vault.* — create a child vault in a folder (read-through), unlink, delete
+                    'vault:{' +
+                      'create:function(path,label){return _sgCmd("vault",{action:"create",path:path,label:label});},' +
+                      'unlink:function(path){return _sgCmd("vault",{action:"unlink",path:path});},' +
+                      'delete:function(path){return _sgCmd("vault",{action:"delete",path:path});}' +
+                    '},' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
                     // sg.history.* — read past commits / trees / blobs (read-only)
                     'history:{' +
@@ -1561,6 +1622,42 @@
                             return;
                         }
                         cmdReply(false, null, 'Unsupported ui action: ' + uiAct);
+                        return;
+                    }
+
+                    // ── vault lifecycle (create / unlink / delete) ────────────────
+                    if (e.data.__sgCmdType === 'vault') {
+                        var vAct  = e.data.action;
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY
+                        var vPath = AppPermissions.normalizePath(e.data.path || '');
+                        if (vAct === 'create') {
+                            var vLabel = String(e.data.label || 'vault');
+                            if (!self._can('vault.create', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.create', vPath).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'ECONSENT' }); return; }
+                                return self._createChildVault(vPath, vLabel).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.create', { path: vPath, ok: true, vault_id: res.vault_id });
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'unlink') {
+                            if (!self._can('vault.unlink', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.unlink', { path: vPath, ok: false, err: 'EPERM' }); return; }
+                            self._unlinkChildVault(vPath)
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unlink', { path: vPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unlink', { path: vPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'delete') {
+                            // Server-side destroy needs the child WRITE key. There is no owner-secret
+                            // tier to store it (ro-links.json is read-tier, readable by parent readers),
+                            // so a secure implementation requires a new owner-secret credential store +
+                            // AppSec sign-off on the destructive endpoint. Deferred — Phase 5.
+                            cmdReply(false, null, 'vault.delete not yet available (needs owner-secret credential store + AppSec sign-off)');
+                            self._emitBridgeCall('vault.delete', { path: vPath, ok: false, err: 'ENOTIMPL' });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported vault action: ' + vAct);
                         return;
                     }
 
