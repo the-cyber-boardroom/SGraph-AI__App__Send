@@ -886,7 +886,7 @@
                 '<script>' + pathHelpers   + '<\/script>' +
                 '<script>' + plrJs         + '<\/script>' +
                 '<script>(function(){' +
-                  'var fileList=' + JSON.stringify(fileList) + ';' +
+                  'var fileList=' + JSON.stringify(fileList.filter(function (f) { return !AppPermissions.hasVaultSegment(f.path); })) + ';' +
                   'var folderPath=' + JSON.stringify(folderPath) + ';' +
                   'var entryPath=' + JSON.stringify(entry.path) + ';' +
                   'var objectUrls=[];' +
@@ -1292,6 +1292,7 @@
                 if (e.data.__sgVfsNavReq) {
                     var navHref     = e.data.__sgVfsNavReq;
                     var navResolved = self._resolvePath(self._htmlDir, navHref);
+                    if (AppPermissions.isFloor('read', navResolved)) { console.warn('[app-shell] nav blocked (protected path):', navResolved); return; }
                     var navMatch    = self._findEntry(fileList, navResolved);
                     if (!navMatch) { console.warn('[app-shell] nav not found:', navResolved); return; }
                     dataSource.getFileBytes(navMatch.path).then(function (buf) {
@@ -1327,6 +1328,7 @@
                     } catch (_) { wReply(false, { err: 'Bad encoding' }); return; }
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
+                    if (AppPermissions.isFloor('write', wResolved)) { wReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPROTECTED' }); return; }
                     var wSlash    = wResolved.lastIndexOf('/');
                     var wDir      = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                     var wFile     = wResolved.slice(wSlash + 1);
@@ -1348,8 +1350,10 @@
                 if (e.data.__sgVfsListReq) {
                     var listId  = e.data.__sgVfsListReq;
                     var prefix  = (e.data.path || '').replace(/^\//, '');
+                    // Floor: never reveal .vault/** — reject a direct list of it (no existence oracle).
+                    if (AppPermissions.hasVaultSegment(prefix)) { try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {} return; }
                     compositeReady.then(function () { return prefix ? ensureMountOpen(prefix) : null; }).then(function () {
-                        var entries = dataSource.getFileList();   // re-read: now includes any opened mount's files
+                        var entries = dataSource.getFileList().filter(function (f) { return !AppPermissions.hasVaultSegment(f.path); });   // floor: hide .vault/** entries
                         if (prefix) {
                             var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
                             var filtered = entries.filter(function (f) {
@@ -1379,6 +1383,7 @@
                     }
                     var rPath     = e.data.path || '';
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
+                    if (AppPermissions.isFloor('read', rResolved)) { rReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPROTECTED' }); return; }
                     compositeReady.then(function () { return ensureMountOpen(rResolved); }).then(function () {
                         var rMatch = self._findEntryStrict(dataSource.getFileList(), rResolved);
                         if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
