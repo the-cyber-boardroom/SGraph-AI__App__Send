@@ -115,34 +115,24 @@
 
     // --- openROToken(roToken, opts) → Promise<{ vault, vaultKey }> -----------------
     // Format 5 open path. Resolves ro-word-word-NNNN via the transfers API:
-    //   1. GET /api/transfers/check-token/{token} → { ciphertext }
+    //   1. Derive a deterministic transfer-id from the token, GET /download/{id} → bytes
     //   2. Decrypt with token as PBKDF2 passphrase → { vault_id, read_key, ref_file_id }
     //   3. SGVault.openReadOnly(sgSend, vault_id, read_key, ref_file_id)
 
     async function openROToken(roToken, opts) {
         opts = opts || {};
         var endpoint  = opts.endpoint  || VaultLoaderStorage.getEndpoint();
-        var accessKey = opts.accessKey || VaultLoaderStorage.getAccessKey() || '';
-        var headers   = {};
-        if (accessKey) headers['x-sgraph-access-token'] = accessKey;
 
-        var resp = await fetch(
-            endpoint + '/api/transfers/check-token/' + encodeURIComponent(roToken),
-            { headers: headers }
-        );
+        var transferId = await SGVaultCrypto.deriveRoTokenTransferId(roToken);
+        var resp = await fetch(endpoint + '/api/transfers/download/' + encodeURIComponent(transferId));
         if (!resp.ok) {
-            var err = new Error('Token check failed: HTTP ' + resp.status);
+            var err = new Error('RO token not found or expired (HTTP ' + resp.status + ')');
             _emit(VaultLoaderEvents.VAULT_OPEN_FAILED, { error: err, vaultKey: 'ro-' + roToken });
             throw err;
         }
-        var data = await resp.json();
-        if (!data || !data.ciphertext) {
-            var err2 = new Error('RO token resolved but server returned no ciphertext payload');
-            _emit(VaultLoaderEvents.VAULT_OPEN_FAILED, { error: err2, vaultKey: 'ro-' + roToken });
-            throw err2;
-        }
-
-        var payloadBytes = await _decryptROPayload(roToken, data.ciphertext);
+        var cipherBytes  = new Uint8Array(await resp.arrayBuffer());
+        var cipherBase64 = btoa(String.fromCharCode.apply(null, cipherBytes));
+        var payloadBytes = await _decryptROPayload(roToken, cipherBase64);
         var payload = JSON.parse(new TextDecoder().decode(payloadBytes));
 
         var vaultId   = payload.vault_id;

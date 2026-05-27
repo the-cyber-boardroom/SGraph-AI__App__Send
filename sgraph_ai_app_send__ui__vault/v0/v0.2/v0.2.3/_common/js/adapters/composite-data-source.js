@@ -31,7 +31,8 @@ class CompositeDataSource {
         this._keyProvider   = opts.keyProvider || null;        // async (mount) -> key|null
         this._vaultOpener   = opts.vaultOpener   || _defaultVaultOpener(rootDataSource);    // full key  → SGVault.open
         this._vaultOpenerRO = opts.vaultOpenerRO || _defaultVaultOpenerRO(rootDataSource);  // ro record → SGVault.openReadOnly
-        this._mounts      = new Map();                          // mountPath -> mount
+        this._mounts      = new Map();                          // mountPath -> mount (vault sub-vaults)
+        this._resources   = new Map();                          // linkPath  -> resource (external embeds)
         this.onTreeChanged = null;
 
         // Re-scan + bubble when the root vault tree changes (e.g. a link file added)
@@ -46,29 +47,43 @@ class CompositeDataSource {
     get _accessKey()  { return this._root._accessKey; }
     set _accessKey(v) { this._root._accessKey = v; }
 
-    // ── Scan the root for *.link.json (type vault) → register mounts ─────────
+    // ── Scan the root for *.link.json → register vault mounts + external resources ──
     async scan() {
         const next = new Map();
+        const resources = new Map();
         const list = this._root.getFileList();
         for (const e of list) {
             if (e.dir || !VaultLinks.isLinkFile(e.path)) continue;
             let link = null;
             try { link = VaultLinks.parseLinkFile(await this._root.getFileBytes(e.path)); }
             catch (_) { link = null; }
-            if (!link || !VaultLinks.isVaultLink(link)) continue;   // Phase 0: vault links only
-            const mountPath = VaultLinks.mountPathFor(e.path);
-            const prev = this._mounts.get(mountPath);
-            next.set(mountPath, prev && prev.linkPath === e.path ? prev : {
-                linkPath: e.path,
-                mountPath: mountPath,
-                nodeName: mountPath.split('/').pop(),
-                link: link,
-                status: 'collapsed',   // collapsed | mounted | locked | error
-                access: 'ro',
-                child: null, vault: null, error: null
-            });
+            if (!link) continue;
+            if (VaultLinks.isVaultLink(link)) {
+                const mountPath = VaultLinks.mountPathFor(e.path);
+                const prev = this._mounts.get(mountPath);
+                next.set(mountPath, prev && prev.linkPath === e.path ? prev : {
+                    linkPath: e.path,
+                    mountPath: mountPath,
+                    nodeName: mountPath.split('/').pop(),
+                    link: link,
+                    status: 'collapsed',   // collapsed | mounted | locked | error
+                    access: 'ro',
+                    child: null, vault: null, error: null
+                });
+            } else if (VaultLinks.isResourceLink(link) && link.url) {
+                const det = VaultLinks.detectResourceType(link.url);
+                resources.set(e.path, {
+                    linkPath: e.path,
+                    nodeName: VaultLinks.mountLabel(e.path, link),
+                    type:     link.type || det.type,
+                    provider: link.provider || det.provider || null,
+                    url:      link.url,
+                    label:    VaultLinks.mountLabel(e.path, link)
+                });
+            }
         }
-        this._mounts = next;
+        this._mounts    = next;
+        this._resources = resources;
         return this;
     }
 
@@ -76,6 +91,10 @@ class CompositeDataSource {
         const norm = String(path).replace(/^\//, '');
         for (const m of this._mounts.values()) if (m.linkPath === norm) return m;
         return null;
+    }
+    _resourceByLinkPath(path) {
+        const norm = String(path).replace(/^\//, '');
+        return this._resources.get(norm) || null;
     }
     _mountForPath(path) {
         const norm = String(path).replace(/^\//, '');
@@ -92,8 +111,12 @@ class CompositeDataSource {
         const out = { name: node.name, children: {}, files: [] };
         for (const f of (node.files || [])) {
             const m = this._mountByLinkPath(f.path);
-            if (m) out.children[m.nodeName] = this._mountTreeNode(m);
-            else   out.files.push(f);
+            const r = m ? null : this._resourceByLinkPath(f.path);
+            if (m)      out.children[m.nodeName] = this._mountTreeNode(m);   // sub-vault → folder
+            else if (r) out.files.push({ path: f.path, name: r.label, dir: false, size: 0,
+                                         _resource: true, _resourceType: r.type, _url: r.url,
+                                         _provider: r.provider, _label: r.label });            // external resource → leaf
+            else        out.files.push(f);
         }
         for (const [name, child] of Object.entries(node.children || {})) {
             out.children[name] = this._spliceNode(child);
@@ -104,12 +127,12 @@ class CompositeDataSource {
     _mountTreeNode(m) {
         if (m.status === 'mounted' && m.child) {
             const pfx = this._prefixTree(m.child.getTree(), m.mountPath);
-            return { name: m.nodeName, _subvault: true, _access: m.access,
+            return { name: m.nodeName, _subvault: true, _access: m.access, _linkPath: m.linkPath,
                      children: pfx.children, files: pfx.files };
         }
         // collapsed / locked / error → lazy, empty node (send-browse loads on expand)
         return { name: m.nodeName, _subvault: true, _lazy: true,
-                 _folderPath: '/' + m.mountPath, _access: m.access,
+                 _folderPath: '/' + m.mountPath, _access: m.access, _linkPath: m.linkPath,
                  children: {}, files: [] };
     }
 
@@ -125,7 +148,7 @@ class CompositeDataSource {
     getFileList() {
         const out = [];
         for (const e of this._root.getFileList()) {
-            if (this._mountByLinkPath(e.path)) continue;   // hide the raw link file
+            if (this._mountByLinkPath(e.path) || this._resourceByLinkPath(e.path)) continue;   // hide raw link files
             out.push(e);
         }
         for (const m of this._mounts.values()) {
@@ -141,12 +164,20 @@ class CompositeDataSource {
     }
 
     // ── Required: file bytes (route mounted paths to the child) ──────────────
+    // Transparency: a read of a path under a sub-vault AUTO-OPENS that sub-vault (read-only,
+    // using a stored ro-record / device key — no prompt here). So an app can `sg.vfs.read` an
+    // inner-vault file by path without the user first expanding it. If no key is available the
+    // mount stays locked and the read falls through to the root (→ ENOENT), preserving the
+    // zero-knowledge boundary.
     async getFileBytes(path) {
         const norm = String(path).replace(/^\//, '');
         const m = this._mountForPath(norm);
-        if (m && m.status === 'mounted' && m.child) {
-            const rel = norm === m.mountPath ? '' : norm.slice(m.mountPath.length + 1);
-            return m.child.getFileBytes(rel);
+        if (m) {
+            if (m.status !== 'mounted') { try { await this._openMount(m); } catch (_) { /* locked / no key */ } }
+            if (m.status === 'mounted' && m.child) {
+                const rel = norm === m.mountPath ? '' : norm.slice(m.mountPath.length + 1);
+                return m.child.getFileBytes(rel);
+            }
         }
         return this._root.getFileBytes(path);
     }

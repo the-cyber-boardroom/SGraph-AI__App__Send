@@ -115,6 +115,16 @@ function makeFakeVault(writable) {
     eq('effectiveLink: read_key from record only', eff.read_key, 'rk');
     eq('effectiveLink: type resolves to vault', eff.type, 'vault');
 
+    // 8. external resources — type detection + isResourceLink
+    eq('detect: youtube → video/youtube', VaultLinks.detectResourceType('https://youtu.be/abc123'), { type: 'video', provider: 'youtube' });
+    eq('detect: youtube.com/watch', VaultLinks.detectResourceType('https://www.youtube.com/watch?v=abc'), { type: 'video', provider: 'youtube' });
+    eq('detect: .png → image', VaultLinks.detectResourceType('https://x.example/logo.PNG'), { type: 'image', provider: null });
+    eq('detect: .mp4 → video file', VaultLinks.detectResourceType('https://x.example/clip.mp4'), { type: 'video', provider: null });
+    eq('detect: web page → link', VaultLinks.detectResourceType('https://clinic.example.com/info'), { type: 'link', provider: null });
+    ok('isResourceLink: video link', VaultLinks.isResourceLink({ ref_id: 'r', type: 'video', url: 'https://youtu.be/x' }) === true);
+    ok('isResourceLink: url-only link', VaultLinks.isResourceLink({ ref_id: 'r', url: 'https://x' }) === true);
+    ok('isResourceLink: a vault is NOT a resource', VaultLinks.isResourceLink({ ref_id: 'r', vault_id: 'v' }) === false);
+
     console.log('  ' + pass + ' pass, ' + fail + ' fail\n');
     process.exit(fail === 0 ? 0 : 1);
 })();

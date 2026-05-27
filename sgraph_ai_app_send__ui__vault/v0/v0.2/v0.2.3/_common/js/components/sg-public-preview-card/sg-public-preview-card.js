@@ -118,9 +118,10 @@
                 <h2 class="pvp-klabel">🔑 Enter the vault key to open the contents</h2>
                 <form class="pvp-keyform">
                     <input id="pvpk" class="pvp-keyinput" type="text" autocomplete="off"
-                           placeholder="passphrase:vaultId  or  read-key…" aria-describedby="pvperr">
+                           placeholder="vault key  ·  or  ro-token (ro-…)" aria-describedby="pvperr">
                     <button class="pvp-open" type="submit">Open vault ▶</button>
                 </form>
+                <p class="pvp-keyhint">Have a read-only token? Paste it (e.g. <code>ro-coral-stamp-5678</code>) to browse this vault without write access.</p>
                 <div id="pvperr">${err}</div>
             </section>`;
         }
@@ -163,6 +164,9 @@
         .pvp-open-local:hover { filter: brightness(1.08); }
         .pvp-or { display: flex; align-items: center; gap: 10px; margin: 12px 0; color: var(--color-text-secondary, #9aa4bf); font-size: 0.82rem; }
         .pvp-or::before, .pvp-or::after { content: ""; flex: 1; height: 1px; background: var(--color-border, #2a2a44); }
+        .pvp-keyhint { margin: 10px 0 0; font-size: 0.8rem; color: var(--color-text-secondary, #9aa4bf); }
+        .pvp-keyhint code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.92em;
+            background: var(--bg-primary, #0a0a18); border: 1px solid var(--color-border, #2a2a44); border-radius: 4px; padding: 1px 5px; }
         .pvp-err { color: var(--danger, #E94560); font-size: 0.86rem; margin-top: 8px; }
         .pvp-wrongvault { display: inline-block; margin-top: 10px; padding: 10px 16px; border-radius: 8px;
             background: var(--color-primary, #4f8ff7); color: #fff; font-weight: 700; text-decoration: none; }

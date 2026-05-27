@@ -190,6 +190,18 @@ class SGVaultCrypto {
         return 'ref-pid-snw-' + hex                                              // Clone branch: deterministic, single-writer
     }
 
+    // --- RO-token transfer-id (read-only share tokens) ---------------------------
+    // Deterministic transfer-id for a friendly ro-token, so a recipient holding only
+    // `ro-word-word-NNNN` can FIND the encrypted creds transfer (no server token→id
+    // registry needed). Mirrors the public-preview pattern. Accepts the token with or
+    // without the `ro-` prefix; both yield the same id. Used by BOTH the token writer
+    // (vault-token-manager) and the readers (app-shell, vault-loader).
+    static async deriveRoTokenTransferId(token) {
+        const bare = String(token || '').replace(/^ro-/, '')
+        const buf  = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ro-token-transfer-v1:' + bare))
+        return this._bytesToHex(new Uint8Array(buf)).slice(0, this.FILE_ID_LENGTH)
+    }
+
     // --- Internal Helpers -------------------------------------------------------
 
     static async _deriveFileId(hmacKey, input) {

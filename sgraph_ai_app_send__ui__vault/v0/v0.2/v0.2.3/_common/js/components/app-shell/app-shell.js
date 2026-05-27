@@ -37,10 +37,13 @@
         }
 
         connectedCallback() {
+            this._resetConsentsHandler = () => this._resetConsents();
+            document.addEventListener('app-hud:reset-consents', this._resetConsentsHandler);
             this._init();
         }
 
         disconnectedCallback() {
+            if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -76,7 +79,7 @@
             }
             // Key always from localStorage (set by root inbox /#vault-key handler)
             var saved = '';
-            try { saved = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+            try { saved = sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
 
             // Public Vault Preview: /en-gb/app/<public-id> (or ?p=<id>) ALWAYS renders the
             // deliberately-public preview + a key prompt — even if a key is saved.
@@ -216,9 +219,10 @@
             this._t.vaultOpened = performance.now();
             this._emitVaultEvent('open-ok', { label: 'Vault opened', vaultName: vault.name || '', ms: Math.round(this._t.vaultOpened - this._t.start) });
 
-            // Persist vault key for reload recovery (shared with /en-gb/vault/ via sg-vault-key)
+            // Persist vault key for reload recovery. Per-tab: sessionStorage is this tab's
+            // truth; localStorage holds the last-opened key as a fresh-tab fallback.
             if (!isRO) {
-                try { localStorage.setItem('sg-vault-key', key); } catch (_) {}
+                try { sessionStorage.setItem('sg-vault-key', key); localStorage.setItem('sg-vault-key', key); } catch (_) {}
             }
 
             // Key never stays in address bar
@@ -226,9 +230,14 @@
                 window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
 
-            // Build data source — use presetAccessKey if supplied (from entry form)
+            // Build data source. Resolve the server access token (write gate): the entry-form
+            // preset, else a saved per-vault / backend key. Thread it onto the write transport so
+            // write PUTs carry x-sgraph-access-token (reads are tokenless).
             this._setStatus('Reading vault…');
-            var accessKey = (!isRO && presetAccessKey) ? presetAccessKey : null;
+            var accessKey = !isRO
+                ? (presetAccessKey || this._resolveAccessToken(vault._vaultId || this._vaultKey))
+                : null;
+            this._applyAccessToken(accessKey);
             this._dataSource = new VaultDataSource(vault, accessKey);
             if (accessKey) this._writable = true;
             await this._dataSource.loadAllSubTrees();
@@ -238,9 +247,28 @@
             // Read app.json
             var appJson = await this._readAppJson();
             this._appJson = appJson;
+            this._perm    = AppPermissions.parsePermissions(appJson);   // grant lookup (floor is unconditional)
+            this._appId   = '';
+            try { if (appJson) this._appId = await AppPermissions.appId(JSON.stringify(appJson)); } catch (_) {}   // consent-cache identity (A4)
             this._t.appJsonFetched = performance.now();
             if (appJson) this._emitVaultEvent('app-json', { label: 'app.json found', entry: appJson.entry || 'index.html', title: appJson.title || '', ms: Math.round(this._t.appJsonFetched - this._t.treeLoaded) });
             else         this._emitVaultEvent('app-json-missing', { label: 'No app.json' });
+
+            // In-vault write token: the vault can carry its own server access token in app.json
+            // (`accessToken`, or `auth.token`). Adopt it only when no browser-side token was found,
+            // so an app opened straight from its vault key (e.g. a root-inbox deep link, with no
+            // token in this tab) can still save. Full-key opens only — a read-only (ro-) open never
+            // gains write capability here. NOTE: any holder of the vault read key can decrypt this
+            // token, so embedding it means "whoever can read the vault may also write to it".
+            var vaultToken = (appJson && (appJson.accessToken || (appJson.auth && appJson.auth.token))) || '';
+            if (!isRO && !accessKey && vaultToken) {
+                accessKey = String(vaultToken);
+                this._applyAccessToken(accessKey);
+                this._dataSource._accessKey = accessKey;
+                this._dataSource.writable   = true;
+                this._writable              = true;
+                this._emitVaultEvent('access-token-from-vault', { label: 'Write token loaded from vault app.json' });
+            }
 
             // Update page title
             var appTitle  = appJson && appJson.title  ? appJson.title  : '';
@@ -251,7 +279,7 @@
             // Notify HUD
             this.dispatchEvent(new CustomEvent('app-shell:ready', {
                 bubbles: true, composed: true,
-                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO }
+                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO, perm: this._perm }
             }));
 
             // Auth intercept (auth.required with no cached key and no preset key)
@@ -262,6 +290,7 @@
                     await this._showAuthPrompt(vault, appJson);
                     return;  // _showAuthPrompt calls _continue() when key accepted
                 }
+                this._applyAccessToken(cachedKey);
                 this._dataSource = new VaultDataSource(vault, cachedKey);
                 this._writable   = true;
             }
@@ -295,18 +324,25 @@
         }
 
         async _continue(appJson) {
+            // A specific file was requested ("Open as App" on a file, via /#key|app:path or the
+            // legacy /en-gb/app#path) — honour it OVER the vault's default app. Previously the
+            // deep-link was only read in the no-app.json branch, so any vault WITH an app.json
+            // always opened its default entry and the requested file was silently dropped.
+            var deepLink = '';
+            try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
+            try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+            var deepPath = deepLink.indexOf('app:') === 0 ? deepLink.slice(4) : '';
+
+            // Exception: if the requested file IS the app.json entry, fall through to the full app
+            // mount so its declared resources (css/js) load — not the bare file.
+            if (deepPath && !(appJson && appJson.entry && deepPath === appJson.entry)) {
+                await this._mountVaultFile(deepPath);
+                return;
+            }
+
             if (!appJson) {
-                // No app.json — check if a file path was given (from /en-gb/app#path).
-                // If so, render that file directly here; do NOT redirect to /en-gb/vault/.
+                // No default app and no file path — open the vault UI.
                 // App Mode lives on /en-gb/app, not on the vault page.
-                var deepLink = '';
-                try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
-                try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
-                if (deepLink.startsWith('app:')) {
-                    await this._mountVaultFile(deepLink.slice(4));
-                    return;
-                }
-                // No file path either — open the vault UI
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
@@ -541,15 +577,19 @@
 
         // ── Credential helpers ────────────────────────────────────────────────────────
 
+        // Resolve `ro-word-word-NNNN` → read creds. The encrypted { vault_id, read_key,
+        // ref_file_id } payload lives at a deterministic transfer-id derived from the
+        // (bare) token; download it and decrypt with the token as PBKDF2 passphrase.
         async _resolveROToken(sgSend, token) {
-            var endpoint = sgSend.endpoint || window.location.origin;
-            var resp = await fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(token));
+            var endpoint   = sgSend.endpoint || window.location.origin;
+            var bare       = String(token || '').replace(/^ro-/, '');
+            var transferId = await SGVaultCrypto.deriveRoTokenTransferId(bare);
+            var resp = await fetch(endpoint + '/api/transfers/download/' + encodeURIComponent(transferId));
             if (!resp.ok) throw new Error('RO token not found or expired (HTTP ' + resp.status + ')');
-            var data = await resp.json();
-            if (!data.ciphertext) throw new Error('Invalid RO token response');
+            var cipherBytes = new Uint8Array(await resp.arrayBuffer());
 
             var enc         = new TextEncoder();
-            var keyMaterial = await crypto.subtle.importKey('raw', enc.encode(token), 'PBKDF2', false, ['deriveKey']);
+            var keyMaterial = await crypto.subtle.importKey('raw', enc.encode(bare), 'PBKDF2', false, ['deriveKey']);
             var aesKey      = await crypto.subtle.deriveKey(
                 { name: 'PBKDF2', salt: enc.encode('sgraph-ro-token-v1'), iterations: 100000, hash: 'SHA-256' },
                 keyMaterial,
@@ -557,11 +597,11 @@
                 false,
                 ['decrypt']
             );
-            var cipherBytes = Uint8Array.from(atob(data.ciphertext), function (c) { return c.charCodeAt(0); });
-            var iv          = cipherBytes.slice(0, 12);
-            var ct          = cipherBytes.slice(12);
-            var plain       = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, aesKey, ct);
-            return JSON.parse(new TextDecoder().decode(plain)); // { vaultId, readKeyB64, refFileId }
+            var iv    = cipherBytes.slice(0, 12);
+            var ct    = cipherBytes.slice(12);
+            var plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, aesKey, ct);
+            var p     = JSON.parse(new TextDecoder().decode(plain)); // stored snake_case
+            return { vaultId: p.vault_id, readKeyB64: p.read_key, refFileId: p.ref_file_id };
         }
 
         _getCachedAccessKey(vaultId) {
@@ -569,6 +609,143 @@
                 return localStorage.getItem('sg-access-key:' + vaultId) ||
                        sessionStorage.getItem('sg-access-key:' + vaultId) || null;
             } catch (_) { return null; }
+        }
+
+        // Resolve a server access token for this vault, in priority order:
+        //   per-vault cache → /vault-mode shared token → generic backend key.
+        _resolveAccessToken(vaultId) {
+            var t = this._getCachedAccessKey(vaultId);
+            if (t) return t;
+            // Parity with /vault mode: VaultLoaderStorage (vault-loader-storage.js) keeps the server
+            // access token under these keys. /vault and /app are the same origin, so a token the user
+            // established in /vault mode authorises writes here too. That module is not loaded on the
+            // /app page, so read the raw keys directly rather than calling VaultLoaderStorage.
+            try {
+                var shared = sessionStorage.getItem('sg-vault-access-key')
+                          || localStorage.getItem('sg-vault-access-key-saved');
+                if (shared) return shared;
+            } catch (_) {}
+            try { return localStorage.getItem('sg-backend-access-key') || null; } catch (_) { return null; }
+        }
+
+        // Thread the access token onto the vault's transport so write PUTs carry
+        // x-sgraph-access-token. The VaultDataSource accessKey only flips the `writable`
+        // flag; the actual write requests authorise via vault._sgSend.token (read at request
+        // time by SGSend._authHeaders). Without this, writes 401 "Access token required".
+        _applyAccessToken(token) {
+            try { if (token && this._vault && this._vault._sgSend) this._vault._sgSend.token = token; }
+            catch (_) {}
+        }
+
+        // Combined per-verb gate for the iframe bridge: the §3.4 floor (non-grantable) THEN the
+        // app.json grant (§3.2/3.3). verb is 'fs.read' | 'fs.write' | 'fs.move' | 'fs.delete' |
+        // 'fs.mkdir' | 'vault.create' | 'vault.unlink' | 'vault.delete'. Consent for the powerful
+        // vault verbs is layered on top in Phase 4. Fails safe (deny) on any error.
+        _can(verb, path) {
+            try {
+                var act = verb.indexOf('.') > -1 ? verb.slice(verb.indexOf('.') + 1) : verb;
+                if (AppPermissions.isFloor(act, path)) return false;
+                return AppPermissions.can(this._perm, verb, path);
+            } catch (_) { return false; }
+        }
+
+        // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
+        // vault never inherits a prior app's consent (A4). Single source of truth for _can-layered
+        // consent and the HUD chip/panel.
+        _consentCacheKey(verb) {
+            var vaultId = (this._vault && this._vault._vaultId) || this._vaultKey || '';
+            return 'sg-app-grant:' + vaultId + ':' + (this._appId || '') + ':' + verb;
+        }
+
+        // Resolve consent for a powerful verb. One-time per (vault, app, verb), cached in
+        // localStorage; vault.delete ALWAYS re-confirms (irreversible). The prompt is rendered on
+        // the HUD (host chrome, §3.5) — the sandboxed app cannot satisfy it. Serialised so two
+        // concurrent requests don't collide on the single HUD slot (A10).
+        async _consent(verb, path) {
+            var alwaysConfirm = (verb === 'vault.delete');
+            var ckey = this._consentCacheKey(verb);
+            if (!alwaysConfirm) { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
+            var granted = await this._hudConsent(verb, path);
+            if (granted && !alwaysConfirm) { try { localStorage.setItem(ckey, '1'); } catch (_) {} }
+            return granted;
+        }
+
+        _hudConsent(verb, path) {
+            var run = function () {
+                return new Promise(function (resolve) {
+                    var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                    if (!hud || typeof hud.requestConsent !== 'function') { resolve(false); return; }
+                    hud.requestConsent(verb, path, function (ok) { resolve(!!ok); });
+                });
+            };
+            var next = (this._consentQueue || Promise.resolve()).then(run, run);
+            this._consentQueue = next.catch(function () {});
+            return next;
+        }
+
+        // ── Vault lifecycle helpers (vault.create / vault.unlink) ───────────────────────
+        // High-entropy passphrase that NEVER matches the simple-token shape ^[a-z]+-[a-z]+-\d{4}$,
+        // so SGVault.open derives via the strong PBKDF2 path (proper vault key, never a simple token).
+        _genVaultPassphrase() {
+            var b = crypto.getRandomValues(new Uint8Array(20)), s = '';
+            for (var i = 0; i < b.length; i++) s += b[i].toString(36);
+            return 'k' + s;
+        }
+        _genRefId() {
+            var b = crypto.getRandomValues(new Uint8Array(6)), hex = '';
+            for (var i = 0; i < b.length; i++) hex += b[i].toString(16).padStart(2, '0');
+            return 'lk-' + hex;
+        }
+        _slugify(label) {
+            var s = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            return s || ('link-' + Math.random().toString(36).slice(2, 8));
+        }
+
+        // Create a new child vault and wire it into folder `path` as a read-through sub-vault:
+        // keyless <slug>.link.json in the tree + a portable read-only owner record (read_key tier).
+        // Mirrors the host "Add link" flow (vault-browse-edit _showAddLink). v1 = read-through only.
+        async _createChildVault(path, label) {
+            var parentVault = this._vault;
+            var sgSend = parentVault && parentVault._sgSend;
+            if (!sgSend || typeof SGVault === 'undefined' || typeof VaultLinks === 'undefined') throw new Error('Cannot create vaults here');
+            var child   = await SGVault.create(sgSend, this._genVaultPassphrase(), { name: label });   // proper-vault-key derivation
+            var vaultId = child._vaultId;
+            var refId   = this._genRefId();
+
+            var dir = path ? ('/' + path) : '/';
+            if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
+            var fileName = this._slugify(label) + '.link.json';
+            var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
+            await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+
+            var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
+            var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
+                           read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
+            await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
+            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+            return { vault_id: vaultId, ref_id: refId, ref_file_id: child._refFileId };
+        }
+
+        // Remove a sub-vault pointer (the <name>.link.json). The child vault stays on the server
+        // (reversible). The orphaned read-tier owner record is harmless and left in place.
+        async _unlinkChildVault(path) {
+            var norm  = AppPermissions.normalizePath(path);
+            var slash = norm.lastIndexOf('/');
+            var dir   = slash > 0 ? '/' + norm.slice(0, slash) : '/';
+            var name  = norm.slice(slash + 1);
+            await this._dataSource.deleteFile(dir, name);
+            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+            return { unlinked: true };
+        }
+
+        // Clear this app's cached consents for the current vault (HUD permissions panel "reset").
+        _resetConsents() {
+            var prefix = 'sg-app-grant:' + ((this._vault && this._vault._vaultId) || this._vaultKey || '') + ':' + (this._appId || '') + ':';
+            try {
+                var rm = [];
+                for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) rm.push(k); }
+                rm.forEach(function (k) { try { localStorage.removeItem(k); } catch (_) {} });
+            } catch (_) {}
         }
 
         _setCachedAccessKey(vaultId, key, persist) {
@@ -649,6 +826,7 @@
                         var data = await resp.json();
                         if (!data.valid) throw new Error('Access key is invalid or has expired');
                         this._setCachedAccessKey(vaultId, key, rCheck.checked);
+                        this._applyAccessToken(key);
                         this._dataSource = new VaultDataSource(vault, key);
                         this._writable   = true;
                         resolve();
@@ -829,7 +1007,7 @@
                 '<script>' + pathHelpers   + '<\/script>' +
                 '<script>' + plrJs         + '<\/script>' +
                 '<script>(function(){' +
-                  'var fileList=' + JSON.stringify(fileList) + ';' +
+                  'var fileList=' + JSON.stringify(fileList.filter(function (f) { return !AppPermissions.hasVaultSegment(f.path); })) + ';' +
                   'var folderPath=' + JSON.stringify(folderPath) + ';' +
                   'var entryPath=' + JSON.stringify(entry.path) + ';' +
                   'var objectUrls=[];' +
@@ -892,6 +1070,12 @@
                 this._showError('File not found: ' + filePath);
                 return;
             }
+
+            // Reflect the opened file in the URL hash (the resolved path — non-sensitive; the vault
+            // key stays in localStorage, never the address bar). This makes reloads re-open the same
+            // file and the link copy-shareable. _init re-reads this hash on reload; _continue →
+            // _mountVaultFile re-mounts and re-sets it. The default app (no deep-link) keeps no hash.
+            try { window.history.replaceState(null, '', window.location.pathname + window.location.search + '#' + entry.path); } catch (_) {}
 
             var ext = entry.path.split('.').pop().toLowerCase();
             var bridgeScript = this._buildVfsBridgeScript(entry.path);
@@ -958,7 +1142,7 @@
                     '<script>' + mdRendererJs + '<\/script>' +
                     '<script>(function(){' +
                         'var md=' + mdEscaped + ';' +
-                        'var html=new MarkdownParser().parse(md);' +
+                        'var html=MarkdownParser.parse(md);' +
                         'var root=document.getElementById("md-root");' +
                         'root.innerHTML=html;' +
                         // Resolve images via VFS bridge: img[data-md-src] → blob URL
@@ -1095,7 +1279,27 @@
                   // window.sg.*
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
+                    // sg.fs.* — mutations gated by app.json permissions (move/delete/mkdir)
+                    'fs:{' +
+                      'move:function(from,to){return _sgCmd("fs",{action:"move",from:from,to:to});},' +
+                      'delete:function(path){return _sgCmd("fs",{action:"delete",path:path});},' +
+                      'mkdir:function(path){return _sgCmd("fs",{action:"mkdir",path:path});}' +
+                    '},' +
+                    // sg.vault.* — create a child vault in a folder (read-through), unlink, delete
+                    'vault:{' +
+                      'create:function(path,label){return _sgCmd("vault",{action:"create",path:path,label:label});},' +
+                      'unlink:function(path){return _sgCmd("vault",{action:"unlink",path:path});},' +
+                      'delete:function(path){return _sgCmd("vault",{action:"delete",path:path});}' +
+                    '},' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
+                    // sg.history.* — read past commits / trees / blobs (read-only)
+                    'history:{' +
+                      'log:function(o){return _sgCmd("history",{action:"log",opts:o||{}});},' +
+                      'list:function(c,p){return _sgCmd("history",{action:"list",commitId:c,path:p||""});},' +
+                      'read:function(c,p){return _sgCmd("history",{action:"read",commitId:c,path:p});},' +
+                      'readText:function(c,p){return _sgCmd("history",{action:"read",commitId:c,path:p}).then(function(b){return new TextDecoder().decode(b);});},' +
+                      'readBlob:function(id){return _sgCmd("history",{action:"readBlob",blobId:id});}' +
+                    '},' +
                     'app:{' +
                       'selfPath:'  + JSON.stringify(currentPath) + ',' +
                       'writable:'  + (writable  ? 'true' : 'false') + ',' +
@@ -1120,7 +1324,9 @@
                     '},' +
                     'ui:{' +
                       'message:function(text,type,opts){opts=opts||{};var h=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);var ttl=opts.ttl===null?null:(typeof opts.ttl==="number"?opts.ttl:3000);window.parent.postMessage({__sgUiMsg:{handle:h,text:String(text||""),msgType:type||"info",ttl:ttl}},"*");return h;},' +
-                      'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");}' +
+                      'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");},' +
+                      // ask the user (on the HUD) to grant a declared-but-consent-gated verb; resolves {granted}
+                      'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -1187,6 +1393,36 @@
         _setupVfsBridgeHandlers(iframeEl, dataSource) {
             var self = this;
 
+            // Transparency for sub-vaults: wrap the data source in a CompositeDataSource so the
+            // app's runtime sg.vfs.* calls can read inner-vault files by path (auto-opened
+            // read-only via stored ro-records — no prompt). Identical behaviour when the vault
+            // has no sub-vaults (the composite delegates everything to the root). Degrades
+            // gracefully if the script isn't loaded.
+            var compositeReady = Promise.resolve();
+            if (typeof CompositeDataSource !== 'undefined' && !(dataSource instanceof CompositeDataSource)) {
+                try {
+                    var composite = new CompositeDataSource(dataSource, { keyProvider: null });  // null = no prompt in app context
+                    compositeReady = composite.scan().catch(function () {});   // register *.link.json mounts
+                    dataSource = composite;
+                } catch (_) { /* keep the plain data source */ }
+            }
+
+            // Sub-vault transparency for app reads: before serving a list/read, make sure the
+            // sub-vault covering that path is opened (read-only, silent). getFileList only exposes
+            // an OPENED mount's inner files, so without this a read of a collapsed sub-vault path
+            // would ENOENT at the file-list pre-check before getFileBytes (which auto-opens) runs.
+            // No-op for ordinary paths and when there are no sub-vaults.
+            function ensureMountOpen(p) {
+                try {
+                    if (dataSource && typeof dataSource._mountForPath === 'function'
+                        && typeof dataSource.loadFolder === 'function'
+                        && dataSource._mountForPath(p)) {
+                        return Promise.resolve(dataSource.loadFolder(p)).catch(function () {});
+                    }
+                } catch (_) {}
+                return Promise.resolve();
+            }
+
             var handler = function (e) {
                 if (!e.data)                              return;
                 if (e.source !== iframeEl.contentWindow)  return;
@@ -1197,6 +1433,7 @@
                 if (e.data.__sgVfsNavReq) {
                     var navHref     = e.data.__sgVfsNavReq;
                     var navResolved = self._resolvePath(self._htmlDir, navHref);
+                    if (AppPermissions.isFloor('read', navResolved)) { console.warn('[app-shell] nav blocked (protected path):', navResolved); return; }
                     var navMatch    = self._findEntry(fileList, navResolved);
                     if (!navMatch) { console.warn('[app-shell] nav not found:', navResolved); return; }
                     dataSource.getFileBytes(navMatch.path).then(function (buf) {
@@ -1232,6 +1469,8 @@
                     } catch (_) { wReply(false, { err: 'Bad encoding' }); return; }
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
+                    if (AppPermissions.isFloor('write', wResolved)) { wReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPROTECTED' }); return; }
+                    if (!self._can('fs.write', wResolved)) { wReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPERM' }); return; }
                     var wSlash    = wResolved.lastIndexOf('/');
                     var wDir      = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                     var wFile     = wResolved.slice(wSlash + 1);
@@ -1252,24 +1491,30 @@
                 // ── List ──────────────────────────────────────────────────────
                 if (e.data.__sgVfsListReq) {
                     var listId  = e.data.__sgVfsListReq;
-                    var entries = fileList;
                     var prefix  = (e.data.path || '').replace(/^\//, '');
-                    if (prefix) {
-                        var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
-                        var filtered = entries.filter(function (f) {
-                            return f.path === prefix || f.path.startsWith(normPfx);
+                    // Floor: never reveal .vault/** — reject a direct list of it (no existence oracle).
+                    if (AppPermissions.hasVaultSegment(prefix)) { try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {} return; }
+                    compositeReady.then(function () { return prefix ? ensureMountOpen(prefix) : null; }).then(function () {
+                        var entries = dataSource.getFileList().filter(function (f) {
+                            return !AppPermissions.hasVaultSegment(f.path) && self._can('fs.read', f.path);   // floor + read grant
                         });
-                        if (filtered.length === 0) {
-                            try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {}
-                            return;
+                        if (prefix) {
+                            var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
+                            var filtered = entries.filter(function (f) {
+                                return f.path === prefix || f.path === normPfx || f.path.startsWith(normPfx);
+                            });
+                            if (filtered.length === 0) {
+                                try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {}
+                                return;
+                            }
+                            entries = filtered;
                         }
-                        entries = filtered;
-                    }
-                    var listed = entries.map(function (f) {
-                        return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                        var listed = entries.map(function (f) {
+                            return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                        });
+                        self._emitBridgeCall('vfs.list', { path: (e.data.path || ''), count: listed.length, ok: true });
+                        try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
                     });
-                    self._emitBridgeCall('vfs.list', { path: (e.data.path || ''), count: listed.length, ok: true });
-                    try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
                     return;
                 }
 
@@ -1282,15 +1527,19 @@
                     }
                     var rPath     = e.data.path || '';
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
-                    var rMatch    = self._findEntryStrict(fileList, rResolved);
-                    if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
-                    var _t0r = performance.now();
-                    dataSource.getFileBytes(rMatch.path).then(function (buf) {
-                        rReply(true, { buf: buf, path: rMatch.path });
-                        self._emitBridgeCall('vfs.read', { path: rResolved, bytes: buf.byteLength, ms: Math.round(performance.now() - _t0r), ok: true });
-                    }).catch(function (err) {
-                        rReply(false, { err: err.message || 'Read failed' });
-                        self._emitBridgeCall('vfs.read', { path: rResolved, ms: Math.round(performance.now() - _t0r), ok: false, err: err.message });
+                    if (AppPermissions.isFloor('read', rResolved)) { rReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPROTECTED' }); return; }
+                    if (!self._can('fs.read', rResolved)) { rReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPERM' }); return; }
+                    compositeReady.then(function () { return ensureMountOpen(rResolved); }).then(function () {
+                        var rMatch = self._findEntryStrict(dataSource.getFileList(), rResolved);
+                        if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
+                        var _t0r = performance.now();
+                        return dataSource.getFileBytes(rMatch.path).then(function (buf) {
+                            rReply(true, { buf: buf, path: rMatch.path });
+                            self._emitBridgeCall('vfs.read', { path: rResolved, bytes: buf.byteLength, ms: Math.round(performance.now() - _t0r), ok: true });
+                        }).catch(function (err) {
+                            rReply(false, { err: err.message || 'Read failed' });
+                            self._emitBridgeCall('vfs.read', { path: rResolved, ms: Math.round(performance.now() - _t0r), ok: false, err: err.message });
+                        });
                     });
                     return;
                 }
@@ -1306,6 +1555,121 @@
                     var endpoint = (window.SG_ENDPOINT
                         || (function(){ try{ return sessionStorage.getItem('sg-vault-endpoint'); }catch(_){ return null; } })()
                         || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
+
+                    if (e.data.__sgCmdType === 'history') {
+                        var ha = e.data.action;
+                        if (ha === 'log') {
+                            vault.logCommits(e.data.opts || {}).then(function (r) { cmdReply(true, r); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'list') {
+                            vault.listTreeAt(e.data.commitId, e.data.path || '').then(function (r) { cmdReply(true, r); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'read') {
+                            vault.readFileAt(e.data.commitId, e.data.path).then(function (buf) { cmdReply(true, buf); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'readBlob') {
+                            vault.readBlob(e.data.blobId).then(function (buf) { cmdReply(true, buf); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unknown history action: ' + ha);
+                        return;
+                    }
+
+                    // ── fs mutations (move / delete / mkdir) ──────────────────────
+                    if (e.data.__sgCmdType === 'fs') {
+                        var fsAct = e.data.action;
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY (no token)
+                        var _np = function (p) { return AppPermissions.normalizePath(p || ''); };
+                        var _split = function (n) { var s = n.lastIndexOf('/'); return { dir: s > 0 ? '/' + n.slice(0, s) : '/', name: n.slice(s + 1) }; };
+                        if (fsAct === 'move') {
+                            var mFrom = _np(e.data.from), mTo = _np(e.data.to);
+                            if (!self._can('fs.move', mFrom) || !self._can('fs.move', mTo)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: 'EPERM' }); return; }
+                            var f = _split(mFrom), t = _split(mTo);
+                            var p = (f.dir === t.dir)
+                                ? dataSource.renameFile(f.dir, f.name, t.name)
+                                : dataSource.moveFile(f.dir, f.name, t.dir).then(function () { if (t.name !== f.name) return dataSource.renameFile(t.dir, f.name, t.name); });
+                            p.then(function () { cmdReply(true, { moved: true }); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: true }); })
+                             .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (fsAct === 'delete') {
+                            var dPath = _np(e.data.path); var d = _split(dPath);
+                            if (!self._can('fs.delete', dPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: 'EPERM' }); return; }
+                            dataSource.deleteFile(d.dir, d.name)
+                                .then(function () { cmdReply(true, { deleted: true }); self._emitBridgeCall('fs.delete', { path: dPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (fsAct === 'mkdir') {
+                            var kPath = _np(e.data.path);
+                            if (!self._can('fs.mkdir', kPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: 'EPERM' }); return; }
+                            dataSource.createFolder('/' + kPath)
+                                .then(function () { cmdReply(true, { created: true }); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported fs action: ' + fsAct);
+                        return;
+                    }
+
+                    // ── ui: runtime permission request (consent on the HUD) ───────
+                    if (e.data.__sgCmdType === 'ui') {
+                        var uiAct = e.data.action;
+                        if (uiAct === 'requestPermission') {
+                            var rVerb = String(e.data.verb || ''), rPath = e.data.path || '';
+                            var rAct  = rVerb.indexOf('.') > -1 ? rVerb.slice(rVerb.indexOf('.') + 1) : rVerb;
+                            if (AppPermissions.isFloor(rAct, rPath)) { cmdReply(false, null, 'Protected path'); return; }
+                            // app.json is a hard ceiling: can only request a verb the manifest declares.
+                            if (!AppPermissions.can(self._perm, rVerb, rPath)) { cmdReply(false, null, 'Permission not declared'); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: false, err: 'EPERM' }); return; }
+                            if (rVerb === 'vault.create' || rVerb === 'vault.delete') {
+                                self._consent(rVerb, rPath).then(function (ok) { cmdReply(true, { granted: ok }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: ok }); });
+                            } else {
+                                cmdReply(true, { granted: true }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: true });
+                            }
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported ui action: ' + uiAct);
+                        return;
+                    }
+
+                    // ── vault lifecycle (create / unlink / delete) ────────────────
+                    if (e.data.__sgCmdType === 'vault') {
+                        var vAct  = e.data.action;
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY
+                        var vPath = AppPermissions.normalizePath(e.data.path || '');
+                        if (vAct === 'create') {
+                            var vLabel = String(e.data.label || 'vault');
+                            if (!self._can('vault.create', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.create', vPath).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'ECONSENT' }); return; }
+                                return self._createChildVault(vPath, vLabel).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.create', { path: vPath, ok: true, vault_id: res.vault_id });
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'unlink') {
+                            if (!self._can('vault.unlink', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.unlink', { path: vPath, ok: false, err: 'EPERM' }); return; }
+                            self._unlinkChildVault(vPath)
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unlink', { path: vPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unlink', { path: vPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'delete') {
+                            // Server-side destroy needs the child WRITE key. There is no owner-secret
+                            // tier to store it (ro-links.json is read-tier, readable by parent readers),
+                            // so a secure implementation requires a new owner-secret credential store +
+                            // AppSec sign-off on the destructive endpoint. Deferred — Phase 5.
+                            cmdReply(false, null, 'vault.delete not yet available (needs owner-secret credential store + AppSec sign-off)');
+                            self._emitBridgeCall('vault.delete', { path: vPath, ok: false, err: 'ENOTIMPL' });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported vault action: ' + vAct);
+                        return;
+                    }
 
                     if (e.data.__sgCmdType === 'git') {
                         var action = e.data.action;
@@ -1339,6 +1703,8 @@
                         if (authAction === 'setKey') {
                             var newKey = String(e.data.key || '').trim();
                             if (!newKey) { cmdReply(true, { ok: true, valid: false }); return; }
+                            self._applyAccessToken(newKey);   // thread token onto write transport (the fix)
+                            try { self._setCachedAccessKey(vault._vaultId || self._vaultKey, newKey, false); } catch (_) {}
                             self._dataSource = new VaultDataSource(vault, newKey);
                             dataSource       = self._dataSource;
                             self._writable   = true;
