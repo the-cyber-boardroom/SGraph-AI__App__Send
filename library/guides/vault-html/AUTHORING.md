@@ -2,6 +2,10 @@
 
 This guide is for anyone — human or AI — writing HTML files that will be stored inside a vault and rendered by the SGraph Send vault iframe. It documents the **calling-convention contract** that vault HTML must follow, the **runtime API** the iframe exposes (`window.sg.*`), and the **patterns and anti-patterns** for loading CSS, JS, and data.
 
+> **Permission model (new).** Mutations (`sg.vfs.write`, `sg.fs.*`, `sg.vault.*`) are now
+> **deny-by-default** and must be declared in `app.json` `permissions`; `.vault/**` is off-limits.
+> Migrating an existing app? Read **[MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)** first.
+
 > **Verified against the live bridge (`app-shell.js`) on 2026-05-26.** Corrections from the previous
 > revision: vault-relative `fetch()` is **not** auto-routed (use `sg.vfs.read`/`readText`); only an
 > `img.src = …` assignment **from JS** is intercepted (a declarative `<img src>` in the initial HTML
@@ -235,6 +239,11 @@ await sg.vfs.write('responses/2026-05-09.json', JSON.stringify(data, null, 2));
 ```
 
 `sg.vfs.write` accepts `string | Uint8Array | ArrayBuffer`. Strings are UTF-8 encoded.
+
+> **Permission required (new).** Writes are now **deny-by-default**: `sg.vfs.write` (and
+> `sg.fs.move/delete/mkdir`, `sg.vault.*`) reject with `EPERM` unless the app's `app.json` declares the
+> grant — e.g. `{ "permissions": { "fs": { "write": ["responses/"] } } }`. The vault must also be
+> writable (an access token). See **[MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)**.
 
 Always check `sg.app.writable` before showing UI that suggests editing — in a share-token (read-only) view, writes will reject with `Read-only vault`.
 
