@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-05-25 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-05-27 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -248,6 +248,64 @@ Updated test assertions from `/en-gb/vault` to `/en-gb/app` routing targets, con
 - **Toolbar de-dup.** `vault-browse-edit.js` no longer adds its own "View Source" button when send-browse already rendered a native source toggle (`.sb-file__view-source`, present for html/csv/markdown).
 - **`check_token` 404 fix.** `app-shell.js` had three calls to `/api/transfers/check_token/` (underscore) — the registered route is `check-token` (hyphen). All corrected; the access-key/auth-bridge validation paths now resolve instead of 404ing.
 - **Second-row (send-browse action bar) removed.** `vault-shell.js` now hides the whole `.sb-header` row (`.vs-view-files .sb-header { display:none }`) — it duplicated the vault name and carried Copy Link / email (covered on Settings) and the non-vault Gallery-view link. The `New File / New Folder / Upload` actions moved from `.sb-header__right` to the **left tree panel** — `vault-browse-edit.js` wraps `SendBrowse.prototype._populateTree` to inject 📄/📁/⮋ icon buttons into `.sb-tree__controls` (writable vaults only, re-injected on tree refresh). The `✓ Decrypted` badge that was on that row is no longer shown; file size still appears in the bottom `vault-status-bar`.
+
+**Sub-vaults Phase 0–3** (25–26 May 2026 — code-complete on `dev`, **browser-unverified**):
+
+All sub-vaults work lives in `v0/v0.2/v0.2.3/` and user v0.3.3 (`sgraph_ai_app_send__ui__user/`).
+
+| Component | File | What It Does | Tests |
+|-----------|------|-------------|-------|
+| `VaultLinks` (Phase 0–1) | `_common/js/lib/links/vault-links.js` (NEW) | `*.link.json` convention reader; `loadRoLinks`/`resolveRef`/`effectiveLink`/`saveRoRecord` for `.vault/owner/ro-links.json` owner records (read_key tier) | 45/45 |
+| `CompositeDataSource` (Phase 0–1) | `_common/js/adapters/composite-data-source.js` (NEW) | Wraps root `VaultDataSource`; scan → `_subvault`/`_lazy` mount nodes; `loadFolder` opens child read-only via `SGVault.openReadOnly`; prefixed splice; routed reads | 36/36 |
+| `<sg-embed-frame>` (Phase 2) | `_common/js/components/sg-embed-frame/sg-embed-frame.js` (NEW) | Controlled external resource embed: `<img>`/`<video>` media elements for media; provider iframe for YouTube/Vimeo; **sandboxed no-`allow-same-origin` iframe for link/app** (no bridge/listener — default-deny); click-to-load privacy; sticky transparency banner | syntax-clean |
+| `<sg-link-card>` (Phase 2) | `_common/js/components/sg-link-card/sg-link-card.js` (NEW) | Sub-vault link card: shows public-info-before-key via `PublicPreviewRead.fetchPreview`; key+save-choice prompt (`.vault` ro/rw · local · ask-each-time); "Open here" (inline) / "Open in new window" (`/#key`) | syntax-clean |
+| `sg-vault--history.js` | `_common/js/lib/sg-vault/sg-vault--history.js` (NEW) | Vault history module | logic-verified |
+| send-browse lazy-on-expand | `sgraph_ai_app_send__ui__user/…/send-browse--v0.3.2.js` (v0.3.3) | Generic `_lazy`/`_subvault` node support; `_resource` leaf render + `_openResourceTab`; backward-compatible (share/open trees unaffected) | existing |
+| vault-shell wiring | `vault-shell.js` | Wraps root in `CompositeDataSource` + scan; `<sg-link-card>` as keyProvider | syntax-clean |
+| vault-browse-edit Add UI (Phase 3) | `vault-browse-edit.js` | "🔗 Add link" button (writable vaults); linked-vault flow: key validated → portable ro-record written (`saveRoRecord` → commit+push); external-resource flow: URL auto-typed | syntax-clean |
+| Per-tab vault identity (P-174) | `vault-loader-storage.js` | Vault key in `sessionStorage`-first (per-tab); access token stays shared; enables "open in new window" as independent session | 8/8 storage-pertab |
+
+**Browser-unverified gaps**: lazy expand → child opens silently; `<sg-embed-frame>` sandbox enforcement; Add-link cross-device portability; security (embedded page cannot read vault). Verification guides: `library/guides/vault-html/SUB-VAULTS-AND-LINKS.md`, `library/guides/vault-html/PLAYWRIGHT-VAULT-APP-ACCESS.md`.
+
+**App-iframe Capabilities (Phases 1–4B)** (27 May 2026 — code-complete on `dev`, **browser-unverified**):
+
+The app-iframe permission model gives hosted apps a grant-based, user-consented file system interface while protecting `/.vault/**` unconditionally. All changes are in `v0/v0.2/v0.2.3/`.
+
+| Component | File | What It Does | Tests |
+|-----------|------|-------------|-------|
+| `AppPermissions` module (Phase 1) | `_common/js/components/app-shell/app-permissions.js` (NEW) | DOM-free, bridge-free pure permission logic: `normalizePath` (collapses `.`/`..`/`//`), `hasVaultSegment`, `isFloor`, `parsePermissions`, `can`, `appId` (SHA-256 of `app.json`) | 39/39 |
+| Security floor (Phase 1) | `app-shell.js` | `.vault/**` reads/writes/list/nav non-grantable (bridge-level, path-normalised); `vfs.list` filters `.vault` entries; direct `list('.vault…')` → `ENOENT` | phase 1 unit |
+| Grant-aware verbs (Phase 2) | `app-shell.js` | Read/write/list grant-gated via `_can(verb, path)`; new FS verbs: `move`/`delete`/`mkdir` via `__sgCmdType:'fs'` (grant+token-gated) | AppPermissions unit |
+| HUD privileges chip (Phase 3) | `app-hud.js` | `🔓 write · move · …` chip showing `app.json` grants; hidden for default-reads-only apps | DOM-only |
+| Consent surface + `requestPermission` (Phase 4A) | `app-hud.js`, `app-shell.js` | HUD consent bar (Allow/Deny); `sg.ui.requestPermission(verb, path)` from iframe; one-per-(vault,appId,verb) localStorage cache; `vault.delete` always re-confirms; chip-click reset | syntax-clean |
+| `vault.create` + `vault.unlink` (Phase 4B) | `app-shell.js` | Iframe creates child vault (high-entropy key; `*.link.json` + `saveRoRecord`; read-through child); unlinks one. `vault.delete` **deferred** (write-key owner-secret-tier needed) | syntax-clean |
+| `en-gb/app/index.html` | index.html | `app-permissions.js` loaded before `app-shell.js`; `hud.setPrivileges()` called on `app-shell:ready` | — |
+
+Spec: `team/roles/architect/reviews/05/27/v0.27.79__architect-spec__app-iframe-capabilities-and-permissions.md`
+Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-implementation.md`
+Migration guide: `library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md`
+
+**App-mode improvements** (27 May 2026 — merged to `dev`):
+
+| Fix | File | What It Fixes |
+|-----|------|--------------|
+| File hash in URL (`#path`) | `app-shell.js` | Reload re-opens the file; link is copy-shareable |
+| Open-as-app honours requested file | `app-shell.js`, `vault-header.js`, `vault-browse-edit.js` | Fixed: the default app was always opened; now the requested file wins |
+| Fix `MarkdownParser.parse` | `app-shell.js` | `new MarkdownParser()` was wrong; changed to `MarkdownParser.parse()` |
+
+**Public vault previews** (25–26 May 2026 — code-complete on `dev`, **browser-unverified**; backend 6/6 + OG 6/6 + JS KAT 9/9):
+
+| Component | Status |
+|-----------|--------|
+| `sg-public-preview-card.js` (preview card) | Implemented |
+| `sg-public-preview-editor.js` (settings tab) | Implemented |
+| OG-render service + route (User Lambda) | Implemented |
+| `/en-gb/preview/<id>` tester page | Implemented |
+| RO-token deterministic resolution (`test__ro_token_resolution.js`) | Implemented; 75 assertions |
+| `/en-gb/app/<public-id>` app-shell Mode A/B wiring | **Pending** |
+| CloudFront path-segment routing | **DevOps dependency — not yet in production** |
+
+Dev pack: `library/sgraph-send/dev_packs/v0.27.62__public-vault-previews/`
 
 ---
 
