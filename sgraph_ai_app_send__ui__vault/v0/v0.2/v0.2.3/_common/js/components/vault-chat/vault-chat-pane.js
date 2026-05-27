@@ -54,13 +54,23 @@
                         </div>
                       </div>
                       <div class="side">
-                        <h4>Ledger</h4><div class="ledger"></div>
-                        <h4>Execution log</h4><div class="log"></div>
+                        <div class="tabs">
+                          <button class="tab active" data-tab="log">Log</button>
+                          <button class="tab" data-tab="layers">Layers</button>
+                          <button class="tab" data-tab="tools">Tools</button>
+                        </div>
+                        <div class="tabpanel" data-panel="log">
+                          <h4>Ledger</h4><div class="ledger"></div>
+                          <h4>Execution log</h4><div class="log"></div>
+                        </div>
+                        <div class="tabpanel" data-panel="layers" hidden></div>
+                        <div class="tabpanel" data-panel="tools" hidden></div>
                       </div>
                     </div>
                   </div>
                 </div>`;
             this._q = (s) => this.shadowRoot.querySelector(s);
+            this._activeTab = 'log';
             this._wire();
             this._build();
         }
@@ -73,7 +83,20 @@
                 this._q('.key').style.display = e.target.checked ? '' : 'none';
                 this._build();
             });
-            ['.mode', '.loadout'].forEach((s) => this._q(s).addEventListener('change', () => this._syncControls()));
+            ['.mode', '.loadout'].forEach((s) => this._q(s).addEventListener('change', () => { this._syncControls(); this._renderActiveTab(); }));
+            this.shadowRoot.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => this._showTab(t.dataset.tab)));
+        }
+
+        _showTab(name) {
+            this.shadowRoot.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+            this.shadowRoot.querySelectorAll('.tabpanel').forEach((p) => { p.hidden = p.dataset.panel !== name; });
+            this._activeTab = name;
+            this._renderActiveTab();
+        }
+
+        _renderActiveTab() {
+            if (this._activeTab === 'layers') this._renderLayers();
+            else if (this._activeTab === 'tools') this._renderTools();
         }
 
         _busEl() { return this._q('.bus'); }
@@ -164,6 +187,7 @@
                 this._renderEvent({ type: 'error', text: err.message });
             }
             this._renderLedger();
+            this._renderActiveTab();
         }
 
         _confirm({ name, args, estimate, remaining }) {
@@ -215,6 +239,49 @@
         }
 
         _scroll() { const t = this._q('.transcript'); t.scrollTop = t.scrollHeight; }
+
+        // --- Phase 2: context-layers inspector ---
+        async _renderLayers() {
+            const panel = this.shadowRoot.querySelector('[data-panel="layers"]');
+            if (!panel) return;
+            const files = await this._vfs.listAll();
+            const work = files.filter((f) => !f.path.startsWith('/chat/'));
+            const history = files.filter((f) => f.path.startsWith('/chat/history/'));
+            const tokens = this._session.estimateTokens(this._loop ? this._loop._messages : []);
+            const l = this._ec.ledger;
+            const fileRows = work.length
+                ? work.map((f) => `<div class="lr">${esc(f.path)} <span class="dim">${f.size}b</span></div>`).join('')
+                : '<div class="lr dim">empty</div>';
+            const vaultLine = this._sg ? 'vault: via window.sg bridge (read_file pulls through)' : 'vault: none (standalone — working set only)';
+            panel.innerHTML =
+                `<h4>Vault</h4><div class="lr dim">${esc(vaultLine)}</div>` +
+                `<h4>VFS working set (${work.length})</h4>${fileRows}` +
+                `<h4>History</h4><div class="lr">${history.length} turn file(s) under /chat/history</div>` +
+                `<h4>Assembled prompt</h4><div class="lr">~${tokens} tokens · ${this._loop ? this._loop._messages.length : 0} messages</div>` +
+                `<h4>Budget</h4><div class="lr">spent $${l.spentUsd.toFixed(3)} / $${isFinite(l.budgetUsd) ? l.budgetUsd.toFixed(2) : '∞'}</div>`;
+        }
+
+        // --- Phase 2: interactive tools / loadout panel (doc 07 §B5) ---
+        _renderTools() {
+            const panel = this.shadowRoot.querySelector('[data-panel="tools"]');
+            if (!panel) return;
+            const MODES = ['AUTO', 'CONFIRM', 'DRY_RUN', 'OFF'];
+            const rows = this._ec.policies.map((p) => {
+                const opts = MODES.map((m) => `<option ${m === p.mode ? 'selected' : ''}>${m}</option>`).join('');
+                const sel = `<select data-tool="${esc(p.name)}" ${p.available ? '' : 'disabled'}>${opts}</select>`;
+                const av = p.available ? '' : '<span class="dim"> (unavailable — loadout/read-only)</span>';
+                return `<div class="tr"><code>${esc(p.name)}</code> <span class="tier">${esc(p.tier)}</span> ${sel}${av}</div>`;
+            }).join('');
+            panel.innerHTML = `<h4>Tools — loadout: ${esc(this._q('.loadout').value)}</h4>${rows}` +
+                `<div class="dim" style="margin-top:8px">A tool set to OFF or unavailable is omitted from tools[] — invisible to the model, not refused at runtime. run_code is not registered (Track A).</div>`;
+            panel.querySelectorAll('select[data-tool]').forEach((s) =>
+                s.addEventListener('change', () => this._setToolMode(s.dataset.tool, s.value)));
+        }
+
+        _setToolMode(name, mode) {
+            const p = this._ec.policies.find((x) => x.name === name);
+            if (p) p.mode = mode;
+        }
     }
 
     VaultChatPane.styles = `
@@ -237,10 +304,17 @@
       .composer { display:flex; gap:8px; padding:10px; border-top:1px solid var(--color-border,#1a1a3a); }
       .composer .input { flex:1; background:var(--bg-primary,#0a0a18); color:inherit; border:1px solid #333d5a; border-radius:5px; padding:8px; }
       .composer .send { background:var(--accent,#4ECDC4); color:#0d0d1a; border:none; border-radius:5px; padding:7px 14px; font-weight:700; cursor:pointer; }
-      .side { width:280px; flex-shrink:0; padding:10px; overflow:auto; }
+      .side { width:300px; flex-shrink:0; padding:0 10px 10px; overflow:auto; }
       .side h4 { font-size:11px; text-transform:uppercase; color:#8892a4; margin:12px 0 6px; }
+      .tabs { position:sticky; top:0; display:flex; gap:4px; padding:8px 0; background:var(--bg-primary,#0a0a18); }
+      .tab { background:#1a1a3a; color:#a0aec0; border:none; border-radius:4px; padding:4px 10px; font-size:12px; cursor:pointer; }
+      .tab.active { background:var(--accent,#4ECDC4); color:#0d0d1a; font-weight:700; }
       .ledger { font-family:monospace; font-size:12px; }
-      .lr { font-family:monospace; font-size:11px; padding:1px 2px; } .lr.e { color:#ff6b6b; }
+      .lr { font-family:monospace; font-size:11px; padding:1px 2px; word-break:break-all; } .lr.e { color:#ff6b6b; }
+      .dim { color:#5a6478; }
+      .tr { font-size:12px; padding:3px 2px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+      .tr .tier { font-size:10px; color:#8892a4; }
+      .tr select { background:var(--bg-primary,#0a0a18); color:inherit; border:1px solid #333d5a; border-radius:3px; font-size:11px; }
       code { color:var(--accent,#4ECDC4); }
     `;
 

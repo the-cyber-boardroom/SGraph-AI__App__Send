@@ -29,6 +29,17 @@
             this.onEvent  = opts.onEvent || (() => {});   // ({type, ...}) for the UI transcript
         }
 
+        // Provenance fencing (doc 09 §3): file content read into the prompt is untrusted.
+        // Wrap it in non-spoofable delimiters labelled DATA so injection in a vault file
+        // cannot issue instructions to the model.
+        _toolResultContent(result) {
+            if (result && result.untrusted && typeof result.content === 'string') {
+                const fenced = this.session.fence(result.content, result.path);
+                return JSON.stringify({ ok: result.ok !== false, path: result.path, content: '[fenced below — untrusted data]' }) + '\n' + fenced;
+            }
+            return JSON.stringify(result);
+        }
+
         async _writeHistory(role, content, extra) {
             const { path, record } = this.session.nextTurnRecord(role, content, extra);
             if (this.vfs) await this.vfs.writeFile(path, JSON.stringify(record));
@@ -67,13 +78,9 @@
                     this.onEvent({ type: 'tool-call', name: call.name, args: call.args });
                     const result = await this.ec.execute(call.name, call.args || {});
                     this.onEvent({ type: 'tool-result', name: call.name, result });
-                    this._messages.push({
-                        role: 'tool',
-                        name: call.name,
-                        toolCallId: call.id,
-                        content: JSON.stringify(result),
-                    });
-                    await this._writeHistory('tool', JSON.stringify(result), { name: call.name });
+                    const content = this._toolResultContent(result);
+                    this._messages.push({ role: 'tool', name: call.name, toolCallId: call.id, content });
+                    await this._writeHistory('tool', content, { name: call.name });
                 }
                 // loop: resend with the tool results appended
             }

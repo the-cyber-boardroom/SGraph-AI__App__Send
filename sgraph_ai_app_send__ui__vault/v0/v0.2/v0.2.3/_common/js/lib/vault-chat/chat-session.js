@@ -72,6 +72,15 @@
             return messages;
         }
 
+        // Instance shortcut to the static fence (used by the loop on untrusted tool output).
+        fence(text, source) { return ChatSession.fenceUntrusted(text, source); }
+
+        // Rough token estimate for the inspector (chars/4 heuristic; good enough for a gauge).
+        estimateTokens(messages) {
+            const chars = (messages || []).reduce((n, m) => n + String(m.content || '').length, 0);
+            return Math.ceil(chars / 4);
+        }
+
         // Allocate the next /chat/history path and the JSON record for a turn.
         nextTurnRecord(role, content, extra) {
             const n = ++this._turn;

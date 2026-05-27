@@ -53,7 +53,7 @@
     function makeRunners(vfs) {
         return {
             async list_folder({ path }) { return { ok: true, entries: await vfs.listFolder(guard(path || '/')) }; },
-            async read_file({ path })  { return { ok: true, path: guard(path), content: await vfs.readText(guard(path)) }; },
+            async read_file({ path })  { return { ok: true, path: guard(path), content: await vfs.readText(guard(path)), untrusted: true }; },
             async stat({ path })       { return { ok: true, stat: await vfs.stat(guard(path)) }; },
             async exists({ path })     { return { ok: true, exists: await vfs.exists(guard(path)) }; },
             async write_file({ path, content }) { const r = await vfs.writeFile(guard(path), content == null ? '' : content); return { ok: true, ...r }; },

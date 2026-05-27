@@ -67,6 +67,21 @@ try {
     const ledger = await page.evaluate(() => document.querySelector('vault-chat-pane').shadowRoot.querySelector('.ledger').textContent);
     /spent \$0\.0/.test(ledger) ? ok('ledger accrued spend: ' + ledger.replace(/\s+/g, ' ').trim()) : fail('ledger not updated: ' + ledger);
 
+    // Phase 2: Layers inspector
+    await page.getByText('Layers', { exact: true }).click();
+    const layers = await page.evaluate(() => document.querySelector('vault-chat-pane').shadowRoot.querySelector('[data-panel="layers"]').textContent);
+    (/work\/a\.md/.test(layers) && /tokens/.test(layers)) ? ok('Layers inspector shows the working set + token estimate') : fail('layers panel incomplete: ' + layers.slice(0, 120));
+
+    // Phase 2: Tools/loadout panel
+    await page.getByText('Tools', { exact: true }).click();
+    const tools = await page.evaluate(() => {
+        const p = document.querySelector('vault-chat-pane').shadowRoot.querySelector('[data-panel="tools"]');
+        return { text: p.textContent, selects: p.querySelectorAll('select[data-tool]').length };
+    });
+    (tools.selects >= 8 && /write_file/.test(tools.text) && !/data-tool="run_code"/.test(tools.text))
+        ? ok(`Tools panel lists ${tools.selects} per-tool mode controls; run_code absent`)
+        : fail('tools panel incomplete');
+
     // real-LLM toggle reveals the key field
     await page.locator('.real').check();
     const keyVisible = await page.locator('.key').isVisible();
