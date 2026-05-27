@@ -1132,7 +1132,7 @@
                     '<script>' + mdRendererJs + '<\/script>' +
                     '<script>(function(){' +
                         'var md=' + mdEscaped + ';' +
-                        'var html=new MarkdownParser().parse(md);' +
+                        'var html=MarkdownParser.parse(md);' +
                         'var root=document.getElementById("md-root");' +
                         'root.innerHTML=html;' +
                         // Resolve images via VFS bridge: img[data-md-src] → blob URL
