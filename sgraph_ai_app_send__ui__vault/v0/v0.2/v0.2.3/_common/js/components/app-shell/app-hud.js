@@ -31,6 +31,11 @@
                     </div>
                     <div class="hud-center">
                         <span class="hud-msg" style="display:none"></span>
+                        <span class="hud-consent" style="display:none">
+                            <span class="hud-consent-text"></span>
+                            <button class="hud-consent-allow">Allow</button>
+                            <button class="hud-consent-deny">Deny</button>
+                        </span>
                     </div>
                     <div class="hud-right">
                         <a class="hud-vault-link" href="#" style="display:none" title="Open vault">Open Vault</a>
@@ -45,6 +50,7 @@
             this.shadowRoot.addEventListener('click', (e) => {
                 if (e.target.closest('.hud-copy-btn'))  this._copyLink();
                 if (e.target.closest('.hud-debug-btn')) this._toggleDebug();
+                if (e.target.closest('.hud-privs-chip')) this._onPrivsClick();
             });
         }
 
@@ -110,6 +116,45 @@
             chip.textContent = '🔓 ' + labels.join(' · ');
             chip.title = 'This app is allowed to: ' + labels.join(', ');
             chip.style.display = '';
+        }
+
+        // Render a consent prompt in the HUD (host chrome — the app cannot draw or dismiss this).
+        // Resolves cb(true/false) only on a real user click. Called by app-shell._consent.
+        requestConsent(verb, path, cb) {
+            const c = this.shadowRoot.querySelector('.hud-consent');
+            const t = this.shadowRoot.querySelector('.hud-consent-text');
+            const allow = this.shadowRoot.querySelector('.hud-consent-allow');
+            const deny  = this.shadowRoot.querySelector('.hud-consent-deny');
+            if (!c || !t || !allow || !deny) { try { cb(false); } catch (_) {} return; }
+            t.textContent = AppHud._consentLabel(verb, path);
+            c.style.display = '';
+            const done = (ok) => {
+                c.style.display = 'none';
+                allow.removeEventListener('click', onAllow);
+                deny.removeEventListener('click', onDeny);
+                try { cb(ok); } catch (_) {}
+            };
+            const onAllow = () => done(true);
+            const onDeny  = () => done(false);
+            allow.addEventListener('click', onAllow);
+            deny.addEventListener('click', onDeny);
+        }
+
+        static _consentLabel(verb, path) {
+            const map = {
+                'vault.create': 'create a vault',
+                'vault.delete': 'permanently delete a vault',
+                'vault.unlink': 'unlink a vault'
+            };
+            const what = map[verb] || ('use ' + verb);
+            return 'This app wants to ' + what + (path ? ' in “' + path + '”' : '') + '.';
+        }
+
+        // Clicking the privileges chip opens the (minimal) permissions panel: the manifest grants
+        // are a fixed ceiling, but the user can reset this app's cached create/delete consents.
+        _onPrivsClick() {
+            const ok = window.confirm('Reset this app’s granted consents (e.g. create/delete prompts will be asked again)?');
+            if (ok) this.dispatchEvent(new CustomEvent('app-hud:reset-consents', { bubbles: true, composed: true }));
         }
 
         // Show a transient message (called from VFS bridge sg.ui.message handler).
@@ -216,8 +261,19 @@
         .hud-privs-chip {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(233,196,69,0.12); color: #E9C445;
-            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap; font-family: monospace;
+            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap; font-family: monospace; cursor: pointer;
         }
+        .hud-privs-chip:hover { border-color: #E9C445; }
+        .hud-consent { display: inline-flex; align-items: center; gap: 0.5rem; }
+        .hud-consent-text { font-size: 0.8rem; color: #e2e8f0; }
+        .hud-consent-allow, .hud-consent-deny {
+            font-size: 0.75rem; padding: 0.2rem 0.7rem; border-radius: 4px; cursor: pointer;
+            border: 1px solid #2a2a4a; background: transparent; white-space: nowrap;
+        }
+        .hud-consent-allow { background: #4ECDC4; color: #0a0a18; border-color: #4ECDC4; font-weight: 700; }
+        .hud-consent-allow:hover { background: #3dbdb5; }
+        .hud-consent-deny { color: #ff6b6b; border-color: rgba(255,107,107,0.4); }
+        .hud-consent-deny:hover { border-color: #ff6b6b; }
         .hud-debug-btn {
             font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
             border: 1px solid #2a2a4a; background: transparent;

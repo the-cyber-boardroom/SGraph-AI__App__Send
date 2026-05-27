@@ -37,10 +37,13 @@
         }
 
         connectedCallback() {
+            this._resetConsentsHandler = () => this._resetConsents();
+            document.addEventListener('app-hud:reset-consents', this._resetConsentsHandler);
             this._init();
         }
 
         disconnectedCallback() {
+            if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -245,6 +248,8 @@
             var appJson = await this._readAppJson();
             this._appJson = appJson;
             this._perm    = AppPermissions.parsePermissions(appJson);   // grant lookup (floor is unconditional)
+            this._appId   = '';
+            try { if (appJson) this._appId = await AppPermissions.appId(JSON.stringify(appJson)); } catch (_) {}   // consent-cache identity (A4)
             this._t.appJsonFetched = performance.now();
             if (appJson) this._emitVaultEvent('app-json', { label: 'app.json found', entry: appJson.entry || 'index.html', title: appJson.title || '', ms: Math.round(this._t.appJsonFetched - this._t.treeLoaded) });
             else         this._emitVaultEvent('app-json-missing', { label: 'No app.json' });
@@ -638,6 +643,50 @@
                 if (AppPermissions.isFloor(act, path)) return false;
                 return AppPermissions.can(this._perm, verb, path);
             } catch (_) { return false; }
+        }
+
+        // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
+        // vault never inherits a prior app's consent (A4). Single source of truth for _can-layered
+        // consent and the HUD chip/panel.
+        _consentCacheKey(verb) {
+            var vaultId = (this._vault && this._vault._vaultId) || this._vaultKey || '';
+            return 'sg-app-grant:' + vaultId + ':' + (this._appId || '') + ':' + verb;
+        }
+
+        // Resolve consent for a powerful verb. One-time per (vault, app, verb), cached in
+        // localStorage; vault.delete ALWAYS re-confirms (irreversible). The prompt is rendered on
+        // the HUD (host chrome, §3.5) — the sandboxed app cannot satisfy it. Serialised so two
+        // concurrent requests don't collide on the single HUD slot (A10).
+        async _consent(verb, path) {
+            var alwaysConfirm = (verb === 'vault.delete');
+            var ckey = this._consentCacheKey(verb);
+            if (!alwaysConfirm) { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
+            var granted = await this._hudConsent(verb, path);
+            if (granted && !alwaysConfirm) { try { localStorage.setItem(ckey, '1'); } catch (_) {} }
+            return granted;
+        }
+
+        _hudConsent(verb, path) {
+            var run = function () {
+                return new Promise(function (resolve) {
+                    var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                    if (!hud || typeof hud.requestConsent !== 'function') { resolve(false); return; }
+                    hud.requestConsent(verb, path, function (ok) { resolve(!!ok); });
+                });
+            };
+            var next = (this._consentQueue || Promise.resolve()).then(run, run);
+            this._consentQueue = next.catch(function () {});
+            return next;
+        }
+
+        // Clear this app's cached consents for the current vault (HUD permissions panel "reset").
+        _resetConsents() {
+            var prefix = 'sg-app-grant:' + ((this._vault && this._vault._vaultId) || this._vaultKey || '') + ':' + (this._appId || '') + ':';
+            try {
+                var rm = [];
+                for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) rm.push(k); }
+                rm.forEach(function (k) { try { localStorage.removeItem(k); } catch (_) {} });
+            } catch (_) {}
         }
 
         _setCachedAccessKey(vaultId, key, persist) {
@@ -1204,7 +1253,9 @@
                     '},' +
                     'ui:{' +
                       'message:function(text,type,opts){opts=opts||{};var h=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);var ttl=opts.ttl===null?null:(typeof opts.ttl==="number"?opts.ttl:3000);window.parent.postMessage({__sgUiMsg:{handle:h,text:String(text||""),msgType:type||"info",ttl:ttl}},"*");return h;},' +
-                      'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");}' +
+                      'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");},' +
+                      // ask the user (on the HUD) to grant a declared-but-consent-gated verb; resolves {granted}
+                      'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -1490,6 +1541,26 @@
                             return;
                         }
                         cmdReply(false, null, 'Unsupported fs action: ' + fsAct);
+                        return;
+                    }
+
+                    // ── ui: runtime permission request (consent on the HUD) ───────
+                    if (e.data.__sgCmdType === 'ui') {
+                        var uiAct = e.data.action;
+                        if (uiAct === 'requestPermission') {
+                            var rVerb = String(e.data.verb || ''), rPath = e.data.path || '';
+                            var rAct  = rVerb.indexOf('.') > -1 ? rVerb.slice(rVerb.indexOf('.') + 1) : rVerb;
+                            if (AppPermissions.isFloor(rAct, rPath)) { cmdReply(false, null, 'Protected path'); return; }
+                            // app.json is a hard ceiling: can only request a verb the manifest declares.
+                            if (!AppPermissions.can(self._perm, rVerb, rPath)) { cmdReply(false, null, 'Permission not declared'); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: false, err: 'EPERM' }); return; }
+                            if (rVerb === 'vault.create' || rVerb === 'vault.delete') {
+                                self._consent(rVerb, rPath).then(function (ok) { cmdReply(true, { granted: ok }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: ok }); });
+                            } else {
+                                cmdReply(true, { granted: true }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: true });
+                            }
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported ui action: ' + uiAct);
                         return;
                     }
 
