@@ -184,7 +184,17 @@
                 : 'Merge: auto-synced with published branch'
             await this._commitMerge(mergeMsg, theirCommitId)
 
-            return { merged: true, fastForward: false, conflicts }
+            // Publish the merge so the named (published) branch converges with the clone branch.
+            // After a three-way merge the old published tip (theirCommitId) is a parent of the merge
+            // commit, so push() is a fast-forward on the server — no published commits are lost.
+            // Without this the merge lives only on the clone branch and a freshly-synced session /
+            // `sgit pull` would land on a different commit than this browser. Best-effort: the merge
+            // already succeeded locally; if the push fails (offline / race) the next sync's ahead-path
+            // auto-push retries it.
+            let published = false
+            try { await this.push(); published = true } catch (_) { /* stays local; next sync publishes */ }
+
+            return { merged: true, fastForward: false, conflicts, published }
         },
 
         // --- Load all lazy sub-trees into in-memory tree ------------------------------

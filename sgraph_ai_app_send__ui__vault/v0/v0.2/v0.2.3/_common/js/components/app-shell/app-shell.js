@@ -248,6 +248,22 @@
             if (appJson) this._emitVaultEvent('app-json', { label: 'app.json found', entry: appJson.entry || 'index.html', title: appJson.title || '', ms: Math.round(this._t.appJsonFetched - this._t.treeLoaded) });
             else         this._emitVaultEvent('app-json-missing', { label: 'No app.json' });
 
+            // In-vault write token: the vault can carry its own server access token in app.json
+            // (`accessToken`, or `auth.token`). Adopt it only when no browser-side token was found,
+            // so an app opened straight from its vault key (e.g. a root-inbox deep link, with no
+            // token in this tab) can still save. Full-key opens only — a read-only (ro-) open never
+            // gains write capability here. NOTE: any holder of the vault read key can decrypt this
+            // token, so embedding it means "whoever can read the vault may also write to it".
+            var vaultToken = (appJson && (appJson.accessToken || (appJson.auth && appJson.auth.token))) || '';
+            if (!isRO && !accessKey && vaultToken) {
+                accessKey = String(vaultToken);
+                this._applyAccessToken(accessKey);
+                this._dataSource._accessKey = accessKey;
+                this._dataSource.writable   = true;
+                this._writable              = true;
+                this._emitVaultEvent('access-token-from-vault', { label: 'Write token loaded from vault app.json' });
+            }
+
             // Update page title
             var appTitle  = appJson && appJson.title  ? appJson.title  : '';
             var vaultName = vault.name || '';
@@ -582,10 +598,20 @@
             } catch (_) { return null; }
         }
 
-        // Resolve a server access token for this vault: per-vault cache → generic backend key.
+        // Resolve a server access token for this vault, in priority order:
+        //   per-vault cache → /vault-mode shared token → generic backend key.
         _resolveAccessToken(vaultId) {
             var t = this._getCachedAccessKey(vaultId);
             if (t) return t;
+            // Parity with /vault mode: VaultLoaderStorage (vault-loader-storage.js) keeps the server
+            // access token under these keys. /vault and /app are the same origin, so a token the user
+            // established in /vault mode authorises writes here too. That module is not loaded on the
+            // /app page, so read the raw keys directly rather than calling VaultLoaderStorage.
+            try {
+                var shared = sessionStorage.getItem('sg-vault-access-key')
+                          || localStorage.getItem('sg-vault-access-key-saved');
+                if (shared) return shared;
+            } catch (_) {}
             try { return localStorage.getItem('sg-backend-access-key') || null; } catch (_) { return null; }
         }
 
