@@ -37,10 +37,13 @@
         }
 
         connectedCallback() {
+            this._resetConsentsHandler = () => this._resetConsents();
+            document.addEventListener('app-hud:reset-consents', this._resetConsentsHandler);
             this._init();
         }
 
         disconnectedCallback() {
+            if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -244,6 +247,9 @@
             // Read app.json
             var appJson = await this._readAppJson();
             this._appJson = appJson;
+            this._perm    = AppPermissions.parsePermissions(appJson);   // grant lookup (floor is unconditional)
+            this._appId   = '';
+            try { if (appJson) this._appId = await AppPermissions.appId(JSON.stringify(appJson)); } catch (_) {}   // consent-cache identity (A4)
             this._t.appJsonFetched = performance.now();
             if (appJson) this._emitVaultEvent('app-json', { label: 'app.json found', entry: appJson.entry || 'index.html', title: appJson.title || '', ms: Math.round(this._t.appJsonFetched - this._t.treeLoaded) });
             else         this._emitVaultEvent('app-json-missing', { label: 'No app.json' });
@@ -273,7 +279,7 @@
             // Notify HUD
             this.dispatchEvent(new CustomEvent('app-shell:ready', {
                 bubbles: true, composed: true,
-                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO }
+                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO, perm: this._perm }
             }));
 
             // Auth intercept (auth.required with no cached key and no preset key)
@@ -631,6 +637,117 @@
             catch (_) {}
         }
 
+        // Combined per-verb gate for the iframe bridge: the §3.4 floor (non-grantable) THEN the
+        // app.json grant (§3.2/3.3). verb is 'fs.read' | 'fs.write' | 'fs.move' | 'fs.delete' |
+        // 'fs.mkdir' | 'vault.create' | 'vault.unlink' | 'vault.delete'. Consent for the powerful
+        // vault verbs is layered on top in Phase 4. Fails safe (deny) on any error.
+        _can(verb, path) {
+            try {
+                var act = verb.indexOf('.') > -1 ? verb.slice(verb.indexOf('.') + 1) : verb;
+                if (AppPermissions.isFloor(act, path)) return false;
+                return AppPermissions.can(this._perm, verb, path);
+            } catch (_) { return false; }
+        }
+
+        // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
+        // vault never inherits a prior app's consent (A4). Single source of truth for _can-layered
+        // consent and the HUD chip/panel.
+        _consentCacheKey(verb) {
+            var vaultId = (this._vault && this._vault._vaultId) || this._vaultKey || '';
+            return 'sg-app-grant:' + vaultId + ':' + (this._appId || '') + ':' + verb;
+        }
+
+        // Resolve consent for a powerful verb. One-time per (vault, app, verb), cached in
+        // localStorage; vault.delete ALWAYS re-confirms (irreversible). The prompt is rendered on
+        // the HUD (host chrome, §3.5) — the sandboxed app cannot satisfy it. Serialised so two
+        // concurrent requests don't collide on the single HUD slot (A10).
+        async _consent(verb, path) {
+            var alwaysConfirm = (verb === 'vault.delete');
+            var ckey = this._consentCacheKey(verb);
+            if (!alwaysConfirm) { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
+            var granted = await this._hudConsent(verb, path);
+            if (granted && !alwaysConfirm) { try { localStorage.setItem(ckey, '1'); } catch (_) {} }
+            return granted;
+        }
+
+        _hudConsent(verb, path) {
+            var run = function () {
+                return new Promise(function (resolve) {
+                    var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                    if (!hud || typeof hud.requestConsent !== 'function') { resolve(false); return; }
+                    hud.requestConsent(verb, path, function (ok) { resolve(!!ok); });
+                });
+            };
+            var next = (this._consentQueue || Promise.resolve()).then(run, run);
+            this._consentQueue = next.catch(function () {});
+            return next;
+        }
+
+        // ── Vault lifecycle helpers (vault.create / vault.unlink) ───────────────────────
+        // High-entropy passphrase that NEVER matches the simple-token shape ^[a-z]+-[a-z]+-\d{4}$,
+        // so SGVault.open derives via the strong PBKDF2 path (proper vault key, never a simple token).
+        _genVaultPassphrase() {
+            var b = crypto.getRandomValues(new Uint8Array(20)), s = '';
+            for (var i = 0; i < b.length; i++) s += b[i].toString(36);
+            return 'k' + s;
+        }
+        _genRefId() {
+            var b = crypto.getRandomValues(new Uint8Array(6)), hex = '';
+            for (var i = 0; i < b.length; i++) hex += b[i].toString(16).padStart(2, '0');
+            return 'lk-' + hex;
+        }
+        _slugify(label) {
+            var s = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            return s || ('link-' + Math.random().toString(36).slice(2, 8));
+        }
+
+        // Create a new child vault and wire it into folder `path` as a read-through sub-vault:
+        // keyless <slug>.link.json in the tree + a portable read-only owner record (read_key tier).
+        // Mirrors the host "Add link" flow (vault-browse-edit _showAddLink). v1 = read-through only.
+        async _createChildVault(path, label) {
+            var parentVault = this._vault;
+            var sgSend = parentVault && parentVault._sgSend;
+            if (!sgSend || typeof SGVault === 'undefined' || typeof VaultLinks === 'undefined') throw new Error('Cannot create vaults here');
+            var child   = await SGVault.create(sgSend, this._genVaultPassphrase(), { name: label });   // proper-vault-key derivation
+            var vaultId = child._vaultId;
+            var refId   = this._genRefId();
+
+            var dir = path ? ('/' + path) : '/';
+            if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
+            var fileName = this._slugify(label) + '.link.json';
+            var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
+            await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+
+            var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
+            var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
+                           read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
+            await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
+            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+            return { vault_id: vaultId, ref_id: refId, ref_file_id: child._refFileId };
+        }
+
+        // Remove a sub-vault pointer (the <name>.link.json). The child vault stays on the server
+        // (reversible). The orphaned read-tier owner record is harmless and left in place.
+        async _unlinkChildVault(path) {
+            var norm  = AppPermissions.normalizePath(path);
+            var slash = norm.lastIndexOf('/');
+            var dir   = slash > 0 ? '/' + norm.slice(0, slash) : '/';
+            var name  = norm.slice(slash + 1);
+            await this._dataSource.deleteFile(dir, name);
+            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+            return { unlinked: true };
+        }
+
+        // Clear this app's cached consents for the current vault (HUD permissions panel "reset").
+        _resetConsents() {
+            var prefix = 'sg-app-grant:' + ((this._vault && this._vault._vaultId) || this._vaultKey || '') + ':' + (this._appId || '') + ':';
+            try {
+                var rm = [];
+                for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) rm.push(k); }
+                rm.forEach(function (k) { try { localStorage.removeItem(k); } catch (_) {} });
+            } catch (_) {}
+        }
+
         _setCachedAccessKey(vaultId, key, persist) {
             try {
                 if (persist) localStorage.setItem('sg-access-key:' + vaultId, key);
@@ -890,7 +1007,7 @@
                 '<script>' + pathHelpers   + '<\/script>' +
                 '<script>' + plrJs         + '<\/script>' +
                 '<script>(function(){' +
-                  'var fileList=' + JSON.stringify(fileList) + ';' +
+                  'var fileList=' + JSON.stringify(fileList.filter(function (f) { return !AppPermissions.hasVaultSegment(f.path); })) + ';' +
                   'var folderPath=' + JSON.stringify(folderPath) + ';' +
                   'var entryPath=' + JSON.stringify(entry.path) + ';' +
                   'var objectUrls=[];' +
@@ -1156,6 +1273,18 @@
                   // window.sg.*
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
+                    // sg.fs.* — mutations gated by app.json permissions (move/delete/mkdir)
+                    'fs:{' +
+                      'move:function(from,to){return _sgCmd("fs",{action:"move",from:from,to:to});},' +
+                      'delete:function(path){return _sgCmd("fs",{action:"delete",path:path});},' +
+                      'mkdir:function(path){return _sgCmd("fs",{action:"mkdir",path:path});}' +
+                    '},' +
+                    // sg.vault.* — create a child vault in a folder (read-through), unlink, delete
+                    'vault:{' +
+                      'create:function(path,label){return _sgCmd("vault",{action:"create",path:path,label:label});},' +
+                      'unlink:function(path){return _sgCmd("vault",{action:"unlink",path:path});},' +
+                      'delete:function(path){return _sgCmd("vault",{action:"delete",path:path});}' +
+                    '},' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
                     // sg.history.* — read past commits / trees / blobs (read-only)
                     'history:{' +
@@ -1189,7 +1318,9 @@
                     '},' +
                     'ui:{' +
                       'message:function(text,type,opts){opts=opts||{};var h=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);var ttl=opts.ttl===null?null:(typeof opts.ttl==="number"?opts.ttl:3000);window.parent.postMessage({__sgUiMsg:{handle:h,text:String(text||""),msgType:type||"info",ttl:ttl}},"*");return h;},' +
-                      'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");}' +
+                      'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");},' +
+                      // ask the user (on the HUD) to grant a declared-but-consent-gated verb; resolves {granted}
+                      'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -1296,6 +1427,7 @@
                 if (e.data.__sgVfsNavReq) {
                     var navHref     = e.data.__sgVfsNavReq;
                     var navResolved = self._resolvePath(self._htmlDir, navHref);
+                    if (AppPermissions.isFloor('read', navResolved)) { console.warn('[app-shell] nav blocked (protected path):', navResolved); return; }
                     var navMatch    = self._findEntry(fileList, navResolved);
                     if (!navMatch) { console.warn('[app-shell] nav not found:', navResolved); return; }
                     dataSource.getFileBytes(navMatch.path).then(function (buf) {
@@ -1331,6 +1463,8 @@
                     } catch (_) { wReply(false, { err: 'Bad encoding' }); return; }
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
+                    if (AppPermissions.isFloor('write', wResolved)) { wReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPROTECTED' }); return; }
+                    if (!self._can('fs.write', wResolved)) { wReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPERM' }); return; }
                     var wSlash    = wResolved.lastIndexOf('/');
                     var wDir      = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                     var wFile     = wResolved.slice(wSlash + 1);
@@ -1352,8 +1486,12 @@
                 if (e.data.__sgVfsListReq) {
                     var listId  = e.data.__sgVfsListReq;
                     var prefix  = (e.data.path || '').replace(/^\//, '');
+                    // Floor: never reveal .vault/** — reject a direct list of it (no existence oracle).
+                    if (AppPermissions.hasVaultSegment(prefix)) { try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {} return; }
                     compositeReady.then(function () { return prefix ? ensureMountOpen(prefix) : null; }).then(function () {
-                        var entries = dataSource.getFileList();   // re-read: now includes any opened mount's files
+                        var entries = dataSource.getFileList().filter(function (f) {
+                            return !AppPermissions.hasVaultSegment(f.path) && self._can('fs.read', f.path);   // floor + read grant
+                        });
                         if (prefix) {
                             var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
                             var filtered = entries.filter(function (f) {
@@ -1383,6 +1521,8 @@
                     }
                     var rPath     = e.data.path || '';
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
+                    if (AppPermissions.isFloor('read', rResolved)) { rReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPROTECTED' }); return; }
+                    if (!self._can('fs.read', rResolved)) { rReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPERM' }); return; }
                     compositeReady.then(function () { return ensureMountOpen(rResolved); }).then(function () {
                         var rMatch = self._findEntryStrict(dataSource.getFileList(), rResolved);
                         if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
@@ -1429,6 +1569,99 @@
                             return;
                         }
                         cmdReply(false, null, 'Unknown history action: ' + ha);
+                        return;
+                    }
+
+                    // ── fs mutations (move / delete / mkdir) ──────────────────────
+                    if (e.data.__sgCmdType === 'fs') {
+                        var fsAct = e.data.action;
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY (no token)
+                        var _np = function (p) { return AppPermissions.normalizePath(p || ''); };
+                        var _split = function (n) { var s = n.lastIndexOf('/'); return { dir: s > 0 ? '/' + n.slice(0, s) : '/', name: n.slice(s + 1) }; };
+                        if (fsAct === 'move') {
+                            var mFrom = _np(e.data.from), mTo = _np(e.data.to);
+                            if (!self._can('fs.move', mFrom) || !self._can('fs.move', mTo)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: 'EPERM' }); return; }
+                            var f = _split(mFrom), t = _split(mTo);
+                            var p = (f.dir === t.dir)
+                                ? dataSource.renameFile(f.dir, f.name, t.name)
+                                : dataSource.moveFile(f.dir, f.name, t.dir).then(function () { if (t.name !== f.name) return dataSource.renameFile(t.dir, f.name, t.name); });
+                            p.then(function () { cmdReply(true, { moved: true }); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: true }); })
+                             .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (fsAct === 'delete') {
+                            var dPath = _np(e.data.path); var d = _split(dPath);
+                            if (!self._can('fs.delete', dPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: 'EPERM' }); return; }
+                            dataSource.deleteFile(d.dir, d.name)
+                                .then(function () { cmdReply(true, { deleted: true }); self._emitBridgeCall('fs.delete', { path: dPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (fsAct === 'mkdir') {
+                            var kPath = _np(e.data.path);
+                            if (!self._can('fs.mkdir', kPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: 'EPERM' }); return; }
+                            dataSource.createFolder('/' + kPath)
+                                .then(function () { cmdReply(true, { created: true }); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported fs action: ' + fsAct);
+                        return;
+                    }
+
+                    // ── ui: runtime permission request (consent on the HUD) ───────
+                    if (e.data.__sgCmdType === 'ui') {
+                        var uiAct = e.data.action;
+                        if (uiAct === 'requestPermission') {
+                            var rVerb = String(e.data.verb || ''), rPath = e.data.path || '';
+                            var rAct  = rVerb.indexOf('.') > -1 ? rVerb.slice(rVerb.indexOf('.') + 1) : rVerb;
+                            if (AppPermissions.isFloor(rAct, rPath)) { cmdReply(false, null, 'Protected path'); return; }
+                            // app.json is a hard ceiling: can only request a verb the manifest declares.
+                            if (!AppPermissions.can(self._perm, rVerb, rPath)) { cmdReply(false, null, 'Permission not declared'); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: false, err: 'EPERM' }); return; }
+                            if (rVerb === 'vault.create' || rVerb === 'vault.delete') {
+                                self._consent(rVerb, rPath).then(function (ok) { cmdReply(true, { granted: ok }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: ok }); });
+                            } else {
+                                cmdReply(true, { granted: true }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: true });
+                            }
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported ui action: ' + uiAct);
+                        return;
+                    }
+
+                    // ── vault lifecycle (create / unlink / delete) ────────────────
+                    if (e.data.__sgCmdType === 'vault') {
+                        var vAct  = e.data.action;
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY
+                        var vPath = AppPermissions.normalizePath(e.data.path || '');
+                        if (vAct === 'create') {
+                            var vLabel = String(e.data.label || 'vault');
+                            if (!self._can('vault.create', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.create', vPath).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'ECONSENT' }); return; }
+                                return self._createChildVault(vPath, vLabel).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.create', { path: vPath, ok: true, vault_id: res.vault_id });
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'unlink') {
+                            if (!self._can('vault.unlink', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.unlink', { path: vPath, ok: false, err: 'EPERM' }); return; }
+                            self._unlinkChildVault(vPath)
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unlink', { path: vPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unlink', { path: vPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'delete') {
+                            // Server-side destroy needs the child WRITE key. There is no owner-secret
+                            // tier to store it (ro-links.json is read-tier, readable by parent readers),
+                            // so a secure implementation requires a new owner-secret credential store +
+                            // AppSec sign-off on the destructive endpoint. Deferred — Phase 5.
+                            cmdReply(false, null, 'vault.delete not yet available (needs owner-secret credential store + AppSec sign-off)');
+                            self._emitBridgeCall('vault.delete', { path: vPath, ok: false, err: 'ENOTIMPL' });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported vault action: ' + vAct);
                         return;
                     }
 

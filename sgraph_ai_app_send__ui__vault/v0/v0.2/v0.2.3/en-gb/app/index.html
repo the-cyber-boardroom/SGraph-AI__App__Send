@@ -69,6 +69,7 @@
     <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
 
     <!-- App shell components -->
+    <script src="/_common/js/components/app-shell/app-permissions.js"></script>
     <script src="/_common/js/components/app-shell/app-hud.js"></script>
     <script src="/_common/js/components/app-shell/app-debug-pane.js"></script>
     <script src="/_common/js/components/app-shell/app-debug-vault-trace.js"></script>
@@ -134,6 +135,9 @@
             var hud = document.getElementById('app-hud');
             if (hud && typeof hud.setInfo === 'function') {
                 hud.setInfo(e.detail.vaultName, e.detail.appTitle, e.detail.vaultKey, e.detail.isRO);
+            }
+            if (hud && typeof hud.setPrivileges === 'function') {
+                hud.setPrivileges(e.detail.perm);
             }
         });
 
