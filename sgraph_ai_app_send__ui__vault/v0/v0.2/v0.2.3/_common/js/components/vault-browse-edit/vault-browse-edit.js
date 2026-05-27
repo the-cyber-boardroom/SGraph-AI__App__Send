@@ -58,8 +58,18 @@
             bar.appendChild(_makeSep());
 
             var path = (fileName || '').replace(/^\//, '');
-            var openAsAppLink = _makeAppLink('↗ Open as App',
-                window.location.origin + '/en-gb/app#' + encodeURIComponent(path));
+            // Prefer a self-contained link that carries BOTH the vault key and the file path
+            // through the root hash inbox: /#<key>|app:<path>. runRoot() (vault-loader-routing.js)
+            // saves the key to localStorage, stores the app: deep-link, and redirects to
+            // /en-gb/app — where app-shell opens THIS file as an app (over any default app.json).
+            // Falls back to the legacy /en-gb/app#path (key taken from localStorage) when the
+            // current key is unavailable. encodeURIComponent the path only; runRoot decodes once.
+            var _vk = '';
+            try { _vk = (globalThis.VaultLoaderStorage && VaultLoaderStorage.getCurrentKey()) || ''; } catch (_) {}
+            var _appHref = _vk
+                ? (window.location.origin + '/#' + _vk + '|app:' + encodeURIComponent(path))
+                : (window.location.origin + '/en-gb/app#' + encodeURIComponent(path));
+            var openAsAppLink = _makeAppLink('↗ Open as App', _appHref);
             _addTip(openAsAppLink, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
             bar.appendChild(openAsAppLink);
         }
@@ -760,8 +770,14 @@
                     if (bar && !bar.dataset.sgAppModeBtn) {
                         bar.dataset.sgAppModeBtn = '1';
                         var pagePath = (folderPath || '').replace(/^\//, '');
-                        var btn = _makeAppLink('↗ Open as App',
-                            window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath));
+                        // Self-contained link via the root inbox (/#key|app:path); see the file-tab
+                        // link above. Falls back to legacy /en-gb/app#path when no current key.
+                        var _pvk = '';
+                        try { _pvk = (globalThis.VaultLoaderStorage && VaultLoaderStorage.getCurrentKey()) || ''; } catch (_) {}
+                        var _pageHref = _pvk
+                            ? (window.location.origin + '/#' + _pvk + '|app:' + encodeURIComponent(pagePath))
+                            : (window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath));
+                        var btn = _makeAppLink('↗ Open as App', _pageHref);
                         _addTip(btn, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
                         bar.appendChild(btn);
                     }
