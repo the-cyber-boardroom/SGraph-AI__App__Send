@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test:vault-unit": "bash tests/unit/vault_ui/loader/run-all.sh",
+    "test:vault-chat-unit": "bash tests/unit/vault_ui/vault-chat/run-all.sh",
     "test:vault-integration": "bash tests/integration/vault_ui/loader/run-all.sh",
     "test:vault-e2e": "npx playwright test tests/e2e/vault_ui/"
   },
