@@ -1067,6 +1067,12 @@
                 return;
             }
 
+            // Reflect the opened file in the URL hash (the resolved path — non-sensitive; the vault
+            // key stays in localStorage, never the address bar). This makes reloads re-open the same
+            // file and the link copy-shareable. _init re-reads this hash on reload; _continue →
+            // _mountVaultFile re-mounts and re-sets it. The default app (no deep-link) keeps no hash.
+            try { window.history.replaceState(null, '', window.location.pathname + window.location.search + '#' + entry.path); } catch (_) {}
+
             var ext = entry.path.split('.').pop().toLowerCase();
             var bridgeScript = this._buildVfsBridgeScript(entry.path);
 
