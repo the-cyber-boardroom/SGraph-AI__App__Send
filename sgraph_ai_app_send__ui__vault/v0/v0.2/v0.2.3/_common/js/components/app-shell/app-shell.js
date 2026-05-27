@@ -274,7 +274,7 @@
             // Notify HUD
             this.dispatchEvent(new CustomEvent('app-shell:ready', {
                 bubbles: true, composed: true,
-                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO }
+                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO, perm: this._perm }
             }));
 
             // Auth intercept (auth.required with no cached key and no preset key)

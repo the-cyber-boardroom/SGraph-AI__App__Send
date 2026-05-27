@@ -136,6 +136,9 @@
             if (hud && typeof hud.setInfo === 'function') {
                 hud.setInfo(e.detail.vaultName, e.detail.appTitle, e.detail.vaultKey, e.detail.isRO);
             }
+            if (hud && typeof hud.setPrivileges === 'function') {
+                hud.setPrivileges(e.detail.perm);
+            }
         });
 
         // Debug pane expand/collapse

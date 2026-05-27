@@ -35,6 +35,7 @@
                     <div class="hud-right">
                         <a class="hud-vault-link" href="#" style="display:none" title="Open vault">Open Vault</a>
                         <button class="hud-copy-btn" style="display:none" title="Copy app link">⎘ Copy Link</button>
+                        <span class="hud-privs-chip" style="display:none" title="What this app is allowed to do"></span>
                         <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
                         <button class="hud-debug-btn" title="Toggle debug panel">🔍 Debug</button>
                     </div>
@@ -85,6 +86,30 @@
             // Update page title
             if (appTitle) document.title = appTitle + ' — SG/App';
             else if (vaultName) document.title = vaultName + ' — SG/App';
+        }
+
+        // Render a compact summary of what the app is allowed to do, from the parsed
+        // app.json permissions (AppPermissions.parsePermissions shape). Visibility only —
+        // makes the otherwise-invisible grants legible to the user. Phase 4 makes it clickable
+        // (permissions panel / revoke). No grants beyond default reads → chip hidden.
+        setPrivileges(perm) {
+            var chip = this.shadowRoot.querySelector('.hud-privs-chip');
+            if (!chip) return;
+            var labels = [];
+            var fs = (perm && perm.fs) || {};
+            var vault = (perm && perm.vault) || {};
+            function granted(v) { return v === true || (Array.isArray(v) && v.length > 0); }
+            if (granted(fs.write))  labels.push('write');
+            if (granted(fs.move))   labels.push('move');
+            if (granted(fs['delete'])) labels.push('delete');
+            if (granted(fs.mkdir))  labels.push('mkdir');
+            if (granted(vault.create)) labels.push('create-vault');
+            if (granted(vault.unlink)) labels.push('unlink-vault');
+            if (vault['delete'] === true) labels.push('delete-vault');
+            if (labels.length === 0) { chip.style.display = 'none'; return; }
+            chip.textContent = '🔓 ' + labels.join(' · ');
+            chip.title = 'This app is allowed to: ' + labels.join(', ');
+            chip.style.display = '';
         }
 
         // Show a transient message (called from VFS bridge sg.ui.message handler).
@@ -187,6 +212,11 @@
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(100,160,220,0.12); color: #64a0dc;
             border: 1px solid rgba(100,160,220,0.25); white-space: nowrap;
+        }
+        .hud-privs-chip {
+            font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
+            background: rgba(233,196,69,0.12); color: #E9C445;
+            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap; font-family: monospace;
         }
         .hud-debug-btn {
             font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
