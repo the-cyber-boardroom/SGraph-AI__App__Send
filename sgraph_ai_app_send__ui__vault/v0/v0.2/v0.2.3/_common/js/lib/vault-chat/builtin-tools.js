@@ -23,6 +23,23 @@
         delete_file: { name: 'delete_file', description: 'Delete a file from the working set.', parameters: { path: 'string' } },
     };
 
+    // OpenAI/Anthropic function-tool schemas for the real LLM request (sg-llm-request
+    // detail.tools[]). Keyed by name so ToolPolicies.compileTools(policies, OPENAI_SCHEMAS)
+    // yields a model-ready tools[] directly.
+    const fn = (name, description, properties, required) =>
+        ({ type: 'function', function: { name, description, parameters: { type: 'object', properties, required: required || [] } } });
+    const S = (description) => ({ type: 'string', description });
+    const OPENAI_SCHEMAS = {
+        list_folder:  fn('list_folder', 'List the files and folders in a working-set directory.', { path: S('Absolute folder path, e.g. /work') }, []),
+        read_file:    fn('read_file', 'Read a text file from the working set.', { path: S('Absolute file path') }, ['path']),
+        stat:         fn('stat', 'Stat a path (size/type).', { path: S('Absolute path') }, ['path']),
+        exists:       fn('exists', 'Check whether a path exists.', { path: S('Absolute path') }, ['path']),
+        write_file:   fn('write_file', 'Write text to a working-set file (creates or overwrites).', { path: S('Absolute file path'), content: S('File content') }, ['path', 'content']),
+        create_folder: fn('create_folder', 'Create a folder in the working set.', { path: S('Absolute folder path') }, ['path']),
+        rename:       fn('rename', 'Rename or move a working-set file.', { from: S('Source path'), to: S('Destination path') }, ['from', 'to']),
+        delete_file:  fn('delete_file', 'Delete a file from the working set.', { path: S('Absolute file path') }, ['path']),
+    };
+
     // Guard: the reserved control prefix is never reachable by a tool (doc 09 §2).
     function guard(path) {
         const p = root.VaultChat.MemoryVfs.norm(path);
@@ -53,5 +70,5 @@
     }
 
     root.VaultChat = root.VaultChat || {};
-    root.VaultChat.BuiltinTools = { REGISTRY, makeRunners, guard };
+    root.VaultChat.BuiltinTools = { REGISTRY, OPENAI_SCHEMAS, makeRunners, guard };
 })(typeof window !== 'undefined' ? window : globalThis);

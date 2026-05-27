@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en-gb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vault Chat</title>
+<!--
+  Phase 1 in-vault chat page. Loads the REAL LLM transport from tools.sgraph.ai
+  (sg-llm-events v0.1.1 + sg-llm-request v0.1.6 — the first sg-llm-request that
+  supports tools[]/tool_choice and emits normalised toolCalls) and the Vault Chat
+  library + pane. Default mode is the keyless MOCK LLM; tick "real LLM" and supply an
+  OpenRouter key to drive real calls. The working set + tools + execution-center policy
+  + budget are the Phase-0 modules (interface-compatible with sg-vfs/sg-tool-runner).
+-->
+<style>
+  html, body { margin:0; height:100%; background:#0a0a18; }
+  vault-chat-pane { display:block; height:100vh; }
+</style>
+
+<!-- Real LLM transport (tools.sgraph.ai CDN) -->
+<script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-events/v0/v0.1/v0.1.1/sg-llm-events.js"></script>
+<script type="module" src="https://dev.tools.sgraph.ai/components/llm/sg-llm-request/v0/v0.1/v0.1.6/sg-llm-request.js"></script>
+</head>
+<body>
+  <vault-chat-pane></vault-chat-pane>
+
+  <!-- Vault Chat library (classic IIFEs → window.VaultChat) -->
+  <script src="../../../_common/js/lib/vault-chat/memory-vfs.js"></script>
+  <script src="../../../_common/js/lib/vault-chat/tool-policies.js"></script>
+  <script src="../../../_common/js/lib/vault-chat/builtin-tools.js"></script>
+  <script src="../../../_common/js/lib/vault-chat/execution-center.js"></script>
+  <script src="../../../_common/js/lib/vault-chat/vault-flush-controller.js"></script>
+  <script src="../../../_common/js/lib/vault-chat/chat-session.js"></script>
+  <script src="../../../_common/js/lib/vault-chat/vault-chat-loop.js"></script>
+  <script src="../../../_common/js/lib/vault-chat/mock-sg.js"></script>
+  <script src="../../../_common/js/lib/vault-chat/llm-bus-adapter.js"></script>
+  <script src="./test/mock-llm.js"></script>
+  <script src="../../../_common/js/components/vault-chat/vault-chat-pane.js"></script>
+</body>
+</html>
