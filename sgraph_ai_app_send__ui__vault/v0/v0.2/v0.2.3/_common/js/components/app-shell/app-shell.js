@@ -244,6 +244,7 @@
             // Read app.json
             var appJson = await this._readAppJson();
             this._appJson = appJson;
+            this._perm    = AppPermissions.parsePermissions(appJson);   // grant lookup (floor is unconditional)
             this._t.appJsonFetched = performance.now();
             if (appJson) this._emitVaultEvent('app-json', { label: 'app.json found', entry: appJson.entry || 'index.html', title: appJson.title || '', ms: Math.round(this._t.appJsonFetched - this._t.treeLoaded) });
             else         this._emitVaultEvent('app-json-missing', { label: 'No app.json' });
@@ -625,6 +626,18 @@
         _applyAccessToken(token) {
             try { if (token && this._vault && this._vault._sgSend) this._vault._sgSend.token = token; }
             catch (_) {}
+        }
+
+        // Combined per-verb gate for the iframe bridge: the §3.4 floor (non-grantable) THEN the
+        // app.json grant (§3.2/3.3). verb is 'fs.read' | 'fs.write' | 'fs.move' | 'fs.delete' |
+        // 'fs.mkdir' | 'vault.create' | 'vault.unlink' | 'vault.delete'. Consent for the powerful
+        // vault verbs is layered on top in Phase 4. Fails safe (deny) on any error.
+        _can(verb, path) {
+            try {
+                var act = verb.indexOf('.') > -1 ? verb.slice(verb.indexOf('.') + 1) : verb;
+                if (AppPermissions.isFloor(act, path)) return false;
+                return AppPermissions.can(this._perm, verb, path);
+            } catch (_) { return false; }
         }
 
         _setCachedAccessKey(vaultId, key, persist) {
@@ -1152,6 +1165,12 @@
                   // window.sg.*
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
+                    // sg.fs.* — mutations gated by app.json permissions (move/delete/mkdir)
+                    'fs:{' +
+                      'move:function(from,to){return _sgCmd("fs",{action:"move",from:from,to:to});},' +
+                      'delete:function(path){return _sgCmd("fs",{action:"delete",path:path});},' +
+                      'mkdir:function(path){return _sgCmd("fs",{action:"mkdir",path:path});}' +
+                    '},' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
                     // sg.history.* — read past commits / trees / blobs (read-only)
                     'history:{' +
@@ -1329,6 +1348,7 @@
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
                     if (AppPermissions.isFloor('write', wResolved)) { wReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPROTECTED' }); return; }
+                    if (!self._can('fs.write', wResolved)) { wReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPERM' }); return; }
                     var wSlash    = wResolved.lastIndexOf('/');
                     var wDir      = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                     var wFile     = wResolved.slice(wSlash + 1);
@@ -1353,7 +1373,9 @@
                     // Floor: never reveal .vault/** — reject a direct list of it (no existence oracle).
                     if (AppPermissions.hasVaultSegment(prefix)) { try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {} return; }
                     compositeReady.then(function () { return prefix ? ensureMountOpen(prefix) : null; }).then(function () {
-                        var entries = dataSource.getFileList().filter(function (f) { return !AppPermissions.hasVaultSegment(f.path); });   // floor: hide .vault/** entries
+                        var entries = dataSource.getFileList().filter(function (f) {
+                            return !AppPermissions.hasVaultSegment(f.path) && self._can('fs.read', f.path);   // floor + read grant
+                        });
                         if (prefix) {
                             var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
                             var filtered = entries.filter(function (f) {
@@ -1384,6 +1406,7 @@
                     var rPath     = e.data.path || '';
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
                     if (AppPermissions.isFloor('read', rResolved)) { rReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPROTECTED' }); return; }
+                    if (!self._can('fs.read', rResolved)) { rReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPERM' }); return; }
                     compositeReady.then(function () { return ensureMountOpen(rResolved); }).then(function () {
                         var rMatch = self._findEntryStrict(dataSource.getFileList(), rResolved);
                         if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
@@ -1430,6 +1453,43 @@
                             return;
                         }
                         cmdReply(false, null, 'Unknown history action: ' + ha);
+                        return;
+                    }
+
+                    // ── fs mutations (move / delete / mkdir) ──────────────────────
+                    if (e.data.__sgCmdType === 'fs') {
+                        var fsAct = e.data.action;
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY (no token)
+                        var _np = function (p) { return AppPermissions.normalizePath(p || ''); };
+                        var _split = function (n) { var s = n.lastIndexOf('/'); return { dir: s > 0 ? '/' + n.slice(0, s) : '/', name: n.slice(s + 1) }; };
+                        if (fsAct === 'move') {
+                            var mFrom = _np(e.data.from), mTo = _np(e.data.to);
+                            if (!self._can('fs.move', mFrom) || !self._can('fs.move', mTo)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: 'EPERM' }); return; }
+                            var f = _split(mFrom), t = _split(mTo);
+                            var p = (f.dir === t.dir)
+                                ? dataSource.renameFile(f.dir, f.name, t.name)
+                                : dataSource.moveFile(f.dir, f.name, t.dir).then(function () { if (t.name !== f.name) return dataSource.renameFile(t.dir, f.name, t.name); });
+                            p.then(function () { cmdReply(true, { moved: true }); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: true }); })
+                             .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (fsAct === 'delete') {
+                            var dPath = _np(e.data.path); var d = _split(dPath);
+                            if (!self._can('fs.delete', dPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: 'EPERM' }); return; }
+                            dataSource.deleteFile(d.dir, d.name)
+                                .then(function () { cmdReply(true, { deleted: true }); self._emitBridgeCall('fs.delete', { path: dPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (fsAct === 'mkdir') {
+                            var kPath = _np(e.data.path);
+                            if (!self._can('fs.mkdir', kPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: 'EPERM' }); return; }
+                            dataSource.createFolder('/' + kPath)
+                                .then(function () { cmdReply(true, { created: true }); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported fs action: ' + fsAct);
                         return;
                     }
 
