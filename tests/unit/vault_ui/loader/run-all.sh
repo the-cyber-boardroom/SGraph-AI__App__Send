@@ -19,5 +19,9 @@ node tests/unit/vault_ui/loader/test__sgsend_access_token.js
 node tests/unit/vault_ui/loader/test__app_permissions.js
 node tests/unit/vault_ui/loader/test__secure_channel_envelope.js
 node tests/unit/vault_ui/loader/test__secure_channel.js
+node tests/unit/vault_ui/loader/test__kernel_mounts.js
+node tests/unit/vault_ui/loader/test__kernel_broker.js
+node tests/unit/vault_ui/loader/test__kernel_relay.js
+node tests/unit/vault_ui/loader/test__app_permissions_vault_mount.js
 echo ""
 echo "=== All vault unit tests passed ==="

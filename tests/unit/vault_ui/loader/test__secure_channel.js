@@ -191,4 +191,4 @@ console.log('\n[suite] SecureChannel — channel.close() lifecycle');
 }
 
 console.log(`\n[result] ${pass} passed, ${fail} failed`);
-if (fail) process.exit(1);
+process.exit(fail ? 1 : 0);    // open MessagePorts keep the loop alive — explicit exit

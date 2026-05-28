@@ -98,6 +98,7 @@
             vault: {
                 create:   _grant(vault.create),
                 unlink:   _grant(vault.unlink),
+                mount:    _grant(vault.mount),       // ViV Phase 2: parent → child kernel spawn
                 'delete': vault['delete'] === true   // bool only (always consent-gated)
             }
         };

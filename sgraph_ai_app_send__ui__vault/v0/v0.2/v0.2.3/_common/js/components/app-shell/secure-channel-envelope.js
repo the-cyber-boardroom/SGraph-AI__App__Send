@@ -65,6 +65,75 @@
         });
     }
 
+    // ─── Mixed-payload canonicalisation (review B2 at the request layer) ───────────
+    // For payloads like { path: 'data/x', data: <Uint8Array> } — i.e. a JSON-shaped
+    // object that EMBEDS bytes — we need a deterministic byte representation for the
+    // signature. The wire still carries the object via structured clone (so Uint8Array
+    // round-trips natively). For signing we serialise to JSON with embedded bytes
+    // represented as `{ __u8: <base64> }`.
+
+    function _bytesToB64(u8) {
+        // Chunked to avoid `apply` arg-count limits and string-concat blowups.
+        let s = '';
+        const CH = 8192;
+        for (let i = 0; i < u8.length; i += CH) {
+            s += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + CH, u8.length)));
+        }
+        return btoa(s);
+    }
+    function _b64ToBytes(s) {
+        const bin = atob(s);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        return u8;
+    }
+
+    function _hasEmbeddedBytes(v) {
+        if (v == null) return false;
+        if (v instanceof Uint8Array || v instanceof ArrayBuffer) return true;
+        if (Array.isArray(v)) {
+            for (let i = 0; i < v.length; i++) if (_hasEmbeddedBytes(v[i])) return true;
+            return false;
+        }
+        if (typeof v === 'object') {
+            for (const k in v) if (Object.prototype.hasOwnProperty.call(v, k)) {
+                if (_hasEmbeddedBytes(v[k])) return true;
+            }
+        }
+        return false;
+    }
+
+    function _canonicalSerialise(v) {
+        if (v === null || v === undefined) return null;
+        if (v instanceof Uint8Array)  return { __u8: _bytesToB64(v) };
+        if (v instanceof ArrayBuffer) return { __u8: _bytesToB64(new Uint8Array(v)) };
+        if (Array.isArray(v))         return v.map(_canonicalSerialise);
+        if (typeof v === 'object') {
+            const keys = Object.keys(v).sort();
+            const out = {};
+            for (let i = 0; i < keys.length; i++) out[keys[i]] = _canonicalSerialise(v[keys[i]]);
+            return out;
+        }
+        return v;
+    }
+    function _canonicalParse(s) {
+        if (s === null || s === undefined) return s;
+        if (typeof s === 'object' && !Array.isArray(s)
+            && typeof s.__u8 === 'string' && Object.keys(s).length === 1) {
+            return _b64ToBytes(s.__u8);
+        }
+        if (Array.isArray(s)) return s.map(_canonicalParse);
+        if (typeof s === 'object') {
+            const out = {};
+            for (const k of Object.keys(s)) out[k] = _canonicalParse(s[k]);
+            return out;
+        }
+        return s;
+    }
+    function _mixedCanonicalBytes(v) {
+        return new TextEncoder().encode(JSON.stringify(_canonicalSerialise(v)));
+    }
+
     // ─── Key generation ─────────────────────────────────────────────────────────────
 
     async function generateSignKeypair() {
@@ -222,31 +291,64 @@
         if (!signKey) throw codeError('EPROTO', 'signKey required');
         if (enc && !encKey) throw codeError('EPROTO', 'encKey required when enc:true');
 
-        // 1. Determine the payload bytes + kind
-        let payloadBytes, kind;
+        // 1. Determine kind + the signed bytes
+        //    'bytes'  : payload is a Uint8Array/ArrayBuffer (fast path, byte-exact).
+        //    'json'   : payload is a plain JSON value with NO embedded bytes.
+        //    'mixed'  : payload is an object/array that contains embedded bytes
+        //               (e.g. vfs.write { path, data:<Uint8Array> }). Wire carries
+        //               the value via structured clone; sig over canonical form.
+        let kind, envPayload, payloadSigBytes;
+
         if (payload === undefined) {
-            payloadBytes = new Uint8Array(0);
             kind = 'json';
+            const zero = new Uint8Array(0);
+            if (enc) {
+                const { iv, ct } = await encryptBytes(zero, encKey);
+                envPayload = { kind, iv, ct };
+                payloadSigBytes = ct;
+            } else {
+                envPayload = { kind, data: zero };
+                payloadSigBytes = zero;
+            }
         } else if (isBytes(payload)) {
-            payloadBytes = toU8(payload);
             kind = 'bytes';
+            const bytes = toU8(payload);
+            if (enc) {
+                const { iv, ct } = await encryptBytes(bytes, encKey);
+                envPayload = { kind, iv, ct };
+                payloadSigBytes = ct;
+            } else {
+                envPayload = { kind, data: bytes };
+                payloadSigBytes = bytes;
+            }
+        } else if (_hasEmbeddedBytes(payload)) {
+            kind = 'mixed';
+            const canon = _mixedCanonicalBytes(payload);
+            if (enc) {
+                const { iv, ct } = await encryptBytes(canon, encKey);
+                envPayload = { kind, iv, ct };
+                payloadSigBytes = ct;
+            } else {
+                // Wire carries the original object via structured clone — Uint8Array
+                // fields round-trip natively over MessageChannel.postMessage. The sig
+                // is over the canonical form so both sides compute the same bytes.
+                envPayload = { kind, value: payload };
+                payloadSigBytes = canon;
+            }
         } else {
-            payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
             kind = 'json';
+            const jsonBytes = new TextEncoder().encode(JSON.stringify(payload));
+            if (enc) {
+                const { iv, ct } = await encryptBytes(jsonBytes, encKey);
+                envPayload = { kind, iv, ct };
+                payloadSigBytes = ct;
+            } else {
+                envPayload = { kind, data: jsonBytes };
+                payloadSigBytes = jsonBytes;
+            }
         }
 
-        // 2. Encrypt if requested
-        let envPayload, payloadSigBytes;
-        if (enc) {
-            const { iv, ct } = await encryptBytes(payloadBytes, encKey);
-            envPayload     = { kind, iv, ct };
-            payloadSigBytes = ct;          // sign over ciphertext (a.k.a. encrypt-then-MAC pattern)
-        } else {
-            envPayload     = { kind, data: payloadBytes };
-            payloadSigBytes = payloadBytes;
-        }
-
-        // 3. Sign meta || payload
+        // 2. Sign meta || payload
         const metaBytes = new TextEncoder().encode(canonicalMetaJSON({ v, cid, dir, id, type, nonce, ts, enc }));
         const toSign    = concatBytes(metaBytes, payloadSigBytes);
         const sig       = await signBytes(toSign, signKey);
@@ -261,8 +363,21 @@
         if (!env.payload || !env.sig)               throw codeError('EPROTO', 'envelope missing payload/sig');
         if (env.enc && !decKey)                     throw codeError('EPROTO', 'decKey required for enc:true');
 
-        // 1. Recompute signed bytes
-        const payloadSigBytes = env.enc ? toU8(env.payload.ct) : toU8(env.payload.data);
+        const kind = env.payload.kind;
+
+        // 1. Recompute the bytes that were signed.
+        //    - enc:true                → ct (encrypt-then-MAC)
+        //    - kind:'bytes' or 'json'  → env.payload.data
+        //    - kind:'mixed' enc:false  → canonical-serialise(env.payload.value)
+        let payloadSigBytes;
+        if (env.enc) {
+            payloadSigBytes = toU8(env.payload.ct);
+        } else if (kind === 'mixed') {
+            payloadSigBytes = _mixedCanonicalBytes(env.payload.value);
+        } else {
+            payloadSigBytes = toU8(env.payload.data);
+        }
+
         const metaBytes = new TextEncoder().encode(canonicalMetaJSON(env));
         const toVerify  = concatBytes(metaBytes, payloadSigBytes);
 
@@ -275,28 +390,34 @@
         }
         if (!valid) throw codeError('EPROTO', 'bad signature');
 
-        // 3. Decrypt if needed
-        let payloadBytes;
-        if (env.enc) {
-            payloadBytes = await decryptBytes({ iv: env.payload.iv, ct: env.payload.ct }, decKey);
-        } else {
-            payloadBytes = toU8(env.payload.data);
-        }
-
-        // 4. Interpret
-        const kind = env.payload.kind;
+        // 3. Interpret payload per kind
         let payload;
         if (kind === 'bytes') {
-            payload = payloadBytes;
+            if (env.enc) {
+                payload = await decryptBytes({ iv: env.payload.iv, ct: env.payload.ct }, decKey);
+            } else {
+                payload = toU8(env.payload.data);
+            }
         } else if (kind === 'json') {
-            if (payloadBytes.length === 0) {
+            let bytes;
+            if (env.enc) bytes = await decryptBytes({ iv: env.payload.iv, ct: env.payload.ct }, decKey);
+            else         bytes = toU8(env.payload.data);
+            if (bytes.length === 0) {
                 payload = undefined;
             } else {
-                try {
-                    payload = JSON.parse(new TextDecoder().decode(payloadBytes));
-                } catch (err) {
-                    throw codeError('EPROTO', 'bad json payload: ' + err.message);
-                }
+                try { payload = JSON.parse(new TextDecoder().decode(bytes)); }
+                catch (err) { throw codeError('EPROTO', 'bad json payload: ' + err.message); }
+            }
+        } else if (kind === 'mixed') {
+            if (env.enc) {
+                const plain = await decryptBytes({ iv: env.payload.iv, ct: env.payload.ct }, decKey);
+                let serialised;
+                try { serialised = JSON.parse(new TextDecoder().decode(plain)); }
+                catch (err) { throw codeError('EPROTO', 'bad mixed payload: ' + err.message); }
+                payload = _canonicalParse(serialised);
+            } else {
+                // Wire carried the original value via structured clone (Uint8Arrays intact).
+                payload = env.payload.value;
             }
         } else {
             throw codeError('EPROTO', 'unknown payload kind: ' + kind);
