@@ -115,7 +115,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
         if self.config.enable_cors:
             self.app().add_middleware(CORSMiddleware,
                                       allow_origins     = ["*"]                                                                                                      ,
-                                      allow_credentials = True                                                                                                       ,
+                                      allow_credentials = False                                                                                                      ,
                                       allow_methods     = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]                                                          ,
                                       allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization", HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY, HEADER__SGRAPH_VAULT__PUBLIC, HEADER__SGRAPH_VAULT__READ_KEY, HEADER__SGRAPH_TRANSFER__DELETE_AUTH],
                                       expose_headers    = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization"]                                  )
