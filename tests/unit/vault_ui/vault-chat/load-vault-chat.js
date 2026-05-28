@@ -33,6 +33,7 @@ load('execution-center.js');
 load('vault-flush-controller.js');
 load('chat-session.js');
 load('vault-chat-loop.js');
+load('tools/consolidate-memory.js');
 load('mock-sg.js');
 
 export const VaultChat = global.window.VaultChat;

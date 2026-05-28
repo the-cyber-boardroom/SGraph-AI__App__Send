@@ -41,6 +41,8 @@
                     </select>
                     <select class="mode" title="persistence mode"><option>ephemeral</option><option>snapshot</option><option>synced</option></select>
                     <select class="loadout" title="tool loadout"><option>edit</option><option>read-only</option><option>memory-curation</option></select>
+                    <input class="scope" value="/" size="10" title="fractal scope (e.g. /, /work, /notes/2026)">
+                    <button class="prune" title="self-prune: consolidate /chat/history → /chat/consolidated, shrink the live prompt">consolidate</button>
                     <label class="llm"><input type="checkbox" class="real"> real LLM</label>
                     <input type="password" class="key" placeholder="sk-or-… (real LLM)" autocomplete="off" spellcheck="false" style="display:none">
                   </div>
@@ -57,6 +59,7 @@
                         <div class="tabs">
                           <button class="tab active" data-tab="log">Log</button>
                           <button class="tab" data-tab="layers">Layers</button>
+                          <button class="tab" data-tab="history">History</button>
                           <button class="tab" data-tab="tools">Tools</button>
                         </div>
                         <div class="tabpanel" data-panel="log">
@@ -64,6 +67,7 @@
                           <h4>Execution log</h4><div class="log"></div>
                         </div>
                         <div class="tabpanel" data-panel="layers" hidden></div>
+                        <div class="tabpanel" data-panel="history" hidden></div>
                         <div class="tabpanel" data-panel="tools" hidden></div>
                       </div>
                     </div>
@@ -83,8 +87,9 @@
                 this._q('.key').style.display = e.target.checked ? '' : 'none';
                 this._build();
             });
-            ['.mode', '.loadout'].forEach((s) => this._q(s).addEventListener('change', () => { this._syncControls(); this._renderActiveTab(); }));
+            ['.mode', '.loadout', '.model', '.scope'].forEach((s) => this._q(s).addEventListener('change', () => { this._syncControls(); this._renderActiveTab(); }));
             this.shadowRoot.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => this._showTab(t.dataset.tab)));
+            this._q('.prune').addEventListener('click', () => this._runConsolidate());
         }
 
         _showTab(name) {
@@ -96,6 +101,7 @@
 
         _renderActiveTab() {
             if (this._activeTab === 'layers') this._renderLayers();
+            else if (this._activeTab === 'history') this._renderHistory();
             else if (this._activeTab === 'tools') this._renderTools();
         }
 
@@ -104,17 +110,19 @@
         _build() {
             const C = VC();
             this._vfs = new C.MemoryVfs();
-            this._session = new C.ChatSession({ mode: this._q('.mode').value, loadout: this._q('.loadout').value, budgetUsd: 1.0, model: this._q('.model').value });
+            this._session = new C.ChatSession({ mode: this._q('.mode').value, loadout: this._q('.loadout').value, budgetUsd: 1.0, model: this._q('.model').value, scopeRoot: (this._q('.scope').value || '/') });
             this._log = [];
+            this._ecRef = { ec: null };                              // late-bound so consolidate can preflight
             this._ec = new C.ExecutionCenter({
                 policies: this._policies(),
                 registry: C.BuiltinTools.OPENAI_SCHEMAS,            // model-ready tool schemas
-                runners: this._runners(),
+                runners: this._runners(this._ecRef),
                 confirm: (req) => this._confirm(req),
                 log: (row) => { this._log.push(row); this._renderLog(); this._renderLedger(); },
-                estimate: (name) => (name === 'create_infographic' ? 0.06 : 0),
+                estimate: (name) => (name === 'create_infographic' ? 0.06 : name === 'consolidate_memory' ? 0.01 : 0),
                 budgetUsd: 1.0,
             });
+            this._ecRef.ec = this._ec;
             this._fc = new C.VaultFlushController(this._vfs, this._sg || this._mockSg(), this._q('.mode').value);
             this._loop = new C.ChatLoop({ executionCenter: this._ec, session: this._session, vfs: this._vfs, sendLlm: this._sendLlm(), onEvent: (e) => this._renderEvent(e) });
             this._renderLedger(); this._renderLog();
@@ -134,24 +142,37 @@
             this._fc.mode = this._q('.mode').value;
             this._session.mode = this._q('.mode').value;
             this._session.model = this._q('.model').value;
+            this._session.scopeRoot = this._q('.scope').value || '/';
         }
 
-        // Built-in runners against the working set, with vault pull-through when a bridge is present.
-        _runners() {
+        // Built-in runners against the working set, with vault pull-through when a bridge
+        // is present, plus the consolidate_memory self-prune runner (doc 05 §4).
+        _runners(ecRef) {
             const C = VC();
             const base = C.BuiltinTools.makeRunners(this._vfs);
-            const sg = this._sg;
-            if (!sg) return base;
-            const vfs = this._vfs;
-            return Object.assign({}, base, {
+            const sg = this._sg, vfs = this._vfs, session = this._session;
+            const withPullThrough = !sg ? base : Object.assign({}, base, {
                 async read_file(args) {
                     const path = C.BuiltinTools.guard(args.path);
                     if (await vfs.exists(path)) return base.read_file(args);
-                    const text = await sg.vfs.readText(path);    // pull vault file into the working set
+                    const text = await sg.vfs.readText(path);
                     await vfs.writeFile(path, text);
-                    return { ok: true, path, content: text, pulledFromVault: true };
+                    return { ok: true, path, content: text, untrusted: true, pulledFromVault: true };
                 },
             });
+            withPullThrough.consolidate_memory = C.ConsolidateMemory.makeRunner({
+                ecRef, vfs, session, getSendLlm: () => this._loop && this._loop.sendLlm,
+            });
+            return withPullThrough;
+        }
+
+        async _runConsolidate() {
+            try {
+                const r = await this._ec.execute('consolidate_memory', { retainTail: 2 });
+                if (r && r.consolidatedPath && this._loop) await this._loop.rebuildAfterConsolidate(r);
+                this._renderEvent({ type: 'system', text: r && r.skipped ? `nothing to prune (${r.skipped})` : `consolidated → ${r.consolidatedPath}` });
+            } catch (e) { this._renderEvent({ type: 'error', text: e.message }); }
+            this._renderLedger(); this._renderActiveTab();
         }
 
         _sendLlm() {
@@ -216,7 +237,8 @@
             else if (e.type === 'tool-result') {
                 const r = e.result || {}; div.className = 'tc';
                 div.textContent = r.denied ? '↳ denied' : r.refused ? `↳ REFUSED: ${r.reason}` : r.ok === false ? `↳ error: ${r.error}` : '↳ ok';
-            } else { div.className = 'm err'; div.textContent = e.text || ''; }
+            } else if (e.type === 'system') { div.className = 'm sys'; div.innerHTML = `<span class="r">system</span>${esc(e.text)}`; }
+            else { div.className = 'm err'; div.textContent = e.text || ''; }
             t.appendChild(div); this._scroll();
         }
 
@@ -253,12 +275,53 @@
                 ? work.map((f) => `<div class="lr">${esc(f.path)} <span class="dim">${f.size}b</span></div>`).join('')
                 : '<div class="lr dim">empty</div>';
             const vaultLine = this._sg ? 'vault: via window.sg bridge (read_file pulls through)' : 'vault: none (standalone — working set only)';
+            const consolidated = files.filter((f) => f.path.startsWith('/chat/consolidated/'));
             panel.innerHTML =
                 `<h4>Vault</h4><div class="lr dim">${esc(vaultLine)}</div>` +
+                `<div class="lr">scope: <code>${esc(this._session.scopeRoot || '/')}</code></div>` +
                 `<h4>VFS working set (${work.length})</h4>${fileRows}` +
                 `<h4>History</h4><div class="lr">${history.length} turn file(s) under /chat/history</div>` +
-                `<h4>Assembled prompt</h4><div class="lr">~${tokens} tokens · ${this._loop ? this._loop._messages.length : 0} messages</div>` +
-                `<h4>Budget</h4><div class="lr">spent $${l.spentUsd.toFixed(3)} / $${isFinite(l.budgetUsd) ? l.budgetUsd.toFixed(2) : '∞'}</div>`;
+                (consolidated.length ? `<h4>Consolidated</h4>` + consolidated.map((f) => `<div class="lr">${esc(f.path)} <span class="dim">${f.size}b</span></div>`).join('') : '') +
+                `<h4>Assembled prompt</h4><div class="lr">~${tokens} tokens · ${this._loop ? this._loop._messages.length : 0} messages <button class="cbtn fp">view full prompt</button></div>` +
+                `<pre class="fullprompt" hidden></pre>` +
+                `<h4>Budget</h4><div class="lr">spent $${l.spentUsd.toFixed(3)} / $${isFinite(l.budgetUsd) ? l.budgetUsd.toFixed(2) : '∞'}  ·  mem $${l.byTag.memory.toFixed(3)}</div>`;
+            const fp = panel.querySelector('.fp');
+            const pre = panel.querySelector('.fullprompt');
+            if (fp) fp.onclick = () => {
+                if (pre.hidden) { pre.textContent = JSON.stringify(this._loop ? this._loop._messages : [], null, 2); pre.hidden = false; fp.textContent = 'hide full prompt'; }
+                else { pre.hidden = true; fp.textContent = 'view full prompt'; }
+            };
+        }
+
+        // Phase 4: History tab — list /chat/history/*, drop a turn from the live prompt
+        // (originals stay in the working set; this is the lossless edit).
+        async _renderHistory() {
+            const panel = this.shadowRoot.querySelector('[data-panel="history"]');
+            if (!panel) return;
+            const files = (await this._vfs.listAll())
+                .filter((f) => f.path.startsWith('/chat/history/'))
+                .sort((a, b) => a.path.localeCompare(b.path));
+            const rows = files.length
+                ? files.map((f) => `<div class="tr"><code>${esc(f.path)}</code> <span class="dim">${f.size}b</span><button class="cbtn drop" data-path="${esc(f.path)}">drop</button></div>`).join('')
+                : '<div class="lr dim">no history yet — send a message</div>';
+            panel.innerHTML = `<h4>History (${files.length})</h4>${rows}` +
+                `<div class="dim" style="margin-top:8px">"drop" removes a turn from the LIVE prompt only. Originals remain in /chat/history/ — the prune is lossless.</div>`;
+            panel.querySelectorAll('button.drop').forEach((b) =>
+                b.addEventListener('click', async () => {
+                    const path = b.dataset.path;
+                    if (this._loop && this._loop._messages) {
+                        // remove any message whose history record path matches this file
+                        // (best-effort: also remove the last message that mirrors this content)
+                        // Conservative behaviour: drop by ordinal — N from /chat/history/NNNN.json
+                        const n = parseInt(path.replace(/^.*\/(\d+)\.json$/, '$1'), 10);
+                        if (Number.isFinite(n) && this._loop._messages.length > n) {
+                            this._loop._messages.splice(n, 1);   // index n (system is [0]) maps to turn n
+                        }
+                    }
+                    await this._vfs.deleteFile(path);
+                    await this._renderHistory();
+                    this._renderLedger();
+                }));
         }
 
         // --- Phase 2: interactive tools / loadout panel (doc 07 §B5) ---

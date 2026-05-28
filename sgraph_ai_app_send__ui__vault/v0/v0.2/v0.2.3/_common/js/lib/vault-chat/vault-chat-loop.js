@@ -29,6 +29,23 @@
             this.onEvent  = opts.onEvent || (() => {});   // ({type, ...}) for the UI transcript
         }
 
+        // Lossless rebuild: keep the system seed; insert the consolidated summary as a
+        // system message; keep the most recent `retainTail*2 + 2` non-system messages so
+        // the model has continuity (doc 05 §4). The dropped /chat/history/* files remain
+        // in the working set — pruning is over the LIVE PROMPT only.
+        async rebuildAfterConsolidate({ consolidatedPath, dropPaths, retainTail }) {
+            retainTail = retainTail == null ? 2 : retainTail;
+            const consolidated = await this.vfs.readText(consolidatedPath).catch(() => '');
+            const sys = this._messages[0];
+            const tail = this._messages.slice(1).slice(-(retainTail * 2 + 2));
+            this._messages = [
+                sys,
+                { role: 'system', content: 'PRIOR CONTEXT (CONSOLIDATED — originals preserved in /chat/history/):\n\n' + consolidated },
+                ...tail,
+            ];
+            this.onEvent({ type: 'system', text: `consolidated ${(dropPaths || []).length} prior turn(s) → ${consolidatedPath}` });
+        }
+
         // Provenance fencing (doc 09 §3): file content read into the prompt is untrusted.
         // Wrap it in non-spoofable delimiters labelled DATA so injection in a vault file
         // cannot issue instructions to the model.
@@ -81,6 +98,12 @@
                     const content = this._toolResultContent(result);
                     this._messages.push({ role: 'tool', name: call.name, toolCallId: call.id, content });
                     await this._writeHistory('tool', content, { name: call.name });
+
+                    // Lossless self-prune: replace the live transcript with the consolidated context
+                    // and the recent tail. Originals stay in /chat/history/. (doc 05 §4)
+                    if (call.name === 'consolidate_memory' && result && result.consolidatedPath) {
+                        await this.rebuildAfterConsolidate(result);
+                    }
                 }
                 // loop: resend with the tool results appended
             }

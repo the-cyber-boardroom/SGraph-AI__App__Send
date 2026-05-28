@@ -68,12 +68,20 @@ try {
     /spent \$0\.0/.test(ledger) ? ok('ledger accrued spend: ' + ledger.replace(/\s+/g, ' ').trim()) : fail('ledger not updated: ' + ledger);
 
     // Phase 2: Layers inspector
-    await page.getByText('Layers', { exact: true }).click();
+    await page.locator('.tab[data-tab="layers"]').click();
     const layers = await page.evaluate(() => document.querySelector('vault-chat-pane').shadowRoot.querySelector('[data-panel="layers"]').textContent);
     (/work\/a\.md/.test(layers) && /tokens/.test(layers)) ? ok('Layers inspector shows the working set + token estimate') : fail('layers panel incomplete: ' + layers.slice(0, 120));
 
+    // Phase 4: view-full-prompt
+    await page.locator('button.fp').click();
+    const promptVisible = await page.evaluate(() => {
+        const pre = document.querySelector('vault-chat-pane').shadowRoot.querySelector('.fullprompt');
+        return pre && !pre.hidden && pre.textContent.length > 50;
+    });
+    promptVisible ? ok('view full prompt reveals the assembled messages') : fail('full prompt not revealed');
+
     // Phase 2: Tools/loadout panel
-    await page.getByText('Tools', { exact: true }).click();
+    await page.locator('.tab[data-tab="tools"]').click();
     const tools = await page.evaluate(() => {
         const p = document.querySelector('vault-chat-pane').shadowRoot.querySelector('[data-panel="tools"]');
         return { text: p.textContent, selects: p.querySelectorAll('select[data-tool]').length };
@@ -81,6 +89,29 @@ try {
     (tools.selects >= 8 && /write_file/.test(tools.text) && !/data-tool="run_code"/.test(tools.text))
         ? ok(`Tools panel lists ${tools.selects} per-tool mode controls; run_code absent`)
         : fail('tools panel incomplete');
+
+    // Phase 4: History tab lists turn files
+    await page.locator('.tab[data-tab="history"]').click();
+    const hist = await page.evaluate(() => document.querySelector('vault-chat-pane').shadowRoot.querySelector('[data-panel="history"]').textContent);
+    /chat\/history\/0001\.json/.test(hist) ? ok('History tab lists turn files') : fail('history panel: ' + hist.slice(0, 120));
+
+    // Phase 4: consolidate button creates a /chat/consolidated/<ts>.md
+    await page.locator('button.prune').click();
+    await page.waitForFunction(() => /chat\/consolidated\//.test(document.querySelector('vault-chat-pane').shadowRoot.querySelector('.transcript').textContent), null, { timeout: 5000 });
+    ok('consolidate_memory wrote a consolidated summary');
+
+    // Phase 4: Layers now shows the Consolidated section
+    await page.locator('.tab[data-tab="layers"]').click();
+    const layers2 = await page.evaluate(() => document.querySelector('vault-chat-pane').shadowRoot.querySelector('[data-panel="layers"]').textContent);
+    /Consolidated/.test(layers2) ? ok('Layers reflects the consolidated file (lossless: originals remain)') : fail('layers post-consolidate: ' + layers2.slice(0, 120));
+
+    // Phase 4: fractal scope — change to /work, manifest filters
+    await page.locator('input.scope').fill('/work');
+    await page.locator('input.scope').dispatchEvent('change');
+    const scope = await page.evaluate(() => document.querySelector('vault-chat-pane')._session ? document.querySelector('vault-chat-pane')._session.scopeRoot : 'n/a');
+    // _session isn't on the element directly; verify via session.buildManifest via the rendered Layers
+    const layersScoped = await page.evaluate(() => document.querySelector('vault-chat-pane').shadowRoot.querySelector('[data-panel="layers"]').textContent);
+    /scope:.*\/work/.test(layersScoped) ? ok('fractal scope reflected in Layers') : fail('scope not reflected: ' + layersScoped.slice(0, 120));
 
     // real-LLM toggle reveals the key field
     await page.locator('.real').check();

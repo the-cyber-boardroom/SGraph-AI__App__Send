@@ -14,5 +14,6 @@ node tests/unit/vault_ui/vault-chat/test__chat_session.js
 node tests/unit/vault_ui/vault-chat/test__chat_loop.js
 node tests/unit/vault_ui/vault-chat/test__mock_llm.js
 node tests/unit/vault_ui/vault-chat/test__fencing_and_guards.js
+node tests/unit/vault_ui/vault-chat/test__consolidate_memory.js
 echo ""
 echo "=== All vault-chat unit tests passed ==="

@@ -37,16 +37,23 @@
         }
 
         // Build a manifest summary from a flat file list ([{path,name,size,type}]).
-        // Excludes the reserved control prefix (doc 09 §2). Names/sizes only — no content.
+        // Excludes the reserved control prefix (doc 09 §2), and filters by this.scopeRoot
+        // so a fractal scope (doc/folder/vault) controls what the LLM is told about.
+        // Names/sizes only — no content.
         buildManifest(entries) {
-            const visible = (entries || []).filter((e) =>
+            const root = this.scopeRoot || '/';
+            let visible = (entries || []).filter((e) =>
                 !(e.path === '/.vault' || (e.path || '').startsWith('/.vault/')));
-            if (!visible.length) return 'The vault scope is empty.';
+            if (root !== '/') {
+                const pre = root.replace(/\/?$/, '/');
+                visible = visible.filter((e) => e.path === root || (e.path || '').startsWith(pre));
+            }
+            if (!visible.length) return `The vault scope ${root} is empty.`;
             const lines = visible
                 .slice()
                 .sort((a, b) => (a.path || '').localeCompare(b.path || ''))
                 .map((e) => `  ${e.path}${e.type === 'folder' ? '/' : ''}${e.size ? `  (${e.size}b)` : ''}`);
-            return `The vault (scope ${this.scopeRoot}) contains:\n${lines.join('\n')}\n` +
+            return `The vault (scope ${root}) contains:\n${lines.join('\n')}\n` +
                 'Use read_file to load only what you need.';
         }
 
