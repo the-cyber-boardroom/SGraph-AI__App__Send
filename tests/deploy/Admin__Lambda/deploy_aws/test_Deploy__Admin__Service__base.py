@@ -46,7 +46,7 @@ class test_Deploy__Admin__Service__base():     # Base class for deployment tests
         assert self.deploy_fast_api.invoke().get('errorMessage') == DEFAULT__ERROR_MESSAGE__WHEN_FAST_API_IS_OK
 
     def test_7__invoke__function_url(self):
-        assert self.deploy_fast_api.invoke__function_url('/info/health') == {'status': 'ok'}
+        assert self.deploy_fast_api.invoke__function_url('/api/info/health') == {'status': 'ok'}
 
     # def test_8__delete(self):
     #     assert self.deploy_fast_api.delete() is True

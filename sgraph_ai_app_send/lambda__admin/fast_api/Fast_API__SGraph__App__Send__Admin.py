@@ -1,6 +1,5 @@
-from osbot_fast_api_serverless.fast_api.routes.Routes__Info import Routes__Info
-
 import sgraph_ai_app_send__ui__admin
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Info__SGraph           import Routes__Info__SGraph
 from osbot_fast_api.api.decorators.route_path                                       import route_path
 from osbot_utils.type_safe.primitives.core.Safe_UInt                                import Safe_UInt
 from osbot_fast_api.api.routes.Routes__Set_Cookie                                   import Routes__Set_Cookie
@@ -123,7 +122,7 @@ class Fast_API__SGraph__App__Send__Admin(Serverless__Fast_API):
     def setup_routes(self):
         self.setup_static_routes()
         self.setup_pulse_route()
-        self.add_routes(Routes__Info             )
+        self.add_routes(Routes__Info__SGraph     )
         self.add_routes(Routes__Tokens           ,
                         service_tokens = self.service_tokens)
         self.add_routes(Routes__Keys             ,

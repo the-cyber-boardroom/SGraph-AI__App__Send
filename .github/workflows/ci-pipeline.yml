@@ -298,7 +298,7 @@ jobs:
           IMG=${{ env.DOCKERHUB_IMAGE }}:${{ steps.version.outputs.tag }}
           docker run -d --name sg-send-vault-test -p 8080:8080 "$IMG"
           sleep 5
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/info/health)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/info/health)
           ROOT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
           docker stop sg-send-vault-test
           if [ "$STATUS" != "200" ];      then echo "Health check failed: $STATUS";  exit 1; fi

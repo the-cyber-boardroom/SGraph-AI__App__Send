@@ -1,6 +1,5 @@
-from osbot_fast_api_serverless.fast_api.routes.Routes__Info import Routes__Info
-
 from osbot_fast_api_serverless.fast_api.Serverless__Fast_API                        import Serverless__Fast_API
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Info__SGraph           import Routes__Info__SGraph
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import Routes__Transfers
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned             import Routes__Presigned
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Early_Access          import Routes__Early_Access
@@ -121,7 +120,7 @@ class Fast_API__SGraph__App__Send__User(Serverless__Fast_API):
                                       expose_headers    = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization"]                                  )
 
     def setup_routes(self):
-        self.add_routes(Routes__Info             )
+        self.add_routes(Routes__Info__SGraph     )
         self.add_routes(Routes__Transfers        ,
                         transfer_service     = self.transfer_service     ,
                         admin_service_client = self.admin_service_client )

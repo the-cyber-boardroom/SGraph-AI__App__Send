@@ -22,7 +22,7 @@ class test_Send__User_Lambda__Test_Client(TestCase):
         cls.client    = cls.test_objs.fast_api__client
 
     def test__health(self):
-        response = self.client.get('/info/health')
+        response = self.client.get('/api/info/health')
         assert response.status_code == 200
 
     def test__vault_write_read(self):
@@ -81,7 +81,7 @@ class test_Send__User_Lambda__Http_Server(TestCase):
                 HEADER__SGRAPH_VAULT__WRITE_KEY   : self.test_objs.write_key   }
 
     def test__health(self):
-        response = requests.get(f'{self.base_url}/info/health')
+        response = requests.get(f'{self.base_url}/api/info/health')
         assert response.status_code == 200
 
     def test__vault_write_read_via_http(self):
