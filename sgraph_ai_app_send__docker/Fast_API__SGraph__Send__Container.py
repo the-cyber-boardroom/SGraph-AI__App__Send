@@ -7,6 +7,12 @@ from starlette.staticfiles                                                      
 from osbot_fast_api.api.decorators.route_path                                   import route_path
 from sgraph_ai_app_send.lambda__user.fast_api.Fast_API__SGraph__App__Send__User  import Fast_API__SGraph__App__Send__User
 from sgraph_ai_app_send.lambda__user.user__config                               import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, ENV_VAR__SEND__VAULT_STATIC_DIR, SEND__VAULT_STATIC_DIR__DEFAULT
+from starlette.middleware.cors                                                  import CORSMiddleware
+from sgraph_ai_app_send.lambda__user.user__config                               import (HEADER__SGRAPH_SEND__ACCESS_TOKEN,
+                                                                                        HEADER__SGRAPH_VAULT__WRITE_KEY,
+                                                                                        HEADER__SGRAPH_VAULT__PUBLIC,
+                                                                                        HEADER__SGRAPH_VAULT__READ_KEY,
+                                                                                        HEADER__SGRAPH_TRANSFER__DELETE_AUTH)
 
 ENV_VAR__SEND__ENABLE_AUTH = 'SEND__ENABLE_AUTH'
 
@@ -17,7 +23,27 @@ class Fast_API__SGraph__Send__Container(Fast_API__SGraph__App__Send__User):
         result = super().setup()
         if self.should_enable_global_auth():
             self.enable_global_auth()
+            self._reassert_cors_outermost()                                         # CORS must sit OUTSIDE Check_API_Key (its allow_cors=True handler is wrong for null origins)
         return result
+
+    def _reassert_cors_outermost(self):
+        # enable_global_auth() adds Middleware__Check_API_Key at user_middleware[0]
+        # (Starlette's outermost slot). With allow_cors=True, that middleware's
+        # built-in preflight handler answers OPTIONS itself with a narrow allow_headers
+        # list and reflects the request Origin under credentials=true — so null-origin
+        # iframes get Access-Control-Allow-Origin: null and every custom-auth-header
+        # preflight fails. Re-adding CORS here pushes it BACK to [0] so it answers
+        # preflight first with the correct (allow_credentials=False + full allow_headers)
+        # config. The existing setup_middleware__cors entry stays in the stack as a
+        # harmless idle duplicate; can be deduplicated later.
+        self.app().add_middleware(CORSMiddleware,
+                                  allow_origins     = ["*"]                                                                                                      ,
+                                  allow_credentials = False                                                                                                      ,
+                                  allow_methods     = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]                                                          ,
+                                  allow_headers     = ["Content-Type", "X-Requested-With", "Origin", "Accept", "Authorization",
+                                                       HEADER__SGRAPH_SEND__ACCESS_TOKEN, HEADER__SGRAPH_VAULT__WRITE_KEY,
+                                                       HEADER__SGRAPH_VAULT__PUBLIC,      HEADER__SGRAPH_VAULT__READ_KEY,
+                                                       HEADER__SGRAPH_TRANSFER__DELETE_AUTH])
 
     def enable_global_auth(self):
         from osbot_fast_api.api.schemas.consts.consts__Fast_API  import ENV_VAR__FAST_API__AUTH__API_KEY__NAME, ENV_VAR__FAST_API__AUTH__API_KEY__VALUE
