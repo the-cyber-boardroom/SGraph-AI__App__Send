@@ -291,6 +291,94 @@ Updated test assertions from `/en-gb/vault` to `/en-gb/app` routing targets, con
 
 ---
 
+### Public Vault Previews (PVP) — v0.2.3 (05/25–26)
+
+An optional deliberately-public preview per vault. Code in `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/`.
+Confirmed shipped: the talk-to-the-vault brief (doc 493, 05/25) reports it "built and working" same-day.
+
+| Feature | Status |
+|---------|--------|
+| Slug → transfer ID + read-only key derivation | EXISTS |
+| Two access modes: `/app/<id>` (ask key) + `/app/<id>#<key>` (auto-load) | EXISTS |
+| OG social-share meta-tag cards (title, description, image) | EXISTS |
+| LARGE social card (1200×630): crop-to-fill + pad-to-fit options | EXISTS |
+| Bot UA routing to OG render endpoint | EXISTS |
+| Owner-controlled disclaimer badge + themed footer | EXISTS |
+| Copyable full-access link (masked/reveal + Copy→Copied feedback) | EXISTS |
+| Embedded Settings tab editor with live preview card | EXISTS |
+| Wrong-vault guard + loads existing published preview into editor | EXISTS |
+| Delete previews + per-vault management list | EXISTS |
+| ro-token key prompt on `/app/<id>` | EXISTS |
+| Pre-fill slug from vault name | EXISTS |
+| Bookkeeping: `.vault/owner/public-previews/` | EXISTS |
+| Timing/expiry controls (X days / X accesses) | **VERIFY** — brief specifies; implementation status unconfirmed |
+
+**Bookkeeping path:** `.vault/owner/public-previews/` (moved from root in `3d2f816` refactor)
+
+---
+
+### Sub-Vaults — v0.2.3, Phases 1–3 (05/25–26)
+
+Convention-based vault-within-vault, Git-submodule style. Code in `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/`.
+
+| Phase | Feature | Status |
+|-------|---------|--------|
+| Phase 1 | ro-links owner records — silent read-only open | EXISTS (`e1e685f`) |
+| Portable | ro-links open silently on any device without key re-entry | EXISTS (`8ddc0d6`) |
+| Phase 2 | Link card UI + vault-in-vaults user guide | EXISTS (`84b73af`) |
+| Phase 2 ext | External resources in controlled iframes | EXISTS (`8ae551a`) |
+| Phase 3 | Owner "Add link" UI in folder-tree controls | EXISTS (`32b9edb`) |
+| CLI access | Clone-within-clone for sgit CLI | PROPOSED (P-248) |
+
+**Convention file:** `.link.json` — a vault-pointer file recording the referenced child vault.
+**Lazy-load:** Sub-vaults pre-initialise on access (like folders), preserving open folders on load.
+**App bridge:** Sub-vault reads/lists are accessible via the VFS bridge from apps.
+
+---
+
+### App-Mode Permission System — v0.2.3, Phases 1–4B (05/27)
+
+Per-app capability grants declared in `app.json`; enforced by the VFS bridge. Code in `_common/js/components/app-shell/`.
+Spec: `team/roles/architect/reviews/05/27/v0.27.79__architect-spec__app-iframe-capabilities-and-permissions.md`
+Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-implementation.md`
+
+| Phase | Feature | Status | Tests |
+|-------|---------|--------|-------|
+| 1 | `AppPermissions` pure module (DOM-free, bridge-free) + security floor | EXISTS | 39 unit assertions |
+| 1 | Security floor: iframe cannot read/write/nav/list `.vault/**` or root `app.json` | EXISTS | 39 unit assertions |
+| 2 | `app.json` grants read by bridge + `fs.move/delete/mkdir` bridge verbs | EXISTS | Covered by Phase 1 |
+| 3 | HUD privileges chip — shows granted permissions in status bar | EXISTS | Browser |
+| 4A | `sg.ui.requestPermission` — runtime consent dialog in HUD | EXISTS | Browser |
+| 4B | `vault.create` + `vault.unlink` for apps (read-through child vaults) | EXISTS | Needs browser+backend |
+| 5 | `vault.delete` | **DEFERRED** — needs owner-secret credential tier + AppSec |
+| 6 | Reads default-deny (flip `READ_DEFAULT` to `false`) | **DEFERRED** — recorded decision |
+
+**`AppPermissions` module:** `normalizePath`, `hasVaultSegment`, `isFloor`, `parsePermissions`, `can`, `appId`. Loaded on `/en-gb/app` before `app-shell.js`. Globally at `globalThis.AppPermissions`.
+
+**In-iframe API (Phase 4B):** `sg.vault.create(path, label)` / `sg.vault.unlink(path)` / `sg.vault.delete(path)` — `vault.delete` returns `ENOTIMPL`.
+
+**Changelog:** `team/comms/changelog/05/27/v0.27.79__changelog__app-perms-phase{1..4b}*.md`
+
+---
+
+### Other Vault UI Improvements (05/25–26)
+
+| Feature | Status | Commit |
+|---------|--------|--------|
+| Vault header status pill (Synced / ↑N / ↓N / Diverged / Read-only states) | EXISTS | `00cb59b` |
+| Access-key entry with `GET /api/transfers/check-token/{key}` validation | EXISTS | `00cb59b` |
+| File actions (Upload/New File/New Folder) moved to tree panel | EXISTS | `4916fca` |
+| Deterministic RO-token ID resolution | EXISTS | `ab3d570` |
+| `sg.history.*` API + sub-vault transparency for apps | EXISTS | `e67fc95` |
+| Write access token threaded for in-app writes | EXISTS | `0a7dc2c` |
+| `HTMLImageElement.prototype.src` patched to serve vault images via bridge | EXISTS | `1b6b621` |
+| Vault key per-tab isolation; access token stays shared across tabs | EXISTS | `d22f720` |
+| App Mode honours requested file over default app | EXISTS | `a7a8c2e` |
+| Opened file persisted in URL (`#path`) — reloads and links work | EXISTS | `fc13d2c` |
+| Markdown files render in App Mode (MarkdownParser.parse not new MarkdownParser) | EXISTS | `e669a2a` |
+
+---
+
 ## PROPOSED
 
 Full list: [proposed/index.md](proposed/index.md)
@@ -300,3 +388,7 @@ Full list: [proposed/index.md](proposed/index.md)
 - **v0.3.0 deferred issues** (47 items) — post-release bug backlog from the v0.3.0 launch
 - **Vault upload beta** in main SG/Send UI — integrate vault-push into upload wizard
 - **Room + Vault pages** migrated to v0.4.0 IFD architecture (currently on v0.3.x legacy)
+- **P-248: Sub-vaults CLI access** — clone-within-clone for sgit; storage tracking; nested clone resolution. Source: doc 490, 05/25 briefs.
+- **P-249: Talk to the vault** — in-vault chat with tool-calling; vault-aware; read-write to self-contained vault; infographic generator + file tools; right-hand pane; user's own OpenRouter key. Arch pack at `library/sgraph-send/dev_packs/vault-chat/`. Source: doc 493, 05/25 briefs.
+- **App-Mode Phase 5: vault.delete** — deferred pending owner-secret credential tier + AppSec sign-off.
+- **App-Mode Phase 6: reads default-deny** — `READ_DEFAULT` flip once apps declare `fs.read` in `app.json`.
