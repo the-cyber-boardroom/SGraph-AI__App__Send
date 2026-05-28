@@ -71,37 +71,67 @@ channel.handle('vfs.read', async ({ path }) => kernel.vfs.read(path));
 
 Design rules baked into the implementation:
 - **Anchor = the port**, never `window`/`event.source`/`window.parent` (version-2 §4.1).
-- **Directional**: `create` returns an initiator handle (can `request`); `accept` returns a responder
-  handle (can `handle` + reply). A responder **cannot** initiate arbitrary requests upward — `channel.request`
-  on a responder throws `Error('directional: responder cannot initiate')`.
+- **Directional (precise rule):** a responder **cannot initiate a *request*** — `responder.request(...)`
+  throws `Error('directional: responder cannot initiate requests')`. **`send()` is permitted in both
+  directions** for events and replies; a responder must be able to emit `ready` and reply to requests,
+  or the Phase 2 spawn handshake deadlocks. Capability still flows down only (a responder gets *no*
+  handle that lets it invoke arbitrary RPC against the initiator); upward traffic is responses + events
+  the initiator subscribed to.
 - **Idempotent secret delivery**: handler for `secrets` is one-shot; the channel rejects a second `secrets`
   message with `EPROTO`.
 - **Non-extractable child key** (`extractable: false` in WebCrypto), except the one-use bootstrap key K1.
 
-## 3. The envelope (version-2 §4.2)
+## 3. The envelope (version-2 §4.2) — binary-safe wire
+
+> **CRITICAL fidelity rule (review B2):** binary payloads (`ArrayBuffer` / `Uint8Array` — file bytes
+> from `getFileBytes` / `saveFile`) **do not survive `JSON.stringify`** — they serialise to `{}`. So
+> the envelope cannot be a JSON string for the data path. Use a **structured-cloneable envelope object**
+> over `MessageChannel.postMessage`; that carries `ArrayBuffer`/`Uint8Array` natively (no copy, no
+> base64 bloat). JSON is used **only for logging metadata** (broker entries), never for the wire.
 
 `secure-channel-envelope.js` exposes a pure `Envelope` object:
 
 ```js
 globalThis.Envelope = {
-  // pack(opts) → { bytes:Uint8Array, sig:string }  — opts has v,cid,dir,id,type,nonce,ts,payload,enc
-  async pack({ v=1, cid, dir, id=null, type, nonce, ts=Date.now(), payload, enc=false, signKey }) { … }
+  // pack(opts) → envelope object (structured-cloneable) — opts has v,cid,dir,id,type,nonce,ts,payload,enc
+  // payload may be: a plain JSON object | a Uint8Array | an ArrayBuffer. Bytes are carried natively.
+  async pack({ v=1, cid, dir, id=null, type, nonce, ts=Date.now(), payload, enc=false, signKey,
+               encRecipientPub /* needed iff enc:true */ }) { … }
 
-  // unpack(bytes, { peerSignKey, decryptKey? }) → { v, cid, dir, id, type, nonce, ts, payload, enc }
+  // unpack(envObj, { peerSignKey, decryptPriv? }) → { v, cid, dir, id, type, nonce, ts, payload, enc }
+  // payload comes back AS BYTES if the original was bytes, AS OBJECT if the original was an object.
   // Throws Error with .code = 'EPROTO' on bad sig OR failed decrypt.
-  async unpack(bytes, { peerSignKey, decryptKey }) { … }
+  async unpack(envObj, { peerSignKey, decryptPriv }) { … }
 
-  // Helpers
-  async generateSignKeypair() { /* P-256 ECDSA, extractable false (pub extractable true) */ }
-  async generateEphemeralBootKey() { /* P-256 ECDSA, K1 — sign-only, ONE-USE, extractable true (private exported once) */ }
-  async deriveEncKey(senderPriv, recipientPub) { /* ECDH P-256 → AES-GCM key, non-extractable */ }
-  async encryptPayload(jsonObj, encKey, iv)    { /* returns { iv, ct } */ }
-  async decryptPayload({ iv, ct }, encKey)    { /* returns jsonObj or throws EPROTO */ }
+  // Helpers — encryptBytes / decryptBytes take BYTES (Uint8Array), not JSON objects.
+  async generateSignKeypair() { /* P-256 ECDSA, sign-priv non-extractable, pub extractable */ }
+  async generateEphemeralBootKey() { /* P-256 ECDSA, K1 — sign-only, ONE-USE, priv exported once over the port */ }
+  async deriveEncKey(senderEphPriv, recipientPub) { /* ECDH P-256 → AES-GCM, non-extractable */ }
+  async encryptBytes(bytes, encKey, iv) { /* bytes: Uint8Array → { iv, ct: Uint8Array } */ }
+  async decryptBytes({ iv, ct }, encKey) { /* returns Uint8Array, throws EPROTO on auth failure */ }
+
+  // Convenience for non-byte payloads
+  jsonToBytes(obj)  { return new TextEncoder().encode(JSON.stringify(obj)); }
+  bytesToJson(buf)  { return JSON.parse(new TextDecoder().decode(buf)); }
 };
 ```
 
-Wire format = JSON-serialised envelope as a `Uint8Array` (`TextEncoder().encode(JSON.stringify(env))`),
-because `MessageChannel` can carry it cheaply and it's easy to log/inspect.
+**Wire format = a structured-cloneable JS object** posted via `port.postMessage(env)`. The envelope's
+`payload` field holds either an object (for control messages) **or a `Uint8Array`/`ArrayBuffer`** (for
+data messages — `vfs.read` results, `vfs.write` `data`). The browser clones the envelope without
+JSON, so bytes round-trip exactly.
+
+When `enc:true` the payload is **encrypted as bytes first, then placed in the envelope** — the order
+is `bytes → encryptBytes → { iv, ct }` where `ct` is a `Uint8Array`, never a JSON-stringified blob.
+For a JSON payload that needs to be encrypted, encode `jsonToBytes(obj)` first, then `encryptBytes`.
+
+The signature `sig` is computed over a deterministic byte representation: concatenate `(v, cid, dir,
+id, type, nonce, ts, enc)` (as a canonical JSON sub-record) || payload-bytes (`ct` if `enc`, else the
+raw bytes if the payload is bytes, else `jsonToBytes(payload)`). Pin the rule in the implementation;
+mismatches between sender and verifier are a classic source of "signature randomly fails."
+
+**Logging:** `KernelBroker` records `{ op, path, mountId, credentialClass, decision, result, ts }` —
+**metadata only**, never the bytes. The audit trail must not contain PHI (see review §5.1 AppSec).
 
 > **Curve note** (version-2 §5.7.1): P-256 is verified-universal. Use ECDSA P-256 for sign and ECDH P-256
 > for key agreement. Switching to X25519/Ed25519 is a Phase 6 optimisation; do **not** start there.
@@ -134,11 +164,13 @@ After the handshake both sides hold each other's **sign public keys**. Every sub
 signed by the sender and verified by the recipient against the pinned peer pub key. The encryption key
 for sensitive payloads is derived per-message via ECDH from ephemeral keypairs (forward secrecy).
 
-> **Why K1 instead of just trusting the port:** the port alone is point-to-point authenticated by
-> construction, but K1 lets a *future* third party (e.g. another kernel reached via port transfer)
-> verify that a message originated from the initiator without holding the port itself. For Phase 1 this
-> is belt-and-suspenders; it becomes load-bearing in Phase 5 (`Kernel-B ↔ window.top` direct channel,
-> mediated by the spawning kernel at birth).
+> **Why K1 (purpose, scope-limited):** K1's only job is to let the child sign its generated K2.pub so
+> the initiator can pin the child's long-term key **before any secret flows**. The port alone is
+> point-to-point authenticated by construction; K1 binds the keypair the *child generated inside the
+> port* to the introduction message, so a future verifier can confirm the pinning was done at birth.
+> **There is no `window.top` channel anywhere in this design** (architect pack §01 §12 removed it).
+> The vaults page aggregates broker state **by querying each kernel** (Phase 5a), not via a top
+> channel. Do not introduce upward `window`/`window.top`/`window.parent` reach for any purpose.
 
 ## 5. Anti-replay (version-2 §4.2)
 
@@ -215,7 +247,9 @@ counter (or random nonce) AND keeps a `ReplayGuard` for incoming.
     }
 
     async request(type, payload, opts = {}) {
-      if (this._role !== 'initiator') throw codeError('EPROTO', 'directional: responder cannot initiate');
+      // NOTE: only request() is restricted; send() (events + replies) is permitted from both sides.
+      // bootFromMessage in Phase 2 relies on the responder being able to send('ready', ...).
+      if (this._role !== 'initiator') throw codeError('EPROTO', 'directional: responder cannot initiate requests');
       const id = randId();
       return new Promise(async (resolve, reject) => {
         this._pending.set(id, { resolve, reject });
@@ -342,18 +376,24 @@ Mandatory tests (mapping to version-2 §5.3):
 
 | # | Test | Maps to |
 |---|---|---|
-| **E1** | `Envelope.pack/unpack` round-trip (signed-only) | sanity |
+| **E1** | `Envelope.pack/unpack` round-trip (signed-only) with a plain JSON-object payload | sanity |
 | **E2** | Pack with `enc:true`, unpack with the recipient's key → returns the payload | sanity |
 | **E3** | Tampered ciphertext → `unpack` throws `Error{code:'EPROTO'}` | **T5** (misroute / bad sig fail-closed) |
 | **E4** | Wrong peerSignKey → `unpack` throws `EPROTO` | **T5** |
 | **E5** | `ReplayGuard.check` accepts unique nonces; rejects reused nonce with `EPROTO` | **T6** (replay) |
 | **E6** | `ReplayGuard.check` rejects `ts` outside the window with `EPROTO` | **T6** |
+| **E7** ★ | **Binary round-trip:** `pack({ payload: bytes })` then `unpack` returns a `Uint8Array` **byte-exact equal** to the input. Use the 8-byte PNG signature `Uint8Array.of(0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)`. Repeat with `enc:true` (encrypt→decrypt). | **review B2** — binary survives the wire |
+| **E8** | `Envelope.encryptBytes`/`decryptBytes` round-trip a non-UTF-8 byte sequence (the same PNG bytes); decrypting with a tampered `ct` throws `EPROTO`. | review B2 |
 | **C1** | Two `SecureChannel` instances wired via a `new MessageChannel()` (initiator + responder, non-sensitive mode). `initiator.request('echo', x)` → responder's `handle('echo', …)` returns the payload, initiator resolves with it. | sanity |
 | **C2** | As C1 but `sensitive: true` — handshake (K1/K2) completes, secrets payload round-trips encrypted. | handshake + crypto |
-| **C3** | Responder calls `channel.request` → throws `'directional: responder cannot initiate'`. | directional invariant (version-2 §4.1) |
+| **C3a** | Responder calls `channel.request(...)` → throws `'directional: responder cannot initiate requests'`. | directional invariant (precise — only `request()` is restricted) |
+| **C3b** ★ | **`send()` works both ways.** Responder calls `channel.send('ready', { kernelId: 'k-b' })`; the initiator's `channel.on('ready', cb)` is invoked with that payload. (This is the Phase 2 spawn handshake path — `bootFromMessage` deadlocks if this is suppressed.) | review B1 |
 | **C4** | A second `secrets` message is rejected (`EPROTO`). | idempotent boot (version-2 §4.1) |
+| **C5** ★ | **Live-channel binary round-trip:** through a real `MessageChannel`, `initiator.request('vfs.read', { path })` resolves with a `Uint8Array` byte-exact equal to what the responder's `handle('vfs.read', …)` returned (use the PNG signature). | review B2 — end-to-end byte fidelity over the channel |
 
-Aim for ~25 assertions total. Add to `tests/unit/vault_ui/loader/run-all.sh`.
+★ = added by the v0.29.2 architect review.
+
+Aim for ~30 assertions total. Add to `tests/unit/vault_ui/loader/run-all.sh`.
 
 ## 9. Commit & push
 
@@ -380,8 +420,10 @@ Phase 2 uses `SecureChannel` in three places:
    `sensitive`-mode crypto by default; the port itself is the authenticator.
 2. **Kernel-A ↔ Kernel-B (spawn)**: `_bootstrapFromIframe` is the bootstrap; `sensitive:true` because
    `secrets` flows. This is the primary path.
-3. **Future (Phase 5+)**: kernel→`window.top` direct channels for the broker UI — mediated by the
-   spawning kernel at birth via port transfer.
+3. **Any future cross-context edge** (workers, inter-tab, additional mounts) uses the **same**
+   `MessagePort` + `SecureChannel` pattern. **No `window.top` / `window.parent` / `frames[]` reach is
+   ever introduced** — architect pack §01 §12 removes it; the vaults page aggregates by querying each
+   kernel (Phase 5a), not via a top channel.
 
 Make sure the Phase 1 commit is green before starting Phase 2 — Phase 2 has nowhere to go if the
 channel isn't trustworthy.

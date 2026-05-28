@@ -79,6 +79,35 @@ Phase 0.5 is an external dependency (Dinis applies the CORS change in AWS — ve
 and 0.5 can proceed in parallel. Phase 2 is blocked on both. Phase 3 is the security deliverable and
 gates any third-party-app roadmap; if no third-party apps are planned, it can sequence after Phase 5.
 
+> **CORS status (as of 2026-05-28):** the **code-side fix is shipped** in `dev` — `Fast_API__SGraph__App__Send__User.py:117`
+> is now `allow_credentials = False` with `allow_origins = ["*"]` preserved (commit `434106dc`,
+> confirmed by the v0.29.2 architect review). The **remaining 0.5 work is operational** — CDN cache
+> invalidation, confirm CloudFront forwards `Origin` + honours `Vary: Origin`, and the real-browser
+> null-frame round-trip (architect pack §6.5–6.6). These must be green before Phase 2's browser end-to-end
+> test (`02-PHASE-2 §7`), **not** before Phase 1.
+
+## Pre-build architect review (v0.29.2) — patches applied
+
+The v0.29.2 architect review (`team/humans/dinis_cruz/briefs/05/vault-in-vault/version-2/v0.29.2__architect-review__viv-implementation-plan.md`)
+flagged two blocking defects in the Phase 1 doc; both are now patched. If you are reading this folder
+for the first time, the **post-review** state is:
+
+- **B1 (resolved):** the `directional` rule is precise — *only `request()` is restricted; `send()`
+  works both ways*. All `window.top` references have been removed from the impl pack — the design
+  forbids upward `window`/`window.parent`/`window.top` reach. Phase 5a's vaults page aggregates by
+  **querying each kernel**, not via a top channel.
+- **B2 (resolved):** binary payloads (file bytes) travel as **structured-cloneable `Uint8Array`** in the
+  envelope's `payload` field — they are **never** `JSON.stringify`-ed (that would yield `{}`). New tests
+  E7/E8 (envelope) and C5 (live channel) + T13 (cross-vault relay) pin byte-exact round-trip with the
+  PNG signature bytes. The `Envelope` helpers `encryptBytes`/`decryptBytes` take bytes, not JSON.
+- **N1 (folded):** `vfs.list` with `rest===''` is handled by the existing local-op branch
+  (`listFolder('/' + path)` with `path:''` ⇒ root); the relay forwards the empty path; a
+  `KernelMounts` test pins `resolve('mounts/p')` → `rest:''`.
+- **N2 (folded):** `02-PHASE-2-spawn-and-cross-vault-write.md` now opens with a hard precondition box
+  for the CDN-clean real-browser CORS check.
+- **N3 (folded):** `KernelBroker.mediate` returns an opaque `entryId`; `finalize(entryId, result)`
+  closes the matching row regardless of concurrency.
+
 ## What "done" looks like (acceptance — version-2 §5.2 gating checks)
 
 - **Phase 1:** `tests/unit/vault_ui/loader/test__secure_channel.js` green; T5/T6 (misroute, replay) covered.
