@@ -190,6 +190,25 @@ Builds entirely on EXISTING foundations: the SG/Send transfer flow + **DELETE** 
 | P-176 | Preview management list + **delete** (not just unpublish) | The editor lists every bookkeeping record under `.vault/owner/public-previews/` (a vault may hold several) with a published/unpublished badge and per-row Edit / Delete. **Unpublish** = `DELETE` the transfer but keep an inactive record (republish at the same link). **Delete** (`PublicPreviewWrite.deletePreview`) = best-effort `DELETE` the transfer **and** `removeFile` the bookkeeping record. Auto-load-into-form only when exactly one record is active; otherwise the owner picks from the list | lead clarification (delete accumulated preview files) |
 | P-177 | RO-token entry on the `/en-gb/app/<public-id>` key prompt | The preview card's key prompt (`sg-public-preview-card.js`) invites a read-only token alongside the vault key (placeholder + hint `ro-…`). The opener path `app-shell._initWithKey` branches on `key.startsWith('ro-')` → `_resolveROToken` → `SGVault.openReadOnly` (read-only; wrong-vault guard applies; not persisted as `sg-vault-key`). **WIRED:** the RO round-trip now resolves via a **deterministic transfer-id** — `SGVaultCrypto.deriveRoTokenTransferId(token)` = `SHA-256('ro-token-transfer-v1:'+bare)[:12]` — used by BOTH the writer (`vault-token-manager.createTransferToken` creates the creds transfer at that id) and the readers (`app-shell._resolveROToken` + `vault-loader.openROToken` derive the id, `GET /download/<id>`, decrypt with the token, `openReadOnly`). Drops the broken `check-token`-ciphertext dependency; no backend change (the `/create` schema already accepts a client `transfer_id`). Also fixed app-shell latent bugs: it had used the `ro-` prefix in the PBKDF2 passphrase and read camelCase fields from a snake_case payload. Guarded by `tests/unit/vault_ui/loader/test__ro_token_resolution.js`. **Pending:** browser verification of the full create→share→open flow; only newly-created tokens resolve (old random-id tokens never resolved anyway) | lead clarification (enter ro token in pic1) |
 
+## Talk to the Vault — Vault Chat with Tool-Calling (05/25 brief — doc 493)
+
+All items below are **PROPOSED — does not exist yet.**
+
+Architecture dev pack (12 documents, code-grounded against real `__Send` code): `library/sgraph-send/dev_packs/v0.27.80__vault-chat/`. Builds on EXISTING: `<app-shell>` + `window.sg` VFS bridge (`app-shell.js`); `vault-generate` LLM-over-`data-llm-bus`; vault file-ops/commit/sync (`sg-vault--file-ops.js`, `sg-vault--folder-ops.js`, `sg-vault-commit.js`, `sg-vault--sync.js`); `sg-agentic-loop`, `sg-tool-runner`, `sg-tool-definition`, `sg-llm-*` from `dev.tools.sgraph.ai` (REUSE unchanged).
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-248 | **Talk to the vault (vault chat, Track A substrate)** | Chat window inside the vault UI (new Vault App at `en-gb/vault/chat/`); vault-aware (reads vault files as context); tool-calling with visible execution via `sg-agentic-loop` + `sg-tool-runner`; read-write to the self-contained vault (write coalesced by `VaultFlushController` into one commit per turn); infographic generation + file modify/add/abstract; right-pane UI (starting UI); OpenRouter key stored at `/.vault/secrets/openrouter.key` (parent injects at iframe-boot; `/.vault/**` excluded from iframe VFS). VFS bridge extended with batch-commit method. Tool policy/budget governor wraps the agentic loop. Run-code NOT registered (Phase 8 gated). | doc 493 + dev pack v0.27.80 docs 02, 03, 04, 05, 08, 10, 12 |
+| P-249 | **Talk to the vault (vault chat, Track B cognition)** | Sidecars (parallel background LLM processes), multi-LLM consensus (primary + validator), semantic knowledge graph (facts/hypotheses/evidence persisted in vault). Built after Track A substrate is working. | dev pack v0.27.80 doc 06, 10 |
+
+**Key decisions settled (dev pack README §3):**
+- D1: Everything-in-iframe topology (chat UI, execution center, budget, key usage all in the chat iframe).
+- D4: OpenRouter key at `/.vault/secrets/openrouter.key`; injected by parent at boot; never readable by the iframe VFS.
+- D5: `ephemeral` (memory-only, commit-free) as default persistence; `snapshot` and `synced` opt-in.
+- D6: `run_code` not registered in Track A.
+
+---
+
 ## Vault Discovery and Public Keys (05/16 briefs — doc 422)
 
 | # | Feature | One-Line Description | Source |

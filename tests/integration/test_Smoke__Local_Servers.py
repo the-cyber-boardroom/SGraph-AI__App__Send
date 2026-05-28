@@ -89,7 +89,7 @@ class test_Smoke__Local_Servers(TestCase):
     # --- User Lambda (no auth required) ---
 
     def test__user__anonymous__health(self):
-        response = httpx.get(f"{USER_BASE_URL}/info/health")
+        response = httpx.get(f"{USER_BASE_URL}/api/info/health")
         assert response.status_code == 200
 
     def test__user__anonymous__docs(self):
@@ -111,23 +111,23 @@ class test_Smoke__Local_Servers(TestCase):
     # --- Admin Lambda (auth required) ---
 
     def test__admin__anonymous__rejected(self):
-        response = httpx.get(f"{ADMIN_BASE_URL}/info/health")
+        response = httpx.get(f"{ADMIN_BASE_URL}/api/info/health")
         assert response.status_code == 401
 
     def test__admin__auth_header__health(self):
         headers  = {AUTH_KEY_NAME: AUTH_KEY_VALUE}
-        response = httpx.get(f"{ADMIN_BASE_URL}/info/health", headers=headers)
+        response = httpx.get(f"{ADMIN_BASE_URL}/api/info/health", headers=headers)
         assert response.status_code == 200
 
     def test__admin__auth_cookie__health(self):
         cookies  = httpx.Cookies()
         cookies.set(AUTH_KEY_NAME, AUTH_KEY_VALUE)
-        response = httpx.get(f"{ADMIN_BASE_URL}/info/health", cookies=cookies)
+        response = httpx.get(f"{ADMIN_BASE_URL}/api/info/health", cookies=cookies)
         assert response.status_code == 200
 
     def test__admin__wrong_key__rejected(self):
         headers  = {AUTH_KEY_NAME: "wrong-value"}
-        response = httpx.get(f"{ADMIN_BASE_URL}/info/health", headers=headers)
+        response = httpx.get(f"{ADMIN_BASE_URL}/api/info/health", headers=headers)
         assert response.status_code == 401
 
     def test__admin__auth_header__docs(self):

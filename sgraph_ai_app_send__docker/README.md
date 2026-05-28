@@ -34,7 +34,7 @@ A FastAPI app (the Send "user lambda") running under uvicorn on port `8080`, wit
 
 Concretely, the image contains:
 
-- **The Send API** — `/api/transfers/*`, `/api/vault/*`, `/api/presigned/*`, `/api/vault/presigned/*`, plus `/info/health`, `/info/status`, `/api/docs` (OpenAPI), `/auth/set-cookie-form`.
+- **The Send API** — `/api/transfers/*`, `/api/vault/*`, `/api/presigned/*`, `/api/vault/presigned/*`, plus `/api/info/health`, `/api/info/status`, `/api/info/versions`, `/api/docs` (OpenAPI), `/auth/set-cookie-form`.
 - **The Vault UI** — flattened from the IFD versioned tree (`v0.2.3`) by `scripts/build-vault-static.sh` at image build time. Server-relative URLs only — no calls to `dev.send.sgraph.ai`.
 - **Storage** — pluggable via `Storage_FS` abstraction. Defaults to **disk** at `/data`; switchable to **memory** or **S3** at runtime.
 
@@ -71,7 +71,8 @@ docker run --rm -p 8080:8080 \
 | `http://localhost:8080/en-gb/` | Landing page — "Open a vault." |
 | `http://localhost:8080/en-gb/vault/` | Vault shell (the file browser, settings, sgit views) |
 | `http://localhost:8080/api/docs` | OpenAPI / Swagger UI |
-| `http://localhost:8080/info/health` | `{"status": "ok", ...}` |
+| `http://localhost:8080/api/info/health` | `{"status": "ok"}` |
+| `http://localhost:8080/api/info/versions` | App + dependency versions (Starlette, FastAPI, …) |
 
 ---
 
@@ -398,7 +399,7 @@ See the [Security domain in the reality doc](../team/roles/librarian/reality/sec
 - **No automatic cleanup of expired transfers.** Transfer expiry is enforced at read time (a stale transfer 404s) but the on-disk artefacts stick around. A reaper is on the roadmap.
 - **Admin UI is not bundled.** This image ships the **user / vault** surface only. The admin Lambda is a separate deployment.
 - **Vault UI version is pinned** to `v0.2.3` at image build time (`scripts/build-vault-static.sh`). New vault UI versions require a rebuild.
-- **No built-in metrics endpoint.** Health is at `/info/health`. Prometheus-style `/metrics` is on the roadmap.
+- **No built-in metrics endpoint.** Health is at `/api/info/health`. Prometheus-style `/metrics` is on the roadmap.
 
 ---
 
