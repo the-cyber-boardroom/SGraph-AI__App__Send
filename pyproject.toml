@@ -23,6 +23,7 @@ osbot-fast-api-serverless      = "*"
 mgraph-ai-service-cache        = "*"
 mgraph-ai-service-cache-client = "*"
 fastapi-mcp                    = "*"
+starlette                      = ">=1.0.1"
 
 [build-system]
 requires = ["poetry-core>=1.9.1"]
