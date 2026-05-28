@@ -38,14 +38,14 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | User Lambda API endpoints | 26 unique (34 route paths) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **73** |
-| Unit tests passing | **~641** (+39 from app-mode Phase 1 AppPermissions) |
+| Unit tests passing | **~760+** (~602 Python + ~150 new vault-UI JS assertions from sub-vaults, public previews, app-perms Phases 1–4B) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 366+ (365 + 2 added 05/28 for briefs 05/25 — Day 71; P-231 resolved to EXISTS) |
-| Total documents catalogued | 493 (488 + 5 briefs processed 05/25; Day 71 vault deepening thread) |
+| Open PROPOSED items (across all domains) | 366+ (365 + 2 added for briefs 05/25 — Day 71: P-248 sub-vaults CLI, P-249 talk to vault; P-231 resolved to EXISTS) |
+| Total documents catalogued | 493 (488 + 5 briefs processed 05/25; Day 71 SG/Send vault-deepening thread) |
 
 ---
 
