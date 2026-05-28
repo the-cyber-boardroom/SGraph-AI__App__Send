@@ -1,7 +1,8 @@
 from unittest                                                                       import TestCase
 from fastapi                                                                        import FastAPI
 from starlette.testclient                                                           import TestClient
-from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE, ROUTES_PATHS__INFO
+from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Info__SGraph           import ROUTES_PATHS__INFO__SGRAPH
 from sgraph_ai_app_send.lambda__user.fast_api.Fast_API__SGraph__App__Send__User     import Fast_API__SGraph__App__Send__User, ROUTES_PATHS__API_DOCS
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import ROUTES_PATHS__TRANSFERS
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned              import ROUTES_PATHS__PRESIGNED
@@ -40,7 +41,7 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
         assert 'x-sgraph-transfer-delete-auth' in headers                          # else the public-preview update/unpublish DELETE preflight fails
 
     def test__client__no_auth_required(self):
-        path     = '/info/health'
+        path     = '/api/info/health'
         response = self.client.get(url=path)
         assert response.status_code == 200
         assert response.json()      == ROUTES_INFO__HEALTH__RETURN_VALUE
@@ -48,7 +49,7 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
     def test__config_fast_api_routes(self):
         fast_api_paths = []
 
-        raw_paths      = sorted(ROUTES_PATHS__INFO                    +
+        raw_paths      = sorted(ROUTES_PATHS__INFO__SGRAPH            +
                                 ROUTES_PATHS__TRANSFERS               +
                                 ROUTES_PATHS__PRESIGNED               +
                                 ROUTES_PATHS__EARLY_ACCESS            +
