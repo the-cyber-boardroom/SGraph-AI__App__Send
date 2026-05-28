@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.27.79 | **Last updated:** 2026-05-26 | **Maintained by:** Librarian (daily run)
+**Version:** v0.28.7 | **Last updated:** 2026-05-28 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,21 +31,21 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-05-25)
+## Quick Stats (as of 2026-05-28)
 
 | Metric | Count |
 |--------|-------|
 | User Lambda API endpoints | 26 unique (34 route paths) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **73** |
-| Unit tests passing | **~602** |
+| Unit tests passing | **~760+** (~602 Python + ~150 new vault-UI JS assertions from sub-vaults, public previews, app-perms Phases 1–4B) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 365+ (341 + 24 added 05/26 for briefs 05/24 — Day 69-70) |
-| Total documents catalogued | 488 (463 + 25 briefs processed 05/24; sg-send-thread + sg-sentinel-batch2 + day-wrap) |
+| Open PROPOSED items (across all domains) | 366+ (365 + 2 added for briefs 05/25 — Day 71: P-248 sub-vaults CLI, P-249 talk to vault; P-231 resolved to EXISTS) |
+| Total documents catalogued | 493 (488 + 5 briefs processed 05/25; Day 71 SG/Send vault-deepening thread) |
 
 ---
 

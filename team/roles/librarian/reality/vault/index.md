@@ -107,7 +107,8 @@ Key proposals for this domain. Full details: see sub-files in `proposed/`.
 - **Vault migration / multi-remote** — pull from multiple remotes, migration tooling → `proposed/multi-remote.md`
 - **Named branch private key re-keying** — move from `read_key` to `write_key` (deferred, low current impact) → `proposed/structure-key-split.md`
 - **P-227: Vault-per-user as SG/Send storage substrate** — PROPOSED: one vault per user for SG/Send; SG/Sentinel rules write user activity to their vault; removes backend complexity; zero-knowledge nuance preserved (activity visible, content unseen). Requires SG/Sentinel deployed. Source: doc 468, 05/24 briefs.
-- **P-231: Vaults within vaults** — PROPOSED: open + create child vaults from inside a parent vault in the vault browser; parent/admin vault reads referenced children; fractal vault-of-vaults operational; no backend changes; respects zero-knowledge model. Client-side UI feature. Source: doc 472, 05/24 briefs.
+- **Sub-Vaults via Web UI (Phases 1–3)** — EXISTS as of 05/25–26: `.link.json` convention files + ro-links owner records; link card UI (Phase 2); owner "Add link" UI (Phase 3); portable ro-links (open on any device); lazy-load (preserve open folders); sub-vault reads/lists via app bridge. Implements P-231 for the Web UI access point. CLI access remains PROPOSED (P-248).
+- **P-248: Sub-vaults CLI access (clone-within-clone)** — PROPOSED: sgit CLI path for sub-vaults — track storage locations, resolve nested clones step by step. Deferred; Web UI prioritised first. Source: doc 490, 05/25 briefs.
 
 ---
 
