@@ -22,6 +22,9 @@ import sys
 ROOT = 'sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common'
 
 # Dependency order — same order the /app page loads, with kernel-* added.
+# kernel-app-handlers.js and kernel-bootstrap.js are bundled at the end so the
+# child kernel runs the SAME policy-enforcing code paths that the Node test suite
+# exercises (no more divergence between TestKernel and the shipped child).
 SCRIPTS = [
     'js/components/app-shell/app-permissions.js',
     'js/components/app-shell/secure-channel-envelope.js',
@@ -43,54 +46,24 @@ SCRIPTS = [
     'js/lib/links/vault-links.js',
     'js/components/app-shell/kernel-mounts.js',
     'js/components/app-shell/kernel-broker.js',
+    'js/components/app-shell/kernel-app-handlers.js',
+    'js/components/app-shell/kernel-bootstrap.js',
 ]
 
 # Inline child-side kernel boot listener. The ONE window.message listener — grabs
-# the transferred port and never listens on window again. Then SecureChannel.accept
-# completes the handshake; on 'secrets' the child kernel boots its vault.
+# the transferred port and hands it to bootKernelOnPort. That function lives in
+# kernel-bootstrap.js (and is unit-tested there); the only line that cannot be
+# unit-tested is the `window.addEventListener` here, because it touches `window`.
 KERNEL_BOOTSTRAP_JS = r"""
 (function () {
     'use strict';
-    // The ONE window.message listener — self-removes after grabbing port2.
     function boot(e) {
         if (!e.data || e.data.type !== 'init') return;
         window.removeEventListener('message', boot);
         var port = e.ports && e.ports[0];
         if (!port) { console.error('[kernel] no port on init'); return; }
-        SecureChannel.accept(port, { expectSensitive: true, cid: e.data.cid }).then(function (ch) {
-            // Channel ready. Wait for 'secrets' delivered from the parent.
-            ch.handle('secrets', async function (payload) {
-                var vaultKey = payload && payload.vaultKey;
-                var token    = payload && payload.accessToken;
-                if (!vaultKey) throw Object.assign(new Error('missing vaultKey'), { code: 'EPROTO' });
-                // Open the vault using the shipped lib.
-                var endpoint = 'https://dev.send.sgraph.ai';
-                var sgSend   = new SGSend({ endpoint: endpoint });
-                if (token) sgSend.token = token;
-                var vault       = await SGVault.open(sgSend, vaultKey);
-                var dataSource  = new VaultDataSource(vault, token || null);
-                // Register vfs.* handlers — relayed cross-vault ops land here.
-                ch.handle('vfs.read', async function (p) {
-                    return dataSource.getFileBytes(p.path);
-                });
-                ch.handle('vfs.list', async function (p) {
-                    return dataSource.listFolder('/' + (p.path || ''));
-                });
-                ch.handle('vfs.write', async function (p) {
-                    if (!dataSource.writable) throw Object.assign(new Error('Read-only'), { code: 'EPERM' });
-                    var path = p.path || '';
-                    var slash = path.lastIndexOf('/');
-                    var dir  = slash > 0 ? '/' + path.slice(0, slash) : '/';
-                    var name = path.slice(slash + 1);
-                    await dataSource.saveFile(dir, name, p.data instanceof Uint8Array ? p.data : new Uint8Array(p.data || []));
-                    // Push on the child's own server edge so the parent vault is untouched.
-                    if (vault.push) { try { await vault.push(); } catch (_) {} }
-                    return { ok: true };
-                });
-                // Signal ready to the parent (responder.send works both ways — review B1).
-                await ch.send('ready', { kernelId: 'k-' + (vault._vaultId || Date.now()) });
-            });
-        }).catch(function (err) { console.error('[kernel] handshake failed', err); });
+        globalThis.bootKernelOnPort(port, { cid: e.data.cid, expectSensitive: true })
+            .catch(function (err) { console.error('[kernel] handshake failed', err); });
     }
     window.addEventListener('message', boot);
 })();
@@ -103,14 +76,7 @@ def read_script(rel_path: str) -> str:
         return f.read()
 
 
-def main() -> int:
-    missing = [s for s in SCRIPTS if not os.path.exists(os.path.join(ROOT, s))]
-    if missing:
-        for m in missing:
-            print(f'  MISSING: {m}', file=sys.stderr)
-        print('Cannot build kernel-shell bundle.', file=sys.stderr)
-        return 1
-
+def build_bundle() -> str:
     scripts_html = []
     for rel in SCRIPTS:
         scripts_html.append(f'<script>\n{read_script(rel)}\n</script>')
@@ -126,6 +92,26 @@ def main() -> int:
     bundle += '(function () { "use strict"; globalThis.KERNEL_SHELL_HTML = '
     bundle += json.dumps(html)
     bundle += '; })();\n'
+    return bundle
+
+
+def main() -> int:
+    to_stdout = ('--stdout' in sys.argv[1:])
+
+    missing = [s for s in SCRIPTS if not os.path.exists(os.path.join(ROOT, s))]
+    if missing:
+        for m in missing:
+            print(f'  MISSING: {m}', file=sys.stderr)
+        print('Cannot build kernel-shell bundle.', file=sys.stderr)
+        return 1
+
+    bundle = build_bundle()
+
+    if to_stdout:
+        # L3 freshness check: tests compare this output against the committed file
+        # without mutating it.
+        sys.stdout.write(bundle)
+        return 0
 
     out_path = os.path.join(ROOT, 'js/components/app-shell/kernel-shell-bundle.js')
     with open(out_path, 'w', encoding='utf-8') as f:

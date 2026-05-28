@@ -1593,16 +1593,21 @@
                     } catch (_) { wReply(false, { err: 'Bad encoding' }); return; }
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
+                    // Floor is unconditional regardless of mount membership — the .vault floor
+                    // is enforced before the path leaves this parent.
                     if (AppPermissions.isFloor('write', wResolved)) { wReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPROTECTED' }); return; }
-                    if (!self._can('fs.write', wResolved)) { wReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPERM' }); return; }
-                    // ViV Phase 2: cross-mount write? If the resolved path is under a mount,
-                    // relay through the child kernel; otherwise fall through to the local op.
+                    // ViV Phase 2 / pack §4.4: mount resolve BEFORE the parent's own fs.write
+                    // grant. Crossing a mount, the parent's authorization is the broker (Edge 2)
+                    // plus the child's policy — NOT a literal fs.write match on the local path.
+                    // (M2 fix: previously we applied the parent's fs.write to the mounts/* path,
+                    // which forced the parent app.json to add a path it has no business writing to.)
                     if (self._mounts && self._mounts.resolve(wResolved)) {
                         self._handleVfsViv('write', { path: wResolved, data: wBytes })
                             .then(function () { wReply(true, { size: wBytes.byteLength, mounted: true }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: true, mounted: true }); })
                             .catch(function (err) { wReply(false, { err: err.message || 'Write failed', code: err.code || 'EPROTO' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: err.code || err.message }); });
                         return;
                     }
+                    if (!self._can('fs.write', wResolved)) { wReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPERM' }); return; }
                     var wSlash    = wResolved.lastIndexOf('/');
                     var wDir      = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                     var wFile     = wResolved.slice(wSlash + 1);
@@ -1623,9 +1628,27 @@
                 // ── List ──────────────────────────────────────────────────────
                 if (e.data.__sgVfsListReq) {
                     var listId  = e.data.__sgVfsListReq;
+                    var listSrc = e.source;
                     var prefix  = (e.data.path || '').replace(/^\//, '');
                     // Floor: never reveal .vault/** — reject a direct list of it (no existence oracle).
-                    if (AppPermissions.hasVaultSegment(prefix)) { try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {} return; }
+                    if (AppPermissions.hasVaultSegment(prefix)) { try { listSrc.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {} return; }
+                    // M3 fix: ViV Phase 2 — cross-mount list. If the prefix is under a mount,
+                    // relay through the child kernel (parity with read/write above).
+                    if (prefix && self._mounts && self._mounts.resolve(prefix)) {
+                        self._handleVfsViv('list', { path: prefix })
+                            .then(function (entries) {
+                                var listed = (entries || []).map(function (f) {
+                                    return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                                });
+                                self._emitBridgeCall('vfs.list', { path: prefix, count: listed.length, ok: true, mounted: true });
+                                try { listSrc.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed, mounted: true }, '*'); } catch (_) {}
+                            })
+                            .catch(function (err) {
+                                self._emitBridgeCall('vfs.list', { path: prefix, ok: false, err: err.code || err.message });
+                                try { listSrc.postMessage({ __sgVfsListReply: listId, ok: false, err: err.message || 'List failed', code: err.code || 'EPROTO', path: prefix }, '*'); } catch (_) {}
+                            });
+                        return;
+                    }
                     compositeReady.then(function () { return prefix ? ensureMountOpen(prefix) : null; }).then(function () {
                         var entries = dataSource.getFileList().filter(function (f) {
                             return !AppPermissions.hasVaultSegment(f.path) && self._can('fs.read', f.path);   // floor + read grant
@@ -1660,14 +1683,14 @@
                     var rPath     = e.data.path || '';
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
                     if (AppPermissions.isFloor('read', rResolved)) { rReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPROTECTED' }); return; }
-                    if (!self._can('fs.read', rResolved)) { rReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPERM' }); return; }
-                    // ViV Phase 2: cross-mount read? Relay through the child kernel.
+                    // M2 (read mirror): mount resolve BEFORE the parent's own fs.read grant.
                     if (self._mounts && self._mounts.resolve(rResolved)) {
                         self._handleVfsViv('read', { path: rResolved })
                             .then(function (buf) { rReply(true, { buf: buf, path: rResolved, mounted: true }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: true, bytes: (buf && buf.byteLength) || 0, mounted: true }); })
                             .catch(function (err) { rReply(false, { err: err.message || 'Read failed', code: err.code || 'EPROTO' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: err.code || err.message }); });
                         return;
                     }
+                    if (!self._can('fs.read', rResolved)) { rReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPERM' }); return; }
                     compositeReady.then(function () { return ensureMountOpen(rResolved); }).then(function () {
                         var rMatch = self._findEntryStrict(dataSource.getFileList(), rResolved);
                         if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }

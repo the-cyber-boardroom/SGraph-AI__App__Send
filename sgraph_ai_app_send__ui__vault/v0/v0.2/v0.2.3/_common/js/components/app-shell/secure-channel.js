@@ -155,9 +155,16 @@
                     this._handshakeWaits.delete(t);
                     res(raw);
                 } else {
+                    // L4: bound the pre-handshake buffer. A noisy/forged peer could otherwise
+                    // pump unknown types and grow memory unbounded before the handshake completes.
+                    // The handshake only needs 'hello' | 'introduce' | 'ready' — any unknown type
+                    // beyond a small allowance is dropped.
                     if (!this._preHandshakeBuf) this._preHandshakeBuf = new Map();
                     if (!this._preHandshakeBuf.has(t)) this._preHandshakeBuf.set(t, []);
-                    this._preHandshakeBuf.get(t).push(raw);
+                    const q = this._preHandshakeBuf.get(t);
+                    if (q.length < 8 && this._preHandshakeBuf.size < 8) {
+                        q.push(raw);
+                    }
                 }
                 return;
             }
@@ -175,6 +182,10 @@
                 console.warn('[secure-channel] dropped envelope', err.code || 'EPROTO', err.message);
                 return;
             }
+            // M6: pin to this channel's cid. A signature-valid envelope from a *different*
+            // channel pair (same code, different ports) would otherwise be processed here
+            // if a peer's port were ever cross-wired. Reject silently.
+            if (msg.cid !== this._cid) return;
 
             // Replies first — match against pending requests.
             // Two reply types so binary values aren't wrapped in JSON (review B2):

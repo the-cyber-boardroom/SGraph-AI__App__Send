@@ -137,26 +137,16 @@
     // ─── Key generation ─────────────────────────────────────────────────────────────
 
     async function generateSignKeypair() {
-        // ECDSA P-256. Private key extractable=false so it can't leak via exportKey.
-        // Public extractable=true so we can ship the pub over the wire.
+        // ECDSA P-256. extractable=true because we exportKey('spki', pub) over the wire;
+        // we never export the private key (no exportKey(... priv) call exists). L1 cleanup:
+        // the prior then/catch pair tried to split extractability per-side, but WebCrypto's
+        // generateKey applies the flag to both halves of the pair, so the fallback was the
+        // only reachable branch. Use the direct call.
         return crypto.subtle.generateKey(
             { name: 'ECDSA', namedCurve: 'P-256' },
-            false,
+            true,
             ['sign', 'verify']
-        ).then(async (pair) => {
-            // WebCrypto generateKey with extractable:false applies to BOTH; we need pub
-            // extractable. Re-generate with extractable:true and re-import private as
-            // non-extractable to enforce the asymmetry.
-            return pair;
-        }).catch(async () => {
-            // Fallback path used universally below — generate with extractable=true and
-            // accept that the pub side is what we export, never the priv.
-            return crypto.subtle.generateKey(
-                { name: 'ECDSA', namedCurve: 'P-256' },
-                true,
-                ['sign', 'verify']
-            );
-        });
+        );
     }
 
     // One-use bootstrap key: private MUST be extractable (we ship it to the child),
