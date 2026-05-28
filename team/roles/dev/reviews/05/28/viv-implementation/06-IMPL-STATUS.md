@@ -44,12 +44,25 @@ These are not implementation gaps — they're the per-spec live-environment chec
 
 ---
 
-## Phases 3 – 6 — design only (queued, NOT implemented)
+### Phase 3 sub-step C prep — `sg-app-stub.js` ✅ (landed; not yet wired)
+
+| Module / file | Purpose |
+|---|---|
+| `_common/js/components/app-shell/sg-app-stub.js` | The iframe-side `window.sg.*` API. Secret-less; every method is a `SecureChannel.request` to the kernel. The **APP is the channel-initiator** (it makes requests); the **kernel is the responder** (handles them, emits events like `sg.ready`). One `window.message` listener for the bootstrap, self-removing. `sg.app.*` metadata populated from the kernel's `sg.ready` event payload. Standalone module — **not yet injected** into `_buildAppSrcdoc` (that's full sub-step C, after sub-step A extracts the kernel-side handlers). |
+| `tests/unit/vault_ui/loader/test__sg_app_stub.js` | **13 jsdom-free assertions** (S1-S9). PNG-byte round-trip through the stub (B2 / T13 at the stub layer), `sg.ready` event hydration, error code propagation via `__err`, smoke audit that `window.sg` holds no `vaultKey`/`accessToken`/`_dataSource`/`_vault` literals. |
+
+**Updated totals:** 39 + 29 + 14 + 13 + 22 + 16 + 6 + 13 = **152 jsdom-free assertions, all green.**
+
+---
+
+## Phases 3 (remaining) – 6 — design only (queued, NOT implemented)
 
 Phase 3 (standalone `/app` → null-origin + bridge split) is the security gate that closes
 `SECURITY-same-origin-app-bypass.md`. The implementation plan is fully specified in
 [`03-PHASE-3-null-app-and-bridge-split.md`](./03-PHASE-3-null-app-and-bridge-split.md) — the parity list
-P1-P7 is the precise checklist. **Recommended sub-step order** (each is a small PR, only step E breaks):
+P1-P7 is the precise checklist. Sub-step C's stub is now **prepared** (above); sub-step A (kernel-side
+handler extraction) is the next concrete code change. **Recommended sub-step order** (each is a small
+PR, only step E breaks):
 
 1. A — move bridge handler bodies into `kernel-handlers.js` (pure refactor; still same-origin).
 2. B — add `SecureChannel.create` + `handle(...)` wiring kernel-side (legacy bridge still loaded).
@@ -73,15 +86,20 @@ P-256 → X25519/Ed25519 iff target-browser support is solid.
 
 ```
 [ DONE      ]  Phase 0.5 CORS code fix on dev (commit 434106dc)
-[ DONE      ]  Phase 1 SecureChannel module + 43 unit assertions
-[ DONE      ]  Phase 2 modules (Mounts, Broker, vault.mount perm) + 57 unit assertions
-[ DONE      ]  Phase 2 wiring (sg.vault.mount/unmount/mounts + _handleVfsViv + bundle)
+[ DONE      ]  Phase 1 SecureChannel module + 43 unit assertions   (merged to dev)
+[ DONE      ]  Phase 2 modules + bridge wiring + bundle             (merged to dev, +57 asserts)
+[ DONE      ]  Phase 3 sub-step C prep — sg-app-stub.js + 13 tests  (on branch, not yet merged)
 [ TO RUN    ]  Phase 0.5 operational: CDN cache invalidation + real-browser null-frame round-trip
 [ TO RUN    ]  Phase 2 §7 browser end-to-end (KneeScore-style cross-vault write)
-[ NEXT      ]  Phase 3 — bridge split (sub-steps A-F per 03-PHASE-3 doc)
-[ AFTER     ]  Phase 4 — unify the three iframe contexts
+[ NEXT      ]  Phase 3 sub-step A — extract kernel-side handlers into class methods (refactor only)
+[ THEN      ]  Phase 3 sub-step B — wire SecureChannel kernel-side, parallel to legacy bridge
+[ THEN      ]  Phase 3 sub-step C — inject sg-app-stub.js via _buildAppSrcdoc (still allow-same-origin)
+[ THEN      ]  Phase 3 sub-step D — walk parity list P1-P7
+[ THEN      ]  Phase 3 sub-step E — DROP allow-same-origin from the 4 sandbox sites (security flip)
+[ THEN      ]  Phase 3 sub-step F — delete dead legacy bridge in app-shell.js
+[ AFTER     ]  Phase 4 — unify the three iframe contexts (data-source-overlay for edit preview)
 [ AFTER     ]  Phase 5 — vaults page + tree-view-expand + CLI
-[ AFTER     ]  Phase 6 — hardening
+[ AFTER     ]  Phase 6 — hardening (curve upgrade, monitoring-mode visibility)
 ```
 
 **Recommended next action when resuming:** run `bash tests/unit/vault_ui/loader/run-all.sh` to confirm
