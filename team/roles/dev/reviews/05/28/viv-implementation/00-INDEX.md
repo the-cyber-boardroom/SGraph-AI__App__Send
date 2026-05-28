@@ -25,6 +25,7 @@ land the code." Where the two disagree, the architect pack wins.
    - [`02-PHASE-2-spawn-and-cross-vault-write.md`](./02-PHASE-2-spawn-and-cross-vault-write.md) — the driving use case (clinician console writes `data/reviews.json` in a patient vault).
    - [`03-PHASE-3-null-app-and-bridge-split.md`](./03-PHASE-3-null-app-and-bridge-split.md) — the security gate (standalone `/app` frame becomes `null`-origin).
    - [`04-PHASES-4-6-and-tests-and-repair.md`](./04-PHASES-4-6-and-tests-and-repair.md) — unify the three iframe contexts, UI consumers, the adversarial test matrix in implementation form, and the agent-facing vault-repair checklist.
+   - [`05-TEST-CATALOG.md`](./05-TEST-CATALOG.md) — **read before writing code.** Readiness audit (what's solid, what to decide during the build, including the kernel-shell bundle build script) + 82 named, jsdom-free assertions across 6 new test files, no mocks/no patches, targeting < 10 s suite runtime. Mapped to T1-T13 and the architect-review B1/B2/N1-N3 patches.
 
 3. **Then check the current shipped state** — the permission model (Phases 1–4B of the prior capabilities
    work) is shipped and is the *child policy* gate in this design. The relevant code:
