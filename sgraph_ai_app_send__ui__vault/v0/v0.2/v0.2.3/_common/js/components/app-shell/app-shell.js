@@ -738,6 +738,126 @@
             return { unlinked: true };
         }
 
+        // ── ViV Phase 2: mount / unmount / mounts ─────────────────────────────────────
+        // Spawn a child kernel (null-origin srcdoc iframe) bound to another vault, fed
+        // its secrets over a SecureChannel. After mount, sg.vfs.* calls with the prefix
+        // relay through the child's kernel — see _handleVfsViv below.
+        async _mountChildVault(opts) {
+            var prefix = opts.prefix, ref = opts.ref, label = opts.label;
+            if (typeof KERNEL_SHELL_HTML === 'undefined') {
+                throw Object.assign(new Error('kernel-shell-bundle not loaded; run scripts/build-kernel-shell-bundle.py'), { code: 'EUNREACH' });
+            }
+            if (typeof SecureChannel === 'undefined' || typeof KernelMounts === 'undefined' || typeof KernelBroker === 'undefined') {
+                throw Object.assign(new Error('ViV modules missing — load secure-channel + kernel-mounts + kernel-broker'), { code: 'EUNREACH' });
+            }
+            this._mounts = this._mounts || new KernelMounts();
+            this._brokerSidecar = this._brokerSidecar || new KernelBroker({
+                kernelId: 'k-' + ((this._vault && this._vault._vaultId) || 'top'),
+                ui: { prompt: this._brokerPromptOnHud.bind(this) }
+            });
+
+            // Resolve the child's credentials. Trial path: read from clinic.json owner
+            // record on the parent vault. Cleaner future path: Kernel-A holds them and
+            // delivers via MessageChannel-port-transfer (architect pack §3 "Cleaner
+            // future variant"). For now: a stub the trial app populates.
+            var creds = await this._resolveChildCredentials(ref);
+            if (!creds || !creds.vaultKey) {
+                throw Object.assign(new Error('no credentials for ref ' + ref), { code: 'EUNREACH' });
+            }
+
+            // Build the iframe. sandbox="allow-scripts" → null origin (no storage, no
+            // ambient fetch unless the CORS fix is live — which it is, post-§06).
+            var iframe = document.createElement('iframe');
+            iframe.sandbox = 'allow-scripts';
+            iframe.style.cssText = 'display:none;';   // headless mount; UI mounts are Phase 5
+            iframe.srcdoc = KERNEL_SHELL_HTML;
+            document.body.appendChild(iframe);
+
+            var channel;
+            try {
+                channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref });
+                await channel.send('secrets', { vaultKey: creds.vaultKey, accessToken: creds.accessToken || null });
+                // Wait for the child kernel's 'ready' event.
+                await new Promise(function (resolve, reject) {
+                    var t = setTimeout(function () { reject(Object.assign(new Error('child kernel boot timeout'), { code: 'EUNREACH' })); }, 10000);
+                    channel.on('ready', function (p) { clearTimeout(t); resolve(p); });
+                });
+            } catch (err) {
+                try { iframe.remove(); } catch (_) {}
+                if (channel) try { channel.close(); } catch (_) {}
+                throw err;
+            }
+            var mountId = 'm-' + ref;
+            this._mounts.add({ mountId, prefix, ref, channel, label, meta: { iframe } });
+            return { mountId, ref };
+        }
+
+        async _unmountChildVault(mountId) {
+            var m = this._mounts && this._mounts.remove(mountId);
+            if (!m) return { unmounted: false };
+            try { m.channel && m.channel.close(); } catch (_) {}
+            try { m.meta && m.meta.iframe && m.meta.iframe.remove(); } catch (_) {}
+            return { unmounted: true, mountId };
+        }
+
+        _listMounts() {
+            if (!this._mounts) return [];
+            return this._mounts.list().map(function (m) {
+                return { mountId: m.mountId, ref: m.ref, prefix: m.prefix, label: m.label, isolation: 'isolated' };
+            });
+        }
+
+        // Trial-only stub. The clinic vault's app.json + an owner record (clinic.json)
+        // can provide child credentials. Real production: Kernel-A holds them
+        // (port-transfer model — architect pack §3 "Cleaner future variant").
+        async _resolveChildCredentials(ref) {
+            if (this._resolveChildCredentialsImpl) return this._resolveChildCredentialsImpl(ref);
+            try {
+                var bytes = await this._dataSource.getFileBytes('clinic.json');
+                var clinic = JSON.parse(new TextDecoder().decode(bytes));
+                var entry = clinic && clinic[ref];
+                if (entry && entry.vaultKey) {
+                    return { vaultKey: entry.vaultKey, accessToken: entry.accessToken || null };
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        // HUD prompt for broker.mediate(ask). Reuses the existing consent bar infrastructure.
+        async _brokerPromptOnHud(req) {
+            return new Promise((resolve) => {
+                var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                if (!hud || typeof hud.requestConsent !== 'function') { resolve('deny'); return; }
+                hud.requestConsent('vfs.' + req.op, req.path + ' (in ' + req.mountId + ')', function (ok) {
+                    resolve(ok ? 'allow' : 'deny');
+                });
+            });
+        }
+
+        // Cross-mount aware vfs handler. Local path → existing data-source ops; cross-mount
+        // path → broker.mediate + relay over the child's SecureChannel.
+        async _handleVfsViv(op, args) {
+            if (!this._mounts) return null;   // signal to caller: no mount, do local op
+            var hit = this._mounts.resolve(args.path);
+            if (!hit) return null;
+            var credentialClass = args.credential ? 'perRequest-rw' : 'standing';
+            var med = await this._brokerSidecar.mediate(op, hit.mount.mountId, hit.rest, credentialClass);
+            if (med.decision !== 'allow') {
+                this._brokerSidecar.finalize(med.entryId, 'ECONSENT');
+                throw Object.assign(new Error('Broker denied'), { code: 'ECONSENT' });
+            }
+            try {
+                var res = await hit.mount.channel.request('vfs.' + op,
+                    { path: hit.rest, data: args.data, credential: args.credential },
+                    { sensitive: !!args.data || op === 'read' });
+                this._brokerSidecar.finalize(med.entryId, 'ok');
+                return res;
+            } catch (err) {
+                this._brokerSidecar.finalize(med.entryId, err.code || 'EPROTO');
+                throw err;
+            }
+        }
+
         // Clear this app's cached consents for the current vault (HUD permissions panel "reset").
         _resetConsents() {
             var prefix = 'sg-app-grant:' + ((this._vault && this._vault._vaultId) || this._vaultKey || '') + ':' + (this._appId || '') + ':';
@@ -1289,7 +1409,11 @@
                     'vault:{' +
                       'create:function(path,label){return _sgCmd("vault",{action:"create",path:path,label:label});},' +
                       'unlink:function(path){return _sgCmd("vault",{action:"unlink",path:path});},' +
-                      'delete:function(path){return _sgCmd("vault",{action:"delete",path:path});}' +
+                      'delete:function(path){return _sgCmd("vault",{action:"delete",path:path});},' +
+                      // ViV Phase 2: mount a child vault for cross-vault reads/writes via this kernel.
+                      'mount:function(opts){return _sgCmd("vault",{action:"mount",prefix:opts&&opts.prefix,ref:opts&&opts.ref,label:opts&&opts.label});},' +
+                      'unmount:function(mountId){return _sgCmd("vault",{action:"unmount",mountId:mountId});},' +
+                      'mounts:function(){return _sgCmd("vault",{action:"mounts"});}' +
                     '},' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
                     // sg.history.* — read past commits / trees / blobs (read-only)
@@ -1471,6 +1595,14 @@
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
                     if (AppPermissions.isFloor('write', wResolved)) { wReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPROTECTED' }); return; }
                     if (!self._can('fs.write', wResolved)) { wReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPERM' }); return; }
+                    // ViV Phase 2: cross-mount write? If the resolved path is under a mount,
+                    // relay through the child kernel; otherwise fall through to the local op.
+                    if (self._mounts && self._mounts.resolve(wResolved)) {
+                        self._handleVfsViv('write', { path: wResolved, data: wBytes })
+                            .then(function () { wReply(true, { size: wBytes.byteLength, mounted: true }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: true, mounted: true }); })
+                            .catch(function (err) { wReply(false, { err: err.message || 'Write failed', code: err.code || 'EPROTO' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: err.code || err.message }); });
+                        return;
+                    }
                     var wSlash    = wResolved.lastIndexOf('/');
                     var wDir      = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                     var wFile     = wResolved.slice(wSlash + 1);
@@ -1529,6 +1661,13 @@
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
                     if (AppPermissions.isFloor('read', rResolved)) { rReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPROTECTED' }); return; }
                     if (!self._can('fs.read', rResolved)) { rReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPERM' }); return; }
+                    // ViV Phase 2: cross-mount read? Relay through the child kernel.
+                    if (self._mounts && self._mounts.resolve(rResolved)) {
+                        self._handleVfsViv('read', { path: rResolved })
+                            .then(function (buf) { rReply(true, { buf: buf, path: rResolved, mounted: true }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: true, bytes: (buf && buf.byteLength) || 0, mounted: true }); })
+                            .catch(function (err) { rReply(false, { err: err.message || 'Read failed', code: err.code || 'EPROTO' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: err.code || err.message }); });
+                        return;
+                    }
                     compositeReady.then(function () { return ensureMountOpen(rResolved); }).then(function () {
                         var rMatch = self._findEntryStrict(dataSource.getFileList(), rResolved);
                         if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
@@ -1665,6 +1804,33 @@
                             // AppSec sign-off on the destructive endpoint. Deferred — Phase 5.
                             cmdReply(false, null, 'vault.delete not yet available (needs owner-secret credential store + AppSec sign-off)');
                             self._emitBridgeCall('vault.delete', { path: vPath, ok: false, err: 'ENOTIMPL' });
+                            return;
+                        }
+                        // ── ViV Phase 2: vault.mount / unmount / mounts ────────────────
+                        if (vAct === 'mount') {
+                            var mPrefix = AppPermissions.normalizePath(e.data.prefix || '');
+                            var mRef    = String(e.data.ref || '');
+                            var mLabel  = String(e.data.label || mRef || 'mount');
+                            if (!mPrefix || !mRef) { cmdReply(false, null, 'mount: prefix + ref required'); return; }
+                            if (!self._can('vault.mount', mPrefix)) {
+                                cmdReply(false, null, 'Permission denied');
+                                self._emitBridgeCall('vault.mount', { prefix: mPrefix, ref: mRef, ok: false, err: 'EPERM' });
+                                return;
+                            }
+                            self._mountChildVault({ prefix: mPrefix, ref: mRef, label: mLabel })
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.mount', { prefix: mPrefix, ref: mRef, ok: true, mountId: res.mountId }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.mount', { prefix: mPrefix, ref: mRef, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'unmount') {
+                            var uMountId = String(e.data.mountId || '');
+                            self._unmountChildVault(uMountId)
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'mounts') {
+                            cmdReply(true, self._listMounts());
                             return;
                         }
                         cmdReply(false, null, 'Unsupported vault action: ' + vAct);
