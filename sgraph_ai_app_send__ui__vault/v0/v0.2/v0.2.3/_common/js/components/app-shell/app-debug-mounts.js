@@ -54,10 +54,12 @@
             var mountsHtml = vm.mounts.length === 0
                 ? '<div class="empty">No vaults mounted. A parent kernel that calls vault.mount appears here.</div>'
                 : vm.mounts.map(function (m) {
+                    var custCls = m.custody === 'parent-held' ? ' c-warn' : '';
                     return '<div class="mrow">' +
                         '<span class="mid">' + esc(m.mountId) + '</span>' +
                         '<span class="mprefix">' + esc(m.prefix) + '</span>' +
                         '<span class="mlabel">' + esc(m.label) + '</span>' +
+                        '<span class="mcust' + custCls + '" title="credential custody mode (gap-doc B10)">' + esc(m.custodyTag) + '</span>' +
                         '<span class="miso">' + esc(m.isolation) + '</span>' +
                         '</div>';
                 }).join('');
@@ -102,6 +104,8 @@
                     .mid { flex:0 0 6rem; color:#9b8cff; }
                     .mprefix { flex:0 0 7rem; color:#4ECDC4; }
                     .mlabel { flex:1; color:#8892a4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                    .mcust { flex:0 0 6rem; color:#5a6478; font-size:0.62rem; text-align:right; }
+                    .mcust.c-warn { color:#fbbf24; }
                     .miso { flex:0 0 4.5rem; color:#3a4558; text-align:right; }
                     .sum { display:flex; gap:0.6rem; padding:0.25rem 0.3rem; font-size:0.65rem; color:#5a6478; }
                     .sum .s-ok { color:#4ade80; } .sum .s-deny { color:#fbbf24; } .sum .s-err { color:#ff6b6b; } .sum .s-pend { color:#60a5fa; }

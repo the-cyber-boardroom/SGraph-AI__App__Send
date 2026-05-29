@@ -46,14 +46,28 @@
         }
     }
 
+    // Short, human-readable custody tag for the Mounts row. The full enum lives in
+    // VivCustody.MODES; this is just the display fold.
+    function custodyTag(c) {
+        switch (c) {
+            case 'parent-held':     return 'parent-held';
+            case 'child-generated': return 'child-gen';
+            case 'user-entered':    return 'user-typed';
+            default:                return c || 'parent-held';
+        }
+    }
+
     function mountRows(mounts) {
         return (mounts || []).map(function (m) {
+            var custody = m.custody || 'parent-held';
             return {
                 mountId:   m.mountId,
                 ref:       m.ref,
                 prefix:    m.prefix,
                 label:     m.label || m.ref || m.mountId,
-                isolation: m.isolation || 'isolated'
+                isolation: m.isolation || 'isolated',
+                custody:   custody,
+                custodyTag: custodyTag(custody)
             };
         });
     }
@@ -106,6 +120,7 @@
         outcomeClass: outcomeClass,
         opIcon:       opIcon,
         credTag:      credTag,
+        custodyTag:   custodyTag,
         mountRows:    mountRows,
         logRows:      logRows,
         summary:      summary,

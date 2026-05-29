@@ -22,12 +22,14 @@ function ok(name, cond, info) { if (cond) { pass++; console.log('  ✓ ' + name)
 console.log('\n[suite] VivMountsView — mountRows');
 {
     const rows = V.mountRows([
-        { mountId: 'm-acme', ref: 'acme', prefix: 'mounts/acme/', label: 'Acme', isolation: 'isolated' },
-        { mountId: 'm-b', ref: 'b', prefix: 'mounts/b/' }   // no label/isolation → defaults
+        { mountId: 'm-acme', ref: 'acme', prefix: 'mounts/acme/', label: 'Acme', isolation: 'isolated', custody: 'child-generated' },
+        { mountId: 'm-b', ref: 'b', prefix: 'mounts/b/' }   // no label/isolation/custody → defaults
     ]);
     ok('maps mountId/ref/prefix', rows[0].mountId === 'm-acme' && rows[0].prefix === 'mounts/acme/');
     ok('label falls back to ref when absent', rows[1].label === 'b');
     ok('isolation defaults to isolated', rows[1].isolation === 'isolated');
+    ok('custody surfaces on the row', rows[0].custody === 'child-generated' && rows[0].custodyTag === 'child-gen');
+    ok('custody defaults to parent-held when absent (matches the unsafe-by-default coupling)', rows[1].custody === 'parent-held' && rows[1].custodyTag === 'parent-held');
     ok('empty input → empty array', V.mountRows().length === 0 && V.mountRows(null).length === 0);
 }
 

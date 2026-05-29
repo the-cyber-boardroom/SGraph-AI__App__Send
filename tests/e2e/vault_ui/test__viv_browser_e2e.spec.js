@@ -197,7 +197,7 @@ test.describe('ViV browser end-to-end (real null-origin srcdoc + browser crypto)
             // Install a provider exactly as app-shell._ensureKernelParent does.
             window._appDebug = window._appDebug || {};
             window._appDebug.vivProvider = () => ({
-                mounts: [{ mountId: 'm-acme', ref: 'acme', prefix: 'mounts/acme/', label: 'Acme Clinic', isolation: 'isolated' }],
+                mounts: [{ mountId: 'm-acme', ref: 'acme', prefix: 'mounts/acme/', label: 'Acme Clinic', isolation: 'isolated', custody: 'parent-held' }],
                 entries: [
                     { ts: 1, edge: 'A▶m-acme', mountId: 'm-acme', op: 'read',  path: 'notes.md',    credentialClass: 'standing', policy: 'auto', decision: 'allow', result: 'ok' },
                     { ts: 2, edge: 'A▶m-acme', mountId: 'm-acme', op: 'write', path: 'outside/x',   credentialClass: 'none',     policy: 'auto', decision: 'allow', result: 'EPERM' }
@@ -213,9 +213,60 @@ test.describe('ViV browser end-to-end (real null-origin srcdoc + browser crypto)
         expect(text).toContain('m-acme');
         expect(text).toContain('mounts/acme/');
         expect(text).toContain('Acme Clinic');
+        expect(text).toContain('parent-held');   // B10 custody tag visible to the operator
         expect(text).toContain('notes.md');
         expect(text).toContain('outside/x');
         expect(text).toContain('EPERM');     // child refusal surfaced in the audit log
         expect(text).toContain('ok');
+    });
+
+    test('B10 — VivCustody refuses parent-held + same-origin App-A; escape hatch is explicit', async ({ page }) => {
+        await page.goto('/en-gb/app');
+        await page.waitForFunction(
+            () => typeof window.VivCustody === 'object' && typeof window.KernelParent === 'function',
+            null, { timeout: 10_000 }
+        );
+
+        const result = await page.evaluate(async () => {
+            const VC = window.VivCustody;
+            // Sanity: the enum is the one the pack names.
+            const modesOk = VC.MODES.PARENT_HELD === 'parent-held' && VC.MODES.CHILD_GENERATED === 'child-generated';
+            // The /app page's App-A iframe is built with `allow-scripts allow-forms allow-same-origin`
+            // (Phase 3 hasn't dropped it yet). VivCustody MUST classify that as same-origin.
+            const origin = VC.classifyAppFrameOrigin('allow-scripts allow-forms allow-same-origin');
+
+            // Default: refuse the unsafe coupling without spawning.
+            let unsafeSpawned = 0, unsafeErr = null;
+            const unsafe = new window.KernelParent({
+                kernelId: 'k', appFrameOrigin: 'same-origin',
+                resolveCredentials: async () => ({ vaultKey: 'k', accessToken: 't', custody: 'parent-held' }),
+                spawnChannel: async () => { unsafeSpawned++; throw new Error('should not spawn'); }
+            });
+            try { await unsafe.mount({ prefix: 'mounts/u/', ref: 'u' }); }
+            catch (e) { unsafeErr = e.code; }
+
+            // Safe: child-generated + same-origin passes the gate (we still don't spawn —
+            // the gate runs BEFORE spawnChannel, so 0 spawns means gate refused; >0 means
+            // gate allowed and our test stub then threw, which is also the gate-passed signal).
+            let safeSpawned = 0, safeErr = null;
+            const safe = new window.KernelParent({
+                kernelId: 'k', appFrameOrigin: 'same-origin',
+                resolveCredentials: async () => ({ vaultKey: 'k', accessToken: 't', custody: 'child-generated' }),
+                spawnChannel: async () => { safeSpawned++; throw new Error('test-stub-throws-after-gate'); }
+            });
+            try { await safe.mount({ prefix: 'mounts/s/', ref: 's' }); }
+            catch (e) { safeErr = e.message; }
+
+            return { modesOk, origin, unsafeSpawned, unsafeErr, safeSpawned, safeErr };
+        });
+
+        expect(result.modesOk).toBe(true);
+        expect(result.origin).toBe('same-origin');
+        // Unsafe combination: refused, channel never spawned (fail-closed BEFORE bring-up).
+        expect(result.unsafeErr).toBe('EUNSAFE_CUSTODY');
+        expect(result.unsafeSpawned).toBe(0);
+        // Safe combination: gate passed, spawnChannel was called.
+        expect(result.safeSpawned).toBe(1);
+        expect(result.safeErr).toContain('test-stub-throws-after-gate');
     });
 });

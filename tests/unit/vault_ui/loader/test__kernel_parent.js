@@ -23,6 +23,7 @@ for (const f of [
     'secure-channel.js',
     'kernel-mounts.js',
     'kernel-broker.js',
+    'viv-custody.js',
     'kernel-parent.js',
     'kernel-app-handlers.js',
     'kernel-bootstrap.js'
@@ -249,6 +250,64 @@ console.log('\n[suite] KernelParent — mount with no credentials → EUNREACH')
     });
     const err = await tryCatch(() => parent.mount({ prefix: 'mounts/z/', ref: 'z' }));
     ok('mount with no resolvable credentials → EUNREACH', err && err.code === 'EUNREACH');
+}
+
+console.log('\n[suite] KernelParent — B10 custody gate (pack §05 invariant)');
+{
+    // Unsafe: parent-held + same-origin App-A → EUNSAFE_CUSTODY, no spawn.
+    let spawnCalls = 0;
+    const unsafe = new KernelParent({
+        kernelId: 'k',
+        appFrameOrigin: 'same-origin',
+        resolveCredentials: async () => ({ vaultKey: 'k', accessToken: 't', custody: 'parent-held' }),
+        spawnChannel: async () => { spawnCalls++; throw new Error('should not spawn'); }
+    });
+    const err = await tryCatch(() => unsafe.mount({ prefix: 'mounts/u/', ref: 'u' }));
+    ok('unsafe coupling → EUNSAFE_CUSTODY', err && err.code === 'EUNSAFE_CUSTODY');
+    ok('unsafe coupling does NOT spawn the channel (fail-closed BEFORE bring-up)', spawnCalls === 0);
+
+    // Synthetic escape hatch: explicit opt-in allows the same combination through.
+    const child = makeChildStack({ files: { 'notes.md': 'x' } });
+    child.appJson = { permissions: { fs: { read: true } } };
+    child.creds   = { vaultKey: 'k', accessToken: 't', endpoint: 'https://example.test', custody: 'parent-held' };
+    const synth = new KernelParent({
+        kernelId: 'k',
+        appFrameOrigin: 'same-origin',
+        allowUnsafeSynthetic: true,
+        resolveCredentials: async () => child.creds,
+        spawnChannel: makeSpawnChannel({ u: child })
+    });
+    const m = await synth.mount({ prefix: 'mounts/u/', ref: 'u' });
+    ok('escape hatch allows the unsafe combination through (synthetic only)', m && m.custody === 'parent-held');
+
+    // Safe combinations don't need the hatch.
+    const safe = new KernelParent({
+        kernelId: 'k',
+        appFrameOrigin: 'same-origin',
+        resolveCredentials: async () => ({ vaultKey: 'k', accessToken: 't', custody: 'child-generated' }),
+        spawnChannel: makeSpawnChannel({ s: child })
+    });
+    // We need a child stack keyed by 's' — reuse the same child for simplicity.
+    const safeReg = { s: child };
+    safe._spawnChannel = makeSpawnChannel(safeReg);
+    const ms = await safe.mount({ prefix: 'mounts/s/', ref: 's' });
+    ok('child-generated + same-origin → allowed (safe)', ms && ms.custody === 'child-generated');
+
+    // Default custody when resolver doesn't tag → parent-held; null-origin parent stays safe.
+    const safeNull = new KernelParent({
+        kernelId: 'k',
+        // default appFrameOrigin = 'null-origin'
+        resolveCredentials: async () => ({ vaultKey: 'k', accessToken: 't' /* no custody field */ }),
+        spawnChannel: makeSpawnChannel({ n: child })
+    });
+    safeNull._spawnChannel = makeSpawnChannel({ n: child });
+    const mn = await safeNull.mount({ prefix: 'mounts/n/', ref: 'n' });
+    ok('untagged creds default to parent-held; null-origin parent → safe',
+        mn && mn.custody === 'parent-held');
+
+    // list() exposes custody so sg.vault.mounts() and the 🔗 Mounts tab can show it.
+    ok('list() exposes custody per mount',
+        safeNull.list()[0].custody === 'parent-held');
 }
 
 for (const c of openChannels) { try { c.close(); } catch (_) {} }

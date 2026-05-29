@@ -46,6 +46,7 @@ SCRIPTS = [
     'js/lib/links/vault-links.js',
     'js/components/app-shell/kernel-mounts.js',
     'js/components/app-shell/kernel-broker.js',
+    'js/components/app-shell/viv-custody.js',
     'js/components/app-shell/kernel-parent.js',
     'js/components/app-shell/kernel-app-handlers.js',
     'js/components/app-shell/kernel-bootstrap.js',

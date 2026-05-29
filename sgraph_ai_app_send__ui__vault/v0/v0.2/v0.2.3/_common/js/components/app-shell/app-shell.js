@@ -752,15 +752,28 @@
                 throw Object.assign(new Error('kernel-shell-bundle not loaded; run scripts/build-kernel-shell-bundle.py'), { code: 'EUNREACH' });
             }
             if (typeof SecureChannel === 'undefined' || typeof KernelMounts === 'undefined'
-                || typeof KernelBroker === 'undefined' || typeof KernelParent === 'undefined') {
-                throw Object.assign(new Error('ViV modules missing — load secure-channel + kernel-mounts + kernel-broker + kernel-parent'), { code: 'EUNREACH' });
+                || typeof KernelBroker === 'undefined' || typeof KernelParent === 'undefined'
+                || typeof VivCustody === 'undefined') {
+                throw Object.assign(new Error('ViV modules missing — load secure-channel + kernel-mounts + kernel-broker + kernel-parent + viv-custody'), { code: 'EUNREACH' });
             }
             var self = this;
+            // Classify THIS kernel's App-A iframe origin for the B10 custody gate.
+            // Today App-A still has allow-same-origin (Phase 3 not yet shipped) at
+            // app-shell.js:1050/1164/1221/1301 — VivCustody reports 'same-origin' for
+            // any of those; once Phase 3 drops allow-same-origin this auto-flips to
+            // 'null-origin' and the gate stops refusing parent-held mounts.
+            var sandboxSpec = (this._iframeEl && this._iframeEl.getAttribute && this._iframeEl.getAttribute('sandbox')) || null;
+            var appOrigin   = VivCustody.classifyAppFrameOrigin(sandboxSpec);
+            // Synthetic-only escape hatch. NEVER set this for real-data trials. The
+            // pack §05 invariant is fail-closed by design; this is the one named opt-in.
+            var unsafeOk = (window.SG_VIV_ALLOW_UNSAFE_SYNTHETIC === true);
             this._kernelParent = new KernelParent({
                 kernelId: 'k-' + ((this._vault && this._vault._vaultId) || 'top'),
                 brokerUi: { prompt: this._brokerPromptOnHud.bind(this) },
                 resolveCredentials: function (ref) { return self._resolveChildCredentials(ref); },
-                spawnChannel: function (ref, creds) { return self._spawnChildChannel(ref, creds); }
+                spawnChannel: function (ref, creds) { return self._spawnChildChannel(ref, creds); },
+                appFrameOrigin:       appOrigin,
+                allowUnsafeSynthetic: unsafeOk
             });
             // Aliases for the legacy message-handler branches + debug surface.
             this._mounts        = this._kernelParent.mounts;
@@ -834,6 +847,8 @@
         // Trial-only stub. The clinic vault's app.json + an owner record (clinic.json)
         // can provide child credentials. Real production: Kernel-A holds them
         // (port-transfer model — architect pack §3 "Cleaner future variant").
+        // Resolved creds are tagged custody:'parent-held' so the B10 gate can refuse
+        // the unsafe combination (this resolver + a same-origin App-A) by default.
         async _resolveChildCredentials(ref) {
             if (this._resolveChildCredentialsImpl) return this._resolveChildCredentialsImpl(ref);
             try {
@@ -841,7 +856,11 @@
                 var clinic = JSON.parse(new TextDecoder().decode(bytes));
                 var entry = clinic && clinic[ref];
                 if (entry && entry.vaultKey) {
-                    return { vaultKey: entry.vaultKey, accessToken: entry.accessToken || null };
+                    return {
+                        vaultKey:    entry.vaultKey,
+                        accessToken: entry.accessToken || null,
+                        custody:     'parent-held'
+                    };
                 }
             } catch (_) {}
             return null;
