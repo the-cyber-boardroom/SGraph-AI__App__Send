@@ -1532,6 +1532,44 @@
                 return Promise.resolve();
             }
 
+            // Operator REPL surface (ViV pack §3.4). Thin async glue over the SAME composite
+            // data source the running app sees (so read-through sub-vaults resolve identically)
+            // + the KernelParent for mount/broker inspection. Refreshed on every mount/nav.
+            // Pure parse/format is SgReplCore; this only executes. No new mechanism — a consumer.
+            function _replSplit(p) {
+                var n = (window.SgReplCore ? SgReplCore.normPath(p) : String(p || '').replace(/^\/+/, ''));
+                var i = n.lastIndexOf('/');
+                return { folder: i === -1 ? '' : n.slice(0, i), file: i === -1 ? n : n.slice(i + 1), path: n };
+            }
+            window._appDebug = window._appDebug || {};
+            window._appDebug.repl = {
+                get writable() { return !!dataSource.writable; },
+                list: function (p) { var n = (window.SgReplCore ? SgReplCore.normPath(p) : ''); return ensureMountOpen(n).then(function () { return dataSource.getFileList(); }); },
+                read: function (p) {
+                    var s = _replSplit(p);
+                    if (!s.file) throw new Error('not a file: ' + s.path);
+                    return ensureMountOpen(s.path).then(function () { return dataSource.getFileBytes(s.path); })
+                        .then(function (buf) { return new TextDecoder().decode(buf); });
+                },
+                write: function (p, text) {
+                    if (!dataSource.writable) return Promise.reject(new Error('read-only vault'));
+                    var s = _replSplit(p);
+                    if (!s.file) return Promise.reject(new Error('not a file: ' + s.path));
+                    if (AppPermissions.isFloor('write', s.path)) return Promise.reject(new Error('protected path (.vault floor)'));
+                    var bytes = new TextEncoder().encode(String(text == null ? '' : text)).buffer;
+                    return Promise.resolve(dataSource.saveFile(s.folder, s.file, bytes)).then(function () { return { ok: true, path: s.path }; });
+                },
+                del: function (p) {
+                    if (!dataSource.writable) return Promise.reject(new Error('read-only vault'));
+                    var s = _replSplit(p);
+                    if (!s.file) return Promise.reject(new Error('not a file: ' + s.path));
+                    if (AppPermissions.isFloor('write', s.path)) return Promise.reject(new Error('protected path (.vault floor)'));
+                    return Promise.resolve(dataSource.deleteFile(s.folder, s.file)).then(function () { return { ok: true, path: s.path }; });
+                },
+                mounts:    function () { var kp = self._kernelParent; return kp ? kp.list() : []; },
+                brokerLog: function () { var kp = self._kernelParent; return kp && kp.broker ? kp.broker.log() : []; }
+            };
+
             var handler = function (e) {
                 if (!e.data)                              return;
                 if (e.source !== iframeEl.contentWindow)  return;
