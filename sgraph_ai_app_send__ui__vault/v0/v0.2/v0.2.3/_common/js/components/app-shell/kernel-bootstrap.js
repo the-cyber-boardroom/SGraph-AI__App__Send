@@ -105,6 +105,17 @@
                 onUpdated:  opts.onUpdated || null
             });
 
+            // B7: monitored-mode handler. Each kernel has a local broker (it MAY become
+            // a parent itself by spawning children later). VivMonitor registers the
+            // 'broker.log' responder; CLOSED by default → parent's request returns
+            // ECONSENT. Surface { broker, monitor } on the channel for opt-in toggling.
+            if (globalThis.KernelBroker && globalThis.VivMonitor) {
+                const childBroker = new globalThis.KernelBroker({ kernelId: 'k-' + (vault._vaultId || 'child') });
+                const monitor     = globalThis.VivMonitor.registerOnChannel(ch, childBroker, { mode: opts.monitorMode || 'closed' });
+                ch._broker  = childBroker;
+                ch._monitor = monitor;
+            }
+
             // Signal ready to the parent (responder.send works both ways — review B1).
             const readyPayload = { kernelId: 'k-' + (vault._vaultId || (Date.now().toString(36))) };
             try { await ch.send('ready', readyPayload); } catch (_) {}
