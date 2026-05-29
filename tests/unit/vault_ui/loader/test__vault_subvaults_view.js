@@ -72,5 +72,20 @@ console.log('\n[suite] VaultSubvaultsView — empty / guards');
     ok('status defaults to collapsed', r[0].status === 'collapsed' && r[0].statusLabel === 'not opened');
 }
 
+console.log('\n[suite] VaultSubvaultsView — chip (in-tree badge, §3.3)');
+{
+    const m = V.chip('mounted', 'ro');
+    ok('mounted → ● connected, ok', m.symbol === '●' && m.state === 'connected' && m.cls === 'ok' && m.access === 'ro');
+    const c = V.chip('collapsed', 'ro');
+    ok('collapsed → ○ no state, pending', c.symbol === '○' && c.state === '' && c.cls === 'pending');
+    const l = V.chip('locked', 'ro');
+    ok('locked → 🔒 err, no access shown', l.cls === 'err' && l.state === 'locked' && l.access === '');
+    const e = V.chip('error', 'rw');
+    ok('error → ⚠ err', e.cls === 'err' && e.state === 'error');
+    ok('defaults: chip(undefined) → collapsed/pending', V.chip().cls === 'pending' && V.chip().symbol === '○');
+    ok('chipText composes symbol+access+state', V.chipText('mounted', 'ro') === '● ro · connected');
+    ok('chipText locked omits empty access', V.chipText('locked', 'ro') === '🔒 · locked');
+}
+
 console.log('\n  ' + pass + ' pass, ' + fail + ' fail');
 if (fail) process.exitCode = 1;
