@@ -15,8 +15,8 @@
    for the real change; committed so the assumption is documented + re-checkable.
    ================================================================================= */
 
-const { test, expect } = require('@playwright/test');
-const http = require('http');
+import { test, expect } from '@playwright/test';
+import http from 'node:http';
 
 let server, baseURL;
 

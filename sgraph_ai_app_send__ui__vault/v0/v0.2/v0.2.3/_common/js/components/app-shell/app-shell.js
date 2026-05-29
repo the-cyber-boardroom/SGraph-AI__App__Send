@@ -1177,14 +1177,11 @@
                 '}());<\/script>' +
                 '</body></html>';
 
-            var blob    = new Blob([html], { type: 'text/html' });
-            var blobUrl = URL.createObjectURL(blob);
-            this._objectUrls.push(blobUrl);
-
+            // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+            iframe.sandbox     = 'allow-scripts allow-forms';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-            iframe.src         = blobUrl;
+            iframe.srcdoc      = html;
             iframe.addEventListener('load', () => {
                 this._iframeStatus  = 'ready';
                 this._t.iframeReady = performance.now();
@@ -1235,13 +1232,11 @@
                 var htmlText  = new TextDecoder().decode(htmlBytes);
                 var injected  = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript);
                 if (injected === htmlText) injected = bridgeScript + htmlText;
-                var blob    = new Blob([injected], { type: 'text/html' });
-                var blobUrl = URL.createObjectURL(blob);
-                this._objectUrls.push(blobUrl);
+                // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+                iframe.sandbox     = 'allow-scripts allow-forms';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-                iframe.src         = blobUrl;
+                iframe.srcdoc      = injected;
                 iframe.addEventListener('load', () => {
                     this._iframeStatus  = 'ready';
                     this._t.iframeReady = performance.now();
@@ -1315,13 +1310,11 @@
                     '}());<\/script>' +
                     '</body></html>';
 
-                var blob    = new Blob([html], { type: 'text/html' });
-                var blobUrl = URL.createObjectURL(blob);
-                this._objectUrls.push(blobUrl);
+                // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+                iframe.sandbox     = 'allow-scripts allow-forms';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-                iframe.src         = blobUrl;
+                iframe.srcdoc      = html;
                 iframe.addEventListener('load', () => {
                     this._iframeStatus  = 'ready';
                     this._t.iframeReady = performance.now();
