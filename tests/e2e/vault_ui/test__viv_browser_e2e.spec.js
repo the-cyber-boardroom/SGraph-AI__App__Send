@@ -231,8 +231,10 @@ test.describe('ViV browser end-to-end (real null-origin srcdoc + browser crypto)
             const VC = window.VivCustody;
             // Sanity: the enum is the one the pack names.
             const modesOk = VC.MODES.PARENT_HELD === 'parent-held' && VC.MODES.CHILD_GENERATED === 'child-generated';
-            // The /app page's App-A iframe is built with `allow-scripts allow-forms allow-same-origin`
-            // (Phase 3 hasn't dropped it yet). VivCustody MUST classify that as same-origin.
+            // Classifier unit-check with the legacy same-origin sandbox string. (Phase 3
+            // has since dropped allow-same-origin from the live app frames — see the
+            // app-mode regression test for the live-frame null-origin assertion; here we
+            // verify the classifier still recognises the legacy string as same-origin.)
             const origin = VC.classifyAppFrameOrigin('allow-scripts allow-forms allow-same-origin');
 
             // Default: refuse the unsafe coupling without spawning.

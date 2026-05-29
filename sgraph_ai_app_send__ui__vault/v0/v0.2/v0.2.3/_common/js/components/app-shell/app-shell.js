@@ -758,10 +758,10 @@
             }
             var self = this;
             // Classify THIS kernel's App-A iframe origin for the B10 custody gate.
-            // Today App-A still has allow-same-origin (Phase 3 not yet shipped) at
-            // app-shell.js:1050/1164/1221/1301 — VivCustody reports 'same-origin' for
-            // any of those; once Phase 3 drops allow-same-origin this auto-flips to
-            // 'null-origin' and the gate stops refusing parent-held mounts.
+            // Phase 3 SHIPPED: the 4 app-frame sites now use `allow-scripts allow-forms`
+            // (no allow-same-origin), so VivCustody classifies App-A as 'null-origin' and
+            // the gate no longer refuses parent-held mounts (null-origin App-A cannot read
+            // the parent's secrets — that was the whole point of the coupling rule).
             var sandboxSpec = (this._iframeEl && this._iframeEl.getAttribute && this._iframeEl.getAttribute('sandbox')) || null;
             var appOrigin   = VivCustody.classifyAppFrameOrigin(sandboxSpec);
             // Synthetic-only escape hatch. NEVER set this for real-data trials. The
@@ -1061,14 +1061,16 @@
             var injected     = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript + resBlock);
             if (injected === htmlText) injected = bridgeScript + resBlock + htmlText;
 
-            var blob    = new Blob([injected], { type: 'text/html' });
-            var blobUrl = URL.createObjectURL(blob);
-            this._objectUrls.push(blobUrl);
-
+            // Phase 3 (pack §5.3 security gate): null-origin app frame. We deliver the
+            // app via `srcdoc`, NOT a parent-origin `blob:` URL — a null-origin sandbox
+            // refuses to load a blob: minted by another origin (pack §5.5; probe P1).
+            // Dropping `allow-same-origin` means app code can no longer read
+            // localStorage / window.parent / ambient-fetch vault paths; every vault
+            // access goes through the postMessage bridge (sg.*), which never needed it.
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+            iframe.sandbox     = 'allow-scripts allow-forms';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-            iframe.src         = blobUrl;
+            iframe.srcdoc      = injected;
             iframe.addEventListener('load', () => {
                 this._iframeStatus  = 'ready';
                 this._t.iframeReady = performance.now();
