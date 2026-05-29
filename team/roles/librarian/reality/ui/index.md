@@ -202,6 +202,7 @@ Lightweight vault app host. Lifecycle: parse hash → open vault → read `app.j
 - `_page.json` support: renders via inline PageLayoutRenderer (PLR) — PLR dependencies are inlined so the page is self-contained; vault routes with a hash open to `/app` rather than `/vault/`.
 - Vault key persisted to `localStorage` for cross-page reload recovery.
 - Exposes `getDebugState()` for `<app-debug-pane>` (appJson, writable, entry, iframeStatus, resourcesLoaded, timing).
+- **ViV Phase 4 (in progress) — unified app-frame bootstrap.** The four iframe-context mount paths (`_mountApp`, `_mountVaultFile` HTML, `_mountPageLayout`, `_mountVaultFile` markdown) build their `srcdoc` via a single pure, DOM-free builder `AppFrameBootstrap.build({kind, …})` (`app-frame-bootstrap.js`, `globalThis.AppFrameBootstrap`, loaded before `app-shell.js`). `kind ∈ {app, html, page-layout, markdown}`. Channel is unchanged — still the postMessage `sg.*` bridge (Phase 4 Option A: unify the bootstrap, not the channel). The builder is unit-tested in Node (`test__app_frame_bootstrap.js`, 31 assertions).
 
 **`<app-hud>` Web Component** (`app-hud.js`, 201 lines — 22 May 2026):
 Fixed 48 px status bar rendered outside `<sg-layout>`. Shows: SG/App brand, vault badge, app title (centre), read-only badge, copy-link button, vault-back link, debug toggle. Handles `sg.ui.message()` notifications dispatched from the app iframe (toast queue with auto-dismiss). Receives vault/app info via `setInfo()` called by the page script on `app-shell:ready`.
