@@ -2,14 +2,22 @@
    Phase 3 probe — null-origin iframe facts (pack §5.5)
 
    Before flipping app-shell's 4 app iframes from same-origin blob: to null-origin
-   srcdoc, confirm the three load-bearing browser facts the migration depends on:
+   srcdoc, confirm the load-bearing browser facts the migration depends on:
 
-     P1. A parent-origin `blob:` URL does NOT load in a sandbox WITHOUT
-         allow-same-origin (this is WHY srcdoc is mandatory, pack §5.5).
+     P1. The security property of dropping allow-same-origin: a frame in
+         `sandbox="allow-scripts"` runs at an OPAQUE origin (location.origin ===
+         "null") and CANNOT read the parent's localStorage (SecurityError) — even
+         when its document is a parent-origin blob: URL. (Empirically: the blob
+         DOES load and run; what changes is the origin becomes opaque. So dropping
+         allow-same-origin is the operative change; srcdoc-vs-blob is a style
+         choice. We use srcdoc — it's cleaner, drops the objectURL lifecycle, and
+         matches the already-null kernel site.)
      P2. `srcdoc` DOES load + run scripts at a null origin, and postMessage
          round-trips parent↔child.
      P3. WindowProxy reference equality (e.source === iframe.contentWindow) still
-         works for a null-origin child (so app-shell.js:1578 source check survives).
+         works for a null-origin child (so the app-shell source check survives).
+     P4. Playwright frameLocator can still read text + computed style INSIDE a
+         null-origin srcdoc frame (the migration path for the e2e regressions).
 
    Pure DOM experiments — no app-shell, no vault, no network. Decides the approach
    for the real change; committed so the assumption is documented + re-checkable.
