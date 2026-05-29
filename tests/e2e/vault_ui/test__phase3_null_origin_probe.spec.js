@@ -42,34 +42,41 @@ test.afterAll(() => new Promise((resolve) => server ? server.close(resolve) : re
 
 test.describe('Phase 3 null-origin probe', () => {
 
-    test('P1 — parent-origin blob: URL is blocked in a sandbox without allow-same-origin', async ({ page }) => {
+    test('P1 — a parent-origin blob: in sandbox=allow-scripts INHERITS the parent origin (why srcdoc)', async ({ page }) => {
         await page.goto(baseURL);
-        const result = await page.evaluate(async () => {
-            const html = '<!doctype html><script>parent.postMessage("BLOB_RAN","*")<\/script>';
+
+        const result = await page.evaluate(async (parentOrigin) => {
+            // The thing we must NOT do: load a parent-minted blob: into the app frame.
+            // Empirically Chromium gives such a frame the PARENT's origin even under
+            // sandbox="allow-scripts" — so dropping allow-same-origin is NOT enough on
+            // its own; the document source matters. srcdoc (P2) yields a true null
+            // origin; blob: does not. This test pins that contrast so the srcdoc choice
+            // in app-shell can't silently regress back to blob:.
+            const html = '<!doctype html><script>' +
+                'parent.postMessage({ ran: true, origin: String(location.origin) }, "*");' +
+                '<\/script>';
             const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
             const iframe = document.createElement('iframe');
-            iframe.sandbox = 'allow-scripts';   // null origin — NO allow-same-origin
+            iframe.sandbox = 'allow-scripts';
             iframe.src = blobUrl;
 
-            let ran = false;
-            const onMsg = (e) => { if (e.data === 'BLOB_RAN') ran = true; };
+            const got = {};
+            const onMsg = (e) => { if (e.data && e.data.ran) { got.ran = true; got.origin = e.data.origin; } };
             window.addEventListener('message', onMsg);
-
-            const loadResult = await new Promise((resolve) => {
-                iframe.addEventListener('load',  () => resolve('load'));
-                iframe.addEventListener('error', () => resolve('error'));
-                document.body.appendChild(iframe);
-                setTimeout(() => resolve('timeout'), 1200);
-            });
-            await new Promise(r => setTimeout(r, 150));
+            document.body.appendChild(iframe);
+            await new Promise(r => setTimeout(r, 600));
             window.removeEventListener('message', onMsg);
             iframe.remove();
             URL.revokeObjectURL(blobUrl);
-            return { ran, loadResult };
-        });
-        // The script inside the parent-origin blob must NOT execute in a null-origin
-        // sandbox — confirming srcdoc is required for the Phase 3 app frames.
-        expect(result.ran).toBe(false);
+            return { got, parentOrigin };
+        }, baseURL);
+
+        // The blob frame runs ...
+        expect(result.got.ran).toBe(true);
+        // ... but it is NOT null-origin (it inherited the parent's origin) — the precise
+        // reason the Phase 3 app frames use srcdoc, not blob:. Compare P2 (srcdoc→null).
+        expect(result.got.origin).not.toBe('null');
+        expect(result.got.origin).toBe(result.parentOrigin);
     });
 
     test('P2 — srcdoc runs scripts at null origin and postMessage round-trips', async ({ page }) => {
