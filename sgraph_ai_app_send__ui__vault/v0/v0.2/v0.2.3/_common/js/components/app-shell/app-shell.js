@@ -1551,12 +1551,14 @@
                             ? navMatch.path.substring(0, navMatch.path.lastIndexOf('/') + 1) : '';
                         self._htmlDir  = newDir;
                         var navBridge  = self._buildVfsBridgeScript(navMatch.path);
-                        var injected   = htmlText.replace(/(<head[^>]*>)/i, '$1' + navBridge);
-                        if (injected === htmlText) injected = navBridge + htmlText;
-                        var blob = new Blob([injected], { type: 'text/html' });
-                        var url  = URL.createObjectURL(blob);
-                        self._objectUrls.push(url);
-                        iframeEl.src = url;
+                        // Phase 3 flipped app frames to null-origin `srcdoc` (see _mountVaultFile).
+                        // An iframe's `srcdoc` attribute OVERRIDES `src`, so once the frame was
+                        // mounted via srcdoc, assigning a blob: `src` here was silently ignored —
+                        // in-vault links did nothing (regression). Navigation must REPLACE srcdoc,
+                        // built the same way as the initial mount (AppFrameBootstrap, kind:'html').
+                        var injected   = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: navBridge });
+                        iframeEl.removeAttribute('src');
+                        iframeEl.srcdoc = injected;
                         console.log('[app-shell] nav →', navMatch.path);
                     }).catch(function (err) { console.error('[app-shell] nav fetch failed:', err); });
                     return;
