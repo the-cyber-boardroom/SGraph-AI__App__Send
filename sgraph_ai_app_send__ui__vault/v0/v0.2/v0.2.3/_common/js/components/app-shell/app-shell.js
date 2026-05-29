@@ -785,6 +785,44 @@
             window._appDebug.vivProvider = function () {
                 return { mounts: kp.list(), entries: kp.broker.log() };
             };
+            // Multi-kernel audit provider (Phase 5.1 — VivAuditView). The top kernel exposes
+            // its own mounts + broker log directly; each DIRECT child is polled via
+            // monitorChild (B7 monitored-mode) — children default to CLOSED, so most surface
+            // as honest "monitoring closed" placeholders rather than empty rows. Async: each
+            // monitorChild is a channel round-trip. Returns the source descriptor list
+            // VivAuditView.aggregate() consumes.
+            window._appDebug.vivAuditProvider = async function () {
+                var sources = [{
+                    kernelId: kp.kernelId || 'top',
+                    label:    'top (this app)',
+                    mounts:   kp.list(),
+                    entries:  kp.broker.log(),
+                    monitor:  'top'
+                }];
+                var children = kp.list();
+                for (var i = 0; i < children.length; i++) {
+                    var m = children[i];
+                    try {
+                        var res = await kp.monitorChild(m.mountId);   // { mode, entries }
+                        sources.push({
+                            kernelId: m.mountId,
+                            label:    m.label || m.ref || m.mountId,
+                            mounts:   [],
+                            entries:  (res && res.entries) || [],
+                            monitor:  (res && res.mode === 'opt-in') ? 'opt-in' : 'closed'
+                        });
+                    } catch (err) {
+                        sources.push({
+                            kernelId: m.mountId,
+                            label:    m.label || m.ref || m.mountId,
+                            mounts:   [],
+                            entries:  null,
+                            monitor:  (err && err.code === 'ECONSENT') ? 'closed' : 'unreachable'
+                        });
+                    }
+                }
+                return sources;
+            };
             return this._kernelParent;
         }
 
