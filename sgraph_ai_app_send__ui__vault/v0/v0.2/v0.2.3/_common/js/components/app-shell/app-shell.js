@@ -1229,8 +1229,7 @@
                 this._setStatus('Loading app…');
                 var htmlBytes = await this._dataSource.getFileBytes(entry.path);
                 var htmlText  = new TextDecoder().decode(htmlBytes);
-                var injected  = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript);
-                if (injected === htmlText) injected = bridgeScript + htmlText;
+                var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
                 iframe.sandbox     = 'allow-scripts allow-forms';
