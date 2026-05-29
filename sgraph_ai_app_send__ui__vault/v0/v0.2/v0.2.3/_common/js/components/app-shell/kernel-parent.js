@@ -36,12 +36,13 @@
 ;(function () {
     'use strict';
 
-    if (!globalThis.KernelMounts || !globalThis.KernelBroker || !globalThis.VivCustody) {
-        throw new Error('KernelParent requires KernelMounts + KernelBroker + VivCustody (load them first)');
+    if (!globalThis.KernelMounts || !globalThis.KernelBroker || !globalThis.VivCustody || !globalThis.VivCredentialTiers) {
+        throw new Error('KernelParent requires KernelMounts + KernelBroker + VivCustody + VivCredentialTiers (load them first)');
     }
     const KMounts = globalThis.KernelMounts;
     const KBroker = globalThis.KernelBroker;
     const VC      = globalThis.VivCustody;
+    const VCT     = globalThis.VivCredentialTiers;
 
     function codeError(code, msg) { const e = new Error(msg); e.code = code; return e; }
 
@@ -95,6 +96,17 @@
             return { unmounted: true, mountId, meta: m.meta || null, channel: m.channel || null };
         }
 
+        // B7 monitored-mode: ask the child for its broker log over the parent-held channel.
+        // Naturally scoped — only the parent that spawned this child holds the channel
+        // (and the child decides whether to expose anything via VivMonitor's opt-in).
+        // Returns { mode, entries }. Throws ECONSENT if the child is in CLOSED mode.
+        async monitorChild(mountId, opts) {
+            if (!globalThis.VivMonitor) throw codeError('EUNREACH', 'VivMonitor not loaded');
+            const m = this.mounts.get(mountId);
+            if (!m) throw codeError('ENOMOUNT', 'no such mount ' + mountId);
+            return globalThis.VivMonitor.requestLog(m.channel, opts || {});
+        }
+
         list() {
             return this.mounts.list().map(function (m) {
                 return {
@@ -114,6 +126,10 @@
             const hit = this.mounts.resolve(args.path);
             if (!hit) return null;                              // local — caller handles
             const credentialClass = args.credential ? 'perRequest-rw' : 'standing';
+            // B5/B6 invariant: refuse destructive verbs without per-request elevation.
+            // Runs BEFORE mediation — an underprivileged request never reaches the
+            // broker or the channel. Throws EUNDERPRIVILEGED with .required/.provided.
+            VCT.gate({ verb: 'fs.' + op, providedTier: credentialClass });
             const med = await this.broker.mediate(op, hit.mount.mountId, hit.rest, credentialClass);
             if (med.decision !== 'allow') {
                 this.broker.finalize(med.entryId, 'ECONSENT');

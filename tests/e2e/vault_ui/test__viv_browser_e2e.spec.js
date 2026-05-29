@@ -269,4 +269,70 @@ test.describe('ViV browser end-to-end (real null-origin srcdoc + browser crypto)
         expect(result.safeSpawned).toBe(1);
         expect(result.safeErr).toContain('test-stub-throws-after-gate');
     });
+
+    test('B5/B6 — VivCredentialTiers refuses delete without per-request elevation', async ({ page }) => {
+        await page.goto('/en-gb/app');
+        await page.waitForFunction(
+            () => typeof window.VivCredentialTiers === 'object',
+            null, { timeout: 10_000 }
+        );
+
+        const result = await page.evaluate(() => {
+            const VCT = window.VivCredentialTiers;
+            // Verb table — read free, write needs standing, delete needs per-request.
+            const t = {
+                read:  VCT.requiredTierFor('fs.read'),
+                write: VCT.requiredTierFor('fs.write'),
+                del:   VCT.requiredTierFor('fs.delete'),
+                vdel:  VCT.requiredTierFor('vault.delete')
+            };
+            // The mandated invariant: standing CANNOT delete; per-request CAN.
+            let deleteAtStanding = null, deleteAtPerReq = null;
+            try { VCT.gate({ verb: 'fs.delete', providedTier: 'standing' }); }
+            catch (e) { deleteAtStanding = { code: e.code, required: e.required }; }
+            try { deleteAtPerReq = VCT.gate({ verb: 'fs.delete', providedTier: 'perRequest-rw' }).ok; }
+            catch (_) { deleteAtPerReq = false; }
+            return { t, deleteAtStanding, deleteAtPerReq };
+        });
+
+        expect(result.t.read).toBe('none');
+        expect(result.t.write).toBe('standing');
+        expect(result.t.del).toBe('perRequest-rw');
+        expect(result.t.vdel).toBe('perRequest-rw');
+        expect(result.deleteAtStanding).toEqual({ code: 'EUNDERPRIVILEGED', required: 'perRequest-rw' });
+        expect(result.deleteAtPerReq).toBe(true);
+    });
+
+    test('B7 — VivMonitor: CLOSED by default → ECONSENT; OPT_IN exposes broker log', async ({ page }) => {
+        await page.goto('/en-gb/app');
+        await page.waitForFunction(
+            () => typeof window.VivMonitor === 'object' && typeof window.KernelBroker === 'function',
+            null, { timeout: 10_000 }
+        );
+
+        const result = await page.evaluate(async () => {
+            const broker = new window.KernelBroker({ kernelId: 'k-child' });
+            // Fake-channel that mirrors SecureChannel.handle/request for VivMonitor's surface.
+            const handlers = new Map();
+            const ch = {
+                handle: (t, fn) => handlers.set(t, fn),
+                request: async (t, p) => { const fn = handlers.get(t); if (!fn) throw new Error('no handler'); return fn(p); }
+            };
+            const m = window.VivMonitor.registerOnChannel(ch, broker);   // CLOSED default
+            const r1 = await broker.mediate('read', 'm-x', 'a', 'standing'); broker.finalize(r1.entryId, 'ok');
+
+            let closedErr = null;
+            try { await window.VivMonitor.requestLog(ch); }
+            catch (e) { closedErr = e.code; }
+
+            m.setMode('opt-in');
+            const res = await window.VivMonitor.requestLog(ch);
+            return { closedErr, openMode: res.mode, openCount: res.entries.length, firstOp: res.entries[0].op };
+        });
+
+        expect(result.closedErr).toBe('ECONSENT');
+        expect(result.openMode).toBe('opt-in');
+        expect(result.openCount).toBe(1);
+        expect(result.firstOp).toBe('read');
+    });
 });

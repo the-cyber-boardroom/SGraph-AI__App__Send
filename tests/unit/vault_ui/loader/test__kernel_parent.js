@@ -24,6 +24,8 @@ for (const f of [
     'kernel-mounts.js',
     'kernel-broker.js',
     'viv-custody.js',
+    'viv-monitor.js',
+    'viv-credential-tiers.js',
     'kernel-parent.js',
     'kernel-app-handlers.js',
     'kernel-bootstrap.js'
@@ -101,9 +103,13 @@ function makeSpawnChannel(childRegistry) {
         });
         const parentSide = await SecureChannel.create(port1, { sensitiveKey: true, cid });
         const readyP = new Promise((resolve) => parentSide.on('ready', resolve));
-        await bootP;
+        const childSide = await bootP;
         await parentSide.send('secrets', { vaultKey: creds.vaultKey, accessToken: creds.accessToken || null, endpoint: creds.endpoint }, { sensitive: true });
         await readyP;
+        // Surface the child-side broker/monitor handles on the parent side so tests can
+        // toggle them. In production these only ever live on the child kernel itself.
+        parentSide._childBroker  = childSide._broker  || null;
+        parentSide._childMonitor = childSide._monitor || null;
         openChannels.push(parentSide);
         return parentSide;
     };
@@ -308,6 +314,87 @@ console.log('\n[suite] KernelParent — B10 custody gate (pack §05 invariant)')
     // list() exposes custody so sg.vault.mounts() and the 🔗 Mounts tab can show it.
     ok('list() exposes custody per mount',
         safeNull.list()[0].custody === 'parent-held');
+}
+
+console.log('\n[suite] KernelParent — B5/B6 credential-tier gate at the relay edge');
+{
+    // The child grants fs.delete on data/** and the parent broker auto-allows fs.delete
+    // for this mount. The ONLY thing that should refuse a standing-credential delete is
+    // the new tier gate. With a credential present, the SAME path succeeds.
+    const child = makeChildStack({ files: { 'data/doomed.txt': 'bye' } });
+    child.appJson = { permissions: { fs: { read: true, write: ['data/'], 'delete': ['data/'] } } };
+    child.creds   = { vaultKey: 'k', accessToken: 't', endpoint: 'https://example.test' };
+    const parent = makeParent({ acme: child });
+    await parent.mount({ prefix: 'mounts/acme/', ref: 'acme' });
+    autoAllow(parent, 'm-acme');
+
+    // Standing (no credential field on the relay) — gate refuses BEFORE mediation.
+    const logBefore = parent.broker.log().length;
+    const err = await tryCatch(() => parent.relay('delete', { path: 'mounts/acme/data/doomed.txt' }));
+    ok('delete with standing credential → EUNDERPRIVILEGED',
+        err && err.code === 'EUNDERPRIVILEGED' && err.required === 'perRequest-rw');
+    ok('refused delete creates NO broker entry (gate runs before mediation)',
+        parent.broker.log().length === logBefore);
+    ok('refused delete leaves the file in the child store',
+        child.store.has('data/doomed.txt'));
+
+    // Same op with a per-request credential present → succeeds. The credential value
+    // itself is not validated here (issuance scheme deferred); presence flips the tier.
+    const okD = await parent.relay('delete', { path: 'mounts/acme/data/doomed.txt', credential: { tier: 'perRequest-rw' } });
+    ok('delete with credential present → ok', okD && okD.ok === true);
+    ok('elevated delete actually removed the file', !child.store.has('data/doomed.txt'));
+
+    // Writes still pass at standing (the invariant only elevates destructive verbs).
+    const okW = await parent.relay('write', { path: 'mounts/acme/data/x', data: new Uint8Array([1, 2, 3]) });
+    ok('write still passes at standing tier', okW && okW.ok === true);
+
+    // Reads are unaffected.
+    const okR = await parent.relay('read', { path: 'mounts/acme/data/x' });
+    ok('read still passes at standing tier', okR instanceof Uint8Array && okR.length === 3);
+}
+
+console.log('\n[suite] KernelParent.monitorChild — B7 monitored-mode round-trip (real bootstrap)');
+{
+    // Real bootstrap registers VivMonitor on the child's channel. Default CLOSED →
+    // parent's monitorChild request returns ECONSENT. After child opts in (via the
+    // ch._monitor handle the bootstrap surfaced), the same request returns entries.
+    const child = makeChildStack({ files: { 'notes.md': 'hi' } });
+    child.appJson = { permissions: { fs: { read: true } } };
+    child.creds   = { vaultKey: 'k-child', accessToken: 't', endpoint: 'https://example.test' };
+    const parent  = makeParent({ acme: child });
+    const m       = await parent.mount({ prefix: 'mounts/acme/', ref: 'acme' });
+    autoAllow(parent, 'm-acme');
+
+    // Trigger one relayed read so the child's broker has an entry (writes its OWN log,
+    // independent of the parent's; this is what monitored-mode exposes).
+    await parent.relay('read', { path: 'mounts/acme/notes.md' });
+
+    // Default CLOSED on the child → parent gets ECONSENT.
+    const err = await tryCatch(() => parent.monitorChild('m-acme'));
+    ok('monitorChild on CLOSED child → ECONSENT',  err && err.code === 'ECONSENT');
+
+    // Reach the child kernel's monitor handle through the spawn helper's stash.
+    const parentSide = parent.mounts.get('m-acme').channel;
+    ok('bootstrap surfaced child broker via spawn helper',  !!parentSide._childBroker);
+    ok('bootstrap surfaced child monitor via spawn helper', !!parentSide._childMonitor);
+    // In production the toggle happens inside the child kernel via its own UI/app code;
+    // here we drive it from the test side since both ends share node memory.
+    parentSide._childMonitor.setMode('opt-in');
+
+    // The child's broker hasn't been used by the child itself yet (it's a fresh kernel
+    // with no children); use the broker handle directly to write a synthetic entry.
+    const r = await parentSide._childBroker.mediate('read', 'm-grandchild', 'foo.md', 'standing');
+    parentSide._childBroker.finalize(r.entryId, 'ok');
+
+    const res = await parent.monitorChild('m-acme');
+    ok('monitorChild on OPT_IN child → returns { mode, entries }',
+        res && res.mode === 'opt-in' && Array.isArray(res.entries) && res.entries.length === 1);
+    ok('entries carry the child broker shape (op/result)',
+        res.entries[0].op === 'read' && res.entries[0].result === 'ok');
+
+    // Unknown mount → ENOMOUNT (not silently null — this is a programmer error path).
+    const err2 = await tryCatch(() => parent.monitorChild('m-nope'));
+    ok('monitorChild on unknown mount → ENOMOUNT', err2 && err2.code === 'ENOMOUNT');
 }
 
 for (const c of openChannels) { try { c.close(); } catch (_) {} }
