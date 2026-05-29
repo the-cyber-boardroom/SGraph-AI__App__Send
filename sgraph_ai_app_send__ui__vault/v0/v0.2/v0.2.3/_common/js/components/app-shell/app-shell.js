@@ -1056,10 +1056,9 @@
                 });
             }
 
-            // Inject bridge + resources into <head>
+            // Inject bridge + resources into <head> via the unified bootstrap builder (Phase 4).
             var bridgeScript = this._buildVfsBridgeScript(entry.path);
-            var injected     = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript + resBlock);
-            if (injected === htmlText) injected = bridgeScript + resBlock + htmlText;
+            var injected     = AppFrameBootstrap.build({ kind: 'app', htmlText: htmlText, bridgeScript: bridgeScript, resBlock: resBlock });
 
             // Phase 3 (pack §5.3 security gate): null-origin app frame. We deliver the
             // app via `srcdoc`, NOT a parent-origin `blob:` URL — a null-origin sandbox
