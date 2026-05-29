@@ -185,4 +185,37 @@ test.describe('ViV browser end-to-end (real null-origin srcdoc + browser crypto)
 
         expect(pageErrors, 'no uncaught page errors').toEqual([]);
     });
+
+    test('B4 — Mounts debug tab renders mounts + broker log from the provider', async ({ page }) => {
+        await page.goto('/en-gb/app');
+        await page.waitForFunction(
+            () => !!customElements.get('app-debug-mounts') && typeof window.VivMountsView === 'object',
+            null, { timeout: 10_000 }
+        );
+
+        const text = await page.evaluate(() => {
+            // Install a provider exactly as app-shell._ensureKernelParent does.
+            window._appDebug = window._appDebug || {};
+            window._appDebug.vivProvider = () => ({
+                mounts: [{ mountId: 'm-acme', ref: 'acme', prefix: 'mounts/acme/', label: 'Acme Clinic', isolation: 'isolated' }],
+                entries: [
+                    { ts: 1, edge: 'A▶m-acme', mountId: 'm-acme', op: 'read',  path: 'notes.md',    credentialClass: 'standing', policy: 'auto', decision: 'allow', result: 'ok' },
+                    { ts: 2, edge: 'A▶m-acme', mountId: 'm-acme', op: 'write', path: 'outside/x',   credentialClass: 'none',     policy: 'auto', decision: 'allow', result: 'EPERM' }
+                ]
+            });
+            const el = document.createElement('app-debug-mounts');
+            document.body.appendChild(el);
+            document.dispatchEvent(new CustomEvent('app-debug:bridge-call', { detail: {} }));
+            return el.shadowRoot.textContent;
+        });
+
+        // Mount row + relayed-op rows + the child refusal are all visible to the operator.
+        expect(text).toContain('m-acme');
+        expect(text).toContain('mounts/acme/');
+        expect(text).toContain('Acme Clinic');
+        expect(text).toContain('notes.md');
+        expect(text).toContain('outside/x');
+        expect(text).toContain('EPERM');     // child refusal surfaced in the audit log
+        expect(text).toContain('ok');
+    });
 });

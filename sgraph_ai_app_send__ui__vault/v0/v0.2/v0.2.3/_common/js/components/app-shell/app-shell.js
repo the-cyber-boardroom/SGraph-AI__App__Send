@@ -765,6 +765,13 @@
             // Aliases for the legacy message-handler branches + debug surface.
             this._mounts        = this._kernelParent.mounts;
             this._brokerSidecar = this._kernelParent.broker;
+            // Live provider for the ViV Mounts debug tab (gap-doc B4). The pane reads this
+            // on each `app-debug:bridge-call` (relayed ops emit one) + on manual refresh.
+            var kp = this._kernelParent;
+            window._appDebug = window._appDebug || {};
+            window._appDebug.vivProvider = function () {
+                return { mounts: kp.list(), entries: kp.broker.log() };
+            };
             return this._kernelParent;
         }
 
