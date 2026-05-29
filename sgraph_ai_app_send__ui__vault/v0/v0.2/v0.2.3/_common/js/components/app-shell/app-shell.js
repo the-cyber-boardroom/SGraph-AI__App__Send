@@ -1215,53 +1215,16 @@
 
                 var mdBytes = await this._dataSource.getFileBytes(entry.path);
                 var mdText  = new TextDecoder().decode(mdBytes);
-                // Escape for inline JSON string embedding
-                var mdEscaped = JSON.stringify(mdText);
 
-                var html = '<!DOCTYPE html><html><head>' +
-                    '<meta charset="utf-8">' +
-                    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-                    bridgeScript +
-                    '<style>' + css1 + '\n' + css2 + '</style>' +
-                    '<style>' +
-                        'html,body{margin:0;padding:0;background:#0d1117;color:#e2e8f0;' +
-                            'font-family:var(--font-sans,system-ui,sans-serif);}' +
-                        '#md-root{max-width:860px;margin:0 auto;padding:2rem 1.5rem;}' +
-                        'img{max-width:100%;height:auto;}' +
-                        'pre,code{background:#1a1f2e;border-radius:4px;}' +
-                        'pre{padding:1rem;overflow-x:auto;}' +
-                        'code{padding:0.15em 0.35em;}' +
-                    '</style>' +
-                    '</head><body>' +
-                    '<div id="md-root"></div>' +
-                    '<script>' + mdParserJs + '<\/script>' +
-                    '<script>' + mdRendererJs + '<\/script>' +
-                    '<script>(function(){' +
-                        'var md=' + mdEscaped + ';' +
-                        'var html=MarkdownParser.parse(md);' +
-                        'var root=document.getElementById("md-root");' +
-                        'root.innerHTML=html;' +
-                        // Resolve images via VFS bridge: img[data-md-src] → blob URL
-                        'var imgs=root.querySelectorAll("img[data-md-src]");' +
-                        'var pending=imgs.length;' +
-                        'function _done(){' +
-                            'if(--pending<=0){' +
-                                'window.parent.postMessage({type:"sg-app-ready"},"*");' +
-                            '}' +
-                        '}' +
-                        'if(!pending){window.parent.postMessage({type:"sg-app-ready"},"*");}' +
-                        'for(var i=0;i<imgs.length;i++){' +
-                            '(function(img){' +
-                                'var src=img.getAttribute("data-md-src");' +
-                                'sg.vfs.read(src).then(function(buf){' +
-                                    'var blob=new Blob([buf]);' +
-                                    'img.src=URL.createObjectURL(blob);' +
-                                    '_done();' +
-                                '}).catch(function(){_done();});' +
-                            '})(imgs[i]);' +
-                        '}' +
-                    '}());<\/script>' +
-                    '</body></html>';
+                // Unified app-frame bootstrap (Phase 4) — markdown render + bridge
+                // image-resolution IIFE now live in AppFrameBootstrap.build({kind:
+                // 'markdown'}); the mount method only fetches deps and the md bytes.
+                var html = AppFrameBootstrap.build({
+                    kind: 'markdown',
+                    bridgeScript: bridgeScript,
+                    deps: { mdParserJs: mdParserJs, mdRendererJs: mdRendererJs, css1: css1, css2: css2 },
+                    mdText: mdText
+                });
 
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
