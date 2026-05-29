@@ -1114,67 +1114,22 @@
                 mdRendererJs  = deps[3], plrJs = deps[4],
                 css1 = deps[5], css2 = deps[6], css3 = deps[7];
 
-            // Path-resolution helpers PageLayoutRenderer expects as globals (from
-            // send-browse-v031.js / send-browse--v0.3.2.js). Inlined here to avoid
-            // loading the full send-browse component just for two utilities.
-            var pathHelpers =
-                'function _resolvePath(base,relative){' +
-                  'if(relative.startsWith("/"))return relative.substring(1);' +
-                  'var combined=base+relative,parts=combined.split("/"),resolved=[];' +
-                  'for(var i=0;i<parts.length;i++){' +
-                    'if(parts[i]==="..")resolved.pop();' +
-                    'else if(parts[i]!=="."&&parts[i]!=="")resolved.push(parts[i]);}' +
-                  'return resolved.join("/");}' +
-                'function _findEntry(fileList,resolved){' +
-                  'try{resolved=decodeURIComponent(resolved);}catch(_){}' +
-                  'var match=fileList.find(function(e){return !e.dir&&e.path===resolved;});if(match)return match;' +
-                  'match=fileList.find(function(e){return !e.dir&&e.path.endsWith("/"+resolved);});if(match)return match;' +
-                  'if(resolved.indexOf(".")===-1){' +
-                    'var exts=[".md",".pdf",".txt",".html",".jpg",".jpeg",".png",".webp"];' +
-                    'for(var i=0;i<exts.length;i++){' +
-                      'match=fileList.find(function(e){return !e.dir&&e.path===resolved+exts[i];});if(match)return match;' +
-                      'match=fileList.find(function(e){return !e.dir&&e.path.endsWith("/"+resolved+exts[i]);});if(match)return match;}}' +
-                  'var filename=resolved.split("/").pop();' +
-                  'if(filename){match=fileList.find(function(e){return !e.dir&&e.path.split("/").pop()===filename;});}' +
-                  'return match||null;}';
-
-            var html = '<!DOCTYPE html><html><head>' +
-                '<meta charset="utf-8">' +
-                '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-                bridgeScript +
-                '<style>' + css1 + '\n' + css2 + '\n' + css3 + '</style>' +
-                '<style>html,body{margin:0;padding:0;height:100%;overflow-x:hidden;}' +
-                'body{background:#0d1117;}#plr-root{min-height:100vh;}</style>' +
-                '</head><body>' +
-                '<div id="plr-root"></div>' +
-                '<script>' + sendHelpersJs + '<\/script>' +
-                '<script>' + fileTypeJs    + '<\/script>' +
-                '<script>' + mdParserJs    + '<\/script>' +
-                '<script>' + mdRendererJs  + '<\/script>' +
-                '<script>' + pathHelpers   + '<\/script>' +
-                '<script>' + plrJs         + '<\/script>' +
-                '<script>(function(){' +
-                  'var fileList=' + JSON.stringify(fileList.filter(function (f) { return !AppPermissions.hasVaultSegment(f.path); })) + ';' +
-                  'var folderPath=' + JSON.stringify(folderPath) + ';' +
-                  'var entryPath=' + JSON.stringify(entry.path) + ';' +
-                  'var objectUrls=[];' +
-                  'var browseInstance={' +
-                    '_objectUrls:objectUrls,' +
-                    'dataSource:{' +
-                      'getFileList:function(){return fileList;},' +
-                      'getFileBytes:function(p){return sg.vfs.read(p);}' +
-                    '}' +
-                  '};' +
-                  'sg.vfs.read(entryPath).then(function(buf){' +
-                    'var json=new TextDecoder().decode(buf);' +
-                    'var container=document.getElementById("plr-root");' +
-                    'PageLayoutRenderer.render(container,json,folderPath,null,browseInstance);' +
-                  '}).catch(function(err){' +
-                    'document.getElementById("plr-root").innerHTML=' +
-                      '"<div style=\\"padding:2rem;color:#ff6b6b\\">Error: "+err.message+"</div>";' +
-                  '});' +
-                '}());<\/script>' +
-                '</body></html>';
+            // Unified app-frame bootstrap (Phase 4). Path-resolution helpers, the
+            // PageLayoutRenderer wiring and the `.vault`-segment fileList filter now live
+            // in AppFrameBootstrap.build({kind:'page-layout'}); the mount method only
+            // fetches deps and passes them in.
+            var html = AppFrameBootstrap.build({
+                kind: 'page-layout',
+                bridgeScript: bridgeScript,
+                deps: {
+                    sendHelpersJs: sendHelpersJs, fileTypeJs: fileTypeJs,
+                    mdParserJs: mdParserJs, mdRendererJs: mdRendererJs, plrJs: plrJs,
+                    css1: css1, css2: css2, css3: css3
+                },
+                fileList:   fileList,
+                folderPath: folderPath,
+                entryPath:  entry.path
+            });
 
             // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
             var iframe         = document.createElement('iframe');
