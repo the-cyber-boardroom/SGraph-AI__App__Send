@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-05-27 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-05-29 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -435,6 +435,26 @@ Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-
 | Opened file persisted in URL (`#path`) — reloads and links work | EXISTS | `fc13d2c` |
 | Markdown files render in App Mode (MarkdownParser.parse not new MarkdownParser) | EXISTS | `e669a2a` |
 
+### ViV (Vault-in-Vault) Kernel Architecture — v0.2.3 (2026-05-28/29)
+
+Phase 1 (SecureChannel) + Phase 2 (spawn + cross-vault write) + Phase 3 sub-step C prep (sg-app-stub) shipped in a single session. 10 bugs fixed (H1, M1–M6, L1, L3, L4). 152+ jsdom-free assertions, all green.
+
+| Module | Purpose | Status |
+|--------|---------|--------|
+| `secure-channel-envelope.js` | Pure WebCrypto P-256 envelope: pack/unpack, ECDSA sign, ECDH-AES-GCM encrypt, ReplayGuard, mixed payload (Uint8Array+JSON) | **EXISTS** |
+| `secure-channel.js` | Port-anchored authenticated channel: create/accept/request/send; K1 one-use bootstrap key; directional rule; cid check | **EXISTS** |
+| `kernel-mounts.js` | `KernelMounts`: longest-prefix mount table with traversal-collapse | **EXISTS** |
+| `kernel-broker.js` | `KernelBroker`: per-kernel sidecar; mediate/finalize (concurrent-safe entryId); policy (auto/ask) | **EXISTS** |
+| `kernel-app-handlers.js` | `registerKernelVfsHandlers`: two-sided capability gate; AppPermissions.isFloor/can; _safePush EUNREACH | **EXISTS** |
+| `kernel-bootstrap.js` | `bootKernelOnPort`: testable bootstrap (handshake → vault.open → register); reads endpoint from secrets | **EXISTS** |
+| `sg-app-stub.js` | Secret-less app-side `window.sg.*` stub; every method is SecureChannel.request to kernel | **EXISTS (Phase 3C prep — not yet wired into _buildAppSrcdoc)** |
+| `kernel-shell-bundle.js` | AUTO-GENERATED: 191 KB self-contained null-origin srcdoc kernel bundle | **EXISTS** |
+| `scripts/build-kernel-shell-bundle.py` | Build script for kernel-shell-bundle.js; --stdout flag for freshness check | **EXISTS** |
+| `vault.mount` capability in `app-permissions.js` | vault.mount capability key: parse + can() | **EXISTS** |
+| VIV relay branch in `app-shell.js` | `_mountChildVault`, `_handleVfsViv` (read+write+list relay), vault bridge actions | **EXISTS** |
+
+**Known deferred bug (L2):** `Envelope._canonicalParse` treats any `{__u8: "<string>"}` as bytes. Edge case; fix deferred to Phase 6 with `{__u8b64}` tag.
+
 ---
 
 ## PROPOSED
@@ -448,5 +468,17 @@ Full list: [proposed/index.md](proposed/index.md)
 - **Room + Vault pages** migrated to v0.4.0 IFD architecture (currently on v0.3.x legacy)
 - **P-248: Sub-vaults CLI access** — clone-within-clone for sgit; storage tracking; nested clone resolution. Source: doc 490, 05/25 briefs.
 - **P-249: Talk to the vault** — in-vault chat with tool-calling; vault-aware; read-write to self-contained vault; infographic generator + file tools; right-hand pane; user's own OpenRouter key. Arch pack at `library/sgraph-send/dev_packs/vault-chat/`. Source: doc 493, 05/25 briefs.
-- **App-Mode Phase 5: vault.delete** — deferred pending owner-secret credential tier + AppSec sign-off.
+- **App-Mode Phase 5: vault.delete (P-255)** — deferred pending owner-secret credential tier + AppSec sign-off.
 - **App-Mode Phase 6: reads default-deny** — `READ_DEFAULT` flip once apps declare `fs.read` in `app.json`.
+- **P-250: sg.vault.mount() assembled API** — user-facing call composing KERNEL_SHELL_HTML → iframe → SecureChannel → secrets → mount registration. Pieces exist; not assembled into single entry point. ~80 lines.
+- **P-251: sg.vault.unmount()** — close channel, remove mount, leave broker log. ~15 lines.
+- **P-252: HUD `ask` broker policy prompt** — HUD consent UI for cross-vault write authorisation. `app-hud.js` extension needed.
+- **P-253: Mounts list / broker log UI on /vault** — Mounts panel showing each BrokerEntry. `KernelBroker.log()` exists; no UI consumer.
+- **P-254: Per-request elevation / credential tiers** — three tiers (none, standing-ro, perRequest-rw); needs schema + issuance + child-side consumer.
+- **P-256: Monitored-mode child visibility** — parent can read child's broker log (debug only, must show 👁 MONITORED badge).
+- **P-257: Phase 0.5 CORS operational verification** — CDN cache invalidation + CloudFront Origin forward + real-browser null-frame round-trip to dev.send.sgraph.ai.
+- **P-258: Phase 2 §7 browser end-to-end** — clinician console writes to patient vault; broker logs invocation; patient vault shows bytes. Needs two dev vaults.
+- **P-259: Phase 3 — standalone /app → null-origin + bridge split** — drop allow-same-origin from 4 sandbox sites; move sg.* to kernel-side; inject sg-app-stub.js. Security gate that closes SEC-VIV-001.
+- **P-260: Phase 4 — unify three iframe contexts** — /vault HTML view + edit preview on same kernel.
+- **P-261: Phase 5 UI consumers** — vault-in-vaults page + tree-view-expand-as-mount + CLI/REPL.
+- **P-262: Phase 6 hardening** — SecureChannel everywhere; monitoring-mode visibility; optional curve upgrade (P-256 → X25519/Ed25519).

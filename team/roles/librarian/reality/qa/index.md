@@ -1,6 +1,6 @@
 # QA — Reality Index
 
-**Domain:** qa/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** qa/ | **Last updated:** 2026-05-29 | **Maintained by:** Librarian (daily run)
 
 This domain covers the test suite, QA infrastructure (browser automation, Playwright), and test strategy. SGraph Send uses an all-real-implementations philosophy: no mocks, no patches. The full stack starts in-memory in ~100ms.
 
@@ -8,9 +8,29 @@ This domain covers the test suite, QA infrastructure (browser automation, Playwr
 
 ## EXISTS (Code-Verified)
 
-### Test Suite: ~602 Tests, All Passing
+### Test Suite: ~912+ Tests, All Passing
 
 **Strategy:** No mocks, no patches. In-memory Memory-FS stack. ~100ms startup.
+
+**ViV Loader Suite (added 2026-05-29, 152 jsdom-free assertions, all green):**
+
+Run with: `bash tests/unit/vault_ui/loader/run-all.sh`
+
+| File | Assertions | What It Tests |
+|------|-----------|---------------|
+| `test__secure_channel_envelope.js` | 29 | Signed+encrypted envelope; T5 tamper; T6 replay; E7/E8 binary (PNG); padding edges; nonce uniqueness |
+| `test__secure_channel.js` | 14 | Port-anchored channel; K1 handshake + sniffer confidentiality (C2); directional rule (C3a/b); PNG bytes live (C5/T13); concurrent requests; close→EUNREACH |
+| `test__kernel_mounts.js` | 13 | Longest-prefix table; add/remove/resolve; traversal-collapse; mount-root list (N1) |
+| `test__kernel_broker.js` | 22 | mediate/finalize; opaque entryId; concurrent-safe (N3); audit log metadata-only; policy auto/ask |
+| `test__kernel_relay.js` | 16 | Integration: SecureChannel + KernelMounts + KernelBroker + synthetic data source; T3a/b directional; T4 non-transitive; T7/T8/T9 capability gate; R2/R3 PNG relay (T13/B2); R5 mount-root (N1) |
+| `test__app_permissions_vault_mount.js` | 6 | vault.mount capability key: parse + can() |
+| `test__kernel_app_handlers.js` | 24 | registerKernelVfsHandlers; two-sided gate (H1 fix); AppPermissions.isFloor/can; _safePush EUNREACH (M1 fix) |
+| `test__kernel_bootstrap.js` | 13 | bootKernelOnPort; handshake→vault.open→register; endpoint from secrets (M5 fix) |
+| `test__sg_app_stub.js` | 13 | Secret-less stub; sg.ready hydration; PNG round-trip (B2/T13); smoke audit: no vaultKey/token in window.sg |
+| `test__bundle_freshness.js` | 1 | kernel-shell-bundle.js is current vs. its sources (L3 fix) |
+| **Total ViV loader suite** | **151+** | |
+
+**Note:** Tests T1 and T2 (null-frame `parent.document`/`localStorage` access throws) require a real browser; they are Phase 3 security gate tests and cannot run in Node.
 
 | Area | Test Count | Coverage |
 |------|-----------|----------|
