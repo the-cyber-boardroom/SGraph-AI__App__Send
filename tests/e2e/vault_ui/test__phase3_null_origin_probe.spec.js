@@ -147,6 +147,39 @@ test.describe('Phase 3 null-origin probe', () => {
         // validation at app-shell.js:1578 keeps working after the null-origin flip.
         expect(result.sourceMatches).toBe(true);
     });
+
+    test('P5 — window.onerror inside a null-origin srcdoc frame forwards errors out via postMessage (Phase 4 re-spec)', async ({ page }) => {
+        await page.goto(baseURL);
+        const result = await page.evaluate(async () => {
+            const iframe = document.createElement('iframe');
+            iframe.sandbox = 'allow-scripts allow-forms';   // null origin (matches the 4 app frames)
+            // Mirrors the bridge re-spec: the frame installs window.onerror → postMessage,
+            // then throws asynchronously. The parent can no longer reach IN under null-origin,
+            // so the frame must report OUT. This pins the mechanism app-shell now relies on.
+            iframe.srcdoc =
+                '<!doctype html><script>' +
+                'window.onerror=function(m,s,l,c){parent.postMessage({type:"sg-app-error",message:String(m),origin:String(location.origin)},"*");return false;};' +
+                'setTimeout(function(){ throw new Error("boom from app"); },10);' +
+                '<\/script>';
+
+            const got = { type: null, message: null, origin: null };
+            const onMsg = (e) => {
+                if (e.data && e.data.type === 'sg-app-error') {
+                    got.type = e.data.type; got.message = e.data.message; got.origin = e.data.origin;
+                }
+            };
+            window.addEventListener('message', onMsg);
+            document.body.appendChild(iframe);
+            await new Promise(r => setTimeout(r, 400));
+            window.removeEventListener('message', onMsg);
+            iframe.remove();
+            return got;
+        });
+        expect(result.type).toBe('sg-app-error');
+        expect(result.message).toContain('boom from app');
+        // Confirms the report crosses the null-origin boundary (the frame is opaque-origin).
+        expect(result.origin).toBe('null');
+    });
 });
 
 test.describe('Phase 3 frameLocator on null-origin frame', () => {

@@ -1269,6 +1269,16 @@
 
             return '<script>(function(){' +
 
+                // App-error surfacing (ViV Phase 4 re-spec). Under null-origin app frames
+                // the parent can no longer reach in to inject window.onerror; instead the
+                // frame self-reports uncaught errors OUT over postMessage (null-origin safe).
+                // The parent handler routes {type:"sg-app-error"} to the HUD. See probe P5.
+                'window.onerror=function(m,s,l,c){try{window.parent.postMessage({type:"sg-app-error",message:String(m)+(l?" (line "+l+(c?":"+c:"")+")":"")},"*");}catch(_){}return false;};' +
+                'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
+                // Body-hidden self-check: if the app never makes its body visible, surface a
+                // hint (mirrors the old same-origin display:none probe, now from inside).
+                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},0);});' +
+
                 // Nav intercept: relative .html links → postMessage to parent
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");if(!a)return;' +
@@ -1876,6 +1886,21 @@
                         if (typeof hud.showMessage === 'function') {
                             hud.showMessage(uiMsg.handle, uiMsg.text, uiMsg.msgType, uiMsg.ttl);
                         }
+                    }
+                    return;
+                }
+
+                // ── App-error surfacing (ViV Phase 4 re-spec) ──────────────────
+                // Null-origin app frames self-report uncaught errors via postMessage
+                // (window.onerror in the injected bridge). Record + surface on the HUD
+                // as a persistent error toast (ttl null). Replaces the old same-origin
+                // contentWindow.onerror injection which is dead under null-origin.
+                if (e.data.type === 'sg-app-error') {
+                    self._lastIframeError = String(e.data.message || 'App error');
+                    self._emitVaultEvent('app-error', { label: 'App error', message: self._lastIframeError });
+                    var ehud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                    if (ehud && typeof ehud.showMessage === 'function') {
+                        ehud.showMessage('sg-app-error', self._lastIframeError, 'error', null);
                     }
                     return;
                 }
