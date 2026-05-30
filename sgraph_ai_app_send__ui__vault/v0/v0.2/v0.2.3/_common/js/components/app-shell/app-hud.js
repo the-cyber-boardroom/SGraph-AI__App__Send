@@ -490,23 +490,12 @@
             if (navbar) navbar.style.display = cfg.show.navBar ? '' : 'none';
         }
 
-        // Resolve a possibly-undefined hud config from app.json into a complete one.
-        // Defaults:
-        //   - mode='full' (chrome row + nav row both visible)
-        //   - 'full' shows print (the bridge-RPC print refactor in
-        //     team/comms/changelog/05/30/changelog__app-state-print-rpc.md
-        //     restored print compatibility under null-origin srcdoc frames)
-        //   - 'minimal' hides nav row + non-essential buttons (suitable for reading-mode apps)
+        // Delegates to AppHudConfig (loaded before this file in /en-gb/app/index.html).
+        // Extracted so the schema can be unit-tested in Node — see test__app_hud_config.js
+        // for the contract (mode resolution, per-mode show.* defaults, override merging,
+        // forward-compat for unknown flags, no-mutation of input).
         static _resolveHudCfg(input) {
-            input = input || {};
-            var mode = (input.mode === 'hidden' || input.mode === 'minimal') ? input.mode : 'full';
-            var defaults = (mode === 'minimal')
-                ? { vaultName: true,  appTitle: true,  openVault: false, copyLink: false, print: false, debug: false,
-                    navBar: false, navArrows: false, navPath: false, navRefresh: false, navHome: false }
-                : { vaultName: true,  appTitle: true,  openVault: true,  copyLink: true,  print: true,  debug: true,
-                    navBar: true,  navArrows: true,  navPath: true,  navRefresh: true,  navHome: true  };
-            var show = Object.assign({}, defaults, (input.show || {}));
-            return { mode: mode, show: show };
+            return AppHudConfig.resolve(input);
         }
 
         static _escapeHtml(s) {

@@ -1409,13 +1409,16 @@
             var dataSource = this._dataSource;
             if (!iframeEl || !dataSource) return;
 
-            // Split off the #fragment — that part never gets resolved against the file list,
-            // it's just passed through to the new doc's scroll-into-view.
-            var hashIdx  = href.indexOf('#');
-            var pathPart = hashIdx >= 0 ? href.slice(0, hashIdx) : href;
-            var fragment = hashIdx >= 0 ? href.slice(hashIdx + 1) : '';
-
-            var resolved = alreadyResolved ? pathPart : this._resolvePath(this._htmlDir, pathPart);
+            // Delegates the parsing + resolution to AppNavHelpers so the two pinned
+            // regression rules (hash-link strip, path-doubling alreadyResolved) live in
+            // ONE place with characterization tests. See test__app_shell_nav_helpers.js.
+            var nav      = AppNavHelpers.resolveNavigation({
+                href:            href,
+                htmlDir:         this._htmlDir,
+                alreadyResolved: alreadyResolved
+            });
+            var resolved = nav.resolved;
+            var fragment = nav.fragment;
             if (AppPermissions.isFloor('read', resolved)) {
                 console.warn('[app-shell] nav blocked (protected path):', resolved);
                 this._renderBrokenLinkOverlay(resolved, 'blocked');
@@ -2383,16 +2386,10 @@
         // ── Path helpers ──────────────────────────────────────────────────────────────
 
         _resolvePath(base, href) {
-            if (href.startsWith('/')) return href.slice(1);
-            if (!base)               return href;
-            var parts    = (base + href).split('/');
-            var resolved = [];
-            for (var i = 0; i < parts.length; i++) {
-                var p = parts[i];
-                if (p === '..')  { if (resolved.length) resolved.pop(); }
-                else if (p !== '.') { resolved.push(p); }
-            }
-            return resolved.join('/');
+            // Pure path math — delegates to AppNavHelpers so the rules are unit-testable
+            // (see test__app_shell_nav_helpers.js). Kept as a method so existing callers
+            // don't change.
+            return AppNavHelpers.resolvePath(base, href);
         }
 
         _findEntry(fileList, path) {
