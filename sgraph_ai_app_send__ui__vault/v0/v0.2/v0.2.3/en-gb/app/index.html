@@ -106,10 +106,12 @@
             overflow: hidden;
         }
         body { display: flex; flex-direction: column; }
-        #hud-host  { flex: 0 0 48px; min-height: 48px; max-height: 48px; overflow: hidden; }
+        /* HUD-host height auto-sizes — the chrome row is always 48px but the nav row
+           adds ~32px when 'navBar' is enabled in app.json, and goes to 0px in hidden mode. */
+        #hud-host  { flex: 0 0 auto; overflow: hidden; }
         #layout-host { flex: 1; min-height: 0; position: relative; }
         sg-layout { display: block; width: 100%; height: 100%; }
-        app-hud { display: block; width: 100%; height: 48px; }
+        app-hud { display: block; width: 100%; }
         /* Hide the sg-layout stack chrome on the app page — panels need no title bar */
         #app-layout { --sgl-panel-header-height: 0px; }
     </style>
@@ -157,6 +159,17 @@
             }
             if (hud && typeof hud.setPrivileges === 'function') {
                 hud.setPrivileges(e.detail.perm);
+            }
+            // Apply the app.json hud.* config (mode + show.* flags). Idempotent — safe to
+            // call before setInfo. The user-side force-show-hud override is read here so
+            // power users can keep chrome visible even on 'hidden'-mode apps.
+            if (hud && typeof hud.applyHudConfig === 'function') {
+                var cfg = e.detail.hudCfg;
+                try {
+                    var force = localStorage.getItem('sg-app-force-show-hud') === '1';
+                    if (force && cfg && cfg.mode === 'hidden') cfg = Object.assign({}, cfg, { mode: 'full' });
+                } catch (_) {}
+                hud.applyHudConfig(cfg);
             }
         });
 

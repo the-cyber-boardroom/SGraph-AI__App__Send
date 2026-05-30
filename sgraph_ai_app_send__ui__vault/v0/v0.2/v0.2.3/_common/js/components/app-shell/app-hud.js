@@ -18,42 +18,100 @@
             this.attachShadow({ mode: 'open' });
             this._messages  = {};     // handle → { el, timer }
             this._debugOpen = false;
+            // Nav state mirrors app-shell's history (set via setNavState on every
+            // 'app-nav:change' event). The HUD never owns the history, only displays it.
+            this._navState  = { path: '', canBack: false, canForward: false, historyLen: 0 };
+            this._recent    = [];   // most-recent-first list of paths for the ⋯ menu
+            // HUD config from app.json (resolved with defaults — see _resolvedHudCfg).
+            this._hudCfg    = null;
+            this._menuOpen  = false;
         }
 
         connectedCallback() {
             this.shadowRoot.innerHTML = `
                 <style>${AppHud.styles}</style>
-                <div class="hud">
-                    <div class="hud-left">
-                        <span class="hud-brand">SG<span class="hud-slash">/</span>App</span>
-                        <span class="hud-vault-badge" style="display:none"></span>
-                        <span class="hud-app-title"></span>
+                <div class="hud-wrap">
+                    <div class="hud">
+                        <div class="hud-left">
+                            <span class="hud-brand" data-hud-el="brand">SG<span class="hud-slash">/</span>App</span>
+                            <span class="hud-vault-badge" data-hud-el="vaultName" style="display:none"></span>
+                            <span class="hud-app-title" data-hud-el="appTitle"></span>
+                        </div>
+                        <div class="hud-center">
+                            <span class="hud-msg" style="display:none"></span>
+                            <span class="hud-consent" style="display:none">
+                                <span class="hud-consent-text"></span>
+                                <button class="hud-consent-allow">Allow</button>
+                                <button class="hud-consent-deny">Deny</button>
+                            </span>
+                        </div>
+                        <div class="hud-right">
+                            <a class="hud-vault-link" data-hud-el="openVault" href="#" style="display:none" title="Open vault">Open Vault</a>
+                            <button class="hud-copy-btn" data-hud-el="copyLink" style="display:none" title="Copy app link">⎘ Copy Link</button>
+                            <button class="hud-print-btn" data-hud-el="print" style="display:none" title="Print this app (opens a print-friendly preview)">&#128424; Print</button>
+                            <span class="hud-privs-chip" style="display:none" title="What this app is allowed to do"></span>
+                            <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
+                            <button class="hud-debug-btn" data-hud-el="debug" title="Toggle debug panel">🔍 Debug</button>
+                        </div>
                     </div>
-                    <div class="hud-center">
-                        <span class="hud-msg" style="display:none"></span>
-                        <span class="hud-consent" style="display:none">
-                            <span class="hud-consent-text"></span>
-                            <button class="hud-consent-allow">Allow</button>
-                            <button class="hud-consent-deny">Deny</button>
-                        </span>
-                    </div>
-                    <div class="hud-right">
-                        <a class="hud-vault-link" href="#" style="display:none" title="Open vault">Open Vault</a>
-                        <button class="hud-copy-btn" style="display:none" title="Copy app link">⎘ Copy Link</button>
-                        <button class="hud-print-btn" style="display:none" title="Print this app (opens a print-friendly preview)">&#128424; Print</button>
-                        <span class="hud-privs-chip" style="display:none" title="What this app is allowed to do"></span>
-                        <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
-                        <button class="hud-debug-btn" title="Toggle debug panel">🔍 Debug</button>
+                    <div class="navrow" data-hud-el="navBar" style="display:none">
+                        <button class="navrow-back"    data-hud-el="navArrows" title="Back"    disabled>‹</button>
+                        <button class="navrow-forward" data-hud-el="navArrows" title="Forward" disabled>›</button>
+                        <button class="navrow-reload"  data-hud-el="navRefresh" title="Reload this page">↻</button>
+                        <span class="navrow-divider" data-hud-el="navArrows"></span>
+                        <div class="navrow-addr" data-hud-el="navPath" title="Click to copy path">
+                            <span class="navrow-addr-icon">📄</span>
+                            <span class="navrow-addr-text"></span>
+                        </div>
+                        <button class="navrow-copy" data-hud-el="navPath" title="Copy path">⎘</button>
+                        <div class="navrow-menu-wrap">
+                            <button class="navrow-menu" title="Recent pages">⋯</button>
+                            <div class="navrow-menu-panel" style="display:none"></div>
+                        </div>
                     </div>
                 </div>
+                <button class="hud-escape" style="display:none" title="Exit app and return to vault">×&nbsp;Exit app</button>
             `;
 
             this.shadowRoot.addEventListener('click', (e) => {
-                if (e.target.closest('.hud-copy-btn'))  this._copyLink();
-                if (e.target.closest('.hud-print-btn')) this._onPrintClick();
-                if (e.target.closest('.hud-debug-btn')) this._toggleDebug();
+                if (e.target.closest('.hud-copy-btn'))   this._copyLink();
+                if (e.target.closest('.hud-print-btn'))  this._onPrintClick();
+                if (e.target.closest('.hud-debug-btn'))  this._toggleDebug();
                 if (e.target.closest('.hud-privs-chip')) this._onPrivsClick();
+                // Nav row buttons — dispatch events that app-shell listens to.
+                if (e.target.closest('.navrow-back'))    this._emitNavEvent('back');
+                if (e.target.closest('.navrow-forward')) this._emitNavEvent('forward');
+                if (e.target.closest('.navrow-reload'))  this._emitNavEvent('reload');
+                if (e.target.closest('.navrow-copy') || e.target.closest('.navrow-addr')) this._copyCurrentPath();
+                if (e.target.closest('.navrow-menu'))    this._toggleMenu();
+                if (e.target.closest('[data-recent-path]')) {
+                    var path = e.target.closest('[data-recent-path]').getAttribute('data-recent-path');
+                    this._emitNavEvent('jump', { path: path });
+                    this._toggleMenu(false);
+                }
+                if (e.target.closest('.hud-escape'))     this._emitNavEvent('exit');
             });
+
+            // Listen for nav-state changes from app-shell (back/forward arrows + path display).
+            this._navChangeHandler = (ev) => this.setNavState(ev.detail || {});
+            document.addEventListener('app-nav:change', this._navChangeHandler);
+
+            // Close the recent-pages menu on outside-click.
+            this._outsideClickHandler = (ev) => {
+                if (!this._menuOpen) return;
+                // Clicks inside the HUD's shadow DOM never reach the document handler in a
+                // way we can usefully test against the menu, so we just close on any doc click
+                // and reopen on the ⋯ click handler if still wanted (the click ordering means
+                // the menu-button click runs first, sees menu open, closes it, then this fires
+                // and is a no-op).
+                this._toggleMenu(false);
+            };
+            document.addEventListener('click', this._outsideClickHandler);
+        }
+
+        disconnectedCallback() {
+            if (this._navChangeHandler) document.removeEventListener('app-nav:change', this._navChangeHandler);
+            if (this._outsideClickHandler) document.removeEventListener('click', this._outsideClickHandler);
         }
 
         // Called by page script with vault/app metadata.
@@ -224,6 +282,165 @@
             this.showMessage('print', 'Preparing print preview…', 'info', 4000);
             this.dispatchEvent(new CustomEvent('app-hud:print', { bubbles: true, composed: true }));
         }
+
+        // ── Nav row ───────────────────────────────────────────────────────────────────
+
+        // Called by app-shell on every 'app-nav:change' event. Updates the path display,
+        // enables/disables back/forward arrows, and maintains the most-recent list for ⋯.
+        setNavState(state) {
+            state = state || {};
+            this._navState = {
+                path:       String(state.path || ''),
+                canBack:    !!state.canBack,
+                canForward: !!state.canForward,
+                historyLen: state.historyLen | 0
+            };
+            this._updateRecent(this._navState.path);
+            var sr = this.shadowRoot; if (!sr) return;
+
+            var back    = sr.querySelector('.navrow-back');
+            var forward = sr.querySelector('.navrow-forward');
+            if (back)    back.disabled    = !this._navState.canBack;
+            if (forward) forward.disabled = !this._navState.canForward;
+
+            var addr = sr.querySelector('.navrow-addr-text');
+            if (addr) {
+                var p = this._navState.path;
+                var hashIdx = p.indexOf('#');
+                if (hashIdx >= 0) {
+                    var pathPart = p.slice(0, hashIdx);
+                    var hashPart = p.slice(hashIdx);
+                    addr.innerHTML = '';
+                    addr.appendChild(document.createTextNode(pathPart));
+                    var hashSpan = document.createElement('span');
+                    hashSpan.className = 'navrow-addr-hash';
+                    hashSpan.textContent = hashPart;
+                    addr.appendChild(hashSpan);
+                } else {
+                    addr.textContent = p;
+                }
+            }
+
+            // Refresh the menu if it's open so it reflects new "current" highlighting.
+            if (this._menuOpen) this._renderMenu();
+        }
+
+        _updateRecent(path) {
+            if (!path) return;
+            // Move-to-front semantics: most recent first, cap at 12.
+            var i = this._recent.indexOf(path);
+            if (i >= 0) this._recent.splice(i, 1);
+            this._recent.unshift(path);
+            if (this._recent.length > 12) this._recent.length = 12;
+        }
+
+        _emitNavEvent(action, detail) {
+            this.dispatchEvent(new CustomEvent('app-hud:nav', {
+                bubbles: true, composed: true,
+                detail: Object.assign({ action: action }, detail || {})
+            }));
+        }
+
+        _copyCurrentPath() {
+            var p = this._navState.path || '';
+            if (!p) return;
+            navigator.clipboard.writeText(p).then(() => {
+                this.showMessage('copyPath', 'Path copied: ' + p, 'success', 2000);
+            }).catch(() => {
+                this.showMessage('copyPath', 'Could not copy', 'warn', 3000);
+            });
+        }
+
+        _toggleMenu(force) {
+            var open = (typeof force === 'boolean') ? force : !this._menuOpen;
+            this._menuOpen = open;
+            var panel = this.shadowRoot && this.shadowRoot.querySelector('.navrow-menu-panel');
+            if (!panel) return;
+            if (open) {
+                this._renderMenu();
+                panel.style.display = '';
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
+        _renderMenu() {
+            var panel = this.shadowRoot && this.shadowRoot.querySelector('.navrow-menu-panel');
+            if (!panel) return;
+            var current = this._navState.path || '';
+            var rows = this._recent.map((p) => {
+                var cls = (p === current) ? 'navrow-menu-item current' : 'navrow-menu-item';
+                var safe = AppHud._escapeHtml(p);
+                return '<div class="' + cls + '" data-recent-path="' + safe + '" title="' + safe + '">📄 ' + safe + '</div>';
+            }).join('');
+            var html = '<div class="navrow-menu-section">Recent</div>'
+                     + (rows || '<div class="navrow-menu-empty">No history yet</div>');
+            panel.innerHTML = html;
+        }
+
+        // ── HUD config (app.json hud.* surface) ───────────────────────────────────────
+
+        // Apply a resolved hud config to the chrome. Idempotent — safe to call repeatedly.
+        // Sovereignty rules baked in:
+        //   1. Consent prompts always render when active (regardless of mode/show flags).
+        //   2. In 'hidden' mode the chrome row is invisible BUT a corner escape pill stays.
+        //   3. The user-side override (force-show-hud) is applied OUTSIDE this method, by
+        //      the page script that constructs the config — see _resolvedHudCfg().
+        applyHudConfig(hudCfg) {
+            this._hudCfg = hudCfg || null;
+            var cfg = AppHud._resolveHudCfg(hudCfg);
+            var sr  = this.shadowRoot; if (!sr) return;
+
+            var wrap   = sr.querySelector('.hud-wrap');
+            var escape = sr.querySelector('.hud-escape');
+
+            if (cfg.mode === 'hidden') {
+                if (wrap)   wrap.style.display = 'none';
+                if (escape) escape.style.display = '';
+                return;
+            }
+            if (wrap)   wrap.style.display = '';
+            if (escape) escape.style.display = 'none';
+
+            // Per-element visibility. Buttons/spans with [data-hud-el] respect the show flags.
+            // Note: the visibility is "may show" — the actual setInfo()/setNavState() calls
+            // still hide elements that have nothing to display (e.g. vault badge with no name).
+            var els = sr.querySelectorAll('[data-hud-el]');
+            els.forEach((el) => {
+                var key = el.getAttribute('data-hud-el');
+                if (key === 'navArrows') {
+                    // Group key — same logic applies to back/forward/divider.
+                    el.style.visibility = cfg.show.navArrows ? '' : 'hidden';
+                    return;
+                }
+                if (cfg.show[key] === false) {
+                    el.style.display = 'none';
+                }
+            });
+
+            var navbar = sr.querySelector('.navrow');
+            if (navbar) navbar.style.display = cfg.show.navBar ? '' : 'none';
+        }
+
+        // Resolve a possibly-undefined hud config from app.json into a complete one.
+        // Defaults: mode='full', everything visible except print (off by default since the
+        // current Print button is broken under null-origin app frames — to be re-enabled
+        // when the bridge-RPC print refactor lands).
+        static _resolveHudCfg(input) {
+            input = input || {};
+            var mode = (input.mode === 'hidden' || input.mode === 'minimal') ? input.mode : 'full';
+            var defaults = (mode === 'minimal')
+                ? { vaultName: true,  appTitle: true,  openVault: false, copyLink: false, print: false, debug: false,
+                    navBar: false, navArrows: false, navPath: false, navRefresh: false }
+                : { vaultName: true,  appTitle: true,  openVault: true,  copyLink: true,  print: false, debug: true,
+                    navBar: true,  navArrows: true,  navPath: true,  navRefresh: true };
+            var show = Object.assign({}, defaults, (input.show || {}));
+            return { mode: mode, show: show };
+        }
+
+        static _escapeHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
     }
 
     AppHud.styles = `
@@ -301,6 +518,106 @@
         }
         .hud-debug-btn:hover  { color: #4ECDC4; border-color: #4ECDC4; }
         .hud-debug-btn.active { color: #4ECDC4; border-color: #4ECDC4; background: rgba(78,205,196,0.08); }
+
+        /* ── Nav row (HUD V1: back/forward/refresh + path display + copy + recent menu) ── */
+        .hud-wrap { display: block; }
+        .navrow {
+            display: flex; align-items: center; gap: 0.4rem;
+            background: #0e0e22; border-bottom: 1px solid #2a2a4a;
+            padding: 0.3rem 0.7rem;
+            min-height: 32px;
+        }
+        .navrow button {
+            background: transparent; border: 1px solid transparent;
+            color: #8892a4; border-radius: 4px;
+            width: 26px; height: 26px;
+            display: inline-flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 0.95rem; font-family: inherit; padding: 0;
+        }
+        .navrow button:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+        .navrow button:disabled,
+        .navrow button:disabled:hover {
+            opacity: 0.28; cursor: default;
+            background: transparent; color: #8892a4;
+        }
+        .navrow-divider {
+            width: 1px; height: 18px; background: #2a2a4a; margin: 0 0.15rem;
+            display: inline-block;
+        }
+        .navrow-addr {
+            flex: 1; min-width: 0;
+            display: flex; align-items: center; gap: 0.45rem;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid #2a2a4a;
+            border-radius: 6px;
+            padding: 0.22rem 0.6rem;
+            color: #e2e8f0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.78rem;
+            cursor: pointer;
+            overflow: hidden;
+            height: 26px; box-sizing: border-box;
+        }
+        .navrow-addr:hover { border-color: rgba(78,205,196,0.35); }
+        .navrow-addr-icon { color: rgba(255,255,255,0.32); flex-shrink: 0; font-size: 0.85rem; }
+        .navrow-addr-text {
+            color: #e2e8f0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            min-width: 0; flex: 1;
+        }
+        .navrow-addr-hash { color: #4ECDC4; }
+        .navrow-menu-wrap { position: relative; }
+        .navrow-menu-panel {
+            position: absolute; top: calc(100% + 4px); right: 0;
+            min-width: 260px; max-width: 420px;
+            background: #14142a; border: 1px solid #2a2a4a;
+            border-radius: 6px; padding: 0.35rem 0;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+            z-index: 100;
+            font-size: 0.78rem;
+        }
+        .navrow-menu-section {
+            color: rgba(255,255,255,0.38);
+            font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+            padding: 0.3rem 0.7rem 0.2rem;
+        }
+        .navrow-menu-item {
+            display: block;
+            padding: 0.3rem 0.7rem;
+            color: #8892a4;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.74rem;
+            cursor: pointer;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .navrow-menu-item:hover  { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+        .navrow-menu-item.current { color: #4ECDC4; }
+        .navrow-menu-empty {
+            padding: 0.4rem 0.7rem 0.6rem;
+            color: rgba(255,255,255,0.32);
+            font-size: 0.74rem;
+            font-style: italic;
+        }
+
+        /* ── Escape pill (hidden-mode sovereignty chrome — always reachable) ──────── */
+        .hud-escape {
+            position: fixed; top: 8px; right: 8px;
+            z-index: 9999;
+            background: rgba(13,17,23,0.85);
+            backdrop-filter: blur(8px);
+            color: #e2e8f0;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 999px;
+            padding: 0.28rem 0.8rem;
+            font-size: 0.72rem;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .hud-escape:hover {
+            background: rgba(13,17,23,0.95);
+            border-color: rgba(78,205,196,0.45);
+            color: #4ECDC4;
+        }
     `;
 
     customElements.define('app-hud', AppHud);

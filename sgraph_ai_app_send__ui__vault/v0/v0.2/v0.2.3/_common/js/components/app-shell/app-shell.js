@@ -34,6 +34,11 @@
             this._iframeStatus    = 'loading';
             this._resourcesLoaded = [];
             this._t               = {};
+            // Nav history for the HUD back/forward arrows. Entries are "path[#fragment]"
+            // strings (e.g. "scenarios/graph.html#c-adequacy"). _navIndex points at the
+            // current entry; -1 means no navigation yet.
+            this._navHistory      = [];
+            this._navIndex        = -1;
         }
 
         connectedCallback() {
@@ -41,12 +46,33 @@
             document.addEventListener('app-hud:reset-consents', this._resetConsentsHandler);
             this._printHandler = () => this._onPrint();
             document.addEventListener('app-hud:print', this._printHandler);
+            // HUD nav row → app-shell. The HUD never owns history; it dispatches actions
+            // and reads back state via 'app-nav:change' events (emitted by _emitNavChange).
+            this._navHudHandler = (ev) => {
+                var action = ev && ev.detail && ev.detail.action;
+                if (action === 'back')    this._navBack();
+                if (action === 'forward') this._navForward();
+                if (action === 'reload')  this._navReload();
+                if (action === 'jump' && ev.detail.path) {
+                    this._navigateToPath(ev.detail.path, { pushHistory: true });
+                }
+                if (action === 'exit')    this._exitApp();
+            };
+            document.addEventListener('app-hud:nav', this._navHudHandler);
             this._init();
+        }
+
+        // Escape-pill action when HUD is in 'hidden' mode. Sends the user back to the vault
+        // file browser (same destination as the chrome row's 'Open Vault' link).
+        _exitApp() {
+            var base = window.location.pathname.split('/en-gb/')[0];
+            window.location.assign(base + '/en-gb/vault/');
         }
 
         disconnectedCallback() {
             if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
             if (this._printHandler) { document.removeEventListener('app-hud:print', this._printHandler); this._printHandler = null; }
+            if (this._navHudHandler) { document.removeEventListener('app-hud:nav', this._navHudHandler); this._navHudHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -282,7 +308,11 @@
             // Notify HUD
             this.dispatchEvent(new CustomEvent('app-shell:ready', {
                 bubbles: true, composed: true,
-                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO, perm: this._perm }
+                detail: {
+                    vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey,
+                    isRO: isRO, perm: this._perm,
+                    hudCfg: (appJson && appJson.hud) || null   // see AppHud._resolveHudCfg
+                }
             }));
 
             // Auth intercept (auth.required with no cached key and no preset key)
@@ -1183,6 +1213,12 @@
             this.shadowRoot.appendChild(iframe);
 
             this._setupVfsBridgeHandlers(iframe, this._dataSource);
+
+            // Seed nav history with this entry so the HUD back/forward arrows have an origin.
+            // Subsequent in-vault link clicks push onto this stack via _pushNavHistory.
+            this._navHistory = [entry.path];
+            this._navIndex   = 0;
+            this._emitNavChange();
         }
 
         // _page.json: render via PageLayoutRenderer.
@@ -1355,6 +1391,160 @@
                 '</div>';
         }
 
+        // ── In-app navigation (HUD back/forward + bridge nav requests) ────────────────
+        //
+        // The iframe's click interceptor (see _buildVfsBridgeScript below) catches every
+        // in-vault link and posts {__sgVfsNavReq: href} to the parent. The message handler
+        // hands it to `_navigateToPath`, which resolves the path against the current dir,
+        // pushes a history entry, swaps the srcdoc, and (if the href had a #fragment) tells
+        // the new doc to scroll to it via __sgVfsScrollToHash. Back/forward arrows on the
+        // HUD bypass the bridge entirely and re-issue from history with pushHistory:false.
+
+        _navigateToPath(href, opts) {
+            opts = opts || {};
+            var pushHistory = (opts.pushHistory !== false);
+            var iframeEl   = this._iframeEl;
+            var dataSource = this._dataSource;
+            if (!iframeEl || !dataSource) return;
+
+            // Split off the #fragment — that part never gets resolved against the file list,
+            // it's just passed through to the new doc's scroll-into-view.
+            var hashIdx  = href.indexOf('#');
+            var pathPart = hashIdx >= 0 ? href.slice(0, hashIdx) : href;
+            var fragment = hashIdx >= 0 ? href.slice(hashIdx + 1) : '';
+
+            var resolved = this._resolvePath(this._htmlDir, pathPart);
+            if (AppPermissions.isFloor('read', resolved)) {
+                console.warn('[app-shell] nav blocked (protected path):', resolved);
+                this._renderBrokenLinkOverlay(resolved, 'blocked');
+                if (pushHistory) this._pushNavHistory(resolved);
+                this._emitNavChange();
+                return;
+            }
+            var match = this._findEntry(dataSource.getFileList(), resolved);
+            if (!match) {
+                console.warn('[app-shell] nav not found:', resolved);
+                this._renderBrokenLinkOverlay(resolved, 'missing');
+                if (pushHistory) this._pushNavHistory(resolved);
+                this._emitNavChange();
+                return;
+            }
+            var self = this;
+            dataSource.getFileBytes(match.path).then(function (buf) {
+                var htmlText = new TextDecoder().decode(buf);
+                self._htmlDir = match.path.includes('/')
+                    ? match.path.substring(0, match.path.lastIndexOf('/') + 1) : '';
+                var navBridge = self._buildVfsBridgeScript(match.path);
+                // Phase 3 flipped app frames to null-origin `srcdoc` (ee6f4995). srcdoc
+                // OVERRIDES src, so we must REPLACE srcdoc — not assign a blob: src.
+                var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: navBridge });
+                iframeEl.removeAttribute('src');
+                iframeEl.srcdoc = injected;
+                var entry = match.path + (fragment ? '#' + fragment : '');
+                if (pushHistory) self._pushNavHistory(entry);
+                // Scroll-to-anchor: reach into the null-origin iframe via postMessage. The
+                // bridge script's __sgVfsScrollToHash listener applies it on DOMContentLoaded.
+                if (fragment) {
+                    var onLoad = function () {
+                        iframeEl.removeEventListener('load', onLoad);
+                        try { iframeEl.contentWindow.postMessage({ __sgVfsScrollToHash: fragment }, '*'); } catch (_) {}
+                    };
+                    iframeEl.addEventListener('load', onLoad);
+                }
+                self._emitNavChange();
+                console.log('[app-shell] nav →', entry);
+            }).catch(function (err) { console.error('[app-shell] nav fetch failed:', err); });
+        }
+
+        _pushNavHistory(entry) {
+            // Truncate any forward entries — the new nav replaces them (browser convention).
+            if (this._navIndex < this._navHistory.length - 1) {
+                this._navHistory.length = this._navIndex + 1;
+            }
+            // Don't push a duplicate of the current entry (refresh shouldn't grow history).
+            var last = this._navHistory[this._navHistory.length - 1];
+            if (last !== entry) this._navHistory.push(entry);
+            this._navIndex = this._navHistory.length - 1;
+        }
+
+        _navBack() {
+            if (this._navIndex <= 0) return false;
+            this._navIndex -= 1;
+            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false });
+            return true;
+        }
+
+        _navForward() {
+            if (this._navIndex >= this._navHistory.length - 1) return false;
+            this._navIndex += 1;
+            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false });
+            return true;
+        }
+
+        _navReload() {
+            var entry = this._navHistory[this._navIndex];
+            if (!entry) return false;
+            this._navigateToPath(entry, { pushHistory: false });
+            return true;
+        }
+
+        _canNavBack()    { return this._navIndex > 0; }
+        _canNavForward() { return this._navIndex < this._navHistory.length - 1; }
+        _currentNavPath() { return this._navHistory[this._navIndex] || ''; }
+
+        // Notify the HUD that nav state has changed so it can update arrows + the address bar.
+        _emitNavChange() {
+            document.dispatchEvent(new CustomEvent('app-nav:change', {
+                bubbles: true, composed: true,
+                detail: {
+                    path:       this._currentNavPath(),
+                    canBack:    this._canNavBack(),
+                    canForward: this._canNavForward(),
+                    historyLen: this._navHistory.length
+                }
+            }));
+        }
+
+        // Friendly dead-end page for navigations that can't be served. Two reasons:
+        //   'missing'  → the path is not in the vault file list at all
+        //   'blocked'  → the path is in a protected segment (AppPermissions floor)
+        // Rendered as a srcdoc so the user can hit the HUD's ‹ back arrow to escape.
+        _renderBrokenLinkOverlay(missingPath, reason) {
+            var iframe = this._iframeEl;
+            if (!iframe) return;
+            var esc = function (s) {
+                return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            };
+            var isBlocked = (reason === 'blocked');
+            var title  = isBlocked ? 'Access denied' : 'Page not found in this vault';
+            var icon   = isBlocked ? '🔒' : '🔗';
+            var detail = isBlocked
+                ? 'The app tried to navigate to a protected path. The platform blocks reads to vault internals from app code.'
+                : 'The link points to a file that does not exist in this vault. The author may have renamed or moved it.';
+            var html = ''
+              + '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
+              + '<style>'
+              +   'html,body{margin:0;padding:0;}'
+              +   'body{background:#0d1117;color:#e6e6e6;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
+              +     'display:flex;align-items:center;justify-content:center;min-height:100vh;}'
+              +   '.err{text-align:center;max-width:540px;padding:2rem 2.5rem;}'
+              +   '.ico{font-size:3rem;margin:0 0 0.6rem;opacity:0.75;line-height:1;}'
+              +   'h1{color:' + (isBlocked ? '#f0ad4e' : '#ff8a8a') + ';font-size:1.15rem;font-weight:600;margin:0 0 0.5rem;}'
+              +   'p{color:rgba(255,255,255,0.62);font-size:0.9rem;line-height:1.55;margin:0.4rem 0;}'
+              +   'code{background:rgba(255,255,255,0.08);padding:0.18rem 0.55rem;border-radius:3px;'
+              +     'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.82em;word-break:break-all;color:#fff;}'
+              +   '.hint{color:rgba(255,255,255,0.38);font-size:0.78rem;margin-top:1.3rem;}'
+              + '</style></head><body><div class="err">'
+              + '<div class="ico">' + icon + '</div>'
+              + '<h1>' + esc(title) + '</h1>'
+              + '<p>' + esc(detail) + '</p>'
+              + '<p><code>' + esc(missingPath) + '</code></p>'
+              + '<p class="hint">Use the &lsaquo; back arrow in the toolbar to return to where you came from.</p>'
+              + '</div></body></html>';
+            iframe.removeAttribute('src');
+            iframe.srcdoc = html;
+        }
+
         // ── VFS bridge (injected into iframe) ─────────────────────────────────────────
 
         _buildVfsBridgeScript(currentPath) {
@@ -1380,16 +1570,33 @@
                 // hint (mirrors the old same-origin display:none probe, now from inside).
                 'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},0);});' +
 
-                // Nav intercept: relative .html links → postMessage to parent
+                // Nav intercept: relative .html/.htm links → postMessage to parent.
+                // The extension check runs on the path portion only (strip ?query / #frag) so
+                // "page.html#section" still routes through the bridge — otherwise the browser
+                // would do a real GET, the static host 403s, and the iframe lands on a dead end.
+                // The ORIGINAL href (with the fragment) is forwarded so the parent can scroll
+                // to the anchor inside the new srcdoc after navigation.
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");if(!a)return;' +
                   'var h=a.getAttribute("href");if(!h)return;' +
                   'if(h.startsWith("http")||h.startsWith("//")||h.startsWith("#")||h.startsWith("mailto:"))return;' +
-                  'if(h.endsWith(".html")||h.endsWith(".htm")){' +
+                  'var hp=h.split("?")[0].split("#")[0];' +
+                  'if(hp.endsWith(".html")||hp.endsWith(".htm")){' +
                     'e.preventDefault();e.stopPropagation();' +
                     'window.parent.postMessage({__sgVfsNavReq:h},"*");' +
                   '}' +
                 '},true);' +
+
+                // Scroll-to-anchor after navigation: parent posts {__sgVfsScrollToHash:"section"}
+                // (no leading '#') once the new srcdoc has loaded. Null-origin frames can't be
+                // scripted by the parent directly, so this listener inside the iframe is how
+                // links like "page.html#section" land on the right element after the swap.
+                'window.addEventListener("message",function(e){' +
+                  'if(!e.data||typeof e.data.__sgVfsScrollToHash!=="string")return;' +
+                  'var frag=e.data.__sgVfsScrollToHash;if(!frag)return;' +
+                  'var apply=function(){try{var el=document.getElementById(frag);if(el){el.scrollIntoView();return;}location.hash="#"+frag;}catch(_){}};' +
+                  'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply);else apply();' +
+                '});' +
 
                 // Core VFS bridge
                 '(function(){' +
@@ -1640,28 +1847,11 @@
                 var fileList = dataSource.getFileList();
 
                 // ── Navigation ────────────────────────────────────────────────
+                // All in-vault link clicks land here. The body is in `_navigateToPath` so the
+                // HUD back/forward arrows can re-issue navigations without going through the
+                // bridge (they call `_navBack` / `_navForward` directly on the AppShell instance).
                 if (e.data.__sgVfsNavReq) {
-                    var navHref     = e.data.__sgVfsNavReq;
-                    var navResolved = self._resolvePath(self._htmlDir, navHref);
-                    if (AppPermissions.isFloor('read', navResolved)) { console.warn('[app-shell] nav blocked (protected path):', navResolved); return; }
-                    var navMatch    = self._findEntry(fileList, navResolved);
-                    if (!navMatch) { console.warn('[app-shell] nav not found:', navResolved); return; }
-                    dataSource.getFileBytes(navMatch.path).then(function (buf) {
-                        var htmlText = new TextDecoder().decode(buf);
-                        var newDir   = navMatch.path.includes('/')
-                            ? navMatch.path.substring(0, navMatch.path.lastIndexOf('/') + 1) : '';
-                        self._htmlDir  = newDir;
-                        var navBridge  = self._buildVfsBridgeScript(navMatch.path);
-                        // Phase 3 flipped app frames to null-origin `srcdoc` (see _mountVaultFile).
-                        // An iframe's `srcdoc` attribute OVERRIDES `src`, so once the frame was
-                        // mounted via srcdoc, assigning a blob: `src` here was silently ignored —
-                        // in-vault links did nothing (regression). Navigation must REPLACE srcdoc,
-                        // built the same way as the initial mount (AppFrameBootstrap, kind:'html').
-                        var injected   = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: navBridge });
-                        iframeEl.removeAttribute('src');
-                        iframeEl.srcdoc = injected;
-                        console.log('[app-shell] nav →', navMatch.path);
-                    }).catch(function (err) { console.error('[app-shell] nav fetch failed:', err); });
+                    self._navigateToPath(e.data.__sgVfsNavReq, { pushHistory: true });
                     return;
                 }
 
