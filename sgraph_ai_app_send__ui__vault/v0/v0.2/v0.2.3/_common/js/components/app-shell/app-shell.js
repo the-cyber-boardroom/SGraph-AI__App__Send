@@ -39,11 +39,14 @@
         connectedCallback() {
             this._resetConsentsHandler = () => this._resetConsents();
             document.addEventListener('app-hud:reset-consents', this._resetConsentsHandler);
+            this._printHandler = () => this._onPrint();
+            document.addEventListener('app-hud:print', this._printHandler);
             this._init();
         }
 
         disconnectedCallback() {
             if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
+            if (this._printHandler) { document.removeEventListener('app-hud:print', this._printHandler); this._printHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -736,6 +739,66 @@
             await this._dataSource.deleteFile(dir, name);
             if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
             return { unlinked: true };
+        }
+
+        // Print the running app (HUD print button).
+        //
+        // The app iframe is sandboxed with allow-same-origin, so the parent can read
+        // iframe.contentDocument. We clone the live DOM, then rewrite every blob: URL
+        // to a data: URI — blob URLs are scoped to the iframe's window and would die
+        // in the print window, so they must be inlined. The result is a self-contained
+        // HTML snapshot which we hand to SgPrint.printHtml (already deployed at
+        // dev.send.sgraph.ai/_common/js/sg-print.js).
+        async _onPrint() {
+            try {
+                var iframe = this._iframeEl;
+                var srcDoc = iframe && iframe.contentDocument;
+                if (!srcDoc || !srcDoc.documentElement) {
+                    console.warn('[app-shell] print: no iframe document available');
+                    return;
+                }
+                if (typeof window.SgPrint === 'undefined' || typeof SgPrint.printHtml !== 'function') {
+                    console.error('[app-shell] SgPrint not loaded — add sg-print.js to the app page');
+                    return;
+                }
+
+                // Clone the document so we can mutate URLs without disturbing the live app.
+                var clone = srcDoc.documentElement.cloneNode(true);
+
+                // Inline blob: URLs (images and any blob-href stylesheets) to data: URIs.
+                // We fetch from the parent context — same origin works because the iframe
+                // has allow-same-origin. Failures are silently kept as-is.
+                async function _blobToDataUrl(url) {
+                    var resp = await fetch(url);
+                    var blob = await resp.blob();
+                    return await new Promise(function (res, rej) {
+                        var fr = new FileReader();
+                        fr.onload  = function () { res(fr.result); };
+                        fr.onerror = function () { rej(fr.error); };
+                        fr.readAsDataURL(blob);
+                    });
+                }
+
+                var imgs = Array.from(clone.querySelectorAll('img[src^="blob:"]'));
+                var links = Array.from(clone.querySelectorAll('link[rel="stylesheet"][href^="blob:"]'));
+                await Promise.all(
+                    imgs.map(async function (img) {
+                        try { img.src = await _blobToDataUrl(img.src); } catch (_) {}
+                    }).concat(links.map(async function (lnk) {
+                        try { lnk.href = await _blobToDataUrl(lnk.href); } catch (_) {}
+                    }))
+                );
+
+                // Drop <script> tags from the print snapshot — they can't run usefully in
+                // the print window (no VFS bridge) and would slow it down or error out.
+                clone.querySelectorAll('script').forEach(function (s) { s.remove(); });
+
+                var html  = '<!DOCTYPE html>\n' + clone.outerHTML;
+                var title = (this._appJson && this._appJson.title) || (this._vault && this._vault.name) || 'App';
+                SgPrint.printHtml(html, title);
+            } catch (err) {
+                console.error('[app-shell] print failed:', err);
+            }
         }
 
         // Clear this app's cached consents for the current vault (HUD permissions panel "reset").

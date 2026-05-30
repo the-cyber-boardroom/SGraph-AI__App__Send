@@ -40,6 +40,7 @@
                     <div class="hud-right">
                         <a class="hud-vault-link" href="#" style="display:none" title="Open vault">Open Vault</a>
                         <button class="hud-copy-btn" style="display:none" title="Copy app link">⎘ Copy Link</button>
+                        <button class="hud-print-btn" style="display:none" title="Print this app (opens a print-friendly preview)">&#128424; Print</button>
                         <span class="hud-privs-chip" style="display:none" title="What this app is allowed to do"></span>
                         <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
                         <button class="hud-debug-btn" title="Toggle debug panel">🔍 Debug</button>
@@ -49,6 +50,7 @@
 
             this.shadowRoot.addEventListener('click', (e) => {
                 if (e.target.closest('.hud-copy-btn'))  this._copyLink();
+                if (e.target.closest('.hud-print-btn')) this._onPrintClick();
                 if (e.target.closest('.hud-debug-btn')) this._toggleDebug();
                 if (e.target.closest('.hud-privs-chip')) this._onPrivsClick();
             });
@@ -84,6 +86,10 @@
             }
             if (copy && vaultKey) {
                 copy.style.display = '';
+            }
+            const printBtn = this.shadowRoot.querySelector('.hud-print-btn');
+            if (printBtn && vaultKey) {
+                printBtn.style.display = '';
             }
             if (roBadge) {
                 roBadge.style.display = isRO ? '' : 'none';
@@ -210,6 +216,14 @@
                 this.showMessage('copy', 'Could not copy: ' + url, 'info', 5000);
             });
         }
+
+        // Print is implemented by app-shell (it owns the iframe). The HUD just signals.
+        // app-shell._onPrint() reads iframe.contentDocument, normalises blob: URLs to
+        // data: URIs (so the print window is self-contained), and hands off to SgPrint.
+        _onPrintClick() {
+            this.showMessage('print', 'Preparing print preview…', 'info', 4000);
+            this.dispatchEvent(new CustomEvent('app-hud:print', { bubbles: true, composed: true }));
+        }
     }
 
     AppHud.styles = `
@@ -253,6 +267,12 @@
             color: #8892a4; cursor: pointer; white-space: nowrap;
         }
         .hud-copy-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
+        .hud-print-btn {
+            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
+            border: 1px solid #2a2a4a; background: transparent;
+            color: #8892a4; cursor: pointer; white-space: nowrap;
+        }
+        .hud-print-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
         .hud-ro-badge {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(100,160,220,0.12); color: #64a0dc;
