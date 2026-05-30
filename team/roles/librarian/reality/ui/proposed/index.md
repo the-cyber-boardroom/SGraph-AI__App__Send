@@ -1,6 +1,6 @@
 # ui/proposed — Index
 
-**Domain:** `ui/` | **Last updated:** 2026-05-22
+**Domain:** `ui/` | **Last updated:** 2026-05-30
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16 (lines 1210–1219, 1234–1241), 17 (lines 1541–1551), 29–30 (lines 2720–2830)
 
 ---
@@ -110,3 +110,27 @@ All items below are PROPOSED — does not exist yet.
 | P-146 | Demo FastAPI orchestration service: sessions, setup, step-N, teardown API; holds credentials; idempotent | doc 421 |
 | P-147 | Auto-teardown for demo sessions: idle timeout 15-20 minutes; explicit teardown button; no orphan resources | doc 421 |
 | P-148 | Pre-provisioned shared demo environment mode (instant-start alternative for public-facing demos) | doc 421 |
+
+---
+
+## Vault Chat Architecture (05/26 briefs — docs 505–506)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-263 | Vault Chat — LLM chat as a null-origin app iframe over the `window.sg` bridge; sibling to Vault App; context layers inspector (vault/VFS/attachments/history); tool-execution control (auto/ask/controlled); history-as-manipulable-files; end-of-chat zip-to-vault | docs 505–506 |
+| P-264 | VFS (Virtual File System) — client-side in-memory FS within the chat iframe; distinct from vault FS; every message/response stored as VFS file; optional VFS-vault sync (writes via `sg.vfs.write`; version-controlled history); self-pruning tool (LLM consolidates to VFS, drops stale live context) | doc 505 |
+| P-265 | Commit Queue — timer-windowed batch commits on vault-shell; configurable window (0=off, 10-15s default); staging area showing pending files; debug panel tab; solves many-files explosion from Vault Chat VFS sync (one-write-per-commit → unbearable) | doc 509 |
+| P-266 | Sidecar LLMs — parallel LLM instances for memory curation, extraction, history maintenance, prompt-injection security checks, consolidation; enable/disable per type; multi-LLM consensus mode (ask several, consolidate one answer) | doc 506 |
+
+---
+
+## Demo Vaults (05/26 briefs — docs 510–511)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-267 | Security Report vault demo — simulated pen test findings delivered as a vault; audience-specific Vault App views per persona (decision-maker/financial/roadmap/risk/AppSec/DevOps/CEO); evidence graph (findings linked to payloads, screenshots, logs); positive scorecard (industry gap); retest scripts; simulated exports to Splunk/Jira/GitHub/risk registers | doc 510 |
+| P-268 | VC Confidential Data vault demo — 6 VC scenarios (inbound data room, investment memo, deal folder, IC/board materials, LP reporting, fund raise); demonstrates read+write loop, audience-specific views, controlled distribution with preview cards; scoped to EXCLUDE ViV for initial demo | doc 511 |
