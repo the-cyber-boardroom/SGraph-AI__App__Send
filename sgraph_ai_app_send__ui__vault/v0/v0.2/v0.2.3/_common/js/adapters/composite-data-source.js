@@ -127,12 +127,12 @@ class CompositeDataSource {
     _mountTreeNode(m) {
         if (m.status === 'mounted' && m.child) {
             const pfx = this._prefixTree(m.child.getTree(), m.mountPath);
-            return { name: m.nodeName, _subvault: true, _access: m.access, _linkPath: m.linkPath,
+            return { name: m.nodeName, _subvault: true, _access: m.access, _status: 'mounted', _linkPath: m.linkPath,
                      children: pfx.children, files: pfx.files };
         }
         // collapsed / locked / error → lazy, empty node (send-browse loads on expand)
         return { name: m.nodeName, _subvault: true, _lazy: true,
-                 _folderPath: '/' + m.mountPath, _access: m.access, _linkPath: m.linkPath,
+                 _folderPath: '/' + m.mountPath, _access: m.access, _status: m.status, _linkPath: m.linkPath,
                  children: {}, files: [] };
     }
 

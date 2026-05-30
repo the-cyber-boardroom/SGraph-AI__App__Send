@@ -214,7 +214,19 @@ class SendBrowse extends SendComponent {
             const linkAttr   = (child && child._linkPath) ? ` data-link-path="${SendHelpers.escapeHtml(child._linkPath)}"` : '';
             const folderCls  = isSubvault ? 'sb-tree__folder sb-tree__folder--subvault' : 'sb-tree__folder';
             const folderIcon = isSubvault ? '🗄' : SendIcons.FOLDER_SM;
-            const chip       = isSubvault ? `<span class="sb-tree__subvault-chip">·${SendHelpers.escapeHtml(child._access || 'ro')}</span>` : '';
+            // Sub-vault status chip (ViV pack §3.3). Status-aware when VaultSubvaultsView is
+            // loaded (in /vault); falls back to the plain `·ro` access chip otherwise.
+            let chip = '';
+            if (isSubvault) {
+                if (window.VaultSubvaultsView && typeof VaultSubvaultsView.chip === 'function') {
+                    const c = VaultSubvaultsView.chip(child._status, child._access);
+                    const txt = [c.symbol, c.access, c.state ? '· ' + c.state : ''].filter(Boolean).join(' ');
+                    const col = { ok: '#4ade80', pending: '#8892a4', err: '#ff6b6b' }[c.cls] || '#8892a4';
+                    chip = `<span class="sb-tree__subvault-chip sb-tree__subvault-chip--${SendHelpers.escapeHtml(c.cls)}" title="${SendHelpers.escapeHtml(c.title)}" style="color:${col};font-size:0.78em;margin-left:0.3em;white-space:nowrap;">${SendHelpers.escapeHtml(txt)}</span>`;
+                } else {
+                    chip = `<span class="sb-tree__subvault-chip">·${SendHelpers.escapeHtml(child._access || 'ro')}</span>`;
+                }
+            }
             const editBtn    = (child && child._linkPath) ? `<span class="sb-link-edit" data-link-path="${SendHelpers.escapeHtml(child._linkPath)}" title="Edit link file">&#9998;</span>` : '';
             const countHtml  = isLazy ? '' : `<span class="sb-tree__count">${this._countFiles(child)}</span>`;
             const innerHtml  = isLazy ? '' : this._renderFolderNode(child, childPath);
@@ -312,6 +324,9 @@ class SendBrowse extends SendComponent {
                     } catch (err) {
                         toggle.textContent = '⚠';
                         console.warn('[send-browse] lazy expand failed for', fp, err && err.message);
+                        // Re-render so the node reflects its new mount status (locked / error)
+                        // in the §3.3 status chip, instead of staying on a stale "not opened".
+                        try { this._populateTree(); } catch (_) {}
                     }
                     return;
                 }

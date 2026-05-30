@@ -83,12 +83,40 @@
         return { rows: rows(mounts), summary: summary(mounts) };
     }
 
+    // In-tree node badge for a sub-vault (send-browse, ViV pack §3.3). Read-through has
+    // no kernel, so "connected" means "opened read-through, read-only" — honest about the
+    // mechanism. Returns the pieces a renderer composes: a state dot + access + optional
+    // state word + a status class (reusing the ok/pending/err vocabulary).
+    function chip(status, access) {
+        var st  = status || 'collapsed';
+        var acc = access || 'ro';
+        switch (st) {
+            case 'mounted':   return { symbol: '●',  access: acc, state: 'connected', cls: 'ok',
+                                       title: 'connected — sub-vault opened read-through (read-only)' };
+            case 'locked':    return { symbol: '🔒', access: '',  state: 'locked',    cls: 'err',
+                                       title: 'locked — no key available to open this sub-vault' };
+            case 'error':     return { symbol: '⚠',  access: '',  state: 'error',     cls: 'err',
+                                       title: 'error — failed to open this sub-vault' };
+            case 'collapsed':
+            default:          return { symbol: '○',  access: acc, state: '',          cls: 'pending',
+                                       title: 'not opened — expand to connect read-through' };
+        }
+    }
+
+    // Convenience: the composed one-line text (e.g. "● ro · connected", "🔒 locked").
+    function chipText(status, access) {
+        var c = chip(status, access);
+        return [c.symbol, c.access, c.state ? '· ' + c.state : ''].filter(Boolean).join(' ');
+    }
+
     globalThis.VaultSubvaultsView = {
         statusLabel: statusLabel,
         statusClass: statusClass,
         accessLabel: accessLabel,
         rows:        rows,
         summary:     summary,
-        build:       build
+        build:       build,
+        chip:        chip,
+        chipText:    chipText
     };
 })();

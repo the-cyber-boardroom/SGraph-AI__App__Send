@@ -28,6 +28,7 @@ node tests/unit/vault_ui/loader/test__kernel_parent.js
 node tests/unit/vault_ui/loader/test__viv_mounts_view.js
 node tests/unit/vault_ui/loader/test__viv_audit_view.js
 node tests/unit/vault_ui/loader/test__vault_subvaults_view.js
+node tests/unit/vault_ui/loader/test__sg_repl_core.js
 node tests/unit/vault_ui/loader/test__viv_custody.js
 node tests/unit/vault_ui/loader/test__viv_monitor.js
 node tests/unit/vault_ui/loader/test__viv_credential_tiers.js
