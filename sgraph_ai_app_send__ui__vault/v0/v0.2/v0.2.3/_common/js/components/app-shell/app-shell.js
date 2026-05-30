@@ -742,74 +742,151 @@
         // Spawn a child kernel (null-origin srcdoc iframe) bound to another vault, fed
         // its secrets over a SecureChannel. After mount, sg.vfs.* calls with the prefix
         // relay through the child's kernel — see _handleVfsViv below.
-        async _mountChildVault(opts) {
-            var prefix = opts.prefix, ref = opts.ref, label = opts.label;
+        // The mount table + broker + relay logic lives in KernelParent (testable, no DOM);
+        // app-shell supplies only the DOM-coupled spawnChannel (iframe + srcdoc) and the
+        // credential resolver. _mounts / _brokerSidecar alias the KernelParent internals so
+        // the message-handler `self._mounts.resolve(...)` checks keep working unchanged.
+        _ensureKernelParent() {
+            if (this._kernelParent) return this._kernelParent;
             if (typeof KERNEL_SHELL_HTML === 'undefined') {
                 throw Object.assign(new Error('kernel-shell-bundle not loaded; run scripts/build-kernel-shell-bundle.py'), { code: 'EUNREACH' });
             }
-            if (typeof SecureChannel === 'undefined' || typeof KernelMounts === 'undefined' || typeof KernelBroker === 'undefined') {
-                throw Object.assign(new Error('ViV modules missing — load secure-channel + kernel-mounts + kernel-broker'), { code: 'EUNREACH' });
+            if (typeof SecureChannel === 'undefined' || typeof KernelMounts === 'undefined'
+                || typeof KernelBroker === 'undefined' || typeof KernelParent === 'undefined'
+                || typeof VivCustody === 'undefined') {
+                throw Object.assign(new Error('ViV modules missing — load secure-channel + kernel-mounts + kernel-broker + kernel-parent + viv-custody'), { code: 'EUNREACH' });
             }
-            this._mounts = this._mounts || new KernelMounts();
-            this._brokerSidecar = this._brokerSidecar || new KernelBroker({
+            var self = this;
+            // Classify THIS kernel's App-A iframe origin for the B10 custody gate.
+            // Phase 3 SHIPPED: the 4 app-frame sites now use `allow-scripts allow-forms`
+            // (no allow-same-origin), so VivCustody classifies App-A as 'null-origin' and
+            // the gate no longer refuses parent-held mounts (null-origin App-A cannot read
+            // the parent's secrets — that was the whole point of the coupling rule).
+            var sandboxSpec = (this._iframeEl && this._iframeEl.getAttribute && this._iframeEl.getAttribute('sandbox')) || null;
+            var appOrigin   = VivCustody.classifyAppFrameOrigin(sandboxSpec);
+            // Synthetic-only escape hatch. NEVER set this for real-data trials. The
+            // pack §05 invariant is fail-closed by design; this is the one named opt-in.
+            var unsafeOk = (window.SG_VIV_ALLOW_UNSAFE_SYNTHETIC === true);
+            this._kernelParent = new KernelParent({
                 kernelId: 'k-' + ((this._vault && this._vault._vaultId) || 'top'),
-                ui: { prompt: this._brokerPromptOnHud.bind(this) }
+                brokerUi: { prompt: this._brokerPromptOnHud.bind(this) },
+                resolveCredentials: function (ref) { return self._resolveChildCredentials(ref); },
+                spawnChannel: function (ref, creds) { return self._spawnChildChannel(ref, creds); },
+                appFrameOrigin:       appOrigin,
+                allowUnsafeSynthetic: unsafeOk
             });
+            // Aliases for the legacy message-handler branches + debug surface.
+            this._mounts        = this._kernelParent.mounts;
+            this._brokerSidecar = this._kernelParent.broker;
+            // Live provider for the ViV Mounts debug tab (gap-doc B4). The pane reads this
+            // on each `app-debug:bridge-call` (relayed ops emit one) + on manual refresh.
+            var kp = this._kernelParent;
+            window._appDebug = window._appDebug || {};
+            window._appDebug.vivProvider = function () {
+                return { mounts: kp.list(), entries: kp.broker.log() };
+            };
+            // Multi-kernel audit provider (Phase 5.1 — VivAuditView). The top kernel exposes
+            // its own mounts + broker log directly; each DIRECT child is polled via
+            // monitorChild (B7 monitored-mode) — children default to CLOSED, so most surface
+            // as honest "monitoring closed" placeholders rather than empty rows. Async: each
+            // monitorChild is a channel round-trip. Returns the source descriptor list
+            // VivAuditView.aggregate() consumes.
+            window._appDebug.vivAuditProvider = async function () {
+                var sources = [{
+                    kernelId: kp.kernelId || 'top',
+                    label:    'top (this app)',
+                    mounts:   kp.list(),
+                    entries:  kp.broker.log(),
+                    monitor:  'top'
+                }];
+                var children = kp.list();
+                for (var i = 0; i < children.length; i++) {
+                    var m = children[i];
+                    try {
+                        var res = await kp.monitorChild(m.mountId);   // { mode, entries }
+                        sources.push({
+                            kernelId: m.mountId,
+                            label:    m.label || m.ref || m.mountId,
+                            mounts:   [],
+                            entries:  (res && res.entries) || [],
+                            monitor:  (res && res.mode === 'opt-in') ? 'opt-in' : 'closed'
+                        });
+                    } catch (err) {
+                        sources.push({
+                            kernelId: m.mountId,
+                            label:    m.label || m.ref || m.mountId,
+                            mounts:   [],
+                            entries:  null,
+                            monitor:  (err && err.code === 'ECONSENT') ? 'closed' : 'unreachable'
+                        });
+                    }
+                }
+                return sources;
+            };
+            return this._kernelParent;
+        }
 
-            // Resolve the child's credentials. Trial path: read from clinic.json owner
-            // record on the parent vault. Cleaner future path: Kernel-A holds them and
-            // delivers via MessageChannel-port-transfer (architect pack §3 "Cleaner
-            // future variant"). For now: a stub the trial app populates.
-            var creds = await this._resolveChildCredentials(ref);
-            if (!creds || !creds.vaultKey) {
-                throw Object.assign(new Error('no credentials for ref ' + ref), { code: 'EUNREACH' });
-            }
-
-            // Build the iframe. sandbox="allow-scripts" → null origin (no storage, no
-            // ambient fetch unless the CORS fix is live — which it is, post-§06).
+        // DOM-coupled child bring-up: build the null-origin srcdoc iframe, run the handshake,
+        // deliver secrets (WITH the parent's own endpoint — M5), wait for the child's 'ready'.
+        // Cleans up the iframe + channel on any failure. This is the only piece that can't be
+        // unit-tested (it touches document/iframe); KernelParent + bootKernelOnPort cover the rest.
+        async _spawnChildChannel(ref, creds) {
             var iframe = document.createElement('iframe');
-            iframe.sandbox = 'allow-scripts';
-            iframe.style.cssText = 'display:none;';   // headless mount; UI mounts are Phase 5
+            iframe.sandbox = 'allow-scripts';            // null origin
+            iframe.style.cssText = 'display:none;';      // headless mount; visible UI mounts are Phase 5
             iframe.srcdoc = KERNEL_SHELL_HTML;
             document.body.appendChild(iframe);
 
             var channel;
             try {
                 channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref });
-                await channel.send('secrets', { vaultKey: creds.vaultKey, accessToken: creds.accessToken || null });
-                // Wait for the child kernel's 'ready' event.
+                // M5: tell the child WHICH server to hit — its own Edge 1. Without this the
+                // child falls back to the hardcoded dev endpoint regardless of where we are.
+                await channel.send('secrets', {
+                    vaultKey:    creds.vaultKey,
+                    accessToken: creds.accessToken || null,
+                    endpoint:    this._sendEndpoint()
+                }, { sensitive: true });
                 await new Promise(function (resolve, reject) {
                     var t = setTimeout(function () { reject(Object.assign(new Error('child kernel boot timeout'), { code: 'EUNREACH' })); }, 10000);
                     channel.on('ready', function (p) { clearTimeout(t); resolve(p); });
                 });
             } catch (err) {
+                if (channel) { try { channel.close(); } catch (_) {} }
                 try { iframe.remove(); } catch (_) {}
-                if (channel) try { channel.close(); } catch (_) {}
                 throw err;
             }
-            var mountId = 'm-' + ref;
-            this._mounts.add({ mountId, prefix, ref, channel, label, meta: { iframe } });
-            return { mountId, ref };
+            // Stash the iframe on the channel so unmount can tear it down.
+            channel._mountIframe = iframe;
+            return channel;
+        }
+
+        async _mountChildVault(opts) {
+            var kp = this._ensureKernelParent();
+            return kp.mount({ prefix: opts.prefix, ref: opts.ref, label: opts.label });
         }
 
         async _unmountChildVault(mountId) {
-            var m = this._mounts && this._mounts.remove(mountId);
-            if (!m) return { unmounted: false };
-            try { m.channel && m.channel.close(); } catch (_) {}
-            try { m.meta && m.meta.iframe && m.meta.iframe.remove(); } catch (_) {}
-            return { unmounted: true, mountId };
+            if (!this._kernelParent) return { unmounted: false };
+            var res = await this._kernelParent.unmount(mountId);
+            // Tear down the iframe stashed on the channel (DOM cleanup KernelParent can't do).
+            try {
+                var iframe = res && res.channel && res.channel._mountIframe;
+                if (iframe) iframe.remove();
+            } catch (_) {}
+            return { unmounted: !!res.unmounted, mountId: res.mountId };
         }
 
         _listMounts() {
-            if (!this._mounts) return [];
-            return this._mounts.list().map(function (m) {
-                return { mountId: m.mountId, ref: m.ref, prefix: m.prefix, label: m.label, isolation: 'isolated' };
-            });
+            if (!this._kernelParent) return [];
+            return this._kernelParent.list();
         }
 
         // Trial-only stub. The clinic vault's app.json + an owner record (clinic.json)
         // can provide child credentials. Real production: Kernel-A holds them
         // (port-transfer model — architect pack §3 "Cleaner future variant").
+        // Resolved creds are tagged custody:'parent-held' so the B10 gate can refuse
+        // the unsafe combination (this resolver + a same-origin App-A) by default.
         async _resolveChildCredentials(ref) {
             if (this._resolveChildCredentialsImpl) return this._resolveChildCredentialsImpl(ref);
             try {
@@ -817,7 +894,11 @@
                 var clinic = JSON.parse(new TextDecoder().decode(bytes));
                 var entry = clinic && clinic[ref];
                 if (entry && entry.vaultKey) {
-                    return { vaultKey: entry.vaultKey, accessToken: entry.accessToken || null };
+                    return {
+                        vaultKey:    entry.vaultKey,
+                        accessToken: entry.accessToken || null,
+                        custody:     'parent-held'
+                    };
                 }
             } catch (_) {}
             return null;
@@ -837,25 +918,8 @@
         // Cross-mount aware vfs handler. Local path → existing data-source ops; cross-mount
         // path → broker.mediate + relay over the child's SecureChannel.
         async _handleVfsViv(op, args) {
-            if (!this._mounts) return null;   // signal to caller: no mount, do local op
-            var hit = this._mounts.resolve(args.path);
-            if (!hit) return null;
-            var credentialClass = args.credential ? 'perRequest-rw' : 'standing';
-            var med = await this._brokerSidecar.mediate(op, hit.mount.mountId, hit.rest, credentialClass);
-            if (med.decision !== 'allow') {
-                this._brokerSidecar.finalize(med.entryId, 'ECONSENT');
-                throw Object.assign(new Error('Broker denied'), { code: 'ECONSENT' });
-            }
-            try {
-                var res = await hit.mount.channel.request('vfs.' + op,
-                    { path: hit.rest, data: args.data, credential: args.credential },
-                    { sensitive: !!args.data || op === 'read' });
-                this._brokerSidecar.finalize(med.entryId, 'ok');
-                return res;
-            } catch (err) {
-                this._brokerSidecar.finalize(med.entryId, err.code || 'EPROTO');
-                throw err;
-            }
+            if (!this._kernelParent) return null;   // no mounts yet → caller does local op
+            return this._kernelParent.relay(op, args);
         }
 
         // Clear this app's cached consents for the current vault (HUD permissions panel "reset").
@@ -1030,19 +1094,20 @@
                 });
             }
 
-            // Inject bridge + resources into <head>
+            // Inject bridge + resources into <head> via the unified bootstrap builder (Phase 4).
             var bridgeScript = this._buildVfsBridgeScript(entry.path);
-            var injected     = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript + resBlock);
-            if (injected === htmlText) injected = bridgeScript + resBlock + htmlText;
+            var injected     = AppFrameBootstrap.build({ kind: 'app', htmlText: htmlText, bridgeScript: bridgeScript, resBlock: resBlock });
 
-            var blob    = new Blob([injected], { type: 'text/html' });
-            var blobUrl = URL.createObjectURL(blob);
-            this._objectUrls.push(blobUrl);
-
+            // Phase 3 (pack §5.3 security gate): null-origin app frame. We deliver the
+            // app via `srcdoc`, NOT a parent-origin `blob:` URL — a null-origin sandbox
+            // refuses to load a blob: minted by another origin (pack §5.5; probe P1).
+            // Dropping `allow-same-origin` means app code can no longer read
+            // localStorage / window.parent / ambient-fetch vault paths; every vault
+            // access goes through the postMessage bridge (sg.*), which never needed it.
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+            iframe.sandbox     = 'allow-scripts allow-forms';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-            iframe.src         = blobUrl;
+            iframe.srcdoc      = injected;
             iframe.addEventListener('load', () => {
                 this._iframeStatus  = 'ready';
                 this._t.iframeReady = performance.now();
@@ -1087,76 +1152,28 @@
                 mdRendererJs  = deps[3], plrJs = deps[4],
                 css1 = deps[5], css2 = deps[6], css3 = deps[7];
 
-            // Path-resolution helpers PageLayoutRenderer expects as globals (from
-            // send-browse-v031.js / send-browse--v0.3.2.js). Inlined here to avoid
-            // loading the full send-browse component just for two utilities.
-            var pathHelpers =
-                'function _resolvePath(base,relative){' +
-                  'if(relative.startsWith("/"))return relative.substring(1);' +
-                  'var combined=base+relative,parts=combined.split("/"),resolved=[];' +
-                  'for(var i=0;i<parts.length;i++){' +
-                    'if(parts[i]==="..")resolved.pop();' +
-                    'else if(parts[i]!=="."&&parts[i]!=="")resolved.push(parts[i]);}' +
-                  'return resolved.join("/");}' +
-                'function _findEntry(fileList,resolved){' +
-                  'try{resolved=decodeURIComponent(resolved);}catch(_){}' +
-                  'var match=fileList.find(function(e){return !e.dir&&e.path===resolved;});if(match)return match;' +
-                  'match=fileList.find(function(e){return !e.dir&&e.path.endsWith("/"+resolved);});if(match)return match;' +
-                  'if(resolved.indexOf(".")===-1){' +
-                    'var exts=[".md",".pdf",".txt",".html",".jpg",".jpeg",".png",".webp"];' +
-                    'for(var i=0;i<exts.length;i++){' +
-                      'match=fileList.find(function(e){return !e.dir&&e.path===resolved+exts[i];});if(match)return match;' +
-                      'match=fileList.find(function(e){return !e.dir&&e.path.endsWith("/"+resolved+exts[i]);});if(match)return match;}}' +
-                  'var filename=resolved.split("/").pop();' +
-                  'if(filename){match=fileList.find(function(e){return !e.dir&&e.path.split("/").pop()===filename;});}' +
-                  'return match||null;}';
+            // Unified app-frame bootstrap (Phase 4). Path-resolution helpers, the
+            // PageLayoutRenderer wiring and the `.vault`-segment fileList filter now live
+            // in AppFrameBootstrap.build({kind:'page-layout'}); the mount method only
+            // fetches deps and passes them in.
+            var html = AppFrameBootstrap.build({
+                kind: 'page-layout',
+                bridgeScript: bridgeScript,
+                deps: {
+                    sendHelpersJs: sendHelpersJs, fileTypeJs: fileTypeJs,
+                    mdParserJs: mdParserJs, mdRendererJs: mdRendererJs, plrJs: plrJs,
+                    css1: css1, css2: css2, css3: css3
+                },
+                fileList:   fileList,
+                folderPath: folderPath,
+                entryPath:  entry.path
+            });
 
-            var html = '<!DOCTYPE html><html><head>' +
-                '<meta charset="utf-8">' +
-                '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-                bridgeScript +
-                '<style>' + css1 + '\n' + css2 + '\n' + css3 + '</style>' +
-                '<style>html,body{margin:0;padding:0;height:100%;overflow-x:hidden;}' +
-                'body{background:#0d1117;}#plr-root{min-height:100vh;}</style>' +
-                '</head><body>' +
-                '<div id="plr-root"></div>' +
-                '<script>' + sendHelpersJs + '<\/script>' +
-                '<script>' + fileTypeJs    + '<\/script>' +
-                '<script>' + mdParserJs    + '<\/script>' +
-                '<script>' + mdRendererJs  + '<\/script>' +
-                '<script>' + pathHelpers   + '<\/script>' +
-                '<script>' + plrJs         + '<\/script>' +
-                '<script>(function(){' +
-                  'var fileList=' + JSON.stringify(fileList.filter(function (f) { return !AppPermissions.hasVaultSegment(f.path); })) + ';' +
-                  'var folderPath=' + JSON.stringify(folderPath) + ';' +
-                  'var entryPath=' + JSON.stringify(entry.path) + ';' +
-                  'var objectUrls=[];' +
-                  'var browseInstance={' +
-                    '_objectUrls:objectUrls,' +
-                    'dataSource:{' +
-                      'getFileList:function(){return fileList;},' +
-                      'getFileBytes:function(p){return sg.vfs.read(p);}' +
-                    '}' +
-                  '};' +
-                  'sg.vfs.read(entryPath).then(function(buf){' +
-                    'var json=new TextDecoder().decode(buf);' +
-                    'var container=document.getElementById("plr-root");' +
-                    'PageLayoutRenderer.render(container,json,folderPath,null,browseInstance);' +
-                  '}).catch(function(err){' +
-                    'document.getElementById("plr-root").innerHTML=' +
-                      '"<div style=\\"padding:2rem;color:#ff6b6b\\">Error: "+err.message+"</div>";' +
-                  '});' +
-                '}());<\/script>' +
-                '</body></html>';
-
-            var blob    = new Blob([html], { type: 'text/html' });
-            var blobUrl = URL.createObjectURL(blob);
-            this._objectUrls.push(blobUrl);
-
+            // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+            iframe.sandbox     = 'allow-scripts allow-forms';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-            iframe.src         = blobUrl;
+            iframe.srcdoc      = html;
             iframe.addEventListener('load', () => {
                 this._iframeStatus  = 'ready';
                 this._t.iframeReady = performance.now();
@@ -1205,15 +1222,12 @@
                 this._setStatus('Loading app…');
                 var htmlBytes = await this._dataSource.getFileBytes(entry.path);
                 var htmlText  = new TextDecoder().decode(htmlBytes);
-                var injected  = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript);
-                if (injected === htmlText) injected = bridgeScript + htmlText;
-                var blob    = new Blob([injected], { type: 'text/html' });
-                var blobUrl = URL.createObjectURL(blob);
-                this._objectUrls.push(blobUrl);
+                var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
+                // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+                iframe.sandbox     = 'allow-scripts allow-forms';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-                iframe.src         = blobUrl;
+                iframe.srcdoc      = injected;
                 iframe.addEventListener('load', () => {
                     this._iframeStatus  = 'ready';
                     this._t.iframeReady = performance.now();
@@ -1239,61 +1253,22 @@
 
                 var mdBytes = await this._dataSource.getFileBytes(entry.path);
                 var mdText  = new TextDecoder().decode(mdBytes);
-                // Escape for inline JSON string embedding
-                var mdEscaped = JSON.stringify(mdText);
 
-                var html = '<!DOCTYPE html><html><head>' +
-                    '<meta charset="utf-8">' +
-                    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-                    bridgeScript +
-                    '<style>' + css1 + '\n' + css2 + '</style>' +
-                    '<style>' +
-                        'html,body{margin:0;padding:0;background:#0d1117;color:#e2e8f0;' +
-                            'font-family:var(--font-sans,system-ui,sans-serif);}' +
-                        '#md-root{max-width:860px;margin:0 auto;padding:2rem 1.5rem;}' +
-                        'img{max-width:100%;height:auto;}' +
-                        'pre,code{background:#1a1f2e;border-radius:4px;}' +
-                        'pre{padding:1rem;overflow-x:auto;}' +
-                        'code{padding:0.15em 0.35em;}' +
-                    '</style>' +
-                    '</head><body>' +
-                    '<div id="md-root"></div>' +
-                    '<script>' + mdParserJs + '<\/script>' +
-                    '<script>' + mdRendererJs + '<\/script>' +
-                    '<script>(function(){' +
-                        'var md=' + mdEscaped + ';' +
-                        'var html=MarkdownParser.parse(md);' +
-                        'var root=document.getElementById("md-root");' +
-                        'root.innerHTML=html;' +
-                        // Resolve images via VFS bridge: img[data-md-src] → blob URL
-                        'var imgs=root.querySelectorAll("img[data-md-src]");' +
-                        'var pending=imgs.length;' +
-                        'function _done(){' +
-                            'if(--pending<=0){' +
-                                'window.parent.postMessage({type:"sg-app-ready"},"*");' +
-                            '}' +
-                        '}' +
-                        'if(!pending){window.parent.postMessage({type:"sg-app-ready"},"*");}' +
-                        'for(var i=0;i<imgs.length;i++){' +
-                            '(function(img){' +
-                                'var src=img.getAttribute("data-md-src");' +
-                                'sg.vfs.read(src).then(function(buf){' +
-                                    'var blob=new Blob([buf]);' +
-                                    'img.src=URL.createObjectURL(blob);' +
-                                    '_done();' +
-                                '}).catch(function(){_done();});' +
-                            '})(imgs[i]);' +
-                        '}' +
-                    '}());<\/script>' +
-                    '</body></html>';
+                // Unified app-frame bootstrap (Phase 4) — markdown render + bridge
+                // image-resolution IIFE now live in AppFrameBootstrap.build({kind:
+                // 'markdown'}); the mount method only fetches deps and the md bytes.
+                var html = AppFrameBootstrap.build({
+                    kind: 'markdown',
+                    bridgeScript: bridgeScript,
+                    deps: { mdParserJs: mdParserJs, mdRendererJs: mdRendererJs, css1: css1, css2: css2 },
+                    mdText: mdText
+                });
 
-                var blob    = new Blob([html], { type: 'text/html' });
-                var blobUrl = URL.createObjectURL(blob);
-                this._objectUrls.push(blobUrl);
+                // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+                iframe.sandbox     = 'allow-scripts allow-forms';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-                iframe.src         = blobUrl;
+                iframe.srcdoc      = html;
                 iframe.addEventListener('load', () => {
                     this._iframeStatus  = 'ready';
                     this._t.iframeReady = performance.now();
@@ -1331,6 +1306,16 @@
             var htmlDir   = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/') + 1) : '';
 
             return '<script>(function(){' +
+
+                // App-error surfacing (ViV Phase 4 re-spec). Under null-origin app frames
+                // the parent can no longer reach in to inject window.onerror; instead the
+                // frame self-reports uncaught errors OUT over postMessage (null-origin safe).
+                // The parent handler routes {type:"sg-app-error"} to the HUD. See probe P5.
+                'window.onerror=function(m,s,l,c){try{window.parent.postMessage({type:"sg-app-error",message:String(m)+(l?" (line "+l+(c?":"+c:"")+")":"")},"*");}catch(_){}return false;};' +
+                'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
+                // Body-hidden self-check: if the app never makes its body visible, surface a
+                // hint (mirrors the old same-origin display:none probe, now from inside).
+                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},0);});' +
 
                 // Nav intercept: relative .html links → postMessage to parent
                 'document.addEventListener("click",function(e){' +
@@ -1939,6 +1924,21 @@
                         if (typeof hud.showMessage === 'function') {
                             hud.showMessage(uiMsg.handle, uiMsg.text, uiMsg.msgType, uiMsg.ttl);
                         }
+                    }
+                    return;
+                }
+
+                // ── App-error surfacing (ViV Phase 4 re-spec) ──────────────────
+                // Null-origin app frames self-report uncaught errors via postMessage
+                // (window.onerror in the injected bridge). Record + surface on the HUD
+                // as a persistent error toast (ttl null). Replaces the old same-origin
+                // contentWindow.onerror injection which is dead under null-origin.
+                if (e.data.type === 'sg-app-error') {
+                    self._lastIframeError = String(e.data.message || 'App error');
+                    self._emitVaultEvent('app-error', { label: 'App error', message: self._lastIframeError });
+                    var ehud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                    if (ehud && typeof ehud.showMessage === 'function') {
+                        ehud.showMessage('sg-app-error', self._lastIframeError, 'error', null);
                     }
                     return;
                 }
