@@ -487,16 +487,19 @@
         }
 
         // Resolve a possibly-undefined hud config from app.json into a complete one.
-        // Defaults: mode='full', everything visible except print (off by default since the
-        // current Print button is broken under null-origin app frames — to be re-enabled
-        // when the bridge-RPC print refactor lands).
+        // Defaults:
+        //   - mode='full' (chrome row + nav row both visible)
+        //   - 'full' shows print (the bridge-RPC print refactor in
+        //     team/comms/changelog/05/30/changelog__app-state-print-rpc.md
+        //     restored print compatibility under null-origin srcdoc frames)
+        //   - 'minimal' hides nav row + non-essential buttons (suitable for reading-mode apps)
         static _resolveHudCfg(input) {
             input = input || {};
             var mode = (input.mode === 'hidden' || input.mode === 'minimal') ? input.mode : 'full';
             var defaults = (mode === 'minimal')
                 ? { vaultName: true,  appTitle: true,  openVault: false, copyLink: false, print: false, debug: false,
                     navBar: false, navArrows: false, navPath: false, navRefresh: false, navHome: false }
-                : { vaultName: true,  appTitle: true,  openVault: true,  copyLink: true,  print: false, debug: true,
+                : { vaultName: true,  appTitle: true,  openVault: true,  copyLink: true,  print: true,  debug: true,
                     navBar: true,  navArrows: true,  navPath: true,  navRefresh: true,  navHome: true  };
             var show = Object.assign({}, defaults, (input.show || {}));
             return { mode: mode, show: show };

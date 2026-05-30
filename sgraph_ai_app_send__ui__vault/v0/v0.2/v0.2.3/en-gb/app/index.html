@@ -107,8 +107,12 @@
         }
         body { display: flex; flex-direction: column; }
         /* HUD-host height auto-sizes — the chrome row is always 48px but the nav row
-           adds ~32px when 'navBar' is enabled in app.json, and goes to 0px in hidden mode. */
-        #hud-host  { flex: 0 0 auto; overflow: hidden; }
+           adds ~32px when 'navBar' is enabled in app.json, and goes to 0px in hidden mode.
+           overflow MUST be visible so the ⋯ recent-pages menu (position:absolute, anchored
+           to the ⋯ button, dropping down below the HUD) can render into the iframe area
+           below. z-index puts the HUD's stacking context above #layout-host (the iframe)
+           so the dropdown actually paints on top rather than being covered. */
+        #hud-host  { flex: 0 0 auto; position: relative; z-index: 10; }
         #layout-host { flex: 1; min-height: 0; position: relative; }
         sg-layout { display: block; width: 100%; height: 100%; }
         app-hud { display: block; width: 100%; }

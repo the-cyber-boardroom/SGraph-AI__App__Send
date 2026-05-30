@@ -779,53 +779,43 @@
         // iframe.contentDocument. We clone the live DOM, then rewrite every blob: URL
         // to a data: URI — blob URLs are scoped to the iframe's window and would die
         // in the print window, so they must be inlined. The result is a self-contained
-        // HTML snapshot which we hand to SgPrint.printHtml (already deployed at
-        // dev.send.sgraph.ai/_common/js/sg-print.js).
+        // Print is now an RPC into the iframe: ViV Phase 3 flipped app frames to null-origin
+        // srcdoc, so iframe.contentDocument throws SecurityError from the parent (the previous
+        // implementation worked under same-origin blob: frames and broke silently after Phase 3
+        // — Commit A hid the button by default; this restores it).
+        //
+        // The iframe-side listener (see _buildVfsBridgeScript: __sgPrintReq) does the DOM clone,
+        // the blob:→data: URL inlining (which has to happen there anyway, because the blob URLs
+        // belong to the iframe and would dangle in a separate print window), and the <script>
+        // stripping. The parent just kicks it off, awaits the snapshot, and hands the HTML to
+        // SgPrint.printHtml.
         async _onPrint() {
             try {
-                var iframe = this._iframeEl;
-                var srcDoc = iframe && iframe.contentDocument;
-                if (!srcDoc || !srcDoc.documentElement) {
-                    console.warn('[app-shell] print: no iframe document available');
-                    return;
-                }
                 if (typeof window.SgPrint === 'undefined' || typeof SgPrint.printHtml !== 'function') {
                     console.error('[app-shell] SgPrint not loaded — add sg-print.js to the app page');
                     return;
                 }
-
-                // Clone the document so we can mutate URLs without disturbing the live app.
-                var clone = srcDoc.documentElement.cloneNode(true);
-
-                // Inline blob: URLs (images and any blob-href stylesheets) to data: URIs.
-                // We fetch from the parent context — same origin works because the iframe
-                // has allow-same-origin. Failures are silently kept as-is.
-                async function _blobToDataUrl(url) {
-                    var resp = await fetch(url);
-                    var blob = await resp.blob();
-                    return await new Promise(function (res, rej) {
-                        var fr = new FileReader();
-                        fr.onload  = function () { res(fr.result); };
-                        fr.onerror = function () { rej(fr.error); };
-                        fr.readAsDataURL(blob);
-                    });
+                var iframe = this._iframeEl;
+                if (!iframe || !iframe.contentWindow) {
+                    console.warn('[app-shell] print: no iframe to request snapshot from');
+                    return;
                 }
-
-                var imgs = Array.from(clone.querySelectorAll('img[src^="blob:"]'));
-                var links = Array.from(clone.querySelectorAll('link[rel="stylesheet"][href^="blob:"]'));
-                await Promise.all(
-                    imgs.map(async function (img) {
-                        try { img.src = await _blobToDataUrl(img.src); } catch (_) {}
-                    }).concat(links.map(async function (lnk) {
-                        try { lnk.href = await _blobToDataUrl(lnk.href); } catch (_) {}
-                    }))
-                );
-
-                // Drop <script> tags from the print snapshot — they can't run usefully in
-                // the print window (no VFS bridge) and would slow it down or error out.
-                clone.querySelectorAll('script').forEach(function (s) { s.remove(); });
-
-                var html  = '<!DOCTYPE html>\n' + clone.outerHTML;
+                var id   = (Math.random() * 1e9 | 0).toString(36) + Date.now().toString(36);
+                var html = await new Promise(function (res, rej) {
+                    var timer = setTimeout(function () {
+                        window.removeEventListener('message', h);
+                        rej(new Error('print snapshot timed out (5s)'));
+                    }, 5000);
+                    function h(e) {
+                        if (!e.data || e.data.__sgPrintReply !== id) return;
+                        clearTimeout(timer);
+                        window.removeEventListener('message', h);
+                        if (e.data.ok) res(e.data.html);
+                        else rej(new Error(e.data.err || 'print snapshot failed'));
+                    }
+                    window.addEventListener('message', h);
+                    iframe.contentWindow.postMessage({ __sgPrintReq: id }, '*');
+                });
                 var title = (this._appJson && this._appJson.title) || (this._vault && this._vault.name) || 'App';
                 SgPrint.printHtml(html, title);
             } catch (err) {
@@ -1636,6 +1626,33 @@
                   'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply);else apply();' +
                 '});' +
 
+                // Print snapshot RPC. ViV Phase 3 flipped app frames to null-origin srcdoc, which
+                // means the parent can't read iframe.contentDocument any more (SecurityError). So
+                // print now runs INSIDE the iframe: the parent posts {__sgPrintReq: id}, this
+                // listener clones documentElement, fetches every blob: url (img.src and stylesheet
+                // link.href) and inlines them as data: URIs (so the print window is self-contained
+                // — blob: URLs created in this iframe wouldn't survive a window.open anyway),
+                // strips <script> tags (they would error or hang in the print preview with no
+                // bridge), and posts the resulting HTML back via {__sgPrintReply: id, ok, html|err}.
+                'window.addEventListener("message",function(e){' +
+                  'if(!e.data||!e.data.__sgPrintReq)return;' +
+                  'var id=e.data.__sgPrintReq;' +
+                  '(async function(){' +
+                    'try{' +
+                      'var clone=document.documentElement.cloneNode(true);' +
+                      'function _b2d(u){return fetch(u).then(function(r){return r.blob();}).then(function(b){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.onerror=function(){rej(fr.error);};fr.readAsDataURL(b);});});}' +
+                      'var imgs=Array.prototype.slice.call(clone.querySelectorAll(\'img[src^="blob:"]\'));' +
+                      'var lnks=Array.prototype.slice.call(clone.querySelectorAll(\'link[rel="stylesheet"][href^="blob:"]\'));' +
+                      'await Promise.all(imgs.map(async function(g){try{g.src=await _b2d(g.src);}catch(_){}}).concat(lnks.map(async function(l){try{l.href=await _b2d(l.href);}catch(_){}})));' +
+                      'clone.querySelectorAll("script").forEach(function(s){s.remove();});' +
+                      'var html="<!DOCTYPE html>\\n"+clone.outerHTML;' +
+                      'window.parent.postMessage({__sgPrintReply:id,ok:true,html:html},"*");' +
+                    '}catch(err){' +
+                      'window.parent.postMessage({__sgPrintReply:id,ok:false,err:String(err&&err.message||err)},"*");' +
+                    '}' +
+                  '})();' +
+                '});' +
+
                 // Core VFS bridge
                 '(function(){' +
                   // Generic postMessage→Promise for write and list
@@ -1744,6 +1761,23 @@
                       'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");},' +
                       // ask the user (on the HUD) to grant a declared-but-consent-gated verb; resolves {granted}
                       'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});}' +
+                    '},' +
+                    // sg.state.* — device-local preferences (theme, panel widths, "don't show again"
+                    // dismissals). Backed by the TOP-LEVEL kernel's localStorage, namespaced as
+                    // sg-app-state:<vaultId>:<appEntryPath>:<key>. Values are JSON-encoded, capped at
+                    // 64 KiB per key. Apps that want VAULT-PERSISTENT state (travels with the vault,
+                    // visible to other devices opening the same vault key) should continue to use
+                    // sg.fs.write(".app-state/...") directly. **Doctrine deviation note:** the ViV
+                    // impl pack's repair checklist (item #1) prescribes sg.vfs("app-state/<key>.json");
+                    // we deliberately chose localStorage for the device-local-prefs use case to avoid
+                    // a vault write on every theme toggle. Documented in
+                    // team/comms/changelog/05/30/changelog__app-state-print-rpc.md.
+                    'state:{' +
+                      'get:function(key){return _sgCmd("state",{action:"get",key:String(key||"")});},' +
+                      'set:function(key,value){return _sgCmd("state",{action:"set",key:String(key||""),value:value});},' +
+                      'remove:function(key){return _sgCmd("state",{action:"remove",key:String(key||"")});},' +
+                      'clear:function(){return _sgCmd("state",{action:"clear"});},' +
+                      'keys:function(){return _sgCmd("state",{action:"keys"});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -2200,6 +2234,73 @@
                             return;
                         }
                         cmdReply(false, null, 'Unsupported git action: ' + action);
+                        return;
+                    }
+
+                    // sg.state.* — device-local prefs in the top-level kernel's localStorage.
+                    // See the bridge-side sg.state JSDoc for the rationale (deliberate doctrine
+                    // deviation from the ViV impl pack's sg.vfs('app-state/*') prescription).
+                    // Namespace: sg-app-state:<vaultId>:<entryPath>:<key>.
+                    //   vaultId  → vault._vaultId (a derived non-secret identifier; NOT the
+                    //              vault key, which is sensitive — never put that in localStorage).
+                    //   entryPath → self._appEntryPath (the app's entry HTML path, e.g.
+                    //               "home/index.html").
+                    // Operations are wrapped in try/catch so a single quota/parse error doesn't
+                    // poison the bridge handler.
+                    if (e.data.__sgCmdType === 'state') {
+                        var sAction = e.data.action;
+                        var vId     = (vault && vault._vaultId) ? String(vault._vaultId) : 'unknown';
+                        var ent     = self._appEntryPath || '';
+                        var ns      = 'sg-app-state:' + vId + ':' + ent + ':';
+                        try {
+                            if (sAction === 'get') {
+                                var gk  = String(e.data.key || '');
+                                var raw = window.localStorage.getItem(ns + gk);
+                                cmdReply(true, raw === null ? null : JSON.parse(raw));
+                                return;
+                            }
+                            if (sAction === 'set') {
+                                var sk  = String(e.data.key || '');
+                                var sv  = (e.data.value === undefined) ? null : e.data.value;
+                                var enc = JSON.stringify(sv);
+                                // 64 KiB per key is plenty for prefs; keeps a runaway app from
+                                // exhausting localStorage (which is per-origin, shared with the
+                                // vault browser and any other apps on this domain).
+                                if (enc.length > 65536) { cmdReply(false, null, 'value too large (max 64 KiB)'); return; }
+                                window.localStorage.setItem(ns + sk, enc);
+                                cmdReply(true, { ok: true });
+                                return;
+                            }
+                            if (sAction === 'remove') {
+                                window.localStorage.removeItem(ns + String(e.data.key || ''));
+                                cmdReply(true, { ok: true });
+                                return;
+                            }
+                            if (sAction === 'clear') {
+                                // Snapshot keys first — mutating localStorage during iteration
+                                // shifts indices and can skip entries.
+                                var toRm = [];
+                                for (var ci = 0; ci < window.localStorage.length; ci++) {
+                                    var ck = window.localStorage.key(ci);
+                                    if (ck && ck.indexOf(ns) === 0) toRm.push(ck);
+                                }
+                                toRm.forEach(function (k) { window.localStorage.removeItem(k); });
+                                cmdReply(true, { ok: true, removed: toRm.length });
+                                return;
+                            }
+                            if (sAction === 'keys') {
+                                var ks = [];
+                                for (var ki = 0; ki < window.localStorage.length; ki++) {
+                                    var kk = window.localStorage.key(ki);
+                                    if (kk && kk.indexOf(ns) === 0) ks.push(kk.slice(ns.length));
+                                }
+                                cmdReply(true, ks);
+                                return;
+                            }
+                            cmdReply(false, null, 'Unsupported state action: ' + sAction);
+                        } catch (sErr) {
+                            cmdReply(false, null, (sErr && sErr.message) || 'state op failed');
+                        }
                         return;
                     }
 
