@@ -14,7 +14,7 @@ Usage:
 
 Options:
     --stage    Lambda stage name (required)
-    --path     Health-check path  (default: /info/health)
+    --path     Health-check path  (default: /api/info/health)
     --timeout  Total seconds to keep trying (default: 120)
     --interval Seconds between attempts     (default: 10)
 """
@@ -74,7 +74,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--stage'   , required=True              )
-    ap.add_argument('--path'    , default='/info/health'     )
+    ap.add_argument('--path'    , default='/api/info/health' )
     ap.add_argument('--timeout' , default=120  , type=int    )
     ap.add_argument('--interval', default=10   , type=int    )
     args = ap.parse_args()

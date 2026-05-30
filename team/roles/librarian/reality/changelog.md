@@ -7,6 +7,31 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-05-29
+
+- `index.md` — Updated: version v0.28.7 → v0.31.3; date 05/28 → 05/29; doc count 493 → 504; JS assertions +152; API endpoints +1 (Routes__Info__SGraph); PROPOSED 366+ → 379+
+- `ui/index.md` — Added: ViV kernel modules (SecureChannel, KernelMounts, KernelBroker, KernelAppHandlers, KernelBootstrap, sg-app-stub, kernel-shell-bundle); P-250 through P-262; 10 bugs fixed notation
+- `security/index.md` — Added: Vault App Trust Model section (SEC-VIV-001 same-origin bypass; trust assumption caveat; CORS fix); last updated 04/28 → 05/29
+- `qa/index.md` — Updated: test count ~760+ → ~912+; added ViV loader suite table (152 jsdom-free assertions across 10 test files); last updated 04/28 → 05/29
+
+Master index: `team/roles/librarian/reviews/05/29/v0.31.3__master-index__briefs-viv-28-29-may.md`
+Processed: 11 new human briefs (briefs/05/vault-in-vault/version-1 × 3 + version-2 × 8)
+New EXISTS items: 14 (ViV kernel modules, CORS fix, Routes__Info, Container, 152 JS tests) | New PROPOSED items: 13 (P-250–P-262)
+
+---
+
+## 2026-05-28
+
+- `index.md` — Updated: version v0.27.79 → v0.28.7; date 05/26 → 05/28; doc count 488 → 493; PROPOSED 365+ → 366+; P-231 resolved to EXISTS
+- `ui/index.md` — Added: Public Vault Previews (full set); Sub-Vaults Phases 1–3; App-Mode Permissions Phases 1–4B; vault header pill; sg.history.* API
+- `vault/index.md` — Added: P-231 resolved EXISTS (Web UI); P-248 (sub-vaults CLI) PROPOSED
+
+Master index: `team/roles/librarian/reviews/05/28/v0.28.7__master-index__briefs-25-may-and-code-25-27-may.md`
+Processed: 5 new human briefs (briefs/05/25/)
+New EXISTS items: 6 | New PROPOSED items: 2 (P-248, P-249)
+
+---
+
 ## 2026-05-26
 
 - `index.md` — Updated: version v0.27.61 → v0.27.79; date 05/25 → 05/26; doc count 463 → 488; PROPOSED count 341+ → 365+

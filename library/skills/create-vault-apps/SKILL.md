@@ -1,0 +1,336 @@
+---
+name: vault-html-app
+description: Build a polished, self-contained HTML application that lives inside an SG/Send vault and renders from index.html — a photo gallery, strategy microsite, dashboard, report, journal, or any single-page experience. Use this whenever the user wants to create a vault app, build an HTML app for a vault, make a website inside a vault, render a page from a vault, or auto-open a vault as an app — even when they only describe the content (gallery, report, microsite, slide deck, form, presentation) without saying "app". Also use when adapting an existing site to run inside a vault, when the user mentions app.json, App Mode, the SG/App host, the app-shell or app-banner components, or says they want a vault to launch a page when opened. Covers the authoring contract all vault HTML must follow, the data-plus-app project shape that works, the patterns that survive both the SG/App host and the vault browser preview, and the sgit commit-and-push workflow.
+---
+
+# Building HTML Apps That Live Inside an SG/Vault
+
+A vault app is a single `index.html` (plus its data and assets) that lives inside an SG/Send vault and renders straight from it. When the vault opens, the app launches: full-screen, talking to the vault through a bridge, with the encrypted blob serving as both the storage and the distribution mechanism. The medium is the message — sharing the vault link *is* sharing the app.
+
+This skill captures the techniques that work, the contract you must follow, and the traps to avoid. It is written from real experience building three production apps (a photo gallery, an event report, a strategy microsite) inside the dev vault server, with one full revision cycle each — the patterns here have all been bug-fixed against actual vault behaviour, not just inferred from docs.
+
+## When to reach for this
+
+Use this skill whenever the deliverable is *both* the content and the experience of viewing it, and the user wants that experience to live securely with the data. A few telltale signs:
+
+- The user has photos / a report / a writeup / a deck / a set of files and wants them shareable as a polished page rather than a folder of files.
+- The user mentions sending the result to someone external, and the data is private or sensitive — they want it encrypted, with a key in the URL.
+- The user references SG/Send, SG/Vault, "App Mode", `app.json`, `_page.json`, the `app-shell` or `app-banner` custom elements, or the dev/prod vault domains.
+- The user already has a vault and wants to "do more with it" than just file storage.
+
+If the work is just file storage, file sharing, or version control of files, this is the wrong skill — `sgit` alone is enough. Reach for this skill when an experience needs to be authored on top of the files.
+
+## The non-negotiable authoring contract
+
+This is the part you cannot skip. Vault HTML runs inside an iframe loaded from a `blob:` URL, which means the browser fetches resources *before* the vault's bridge script can install. Anything declarative against a vault-relative path will 404. The contract is therefore:
+
+1. **No `<link rel="stylesheet" href="…">` against vault files.** Inline all CSS, or use a `data:` URI, or call `window.sg.loadCss(path)` after `DOMContentLoaded`.
+2. **No `<script src="…">` against vault files.** Inline all JS, or use `window.sg.loadJs(path)`.
+
+> Note on what's verified: in all three apps this session I **inlined** all CSS and JS, and that is the path I can vouch for. The `window.sg.loadCss` / `loadJs` alternatives come from the vault's AUTHORING.md guide and are the documented mechanism, but I did not exercise them — prefer inlining unless you have a reason to load lazily, and verify the `sg.*` calls if you do.
+3. **No `<img src="…">` in markup against vault files.** Set `img.src = '…'` from JS once the bridge is up. (A `MutationObserver` does intercept `<img>` markup in the SG/App host, but it is not guaranteed in the vault-browser preview — set `src` from JS to be safe everywhere.)
+4. **No `<iframe src>`, no `<source src>`, no CSS `@import`, no ESM `import`, no `new Worker()` against vault files.** These all run too early.
+5. **`fetch('something.json')` works** — the bridge patches `fetch`. This is the right way to load data.
+6. **`<a href="vault-path">` works** — clicks are postMessage-intercepted by the host.
+
+Two more things that follow from the contract:
+
+- **Always provide an inlined fallback for the data file.** Anyone who saves the HTML standalone or opens it outside the vault still gets a working page. Pattern:
+  ```js
+  const FALLBACK = /*__DATA__*/{};
+  async function getData(){
+    try { const r = await fetch('content.json',{cache:'no-store'});
+          if (r.ok) { const j = await r.json(); if (j && j.sections) return j; } }
+    catch(e){}
+    return FALLBACK;
+  }
+  ```
+  Then inject the real JSON into `FALLBACK` at build time, replacing the `{}`. This is also what lets the page render in the vault-browser *preview* (which doesn't always run the same code path as the SG/App host).
+
+- **Signal `sg-app-ready` once the page has rendered.** The SG/App host shows a "Loading app…" overlay until it gets this message:
+  ```js
+  try { window.parent && window.parent.postMessage({type:'sg-app-ready'},'*'); } catch(e){}
+  ```
+  Call it at the end of your build function. Skipping this leaves users staring at a spinner.
+
+## The project shape that works
+
+For any non-trivial vault app, lay it out like this:
+
+```
+/                    (vault root)
+  index.html         — the app: inlined CSS + inlined JS + inlined fallback data
+  app.json           — auto-launch config (see below)
+  content.json       — editable content catalogue (or gallery.json, data.json — pick a clear name)
+  README.md          — what's in the vault and how to edit
+  NARRATIVE.md       — long-form prose if relevant (gallery / report)
+  photos/            — for galleries: web/ thumbs/ originals/ (three sizes)
+   web/              — ~1600px max, WebP at q≈82 — used in lightbox
+   thumbs/           — ~760px max, WebP at q≈80 — used in grid
+   originals/        — full-res, renamed to slugs, preserved
+  maps/  diagrams/   — for non-photo content, the same three-size pattern still pays off
+  social/            — derived assets (collages, contact sheets, OG images)
+```
+
+Why this shape:
+
+- **Content lives in JSON, not in HTML.** It lets the user (or you in a later turn) edit captions, reorder sections, rewrite prose, without touching the app. The app reads it from `fetch('content.json')` and falls back to the inlined copy.
+- **Three image sizes** keep the gallery responsive *and* keep the page weight reasonable. Don't try to use the originals; the page will be ~50 MB and slow.
+- **Originals are preserved, renamed to slugs.** Never overwrite or delete the user's source images. If they uploaded `IMG_0184.webp`, keep a copy in `photos/originals/04-opening-keynote.webp` so nothing is lost.
+- **`social/` is separate** so derived images don't get confused with source content.
+
+### `app.json` — auto-launch
+
+```json
+{
+  "entry": "index.html",
+  "present": true,
+  "auto_open": true,
+  "title": "Whatever the page is called"
+}
+```
+
+With `present:true`, opening the vault boots straight into App Mode rather than the file browser. I set `auto_open:true` as well in every app this session and they did auto-launch, but I confirmed only `present` against the host source — treat `auto_open` as belt-and-braces until verified. Without `app.json` at all, the user lands on the file browser and has to click `index.html` manually.
+
+## The proven layout & UX patterns
+
+Across the three apps I shipped, these patterns held up:
+
+### For photo galleries: justified rows, not row-span masonry
+
+I started with a CSS-grid masonry using `grid-auto-rows: 1px` and `grid-row: span N`. **Don't do this.** The row span multiplies through every `gap` between tracks, so each tile ends up hundreds of pixels too tall, and `object-fit: cover` then shows a near-solid colour slice. The fix is a **JS-driven justified-rows layout** (Flickr/Google Photos style):
+
+```js
+const GAP = 14;
+function targetRowHeight(){
+  const w = window.innerWidth;
+  if (w <= 560) return 99999;       // one photo per row on phones
+  if (w <= 980) return 240;
+  return 300;
+}
+function layoutChapter(grid, items){
+  grid.innerHTML = '';
+  const cw = grid.clientWidth;
+  const target = targetRowHeight();
+  let row = [], aspectSum = 0;
+  const flush = (isLast)=>{
+    if (!row.length) return;
+    let h = (cw - GAP*(row.length-1)) / aspectSum;
+    if (isLast) h = Math.min(h, target * 1.5);
+    h = Math.min(h, target * 1.6);
+    const rowEl = document.createElement('div'); rowEl.className='grid-row';
+    row.forEach(p => rowEl.appendChild(makeFigure(p, Math.round(h*(p.w/p.h)), Math.round(h))));
+    grid.appendChild(rowEl); row = []; aspectSum = 0;
+  };
+  items.forEach(p => {
+    row.push(p); aspectSum += p.w / p.h;
+    const h = (cw - GAP*(row.length-1)) / aspectSum;
+    if (h <= target) flush(false);
+  });
+  flush(true);
+}
+```
+
+This preserves true aspect ratios, reads strictly left-to-right (top-to-bottom), and re-flows on resize. The photo's `w` and `h` come from `content.json` (capture them when you process the images).
+
+### For long-form / strategy content: scrollytelling layout
+
+For a strategy essay, report, or microsite, use a single-column reading layout with sticky section navigation and a scroll-progress bar:
+
+- `--measure: 680px` for prose width (any wider is unreadable).
+- Each section gets a `scroll-margin-top` so anchor links don't slide under the sticky nav.
+- One `IntersectionObserver` highlights the active nav link; another reveals figures as they scroll into view.
+- Don't lazy-load images — see "Eager loading" below.
+
+### Eager image loading (always)
+
+I tried lazy-loading thumbnails with an `IntersectionObserver` that set `img.src` on intersection. **This caused the bug where the vault-browser preview rendered placeholder blocks** while the App Mode page rendered correctly: the two run with different scroll/observer contexts. The lazy observer fires reliably in one but not the other.
+
+Fix: set `img.src` *eagerly* when each tile is built. The thumbnails are tiny (~50 KB each, ~1 MB total) so the cost is negligible, and the behaviour is now identical in both environments:
+
+```js
+const img = document.createElement('img');
+img.alt = photo.title;
+img.loading = 'lazy';                       // native lazy is fine
+img.src = photo.thumb;                      // set immediately — the bridge will route it
+fig.appendChild(img);
+```
+
+The `IntersectionObserver` is still useful, but only for the fade-in reveal animation, not for setting the `src`.
+
+### Lightbox
+
+Every gallery/report wants click-to-zoom. The pattern:
+- A single fixed `<div class="lb">` with an `<img>` inside, hidden by default.
+- Click any thumbnail → set the lightbox img `src` to the web (~1600px) version, add `.open` class.
+- `Escape` / click outside / close button to dismiss.
+- For galleries, support `←` / `→` to step through.
+
+Hardcode no images in the lightbox markup — they get set from JS like everything else.
+
+### Inlined data URI tricks
+
+Two cheap wins that are safe inside the iframe:
+
+- **Faint paper grain** for editorial layouts: an SVG noise filter as a `background-image: url("data:image/svg+xml,…")`. No file needed.
+- **Drawn icons** (e.g. a padlock): a small `<svg>` inline rather than an emoji. Emojis render inconsistently across fonts on the server-side (DejaVu shows tofu); inline SVG is reliable.
+
+## The build-and-publish workflow
+
+The full loop, condensed:
+
+1. **Clone the vault** with `sgit`:
+   ```
+   sgit clone <simple-token> <local-dir>
+   ```
+   The simple token alone is enough for read access; the keys are derived from it.
+
+2. **Process the source files**. For photos: write a small Python/Pillow script that renames originals to slugs, generates web and thumb sizes, and emits a `content.json` (or `gallery.json`) with each item's `id`, `title`, `caption`, `thumb`, `web`, `original`, `w`, `h`, `chapter`, etc. Don't try to do this by hand for 20 photos.
+
+3. **Read the relevant skills first.** Before writing the app, `view` `/mnt/skills/public/frontend-design/SKILL.md` (the design tokens and constraints for this environment). If the user gave you a vault to start from, also read `/mnt/skills/user/sgit/SKILL.md` and `/mnt/skills/user/create-vault-content/SKILL.md`.
+
+4. **Build `index.html`** as a single self-contained file: inlined CSS, inlined JS, an `{}` placeholder for the data fallback.
+
+5. **Inject the data.** Crucially, when inlining the data as the `FALLBACK` object literal, use `json.dumps(obj)` — *not* the pretty-printed file text. Multi-line strings in JSON contain literal newlines, which are valid in `.json` but break a JS object literal. `json.dumps` produces a compact string with `\n` escape sequences. Pattern:
+   ```python
+   obj = json.load(open('content.json'))
+   compact = json.dumps(obj, ensure_ascii=False)
+   assert "\n" not in compact, "raw newline leaked"
+   html = open('index.html').read()
+   new = html.replace('const FALLBACK = /*__DATA__*/{}',
+                      'const FALLBACK = /*__DATA__*/'+compact)
+   open('index.html','w').write(new)
+   ```
+   I burned a real bug on this with the Mermaid-source appendix — the multi-line code blocks made the inlined JS unparseable until I switched from raw JSON to `json.dumps`. Keep the placeholder marker (`/*__DATA__*/{}`) on a single distinctive line so the replace can be exact, not regex.
+
+6. **Validate before pushing.** Three quick checks:
+   - **JS syntax**: `node -e "…compileFunction(scriptBody)…"` to catch any inlining bugs.
+   - **Contract**: regex-scan the HTML for `<link href|<script src|<img src` against vault paths; should be zero.
+   - **Paths**: walk the data and confirm every referenced file exists on disk.
+
+7. **Write `app.json`** to auto-launch (above), and a `README.md` describing the structure.
+
+8. **Commit and push:**
+   ```
+   sgit commit "<message>"
+   sgit push --token <access-token>     # token goes after the subcommand
+   sgit status                          # confirm "in sync with remote"
+   ```
+   Note the token position — `sgit --token X push` does not work in the version I tested; it must be `sgit push --token X`.
+
+9. **Get the user to eyeball it.** You cannot render the page yourself in most sandboxes (Chromium downloads are typically blocked). Ask the user to hard-refresh the vault URL and screenshot anything that looks wrong. Static validation catches contract violations and JS errors but cannot tell you whether the grid actually looks good — that needs human eyes.
+
+## A working `index.html` skeleton
+
+A minimum viable vault app, with the contract followed and the patterns above wired up:
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Vault App</title>
+<style>
+  /* ALL CSS inlined here — no <link> tags */
+  :root { --paper:#fbfaf7; --ink:#1a1b1e; --accent:#c0392b; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family: ui-serif, Georgia, serif; }
+  .hero { padding: 4rem 2rem; }
+  .grid { display:flex; flex-direction:column; gap:1rem; }
+  figure { margin:0; opacity:0; transition: opacity .8s ease; }
+  figure.in { opacity:1; }
+  figure img { width:100%; height:auto; display:block; }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <h1 id="hTitle"></h1>
+    <p id="hTag"></p>
+  </header>
+  <main class="grid" id="grid"></main>
+
+<script>
+const FALLBACK = /*__DATA__*/{};
+
+async function getData(){
+  try {
+    const r = await fetch('content.json', { cache: 'no-store' });
+    if (r.ok) { const j = await r.json(); if (j && j.items) return j; }
+  } catch (e) {}
+  return FALLBACK;
+}
+
+function el(tag, cls, html){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  return e;
+}
+
+function build(data){
+  document.getElementById('hTitle').textContent = data.title || 'Untitled';
+  document.getElementById('hTag').textContent   = data.tagline || '';
+  const grid = document.getElementById('grid');
+  data.items.forEach(item => {
+    const fig = el('figure');
+    const img = el('img');
+    img.alt = item.title;
+    img.loading = 'lazy';
+    img.src = item.thumb;              // SET FROM JS — never in markup
+    fig.appendChild(img);
+    grid.appendChild(fig);
+  });
+  // reveal animation
+  if ('IntersectionObserver' in window){
+    const io = new IntersectionObserver((es,o) => es.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); o.unobserve(e.target); }
+    }), { threshold: .08 });
+    document.querySelectorAll('figure').forEach(f => io.observe(f));
+  } else {
+    document.querySelectorAll('figure').forEach(f => f.classList.add('in'));
+  }
+  // tell the SG/App host we're done
+  try { window.parent && window.parent.postMessage({ type: 'sg-app-ready' }, '*'); } catch (e) {}
+}
+
+getData().then(build).catch(err => {
+  console.error('[app] build failed', err);
+  document.getElementById('grid').innerHTML = '<p>Could not load content.</p>';
+  try { window.parent && window.parent.postMessage({ type: 'sg-app-ready' }, '*'); } catch (e) {}
+});
+</script>
+</body>
+</html>
+```
+
+## Common failure modes and how to recognise them
+
+| What you see | What it usually is |
+|--------------|----------------------|
+| Grid tiles are absurdly tall (hundreds of px) showing a near-solid colour | `grid-row: span N` masonry with `grid-auto-rows: 1px` and a non-zero `gap`. Switch to justified rows or column masonry. |
+| Vault browser preview shows placeholder blocks; App Mode shows photos | Lazy-loading via `IntersectionObserver`. Set `img.src` eagerly instead. |
+| App stuck on "Loading app…" overlay | You didn't post `{type:'sg-app-ready'}` to the parent. Add it at the end of `build()`. |
+| `Uncaught SyntaxError` in inlined script, often pointing to the data block | You inlined the pretty-printed JSON (with raw newlines). Use `json.dumps(obj)` to get a compact, properly-escaped string. |
+| "Could not load content" or blank page in some contexts | You only `fetch('content.json')` with no fallback. Always provide the inlined `FALLBACK`. |
+| Drop cap appears on every intro paragraph instead of just the first | Your selector is `.intro p::first-letter` rather than `.intro p:first-of-type::first-letter`. |
+| Emojis render as boxes in collages or stamped images | The server-side font (DejaVu) lacks the glyph. Draw the shape in SVG or skip the emoji. |
+| `sgit push` says "no access token configured" even with `--token X` | Token argument position. Use `sgit push --token X`, not `sgit --token X push`. |
+
+## The medium is the argument
+
+One small but powerful technique: when the user wants to *demo* the vault to someone, lean into the meta-point in the app's footer. Something like:
+
+> 🔒 Delivered as an encrypted SG/Vault — this page is a little HTML on top of a vault, rendered straight from it. The link-holder holds the key; SGraph never sees the contents. The experience and the security are the same artifact.
+
+That single paragraph turns "here are some photos" into "and by the way, here's what SG/Send does." Use it when the recipient is a potential user, partner, or investor; tone it down when it's a personal share.
+
+## Notes on what this skill doesn't cover yet
+
+This is a first pass, and several things should grow into bundled reference files as we iterate:
+
+- **`_page.json` layouts** for content that isn't a single-page app — the `create-vault-content` skill covers that; cross-reference rather than duplicate.
+- **The full `window.sg` runtime API** (`sg.vfs.read`, `sg.vfs.list`, `sg.vfs.write`, `sg.app.writable`, `sg.app.selfPath`). The skeleton above doesn't need them, but a write-back-to-vault app (journal, editor) does.
+- **Service-worker upgrade path.** When the vault ships a service worker, the declarative restrictions in the contract lift — `<link>` and `<script src>` against vault paths will start working. Until then, the JS-only approach is what's safe.
+- **Multi-app vaults** (more than one `app.json` / multiple entries). Not yet shipped in the version I worked against.
+
+When any of those become relevant, add a reference file and link to it from here rather than expanding the body.
