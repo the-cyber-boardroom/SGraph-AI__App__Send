@@ -442,23 +442,38 @@ Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-
 | Opened file persisted in URL (`#path`) — reloads and links work | EXISTS | `fc13d2c` |
 | Markdown files render in App Mode (MarkdownParser.parse not new MarkdownParser) | EXISTS | `e669a2a` |
 
-### ViV (Vault-in-Vault) Kernel Architecture — v0.2.3 (2026-05-28/29)
+### ViV (Vault-in-Vault) Kernel Architecture — v0.2.3 (2026-05-28/29) + Phase 3–5.1 (2026-05-29)
 
-Phase 1 (SecureChannel) + Phase 2 (spawn + cross-vault write) + Phase 3 sub-step C prep (sg-app-stub) shipped in a single session. 10 bugs fixed (H1, M1–M6, L1, L3, L4). 152+ jsdom-free assertions, all green.
+Phase 1 (SecureChannel) + Phase 2 (spawn + cross-vault write) + Phase 3 sub-step C prep (sg-app-stub) shipped in the first session. 10 bugs fixed (H1, M1–M6, L1, L3, L4). Phase 3 security gate (null-origin) + B4–B10 mandated invariants + KernelParent shipped before the 05/29 librarian session. Phase 4 (AppFrameBootstrap) + Phase 5.1 (VivAuditView) shipped after.
 
-| Module | Purpose | Status |
-|--------|---------|--------|
-| `secure-channel-envelope.js` | Pure WebCrypto P-256 envelope: pack/unpack, ECDSA sign, ECDH-AES-GCM encrypt, ReplayGuard, mixed payload (Uint8Array+JSON) | **EXISTS** |
-| `secure-channel.js` | Port-anchored authenticated channel: create/accept/request/send; K1 one-use bootstrap key; directional rule; cid check | **EXISTS** |
-| `kernel-mounts.js` | `KernelMounts`: longest-prefix mount table with traversal-collapse | **EXISTS** |
-| `kernel-broker.js` | `KernelBroker`: per-kernel sidecar; mediate/finalize (concurrent-safe entryId); policy (auto/ask) | **EXISTS** |
-| `kernel-app-handlers.js` | `registerKernelVfsHandlers`: two-sided capability gate; AppPermissions.isFloor/can; _safePush EUNREACH | **EXISTS** |
-| `kernel-bootstrap.js` | `bootKernelOnPort`: testable bootstrap (handshake → vault.open → register); reads endpoint from secrets | **EXISTS** |
-| `sg-app-stub.js` | Secret-less app-side `window.sg.*` stub; every method is SecureChannel.request to kernel | **EXISTS (Phase 3C prep — not yet wired into _buildAppSrcdoc)** |
-| `kernel-shell-bundle.js` | AUTO-GENERATED: 191 KB self-contained null-origin srcdoc kernel bundle | **EXISTS** |
-| `scripts/build-kernel-shell-bundle.py` | Build script for kernel-shell-bundle.js; --stdout flag for freshness check | **EXISTS** |
-| `vault.mount` capability in `app-permissions.js` | vault.mount capability key: parse + can() | **EXISTS** |
-| VIV relay branch in `app-shell.js` | `_mountChildVault`, `_handleVfsViv` (read+write+list relay), vault bridge actions | **EXISTS** |
+**335+ jsdom-free assertions total across the ViV loader suite (17 test files), all green.**
+
+| Module | Purpose | Status | Tests |
+|--------|---------|--------|-------|
+| `secure-channel-envelope.js` | Pure WebCrypto P-256 envelope: pack/unpack, ECDSA sign, ECDH-AES-GCM encrypt, ReplayGuard, mixed payload (Uint8Array+JSON) | **EXISTS** | 29 |
+| `secure-channel.js` | Port-anchored authenticated channel: create/accept/request/send; K1 one-use bootstrap key; directional rule; cid check | **EXISTS** | 14 |
+| `kernel-mounts.js` | `KernelMounts`: longest-prefix mount table with traversal-collapse | **EXISTS** | 13 |
+| `kernel-broker.js` | `KernelBroker`: per-kernel sidecar; mediate/finalize (concurrent-safe entryId); policy (auto/ask) | **EXISTS** | 22 |
+| `kernel-app-handlers.js` | `registerKernelVfsHandlers`: two-sided capability gate; AppPermissions.isFloor/can; _safePush EUNREACH | **EXISTS** | 24 |
+| `kernel-bootstrap.js` | `bootKernelOnPort`: testable bootstrap (handshake → vault.open → register); reads endpoint from secrets | **EXISTS** | 13 |
+| `sg-app-stub.js` | Secret-less app-side `window.sg.*` stub; every method is SecureChannel.request to kernel. Phase 3C prep. **Wired into _buildAppSrcdoc via Phase 3 + Phase 4 AppFrameBootstrap.** | **EXISTS** | 13 |
+| `kernel-shell-bundle.js` | AUTO-GENERATED: 191 KB self-contained null-origin srcdoc kernel bundle | **EXISTS** | 1 freshness |
+| `scripts/build-kernel-shell-bundle.py` | Build script for kernel-shell-bundle.js; --stdout flag for freshness check | **EXISTS** | — |
+| `vault.mount` capability in `app-permissions.js` | vault.mount capability key: parse + can() | **EXISTS** | 6 |
+| VIV relay branch in `app-shell.js` | `_mountChildVault`, `_handleVfsViv` (read+write+list relay), vault bridge actions | **EXISTS** | 16 relay |
+| `kernel-parent.js` | Parent-side peer to kernel-bootstrap; spawn/handshake child kernel; relay operations; monitorChild (B7); endpoint reads from secrets (M5 fix) | **EXISTS** | 44 |
+| `viv-mounts-view.js` | Pure view-model for mount table + broker log (B4): mountRows/logRows/summary/outcomeClass/credTag | **EXISTS** | 33 |
+| `app-debug-mounts.js` | `<app-debug-mounts>` debug pane Mounts tab component; reads vivProvider(); re-renders on bridge-call events | **EXISTS** | — |
+| `viv-credential-tiers.js` | B5/B6 credential tier gate: TIERS enum; requiredTierFor; meets; fail-closed gate() → EUNDERPRIVILEGED; unknown verbs → highest tier; gate in relay() before mediation | **EXISTS** | 28 |
+| `viv-monitor.js` | B7 monitor mode: MODES.CLOSED (default) / OPT_IN; registerOnChannel | **EXISTS** | 20 |
+| `viv-custody.js` | B10 custody gate: fail-closed; unknown custodians → EUNSAFE_CUSTODY; wired into relay() | **EXISTS** | 33 |
+| `app-frame-bootstrap.js` | Phase 4 Option A: pure DOM-free srcdoc builder for all 4 iframe contexts (app/html/page-layout/markdown); `AppFrameBootstrap.build({kind, …})`; all 4 mount methods wired | **EXISTS** | 32 |
+| `viv-audit-view.js` | Phase 5.1 cross-kernel audit aggregation: aggregate/filterLog/groupLog/facets/sourceRows; consent-honest (CLOSED→no log; grandchildren unreachable) | **EXISTS** | 37 |
+| `app-debug-audit.js` | `<app-debug-audit>` Audit tab in /app debug pane; async vivAuditProvider (KernelParent.monitorChild); coalesced re-fetch | **EXISTS** | — |
+
+**Phase 3 (Security Gate): CLOSED** — commit `f534b27` + `1b5b6b1`. All 4 `app-shell.js` mount sites now `sandbox="allow-scripts allow-forms"` (no `allow-same-origin`); content via `srcdoc` not `blob:`. **SEC-VIV-001 is resolved.** Probe suite: 30 Playwright assertions, 0 failures.
+
+**App-error surfacing re-spec (Phase 4):** Null-origin frames self-report errors via `postMessage({type:"sg-app-error"}, "*")`. Parent shows persistent toast via `<app-hud>.showMessage()`. Browser-verified via probe P5.
 
 **Known deferred bug (L2):** `Envelope._canonicalParse` treats any `{__u8: "<string>"}` as bytes. Edge case; fix deferred to Phase 6 with `{__u8b64}` tag.
 
@@ -485,7 +500,13 @@ Full list: [proposed/index.md](proposed/index.md)
 - **P-256: Monitored-mode child visibility** — parent can read child's broker log (debug only, must show 👁 MONITORED badge).
 - **P-257: Phase 0.5 CORS operational verification** — CDN cache invalidation + CloudFront Origin forward + real-browser null-frame round-trip to dev.send.sgraph.ai.
 - **P-258: Phase 2 §7 browser end-to-end** — clinician console writes to patient vault; broker logs invocation; patient vault shows bytes. Needs two dev vaults.
-- **P-259: Phase 3 — standalone /app → null-origin + bridge split** — drop allow-same-origin from 4 sandbox sites; move sg.* to kernel-side; inject sg-app-stub.js. Security gate that closes SEC-VIV-001.
-- **P-260: Phase 4 — unify three iframe contexts** — /vault HTML view + edit preview on same kernel.
-- **P-261: Phase 5 UI consumers** — vault-in-vaults page + tree-view-expand-as-mount + CLI/REPL.
-- **P-262: Phase 6 hardening** — SecureChannel everywhere; monitoring-mode visibility; optional curve upgrade (P-256 → X25519/Ed25519).
+- ~~**P-259: Phase 3 null-origin security gate**~~ → **SHIPPED** (commit `f534b27`). SEC-VIV-001 closed. See ViV section above.
+- **P-260: Phase 4 Option B — /vault HTML view + edit preview on SecureChannel kernel** — AppFrameBootstrap (Option A) SHIPPED. Remaining: promote /vault HTML view + edit preview from postMessage bridge to SecureChannel kernel (full kernel unification).
+- **P-261: Phase 5 remaining consumers** — VivAuditView core + Audit tab in /app SHIPPED (Phase 5.1). Remaining: standalone vault-in-vaults audit page (BLOCKED by design — broker logs in-memory per-document); tree-view-expand-as-mount; CLI/REPL.
+- **P-262: Phase 6 hardening** — SecureChannel everywhere; monitoring-mode badge; optional curve upgrade (P-256 → X25519/Ed25519).
+- **P-263: Vault Chat full architecture** — LLM chat as iframe sibling to Vault App; context layers inspector; tool-execution control; history-as-files; end-of-chat zip-to-vault. Arch: docs 505–506 (05/26 briefs).
+- **P-264: VFS (Virtual File System) as LLM working memory** — client-side in-memory FS distinct from vault FS; every message/response stored as VFS file; optional sync to vault; self-pruning tool (LLM consolidates to VFS, drops detail from live context).
+- **P-265: Commit Queue — timer-windowed batch commits** — vault-shell batching mechanism; configurable window (0=off, 10-15s default); staging area; debug tab; solves many-files explosion from Vault Chat VFS sync.
+- **P-266: Sidecar LLMs** — parallel LLM instances for memory curation, security checks, consolidation; enable/disable per type; multi-LLM consensus mode.
+- **P-267: Security Report vault demo** — simulated pen test findings as a vault; audience-specific Vault App views; evidence graph; positive scorecard; retest scripts. Requires Vault Chat (P-263).
+- **P-268: VC Confidential Data vault demo** — 6 VC scenarios (inbound data room, memo, deal folder, IC materials, LP reporting, fund raise); scoped to exclude ViV for initial demo.
