@@ -340,11 +340,15 @@
 
         _updateRecent(path) {
             if (!path) return;
-            // Move-to-front semantics: most recent first, cap at 12.
-            var i = this._recent.indexOf(path);
-            if (i >= 0) this._recent.splice(i, 1);
+            // Pure chronological recency — last 15 entries, duplicates kept on purpose.
+            // The previous move-to-front dedup made the same path jump positions in the
+            // menu as you navigated past it again, which is disorienting: a link's slot
+            // shouldn't shift just because you visited that page once more. Keeping the
+            // raw sequence reflects "where you've been" more honestly. Skip only the
+            // immediate self-repeat (a reload of the same page shouldn't double-stamp it).
+            if (this._recent[0] === path) return;
             this._recent.unshift(path);
-            if (this._recent.length > 12) this._recent.length = 12;
+            if (this._recent.length > 15) this._recent.length = 15;
         }
 
         _emitNavEvent(action, detail) {
