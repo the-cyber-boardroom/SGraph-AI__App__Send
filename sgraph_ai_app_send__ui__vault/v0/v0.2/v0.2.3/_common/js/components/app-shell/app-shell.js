@@ -53,8 +53,10 @@
                 if (action === 'back')    this._navBack();
                 if (action === 'forward') this._navForward();
                 if (action === 'reload')  this._navReload();
+                if (action === 'home')    this._navHome();
                 if (action === 'jump' && ev.detail.path) {
-                    this._navigateToPath(ev.detail.path, { pushHistory: true });
+                    // Recent-pages menu paths are vault-absolute (stored from history).
+                    this._navigateToPath(ev.detail.path, { pushHistory: true, alreadyResolved: true });
                 }
                 if (action === 'exit')    this._exitApp();
             };
@@ -1198,7 +1200,7 @@
             // localStorage / window.parent / ambient-fetch vault paths; every vault
             // access goes through the postMessage bridge (sg.*), which never needed it.
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms';
+            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
             iframe.srcdoc      = injected;
             iframe.addEventListener('load', () => {
@@ -1216,8 +1218,11 @@
 
             // Seed nav history with this entry so the HUD back/forward arrows have an origin.
             // Subsequent in-vault link clicks push onto this stack via _pushNavHistory.
-            this._navHistory = [entry.path];
-            this._navIndex   = 0;
+            // _appEntryPath is remembered separately so the Home button can jump back to
+            // the app's root regardless of how deep nav has wandered.
+            this._appEntryPath = entry.path;
+            this._navHistory   = [entry.path];
+            this._navIndex     = 0;
             this._emitNavChange();
         }
 
@@ -1270,7 +1275,7 @@
 
             // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms';
+            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
             iframe.srcdoc      = html;
             iframe.addEventListener('load', () => {
@@ -1324,7 +1329,7 @@
                 var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms';
+                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
                 iframe.srcdoc      = injected;
                 iframe.addEventListener('load', () => {
@@ -1365,7 +1370,7 @@
 
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms';
+                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
                 iframe.srcdoc      = html;
                 iframe.addEventListener('load', () => {
@@ -1402,7 +1407,14 @@
 
         _navigateToPath(href, opts) {
             opts = opts || {};
-            var pushHistory = (opts.pushHistory !== false);
+            var pushHistory     = (opts.pushHistory !== false);
+            // History entries (back/forward, home) carry already-resolved vault-absolute
+            // paths — re-running _resolvePath against the *current* this._htmlDir would
+            // double-prefix them (e.g. back from "shared/test-lab/" to "home/index.html"
+            // would resolve to "shared/test-lab/home/index.html", which doesn't exist).
+            // The bridge click-interceptor path is always relative-to-current-dir and so
+            // does need resolution — that's the default (alreadyResolved !== true).
+            var alreadyResolved = (opts.alreadyResolved === true);
             var iframeEl   = this._iframeEl;
             var dataSource = this._dataSource;
             if (!iframeEl || !dataSource) return;
@@ -1413,7 +1425,7 @@
             var pathPart = hashIdx >= 0 ? href.slice(0, hashIdx) : href;
             var fragment = hashIdx >= 0 ? href.slice(hashIdx + 1) : '';
 
-            var resolved = this._resolvePath(this._htmlDir, pathPart);
+            var resolved = alreadyResolved ? pathPart : this._resolvePath(this._htmlDir, pathPart);
             if (AppPermissions.isFloor('read', resolved)) {
                 console.warn('[app-shell] nav blocked (protected path):', resolved);
                 this._renderBrokenLinkOverlay(resolved, 'blocked');
@@ -1470,21 +1482,32 @@
         _navBack() {
             if (this._navIndex <= 0) return false;
             this._navIndex -= 1;
-            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false });
+            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false, alreadyResolved: true });
             return true;
         }
 
         _navForward() {
             if (this._navIndex >= this._navHistory.length - 1) return false;
             this._navIndex += 1;
-            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false });
+            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false, alreadyResolved: true });
             return true;
         }
 
         _navReload() {
             var entry = this._navHistory[this._navIndex];
             if (!entry) return false;
-            this._navigateToPath(entry, { pushHistory: false });
+            this._navigateToPath(entry, { pushHistory: false, alreadyResolved: true });
+            return true;
+        }
+
+        // Jump back to the app's entry file (from app.json — captured at _mountApp time).
+        // Pushes a new history entry rather than rewinding the stack — going Home from
+        // page-deep-in-the-tree shouldn't erase your forward stack the way Back/Forward do.
+        _navHome() {
+            if (!this._appEntryPath) return false;
+            // No-op if we're already on Home (don't pollute history with duplicates).
+            if (this._currentNavPath() === this._appEntryPath) return true;
+            this._navigateToPath(this._appEntryPath, { pushHistory: true, alreadyResolved: true });
             return true;
         }
 
@@ -1494,12 +1517,15 @@
 
         // Notify the HUD that nav state has changed so it can update arrows + the address bar.
         _emitNavChange() {
+            var cur  = this._currentNavPath();
+            var home = this._appEntryPath || '';
             document.dispatchEvent(new CustomEvent('app-nav:change', {
                 bubbles: true, composed: true,
                 detail: {
-                    path:       this._currentNavPath(),
+                    path:       cur,
                     canBack:    this._canNavBack(),
                     canForward: this._canNavForward(),
+                    canHome:    !!home && (cur !== home),
                     historyLen: this._navHistory.length
                 }
             }));
@@ -1576,10 +1602,22 @@
                 // would do a real GET, the static host 403s, and the iframe lands on a dead end.
                 // The ORIGINAL href (with the fragment) is forwarded so the parent can scroll
                 // to the anchor inside the new srcdoc after navigation.
+                //
+                // External links (http://, https://, //) are opened in a NEW TAB via window.open.
+                // The iframe's sandbox now includes allow-popups + allow-popups-to-escape-sandbox,
+                // so the new window is unrestricted. Doing it from inside the iframe (synchronous
+                // within the click gesture) avoids the popup-blocker hit that a postMessage round-
+                // trip to the parent would incur — postMessage is async, the gesture is lost, and
+                // window.open() in the parent would be blocked.
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");if(!a)return;' +
                   'var h=a.getAttribute("href");if(!h)return;' +
-                  'if(h.startsWith("http")||h.startsWith("//")||h.startsWith("#")||h.startsWith("mailto:"))return;' +
+                  'if(h.startsWith("#")||h.startsWith("mailto:"))return;' +
+                  'if(h.startsWith("http")||h.startsWith("//")){' +
+                    'e.preventDefault();e.stopPropagation();' +
+                    'try{window.open(h,"_blank","noopener,noreferrer");}catch(_){}' +
+                    'return;' +
+                  '}' +
                   'var hp=h.split("?")[0].split("#")[0];' +
                   'if(hp.endsWith(".html")||hp.endsWith(".htm")){' +
                     'e.preventDefault();e.stopPropagation();' +

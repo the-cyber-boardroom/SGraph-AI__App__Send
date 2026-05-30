@@ -55,13 +55,15 @@
                         </div>
                     </div>
                     <div class="navrow" data-hud-el="navBar" style="display:none">
-                        <button class="navrow-back"    data-hud-el="navArrows" title="Back"    disabled>‹</button>
-                        <button class="navrow-forward" data-hud-el="navArrows" title="Forward" disabled>›</button>
+                        <button class="navrow-back"    data-hud-el="navArrows"  title="Back"    disabled>‹</button>
+                        <button class="navrow-forward" data-hud-el="navArrows"  title="Forward" disabled>›</button>
                         <button class="navrow-reload"  data-hud-el="navRefresh" title="Reload this page">↻</button>
+                        <button class="navrow-home"    data-hud-el="navHome"    title="Home (app entry page)" disabled>⌂</button>
                         <span class="navrow-divider" data-hud-el="navArrows"></span>
-                        <div class="navrow-addr" data-hud-el="navPath" title="Click to copy path">
+                        <div class="navrow-addr" data-hud-el="navPath" title="Click to edit, Enter to navigate, Esc to cancel">
                             <span class="navrow-addr-icon">📄</span>
                             <span class="navrow-addr-text"></span>
+                            <input class="navrow-addr-input" type="text" autocomplete="off" spellcheck="false" style="display:none" />
                         </div>
                         <button class="navrow-copy" data-hud-el="navPath" title="Copy path">⎘</button>
                         <div class="navrow-menu-wrap">
@@ -82,8 +84,13 @@
                 if (e.target.closest('.navrow-back'))    this._emitNavEvent('back');
                 if (e.target.closest('.navrow-forward')) this._emitNavEvent('forward');
                 if (e.target.closest('.navrow-reload'))  this._emitNavEvent('reload');
-                if (e.target.closest('.navrow-copy') || e.target.closest('.navrow-addr')) this._copyCurrentPath();
-                if (e.target.closest('.navrow-menu'))    this._toggleMenu();
+                if (e.target.closest('.navrow-home'))    this._emitNavEvent('home');
+                // Address-bar click: enter edit mode (the explicit copy button still copies).
+                if (e.target.closest('.navrow-copy'))    this._copyCurrentPath();
+                if (e.target.closest('.navrow-addr') && !e.target.closest('.navrow-addr-input')) {
+                    this._enterAddrEdit();
+                }
+                if (e.target.closest('.navrow-menu'))  { e.stopPropagation(); this._toggleMenu(); }
                 if (e.target.closest('[data-recent-path]')) {
                     var path = e.target.closest('[data-recent-path]').getAttribute('data-recent-path');
                     this._emitNavEvent('jump', { path: path });
@@ -92,26 +99,25 @@
                 if (e.target.closest('.hud-escape'))     this._emitNavEvent('exit');
             });
 
+            // Editable URL bar: Enter commits + navigates, Escape cancels, focus loss cancels.
+            this.shadowRoot.addEventListener('keydown', (e) => {
+                if (!e.target || !e.target.classList || !e.target.classList.contains('navrow-addr-input')) return;
+                if (e.key === 'Enter')  { e.preventDefault(); this._exitAddrEdit(true);  }
+                if (e.key === 'Escape') { e.preventDefault(); this._exitAddrEdit(false); }
+            });
+            this.shadowRoot.addEventListener('focusout', (e) => {
+                if (!e.target || !e.target.classList || !e.target.classList.contains('navrow-addr-input')) return;
+                if (this._editingAddr) this._exitAddrEdit(false);
+            });
+
             // Listen for nav-state changes from app-shell (back/forward arrows + path display).
             this._navChangeHandler = (ev) => this.setNavState(ev.detail || {});
             document.addEventListener('app-nav:change', this._navChangeHandler);
-
-            // Close the recent-pages menu on outside-click.
-            this._outsideClickHandler = (ev) => {
-                if (!this._menuOpen) return;
-                // Clicks inside the HUD's shadow DOM never reach the document handler in a
-                // way we can usefully test against the menu, so we just close on any doc click
-                // and reopen on the ⋯ click handler if still wanted (the click ordering means
-                // the menu-button click runs first, sees menu open, closes it, then this fires
-                // and is a no-op).
-                this._toggleMenu(false);
-            };
-            document.addEventListener('click', this._outsideClickHandler);
         }
 
         disconnectedCallback() {
             if (this._navChangeHandler) document.removeEventListener('app-nav:change', this._navChangeHandler);
-            if (this._outsideClickHandler) document.removeEventListener('click', this._outsideClickHandler);
+            if (this._docClickHandler) document.removeEventListener('click', this._docClickHandler);
         }
 
         // Called by page script with vault/app metadata.
@@ -293,6 +299,7 @@
                 path:       String(state.path || ''),
                 canBack:    !!state.canBack,
                 canForward: !!state.canForward,
+                canHome:    !!state.canHome,
                 historyLen: state.historyLen | 0
             };
             this._updateRecent(this._navState.path);
@@ -300,11 +307,17 @@
 
             var back    = sr.querySelector('.navrow-back');
             var forward = sr.querySelector('.navrow-forward');
+            var home    = sr.querySelector('.navrow-home');
             if (back)    back.disabled    = !this._navState.canBack;
             if (forward) forward.disabled = !this._navState.canForward;
+            if (home)    home.disabled    = !this._navState.canHome;
 
             var addr = sr.querySelector('.navrow-addr-text');
-            if (addr) {
+            // Don't overwrite the display text while the user is editing the URL — they're
+            // typing into the input and an incoming nav-change shouldn't visually flicker
+            // behind it. When the input commits and edit mode exits, the next nav-change
+            // (the one that just landed) will already be the one we want to show.
+            if (addr && !this._editingAddr) {
                 var p = this._navState.path;
                 var hashIdx = p.indexOf('#');
                 if (hashIdx >= 0) {
@@ -351,6 +364,43 @@
             });
         }
 
+        // Browser-style URL bar: click flips text → input pre-filled with current path,
+        // focused and selected. Enter commits via the 'jump' nav event (paths typed in
+        // are treated as vault-absolute by app-shell, so no current-dir prefixing).
+        // Escape or focus loss cancels and restores the read-only display.
+        _enterAddrEdit() {
+            var sr = this.shadowRoot; if (!sr) return;
+            if (this._editingAddr) return;
+            var input = sr.querySelector('.navrow-addr-input');
+            var text  = sr.querySelector('.navrow-addr-text');
+            var icon  = sr.querySelector('.navrow-addr-icon');
+            if (!input) return;
+            this._editingAddr = true;
+            input.value = this._navState.path || '';
+            if (text) text.style.display = 'none';
+            if (icon) icon.style.display = 'none';
+            input.style.display = '';
+            // Defer focus/select until after the click event finishes (avoids a
+            // race where focusout from another element re-triggers _exitAddrEdit).
+            setTimeout(() => { input.focus(); input.select(); }, 0);
+        }
+
+        _exitAddrEdit(commit) {
+            var sr = this.shadowRoot; if (!sr) return;
+            if (!this._editingAddr) return;
+            var input = sr.querySelector('.navrow-addr-input');
+            var text  = sr.querySelector('.navrow-addr-text');
+            var icon  = sr.querySelector('.navrow-addr-icon');
+            this._editingAddr = false;
+            var value = input ? (input.value || '').trim() : '';
+            if (input) input.style.display = 'none';
+            if (text)  text.style.display  = '';
+            if (icon)  icon.style.display  = '';
+            if (commit && value && value !== this._navState.path) {
+                this._emitNavEvent('jump', { path: value });
+            }
+        }
+
         _toggleMenu(force) {
             var open = (typeof force === 'boolean') ? force : !this._menuOpen;
             this._menuOpen = open;
@@ -359,8 +409,22 @@
             if (open) {
                 this._renderMenu();
                 panel.style.display = '';
+                // Outside-click close: armed on the *next* event-loop turn so the
+                // click that opens the menu (which bubbles from shadow DOM up to
+                // document with composed:true) doesn't immediately close it again.
+                // A one-shot listener means clicks on the ⋯ button after open will
+                // re-toggle through the shadow handler instead of being eaten here.
+                if (this._docClickHandler) document.removeEventListener('click', this._docClickHandler);
+                setTimeout(() => {
+                    this._docClickHandler = () => this._toggleMenu(false);
+                    document.addEventListener('click', this._docClickHandler, { once: true });
+                }, 0);
             } else {
                 panel.style.display = 'none';
+                if (this._docClickHandler) {
+                    document.removeEventListener('click', this._docClickHandler);
+                    this._docClickHandler = null;
+                }
             }
         }
 
@@ -431,9 +495,9 @@
             var mode = (input.mode === 'hidden' || input.mode === 'minimal') ? input.mode : 'full';
             var defaults = (mode === 'minimal')
                 ? { vaultName: true,  appTitle: true,  openVault: false, copyLink: false, print: false, debug: false,
-                    navBar: false, navArrows: false, navPath: false, navRefresh: false }
+                    navBar: false, navArrows: false, navPath: false, navRefresh: false, navHome: false }
                 : { vaultName: true,  appTitle: true,  openVault: true,  copyLink: true,  print: false, debug: true,
-                    navBar: true,  navArrows: true,  navPath: true,  navRefresh: true };
+                    navBar: true,  navArrows: true,  navPath: true,  navRefresh: true,  navHome: true  };
             var show = Object.assign({}, defaults, (input.show || {}));
             return { mode: mode, show: show };
         }
@@ -566,6 +630,18 @@
             min-width: 0; flex: 1;
         }
         .navrow-addr-hash { color: #4ECDC4; }
+        .navrow-addr-input {
+            flex: 1; min-width: 0;
+            background: transparent;
+            border: none; outline: none;
+            color: #e2e8f0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.78rem;
+            padding: 0;
+            cursor: text;
+        }
+        .navrow-addr-input::selection { background: rgba(78,205,196,0.35); color: #fff; }
+        .navrow-addr-input:focus { outline: none; }
         .navrow-menu-wrap { position: relative; }
         .navrow-menu-panel {
             position: absolute; top: calc(100% + 4px); right: 0;
