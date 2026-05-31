@@ -701,14 +701,18 @@
             return s || ('link-' + Math.random().toString(36).slice(2, 8));
         }
 
-        // Create a new child vault and wire it into folder `path` as a read-through sub-vault:
+        // Create a new child vault and wire it into folder `path` as a sub-vault:
         // keyless <slug>.link.json in the tree + a portable read-only owner record (read_key tier).
-        // Mirrors the host "Add link" flow (vault-browse-edit _showAddLink). v1 = read-through only.
-        async _createChildVault(path, label) {
+        // When opts.rw is true, ALSO seal the child's FULL key with the parent's write secret and
+        // store it in .vault/owner/rw-links.json (owner-secret tier) so the parent can later mount
+        // the child WRITABLE via the relay. Mirrors the host "Add link" flow.
+        async _createChildVault(path, label, opts) {
+            opts = opts || {};
             var parentVault = this._vault;
             var sgSend = parentVault && parentVault._sgSend;
             if (!sgSend || typeof SGVault === 'undefined' || typeof VaultLinks === 'undefined') throw new Error('Cannot create vaults here');
-            var child   = await SGVault.create(sgSend, this._genVaultPassphrase(), { name: label });   // proper-vault-key derivation
+            var passphrase = this._genVaultPassphrase();
+            var child   = await SGVault.create(sgSend, passphrase, { name: label });   // proper-vault-key derivation
             var vaultId = child._vaultId;
             var refId   = this._genRefId();
 
@@ -716,14 +720,36 @@
             if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
             var fileName = this._slugify(label) + '.link.json';
             var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
+            if (opts.rw) linkObj.access = 'rw';
             await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
 
             var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
             var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
                            read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
             await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
+
+            // rw tier: seal the child FULL key with the parent's write secret (D1 accepted).
+            // The parent reader can open rw-links.json but cannot unseal without the write secret.
+            if (opts.rw) {
+                var childFullKey = passphrase + ':' + vaultId;
+                await this._saveRwLink(parentVault, refId, { vault_id: vaultId, label: label }, childFullKey);
+            }
             if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
-            return { vault_id: vaultId, ref_id: refId, ref_file_id: child._refFileId };
+            return { vault_id: vaultId, ref_id: refId, ref_file_id: child._refFileId, access: opts.rw ? 'rw' : 'ro' };
+        }
+
+        // Seal a child FULL key with the parent's write secret and persist it as an rw owner record.
+        // Throws if the parent vault is not writable (no write secret available to seal with).
+        async _saveRwLink(parentVault, refId, meta, childFullKey) {
+            if (typeof VaultRwSeal === 'undefined') throw new Error('rw sealing unavailable (VaultRwSeal not loaded)');
+            var writeSecret = parentVault && parentVault._writeKey;
+            if (!writeSecret) throw new Error('Parent vault is read-only: cannot seal a child write key');
+            var sealed = await VaultRwSeal.seal(childFullKey, writeSecret);
+            return VaultLinks.saveRwRecord(parentVault, refId, {
+                vault_id:  (meta && meta.vault_id) || null,
+                label:     (meta && meta.label) || null,
+                sealed_key: sealed
+            });
         }
 
         // Remove a sub-vault pointer (the <name>.link.json). The child vault stays on the server
@@ -890,13 +916,23 @@
             return this._kernelParent.list();
         }
 
-        // Trial-only stub. The clinic vault's app.json + an owner record (clinic.json)
-        // can provide child credentials. Real production: Kernel-A holds them
-        // (port-transfer model — architect pack §3 "Cleaner future variant").
-        // Resolved creds are tagged custody:'parent-held' so the B10 gate can refuse
-        // the unsafe combination (this resolver + a same-origin App-A) by default.
+        // Resolve a child vault's credentials for mounting. Order:
+        //   1. injected impl (tests / custom resolvers)
+        //   2. rw owner record (.vault/owner/rw-links.json): unseal the child FULL key with the
+        //      parent's write secret → WRITABLE mount. This is the real credential path (D1).
+        //   3. clinic.json trial stub (legacy synthetic path).
+        // Resolved creds are tagged custody:'parent-held' so the B10 gate can refuse the unsafe
+        // combination (parent-held creds + a same-origin App-A) by default.
         async _resolveChildCredentials(ref) {
             if (this._resolveChildCredentialsImpl) return this._resolveChildCredentialsImpl(ref);
+
+            // 2. rw owner record → unseal child full key with the parent's write secret
+            try {
+                var creds = await this._resolveRwCredentials(ref);
+                if (creds) return creds;
+            } catch (_) { /* fall through to trial stub */ }
+
+            // 3. clinic.json trial stub
             try {
                 var bytes = await this._dataSource.getFileBytes('clinic.json');
                 var clinic = JSON.parse(new TextDecoder().decode(bytes));
@@ -910,6 +946,26 @@
                 }
             } catch (_) {}
             return null;
+        }
+
+        // Unseal the rw owner record for `ref` (a ref_id) using the parent vault's write secret.
+        // Returns { vaultKey, accessToken, custody:'parent-held', access:'rw' } or null if there is
+        // no rw record. Throws only on an unexpected seal/crypto failure (caller falls through).
+        async _resolveRwCredentials(ref) {
+            if (typeof VaultLinks === 'undefined' || typeof VaultRwSeal === 'undefined') return null;
+            var parentVault = this._vault;
+            if (!parentVault) return null;
+            var rec = await VaultLinks.resolveRwRef(parentVault, ref);
+            if (!rec || !rec.sealed_key) return null;
+            var writeSecret = parentVault._writeKey;
+            if (!writeSecret) return null;   // parent opened read-only → cannot unseal
+            var childFullKey = await VaultRwSeal.unseal(rec.sealed_key, writeSecret);
+            return {
+                vaultKey:    childFullKey,
+                accessToken: null,
+                custody:     'parent-held',
+                access:      'rw'
+            };
         }
 
         // HUD prompt for broker.mediate(ask). Reuses the existing consent bar infrastructure.
