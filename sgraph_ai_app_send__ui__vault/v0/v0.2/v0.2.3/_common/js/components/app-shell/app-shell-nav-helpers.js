@@ -102,6 +102,64 @@
                 ? split.pathPart
                 : AppNavHelpers.resolvePath(htmlDir, split.pathPart);
             return { resolved: resolved, fragment: split.fragment };
+        },
+
+        // Decide how to mount a vault on initial open, given the deep-link captured at
+        // _init time (e.g. /en-gb/app/#patient/index.html → 'patient/index.html') and
+        // the parsed app.json from the vault.
+        //
+        // **REGRESSION TEST ANCHOR (2026-05-31 deep-link-loses-resources bug):**
+        // Pre-fix, a deep-link to any HTML file other than the default entry sent the
+        // user to _mountVaultFile (bare single-file view, no app.json resources),
+        // which is why /en-gb/app/#patient/index.html rendered unstyled — the file
+        // loaded, but the app's CSS/JS never did. The fix: when the deep-link is an
+        // HTML/HTM file AND the vault has an app.json, route through the app mount
+        // path with the deep-link overriding app.json.entry. Non-HTML deep-links
+        // (images, markdown, json) still go through _mountVaultFile because the app
+        // mount path is HTML-only.
+        //
+        // Pure: no `this`, no DOM. Returns one of:
+        //   { strategy: 'app',      appJson }    — call _mountApp(appJson, resources)
+        //   { strategy: 'file',     filePath }   — call _mountVaultFile(filePath)
+        //   { strategy: 'redirect' }             — no app, no file → redirect to /vault/
+        //
+        // opts:
+        //   deepPath — the file path requested via /#path (or '' if none)
+        //   appJson  — parsed app.json (or null if the vault has none)
+        decideMountStrategy: function (opts) {
+            opts = opts || {};
+            var deepPath = String(opts.deepPath || '');
+            var appJson  = opts.appJson || null;
+            var deepPathIsHtml = deepPath.length > 0 &&
+                (deepPath.lastIndexOf('.html') === deepPath.length - 5 ||
+                 deepPath.lastIndexOf('.htm')  === deepPath.length - 4);
+
+            // Deep-link to an HTML file + vault has an app → app mount, deep-linked
+            // file as entry. The app's CSS/JS still load because we go through the
+            // full _mountApp path (vs the bare _mountVaultFile).
+            if (deepPath && appJson && deepPathIsHtml) {
+                return {
+                    strategy: 'app',
+                    appJson:  Object.assign({}, appJson, { entry: deepPath })
+                };
+            }
+            // Deep-link to a non-HTML file → bare file view (resources don't apply
+            // to images / markdown / json anyway).
+            if (deepPath && !deepPathIsHtml) {
+                return { strategy: 'file', filePath: deepPath };
+            }
+            // Deep-link to HTML but no app.json → bare file view (no resources to
+            // load anyway, and we can't construct a synthetic app.json that wouldn't
+            // mislead downstream code about what resources to fetch).
+            if (deepPath && !appJson) {
+                return { strategy: 'file', filePath: deepPath };
+            }
+            // No deep-link: regular app mount if there's an app.json, redirect to the
+            // vault UI otherwise.
+            if (appJson) {
+                return { strategy: 'app', appJson: appJson };
+            }
+            return { strategy: 'redirect' };
         }
     };
 

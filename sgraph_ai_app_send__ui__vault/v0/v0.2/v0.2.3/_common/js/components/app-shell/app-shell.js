@@ -182,6 +182,13 @@
 
             var res = { status: 'error', preview: null };
             try { res = await PublicPreviewRead.fetchPreview(endpoint, publicId); } catch (_) {}
+            // Tab title reflects the vault on the unlock screen. Set BEFORE the first render
+            // so the user sees the right tab label as soon as the card paints. If a later
+            // mount (vault opened → app launched) sets its own title via _mountApp /
+            // _mountVaultFile, that takes precedence — this is just the unlock-screen default.
+            if (res && res.preview && res.preview.title) {
+                document.title = 'SG/Vault — ' + res.preview.title;
+            }
             var render = function (extra) { card.setState(Object.assign({ status: res.status, preview: res.preview }, common, extra || {})); };
             render();
 
@@ -360,33 +367,40 @@
 
         async _continue(appJson) {
             // A specific file was requested ("Open as App" on a file, via /#key|app:path or the
-            // legacy /en-gb/app#path) — honour it OVER the vault's default app. Previously the
-            // deep-link was only read in the no-app.json branch, so any vault WITH an app.json
-            // always opened its default entry and the requested file was silently dropped.
+            // direct /en-gb/app/#path link form) — read it now and clear so a reload starts fresh.
             var deepLink = '';
             try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
             try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
             var deepPath = deepLink.indexOf('app:') === 0 ? deepLink.slice(4) : '';
 
-            // Exception: if the requested file IS the app.json entry, fall through to the full app
-            // mount so its declared resources (css/js) load — not the bare file.
-            if (deepPath && !(appJson && appJson.entry && deepPath === appJson.entry)) {
-                await this._mountVaultFile(deepPath);
-                return;
-            }
+            // The decision (deep-link × app.json present × deep-link is HTML) is delegated to
+            // AppNavHelpers.decideMountStrategy — pure, unit-tested. **The bug it fixes**
+            // (2026-05-31): a deep-link to ANY HTML file other than the default entry used to
+            // fall through to _mountVaultFile (bare file, no app.json resources loaded), so
+            // /en-gb/app/#patient/index.html rendered unstyled. Now an HTML deep-link in an
+            // app vault routes through _mountApp with the deep-link overriding appJson.entry,
+            // so the app's CSS/JS still load.
+            var decision = AppNavHelpers.decideMountStrategy({ deepPath: deepPath, appJson: appJson });
 
-            if (!appJson) {
-                // No default app and no file path — open the vault UI.
-                // App Mode lives on /en-gb/app, not on the vault page.
+            if (decision.strategy === 'redirect') {
+                // No default app and no file path — App Mode lives on /en-gb/app, not the
+                // vault page; bounce there so the user can browse files instead.
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
             }
+            if (decision.strategy === 'file') {
+                await this._mountVaultFile(decision.filePath);
+                return;
+            }
+            // decision.strategy === 'app' — appJson may be the original or a deep-link-
+            // overridden clone with .entry set to the requested HTML file.
+            var effectiveAppJson = decision.appJson;
             this._setStatus('Loading resources…');
-            var resourcesData = await this._fetchResources(appJson);
+            var resourcesData = await this._fetchResources(effectiveAppJson);
             this._t.resourcesLoaded = performance.now();
             this._emitVaultEvent('resources-loaded', { label: 'Resources pre-fetched', cssCount: resourcesData.css.length, jsCount: resourcesData.js.length, ms: Math.round(this._t.resourcesLoaded - (this._t.appJsonFetched || this._t.treeLoaded)) });
-            await this._mountApp(appJson, resourcesData);
+            await this._mountApp(effectiveAppJson, resourcesData);
         }
 
 
@@ -1595,7 +1609,15 @@
                 'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
                 // Body-hidden self-check: if the app never makes its body visible, surface a
                 // hint (mirrors the old same-origin display:none probe, now from inside).
-                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},0);});' +
+                //
+                // Delay raised from 0 → 2500 ms (2026-05-31): apps with a typical "hidden
+                // until init JS runs" reveal pattern (Private Health Score is one) hit the
+                // 0-ms check before their reveal had a chance to fire, so the banner showed
+                // a false-positive even when the page later rendered fine. 2.5 s is well past
+                // every reasonable init time but short enough to still be useful when the app
+                // GENUINELY never reveals. Apps that take >2.5s to first paint should signal
+                // sg-app-ready (see AUTHORING.md) — the banner reflects a real problem then.
+                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},2500);});' +
 
                 // Nav intercept: relative .html/.htm links → postMessage to parent.
                 // The extension check runs on the path portion only (strip ?query / #frag) so
