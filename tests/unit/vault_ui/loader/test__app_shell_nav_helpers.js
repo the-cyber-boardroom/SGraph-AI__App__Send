@@ -168,5 +168,100 @@ console.log('\n[suite] AppNavHelpers — resolveNavigation (PATH-DOUBLING FIX AN
         }), { resolved: 'a/b/c.html', fragment: '' }));
 }
 
+console.log('\n[suite] AppNavHelpers — decideMountStrategy (DEEP-LINK BUG ANCHOR)');
+{
+    // The headline regression pin: /en-gb/app/#patient/index.html, a deep-linked HTML
+    // file in an app vault. PRE-FIX: routed to _mountVaultFile (bare file, no
+    // resources). POST-FIX: routes through _mountApp with the deep-link overriding
+    // appJson.entry, so the app's CSS/JS still load.
+    var d1 = H.decideMountStrategy({
+        deepPath: 'patient/index.html',
+        appJson:  { entry: 'home/index.html', title: 'Demo', resources: { css: ['styles.css'] } }
+    });
+    ok('DM1 deep-link HTML + app.json → strategy=app with overridden entry (THE FIX)',
+        d1.strategy === 'app'
+        && d1.appJson.entry === 'patient/index.html'
+        && d1.appJson.title === 'Demo'                 // other appJson fields preserved
+        && d1.appJson.resources.css[0] === 'styles.css');
+
+    ok('DM2 decideMountStrategy does NOT mutate the input appJson (clone semantics)',
+        (function () {
+            var input = { entry: 'home/index.html', title: 'X' };
+            H.decideMountStrategy({ deepPath: 'other/page.html', appJson: input });
+            return input.entry === 'home/index.html' && input.title === 'X';
+        })());
+
+    // Deep-link matches the default entry — no override needed, but still routes to
+    // app mount (which was the pre-fix exception case the original code handled
+    // separately; my helper unifies both paths).
+    var d3 = H.decideMountStrategy({
+        deepPath: 'home/index.html',
+        appJson:  { entry: 'home/index.html' }
+    });
+    ok('DM3 deep-link == default entry → strategy=app (no change in behaviour)',
+        d3.strategy === 'app' && d3.appJson.entry === 'home/index.html');
+
+    // .htm extension (less common but valid) — same treatment as .html.
+    var d4 = H.decideMountStrategy({
+        deepPath: 'pages/intro.htm',
+        appJson:  { entry: 'index.htm' }
+    });
+    ok('DM4 .htm deep-link in app vault → strategy=app with override',
+        d4.strategy === 'app' && d4.appJson.entry === 'pages/intro.htm');
+
+    // Non-HTML deep-link in an app vault → bare file view. App mount path is
+    // HTML-only; mounting a markdown / image / json as the entry would error or
+    // render uselessly.
+    var d5 = H.decideMountStrategy({
+        deepPath: 'docs/notes.md',
+        appJson:  { entry: 'home/index.html' }
+    });
+    ok('DM5 non-HTML deep-link (.md) → strategy=file, bypasses app mount',
+        d5.strategy === 'file' && d5.filePath === 'docs/notes.md');
+
+    var d6 = H.decideMountStrategy({
+        deepPath: 'photos/hero.webp',
+        appJson:  { entry: 'index.html' }
+    });
+    ok('DM6 non-HTML deep-link (image) → strategy=file',
+        d6.strategy === 'file' && d6.filePath === 'photos/hero.webp');
+
+    // Deep-link HTML but vault has no app.json → bare file view. Without an
+    // app.json there are no resources to load anyway; the file is on its own.
+    var d7 = H.decideMountStrategy({
+        deepPath: 'standalone.html',
+        appJson:  null
+    });
+    ok('DM7 HTML deep-link + no app.json → strategy=file',
+        d7.strategy === 'file' && d7.filePath === 'standalone.html');
+
+    // No deep-link + app.json → app mount with default entry. The plain case.
+    var d8 = H.decideMountStrategy({
+        deepPath: '',
+        appJson:  { entry: 'index.html', title: 'X' }
+    });
+    ok('DM8 no deep-link + app.json → strategy=app, default entry preserved',
+        d8.strategy === 'app' && d8.appJson.entry === 'index.html' && d8.appJson === d8.appJson);
+
+    // No deep-link + no app.json → redirect to vault UI.
+    var d9 = H.decideMountStrategy({ deepPath: '', appJson: null });
+    ok('DM9 no deep-link + no app.json → strategy=redirect',
+        d9.strategy === 'redirect');
+
+    // Empty opts → redirect (safe default — no path, no app).
+    var d10 = H.decideMountStrategy({});
+    ok('DM10 empty opts → strategy=redirect',
+        d10.strategy === 'redirect');
+
+    // Trick case: substring "html" inside path, but path doesn't actually END in .html.
+    // e.g. a directory named "html". Should be treated as non-HTML.
+    var d11 = H.decideMountStrategy({
+        deepPath: 'html-templates/readme.md',
+        appJson:  { entry: 'index.html' }
+    });
+    ok('DM11 substring "html" mid-path does not trigger HTML branch',
+        d11.strategy === 'file' && d11.filePath === 'html-templates/readme.md');
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
