@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.31.8 | **Last updated:** 2026-05-30 | **Maintained by:** Librarian (daily run)
+**Version:** v0.31.12 | **Last updated:** 2026-05-31 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -38,14 +38,14 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | User Lambda API endpoints | 26 unique (34 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **74+** |
-| Unit tests passing | **~1139+** (~602 Python + ~150 vault-UI JS from sub-vaults/public-previews/app-perms + 335 ViV loader suite from Phase 1–5.1 inc. B4–B10/KernelParent/AppFrameBootstrap/VivAuditView) |
+| Unit tests passing | **~1240+** (~602 Python + ~157 vault-UI JS from sub-vaults/public-previews/app-perms/VaultSubvaultsView + ~364 ViV loader suite from Phase 1–5.1 inc. B4–B10/KernelParent/AppFrameBootstrap/VivAuditView/SgReplCore + 65 app-shell extraction AppHudConfig+AppNavHelpers new) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 385+ (379 − 1 closed P-259 + 6 new P-263–P-268 from 05/26 briefs) |
-| Total documents catalogued | 511 (504 + 7 briefs processed 05/30: 05/26 vault-chat × 3 + commit-queue + day-index + security-demo + vc-demo) |
+| Open PROPOSED items (across all domains) | 395+ (385 + 10 new P-269–P-278 from 05/29 briefs) |
+| Total documents catalogued | 524 (511 + 13 briefs processed 05/31: 05/29 connectors × 6 + assessments × 6 + day-index) |
 
 ---
 
