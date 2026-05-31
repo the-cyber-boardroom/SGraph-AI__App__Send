@@ -43,6 +43,7 @@ SCRIPTS = [
     'js/lib/sg-send/sg-send.js',
     'js/adapters/vault-data-source.js',
     'js/adapters/composite-data-source.js',
+    'js/adapters/vault-access.js',
     'js/lib/links/vault-links.js',
     'js/lib/links/vault-rw-seal.js',
     'js/components/app-shell/kernel-mounts.js',

@@ -13,6 +13,7 @@ node tests/unit/vault_ui/loader/test__public_preview_crypto.js
 node tests/unit/vault_ui/loader/test__vault_links.js
 node tests/unit/vault_ui/loader/test__vault_rw_seal.js
 node tests/unit/vault_ui/loader/test__composite_data_source.js
+node tests/unit/vault_ui/loader/test__vault_access.js
 node tests/unit/vault_ui/loader/test__storage_pertab.js
 node tests/unit/vault_ui/loader/test__vault_history.js
 node tests/unit/vault_ui/loader/test__ro_record_derivation.js
