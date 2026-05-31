@@ -60,19 +60,30 @@ class VaultAccess {
     get _vault()      { return this._root && this._root._vault; }
 
     // ── mount resolution ────────────────────────────────────────────────────
-    _norm(p) { return String(p == null ? '' : p).replace(/^\//, ''); }
+    // Strip a leading slash and any trailing slashes so mount prefixes and paths compare
+    // cleanly (a trailing slash in the mount table must not defeat the 'mp/' boundary check).
+    _norm(p) { return String(p == null ? '' : p).replace(/^\/+/, '').replace(/\/+$/, ''); }
 
     // → { mountPath, access } | null
+    // Longest-prefix wins, so an overlapping/nested mount ('mounts/a/b') is preferred over a
+    // shorter ancestor ('mounts/a') for a path inside it. A mount only matches the path itself
+    // or paths under it ('mp' or 'mp/...') — never a sibling sharing a name fragment
+    // ('mounts/a' must NOT match 'mounts/about/x').
     _mountForPath(path) {
         const norm = this._norm(path);
         if (this._mountsFn) {
             let list = [];
             try { list = this._mountsFn() || []; } catch (_) { list = []; }
+            let best = null;
             for (const m of list) {
+                if (!m || m.mountPath == null) continue;
                 const mp = this._norm(m.mountPath);
-                if (norm === mp || norm.startsWith(mp + '/')) return { mountPath: mp, access: m.access || 'ro' };
+                if (mp === '') continue;   // a root-level "mount" is meaningless; ignore
+                if (norm === mp || norm.startsWith(mp + '/')) {
+                    if (!best || mp.length > best.mountPath.length) best = { mountPath: mp, access: m.access || 'ro' };
+                }
             }
-            return null;
+            return best;
         }
         if (this._root && typeof this._root._mountForPath === 'function') {
             const m = this._root._mountForPath(norm);

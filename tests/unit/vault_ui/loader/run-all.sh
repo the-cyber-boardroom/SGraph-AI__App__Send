@@ -11,9 +11,12 @@ node tests/unit/vault_ui/loader/test__recent_list.js
 node tests/unit/vault_ui/loader/test__routing_decisions.js
 node tests/unit/vault_ui/loader/test__public_preview_crypto.js
 node tests/unit/vault_ui/loader/test__vault_links.js
+node tests/unit/vault_ui/loader/test__vault_links_rw_edge.js
 node tests/unit/vault_ui/loader/test__vault_rw_seal.js
+node tests/unit/vault_ui/loader/test__vault_rw_seal_edge.js
 node tests/unit/vault_ui/loader/test__composite_data_source.js
 node tests/unit/vault_ui/loader/test__vault_access.js
+node tests/unit/vault_ui/loader/test__vault_access_edge.js
 node tests/unit/vault_ui/loader/test__rw_credential_loop.js
 node tests/unit/vault_ui/loader/test__storage_pertab.js
 node tests/unit/vault_ui/loader/test__vault_history.js
