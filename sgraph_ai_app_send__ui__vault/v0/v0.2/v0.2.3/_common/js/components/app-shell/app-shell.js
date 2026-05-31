@@ -877,6 +877,14 @@
             // monitorChild is a channel round-trip. Returns the source descriptor list
             // VivAuditView.aggregate() consumes.
             window._appDebug.vivAuditProvider = async function () {
+                // SecureChannel.request has no timeout (settles only on reply / channel-close),
+                // so an alive-but-unresponsive child would otherwise hang the whole audit poll.
+                // Bound each monitorChild round-trip; a timeout surfaces as 'unreachable'.
+                function _withTimeout(p, ms) {
+                    return Promise.race([ p, new Promise(function (_, reject) {
+                        setTimeout(function () { reject(Object.assign(new Error('monitor timeout'), { code: 'ETIMEDOUT' })); }, ms);
+                    }) ]);
+                }
                 var sources = [{
                     kernelId: kp.kernelId || 'top',
                     label:    'top (this app)',
@@ -888,7 +896,7 @@
                 for (var i = 0; i < children.length; i++) {
                     var m = children[i];
                     try {
-                        var res = await kp.monitorChild(m.mountId);   // { mode, entries }
+                        var res = await _withTimeout(kp.monitorChild(m.mountId), 3000);   // { mode, entries }
                         sources.push({
                             kernelId: m.mountId,
                             label:    m.label || m.ref || m.mountId,
