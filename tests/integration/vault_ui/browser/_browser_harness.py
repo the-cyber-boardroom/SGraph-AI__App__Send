@@ -101,6 +101,74 @@ class BrowserHarnessTestCase(TestCase):
         if errors:
             print(f'[harness] teardown errors: {errors}')
 
+    # -------------------------------------------------------------------------
+    # sgit-ai vault helpers — exposed on the harness so multiple tests can share
+    # them. All operate against the test-class's API (self.api_url / access_token).
+    # -------------------------------------------------------------------------
+
+    def _sgit(self, cwd, *args, check=True):
+        """Run sgit-ai with stdout/stderr captured. Raises if non-zero unless
+        check=False (in which case the caller inspects .returncode + .stderr)."""
+        import subprocess
+        proc = subprocess.run(['sgit', *args], cwd=str(cwd), capture_output=True, text=True)
+        if check and proc.returncode != 0:
+            raise RuntimeError(
+                f'sgit {" ".join(args)!r} failed ({proc.returncode}):\n'
+                f'STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}'
+            )
+        return proc
+
+    @staticmethod
+    def _new_vault_key():
+        """Generate a fresh {passphrase}:{vault_id} vault key. Random per call,
+        so tests don't share state with previous runs against the same in-memory
+        backend."""
+        import secrets, string
+        passphrase = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(16))
+        vault_id   = ''.join(secrets.choice('0123456789abcdef') for _ in range(8))
+        return f'{passphrase}:{vault_id}'
+
+    def create_seeded_vault(self, files: dict, vault_key: str = ''):
+        """Create a vault on the local backend via sgit-ai and seed it with
+        `files` (path → text content). Returns (vault_key, vault_dir).
+
+        The vault_dir is a tmpdir kept until process exit so follow-up tests
+        in the same case CAN re-use the same local clone if they want."""
+        import tempfile
+        from pathlib import Path
+        tmp = tempfile.mkdtemp(prefix='sgit-pilot-')
+        cwd = Path(tmp)
+        vault_key = vault_key or self._new_vault_key()
+        # 1. create empty vault on the server. --token must come AFTER 'create'
+        #    in this sgit version (the global --token isn't propagated to push).
+        self._sgit(cwd, '--base-url', self.api_url,
+                   'create', '--token', self.access_token,
+                   '--vault-key', vault_key, 'vault')
+        vault_dir = cwd / 'vault'
+        # 2. write files into the working tree
+        for rel, content in files.items():
+            f = vault_dir / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(content) if isinstance(content, str) else f.write_bytes(content)
+        # 3. commit (local) + push (remote)
+        self._sgit(vault_dir, 'commit', '-m', 'seed')
+        self._sgit(vault_dir, 'push', '--base-url', self.api_url, '--token', self.access_token)
+        return vault_key, vault_dir
+
+    def clone_vault(self, vault_key: str):
+        """Clone an existing vault from the local backend into a fresh tmpdir.
+        Returns the clone path. Used by the round-trip tests: vault created
+        from one workspace, cloned to another, modified, pushed back, then
+        observed in the browser."""
+        import tempfile
+        from pathlib import Path
+        tmp = tempfile.mkdtemp(prefix='sgit-clone-')
+        cwd = Path(tmp)
+        self._sgit(cwd, '--base-url', self.api_url,
+                   'clone', '--token', self.access_token,
+                   vault_key, 'clone')
+        return cwd / 'clone'
+
     def new_app_page(self, init_script: str = ''):
         """Open a new browser page with window.SG_ENDPOINT pre-configured to
         point at the local FastAPI backend. The UI reads SG_ENDPOINT first

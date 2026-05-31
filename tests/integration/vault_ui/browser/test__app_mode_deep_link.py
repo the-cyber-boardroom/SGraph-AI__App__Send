@@ -29,66 +29,8 @@ What this test does:
 """
 
 import json
-import secrets
-import string
-import subprocess
-import tempfile
-from pathlib import Path
 
 from _browser_harness import BrowserHarnessTestCase
-
-
-# -------------------------------------------------------------------------------
-# sgit-ai helpers
-# -------------------------------------------------------------------------------
-
-def _new_vault_key() -> str:
-    """Generate a fresh {passphrase}:{vault_id} vault key — random per test so
-    we're not sharing state with other runs against the same in-memory backend."""
-    passphrase = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(16))
-    vault_id   = ''.join(secrets.choice('0123456789abcdef') for _ in range(8))
-    return f'{passphrase}:{vault_id}'
-
-
-def _sgit(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    """Run sgit, capture output, optionally raise on non-zero."""
-    proc = subprocess.run(['sgit', *args], cwd=cwd, capture_output=True, text=True)
-    if check and proc.returncode != 0:
-        raise RuntimeError(
-            f'sgit {" ".join(args)!r} failed ({proc.returncode}):\n'
-            f'STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}'
-        )
-    return proc
-
-
-def create_seeded_vault(api_url: str, access_token: str, files: dict[str, str]) -> str:
-    """Create a vault on `api_url` via sgit-ai and push the given files into it.
-
-    Returns the vault key (so the browser can open the vault). The on-disk
-    sgit clone is in a tmpdir that this helper does NOT clean up — pytest will
-    clear it when the process exits."""
-    tmp       = tempfile.mkdtemp(prefix='sgit-pilot-')
-    cwd       = Path(tmp)
-    vault_key = _new_vault_key()
-
-    # 1. Create the empty vault on the server. --token must come AFTER 'create'
-    #    (the global --token isn't propagated to push in this sgit version).
-    _sgit(cwd, '--base-url', api_url,
-          'create', '--token', access_token, '--vault-key', vault_key, 'vault')
-
-    vault_dir = cwd / 'vault'
-
-    # 2. Write the files into the working tree.
-    for rel_path, content in files.items():
-        f = vault_dir / rel_path
-        f.parent.mkdir(parents=True, exist_ok=True)
-        f.write_text(content)
-
-    # 3. Commit (local — no token/base-url needed) then push (remote — needs both).
-    _sgit(vault_dir, 'commit', '-m', 'seed')
-    _sgit(vault_dir, 'push', '--base-url', api_url, '--token', access_token)
-
-    return vault_key
 
 
 # -------------------------------------------------------------------------------
@@ -131,8 +73,7 @@ class test__app_mode_deep_link(BrowserHarnessTestCase):
 
     def test__patient_deep_link_routes_through_app_mount_and_loads_css(self):
         # ----- seed a real vault on the local backend via sgit -----
-        vault_key = create_seeded_vault(
-            self.api_url, self.access_token,
+        vault_key, _ = self.create_seeded_vault(
             files = {
                 'app.json':           _APP_JSON,
                 'styles.css':         _STYLES_CSS,
