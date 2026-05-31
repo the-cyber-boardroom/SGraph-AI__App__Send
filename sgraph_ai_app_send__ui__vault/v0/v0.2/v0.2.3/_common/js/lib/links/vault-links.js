@@ -12,7 +12,10 @@
    `.json` (a deliberate "disable" gesture, and why no secret may live here).
 
    Phase 0 key resolution is localStorage (the "save on this device" option) or a UI
-   prompt. The `.vault/owner/{ro,rw}-links` owner records arrive in Phase 1.
+   prompt. The `.vault/owner/ro-links.json` owner record (read_key tier) and the
+   `.vault/owner/rw-links.json` owner record (child FULL key, sealed by the caller with
+   the parent owner's write secret) are both handled here. This module is KEY-BLIND for
+   the rw tier: it persists/returns the opaque sealed blob and never seals/unseals.
 
    Pure logic, no DOM. Exposed as window.VaultLinks (browser) and module.exports (node).
    ================================================================================= */
@@ -24,8 +27,19 @@ const VaultLinks = {
     DEFAULT_PIN:          { mode: 'latest' },
     OWNER_FOLDER:         '.vault/owner',          // single owner-metadata root
     RO_LINKS_FILE:        'ro-links.json',         // read_key tier (readable by parent readers)
-    // NB: rw-links.json (owner-only, double-encrypted full keys) is deferred until writable
-    // sub-vaults land — v1 opens children read-only, so only ro-links is needed.
+    RW_LINKS_FILE:        'rw-links.json',         // owner tier: child FULL key, sealed with the
+                                                   // parent's WRITE secret. The file is a normal
+                                                   // vault file (so the parent's read_key already
+                                                   // encrypts it at rest), but the per-record
+                                                   // `sealed_key` is ADDITIONALLY sealed by the
+                                                   // caller with the parent owner's write secret —
+                                                   // so a parent READER can open the file yet still
+                                                   // cannot recover a child full key. This module
+                                                   // never sees a plaintext child key: seal/unseal
+                                                   // happen in the caller (see app-shell). Accepted
+                                                   // risk per the 05/31 rw-sub-vaults scoping (D1):
+                                                   // managing a child fully from its parent REQUIRES
+                                                   // the parent to hold the child's writable key.
 
     // --- suffix recognition -----------------------------------------------------
     isLinkFile(path) {
@@ -180,6 +194,70 @@ const VaultLinks = {
         else        await vault.addFile('/' + this.OWNER_FOLDER, this.RO_LINKS_FILE, bytes);
         if (typeof vault.push === 'function') { try { await vault.push(); } catch (_) {} }
         return ro;
+    },
+
+    // --- Owner records: .vault/owner/rw-links.json (owner-secret tier) -----------
+    //     A map { <ref_id>: { vault_id, label?, sealed_key, ref_file_id? } } where
+    //     `sealed_key` is the child's FULL key already sealed by the CALLER with the
+    //     parent owner's write secret (this module is key-blind — it persists and
+    //     returns the opaque blob, never plaintext). Same on-disk shape and merge
+    //     semantics as ro-links; different filename + payload field. Writing requires a
+    //     writable (owner) parent vault and pushes to the server.
+
+    async loadRwLinks(vault) {
+        if (!vault) return {};
+        try {
+            if (vault.needsLoading && vault.needsLoading('/' + this.OWNER_FOLDER)) {
+                await vault.loadSubTreeOnDemand('/' + this.OWNER_FOLDER);
+            }
+        } catch (_) { /* folder absent — fine */ }
+        try {
+            const buf = await vault.getFile(this.OWNER_FOLDER, this.RW_LINKS_FILE);
+            const obj = JSON.parse(new TextDecoder().decode(buf));
+            return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+        } catch (_) { return {}; }
+    },
+
+    // resolve a ref_id → its rw record (or null). Caller must unseal `sealed_key`.
+    async resolveRwRef(vault, refId) {
+        if (!vault || !refId) return null;
+        const rw = await this.loadRwLinks(vault);
+        return rw[refId] || null;
+    },
+
+    // write/replace one rw record. `record.sealed_key` MUST already be sealed by the
+    // caller; this method rejects a record that carries an obvious plaintext key field
+    // so a key never lands here unsealed by mistake.
+    async saveRwRecord(vault, refId, record) {
+        if (!vault || !vault.writable) throw new Error('Read-only: cannot save a link record');
+        if (!refId)                    throw new Error('saveRwRecord: refId required');
+        if (!record || !record.sealed_key) throw new Error('saveRwRecord: record.sealed_key required (caller must seal the child key)');
+        if (record.key || record.full_key || record.vault_key) {
+            throw new Error('saveRwRecord: refusing a plaintext key field — only sealed_key may be stored');
+        }
+        await this._ensureOwnerFolder(vault);
+        const rw = await this.loadRwLinks(vault);
+        rw[refId] = record;
+        const bytes  = new TextEncoder().encode(JSON.stringify(rw, null, 2));
+        const exists = (vault.listFolder('/' + this.OWNER_FOLDER) || []).some(e => e.name === this.RW_LINKS_FILE);
+        if (exists) await vault.updateFile('/' + this.OWNER_FOLDER, this.RW_LINKS_FILE, bytes);
+        else        await vault.addFile('/' + this.OWNER_FOLDER, this.RW_LINKS_FILE, bytes);
+        if (typeof vault.push === 'function') { try { await vault.push(); } catch (_) {} }
+        return rw;
+    },
+
+    // remove one rw record (revoke parent's writable custody of a child). Idempotent.
+    async deleteRwRecord(vault, refId) {
+        if (!vault || !vault.writable) throw new Error('Read-only: cannot delete a link record');
+        if (!refId) throw new Error('deleteRwRecord: refId required');
+        const rw = await this.loadRwLinks(vault);
+        if (!(refId in rw)) return rw;
+        delete rw[refId];
+        await this._ensureOwnerFolder(vault);
+        const bytes = new TextEncoder().encode(JSON.stringify(rw, null, 2));
+        await vault.updateFile('/' + this.OWNER_FOLDER, this.RW_LINKS_FILE, bytes);
+        if (typeof vault.push === 'function') { try { await vault.push(); } catch (_) {} }
+        return rw;
     }
 };
 

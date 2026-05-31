@@ -115,6 +115,48 @@ function makeFakeVault(writable) {
     eq('effectiveLink: read_key from record only', eff.read_key, 'rk');
     eq('effectiveLink: type resolves to vault', eff.type, 'vault');
 
+    // 7b. owner records — .vault/owner/rw-links.json (owner-secret tier, key-blind)
+    const vRw = makeFakeVault(true);
+    eq('loadRwLinks: empty → {}', await VaultLinks.loadRwLinks(vRw), {});
+    await VaultLinks.saveRwRecord(vRw, 'lk-1', { vault_id: 'cv', label: 'Alice', sealed_key: 'SEALED-BLOB-1', ref_file_id: 'rf' });
+    ok('saveRwRecord: pushed to server', vRw.pushed === 1);
+    const rw = await VaultLinks.loadRwLinks(vRw);
+    ok('rw record round-trips (sealed_key)', !!rw['lk-1'] && rw['lk-1'].sealed_key === 'SEALED-BLOB-1');
+    const rwRec = await VaultLinks.resolveRwRef(vRw, 'lk-1');
+    ok('resolveRwRef finds record', !!rwRec && rwRec.vault_id === 'cv');
+    ok('resolveRwRef unknown → null', (await VaultLinks.resolveRwRef(vRw, 'nope')) === null);
+    await VaultLinks.saveRwRecord(vRw, 'lk-2', { vault_id: 'cv2', sealed_key: 'SEALED-BLOB-2' });
+    const rw2 = await VaultLinks.loadRwLinks(vRw);
+    ok('second rw record merged (both present)', !!rw2['lk-1'] && !!rw2['lk-2']);
+
+    // rw is key-blind: a record with no sealed_key, or with a plaintext key field, is refused
+    let rwThrew1 = false; try { await VaultLinks.saveRwRecord(vRw, 'lk', { vault_id: 'c' }); } catch (_) { rwThrew1 = true; }
+    ok('saveRwRecord without sealed_key throws', rwThrew1);
+    let rwThrew2 = false; try { await VaultLinks.saveRwRecord(vRw, 'lk', { sealed_key: 'ok', key: 'apple-river-1234:cv' }); } catch (_) { rwThrew2 = true; }
+    ok('saveRwRecord with plaintext key field refused', rwThrew2);
+    let rwThrew3 = false; try { await VaultLinks.saveRwRecord(vRw, 'lk', { sealed_key: 'ok', full_key: 'x' }); } catch (_) { rwThrew3 = true; }
+    ok('saveRwRecord with plaintext full_key refused', rwThrew3);
+
+    // delete (revoke parent's writable custody) — idempotent
+    await VaultLinks.deleteRwRecord(vRw, 'lk-1');
+    const rw3 = await VaultLinks.loadRwLinks(vRw);
+    ok('deleteRwRecord removes only the target', !rw3['lk-1'] && !!rw3['lk-2']);
+    const rw4 = await VaultLinks.deleteRwRecord(vRw, 'lk-1');  // already gone
+    ok('deleteRwRecord idempotent (unknown ref ok)', !rw4['lk-1']);
+
+    const vRwRO = makeFakeVault(false);
+    let rwThrew4 = false; try { await VaultLinks.saveRwRecord(vRwRO, 'lk', { sealed_key: 'x' }); } catch (_) { rwThrew4 = true; }
+    ok('saveRwRecord on read-only vault throws', rwThrew4);
+
+    // ro and rw owner records are independent files (no cross-contamination)
+    const vBoth = makeFakeVault(true);
+    await VaultLinks.saveRoRecord(vBoth, 'shared', { type: 'vault', read_key: 'RK', ref_file_id: 'rf', vault_id: 'cv' });
+    await VaultLinks.saveRwRecord(vBoth, 'shared', { vault_id: 'cv', sealed_key: 'SEALED' });
+    const roSide = await VaultLinks.loadRoLinks(vBoth);
+    const rwSide = await VaultLinks.loadRwLinks(vBoth);
+    ok('ro file holds read_key, not sealed_key', roSide['shared'] && roSide['shared'].read_key === 'RK' && !roSide['shared'].sealed_key);
+    ok('rw file holds sealed_key, not read_key', rwSide['shared'] && rwSide['shared'].sealed_key === 'SEALED' && !rwSide['shared'].read_key);
+
     // 8. external resources — type detection + isResourceLink
     eq('detect: youtube → video/youtube', VaultLinks.detectResourceType('https://youtu.be/abc123'), { type: 'video', provider: 'youtube' });
     eq('detect: youtube.com/watch', VaultLinks.detectResourceType('https://www.youtube.com/watch?v=abc'), { type: 'video', provider: 'youtube' });
