@@ -44,6 +44,7 @@ SCRIPTS = [
     'js/adapters/vault-data-source.js',
     'js/adapters/composite-data-source.js',
     'js/lib/links/vault-links.js',
+    'js/lib/links/vault-rw-seal.js',
     'js/components/app-shell/kernel-mounts.js',
     'js/components/app-shell/kernel-broker.js',
     'js/components/app-shell/viv-custody.js',
