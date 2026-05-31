@@ -182,6 +182,13 @@
 
             var res = { status: 'error', preview: null };
             try { res = await PublicPreviewRead.fetchPreview(endpoint, publicId); } catch (_) {}
+            // Tab title reflects the vault on the unlock screen. Set BEFORE the first render
+            // so the user sees the right tab label as soon as the card paints. If a later
+            // mount (vault opened → app launched) sets its own title via _mountApp /
+            // _mountVaultFile, that takes precedence — this is just the unlock-screen default.
+            if (res && res.preview && res.preview.title) {
+                document.title = 'SG/Vault — ' + res.preview.title;
+            }
             var render = function (extra) { card.setState(Object.assign({ status: res.status, preview: res.preview }, common, extra || {})); };
             render();
 
