@@ -77,3 +77,38 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # ── Browser integration tests (~15s): Python pytest, FastAPI test-server + ─
+  # Python http.server + Playwright Chromium + sgit-ai. End-to-end coverage of
+  # live-vault scenarios (deep-link routing, CSS/JS resource loading, etc.) —
+  # the layer that was missing per the user audit. Runs the same pytest cases
+  # that pass locally in ~12s.
+  browser-integration:
+    name: Browser integration (Python + Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5            # healthy run ~15-30s including setup
+    needs: [unit, integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install project (pyproject.toml deps)
+        run: poetry install --no-interaction --no-ansi
+
+      - name: Install Playwright + Chromium
+        run: |
+          poetry run pip install playwright
+          poetry run playwright install --with-deps chromium
+
+      - name: Install sgit-ai CLI (used by the live-vault tests)
+        run: poetry run pip install sgit-ai
+
+      - name: Run browser integration tests
+        run: poetry run pytest tests/integration/vault_ui/browser/ -v --tb=short

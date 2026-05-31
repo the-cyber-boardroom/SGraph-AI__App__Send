@@ -1,6 +1,6 @@
 ---
 name: vault-html-app
-description: Build a polished, self-contained HTML application that lives inside an SG/Send vault and renders from index.html — a photo gallery, strategy microsite, dashboard, report, journal, or any single-page experience. Use this whenever the user wants to create a vault app, build an HTML app for a vault, make a website inside a vault, render a page from a vault, or auto-open a vault as an app — even when they only describe the content (gallery, report, microsite, slide deck, form, presentation) without saying "app". Also use when adapting an existing site to run inside a vault, when the user mentions app.json, App Mode, the SG/App host, the app-shell or app-banner components, or says they want a vault to launch a page when opened. Covers the authoring contract all vault HTML must follow, the data-plus-app project shape that works, the patterns that survive both the SG/App host and the vault browser preview, and the sgit commit-and-push workflow.
+description: Build a polished, self-contained HTML application that lives inside an SG/Send vault and renders from index.html — a photo gallery, strategy microsite, dashboard, report, journal, or any single-page experience. Use this whenever the user wants to create a vault app, build an HTML app for a vault, make a website inside a vault, render a page from a vault, or auto-open a vault as an app — even when they only describe the content (gallery, report, microsite, slide deck, form, presentation) without saying "app". Also use when adapting an existing site to run inside a vault, when the user mentions app.json, App Mode, the SG/App host, the app-shell or app-hud components, hud config (hud.mode, hud.show.*), the sg.* runtime API (sg.vfs, sg.fs, sg.vault, sg.state, sg.history, sg.sync, sg.auth, sg.ui), sg.state device-local preferences, editable URL bar / Home button / Recent pages on the HUD, or says they want a vault to launch a page when opened. Covers the authoring contract all vault HTML must follow, the data-plus-app project shape that works, the patterns that survive both the SG/App host and the vault browser preview, the sgit commit-and-push workflow, and cross-references the canonical window.sg API reference (library/guides/vault-html/AUTHORING.md) and the sg-playwright screenshot guide.
 ---
 
 # Building HTML Apps That Live Inside an SG/Vault
@@ -8,6 +8,24 @@ description: Build a polished, self-contained HTML application that lives inside
 A vault app is a single `index.html` (plus its data and assets) that lives inside an SG/Send vault and renders straight from it. When the vault opens, the app launches: full-screen, talking to the vault through a bridge, with the encrypted blob serving as both the storage and the distribution mechanism. The medium is the message — sharing the vault link *is* sharing the app.
 
 This skill captures the techniques that work, the contract you must follow, and the traps to avoid. It is written from real experience building three production apps (a photo gallery, an event report, a strategy microsite) inside the dev vault server, with one full revision cycle each — the patterns here have all been bug-fixed against actual vault behaviour, not just inferred from docs.
+
+## Canonical references
+
+This file is the agent-facing **how-to** — patterns, traps, sample skeletons. For the
+**authoritative platform reference**, two docs are kept in lockstep with the
+`app-shell`/`app-hud` source code:
+
+- **`library/guides/vault-html/AUTHORING.md`** — the full `window.sg.*` runtime API,
+  every namespace (`vfs`, `fs`, `vault`, `history`, `sync`, `auth`, `ui`, `state`,
+  `loadCss`/`loadJs`, `app`), what the host does automatically (nav, hash anchors,
+  external links, friendly 404, print, consent overlays), and the `app.json`
+  `hud.{mode, show.*}` config schema for the chrome.
+- **`library/skills/sg-playwright-guide.md`** — how to drive `sg-playwright` from a
+  Claude session to screenshot a live vault app (no local Chromium required).
+
+**Cross-check AUTHORING.md before you write any `sg.*` call from this skill.** Some
+samples in this file pre-date 2026-05-30 — when in doubt, the AUTHORING.md is the
+ground truth.
 
 ## When to reach for this
 
@@ -52,6 +70,35 @@ Two more things that follow from the contract:
   try { window.parent && window.parent.postMessage({type:'sg-app-ready'},'*'); } catch(e){}
   ```
   Call it at the end of your build function. Skipping this leaves users staring at a spinner.
+
+## What the SG/App host gives you (so apps don't reinvent it)
+
+The host chrome (`<app-shell>` + `<app-hud>`) does a lot of work for you. **Reach for
+these before building your own version** — apps that duplicate host capabilities tend
+to ship redundant UI that ages out of sync with the platform. As of 2026-05-30:
+
+| Capability | Where it lives | What it means for your app |
+|---|---|---|
+| **Hash anchors** in vault links — `<a href="page.html#section">` | Host click interceptor + parent scroll-to-anchor postMessage | Just write the link; the host strips the fragment for the path lookup, then scrolls the new doc to the anchor on `DOMContentLoaded`. (Used to be broken — 403'd against the static host.) |
+| **External links** — `<a href="https://example.com">` | Iframe sandbox `allow-popups allow-popups-to-escape-sandbox` + click interceptor → `window.open` from inside the gesture | Don't add `target="_blank"`; the host opens it in a new tab with `noopener,noreferrer`. |
+| **Back / forward / Home / Reload / Recent pages** | The `<app-hud>` nav row above your iframe | Don't build app-side back buttons. The HUD has a browser-style toolbar with a parent-side history stack, a recent-pages dropdown (last 15, chronological), and an editable URL bar (click → type vault-absolute path → Enter). |
+| **Friendly 404 / access-denied overlay** | `_renderBrokenLinkOverlay` in `app-shell.js` | A click on a missing or `.vault/**`-floored path lands on a host-rendered dead-end page with a ‹ back arrow. You don't need to handle broken-link routing. |
+| **Print** | HUD "🖨 Print" button → bridge RPC → DOM snapshot with `blob:`→`data:` inlining → `SgPrint.printHtml` | Hide it via `hud.show.print: false` if your app shouldn't be printed; otherwise it just works. (Restored 2026-05-30 — was broken under null-origin srcdoc.) |
+| **Toast notifications** | `sg.ui.message(text, type, opts)` → `<app-hud>` toast row | Don't build your own notification UI. The HUD has one. |
+| **Consent prompts** for grant-gated verbs (`sg.fs.*`, `sg.vault.*`) | Host HUD overlay + `sg.ui.requestPermission(verb, path)` | Apps that declare permissions in `app.json` get the consent UI for free. Don't build a homegrown "are you sure?" modal. |
+| **Device-local prefs** — theme, panel widths, "don't show again" | `sg.state.{get,set,remove,clear,keys}` (NEW 2026-05-30) | Namespaced top-level-kernel `localStorage`, 64 KiB/value. Survives reload, NOT a vault write. For vault-persistent state use `sg.fs.write('.app-state/...')` instead. |
+| **Hide / dim the chrome** | `app.json` `hud.mode: "minimal" \| "hidden"` (NEW 2026-05-30) | Declare in `app.json`; don't try to suppress the HUD from inside the iframe (it's not reachable from your DOM and you shouldn't). See AUTHORING.md → "Configuring the host chrome". |
+
+### Heads-up: `fetch()` of vault paths is NOT patched
+
+A common mistake: writing `fetch('content.json')` and expecting the bridge to route it.
+It doesn't — `window.fetch` is **not** patched. The relative URL resolves against the
+iframe's opaque blob origin, finds nothing, and 404s.
+
+The right call is `await sg.vfs.readText('content.json')` (or `.read` for binary). The
+inlined `FALLBACK` pattern below works as a *fallback* (catches the 404 and uses the
+embedded copy) but the "fetch-first, fallback second" sample in this skill is a
+**fallback chain**, not a "fetch works" claim. AUTHORING.md is the ground truth here.
 
 ## The project shape that works
 
@@ -218,7 +265,17 @@ The full loop, condensed:
    ```
    Note the token position — `sgit --token X push` does not work in the version I tested; it must be `sgit push --token X`.
 
-9. **Get the user to eyeball it.** You cannot render the page yourself in most sandboxes (Chromium downloads are typically blocked). Ask the user to hard-refresh the vault URL and screenshot anything that looks wrong. Static validation catches contract violations and JS errors but cannot tell you whether the grid actually looks good — that needs human eyes.
+9. **Screenshot it yourself with `sg-playwright`, then ask the user to confirm.** The
+   long-standing assumption that agents "can't render the page" is **no longer
+   universally true** — when the operator has spun up an `sg-playwright` service,
+   you can drive a real Chromium over HTTP with no local install (`library/skills/sg-playwright-guide.md`
+   is the operator-and-agent guide). Take a screenshot of the live vault URL, eyeball
+   it, fix obvious layout / contrast / overflow issues yourself, and **then** hand to
+   the user for a human-eyes pass on subjective quality (does the grid actually look
+   good, are the captions readable, etc.). If `sg-playwright` is not available in this
+   session, fall back to the older flow: ask the user to hard-refresh and screenshot
+   anything that looks wrong. Static validation catches contract violations and JS
+   errors but not visual quality.
 
 ## A working `index.html` skeleton
 
@@ -326,11 +383,10 @@ That single paragraph turns "here are some photos" into "and by the way, here's 
 
 ## Notes on what this skill doesn't cover yet
 
-This is a first pass, and several things should grow into bundled reference files as we iterate:
-
 - **`_page.json` layouts** for content that isn't a single-page app — the `create-vault-content` skill covers that; cross-reference rather than duplicate.
-- **The full `window.sg` runtime API** (`sg.vfs.read`, `sg.vfs.list`, `sg.vfs.write`, `sg.app.writable`, `sg.app.selfPath`). The skeleton above doesn't need them, but a write-back-to-vault app (journal, editor) does.
-- **Service-worker upgrade path.** When the vault ships a service worker, the declarative restrictions in the contract lift — `<link>` and `<script src>` against vault paths will start working. Until then, the JS-only approach is what's safe.
+- ~~**The full `window.sg` runtime API.**~~ **Now covered by `library/guides/vault-html/AUTHORING.md`** — that doc is the authoritative reference for every namespace (`vfs`, `fs`, `vault`, `history`, `sync`, `auth`, `ui`, `state`, `loadCss`/`loadJs`, `app`), with shapes, return types, and consent semantics. Don't duplicate it here.
+- **Service-worker upgrade path.** When the vault ships a service worker, the declarative restrictions in the contract lift — `<link>` and `<script src>` against vault paths will start working. Until then, the JS-only approach is what's safe. (See `library/guides/vault-html/service-worker-future.md`.)
 - **Multi-app vaults** (more than one `app.json` / multiple entries). Not yet shipped in the version I worked against.
+- ~~**Screenshotting the live app for visual review.**~~ **Now covered by `library/skills/sg-playwright-guide.md`** — drive a real Chromium over HTTP, no local install. Use it before falling back to "ask the user to screenshot".
 
 When any of those become relevant, add a reference file and link to it from here rather than expanding the body.

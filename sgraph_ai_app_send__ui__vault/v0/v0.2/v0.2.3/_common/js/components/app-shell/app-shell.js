@@ -34,16 +34,47 @@
             this._iframeStatus    = 'loading';
             this._resourcesLoaded = [];
             this._t               = {};
+            // Nav history for the HUD back/forward arrows. Entries are "path[#fragment]"
+            // strings (e.g. "scenarios/graph.html#c-adequacy"). _navIndex points at the
+            // current entry; -1 means no navigation yet.
+            this._navHistory      = [];
+            this._navIndex        = -1;
         }
 
         connectedCallback() {
             this._resetConsentsHandler = () => this._resetConsents();
             document.addEventListener('app-hud:reset-consents', this._resetConsentsHandler);
+            this._printHandler = () => this._onPrint();
+            document.addEventListener('app-hud:print', this._printHandler);
+            // HUD nav row → app-shell. The HUD never owns history; it dispatches actions
+            // and reads back state via 'app-nav:change' events (emitted by _emitNavChange).
+            this._navHudHandler = (ev) => {
+                var action = ev && ev.detail && ev.detail.action;
+                if (action === 'back')    this._navBack();
+                if (action === 'forward') this._navForward();
+                if (action === 'reload')  this._navReload();
+                if (action === 'home')    this._navHome();
+                if (action === 'jump' && ev.detail.path) {
+                    // Recent-pages menu paths are vault-absolute (stored from history).
+                    this._navigateToPath(ev.detail.path, { pushHistory: true, alreadyResolved: true });
+                }
+                if (action === 'exit')    this._exitApp();
+            };
+            document.addEventListener('app-hud:nav', this._navHudHandler);
             this._init();
+        }
+
+        // Escape-pill action when HUD is in 'hidden' mode. Sends the user back to the vault
+        // file browser (same destination as the chrome row's 'Open Vault' link).
+        _exitApp() {
+            var base = window.location.pathname.split('/en-gb/')[0];
+            window.location.assign(base + '/en-gb/vault/');
         }
 
         disconnectedCallback() {
             if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
+            if (this._printHandler) { document.removeEventListener('app-hud:print', this._printHandler); this._printHandler = null; }
+            if (this._navHudHandler) { document.removeEventListener('app-hud:nav', this._navHudHandler); this._navHudHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -151,6 +182,13 @@
 
             var res = { status: 'error', preview: null };
             try { res = await PublicPreviewRead.fetchPreview(endpoint, publicId); } catch (_) {}
+            // Tab title reflects the vault on the unlock screen. Set BEFORE the first render
+            // so the user sees the right tab label as soon as the card paints. If a later
+            // mount (vault opened → app launched) sets its own title via _mountApp /
+            // _mountVaultFile, that takes precedence — this is just the unlock-screen default.
+            if (res && res.preview && res.preview.title) {
+                document.title = 'SG/Vault — ' + res.preview.title;
+            }
             var render = function (extra) { card.setState(Object.assign({ status: res.status, preview: res.preview }, common, extra || {})); };
             render();
 
@@ -279,7 +317,11 @@
             // Notify HUD
             this.dispatchEvent(new CustomEvent('app-shell:ready', {
                 bubbles: true, composed: true,
-                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO, perm: this._perm }
+                detail: {
+                    vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey,
+                    isRO: isRO, perm: this._perm,
+                    hudCfg: (appJson && appJson.hud) || null   // see AppHud._resolveHudCfg
+                }
             }));
 
             // Auth intercept (auth.required with no cached key and no preset key)
@@ -325,33 +367,40 @@
 
         async _continue(appJson) {
             // A specific file was requested ("Open as App" on a file, via /#key|app:path or the
-            // legacy /en-gb/app#path) — honour it OVER the vault's default app. Previously the
-            // deep-link was only read in the no-app.json branch, so any vault WITH an app.json
-            // always opened its default entry and the requested file was silently dropped.
+            // direct /en-gb/app/#path link form) — read it now and clear so a reload starts fresh.
             var deepLink = '';
             try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
             try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
             var deepPath = deepLink.indexOf('app:') === 0 ? deepLink.slice(4) : '';
 
-            // Exception: if the requested file IS the app.json entry, fall through to the full app
-            // mount so its declared resources (css/js) load — not the bare file.
-            if (deepPath && !(appJson && appJson.entry && deepPath === appJson.entry)) {
-                await this._mountVaultFile(deepPath);
-                return;
-            }
+            // The decision (deep-link × app.json present × deep-link is HTML) is delegated to
+            // AppNavHelpers.decideMountStrategy — pure, unit-tested. **The bug it fixes**
+            // (2026-05-31): a deep-link to ANY HTML file other than the default entry used to
+            // fall through to _mountVaultFile (bare file, no app.json resources loaded), so
+            // /en-gb/app/#patient/index.html rendered unstyled. Now an HTML deep-link in an
+            // app vault routes through _mountApp with the deep-link overriding appJson.entry,
+            // so the app's CSS/JS still load.
+            var decision = AppNavHelpers.decideMountStrategy({ deepPath: deepPath, appJson: appJson });
 
-            if (!appJson) {
-                // No default app and no file path — open the vault UI.
-                // App Mode lives on /en-gb/app, not on the vault page.
+            if (decision.strategy === 'redirect') {
+                // No default app and no file path — App Mode lives on /en-gb/app, not the
+                // vault page; bounce there so the user can browse files instead.
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
             }
+            if (decision.strategy === 'file') {
+                await this._mountVaultFile(decision.filePath);
+                return;
+            }
+            // decision.strategy === 'app' — appJson may be the original or a deep-link-
+            // overridden clone with .entry set to the requested HTML file.
+            var effectiveAppJson = decision.appJson;
             this._setStatus('Loading resources…');
-            var resourcesData = await this._fetchResources(appJson);
+            var resourcesData = await this._fetchResources(effectiveAppJson);
             this._t.resourcesLoaded = performance.now();
             this._emitVaultEvent('resources-loaded', { label: 'Resources pre-fetched', cssCount: resourcesData.css.length, jsCount: resourcesData.js.length, ms: Math.round(this._t.resourcesLoaded - (this._t.appJsonFetched || this._t.treeLoaded)) });
-            await this._mountApp(appJson, resourcesData);
+            await this._mountApp(effectiveAppJson, resourcesData);
         }
 
 
@@ -764,6 +813,56 @@
             return { unlinked: true };
         }
 
+        // Print the running app (HUD print button).
+        //
+        // The app iframe is sandboxed with allow-same-origin, so the parent can read
+        // iframe.contentDocument. We clone the live DOM, then rewrite every blob: URL
+        // to a data: URI — blob URLs are scoped to the iframe's window and would die
+        // in the print window, so they must be inlined. The result is a self-contained
+        // Print is now an RPC into the iframe: ViV Phase 3 flipped app frames to null-origin
+        // srcdoc, so iframe.contentDocument throws SecurityError from the parent (the previous
+        // implementation worked under same-origin blob: frames and broke silently after Phase 3
+        // — Commit A hid the button by default; this restores it).
+        //
+        // The iframe-side listener (see _buildVfsBridgeScript: __sgPrintReq) does the DOM clone,
+        // the blob:→data: URL inlining (which has to happen there anyway, because the blob URLs
+        // belong to the iframe and would dangle in a separate print window), and the <script>
+        // stripping. The parent just kicks it off, awaits the snapshot, and hands the HTML to
+        // SgPrint.printHtml.
+        async _onPrint() {
+            try {
+                if (typeof window.SgPrint === 'undefined' || typeof SgPrint.printHtml !== 'function') {
+                    console.error('[app-shell] SgPrint not loaded — add sg-print.js to the app page');
+                    return;
+                }
+                var iframe = this._iframeEl;
+                if (!iframe || !iframe.contentWindow) {
+                    console.warn('[app-shell] print: no iframe to request snapshot from');
+                    return;
+                }
+                var id   = (Math.random() * 1e9 | 0).toString(36) + Date.now().toString(36);
+                var html = await new Promise(function (res, rej) {
+                    var timer = setTimeout(function () {
+                        window.removeEventListener('message', h);
+                        rej(new Error('print snapshot timed out (5s)'));
+                    }, 5000);
+                    function h(e) {
+                        if (!e.data || e.data.__sgPrintReply !== id) return;
+                        clearTimeout(timer);
+                        window.removeEventListener('message', h);
+                        if (e.data.ok) res(e.data.html);
+                        else rej(new Error(e.data.err || 'print snapshot failed'));
+                    }
+                    window.addEventListener('message', h);
+                    iframe.contentWindow.postMessage({ __sgPrintReq: id }, '*');
+                });
+                var title = (this._appJson && this._appJson.title) || (this._vault && this._vault.name) || 'App';
+                SgPrint.printHtml(html, title);
+            } catch (err) {
+                console.error('[app-shell] print failed:', err);
+            }
+        }
+
         // ── ViV Phase 2: mount / unmount / mounts ─────────────────────────────────────
         // Spawn a child kernel (null-origin srcdoc iframe) bound to another vault, fed
         // its secrets over a SecureChannel. After mount, sg.vfs.* calls with the prefix
@@ -1169,7 +1268,7 @@
             // localStorage / window.parent / ambient-fetch vault paths; every vault
             // access goes through the postMessage bridge (sg.*), which never needed it.
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms';
+            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
             iframe.srcdoc      = injected;
             iframe.addEventListener('load', () => {
@@ -1184,6 +1283,15 @@
             this.shadowRoot.appendChild(iframe);
 
             this._setupVfsBridgeHandlers(iframe, this._dataSource);
+
+            // Seed nav history with this entry so the HUD back/forward arrows have an origin.
+            // Subsequent in-vault link clicks push onto this stack via _pushNavHistory.
+            // _appEntryPath is remembered separately so the Home button can jump back to
+            // the app's root regardless of how deep nav has wandered.
+            this._appEntryPath = entry.path;
+            this._navHistory   = [entry.path];
+            this._navIndex     = 0;
+            this._emitNavChange();
         }
 
         // _page.json: render via PageLayoutRenderer.
@@ -1235,7 +1343,7 @@
 
             // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms';
+            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
             iframe.srcdoc      = html;
             iframe.addEventListener('load', () => {
@@ -1289,7 +1397,7 @@
                 var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms';
+                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
                 iframe.srcdoc      = injected;
                 iframe.addEventListener('load', () => {
@@ -1330,7 +1438,7 @@
 
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms';
+                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
                 iframe.srcdoc      = html;
                 iframe.addEventListener('load', () => {
@@ -1356,6 +1464,184 @@
                 '</div>';
         }
 
+        // ── In-app navigation (HUD back/forward + bridge nav requests) ────────────────
+        //
+        // The iframe's click interceptor (see _buildVfsBridgeScript below) catches every
+        // in-vault link and posts {__sgVfsNavReq: href} to the parent. The message handler
+        // hands it to `_navigateToPath`, which resolves the path against the current dir,
+        // pushes a history entry, swaps the srcdoc, and (if the href had a #fragment) tells
+        // the new doc to scroll to it via __sgVfsScrollToHash. Back/forward arrows on the
+        // HUD bypass the bridge entirely and re-issue from history with pushHistory:false.
+
+        _navigateToPath(href, opts) {
+            opts = opts || {};
+            var pushHistory     = (opts.pushHistory !== false);
+            // History entries (back/forward, home) carry already-resolved vault-absolute
+            // paths — re-running _resolvePath against the *current* this._htmlDir would
+            // double-prefix them (e.g. back from "shared/test-lab/" to "home/index.html"
+            // would resolve to "shared/test-lab/home/index.html", which doesn't exist).
+            // The bridge click-interceptor path is always relative-to-current-dir and so
+            // does need resolution — that's the default (alreadyResolved !== true).
+            var alreadyResolved = (opts.alreadyResolved === true);
+            var iframeEl   = this._iframeEl;
+            var dataSource = this._dataSource;
+            if (!iframeEl || !dataSource) return;
+
+            // Delegates the parsing + resolution to AppNavHelpers so the two pinned
+            // regression rules (hash-link strip, path-doubling alreadyResolved) live in
+            // ONE place with characterization tests. See test__app_shell_nav_helpers.js.
+            var nav      = AppNavHelpers.resolveNavigation({
+                href:            href,
+                htmlDir:         this._htmlDir,
+                alreadyResolved: alreadyResolved
+            });
+            var resolved = nav.resolved;
+            var fragment = nav.fragment;
+            if (AppPermissions.isFloor('read', resolved)) {
+                console.warn('[app-shell] nav blocked (protected path):', resolved);
+                this._renderBrokenLinkOverlay(resolved, 'blocked');
+                if (pushHistory) this._pushNavHistory(resolved);
+                this._emitNavChange();
+                return;
+            }
+            var match = this._findEntry(dataSource.getFileList(), resolved);
+            if (!match) {
+                console.warn('[app-shell] nav not found:', resolved);
+                this._renderBrokenLinkOverlay(resolved, 'missing');
+                if (pushHistory) this._pushNavHistory(resolved);
+                this._emitNavChange();
+                return;
+            }
+            var self = this;
+            dataSource.getFileBytes(match.path).then(function (buf) {
+                var htmlText = new TextDecoder().decode(buf);
+                self._htmlDir = match.path.includes('/')
+                    ? match.path.substring(0, match.path.lastIndexOf('/') + 1) : '';
+                var navBridge = self._buildVfsBridgeScript(match.path);
+                // Phase 3 flipped app frames to null-origin `srcdoc` (ee6f4995). srcdoc
+                // OVERRIDES src, so we must REPLACE srcdoc — not assign a blob: src.
+                var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: navBridge });
+                iframeEl.removeAttribute('src');
+                iframeEl.srcdoc = injected;
+                var entry = match.path + (fragment ? '#' + fragment : '');
+                if (pushHistory) self._pushNavHistory(entry);
+                // Scroll-to-anchor: reach into the null-origin iframe via postMessage. The
+                // bridge script's __sgVfsScrollToHash listener applies it on DOMContentLoaded.
+                if (fragment) {
+                    var onLoad = function () {
+                        iframeEl.removeEventListener('load', onLoad);
+                        try { iframeEl.contentWindow.postMessage({ __sgVfsScrollToHash: fragment }, '*'); } catch (_) {}
+                    };
+                    iframeEl.addEventListener('load', onLoad);
+                }
+                self._emitNavChange();
+                console.log('[app-shell] nav →', entry);
+            }).catch(function (err) { console.error('[app-shell] nav fetch failed:', err); });
+        }
+
+        _pushNavHistory(entry) {
+            // Truncate any forward entries — the new nav replaces them (browser convention).
+            if (this._navIndex < this._navHistory.length - 1) {
+                this._navHistory.length = this._navIndex + 1;
+            }
+            // Don't push a duplicate of the current entry (refresh shouldn't grow history).
+            var last = this._navHistory[this._navHistory.length - 1];
+            if (last !== entry) this._navHistory.push(entry);
+            this._navIndex = this._navHistory.length - 1;
+        }
+
+        _navBack() {
+            if (this._navIndex <= 0) return false;
+            this._navIndex -= 1;
+            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false, alreadyResolved: true });
+            return true;
+        }
+
+        _navForward() {
+            if (this._navIndex >= this._navHistory.length - 1) return false;
+            this._navIndex += 1;
+            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false, alreadyResolved: true });
+            return true;
+        }
+
+        _navReload() {
+            var entry = this._navHistory[this._navIndex];
+            if (!entry) return false;
+            this._navigateToPath(entry, { pushHistory: false, alreadyResolved: true });
+            return true;
+        }
+
+        // Jump back to the app's entry file (from app.json — captured at _mountApp time).
+        // Pushes a new history entry rather than rewinding the stack — going Home from
+        // page-deep-in-the-tree shouldn't erase your forward stack the way Back/Forward do.
+        _navHome() {
+            if (!this._appEntryPath) return false;
+            // No-op if we're already on Home (don't pollute history with duplicates).
+            if (this._currentNavPath() === this._appEntryPath) return true;
+            this._navigateToPath(this._appEntryPath, { pushHistory: true, alreadyResolved: true });
+            return true;
+        }
+
+        _canNavBack()    { return this._navIndex > 0; }
+        _canNavForward() { return this._navIndex < this._navHistory.length - 1; }
+        _currentNavPath() { return this._navHistory[this._navIndex] || ''; }
+
+        // Notify the HUD that nav state has changed so it can update arrows + the address bar.
+        _emitNavChange() {
+            var cur  = this._currentNavPath();
+            var home = this._appEntryPath || '';
+            document.dispatchEvent(new CustomEvent('app-nav:change', {
+                bubbles: true, composed: true,
+                detail: {
+                    path:       cur,
+                    canBack:    this._canNavBack(),
+                    canForward: this._canNavForward(),
+                    canHome:    !!home && (cur !== home),
+                    historyLen: this._navHistory.length
+                }
+            }));
+        }
+
+        // Friendly dead-end page for navigations that can't be served. Two reasons:
+        //   'missing'  → the path is not in the vault file list at all
+        //   'blocked'  → the path is in a protected segment (AppPermissions floor)
+        // Rendered as a srcdoc so the user can hit the HUD's ‹ back arrow to escape.
+        _renderBrokenLinkOverlay(missingPath, reason) {
+            var iframe = this._iframeEl;
+            if (!iframe) return;
+            var esc = function (s) {
+                return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            };
+            var isBlocked = (reason === 'blocked');
+            var title  = isBlocked ? 'Access denied' : 'Page not found in this vault';
+            var icon   = isBlocked ? '🔒' : '🔗';
+            var detail = isBlocked
+                ? 'The app tried to navigate to a protected path. The platform blocks reads to vault internals from app code.'
+                : 'The link points to a file that does not exist in this vault. The author may have renamed or moved it.';
+            var html = ''
+              + '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
+              + '<style>'
+              +   'html,body{margin:0;padding:0;}'
+              +   'body{background:#0d1117;color:#e6e6e6;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
+              +     'display:flex;align-items:center;justify-content:center;min-height:100vh;}'
+              +   '.err{text-align:center;max-width:540px;padding:2rem 2.5rem;}'
+              +   '.ico{font-size:3rem;margin:0 0 0.6rem;opacity:0.75;line-height:1;}'
+              +   'h1{color:' + (isBlocked ? '#f0ad4e' : '#ff8a8a') + ';font-size:1.15rem;font-weight:600;margin:0 0 0.5rem;}'
+              +   'p{color:rgba(255,255,255,0.62);font-size:0.9rem;line-height:1.55;margin:0.4rem 0;}'
+              +   'code{background:rgba(255,255,255,0.08);padding:0.18rem 0.55rem;border-radius:3px;'
+              +     'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.82em;word-break:break-all;color:#fff;}'
+              +   '.hint{color:rgba(255,255,255,0.38);font-size:0.78rem;margin-top:1.3rem;}'
+              + '</style></head><body><div class="err">'
+              + '<div class="ico">' + icon + '</div>'
+              + '<h1>' + esc(title) + '</h1>'
+              + '<p>' + esc(detail) + '</p>'
+              + '<p><code>' + esc(missingPath) + '</code></p>'
+              + '<p class="hint">Use the &lsaquo; back arrow in the toolbar to return to where you came from.</p>'
+              + '</div></body></html>';
+            iframe.removeAttribute('src');
+            iframe.srcdoc = html;
+        }
+
         // ── VFS bridge (injected into iframe) ─────────────────────────────────────────
 
         _buildVfsBridgeScript(currentPath) {
@@ -1379,18 +1665,82 @@
                 'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
                 // Body-hidden self-check: if the app never makes its body visible, surface a
                 // hint (mirrors the old same-origin display:none probe, now from inside).
-                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},0);});' +
+                //
+                // Delay raised from 0 → 2500 ms (2026-05-31): apps with a typical "hidden
+                // until init JS runs" reveal pattern (Private Health Score is one) hit the
+                // 0-ms check before their reveal had a chance to fire, so the banner showed
+                // a false-positive even when the page later rendered fine. 2.5 s is well past
+                // every reasonable init time but short enough to still be useful when the app
+                // GENUINELY never reveals. Apps that take >2.5s to first paint should signal
+                // sg-app-ready (see AUTHORING.md) — the banner reflects a real problem then.
+                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},2500);});' +
 
-                // Nav intercept: relative .html links → postMessage to parent
+                // Nav intercept: relative .html/.htm links → postMessage to parent.
+                // The extension check runs on the path portion only (strip ?query / #frag) so
+                // "page.html#section" still routes through the bridge — otherwise the browser
+                // would do a real GET, the static host 403s, and the iframe lands on a dead end.
+                // The ORIGINAL href (with the fragment) is forwarded so the parent can scroll
+                // to the anchor inside the new srcdoc after navigation.
+                //
+                // External links (http://, https://, //) are opened in a NEW TAB via window.open.
+                // The iframe's sandbox now includes allow-popups + allow-popups-to-escape-sandbox,
+                // so the new window is unrestricted. Doing it from inside the iframe (synchronous
+                // within the click gesture) avoids the popup-blocker hit that a postMessage round-
+                // trip to the parent would incur — postMessage is async, the gesture is lost, and
+                // window.open() in the parent would be blocked.
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");if(!a)return;' +
                   'var h=a.getAttribute("href");if(!h)return;' +
-                  'if(h.startsWith("http")||h.startsWith("//")||h.startsWith("#")||h.startsWith("mailto:"))return;' +
-                  'if(h.endsWith(".html")||h.endsWith(".htm")){' +
+                  'if(h.startsWith("#")||h.startsWith("mailto:"))return;' +
+                  'if(h.startsWith("http")||h.startsWith("//")){' +
+                    'e.preventDefault();e.stopPropagation();' +
+                    'try{window.open(h,"_blank","noopener,noreferrer");}catch(_){}' +
+                    'return;' +
+                  '}' +
+                  'var hp=h.split("?")[0].split("#")[0];' +
+                  'if(hp.endsWith(".html")||hp.endsWith(".htm")){' +
                     'e.preventDefault();e.stopPropagation();' +
                     'window.parent.postMessage({__sgVfsNavReq:h},"*");' +
                   '}' +
                 '},true);' +
+
+                // Scroll-to-anchor after navigation: parent posts {__sgVfsScrollToHash:"section"}
+                // (no leading '#') once the new srcdoc has loaded. Null-origin frames can't be
+                // scripted by the parent directly, so this listener inside the iframe is how
+                // links like "page.html#section" land on the right element after the swap.
+                'window.addEventListener("message",function(e){' +
+                  'if(!e.data||typeof e.data.__sgVfsScrollToHash!=="string")return;' +
+                  'var frag=e.data.__sgVfsScrollToHash;if(!frag)return;' +
+                  'var apply=function(){try{var el=document.getElementById(frag);if(el){el.scrollIntoView();return;}location.hash="#"+frag;}catch(_){}};' +
+                  'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply);else apply();' +
+                '});' +
+
+                // Print snapshot RPC. ViV Phase 3 flipped app frames to null-origin srcdoc, which
+                // means the parent can't read iframe.contentDocument any more (SecurityError). So
+                // print now runs INSIDE the iframe: the parent posts {__sgPrintReq: id}, this
+                // listener clones documentElement, fetches every blob: url (img.src and stylesheet
+                // link.href) and inlines them as data: URIs (so the print window is self-contained
+                // — blob: URLs created in this iframe wouldn't survive a window.open anyway),
+                // strips <script> tags (they would error or hang in the print preview with no
+                // bridge), and posts the resulting HTML back via {__sgPrintReply: id, ok, html|err}.
+                'window.addEventListener("message",function(e){' +
+                  'if(!e.data||!e.data.__sgPrintReq)return;' +
+                  'var id=e.data.__sgPrintReq;' +
+                  '(async function(){' +
+                    'try{' +
+                      'var clone=document.documentElement.cloneNode(true);' +
+                      'function _b2d(u){return fetch(u).then(function(r){return r.blob();}).then(function(b){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.onerror=function(){rej(fr.error);};fr.readAsDataURL(b);});});}' +
+                      'var imgs=Array.prototype.slice.call(clone.querySelectorAll(\'img[src^="blob:"]\'));' +
+                      'var lnks=Array.prototype.slice.call(clone.querySelectorAll(\'link[rel="stylesheet"][href^="blob:"]\'));' +
+                      'await Promise.all(imgs.map(async function(g){try{g.src=await _b2d(g.src);}catch(_){}}).concat(lnks.map(async function(l){try{l.href=await _b2d(l.href);}catch(_){}})));' +
+                      'clone.querySelectorAll("script").forEach(function(s){s.remove();});' +
+                      'var html="<!DOCTYPE html>\\n"+clone.outerHTML;' +
+                      'window.parent.postMessage({__sgPrintReply:id,ok:true,html:html},"*");' +
+                    '}catch(err){' +
+                      'window.parent.postMessage({__sgPrintReply:id,ok:false,err:String(err&&err.message||err)},"*");' +
+                    '}' +
+                  '})();' +
+                '});' +
 
                 // Core VFS bridge
                 '(function(){' +
@@ -1500,6 +1850,23 @@
                       'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");},' +
                       // ask the user (on the HUD) to grant a declared-but-consent-gated verb; resolves {granted}
                       'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});}' +
+                    '},' +
+                    // sg.state.* — device-local preferences (theme, panel widths, "don't show again"
+                    // dismissals). Backed by the TOP-LEVEL kernel's localStorage, namespaced as
+                    // sg-app-state:<vaultId>:<appEntryPath>:<key>. Values are JSON-encoded, capped at
+                    // 64 KiB per key. Apps that want VAULT-PERSISTENT state (travels with the vault,
+                    // visible to other devices opening the same vault key) should continue to use
+                    // sg.fs.write(".app-state/...") directly. **Doctrine deviation note:** the ViV
+                    // impl pack's repair checklist (item #1) prescribes sg.vfs("app-state/<key>.json");
+                    // we deliberately chose localStorage for the device-local-prefs use case to avoid
+                    // a vault write on every theme toggle. Documented in
+                    // team/comms/changelog/05/30/changelog__app-state-print-rpc.md.
+                    'state:{' +
+                      'get:function(key){return _sgCmd("state",{action:"get",key:String(key||"")});},' +
+                      'set:function(key,value){return _sgCmd("state",{action:"set",key:String(key||""),value:value});},' +
+                      'remove:function(key){return _sgCmd("state",{action:"remove",key:String(key||"")});},' +
+                      'clear:function(){return _sgCmd("state",{action:"clear"});},' +
+                      'keys:function(){return _sgCmd("state",{action:"keys"});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -1641,28 +2008,11 @@
                 var fileList = dataSource.getFileList();
 
                 // ── Navigation ────────────────────────────────────────────────
+                // All in-vault link clicks land here. The body is in `_navigateToPath` so the
+                // HUD back/forward arrows can re-issue navigations without going through the
+                // bridge (they call `_navBack` / `_navForward` directly on the AppShell instance).
                 if (e.data.__sgVfsNavReq) {
-                    var navHref     = e.data.__sgVfsNavReq;
-                    var navResolved = self._resolvePath(self._htmlDir, navHref);
-                    if (AppPermissions.isFloor('read', navResolved)) { console.warn('[app-shell] nav blocked (protected path):', navResolved); return; }
-                    var navMatch    = self._findEntry(fileList, navResolved);
-                    if (!navMatch) { console.warn('[app-shell] nav not found:', navResolved); return; }
-                    dataSource.getFileBytes(navMatch.path).then(function (buf) {
-                        var htmlText = new TextDecoder().decode(buf);
-                        var newDir   = navMatch.path.includes('/')
-                            ? navMatch.path.substring(0, navMatch.path.lastIndexOf('/') + 1) : '';
-                        self._htmlDir  = newDir;
-                        var navBridge  = self._buildVfsBridgeScript(navMatch.path);
-                        // Phase 3 flipped app frames to null-origin `srcdoc` (see _mountVaultFile).
-                        // An iframe's `srcdoc` attribute OVERRIDES `src`, so once the frame was
-                        // mounted via srcdoc, assigning a blob: `src` here was silently ignored —
-                        // in-vault links did nothing (regression). Navigation must REPLACE srcdoc,
-                        // built the same way as the initial mount (AppFrameBootstrap, kind:'html').
-                        var injected   = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: navBridge });
-                        iframeEl.removeAttribute('src');
-                        iframeEl.srcdoc = injected;
-                        console.log('[app-shell] nav →', navMatch.path);
-                    }).catch(function (err) { console.error('[app-shell] nav fetch failed:', err); });
+                    self._navigateToPath(e.data.__sgVfsNavReq, { pushHistory: true });
                     return;
                 }
 
@@ -1976,6 +2326,73 @@
                         return;
                     }
 
+                    // sg.state.* — device-local prefs in the top-level kernel's localStorage.
+                    // See the bridge-side sg.state JSDoc for the rationale (deliberate doctrine
+                    // deviation from the ViV impl pack's sg.vfs('app-state/*') prescription).
+                    // Namespace: sg-app-state:<vaultId>:<entryPath>:<key>.
+                    //   vaultId  → vault._vaultId (a derived non-secret identifier; NOT the
+                    //              vault key, which is sensitive — never put that in localStorage).
+                    //   entryPath → self._appEntryPath (the app's entry HTML path, e.g.
+                    //               "home/index.html").
+                    // Operations are wrapped in try/catch so a single quota/parse error doesn't
+                    // poison the bridge handler.
+                    if (e.data.__sgCmdType === 'state') {
+                        var sAction = e.data.action;
+                        var vId     = (vault && vault._vaultId) ? String(vault._vaultId) : 'unknown';
+                        var ent     = self._appEntryPath || '';
+                        var ns      = 'sg-app-state:' + vId + ':' + ent + ':';
+                        try {
+                            if (sAction === 'get') {
+                                var gk  = String(e.data.key || '');
+                                var raw = window.localStorage.getItem(ns + gk);
+                                cmdReply(true, raw === null ? null : JSON.parse(raw));
+                                return;
+                            }
+                            if (sAction === 'set') {
+                                var sk  = String(e.data.key || '');
+                                var sv  = (e.data.value === undefined) ? null : e.data.value;
+                                var enc = JSON.stringify(sv);
+                                // 64 KiB per key is plenty for prefs; keeps a runaway app from
+                                // exhausting localStorage (which is per-origin, shared with the
+                                // vault browser and any other apps on this domain).
+                                if (enc.length > 65536) { cmdReply(false, null, 'value too large (max 64 KiB)'); return; }
+                                window.localStorage.setItem(ns + sk, enc);
+                                cmdReply(true, { ok: true });
+                                return;
+                            }
+                            if (sAction === 'remove') {
+                                window.localStorage.removeItem(ns + String(e.data.key || ''));
+                                cmdReply(true, { ok: true });
+                                return;
+                            }
+                            if (sAction === 'clear') {
+                                // Snapshot keys first — mutating localStorage during iteration
+                                // shifts indices and can skip entries.
+                                var toRm = [];
+                                for (var ci = 0; ci < window.localStorage.length; ci++) {
+                                    var ck = window.localStorage.key(ci);
+                                    if (ck && ck.indexOf(ns) === 0) toRm.push(ck);
+                                }
+                                toRm.forEach(function (k) { window.localStorage.removeItem(k); });
+                                cmdReply(true, { ok: true, removed: toRm.length });
+                                return;
+                            }
+                            if (sAction === 'keys') {
+                                var ks = [];
+                                for (var ki = 0; ki < window.localStorage.length; ki++) {
+                                    var kk = window.localStorage.key(ki);
+                                    if (kk && kk.indexOf(ns) === 0) ks.push(kk.slice(ns.length));
+                                }
+                                cmdReply(true, ks);
+                                return;
+                            }
+                            cmdReply(false, null, 'Unsupported state action: ' + sAction);
+                        } catch (sErr) {
+                            cmdReply(false, null, (sErr && sErr.message) || 'state op failed');
+                        }
+                        return;
+                    }
+
                     if (e.data.__sgCmdType === 'auth') {
                         var authAction = e.data.action;
                         if (authAction === 'setKey') {
@@ -2055,16 +2472,10 @@
         // ── Path helpers ──────────────────────────────────────────────────────────────
 
         _resolvePath(base, href) {
-            if (href.startsWith('/')) return href.slice(1);
-            if (!base)               return href;
-            var parts    = (base + href).split('/');
-            var resolved = [];
-            for (var i = 0; i < parts.length; i++) {
-                var p = parts[i];
-                if (p === '..')  { if (resolved.length) resolved.pop(); }
-                else if (p !== '.') { resolved.push(p); }
-            }
-            return resolved.join('/');
+            // Pure path math — delegates to AppNavHelpers so the rules are unit-testable
+            // (see test__app_shell_nav_helpers.js). Kept as a method so existing callers
+            // don't change.
+            return AppNavHelpers.resolvePath(base, href);
         }
 
         _findEntry(fileList, path) {

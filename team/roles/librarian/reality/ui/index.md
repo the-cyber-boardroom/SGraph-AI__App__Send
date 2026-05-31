@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-05-27 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-05-31 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -207,8 +207,22 @@ Lightweight vault app host. Lifecycle: parse hash → open vault → read `app.j
 - **Regression fix — in-vault link navigation under null-origin frames (SHIPPED).** Phase 3 flipped all app frames to render via `iframe.srcdoc` (null-origin sandbox). An iframe's `srcdoc` attribute **overrides** `src`, but the in-app link-nav handler (`_setupVfsBridgeHandlers`, `__sgVfsNavReq`) was left assigning a parent-origin `blob:` `src` — silently ignored once the frame was mounted via `srcdoc`, so clicking an in-vault `.html` link did nothing (the frame kept showing the original page; the browser status bar showed the un-intercepted absolute href, e.g. a `403` against the vault origin if followed). Fix: navigation now rebuilds via `AppFrameBootstrap.build({kind:'html'})` and assigns `iframeEl.srcdoc` (clearing any stale `src`), matching the initial-mount path. **Coverage gap that let this through:** no e2e drives a real app-shell mount + in-vault link click (the existing app-context regression spec stubs the network); an app-shell nav e2e harness (real decrypt → mount → click → assert frame content changes) is the recommended follow-up.
 - **ViV Phase 5.1 — cross-kernel audit aggregation core + UI surface (SHIPPED).** `viv-audit-view.js` (`globalThis.VivAuditView`, pure/DOM-free, built on `VivMountsView`) aggregates the mount tables + broker logs of multiple kernels into one operator view: `aggregate(sources)`, `filterLog(log, criteria)`, `groupLog(log, dimension∈{mount,kernel,op,decision,result,cred})`, `facets(log)`, `sourceRows(sources)`. Consent-honest: only `monitor∈{top,opt-in}` sources expose a log; `closed`/`unreachable` children contribute their (parent-visible) mount rows + an explicit placeholder but **no** log entries (matches VivMonitor fail-closed default). Grandchild kernels are unreachable by design (no central collector). Unit-tested in Node (`test__viv_audit_view.js`, 33 assertions). **Surfaced** as the `<app-debug-audit>` "🛡️ Audit" tab in the `/app` debug pane (see above) — chosen over a standalone page because broker logs are in-memory per-document in the app-shell runtime, so only an in-process debug tab can read them.
 
-**`<app-hud>` Web Component** (`app-hud.js`, 201 lines — 22 May 2026):
-Fixed 48 px status bar rendered outside `<sg-layout>`. Shows: SG/App brand, vault badge, app title (centre), read-only badge, copy-link button, vault-back link, debug toggle. Handles `sg.ui.message()` notifications dispatched from the app iframe (toast queue with auto-dismiss). Receives vault/app info via `setInfo()` called by the page script on `app-shell:ready`.
+**`<app-hud>` Web Component** (`app-hud.js`, 490 lines — 30 May 2026):
+48 px chrome row rendered outside `<sg-layout>`, plus an optional 32 px nav row below it (V1, 30 May 2026). Chrome shows: SG/App brand, vault badge, app title (centre), read-only badge, copy-link button, vault-back link, debug toggle. Handles `sg.ui.message()` notifications dispatched from the app iframe (toast queue with auto-dismiss). Receives vault/app info via `setInfo()` called by the page script on `app-shell:ready`.
+
+- **In-vault nav row V1 (SHIPPED 30 May 2026).** Browser-style toolbar inside the HUD: back / forward / refresh arrows + path display (with `#fragment` highlighted in teal) + copy-path button + ⋯ recent-pages menu (last 15, chronological, no dedup). The HUD never owns history; it dispatches `app-hud:nav` `{action: back|forward|reload|jump|exit, path?}` and renders state pushed back via `app-nav:change` from `<app-shell>`. Type-to-jump address-bar autocomplete is **NOT** in V1 — deferred to a follow-up. **Hash-link bug fix:** the iframe click interceptor in `app-shell._buildVfsBridgeScript` now strips `?`/`#` before its `.html`/`.htm` extension check, so `pages/x.html#section` links are intercepted instead of falling through to a 403. The fragment is forwarded and applied via `__sgVfsScrollToHash` on `DOMContentLoaded` (null-origin safe). Friendly broken-link overlay replaces the prior console-warn dead-end. **Bug fixes shipped (follow-up commits):** path-doubling fixed (`alreadyResolved:true` flag for history-entry navigations); recent-pages close-on-open fixed (one-shot outside-click listener on next event-loop turn); Home button added; editable URL bar display.
+- **`app.json` `hud.*` config schema (SHIPPED 30 May 2026).** `hud.mode ∈ {full, minimal, hidden}` (default `full`) + `hud.show.{vaultName,appTitle,openVault,copyLink,print,debug,navBar,navArrows,navPath,navRefresh}` granular flags. `mode:"hidden"` collapses the entire HUD; the iframe takes 100% of the viewport. **Sovereignty rail (apps cannot suppress):** (1) active `requestConsent` overlays always render; (2) a corner `× Exit app` pill persists in `hidden` mode; (3) user-side override `localStorage['sg-app-force-show-hud']='1'` forces `mode:"full"` regardless of `app.json`. Resolved by `AppHudConfig.resolve(cfg)` (see below). Applied via `hud.applyHudConfig(cfg)` on `app-shell:ready`.
+- **`sg.state.*` bridge namespace (SHIPPED 30–31 May 2026).** New namespace exposed to every app frame: `sg.state.get(key)`, `sg.state.set(key, value)`, `sg.state.remove(key)`, `sg.state.list()`. Backed by kernel `localStorage` (device-local; not part of the vault; persists across vault navigations in the same app). Allows apps to store user preferences (dark mode, layout) without vault commits. Added to `app-shell.js` in Commit B alongside the print bridge-RPC fix.
+- **Print bridge-RPC (SHIPPED Commit B, 30 May 2026).** `sg.shell.print` RPC: app iframe posts its rendered HTML via `postMessage`; parent reconstructs a blob URL and invokes `window.print()`. Null-origin safe (does not read `iframe.contentDocument`). The initial Print button (Commit A) read `contentDocument` directly which throws `SecurityError` under Phase 3 null-origin frames; Commit B replaced it with this bridge-RPC path.
+- **New `<app-shell>` nav surface**: `_navigateToPath(href, {alreadyResolved, pushHistory})`, `_pushNavHistory`, `_navBack`, `_navForward`, `_navReload`, `_canNavBack`, `_canNavForward`, `_currentNavPath`, `_renderBrokenLinkOverlay(path, reason)`, `_exitApp`, `_emitNavChange`. Nav history seeded with entry path on `_mountApp`; forward stack truncated on new nav.
+
+**`AppHudConfig` module** (`app-hud-config.js` — pilot extraction, 31 May 2026):
+Pure resolver for the `app.json` `hud.*` schema. `AppHudConfig.resolve(cfg)` → `{mode, show}` with per-mode defaults then explicit overrides. Extracted from `app-hud.js` to make it testable in Node. `globalThis.AppHudConfig`. **Unit tests:** 30 assertions (`test__app_hud_config.js`).
+
+**`AppNavHelpers` module** (`app-shell-nav-helpers.js` — pilot extraction, 31 May 2026):
+Pure nav-logic helpers extracted from `app-shell.js`. `globalThis.AppNavHelpers`. Contains `_navigateToPath` semantics, history management, and path resolution. Extracted to improve testability. **Unit tests:** 35 assertions (`test__app_shell_nav_helpers.js`).
+
+**Note on `SgReplCore` / `app-debug-repl.js` test file:** Previously referenced in this document (29 assertions), the test file (`test__sg_repl_core.js`) was committed to dev on 30–31 May. 29 assertions now confirmed in repo.
 
 **`<app-debug-pane>` Web Component** (`app-debug-pane.js`, 149 lines — 22 May 2026):
 Collapsible right-edge debug panel with 7 tabs: Vault Trace, Bridge Log, Mounts (single-kernel, B4), **Audit** (cross-kernel, Phase 5.1), **REPL** (sg.* console, pack §3.4), App State, Network. Collapses to a narrow edge strip when host width < 40 px (ResizeObserver). Tabs are lazy-loaded sub-components.
@@ -446,6 +460,41 @@ Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-
 | Opened file persisted in URL (`#path`) — reloads and links work | EXISTS | `fc13d2c` |
 | Markdown files render in App Mode (MarkdownParser.parse not new MarkdownParser) | EXISTS | `e669a2a` |
 
+### ViV (Vault-in-Vault) Kernel Architecture — v0.2.3 (2026-05-28/29) + Phase 3–5.1 (2026-05-29)
+
+Phase 1 (SecureChannel) + Phase 2 (spawn + cross-vault write) + Phase 3 sub-step C prep (sg-app-stub) shipped in the first session. 10 bugs fixed (H1, M1–M6, L1, L3, L4). Phase 3 security gate (null-origin) + B4–B10 mandated invariants + KernelParent shipped before the 05/29 librarian session. Phase 4 (AppFrameBootstrap) + Phase 5.1 (VivAuditView) shipped after.
+
+**335+ jsdom-free assertions total across the ViV loader suite (17 test files), all green.**
+
+| Module | Purpose | Status | Tests |
+|--------|---------|--------|-------|
+| `secure-channel-envelope.js` | Pure WebCrypto P-256 envelope: pack/unpack, ECDSA sign, ECDH-AES-GCM encrypt, ReplayGuard, mixed payload (Uint8Array+JSON) | **EXISTS** | 29 |
+| `secure-channel.js` | Port-anchored authenticated channel: create/accept/request/send; K1 one-use bootstrap key; directional rule; cid check | **EXISTS** | 14 |
+| `kernel-mounts.js` | `KernelMounts`: longest-prefix mount table with traversal-collapse | **EXISTS** | 13 |
+| `kernel-broker.js` | `KernelBroker`: per-kernel sidecar; mediate/finalize (concurrent-safe entryId); policy (auto/ask) | **EXISTS** | 22 |
+| `kernel-app-handlers.js` | `registerKernelVfsHandlers`: two-sided capability gate; AppPermissions.isFloor/can; _safePush EUNREACH | **EXISTS** | 24 |
+| `kernel-bootstrap.js` | `bootKernelOnPort`: testable bootstrap (handshake → vault.open → register); reads endpoint from secrets | **EXISTS** | 13 |
+| `sg-app-stub.js` | Secret-less app-side `window.sg.*` stub; every method is SecureChannel.request to kernel. Phase 3C prep. **Wired into _buildAppSrcdoc via Phase 3 + Phase 4 AppFrameBootstrap.** | **EXISTS** | 13 |
+| `kernel-shell-bundle.js` | AUTO-GENERATED: 191 KB self-contained null-origin srcdoc kernel bundle | **EXISTS** | 1 freshness |
+| `scripts/build-kernel-shell-bundle.py` | Build script for kernel-shell-bundle.js; --stdout flag for freshness check | **EXISTS** | — |
+| `vault.mount` capability in `app-permissions.js` | vault.mount capability key: parse + can() | **EXISTS** | 6 |
+| VIV relay branch in `app-shell.js` | `_mountChildVault`, `_handleVfsViv` (read+write+list relay), vault bridge actions | **EXISTS** | 16 relay |
+| `kernel-parent.js` | Parent-side peer to kernel-bootstrap; spawn/handshake child kernel; relay operations; monitorChild (B7); endpoint reads from secrets (M5 fix) | **EXISTS** | 44 |
+| `viv-mounts-view.js` | Pure view-model for mount table + broker log (B4): mountRows/logRows/summary/outcomeClass/credTag | **EXISTS** | 33 |
+| `app-debug-mounts.js` | `<app-debug-mounts>` debug pane Mounts tab component; reads vivProvider(); re-renders on bridge-call events | **EXISTS** | — |
+| `viv-credential-tiers.js` | B5/B6 credential tier gate: TIERS enum; requiredTierFor; meets; fail-closed gate() → EUNDERPRIVILEGED; unknown verbs → highest tier; gate in relay() before mediation | **EXISTS** | 28 |
+| `viv-monitor.js` | B7 monitor mode: MODES.CLOSED (default) / OPT_IN; registerOnChannel | **EXISTS** | 20 |
+| `viv-custody.js` | B10 custody gate: fail-closed; unknown custodians → EUNSAFE_CUSTODY; wired into relay() | **EXISTS** | 33 |
+| `app-frame-bootstrap.js` | Phase 4 Option A: pure DOM-free srcdoc builder for all 4 iframe contexts (app/html/page-layout/markdown); `AppFrameBootstrap.build({kind, …})`; all 4 mount methods wired | **EXISTS** | 32 |
+| `viv-audit-view.js` | Phase 5.1 cross-kernel audit aggregation: aggregate/filterLog/groupLog/facets/sourceRows; consent-honest (CLOSED→no log; grandchildren unreachable) | **EXISTS** | 37 |
+| `app-debug-audit.js` | `<app-debug-audit>` Audit tab in /app debug pane; async vivAuditProvider (KernelParent.monitorChild); coalesced re-fetch | **EXISTS** | — |
+
+**Phase 3 (Security Gate): CLOSED** — commit `f534b27` + `1b5b6b1`. All 4 `app-shell.js` mount sites now `sandbox="allow-scripts allow-forms"` (no `allow-same-origin`); content via `srcdoc` not `blob:`. **SEC-VIV-001 is resolved.** Probe suite: 30 Playwright assertions, 0 failures.
+
+**App-error surfacing re-spec (Phase 4):** Null-origin frames self-report errors via `postMessage({type:"sg-app-error"}, "*")`. Parent shows persistent toast via `<app-hud>.showMessage()`. Browser-verified via probe P5.
+
+**Known deferred bug (L2):** `Envelope._canonicalParse` treats any `{__u8: "<string>"}` as bytes. Edge case; fix deferred to Phase 6 with `{__u8b64}` tag.
+
 ---
 
 ## PROPOSED
@@ -459,5 +508,23 @@ Full list: [proposed/index.md](proposed/index.md)
 - **Room + Vault pages** migrated to v0.4.0 IFD architecture (currently on v0.3.x legacy)
 - **P-248: Sub-vaults CLI access** — clone-within-clone for sgit; storage tracking; nested clone resolution. Source: doc 490, 05/25 briefs.
 - **P-249: Talk to the vault** — in-vault chat with tool-calling; vault-aware; read-write to self-contained vault; infographic generator + file tools; right-hand pane; user's own OpenRouter key. Arch pack at `library/sgraph-send/dev_packs/vault-chat/`. Source: doc 493, 05/25 briefs.
-- **App-Mode Phase 5: vault.delete** — deferred pending owner-secret credential tier + AppSec sign-off.
+- **App-Mode Phase 5: vault.delete (P-255)** — deferred pending owner-secret credential tier + AppSec sign-off.
 - **App-Mode Phase 6: reads default-deny** — `READ_DEFAULT` flip once apps declare `fs.read` in `app.json`.
+- **P-250: sg.vault.mount() assembled API** — user-facing call composing KERNEL_SHELL_HTML → iframe → SecureChannel → secrets → mount registration. Pieces exist; not assembled into single entry point. ~80 lines.
+- **P-251: sg.vault.unmount()** — close channel, remove mount, leave broker log. ~15 lines.
+- **P-252: HUD `ask` broker policy prompt** — HUD consent UI for cross-vault write authorisation. `app-hud.js` extension needed.
+- **P-253: Mounts list / broker log UI on /vault** — Mounts panel showing each BrokerEntry. `KernelBroker.log()` exists; no UI consumer.
+- **P-254: Per-request elevation / credential tiers** — three tiers (none, standing-ro, perRequest-rw); needs schema + issuance + child-side consumer.
+- **P-256: Monitored-mode child visibility** — parent can read child's broker log (debug only, must show 👁 MONITORED badge).
+- **P-257: Phase 0.5 CORS operational verification** — CDN cache invalidation + CloudFront Origin forward + real-browser null-frame round-trip to dev.send.sgraph.ai.
+- **P-258: Phase 2 §7 browser end-to-end** — clinician console writes to patient vault; broker logs invocation; patient vault shows bytes. Needs two dev vaults.
+- ~~**P-259: Phase 3 null-origin security gate**~~ → **SHIPPED** (commit `f534b27`). SEC-VIV-001 closed. See ViV section above.
+- **P-260: Phase 4 Option B — /vault HTML view + edit preview on SecureChannel kernel** — AppFrameBootstrap (Option A) SHIPPED. Remaining: promote /vault HTML view + edit preview from postMessage bridge to SecureChannel kernel (full kernel unification).
+- **P-261: Phase 5 remaining consumers** — VivAuditView core + Audit tab in /app SHIPPED (Phase 5.1). Remaining: standalone vault-in-vaults audit page (BLOCKED by design — broker logs in-memory per-document); tree-view-expand-as-mount; CLI/REPL.
+- **P-262: Phase 6 hardening** — SecureChannel everywhere; monitoring-mode badge; optional curve upgrade (P-256 → X25519/Ed25519).
+- **P-263: Vault Chat full architecture** — LLM chat as iframe sibling to Vault App; context layers inspector; tool-execution control; history-as-files; end-of-chat zip-to-vault. Arch: docs 505–506 (05/26 briefs).
+- **P-264: VFS (Virtual File System) as LLM working memory** — client-side in-memory FS distinct from vault FS; every message/response stored as VFS file; optional sync to vault; self-pruning tool (LLM consolidates to VFS, drops detail from live context).
+- **P-265: Commit Queue — timer-windowed batch commits** — vault-shell batching mechanism; configurable window (0=off, 10-15s default); staging area; debug tab; solves many-files explosion from Vault Chat VFS sync.
+- **P-266: Sidecar LLMs** — parallel LLM instances for memory curation, security checks, consolidation; enable/disable per type; multi-LLM consensus mode.
+- **P-267: Security Report vault demo** — simulated pen test findings as a vault; audience-specific Vault App views; evidence graph; positive scorecard; retest scripts. Requires Vault Chat (P-263).
+- **P-268: VC Confidential Data vault demo** — 6 VC scenarios (inbound data room, memo, deal folder, IC materials, LP reporting, fund raise); scoped to exclude ViV for initial demo.

@@ -68,6 +68,9 @@
     <!-- sg-layout (fractal window manager) -->
     <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
 
+    <!-- Print helper (used by the HUD Print button — opens a self-contained print preview) -->
+    <script src="https://dev.send.sgraph.ai/_common/js/sg-print.js"></script>
+
     <!-- App shell components -->
     <script src="/_common/js/components/app-shell/app-permissions.js"></script>
     <script src="/_common/js/components/app-shell/secure-channel-envelope.js"></script>
@@ -92,6 +95,9 @@
     <script src="/_common/js/components/app-shell/app-debug-app-state.js"></script>
     <script src="/_common/js/components/app-shell/app-debug-network.js"></script>
     <script src="/_common/js/components/app-shell/app-frame-bootstrap.js"></script>
+    <!-- Pure helpers (DOM-free) used by app-shell + app-hud. MUST load before both. -->
+    <script src="/_common/js/components/app-shell/app-shell-nav-helpers.js"></script>
+    <script src="/_common/js/components/app-shell/app-hud-config.js"></script>
     <script src="/_common/js/components/app-shell/app-shell.js"></script>
 
     <style>
@@ -103,10 +109,16 @@
             overflow: hidden;
         }
         body { display: flex; flex-direction: column; }
-        #hud-host  { flex: 0 0 48px; min-height: 48px; max-height: 48px; overflow: hidden; }
+        /* HUD-host height auto-sizes — the chrome row is always 48px but the nav row
+           adds ~32px when 'navBar' is enabled in app.json, and goes to 0px in hidden mode.
+           overflow MUST be visible so the ⋯ recent-pages menu (position:absolute, anchored
+           to the ⋯ button, dropping down below the HUD) can render into the iframe area
+           below. z-index puts the HUD's stacking context above #layout-host (the iframe)
+           so the dropdown actually paints on top rather than being covered. */
+        #hud-host  { flex: 0 0 auto; position: relative; z-index: 10; }
         #layout-host { flex: 1; min-height: 0; position: relative; }
         sg-layout { display: block; width: 100%; height: 100%; }
-        app-hud { display: block; width: 100%; height: 48px; }
+        app-hud { display: block; width: 100%; }
         /* Hide the sg-layout stack chrome on the app page — panels need no title bar */
         #app-layout { --sgl-panel-header-height: 0px; }
     </style>
@@ -154,6 +166,17 @@
             }
             if (hud && typeof hud.setPrivileges === 'function') {
                 hud.setPrivileges(e.detail.perm);
+            }
+            // Apply the app.json hud.* config (mode + show.* flags). Idempotent — safe to
+            // call before setInfo. The user-side force-show-hud override is read here so
+            // power users can keep chrome visible even on 'hidden'-mode apps.
+            if (hud && typeof hud.applyHudConfig === 'function') {
+                var cfg = e.detail.hudCfg;
+                try {
+                    var force = localStorage.getItem('sg-app-force-show-hud') === '1';
+                    if (force && cfg && cfg.mode === 'hidden') cfg = Object.assign({}, cfg, { mode: 'full' });
+                } catch (_) {}
+                hud.applyHudConfig(cfg);
             }
         });
 
