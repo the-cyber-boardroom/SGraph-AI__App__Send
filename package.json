@@ -9,7 +9,8 @@
   "scripts": {
     "test:vault-unit": "bash tests/unit/vault_ui/loader/run-all.sh",
     "test:vault-integration": "bash tests/integration/vault_ui/loader/run-all.sh",
-    "test:vault-e2e": "npx playwright test tests/e2e/vault_ui/"
+    "test:vault-e2e": "npx playwright test tests/e2e/vault_ui/",
+    "test:vault-browser-integration": ".venv/bin/python3 -m pytest tests/integration/vault_ui/browser/ -v"
   },
   "engines": {
     "node": ">=18.0.0"
