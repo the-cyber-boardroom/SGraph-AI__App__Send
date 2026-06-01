@@ -1,6 +1,6 @@
 # QA — Reality Index
 
-**Domain:** qa/ | **Last updated:** 2026-05-30 | **Maintained by:** Librarian (daily run)
+**Domain:** qa/ | **Last updated:** 2026-06-01 | **Maintained by:** Librarian (daily run)
 
 This domain covers the test suite, QA infrastructure (browser automation, Playwright), and test strategy. SGraph Send uses an all-real-implementations philosophy: no mocks, no patches. The full stack starts in-memory in ~100ms.
 
@@ -8,7 +8,7 @@ This domain covers the test suite, QA infrastructure (browser automation, Playwr
 
 ## EXISTS (Code-Verified)
 
-### Test Suite: ~1139+ Tests, All Passing
+### Test Suite: ~1257+ Tests, All Passing
 
 **Strategy:** No mocks, no patches. In-memory Memory-FS stack. ~100ms startup.
 
@@ -83,6 +83,27 @@ Run with: `bash tests/unit/vault_ui/loader/run-all.sh`
 | Version | 3 | Version file reading |
 | Container App | 9 | Health, status, root redirect, static UI, transfers, vault, auth cookie form, disk storage |
 | Container App Auth | 7 | Auth enforcement, header token, cookie token, form exclusion |
+
+**App-shell extraction (added 2026-05-31, extended 2026-06-01):**
+
+| File | Assertions | What It Tests |
+|------|-----------|---------------|
+| `test__app_hud_config.js` | 31 | `AppHudConfig.resolve()` — per-mode defaults, explicit overrides, sovereignty-rail constraints |
+| `test__app_shell_nav_helpers.js` | 47 | `AppNavHelpers` deep-link routing (DM1–DM11), path resolution, history management |
+
+**Browser Integration Tests — Python + Playwright (added 2026-05-31):**
+
+Exercises a real local file server + headless Chromium + sgit-ai. End-to-end coverage of live-vault scenarios not reachable by Node/jsdom tests.
+
+| File | Test functions | What It Tests |
+|------|---------------|---------------|
+| `tests/integration/vault_ui/browser/test__harness_smoke.py` | 3 | Harness boots, vault server responds, Playwright connects |
+| `tests/integration/vault_ui/browser/test__app_mode_deep_link.py` | 1 | Deep-link HTML fix: CSS/JS loads correctly in a real browser |
+| `tests/integration/vault_ui/browser/test__sgit_round_trip.py` | 1 | sgit-ai round-trip: create vault, modify, push, verify browser sees update |
+
+Base class: `tests/integration/vault_ui/browser/_browser_harness.py` (193 lines) — `self._sgit()`, `self._new_vault_key()`, `self.create_seeded_vault(files)` shared helpers.
+
+Run: `poetry run pytest tests/integration/vault_ui/browser/ -v` (or CI: `npm run test:vault-browser-integration`)
 
 **Additional tests (not in unit suite):**
 - 8 deployment tests (Lambda create/update/invoke per stage)

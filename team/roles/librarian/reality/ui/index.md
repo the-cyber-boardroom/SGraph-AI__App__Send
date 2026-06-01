@@ -220,7 +220,10 @@ Lightweight vault app host. Lifecycle: parse hash → open vault → read `app.j
 Pure resolver for the `app.json` `hud.*` schema. `AppHudConfig.resolve(cfg)` → `{mode, show}` with per-mode defaults then explicit overrides. Extracted from `app-hud.js` to make it testable in Node. `globalThis.AppHudConfig`. **Unit tests:** 30 assertions (`test__app_hud_config.js`).
 
 **`AppNavHelpers` module** (`app-shell-nav-helpers.js` — pilot extraction, 31 May 2026):
-Pure nav-logic helpers extracted from `app-shell.js`. `globalThis.AppNavHelpers`. Contains `_navigateToPath` semantics, history management, and path resolution. Extracted to improve testability. **Unit tests:** 35 assertions (`test__app_shell_nav_helpers.js`).
+Pure nav-logic helpers extracted from `app-shell.js`. `globalThis.AppNavHelpers`. Contains `_navigateToPath` semantics, history management, and path resolution. Extracted to improve testability. **Unit tests:** 47 assertions (`test__app_shell_nav_helpers.js` — extended from 35 to 47 with deep-link matrix DM5–DM11, 01 June 2026).
+
+**Deep-link HTML fix (01 June 2026 — commit `3271fbdf`):**
+Fixed `/en-gb/app/#path/page.html` not loading CSS/JS. Root cause: `_continue()` was calling `_mountVaultFile(deepPath)` (bare file view, ignores `app.json` resources) when the deep-link path differed from `app.json`'s `entry`. Fix: HTML deep-links always route through `_mountApp(deepPath)` so `app.json` resources (CSS/JS declared in the `resources` block) are injected. Bonus: body-hidden self-check delay raised from `setTimeout(0)` to `setTimeout(2500)` to suppress false-positive "App body is hidden" banners for reveal-on-ready apps (e.g. Private Health Score).
 
 **Note on `SgReplCore` / `app-debug-repl.js` test file:** Previously referenced in this document (29 assertions), the test file (`test__sg_repl_core.js`) was committed to dev on 30–31 May. 29 assertions now confirmed in repo.
 
