@@ -110,6 +110,30 @@ const VaultLinks = {
         return { type: 'link', provider: null };
     },
 
+    // --- Add-link honesty: how a linked vault will actually mount -----------------
+    //     The add-link flow opens the pasted key, derives the READ key, and mounts the
+    //     sub-vault READ-ONLY (the composite/tree splice is read-only today; rw-in-tree
+    //     is gated on M2/M3). If the pasted key was write-capable, the write capability
+    //     is intentionally NOT stored. Surface that plainly instead of downgrading
+    //     silently. `opts.writable` is the opened child's `.writable` (truthy = a write
+    //     key was derived). `opts.portable` true = saved as an ro-record that opens on
+    //     any device; false = this-device fallback. Returns { mode, writeKeyStored,
+    //     hint, result } — `hint` is the static form caption, `result` the success line.
+    addLinkDisclosure(opts) {
+        const o          = opts || {};
+        const writable   = !!o.writable;
+        const portable   = !!o.portable;
+        const label      = o.label ? String(o.label) : 'vault';
+        const where      = portable ? 'opens on any device' : 'saved on this device';
+        const hint = writable
+            ? 'Opens read-only. You pasted a write-capable key — only read access is kept; the write key is not stored.'
+            : 'Opens read-only. Validated + saved; the write key is not stored.';
+        const result = writable
+            ? 'Linked "' + label + '" read-only (' + where + ') — write key not stored'
+            : 'Linked "' + label + '" (' + where + ')';
+        return { mode: 'read-only', writeKeyStored: false, hint: hint, result: result };
+    },
+
     // --- Phase 0 key store: "save on this device" (localStorage) ----------------
     //     Real owner records (.vault/owner/ro-links|rw-links) arrive in Phase 1.
     getStoredChildKey(vaultId) {

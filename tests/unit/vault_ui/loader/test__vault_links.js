@@ -167,6 +167,22 @@ function makeFakeVault(writable) {
     ok('isResourceLink: url-only link', VaultLinks.isResourceLink({ ref_id: 'r', url: 'https://x' }) === true);
     ok('isResourceLink: a vault is NOT a resource', VaultLinks.isResourceLink({ ref_id: 'r', vault_id: 'v' }) === false);
 
+    // 9. addLinkDisclosure — honest read-only mount messaging (no silent downgrade)
+    const dRo  = VaultLinks.addLinkDisclosure({ writable: false, portable: true,  label: 'Alice' });
+    const dRw  = VaultLinks.addLinkDisclosure({ writable: true,  portable: true,  label: 'Alice' });
+    const dRwD = VaultLinks.addLinkDisclosure({ writable: true,  portable: false, label: 'Alice' });
+    ok('disclosure: always mounts read-only',           dRo.mode === 'read-only' && dRw.mode === 'read-only');
+    ok('disclosure: write key never stored',            dRo.writeKeyStored === false && dRw.writeKeyStored === false);
+    ok('disclosure: ro hint mentions read-only',        /read-only/i.test(dRo.hint) && /not stored/i.test(dRo.hint));
+    ok('disclosure: writable hint names the downgrade', /write-capable/i.test(dRw.hint) && /not stored/i.test(dRw.hint));
+    ok('disclosure: writable result flags downgrade',   /read-only/i.test(dRw.result) && /write key not stored/i.test(dRw.result));
+    ok('disclosure: ro result does NOT over-warn',      !/write key not stored/i.test(dRo.result));
+    ok('disclosure: portable → "any device"',           /any device/i.test(dRw.result));
+    ok('disclosure: non-portable → "this device"',      /this device/i.test(dRwD.result));
+    ok('disclosure: label carried into result',         /Alice/.test(dRw.result));
+    const dDef = VaultLinks.addLinkDisclosure();   // no opts → safe defaults
+    ok('disclosure: no-args defaults to ro/not-stored', dDef.mode === 'read-only' && dDef.writeKeyStored === false && /read-only/i.test(dDef.hint));
+
     console.log('  ' + pass + ' pass, ' + fail + ' fail\n');
     process.exit(fail === 0 ? 0 : 1);
 })();

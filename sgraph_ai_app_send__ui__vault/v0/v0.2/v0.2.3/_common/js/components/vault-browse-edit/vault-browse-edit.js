@@ -945,7 +945,7 @@
             '<div id="al-vault-row">' +
                 '<label style="font-size:12px;color:#8892a4;">Vault key or read-only token</label>' +
                 '<input id="al-key" type="password" placeholder="apple-river-1234  or  ro-coral-stamp-5678" autocomplete="off" style="' + inS + '">' +
-                '<div style="font-size:12px;color:#4a5568;margin:-0.4rem 0 0.6rem;">Validated + saved on this device. Opens read-only.</div>' +
+                '<div style="font-size:12px;color:#4a5568;margin:-0.4rem 0 0.6rem;">Opens <b>read-only</b>. A write-capable key is accepted but only read access is kept — the write key is not stored.</div>' +
             '</div>' +
             '<div id="al-url-row" style="display:none;">' +
                 '<label style="font-size:12px;color:#8892a4;">URL</label>' +
@@ -1021,8 +1021,11 @@
                         console.warn('[add-link] portable ro-record failed, falling back to device key:', eRec && eRec.message);
                         try { VaultLinks.setStoredChildKey(vaultId, key); } catch (_) {}   // this-device fallback
                     }
+                    // Honest disclosure: the sub-vault mounts read-only; if the pasted key was
+                    // write-capable, say the write key was not kept (rather than downgrading silently).
+                    var disc = VaultLinks.addLinkDisclosure({ writable: !!child.writable, portable: portable, label: label });
                     if (window.sgraphVault && window.sgraphVault.messages) {
-                        window.sgraphVault.messages.success('Linked vault "' + label + '"' + (portable ? ' (opens on any device)' : ' (saved on this device)'));
+                        window.sgraphVault.messages.success(disc.result);
                     }
                     if (browse.dataSource.scan) { try { await browse.dataSource.scan(); } catch (_) {} }
                     overlay.remove();
