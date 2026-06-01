@@ -7,6 +7,21 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-01
+
+- `index.md` — Updated: version v0.31.12 → v0.31.15; date 05/31 → 06/01; unit tests ~1240+ → ~1257+; PROPOSED 395+ → 397+ (P-279–P-280)
+- `ui/index.md` — Added: deep-link HTML fix (CSS/JS loading in `/en-gb/app/#deep-link`); AppNavHelpers test count 35→47; last updated 05/31 → 06/01
+- `qa/index.md` — Added: browser integration harness (5 pytest functions, 4 files, Python+Playwright+sgit-ai); test count ~1139+ → ~1257+; last updated 05/30 → 06/01
+- `security/index.md` — Added: SEC-VIV-002 (popup capability over-grant to inner vaults — OPEN, Medium); last updated 05/29 → 06/01
+- `infra/index.md` — Added: `_test-ui-vault.yml` reusable vault UI test workflow (4-job pipeline); `test:vault-browser-integration` npm script; last updated 05/13 → 06/01
+- `ui/proposed/index.md` — Added P-279 (kernel path unification) + P-280 (popup gate fix); last updated 05/31 → 06/01
+
+Master index: `team/roles/librarian/reviews/06/01/v0.31.15__master-index__no-new-briefs-code-31-may.md`
+Processed: 0 new human briefs (no June briefs yet — first day of month)
+New EXISTS items: 7 (deep-link fix, AppNavHelpers 35→47, browser integration harness ×4 files, CI reusable workflow) | New PROPOSED items: 2 (P-279, P-280)
+
+---
+
 ## 2026-05-29
 
 - `index.md` — Updated: version v0.28.7 → v0.31.3; date 05/28 → 05/29; doc count 493 → 504; JS assertions +152; API endpoints +1 (Routes__Info__SGraph); PROPOSED 366+ → 379+

@@ -1,6 +1,6 @@
 # ui/proposed — Index
 
-**Domain:** `ui/` | **Last updated:** 2026-05-31
+**Domain:** `ui/` | **Last updated:** 2026-06-01
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16 (lines 1210–1219, 1234–1241), 17 (lines 1541–1551), 29–30 (lines 2720–2830)
 
 ---
@@ -162,3 +162,14 @@ All items below are PROPOSED — does not exist yet. All depend on Vault Chat (P
 | P-276 | Evidence-Driven CV + Hiring Signals Workflow — research-first (deep-research agents discover, user confirms — not asking person to write their own CV); confirm-correct-weight loop (confirm, weight per role, relate connections); every claim anchored to stored/dated evidence in vault (HTML, screenshots — vault as own evidence archive); consistency enforces honesty (evidence graphs make exaggeration visible — inflated claims have no supporting evidence); versioned importable publishable vault app (vault-of-vaults; mini apps inside person's vault); feedback harvesting via read-only/read-write sub-vaults (reviewers see only child vault); personalised packs (one-pager to 50MB evidence pack); hiring signals: thinking/values/whole person, non-linear paths, trespasser syndrome (under-labelled transferable skills), buried nuggets, T/M technical depth | docs 521–522 |
 | P-277 | Vault App Store / Hub — catalogue to share/distribute/discover vault apps (distributes P-274/P-276/P-278 and others); describe each vault (purpose, workflow); security-analyse + agent-map before import (trust layer: show what the app requests before user imports an executable vault); billing (sell vaults to developer's benefit; optionally bundle OpenRouter credits so buyer gets app + allowance to run it); multi-language/culture; zip-based distribution (a vault is a zip; clean import/version/local-load flow building on vault.create + VIV) | doc 523 |
 | P-278 | Consulting Assessments — three information sources (user/consultant/research); confirmation-not-open-ended questions (assert company's posture with evidence; user confirms or rebuts; evidence-backed harshness is valid); customised graph-based standards (GDPR, ISO 27000 as graphs; leverage existing graph versions; SHARE WITH SG/Sentinel compliance-as-living-graph — cross-product capture); company-type scoping + Companies House lookup (name/number → public info → present-then-confirm); rounds/passes concept (user chooses how many; per-round: evidence→next-questions→user-provides→analyse→save; non-linear, branchable, replayable; budget = number of rounds); three delivery models: (1) self-service (private or ephemeral vault), (2) send-to-consultant, (3) consultant-driven; thesis: augment the human expert, not replace them | doc 524 |
+
+---
+
+## Architecture Decisions — Shell Unification + Security Hardening (06/01 code audit)
+
+All items below are PROPOSED — does not exist yet.
+
+| Feature | One-Line Description | Source |
+|---------|---------------------|--------|
+| P-279 | **Kernel Path Unification / CompositeDataSource Retirement** — retire `CompositeDataSource` (read-only sub-vault adapter in `vault-shell.js`) and converge the tree view (`/en-gb/vault`) and app view (`/en-gb/app`) onto a single `KernelParent` + relay kernel path; all file ops (root + every mount) go through `VaultAccess → relay → KernelParent → SecureChannel → child kernel → _safePush`; the two shells become one shell over one data path; enables rw sub-vault writes from the tree view; security stack (broker policy, B10 custody gate, floor, audit, Edge-1 push) lives on one code path only; app-shell already builds a full VaultDataSource and tree — the seam is already there (`index.html:19-20` routes `#token → /en-gb/app`, and app-shell redirects to `/en-gb/vault` when no `app.json` found). Scoped in `team/roles/architect/reviews/05/31/v0.31.2__scoping__rw-sub-vaults-kernel-relay-in-tree.md` | Architect session 05/31 |
+| P-280 | **Popup Capability Gate for Inner Vaults** (SEC-VIV-002 fix) — gate `allow-popups-to-escape-sandbox` to the root vault only; inner/mounted sub-vault HTML/markdown content must NOT inherit this capability unconditionally; fix: at the four mount sites (`_mountApp`, `_mountPageLayout`, `_mountVaultFile` HTML, `_mountVaultFile` markdown) detect whether the path is root-vault vs mounted sub-vault and strip popup flags for inner-vault renders; inner vaults wanting popups use a future request + parent-consent capability-grant flow; easier after P-279 (kernel path unification) provides clean context for detecting inner-vault renders. Decision: Dinis 05/31 | AppSec session 05/31 |
