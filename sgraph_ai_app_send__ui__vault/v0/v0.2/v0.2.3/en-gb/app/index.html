@@ -57,6 +57,10 @@
     <script src="/_common/js/adapters/vault-data-source.js"></script>
     <!-- Sub-vaults: link reader + composite, so apps can read inner-vault data via sg.vfs -->
     <script src="/_common/js/lib/links/vault-links.js"></script>
+    <!-- rw sub-vault sealing: app-shell unseals the child write key with the parent's
+         write secret (owner-secret tier). Required by _saveRwLink/_resolveRwCredentials;
+         without it VaultRwSeal is undefined and the rw path is dead in this context. -->
+    <script src="/_common/js/lib/links/vault-rw-seal.js"></script>
     <script src="/_common/js/adapters/composite-data-source.js"></script>
 
     <!-- Public Vault Preview (read path + card) — renders /en-gb/app/<public-id> -->
@@ -97,6 +101,7 @@
     <script src="/_common/js/components/app-shell/app-frame-bootstrap.js"></script>
     <!-- Pure helpers (DOM-free) used by app-shell + app-hud. MUST load before both. -->
     <script src="/_common/js/components/app-shell/app-shell-nav-helpers.js"></script>
+    <script src="/_common/js/components/app-shell/app-shell-rw-creds.js"></script>
     <script src="/_common/js/components/app-shell/app-hud-config.js"></script>
     <script src="/_common/js/components/app-shell/app-shell.js"></script>
 

@@ -22,7 +22,8 @@ function load(rel, exposeAs) {
 }
 load('lib/links/vault-links.js', 'VaultLinks');
 load('lib/links/vault-rw-seal.js', 'VaultRwSeal');
-const { VaultLinks, VaultRwSeal } = globalThis;
+load('components/app-shell/app-shell-rw-creds.js', 'AppRwCreds');
+const { VaultLinks, VaultRwSeal, AppRwCreds } = globalThis;
 
 let pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; console.log('  ✓ ' + name); } else { fail++; console.log('  ✗ ' + name); } }
@@ -44,21 +45,23 @@ function makeFakeVault(writable, writeKeyHex) {
     };
 }
 
-// the two app-shell operations, faithfully replicated (the code under test lives in app-shell.js
-// _saveRwLink / _resolveRwCredentials — this mirrors them exactly so the loop is provable in node)
+// app-shell's two rw operations, delegating to the SAME pure glue app-shell uses
+// (AppRwCreds.writeSecretOf / rwRecordBody / credsFromChildKey). Only the I/O wrappers
+// (seal/unseal + VaultLinks) live here; the decisions are the real shipped code, so a
+// regression in the assembly/shape/guard fails this loop, not just a private copy.
 async function saveRwLink(parentVault, refId, meta, childFullKey) {
-    const writeSecret = parentVault && parentVault._writeKey;
+    const writeSecret = AppRwCreds.writeSecretOf(parentVault);
     if (!writeSecret) throw new Error('Parent vault is read-only: cannot seal a child write key');
     const sealed = await VaultRwSeal.seal(childFullKey, writeSecret);
-    return VaultLinks.saveRwRecord(parentVault, refId, { vault_id: meta.vault_id, label: meta.label, sealed_key: sealed });
+    return VaultLinks.saveRwRecord(parentVault, refId, AppRwCreds.rwRecordBody(meta, sealed));
 }
 async function resolveRwCredentials(parentVault, ref) {
     const rec = await VaultLinks.resolveRwRef(parentVault, ref);
     if (!rec || !rec.sealed_key) return null;
-    const writeSecret = parentVault._writeKey;
+    const writeSecret = AppRwCreds.writeSecretOf(parentVault);
     if (!writeSecret) return null;
     const childFullKey = await VaultRwSeal.unseal(rec.sealed_key, writeSecret);
-    return { vaultKey: childFullKey, accessToken: null, custody: 'parent-held', access: 'rw' };
+    return AppRwCreds.credsFromChildKey(childFullKey);
 }
 
 console.log('\n[suite] rw credential loop — seal→store→resolve→unseal (real modules)');

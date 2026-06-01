@@ -780,7 +780,7 @@
             // rw tier: seal the child FULL key with the parent's write secret (D1 accepted).
             // The parent reader can open rw-links.json but cannot unseal without the write secret.
             if (opts.rw) {
-                var childFullKey = passphrase + ':' + vaultId;
+                var childFullKey = AppRwCreds.buildChildFullKey(passphrase, vaultId);
                 await this._saveRwLink(parentVault, refId, { vault_id: vaultId, label: label }, childFullKey);
             }
             if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
@@ -791,14 +791,10 @@
         // Throws if the parent vault is not writable (no write secret available to seal with).
         async _saveRwLink(parentVault, refId, meta, childFullKey) {
             if (typeof VaultRwSeal === 'undefined') throw new Error('rw sealing unavailable (VaultRwSeal not loaded)');
-            var writeSecret = parentVault && parentVault._writeKey;
+            var writeSecret = AppRwCreds.writeSecretOf(parentVault);
             if (!writeSecret) throw new Error('Parent vault is read-only: cannot seal a child write key');
             var sealed = await VaultRwSeal.seal(childFullKey, writeSecret);
-            return VaultLinks.saveRwRecord(parentVault, refId, {
-                vault_id:  (meta && meta.vault_id) || null,
-                label:     (meta && meta.label) || null,
-                sealed_key: sealed
-            });
+            return VaultLinks.saveRwRecord(parentVault, refId, AppRwCreds.rwRecordBody(meta, sealed));
         }
 
         // Remove a sub-vault pointer (the <name>.link.json). The child vault stays on the server
@@ -1056,15 +1052,10 @@
             if (!parentVault) return null;
             var rec = await VaultLinks.resolveRwRef(parentVault, ref);
             if (!rec || !rec.sealed_key) return null;
-            var writeSecret = parentVault._writeKey;
+            var writeSecret = AppRwCreds.writeSecretOf(parentVault);
             if (!writeSecret) return null;   // parent opened read-only → cannot unseal
             var childFullKey = await VaultRwSeal.unseal(rec.sealed_key, writeSecret);
-            return {
-                vaultKey:    childFullKey,
-                accessToken: null,
-                custody:     'parent-held',
-                access:      'rw'
-            };
+            return AppRwCreds.credsFromChildKey(childFullKey);
         }
 
         // HUD prompt for broker.mediate(ask). Reuses the existing consent bar infrastructure.
