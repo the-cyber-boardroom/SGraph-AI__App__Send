@@ -523,7 +523,14 @@
         }
         .hud-app-title {
             font-size: 0.875rem; font-weight: 600; color: #e2e8f0;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            min-width: 0;
+            /* No max-width — title grows to its natural width and only ellipsizes
+               when the row genuinely runs out of space (hud-left shrinks via flex,
+               hud-center is flex:1 so it absorbs the squeeze first). The previous
+               200px cap was a leftover from when the HUD was a packed 48px row;
+               with app.json hud.show.* it's common to have only brand+title in
+               hud-left and they should use whatever room is available. */
         }
         .hud-msg {
             font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 4px;
