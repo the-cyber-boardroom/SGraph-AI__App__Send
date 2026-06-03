@@ -102,9 +102,13 @@ jobs:
       - name: Install project (pyproject.toml deps)
         run: poetry install --no-interaction --no-ansi
 
-      - name: Install Playwright + Chromium
+      - name: Install Playwright + Chromium + Python test runner
+        # pytest and httpx aren't in pyproject.toml (the project's main CI uses
+        # the owasp-sbot pytest__run-tests composite action which provides them
+        # implicitly — see ci-pipeline.yml). We install them explicitly here so
+        # this job doesn't need to depend on that composite action.
         run: |
-          poetry run pip install playwright
+          poetry run pip install playwright pytest httpx
           poetry run playwright install --with-deps chromium
 
       - name: Install sgit-ai CLI (used by the live-vault tests)
