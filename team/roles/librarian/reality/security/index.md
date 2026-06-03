@@ -1,6 +1,6 @@
 # Security — Reality Index
 
-**Domain:** security/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** security/ | **Last updated:** 2026-06-01 | **Maintained by:** Librarian (daily run)
 
 This domain covers the security properties verified in code, known violations flagged for remediation, AppSec findings, external validations, and the performance baseline. It is the authoritative record for any security-related claim about SGraph Send.
 
@@ -23,6 +23,23 @@ This domain covers the security properties verified in code, known violations fl
 | Vault Pointer reads are public | No auth — zero-knowledge model: data is AES-256-GCM ciphertext, useless without key |
 | Vault Pointer writes double-gated | Requires access token + write_key |
 | Vault Pointer read-base64 size limit | Lambda response capped at 3.75MB to prevent abuse |
+
+### Vault App Trust Model (v0.31.3 — Added 2026-05-29)
+
+| Property | Status |
+|---------|--------|
+| **Trust assumption** | Vault apps are **first-party and trusted**. The permission model (Phases 1–4B) assumes cooperative app code. It is NOT a boundary against untrusted code in the same origin. |
+| **same-origin app bypass** | **Latent — SEC-VIV-001.** App frames run with `allow-same-origin`; app code can bypass `sg.*` and read vault keys/tokens from `localStorage`. Not active while all apps are first-party. **Active the moment any third-party or untrusted vault app code runs.** |
+| **Remedy (PROPOSED)** | Phase 3 of the ViV plan: drop `allow-same-origin`; app frames become `null`-origin; secrets stay kernel-side. Closes SEC-VIV-001. Gate: T1/T2/T3 browser probe tests must return BLOCKED. |
+| **Gate** | **Do NOT enable third-party, customer-authored, or shared-untrusted vault app code until Phase 3 sub-step E is complete and AppSec has signed off.** |
+| CORS fix | `allow_credentials = False` on User Lambda CORS (commit `434106dc`). Fixes Starlette reflecting `Origin: null` → `ACAO: null` (which browsers reject). CDN cache invalidation + real-browser confirmation PROPOSED (P-257). |
+
+### AppSec Findings — Vault App Trust Model
+
+| ID | Severity | Status | Description |
+|----|----------|--------|-------------|
+| SEC-VIV-001 | High | Latent (see above) | same-origin app bypass — remedied by Phase 3 null-origin (shipped v0.31.3) |
+| **SEC-VIV-002** | **Medium** | **OPEN** | **`allow-popups-to-escape-sandbox` over-granted to inner-vault content.** The four app-frame render paths (`_mountApp`, `_mountPageLayout`, `_mountVaultFile` HTML, `_mountVaultFile` markdown) unconditionally set `allow-popups allow-popups-to-escape-sandbox` in the iframe sandbox. These same methods also render mounted sub-vault content via `CompositeDataSource`. Result: HTML/markdown from an inner vault inherits the ability to open a fully unsandboxed, real-origin browsing context — a capability it never requested and the security model never intended to grant. **Decision (Dinis, 05/31):** gate popups to the root vault only; inner/mounted sub-vault content must not receive popup capability; an inner vault wanting popups becomes a future request + parent-consent flow. **Fix:** PROPOSED (P-280) — depends on kernel path unification (P-279) for clean detection of inner-vault render paths. **Source:** `team/roles/appsec/reviews/05/31/v0.31.12__appsec__popup-capability-over-grant-to-inner-vaults.md` |
 
 ### Token Security
 

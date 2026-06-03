@@ -120,7 +120,7 @@ These are version-2 §5.3 T1–T12 expanded into runnable tests. Most live in
 |---|---|---|
 | **T1** *(null child reads `parent.document` → throws)* | `library/guides/vault-html/null-origin-probe.html` (Phase 3 §7) | manual: open the probe; expect `BLOCKED: SecurityError` |
 | **T2** *(null child reads `localStorage` → throws)* | same probe | manual: expect `BLOCKED: SecurityError` |
-| **T3** *(null child cannot initiate against `window.parent`)* | `test__kernel_relay.js` | spin up a kernel in node + a fake responder; assert the responder's `channel.request` throws `directional: responder cannot initiate` |
+| **T3** *(null child cannot initiate against `window.parent`)* | `test__kernel_relay.js` | spin up a kernel in node + a fake responder; assert the responder's `channel.request(...)` throws `directional: responder cannot initiate requests`. **Also assert the inverse: `responder.send('ready', …)` works** and the initiator's `on('ready', …)` fires (review B1 — `bootFromMessage` deadlocks otherwise). |
 | **T4** *(grandchild C posts to top A; not transitive)* | `test__kernel_relay.js` | construct three kernels (A,B,C) wired A↔B and B↔C; assert C has no port to A and A's broker has no entry for C |
 | **T5** *(misroute / forged envelope dropped)* | `test__secure_channel.js` (Phase 1, E3/E4) | tamper ciphertext or use wrong peerSignKey → `Envelope.unpack` throws `EPROTO` |
 | **T6** *(replay nonce rejected)* | `test__secure_channel.js` (E5/E6) | reuse a nonce; `ReplayGuard.check` throws `EPROTO` |
@@ -130,9 +130,13 @@ These are version-2 §5.3 T1–T12 expanded into runnable tests. Most live in
 | **T10** *(null-origin GET + PUT to SG/API after the CORS fix)* | browser (Phase 0.5 §6.6 curl + real-browser iframe test) | both succeed; `ACAO: *` observed |
 | **T11** *(isolation mode: parent cannot read child↔grandchild traffic)* | `test__kernel_relay.js` | in isolation mode the parent never holds K2-priv; sniffing the port traffic yields ciphertext only |
 | **T12** *(monitoring mode visible)* | manual / Playwright | open vaults page with a kernel in monitoring mode; the `👁 MONITORED` badge is present |
+| **T13** ★ *(binary payloads survive the wire — review B2)* | `test__secure_channel.js` (E7/E8/C5) + `test__kernel_relay.js` | round-trip `Uint8Array.of(0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)` through (a) `Envelope.pack`/`unpack`, signed-only and encrypted, (b) a live `MessageChannel` via `SecureChannel.request`, (c) the full cross-vault `vfs.read`/`vfs.write` relay (Phase 2). At each layer assert byte-exact equality with the input. **This catches the JSON-strigification footgun that would silently return `{}` for file bytes** on the KneeScore driving path. |
 
-Aim: T1–T9 and T11 land **before** Phase 3 ships to prod; T10 is the Phase 0.5 gate; T12 is the
-Phase 5/6 gate.
+★ = added by the v0.29.2 architect review.
+
+Aim: T1–T9 and T11 land **before** Phase 3 ships to prod; T10 is the Phase 0.5 gate; **T13 is
+mandatory before Phase 2's browser end-to-end (02 §7) — it's the load-bearing test for the entire
+binary data path**; T12 is the Phase 5/6 gate.
 
 ---
 

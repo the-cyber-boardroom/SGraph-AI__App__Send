@@ -5,10 +5,10 @@ APP__SEND__USER__FAST_API__TITLE           = "SGraph Send"
 APP__SEND__USER__FAST_API__DESCRIPTION     = "SGraph Send — Zero-Knowledge Encrypted File Sharing"
 APP__SEND__USER__LAMBDA_DEPENDENCIES       = ['fastapi-mcp==0.4.0'                     ,
                                               'httpx==0.28.1'                          ,
-                                              'memory-fs==v0.40.0'                     ,
+                                              'memory-fs==v0.41.0'                     ,
                                               'mgraph-ai-service-cache-client==v0.33.0',
                                               'mgraph-ai-service-cache==v0.14.0'       ,
-                                              'osbot-fast-api-serverless==v1.33.0'     ]
+                                              'osbot-fast-api-serverless==v1.35.0'     ]
 
 
 APP_SEND__UI__USER__ROUTE__PATH__CONSOLE    = 'send'

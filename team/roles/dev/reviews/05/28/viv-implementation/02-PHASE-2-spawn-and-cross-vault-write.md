@@ -2,7 +2,29 @@
 
 **Pack version** v0.28.7 · **Audience** the agent implementing the ViV product unlock.
 **Authoritative spec:** version-2 §01 (esp. §4–§9), §02 §2.4–§2.6, §04 §4.4–§4.6.
-**Preconditions:** Phase 1 (SecureChannel) green; Phase 0.5 (CORS) applied in `dev`.
+
+> ## 🛑 HARD PRECONDITION — confirm before §7 (the browser end-to-end)
+>
+> Phase 2's `mountChild` boots a `null`-origin kernel that **immediately calls `SGVault.open` →
+> `fetch dev.send.sgraph.ai`**. That fetch is CORS-bound. The code-side CORS fix has shipped
+> (`Fast_API__SGraph__App__Send__User.py:117`: `allow_credentials=False`, `allow_origins=["*"]`,
+> commit `434106dc` on `dev`), but you must **independently verify on the live `dev` CDN** that:
+>
+> 1. `curl -i -X OPTIONS https://dev.send.sgraph.ai/<vault-route> -H 'Origin: null' \
+>     -H 'Access-Control-Request-Method: PUT' \
+>     -H 'Access-Control-Request-Headers: x-sgraph-access-token'` returns
+>    `Access-Control-Allow-Origin: *` (NOT `null`, NOT a reflected origin), with **no**
+>    `Access-Control-Allow-Credentials` header.
+> 2. A tokenless GET and a token PUT from `Origin: null` both succeed (pack §6.6).
+> 3. A real-browser `sandbox="allow-scripts"` iframe on `dev.vault.sgraph.ai` completes the same
+>    GET/PUT round-trip with no console errors.
+>
+> **If you see `Failed to fetch`, the first thing to suspect is a stale CDN cache of the old
+> reflected-`Origin` header — invalidate the CloudFront cache before debugging code.** This is the
+> single most common waste-a-session trap for this phase.
+>
+> **Phase 1 (SecureChannel, no network) is *not* blocked by this** and can proceed in parallel; only
+> §7 (the browser end-to-end) requires it.
 
 **What this phase ships:** a kernel can **mount** a child vault as a `null`-origin iframe with its own
 kernel, message-booted via SecureChannel; `sg.vfs.*` resolves mounts and **relays** invocations to the
@@ -107,23 +129,30 @@ class KernelBroker {
 
   setPolicy(mountId, capability, value)        { this._policy.set(`${mountId}|${capability}`, value); }
 
+  // Default policy by capability — confirmed shape:
+  //   fs.read  (covers read + list) → 'auto'   (no prompt; transparent reads)
+  //   fs.write / fs.delete / fs.mkdir / fs.move → 'ask'
+  //   vault.create / vault.unlink     → 'ask'   (HUD consent stays one-time per (vault, app, verb))
+  _defaultPolicy(cap) { return cap === 'fs.read' ? 'auto' : 'ask'; }
+
   // Called by the kernel BEFORE relaying a request to a child.
+  // Returns { decision: 'allow'|'deny', entryId }. entryId is the opaque handle for finalize().
   async mediate(op, mountId, path, credentialClass = 'none') {
     const cap = this._capabilityFor(op);                                // 'fs.read' | 'fs.write' | ...
-    const policy = this._policy.get(`${mountId}|${cap}`) || (op === 'read' ? 'auto' : 'ask');
+    const policy = this._policy.get(`${mountId}|${cap}`) || this._defaultPolicy(cap);
     let decision = 'deny';
     if (policy === 'auto')        decision = 'allow';
     else if (policy === 'never')  decision = 'deny';
     else if (policy === 'ask')    decision = this._ui ? await this._ui.prompt({ op, mountId, path, credentialClass }) : 'deny';
-    this._log.push({ ts: Date.now(), edge: `${this._kernelId}▶${mountId}`, mountId, op, path, credentialClass, policy, decision, result: 'pending' });
-    return decision;
+    const entryId = 'be-' + (this._seq = (this._seq || 0) + 1) + '-' + Date.now().toString(36);
+    this._log.push({ entryId, ts: Date.now(), edge: `${this._kernelId}▶${mountId}`, mountId, op, path, credentialClass, policy, decision, result: 'pending' });
+    return { decision, entryId };
   }
 
-  // Called by the kernel AFTER the relayed op completes (or fails) to close the log entry.
-  finalize(mountId, path, op, result) {
+  // Close the entry by its opaque id — robust under concurrent ops on the same path.
+  finalize(entryId, result) {
     for (let i = this._log.length - 1; i >= 0; i--) {
-      const e = this._log[i];
-      if (e.mountId === mountId && e.op === op && e.path === path && e.result === 'pending') { e.result = result; return; }
+      if (this._log[i].entryId === entryId) { this._log[i].result = result; return; }
     }
   }
 
@@ -136,8 +165,16 @@ class KernelBroker {
 globalThis.KernelBroker = KernelBroker;
 ```
 
-Tests: policy defaults, log structure, `mediate` with each policy (`auto` / `ask` answered yes/no /
-`never`), `finalize` closes the matching pending entry.
+> **Why an opaque `entryId` (review N3):** the earlier sketch closed entries by tuple
+> `(mountId, op, path)`, which mis-attributes results under concurrency (two writes to the same path,
+> a write + retry, etc.). The audit trail is a security artefact; tuple-matching corrupts it under
+> exactly the conditions a real workflow produces. Opaque `entryId` returned from `mediate` and
+> passed back to `finalize` makes the close 1:1.
+
+Tests: policy defaults (`fs.read` = auto, mutations = ask), log structure includes `entryId`,
+`mediate` with each policy outcome, **concurrent-ops test:** issue two `mediate(...)` for the same
+`(mountId, op, path)`, finalize them out of order using their `entryId`s, assert each log row carries
+its own `result`.
 
 ## 4. Sub-step C — `kernel-boot.js` (the state machine)
 
@@ -220,16 +257,22 @@ class Kernel {
       }
       throw codeError('EPERM', 'unknown op');
     }
-    // Cross-mount — Edge 2 (relay)
+    // Cross-mount — Edge 2 (relay). The child runs its own resolve(rest) recursively, so depth-N works.
     const credentialClass = credential ? 'perRequest-rw' : 'standing';
-    const decision = await this._broker.mediate(op, hit.mount.mountId, hit.rest, credentialClass);
-    if (decision !== 'allow') { this._broker.finalize(hit.mount.mountId, hit.rest, op, 'EPERM'); throw codeError('ECONSENT', 'broker denied'); }
+    const { decision, entryId } = await this._broker.mediate(op, hit.mount.mountId, hit.rest, credentialClass);
+    if (decision !== 'allow') { this._broker.finalize(entryId, 'ECONSENT'); throw codeError('ECONSENT', 'broker denied'); }
+
+    // Mount-root listing (review N1): `list` of 'mounts/<m>' with rest==='' relays as a child-root list.
+    // The child treats path:'' as '/' (its root) in its own resolve(). Both 'list' and 'read' are
+    // handled identically by the relay — only the child's interpretation of an empty path differs.
+    const relayPayload = { path: hit.rest, data, credential };
+
     try {
-      const result = await hit.mount.channel.request('vfs.' + op, { path: hit.rest, data, credential }, { sensitive: !!data });
-      this._broker.finalize(hit.mount.mountId, hit.rest, op, 'ok');
+      const result = await hit.mount.channel.request('vfs.' + op, relayPayload, { sensitive: !!data || op === 'read' });
+      this._broker.finalize(entryId, 'ok');
       return result;
     } catch (err) {
-      this._broker.finalize(hit.mount.mountId, hit.rest, op, err.code || 'EPROTO');
+      this._broker.finalize(entryId, err.code || 'EPROTO');
       throw err;
     }
   }

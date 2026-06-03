@@ -205,3 +205,30 @@ All items below are PROPOSED — does not exist yet.
 | P-162 | AppSec vault schema for threat artefacts | System descriptions, threat lists, attack trees, mitigations, evidence — all in vault | doc 423 |
 | P-163 | SBOM analysis mini-tool (planned next) | syft/cdxgen integration; vault holds SBOM + change history; planned after threat modelling | doc 423 |
 | P-164 | Dependency scanning mini-tool (planned next) | trivy/grype integration; vault tracks findings and fixes; planned after threat modelling | doc 423 |
+
+---
+
+## Partner Integrations + Skills Ecosystem (05/30–06/01 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+### Partner Integration Stack
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-288 | Netlify AX Integration | Two deployment modes: Mode A (rendered output zip → Netlify deploys); Mode B (encrypted vault zip + Netlify edge function decrypts with public read key). Mode A for public library sites; Mode B for vault-native hosting. Depends on VIV for Mode B. | 05/30 brief |
+| P-289 | Daytona Sandbox Integration | Vault holds code → Daytona runs it → results flow back to vault with provenance. Result return interface to be specified (stdout / structured JSON / artefacts). Stateful sandbox session contract for multi-round workflows. Blocks P-298 (comparison vault). | 06/01 brief |
+| P-290 | Convex Reactive State Integration | Vault = source of truth; Convex = live working state layer. Sync boundary unspecified — what triggers commit from Convex to vault? Who holds vault write key in Convex-backed app? Zero-knowledge property must hold when Convex has live working state. BLOCKED on architect boundary document. Architecturally riskiest integration. | 06/01 brief |
+| P-291 | Pi Coding Agent Harness Integration | Bidirectional base-vault ↔ Pi-Package mapping via open Skills standard. Pi adds agent harness + unified LLM API; does not duplicate vault storage model. Additive, low risk. | 06/01 brief |
+| P-292 | HeyGen Video Agent Integration | HeyGen wrapped as a skill/connector on the MCP path. Vault content → script conversion (agent-side recommended); generated video stored back in vault with provenance edge to source content. | 06/01 brief |
+| P-293 | Tavon White-Label AI Solutions | Channel/GTM decision; no development work from sg-send repo. Assign to Strategy/Ambassador. | 06/01 brief |
+
+### Skills Creator Economy
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-294 | Semantic Knowledge Graphs for Agentic Skills | Document-to-graph pipeline (P-281) applied to SKILL.md files. Skill-specific edge types: prerequisite, composition, conflict, family, capability, provenance. Graph schema is a superset of P-281 compliance graph schema — one unified schema covers both. Persisted in base vault. Drives marketplace discovery (P-297) and comparison (P-298). | 06/01 brief |
+| P-295 | Skill Base Vaults + Creator Economy | Base vault schema for skills: SKILL.md, code samples (multiple languages), guidance, evidence/credibility, certifications, tests/evals, threat model, security materials, version history. Open Standards format (agentskills.io). Base-to-customised promotion path. Creator reputation field (provenance-grounded, portable). Licensing metadata (base open/CC; customised commercial). | 06/01 brief |
+| P-296 | Skills Creator Economy (Branded/Certified/Customised Versions) | Refinement of P-295. Three sellable versions on the open base: branded (creator brand), certified (creator-certified), customised (developed + certified + maintained by creator — the IP-bearing product). IP is specifically in the customised, maintained version. Maintenance as ongoing relationship (version control + provenance). | 06/01 brief |
+| P-297 | Skills Marketplace with Scoring and Community Feedback | Marketplace built on Vault App Store. Composite vault-grounded scoring: provenance score, eval score, security score, behaviour/safety score, usage score, community feedback score, reputation score. Community feedback via sub-vault harvesting (reviews, endorsements, usage, issues) — all with provenance. Multi-marketplace publishing via open standard portable zip. Depends on P-295, P-294, Vault App Store (prior P). | 06/01 brief |
+| P-298 | Skill Comparison + CLI-Wrapping + Token Optimisation | Three capabilities: (1) comparison vault — talk to candidates via vault chat (P-248), run in Daytona (P-289), rank with explainability, publish as cloneable public vault; (2) CLI-wrapping — arbitrary CLI wrapped in sandbox with tests, exposed as agent-usable skill; (3) token optimisation — broken-down optimised delivery sized to consumer's token budget and runtime context. | 06/01 brief |

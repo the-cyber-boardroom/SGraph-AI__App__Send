@@ -1,6 +1,6 @@
 # Infrastructure — Reality Index
 
-**Domain:** infra/ | **Last updated:** 2026-05-13 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/ | **Last updated:** 2026-06-01 | **Maintained by:** Librarian (daily run)
 
 This domain covers deployment infrastructure: storage backends, Lambda functions, CI/CD pipelines, container deployments, and the 7 deployment targets. It does not cover the application API (see `../api/`) or security properties (see `../security/`).
 
@@ -85,6 +85,21 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 
 - **Admin Lambda deploy skipped on `main` and `prod`** — Admin Lambda is not active on main/prod targets. CI steps for admin lambda deploy are bypassed on both (commits `c792383`, `a06a112`, 01 May 2026). Admin Lambda still deploys to `dev`.
 
+### Vault UI Test Pipeline — Reusable Workflow (added 01 June 2026)
+
+**`.github/workflows/_test-ui-vault.yml`** (commit `101d5a35`): Reusable workflow defining the vault UI test pipeline in one place so it cannot drift across callers.
+
+| Job | Runner | Timeout | Command | Notes |
+|-----|--------|---------|---------|-------|
+| `unit` | ubuntu-latest | 5 min | `npm run test:vault-unit` | Pure JS + jsdom, ~5s |
+| `integration` | ubuntu-latest | 5 min | `npm run test:vault-integration` | Node + jsdom + in-memory SGVault stub, ~10s |
+| `e2e` | ubuntu-latest | 2 min | `npm run test:vault-e2e` | Playwright Chromium, ~60s |
+| `browser-integration` | ubuntu-latest | 5 min | `poetry run pytest tests/integration/vault_ui/browser/` | Python + Playwright + sgit-ai, ~15s |
+
+`package.json` new script: `"test:vault-browser-integration": ".venv/bin/python3 -m pytest tests/integration/vault_ui/browser/ -v"`
+
+**Note:** This workflow is defined as a reusable caller (`on: workflow_call`). Verify that `deploy-ui-vault.yml` invokes it as a pre-deploy gate (OQ-browser-int-tests-ci-1).
+
 ### CI Python Scripts
 
 | Script | What It Does |
@@ -113,8 +128,16 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 
 ---
 
+### Lambda Dependency Update Workflow
+
+- **Guide:** `library/guides/development/dependencies/v0.29.1__guide__updating-dependencies-lambda-and-docker.md`
+- **Architecture brief:** `team/comms/briefs/05/20/v0.27.38__architect-to-dev__lambda-dependency-packaging.md`
+- **Two-track model:** Docker uses wildcard deps in `pyproject.toml` (auto-latest on build). Lambda uses hardcoded `==` pins in `user__config.py` / `admin__config.py` with content-addressable S3 cache (`sha256(sorted(pins))[:12]`). Pin bump = cache bust = fresh pip resolution.
+- **Verification endpoint:** `GET /api/info/versions` returns installed versions of all tracked dependencies at runtime
+
 ## PROPOSED (Not Yet Implemented)
 
+- CloudFront behavior bypass for `obj-cas-imm-*` immutable objects — skip Lambda@Edge, cache at edge for 1 year (`team/roles/architect/reviews/06/03/v0.29.1__proposal__cloudfront-immutable-object-bypass.md`)
 - Deploy Infrastructure — Ephemeral EC2 Deploy Service (control plane, Router Lambda) (Section 16)
 - Docker-based local LLM chat (`sg_send_deploy__local_llm/`) with FastAPI Ollama proxy (Section 16)
 - 3 local LLM chat UI Web Components (`chat-panel`, `session-list`, `model-picker`) (Section 16)

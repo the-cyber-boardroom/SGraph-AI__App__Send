@@ -69,6 +69,9 @@
             var tabs = [
                 { id: 'vault-trace', label: '🔓 Vault', tag: 'app-debug-vault-trace' },
                 { id: 'bridge-log',  label: '🔌 Bridge', tag: 'app-debug-bridge-log'  },
+                { id: 'mounts',      label: '🔗 Mounts', tag: 'app-debug-mounts'       },
+                { id: 'audit',       label: '🛡️ Audit',  tag: 'app-debug-audit'       },
+                { id: 'repl',        label: '›_ REPL',   tag: 'app-debug-repl'        },
                 { id: 'app-state',   label: '📊 State',  tag: 'app-debug-app-state'   },
                 { id: 'network',     label: '🌐 Net',    tag: 'app-debug-network'      },
             ];
