@@ -7,6 +7,30 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-03
+
+Second librarian session on the same briefs (first was 06/02, ref `team/roles/librarian/reviews/06/02/`). This session produced more detailed architect/dev reviews and a debrief; the reality document updates were carried forward from the 06/02 session (canonical P-numbers). Index date updated to 06/03.
+
+- `index.md` — Date updated 06/02 → 06/03 (second session); all other stats from 06/02 session retained
+- `vault/proposed/index.md` — Added P-281 (vault-per-standard pipeline), P-282 (public preview + embedded RO key), P-284 (vulnerability debriefs as vault artefacts); already carried from 06/02 session
+
+Master index (06/03 session): `team/roles/librarian/reviews/06/03/v0.31.18__master-index__briefs-30-may-to-01-june.md`
+Architect review: `team/roles/architect/reviews/06/03/v0.31.18__architect-review__briefs-30-may-to-01-june.md`
+Dev review: `team/roles/dev/reviews/06/03/v0.31.18__dev-review__briefs-30-may-to-01-june.md`
+
+## 2026-06-02
+
+- `index.md` — Updated: version v0.31.15 → v0.31.18; date 06/01 → 06/02; PROPOSED 397+ → 416+ (P-281–P-299 canonical); total docs 524 → 546 (22 new human briefs from 05/30, 05/31, 06/01)
+- `vault/proposed/index.md` — Added P-281 (vault-per-standard pipeline), P-282 (public preview + embedded RO key), P-284 (vulnerability debriefs); last updated 05/25 → 06/02
+- `ai-agents/proposed/index.md` — Added P-283 (library as shop front + FS email), P-286 (per-page semantic graphs), P-288–P-299 (Netlify, Daytona, Convex, Pi, HeyGen, Tavon, skills graph, base vaults, creator economy, marketplace, comparison, OpenRouter broker); last updated 05/21 → 06/02
+- `website/proposed/index.md` — Added P-283 (library as shop front), P-285 (agent-controlled website + vault CI), P-286 (per-page semantic graphs), P-287 (industry use-case pages); last updated 05/17 → 06/02
+- `identity/proposed/index.md` — Added P-299 (OpenRouter key/credit/billing broker service); last updated (previous) → 06/02
+
+Master index (06/02 session): `team/roles/librarian/reviews/06/02/v0.31.18__master-index__briefs-30-31-may-01-june.md`
+Processed: 22 new human briefs (05/30 ×5, 05/31 ×4, 06/01 ×13) | New PROPOSED: 19 (P-281–P-299 canonical)
+
+---
+
 ## 2026-06-01
 
 - `index.md` — Updated: version v0.31.12 → v0.31.15; date 05/31 → 06/01; unit tests ~1240+ → ~1257+; PROPOSED 395+ → 397+ (P-279–P-280)

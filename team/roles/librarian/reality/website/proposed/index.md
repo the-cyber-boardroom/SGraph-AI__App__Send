@@ -106,3 +106,16 @@ redesign shipped; subhead not yet decided).
 | Proposed Feature | Status |
 |-----------------|--------|
 | `<sg-video>` Web Component for encrypted vault video playback | PROPOSED — does not exist yet; cipher mode research required |
+
+---
+
+## Agent-Controlled Web + Vault Publishing (05/30–06/01 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-283 | Library as Shop Front + Multi-Agent Content Workflow | Library website rendered from vault; multi-agent content workflow (content vault + communications vault + FS email + dev/content/QA agents). Claimed working in website and sgit-ai repos — NOT code-verified in sg-send repo (OQ-library-rendering-verify-1). Assign to Librarian to verify in website repo. | 05/30 brief |
+| P-285 | Agent-Controlled Websites + Vault CI Pipeline | Per-agent section vaults (ambassador/alchemist/journalist) + website vault as VIV parent (P-159/P-160); dev/QA/prod environment vaults; vault-to-vault promotion as CI step (commit-queue/sgit push); prod on separate server. BLOCKED on VIV browser verification (OQ-viv-phase2-browser-1). | 05/30 brief |
+| P-286 | Per-Page Semantic Graphs + Edge Rendering | Lambda@Edge function extended from llms.txt to generate and cache per-page semantic graph; URL scheme `page.graph.json` (JSON-LD); cached on content change only; public vaults only — no edge-side decryption of private content. Foundation: llms.txt edge function in website repo (OQ-llmstxt-edge-verify-1). | 05/30 brief |
+| P-287 | Industry Use-Case Pages with Embedded Vaults | Per-industry vault as VIV child of website vault; rendered as embedded section on industry page via public read key; per-industry engagement metrics. BLOCKED on VIV browser verification. | 05/31 brief |

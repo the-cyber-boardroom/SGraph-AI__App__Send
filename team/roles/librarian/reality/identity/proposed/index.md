@@ -112,3 +112,13 @@ All items below are PROPOSED — does not exist yet.
 | P-168 | Gmail API connector v2 (bidirectional sync; OAuth scoped to read + send; mirrors Gmail mailbox into vault) | doc 425 |
 | P-169 | WorkMail migration tool: export mbox/maildir from WorkMail → parse → commit to email-fs vault; reusable for future customers | doc 425 |
 | P-170 | Private email vault isolation: dedicated vault per user; separate encryption key, S3 bucket/account, access path, and backup cadence from public vaults | doc 425 |
+
+---
+
+## LLM API Billing Broker (06/01 brief)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-299 | OpenRouter Key/Credit/Billing Broker | Vault for secrets + auth (Google OAuth, PROPOSED) as foundation. New build: credit-purchase layer, payment-brokering layer (Stripe — do not build custom payment processing). BLOCKED on financial/legal requirements analysis. Payment brokering is regulated. | 06/01 brief |
