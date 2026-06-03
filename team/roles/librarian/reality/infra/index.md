@@ -113,8 +113,16 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 
 ---
 
+### Lambda Dependency Update Workflow
+
+- **Guide:** `library/guides/development/dependencies/v0.29.1__guide__updating-dependencies-lambda-and-docker.md`
+- **Architecture brief:** `team/comms/briefs/05/20/v0.27.38__architect-to-dev__lambda-dependency-packaging.md`
+- **Two-track model:** Docker uses wildcard deps in `pyproject.toml` (auto-latest on build). Lambda uses hardcoded `==` pins in `user__config.py` / `admin__config.py` with content-addressable S3 cache (`sha256(sorted(pins))[:12]`). Pin bump = cache bust = fresh pip resolution.
+- **Verification endpoint:** `GET /api/info/versions` returns installed versions of all tracked dependencies at runtime
+
 ## PROPOSED (Not Yet Implemented)
 
+- CloudFront behavior bypass for `obj-cas-imm-*` immutable objects — skip Lambda@Edge, cache at edge for 1 year (`team/roles/architect/reviews/06/03/v0.29.1__proposal__cloudfront-immutable-object-bypass.md`)
 - Deploy Infrastructure — Ephemeral EC2 Deploy Service (control plane, Router Lambda) (Section 16)
 - Docker-based local LLM chat (`sg_send_deploy__local_llm/`) with FastAPI Ollama proxy (Section 16)
 - 3 local LLM chat UI Web Components (`chat-panel`, `session-list`, `model-picker`) (Section 16)
