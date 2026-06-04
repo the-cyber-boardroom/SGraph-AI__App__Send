@@ -96,6 +96,38 @@ class Storage_FS__S3(Storage_FS):                                               
             paths.append(Safe_Str__File__Path(s3_key))
         return sorted(paths)
 
+    def folder__folders(self, parent_folder,                                     # List immediate subfolder names under a prefix (derived from keys)
+                              return_full_path: bool = True
+                       ) -> List[Safe_Str__File__Path]:
+        scoped     = str(parent_folder)                                          # base path (no s3_prefix) used to strip the remainder
+        if scoped and not scoped.endswith('/'):
+            scoped += '/'
+        s3_prefix  = self.s3_key(parent_folder)                                  # full S3 prefix (with optional s3_prefix) for the list call
+        if not s3_prefix.endswith('/'):
+            s3_prefix += '/'
+        s3_keys    = self._s3().find_files(bucket=self.s3_bucket, prefix=s3_prefix)
+        subfolders = set()
+        for s3_key in s3_keys:
+            key = s3_key
+            if self.s3_prefix:                                                   # strip optional s3_prefix to get the application-relative key
+                pfx = self.s3_prefix if self.s3_prefix.endswith('/') else f"{self.s3_prefix}/"
+                if key.startswith(pfx):
+                    key = key[len(pfx):]
+            if not key.startswith(scoped):
+                continue
+            remainder = key[len(scoped):]
+            parts     = remainder.split('/')
+            if len(parts) <= 1:                                                  # a file directly in the folder, not a subfolder
+                continue
+            first = parts[0]
+            if not first:
+                continue
+            if return_full_path:
+                subfolders.add(Safe_Str__File__Path(f'{scoped}{first}'))
+            else:
+                subfolders.add(Safe_Str__File__Path(first))
+        return sorted(subfolders)
+
     def files__paths(self) -> List[Safe_Str__File__Path]:                       # List all file paths in bucket
         prefix  = self.s3_prefix if self.s3_prefix else ''
         s3_keys = self._s3().find_files(bucket=self.s3_bucket, prefix=prefix)

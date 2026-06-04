@@ -16,14 +16,19 @@ from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                   
 
 
 VAULT_ID     = 'inboxrt00001'
-WRITE_KEY    = 'route_test_write_key_1234'
-APPEND_TOKEN = 'route_test_append_token'
-ENUM_KEY     = 'route_test_enum_key'
+WRITE_KEY    = 'route_test_write_key_1234'                                       # only hashed for the gate — need not be hex
+ENUM_KEY     = hashlib.sha256(b'route-enum-key').hexdigest()                    # hex so the tier test can present it as a token and reach the gate
+APPEND_TOKEN = hashlib.sha256(b'route-recipient-pubkey').hexdigest()            # token = H(pubkey) — hex, also the folder name
 PAYLOAD      = b'\x00\x01\x02encrypted-route-test'
+GHOST_FILE_ID = '1700000000000_aaaaaaaaaaaaaaaaaaaaaaaa.enc'                     # well-formed but never written
 
 
 def _hash(value):
     return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _hex_token(seed):
+    return hashlib.sha256(seed.encode()).hexdigest()
 
 
 class test_Routes__Vault__Inbox(TestCase):
@@ -145,8 +150,13 @@ class test_Routes__Vault__Inbox(TestCase):
 
     def test__append__wrong_token(self):
         self._create_vault('appendrt0002')
-        response = self._append('appendrt0002', token='wrong')
+        response = self._append('appendrt0002', token=_hex_token('wrong'))      # well-formed but not an anchor
         assert response.status_code == 403
+
+    def test__append__malformed_token(self):
+        self._create_vault('appendrt0007')
+        response = self._append('appendrt0007', token='../../etc')             # traversal attempt → 400
+        assert response.status_code == 400
 
     def test__append__missing_token(self):
         self._create_vault('appendrt0003')
@@ -288,7 +298,7 @@ class test_Routes__Vault__Inbox(TestCase):
         vault = 'fetchrt00005'
         self._create_vault(vault)
         response = self._fetch(vault, inbox=APPEND_TOKEN,
-                                file_ids=['nonexistent.enc'])
+                                file_ids=[GHOST_FILE_ID])
         assert response.status_code == 200
         data = response.json()
         assert len(data['files'])   == 0
@@ -496,8 +506,8 @@ class test_Routes__Vault__Inbox(TestCase):
 
     def test__multiple_correspondents(self):
         vault = 'multicor0001'
-        token_a = 'correspondent_alpha'
-        token_b = 'correspondent_beta'
+        token_a = _hex_token('correspondent-alpha')
+        token_b = _hex_token('correspondent-beta')
         manifest = dict(vault_id       = vault                                ,
                         write_key_hash = _hash(WRITE_KEY)                     ,
                         append_anchors = [_hash(token_a), _hash(token_b)]     ,
@@ -515,3 +525,40 @@ class test_Routes__Vault__Inbox(TestCase):
         listing_b = self._list(vault, inbox=token_b).json()
         assert len(listing_a['entries']) == 2
         assert len(listing_b['entries']) == 1
+
+    # =========================================================================
+    # Input validation / path-traversal (B-2) and batch cap (I-3) over HTTP
+    # =========================================================================
+
+    def test__fetch__traversal_file_id_400(self):
+        vault = 'travrt000001'
+        self._create_vault(vault)
+        response = self._fetch(vault, inbox=APPEND_TOKEN,
+                                file_ids=['../../bare/data/obj/payload'])
+        assert response.status_code == 400
+
+    def test__fetch__traversal_inbox_400(self):
+        vault = 'travrt000002'
+        self._create_vault(vault)
+        response = self._fetch(vault, inbox='../../bare', file_ids=[GHOST_FILE_ID])
+        assert response.status_code == 400
+
+    def test__purge__traversal_file_id_400(self):
+        vault = 'travrt000003'
+        self._create_vault(vault)
+        response = self._purge(vault, folder='inbox', inbox=APPEND_TOKEN,
+                                file_ids=['../../manifest.json'])
+        assert response.status_code == 400
+
+    def test__fetch__oversized_batch_400(self):
+        vault = 'travrt000004'
+        self._create_vault(vault)
+        response = self._fetch(vault, inbox=APPEND_TOKEN,
+                                file_ids=[GHOST_FILE_ID] * 101)
+        assert response.status_code == 400
+
+    def test__list__garbage_limit_400(self):
+        vault = 'travrt000005'
+        self._create_vault(vault)
+        response = self._list(vault, limit='abc')
+        assert response.status_code == 400
