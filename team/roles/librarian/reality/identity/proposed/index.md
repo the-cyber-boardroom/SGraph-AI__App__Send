@@ -100,6 +100,16 @@ All items below are PROPOSED — does not exist yet.
 
 ---
 
+## PKI Identity Envelopes + Identity-Provider Partnership (06/03 brief)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-314 | PKI Not Secrets — Identity Envelopes + Identity-Provider Partnership | Paradigm shift: instead of one vault key (a secret), each identity holds many granular keys. Vault becomes a "travelling envelope" carrying identity proof, evidence of actions, tools, schemas, and scoped capabilities. Supply-chain workflows gated by cryptographic key handoffs (A signs off → only B can continue). Surgical ephemeral privilege elevation (time-limited scoped key, not full vault key). Partnership with identity-provider companies to distribute and manage keys at scale. Phases: P0 append_token model (EXISTS in vault inbox), Phase 1 per-vault scoped keys (P-313), Phase 2 per-identity PKI + IdP integration. Requires key distribution model decision (`OQ-pki-key-distribution-model-1`). | 06/03 arch-brief |
+
+---
+
 ## SG Mail Email Client (05/16 brief — doc 425)
 
 All items below are PROPOSED — does not exist yet.

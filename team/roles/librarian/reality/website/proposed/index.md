@@ -119,3 +119,14 @@ All items below are PROPOSED — does not exist yet.
 | P-285 | Agent-Controlled Websites + Vault CI Pipeline | Per-agent section vaults (ambassador/alchemist/journalist) + website vault as VIV parent (P-159/P-160); dev/QA/prod environment vaults; vault-to-vault promotion as CI step (commit-queue/sgit push); prod on separate server. BLOCKED on VIV browser verification (OQ-viv-phase2-browser-1). | 05/30 brief |
 | P-286 | Per-Page Semantic Graphs + Edge Rendering | Lambda@Edge function extended from llms.txt to generate and cache per-page semantic graph; URL scheme `page.graph.json` (JSON-LD); cached on content change only; public vaults only — no edge-side decryption of private content. Foundation: llms.txt edge function in website repo (OQ-llmstxt-edge-verify-1). | 05/30 brief |
 | P-287 | Industry Use-Case Pages with Embedded Vaults | Per-industry vault as VIV child of website vault; rendered as embedded section on industry page via public read key; per-industry engagement metrics. BLOCKED on VIV browser verification. | 05/31 brief |
+
+---
+
+## Blast Radius Strategy + Consultant Delivery (06/02 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-306 | Blast Radius Company Thesis — Website Positioning | Cybersecurity vertical framing: security change is business change; blast radius = zone of change from any security initiative; four-part thesis: side-effect taxonomy (neutral/negative-but-accepted/net-positive), don't become a choke point, open-source play creates sovereignty, visibility + digital twin of blast radius; many small fast-value solutions scale better than one large one; SG/Vault naturally maps onto this model as non-choke-point infrastructure. Translate into website cybersecurity landing page. | 06/02 strategy-brief |
+| P-308 | Consultant Delivery Playbook — Website/Marketing | Practitioner-facing delivery model: run-your-own vault as consultant infrastructure (serverless single-tenant or self-hosted multi-tenant); eight-step engagement with two mandatory sign-offs (discovery + delivery); critical side-by-side rule (never replace a working system without running both in parallel long enough to prove value); commercial test (consultant time savings > customer change cost?); case-study compounding (each vault becomes a case study and template). Surface on website for consultant audience. | 06/02 strategy-brief |
