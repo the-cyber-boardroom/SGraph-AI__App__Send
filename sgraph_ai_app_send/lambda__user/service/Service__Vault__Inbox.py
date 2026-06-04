@@ -10,8 +10,9 @@ import secrets
 import time
 from   memory_fs.storage_fs.Storage_FS                                           import Storage_FS
 from   memory_fs.storage_fs.providers.Storage_FS__Memory                         import Storage_FS__Memory
-from   osbot_utils.type_safe.primitives.domains.identifiers.safe_int.Timestamp_Now import Timestamp_Now
 from   osbot_utils.type_safe.Type_Safe                                           import Type_Safe
+from   sgraph_ai_app_send.lambda__user.schemas.Safe_Str__Vault__Append_Token     import Safe_Str__Vault__Append_Token
+from   sgraph_ai_app_send.lambda__user.schemas.Safe_Str__Vault__Inbox__File_Id   import Safe_Str__Vault__Inbox__File_Id
 from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                    import (path__vault_manifest          ,
                                                                                          path__vault_tombstone         ,
                                                                                          path__vault_inbox             ,
@@ -19,12 +20,12 @@ from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                   
                                                                                          path__vault_processed         ,
                                                                                          path__vault_processed_prefix  )
 
-INBOX_MAX_FILES       = 1000
-INBOX_MAX_BYTES       = 50 * 1024 * 1024  # 50 MB
-APPEND_MAX_PAYLOAD    = 5  * 1024 * 1024  # 5 MB per message
-INBOX_DEFAULT_LIMIT   = 50
-INBOX_MAX_LIMIT       = 200
-INLINE_CONTENT_CEILING = 3 * 1024 * 1024  # 3 MB summed ciphertext for include_content
+INBOX_MAX_FILES          = 1000                                                  # Per-inbox file-count cap (availability guard)
+APPEND_MAX_PAYLOAD       = 5  * 1024 * 1024                                      # 5 MB per message
+INBOX_DEFAULT_LIMIT      = 50
+INBOX_MAX_LIMIT          = 200
+INBOX_BATCH_MAX_FILE_IDS = 100                                                   # Cap per fetch/mark-processed/purge batch (DoS guard)
+INLINE_CONTENT_CEILING   = 3 * 1024 * 1024                                       # 3 MB summed ciphertext for include_content
 
 
 class Service__Vault__Inbox(Type_Safe):
@@ -56,6 +57,14 @@ class Service__Vault__Inbox(Type_Safe):
     @staticmethod
     def _hash(value):
         return hashlib.sha256(value.encode()).hexdigest()
+
+    @staticmethod
+    def _safe_token(value):                                                      # Coerce to a hex-only, traversal-proof folder name (raises on bad input)
+        return Safe_Str__Vault__Append_Token(value)
+
+    @staticmethod
+    def _safe_file_id(value):                                                    # Coerce to the server's own filename format (raises on bad input)
+        return Safe_Str__Vault__Inbox__File_Id(value)
 
     def _check_append_token(self, vault_id, presented_token):
         manifest = self._load_manifest(vault_id)
@@ -95,25 +104,22 @@ class Service__Vault__Inbox(Type_Safe):
         return dict(vault_id = vault_id, status = 'configured')
 
     def append(self, vault_id, append_token, payload_bytes):
-        if not self._check_append_token(vault_id, append_token):
+        try:
+            token = self._safe_token(append_token)                              # hex-only — safe as a path component (B-2)
+        except (ValueError, Exception):
+            return dict(status='invalid_input')
+        if not self._check_append_token(vault_id, token):
             return dict(status='gate_failed')
         if len(payload_bytes) > APPEND_MAX_PAYLOAD:
             return dict(status='payload_too_large')
-        inbox_prefix = path__vault_inbox_prefix(vault_id, append_token)
-        files        = self.storage_fs.folder__files__all(inbox_prefix)
+        inbox_prefix = path__vault_inbox_prefix(vault_id, token)
+        files        = self.storage_fs.folder__files__all(inbox_prefix)         # file-count cap only — no per-file reads (I-2)
         if len(files) >= INBOX_MAX_FILES:
             return dict(status='at_capacity')
-        total_size = 0
-        for f in files:
-            file_bytes = self.storage_fs.file__bytes(str(f))
-            if file_bytes:
-                total_size += len(file_bytes)
-        if total_size + len(payload_bytes) > INBOX_MAX_BYTES:
-            return dict(status='at_capacity')
-        epoch_ms = f'{int(time.time() * 1000):013d}'
-        rand_hex = secrets.token_hex(12)
+        epoch_ms  = f'{int(time.time() * 1000):013d}'
+        rand_hex  = secrets.token_hex(12)                                       # 96 bits — carries append-blindness at the ciphertext layer
         file_name = f'{epoch_ms}_{rand_hex}.enc'
-        file_path = path__vault_inbox(vault_id, append_token, file_name)
+        file_path = path__vault_inbox(vault_id, token, file_name)
         self.storage_fs.file__save(file_path, payload_bytes)
         return dict(status='ok')
 
@@ -121,56 +127,68 @@ class Service__Vault__Inbox(Type_Safe):
                    limit=None, include_content=False):
         if not self._check_enum_key(vault_id, enum_key):
             return dict(status='gate_failed')
-        manifest = self._load_manifest(vault_id)
-        anchors  = manifest.get('append_anchors', [])
-        if limit is None:
-            limit = INBOX_DEFAULT_LIMIT
-        limit = min(limit, INBOX_MAX_LIMIT)
-        all_entries = []
-        token_folders = []
-        if inbox:
-            token_folders = [inbox]
-        else:
+        try:
+            limit = INBOX_DEFAULT_LIMIT if limit is None else int(limit)        # coerce (M-4) — JSON may deliver a string
+        except (ValueError, TypeError):
+            return dict(status='invalid_input')
+        limit = max(1, min(limit, INBOX_MAX_LIMIT))
+
+        if inbox:                                                               # scoped to one folder
+            try:
+                token_folders = [str(self._safe_token(inbox))]                  # validate folder name (B-2)
+            except (ValueError, Exception):
+                return dict(status='invalid_input')
+        else:                                                                    # enumerate all inbox folders (S3 now supported — B-1)
             vault_inbox_base = path__vault_inbox_prefix(vault_id, '')[:-1]
-            subfolders = self.storage_fs.folder__folders(vault_inbox_base)
+            subfolders       = self.storage_fs.folder__folders(vault_inbox_base)
+            token_folders    = []
             for folder in subfolders:
                 folder_name = str(folder).rstrip('/').rsplit('/', 1)[-1]
                 if folder_name:
                     token_folders.append(folder_name)
+
+        all_entries = []
         for token_folder in token_folders:
             prefix = path__vault_inbox_prefix(vault_id, token_folder)
             files  = self.storage_fs.folder__files__all(prefix)
             for f in files:
                 path_str  = str(f)
                 file_name = path_str.rsplit('/', 1)[-1]
-                file_bytes = self.storage_fs.file__bytes(path_str)
-                size       = len(file_bytes) if file_bytes else 0
-                epoch_str  = file_name.split('_')[0] if '_' in file_name else '0'
-                entry = dict(inbox     = token_folder,
-                             file_id   = file_name   ,
-                             size      = size        ,
-                             received  = int(epoch_str))
-                if include_content and file_bytes:
-                    entry['content'] = base64.b64encode(file_bytes).decode('ascii')
+                epoch_str = file_name.split('_')[0] if '_' in file_name else '0'
+                entry     = dict(inbox    = token_folder      ,
+                                 file_id  = file_name         ,
+                                 received = int(epoch_str)    )                  # metadata only — no read (I-1)
                 all_entries.append(entry)
         all_entries.sort(key=lambda e: e['file_id'])
         if after_file_id:
             all_entries = [e for e in all_entries if e['file_id'] > after_file_id]
         truncated = len(all_entries) > limit
         entries   = all_entries[:limit]
-        if include_content:
-            total_content = sum(e['size'] for e in entries if 'content' in e)
-            if total_content > INLINE_CONTENT_CEILING:
+
+        if include_content:                                                      # only now do we read bytes — for the paged window only
+            total = 0
+            for entry in entries:
+                file_path  = path__vault_inbox(vault_id, entry['inbox'], entry['file_id'])
+                file_bytes = self.storage_fs.file__bytes(file_path) or b''
+                entry['size']    = len(file_bytes)
+                entry['content'] = base64.b64encode(file_bytes).decode('ascii')
+                total += len(file_bytes)
+            if total > INLINE_CONTENT_CEILING:
                 return dict(status='content_too_large', entries=[], truncated=True)
+
         return dict(status='ok', entries=entries, truncated=truncated)
 
     def inbox_fetch(self, vault_id, enum_key, inbox, file_ids):
         if not self._check_enum_key(vault_id, enum_key):
             return dict(status='gate_failed')
+        valid = self._validate_batch(inbox, file_ids)
+        if valid is None:
+            return dict(status='invalid_input')
+        token, safe_ids = valid
         files   = []
         missing = []
-        for file_id in file_ids:
-            file_path = path__vault_inbox(vault_id, inbox, file_id)
+        for file_id in safe_ids:
+            file_path = path__vault_inbox(vault_id, token, file_id)
             if self.storage_fs.file__exists(file_path):
                 file_bytes = self.storage_fs.file__bytes(file_path)
                 files.append(dict(file_id = file_id,
@@ -183,11 +201,15 @@ class Service__Vault__Inbox(Type_Safe):
     def mark_processed(self, vault_id, enum_key, inbox, file_ids):
         if not self._check_enum_key(vault_id, enum_key):
             return dict(status='gate_failed')
+        valid = self._validate_batch(inbox, file_ids)
+        if valid is None:
+            return dict(status='invalid_input')
+        token, safe_ids = valid
         moved   = []
         missing = []
-        for file_id in file_ids:
-            src = path__vault_inbox(vault_id, inbox, file_id)
-            dst = path__vault_processed(vault_id, inbox, file_id)
+        for file_id in safe_ids:
+            src = path__vault_inbox(vault_id, token, file_id)
+            dst = path__vault_processed(vault_id, token, file_id)
             if self.storage_fs.file__exists(src):
                 file_bytes = self.storage_fs.file__bytes(src)
                 self.storage_fs.file__save(dst, file_bytes)
@@ -200,10 +222,14 @@ class Service__Vault__Inbox(Type_Safe):
     def purge(self, vault_id, write_key_hex, folder, inbox, file_ids=None):
         if not self._check_write_key(vault_id, write_key_hex):
             return dict(status='gate_failed')
+        try:
+            token = str(self._safe_token(inbox))                                # validate folder name (B-2)
+        except (ValueError, Exception):
+            return dict(status='invalid_input')
         purged  = []
         missing = []
-        if folder == 'processed' and not file_ids:
-            prefix = path__vault_processed_prefix(vault_id, inbox)
+        if folder == 'processed' and not file_ids:                              # bulk purge all processed (brief 01 §3.5)
+            prefix = path__vault_processed_prefix(vault_id, token)
             files  = self.storage_fs.folder__files__all(prefix)
             for f in files:
                 path_str  = str(f)
@@ -213,14 +239,30 @@ class Service__Vault__Inbox(Type_Safe):
             return dict(status='ok', purged=purged, missing=missing)
         if not file_ids:
             return dict(status='ok', purged=purged, missing=missing)
-        for file_id in file_ids:
+        if len(file_ids) > INBOX_BATCH_MAX_FILE_IDS:                            # DoS guard (I-3)
+            return dict(status='invalid_input')
+        for raw_id in file_ids:
+            try:
+                file_id = str(self._safe_file_id(raw_id))                       # validate file id (B-2)
+            except (ValueError, Exception):
+                return dict(status='invalid_input')
             if folder == 'inbox':
-                path = path__vault_inbox(vault_id, inbox, file_id)
+                path = path__vault_inbox(vault_id, token, file_id)
             else:
-                path = path__vault_processed(vault_id, inbox, file_id)
+                path = path__vault_processed(vault_id, token, file_id)
             if self.storage_fs.file__exists(path):
                 self.storage_fs.file__delete(path)
                 purged.append(file_id)
             else:
                 missing.append(file_id)
         return dict(status='ok', purged=purged, missing=missing)
+
+    def _validate_batch(self, inbox, file_ids):                                  # Returns (token, [file_ids]) or None if any input is malformed / over cap
+        if not file_ids or len(file_ids) > INBOX_BATCH_MAX_FILE_IDS:            # DoS guard (I-3)
+            return None
+        try:
+            token    = str(self._safe_token(inbox))                             # validate folder name (B-2)
+            safe_ids = [str(self._safe_file_id(fid)) for fid in file_ids]       # validate each file id (B-2)
+        except (ValueError, Exception):
+            return None
+        return token, safe_ids

@@ -9,20 +9,25 @@ import hashlib
 import json
 import time
 from   unittest                                                                    import TestCase
-from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Inbox               import (Service__Vault__Inbox  ,
-                                                                                           INBOX_MAX_FILES       ,
-                                                                                           INBOX_MAX_BYTES       ,
-                                                                                           APPEND_MAX_PAYLOAD    ,
-                                                                                           INBOX_DEFAULT_LIMIT   ,
-                                                                                           INBOX_MAX_LIMIT       )
+from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Inbox               import (Service__Vault__Inbox     ,
+                                                                                           INBOX_MAX_FILES          ,
+                                                                                           APPEND_MAX_PAYLOAD       ,
+                                                                                           INBOX_DEFAULT_LIMIT      ,
+                                                                                           INBOX_MAX_LIMIT          ,
+                                                                                           INBOX_BATCH_MAX_FILE_IDS )
 from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import path__vault_manifest
 
 
 VAULT_ID     = 'inboxvault01'
-WRITE_KEY    = 'deadbeef1234567890abcdef'
-APPEND_TOKEN = 'test_append_token_abc123'
-ENUM_KEY     = 'test_enum_key_xyz789'
+WRITE_KEY    = 'deadbeef1234567890abcdef'                                        # only hashed for the gate — need not be hex
+ENUM_KEY     = hashlib.sha256(b'enum-key-seed').hexdigest()                     # hex so tier tests can present it as a token and reach the gate
+APPEND_TOKEN = hashlib.sha256(b'recipient-public-key').hexdigest()              # token = H(pubkey) — hex, also the folder name
 PAYLOAD      = b'\x00\x01\x02\x03encrypted-test-payload'
+GHOST_FILE_ID = '1700000000000_aaaaaaaaaaaaaaaaaaaaaaaa.enc'                     # well-formed but never written
+
+
+def _hex_token(seed):
+    return hashlib.sha256(seed.encode()).hexdigest()
 
 
 def _hash(value):
@@ -150,7 +155,7 @@ class test_Service__Vault__Inbox(TestCase):
         assert result['status'] == 'ok'
 
     def test__append__wrong_token(self):
-        result = self.service.append(VAULT_ID, 'wrong_token', PAYLOAD)
+        result = self.service.append(VAULT_ID, _hex_token('wrong'), PAYLOAD)    # well-formed but not an anchor
         assert result['status'] == 'gate_failed'
 
     def test__append__payload_stored(self):
@@ -198,8 +203,8 @@ class test_Service__Vault__Inbox(TestCase):
         assert result == dict(status='ok')
 
     def test__append__different_tokens_different_folders(self):
-        token_a = 'token_alpha'
-        token_b = 'token_beta'
+        token_a = _hex_token('alpha')
+        token_b = _hex_token('beta')
         self.service.configure(VAULT_ID, WRITE_KEY,
                                 append_anchors=[_hash(token_a), _hash(token_b)])
         self.service.append(VAULT_ID, token_a, b'from-alpha')
@@ -228,9 +233,9 @@ class test_Service__Vault__Inbox(TestCase):
         result = self.service.inbox_list(VAULT_ID, ENUM_KEY)
         entry  = result['entries'][0]
         assert 'file_id'  in entry
-        assert 'size'     in entry
         assert 'received' in entry
         assert 'inbox'    in entry
+        assert 'size'     not in entry                                          # size is read-free now: only present with content (I-1)
         assert 'content'  not in entry
 
     def test__inbox_list__include_content(self):
@@ -277,8 +282,8 @@ class test_Service__Vault__Inbox(TestCase):
         assert len(result['entries']) == 5
 
     def test__inbox_list__filter_by_inbox(self):
-        token_a = 'filter_token_a'
-        token_b = 'filter_token_b'
+        token_a = _hex_token('filter-a')
+        token_b = _hex_token('filter-b')
         self.service.configure(VAULT_ID, WRITE_KEY,
                                 append_anchors=[_hash(token_a), _hash(token_b)])
         self.service.append(VAULT_ID, token_a, b'msg-a-1')
@@ -310,7 +315,7 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__inbox_fetch__missing_file(self):
         result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
-                                           ['nonexistent.enc'])
+                                           [GHOST_FILE_ID])                      # well-formed but never written
         assert result['status']  == 'ok'
         assert len(result['files'])   == 0
         assert len(result['missing']) == 1
@@ -321,10 +326,10 @@ class test_Service__Vault__Inbox(TestCase):
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
         result  = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, inbox,
-                                            [file_id, 'ghost.enc'])
+                                            [file_id, GHOST_FILE_ID])
         assert len(result['files'])   == 1
         assert len(result['missing']) == 1
-        assert result['missing'][0]   == 'ghost.enc'
+        assert result['missing'][0]   == GHOST_FILE_ID
 
     def test__inbox_fetch__multiple_files(self):
         self._append_n(3)
@@ -383,11 +388,11 @@ class test_Service__Vault__Inbox(TestCase):
         listing  = self.service.inbox_list(VAULT_ID, ENUM_KEY)
         file_ids = [e['file_id'] for e in listing['entries']]
         inbox    = listing['entries'][0]['inbox']
-        batch    = [file_ids[0], 'ghost.enc', file_ids[2]]
+        batch    = [file_ids[0], GHOST_FILE_ID, file_ids[2]]
         result   = self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, batch)
         assert len(result['moved'])   == 2
         assert len(result['missing']) == 1
-        assert 'ghost.enc' in result['missing']
+        assert GHOST_FILE_ID in result['missing']
 
     # =========================================================================
     # Purge
@@ -531,11 +536,9 @@ class test_Service__Vault__Inbox(TestCase):
         assert self.service.inbox_list(vault, ENUM_KEY)['status'] == 'gate_failed'
         assert self.service.purge(vault, WRITE_KEY, 'processed', APPEND_TOKEN)['status'] == 'gate_failed'
 
-    def test__empty_inbox_operations_are_safe(self):
+    def test__empty_batch_rejected(self):
         result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, [])
-        assert result['status'] == 'ok'
-        assert len(result['files'])   == 0
-        assert len(result['missing']) == 0
+        assert result['status'] == 'invalid_input'
 
     def test__mark_processed_preserves_content(self):
         payload = b'important-encrypted-message'
@@ -563,3 +566,106 @@ class test_Service__Vault__Inbox(TestCase):
         received = listing['entries'][0]['received']
         now_ms = int(time.time() * 1000)
         assert abs(received - now_ms) < 5000
+
+    # =========================================================================
+    # B-2 — path-traversal / input validation (typed Safe_Str enforcement)
+    # =========================================================================
+
+    def test__append__rejects_traversal_token(self):
+        self.service.configure(VAULT_ID, WRITE_KEY,
+                                append_anchors=[_hash('../../etc')])             # even if an anchor somehow matched...
+        result = self.service.append(VAULT_ID, '../../etc', PAYLOAD)            # ...the token is rejected before path use
+        assert result['status'] == 'invalid_input'
+
+    def test__append__rejects_non_hex_token(self):
+        result = self.service.append(VAULT_ID, 'not_hex_token!!', PAYLOAD)
+        assert result['status'] == 'invalid_input'
+
+    def test__inbox_list__rejects_traversal_inbox(self):
+        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, inbox='../../bare')
+        assert result['status'] == 'invalid_input'
+
+    def test__fetch__rejects_traversal_inbox(self):
+        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, '../../bare',
+                                           [GHOST_FILE_ID])
+        assert result['status'] == 'invalid_input'
+
+    def test__fetch__rejects_traversal_file_id(self):
+        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
+                                           ['../../bare/data/obj/payload'])
+        assert result['status'] == 'invalid_input'
+
+    def test__mark_processed__rejects_traversal_file_id(self):
+        result = self.service.mark_processed(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
+                                              ['../../manifest.json'])
+        assert result['status'] == 'invalid_input'
+
+    def test__purge__rejects_traversal_file_id(self):
+        result = self.service.purge(VAULT_ID, WRITE_KEY, 'inbox', APPEND_TOKEN,
+                                     ['../../manifest.json'])
+        assert result['status'] == 'invalid_input'
+
+    def test__purge__rejects_traversal_inbox(self):
+        result = self.service.purge(VAULT_ID, WRITE_KEY, 'processed', '../../bare')
+        assert result['status'] == 'invalid_input'
+
+    def test__enum_holder_cannot_escape_inbox_via_file_id(self):                 # the core tier-escalation the typing prevents
+        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
+                                           ['../../../bare/data/secret/payload'])
+        assert result['status'] == 'invalid_input'                              # never reaches storage
+
+    # =========================================================================
+    # I-3 — batch size cap (DoS guard)
+    # =========================================================================
+
+    def test__fetch__rejects_oversized_batch(self):
+        ids = [GHOST_FILE_ID] * (INBOX_BATCH_MAX_FILE_IDS + 1)
+        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, ids)
+        assert result['status'] == 'invalid_input'
+
+    def test__mark_processed__rejects_oversized_batch(self):
+        ids = [GHOST_FILE_ID] * (INBOX_BATCH_MAX_FILE_IDS + 1)
+        result = self.service.mark_processed(VAULT_ID, ENUM_KEY, APPEND_TOKEN, ids)
+        assert result['status'] == 'invalid_input'
+
+    def test__purge__rejects_oversized_batch(self):
+        ids = [GHOST_FILE_ID] * (INBOX_BATCH_MAX_FILE_IDS + 1)
+        result = self.service.purge(VAULT_ID, WRITE_KEY, 'inbox', APPEND_TOKEN, ids)
+        assert result['status'] == 'invalid_input'
+
+    def test__fetch__accepts_max_batch(self):
+        ids = [GHOST_FILE_ID] * INBOX_BATCH_MAX_FILE_IDS
+        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, ids)
+        assert result['status'] == 'ok'
+
+    # =========================================================================
+    # M-4 — limit coercion
+    # =========================================================================
+
+    def test__inbox_list__limit_string_coerced(self):
+        self._append_n(3)
+        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit='2')
+        assert result['status'] == 'ok'
+        assert len(result['entries']) == 2
+
+    def test__inbox_list__limit_garbage_rejected(self):
+        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit='abc')
+        assert result['status'] == 'invalid_input'
+
+    # =========================================================================
+    # I-1 — metadata listing performs no payload reads
+    # =========================================================================
+
+    def test__inbox_list__metadata_only_omits_size_and_content(self):
+        self._append_n(2)
+        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, include_content=False)
+        for entry in result['entries']:
+            assert 'size'    not in entry
+            assert 'content' not in entry
+
+    def test__inbox_list__content_includes_size(self):
+        self._append()
+        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, include_content=True)
+        entry = result['entries'][0]
+        assert entry['size'] == len(PAYLOAD)
+        assert base64.b64decode(entry['content']) == PAYLOAD

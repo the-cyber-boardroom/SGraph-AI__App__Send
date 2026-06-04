@@ -3,6 +3,7 @@
 # Append-only inbox: append, list, fetch, mark-processed, purge, configure
 # ===============================================================================
 
+import base64
 from   fastapi                                                                     import HTTPException, Request
 from   osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from   osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
@@ -70,12 +71,14 @@ class Routes__Vault__Inbox(Fast_API__Routes):
         if not payload_b64:
             raise HTTPException(status_code = 400, detail = 'Missing payload')
         try:
-            payload_bytes = __import__('base64').b64decode(payload_b64)
+            payload_bytes = base64.b64decode(payload_b64)
         except Exception:
             raise HTTPException(status_code = 400, detail = 'Invalid base64 payload')
         result = self.inbox_service.append(vault_id      = str(vault_id)  ,
                                             append_token  = append_token  ,
                                             payload_bytes = payload_bytes )
+        if result['status'] == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = 'Invalid append_token')
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Forbidden')
         if result['status'] == 'payload_too_large':
@@ -98,6 +101,8 @@ class Routes__Vault__Inbox(Fast_API__Routes):
             after_file_id   = body.get('after_file_id')         ,
             limit           = body.get('limit')                 ,
             include_content = body.get('include_content', False))
+        if result['status'] == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = 'Invalid inbox or limit')
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Forbidden')
         if result['status'] == 'content_too_large':
@@ -119,6 +124,8 @@ class Routes__Vault__Inbox(Fast_API__Routes):
                                                  enum_key = enum_key    ,
                                                  inbox    = inbox       ,
                                                  file_ids = file_ids    )
+        if result['status'] == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = 'Invalid inbox or file_ids')
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Forbidden')
         return result
@@ -138,6 +145,8 @@ class Routes__Vault__Inbox(Fast_API__Routes):
                                                     enum_key = enum_key    ,
                                                     inbox    = inbox       ,
                                                     file_ids = file_ids    )
+        if result['status'] == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = 'Invalid inbox or file_ids')
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Forbidden')
         return result
@@ -162,6 +171,8 @@ class Routes__Vault__Inbox(Fast_API__Routes):
                                            folder        = folder      ,
                                            inbox         = inbox       ,
                                            file_ids      = file_ids    )
+        if result['status'] == 'invalid_input':
+            raise HTTPException(status_code = 400, detail = 'Invalid inbox or file_ids')
         if result['status'] == 'gate_failed':
             raise HTTPException(status_code = 403, detail = 'Write key mismatch')
         return result
