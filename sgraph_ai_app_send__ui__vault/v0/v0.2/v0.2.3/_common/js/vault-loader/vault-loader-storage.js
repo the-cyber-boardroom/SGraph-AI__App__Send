@@ -4,14 +4,22 @@
    vault loader. Emits events on mutation via the existing EventBus.
 
    localStorage keys:
-     sg-vault-key            — currently loaded vault credential
+     sg-vault-key            — LAST-opened vault credential (fallback for a fresh tab only)
+     sg-vault-access-key-saved — durable server access token (shared across tabs — intended)
      sg-vault-recent         — unified recent-vaults list (JSON)
      sg-vault-recent:migrated-at — migration timestamp guard
 
    sessionStorage keys:
-     sg-vault-access-key     — server access token (write gate)
+     sg-vault-key            — THIS TAB's vault credential (per-tab source of truth)
+     sg-vault-access-key     — active-session server access token
      sg-vault-endpoint       — API endpoint override
      sg-vault-creating       — flag: this vault is being created (not opened)
+
+   Per-tab vault identity: the vault KEY is per-tab (sessionStorage), so opening a second
+   vault in a new tab does not change the first tab's vault on reload, and closing a tab is a
+   no-op for the others. localStorage holds only the LAST-opened key as a convenience fallback
+   for a brand-new tab. The ACCESS TOKEN, by contrast, is intentionally shared across tabs
+   (localStorage `-saved` copy) — it is the server write gate, not the encryption key.
 
    Load order: after vault-loader-events.js.
    ================================================================================= */
@@ -29,19 +37,32 @@
 
     globalThis.VaultLoaderStorage = {
 
-        // --- Current vault key (localStorage) --------------------------------------
+        // --- Current vault key (per-tab: sessionStorage first, localStorage fallback) ---
+        // The vault KEY is per-tab. setCurrentKey writes BOTH sessionStorage (this tab's truth)
+        // and localStorage (last-opened, so a brand-new tab can restore the most recent vault).
+        // getCurrentKey prefers this tab's sessionStorage so tabs never clobber each other.
 
         getCurrentKey: function () {
-            try { return localStorage.getItem('sg-vault-key'); } catch (_) { return null; }
+            try {
+                return sessionStorage.getItem('sg-vault-key')
+                    || localStorage.getItem('sg-vault-key')
+                    || null;
+            } catch (_) { return null; }
         },
 
         setCurrentKey: function (key) {
-            try { localStorage.setItem('sg-vault-key', key); } catch (_) {}
+            try {
+                sessionStorage.setItem('sg-vault-key', key);   // this tab
+                localStorage.setItem('sg-vault-key', key);      // last-opened fallback
+            } catch (_) {}
             _emit(VaultLoaderEvents.VAULT_KEY_SET, { key: key });
         },
 
         clearCurrentKey: function () {
-            try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
+            try {
+                sessionStorage.removeItem('sg-vault-key');
+                localStorage.removeItem('sg-vault-key');
+            } catch (_) {}
             _emit(VaultLoaderEvents.VAULT_KEY_CLEARED, {});
         },
 

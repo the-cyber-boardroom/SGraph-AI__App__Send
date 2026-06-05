@@ -205,3 +205,54 @@ All items below are PROPOSED — does not exist yet.
 | P-162 | AppSec vault schema for threat artefacts | System descriptions, threat lists, attack trees, mitigations, evidence — all in vault | doc 423 |
 | P-163 | SBOM analysis mini-tool (planned next) | syft/cdxgen integration; vault holds SBOM + change history; planned after threat modelling | doc 423 |
 | P-164 | Dependency scanning mini-tool (planned next) | trivy/grype integration; vault tracks findings and fixes; planned after threat modelling | doc 423 |
+
+---
+
+## Partner Integrations + Skills Ecosystem (05/30–06/01 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+### Partner Integration Stack
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-288 | Netlify AX Integration | Two deployment modes: Mode A (rendered output zip → Netlify deploys); Mode B (encrypted vault zip + Netlify edge function decrypts with public read key). Mode A for public library sites; Mode B for vault-native hosting. Depends on VIV for Mode B. | 05/30 brief |
+| P-289 | Daytona Sandbox Integration | Vault holds code → Daytona runs it → results flow back to vault with provenance. Result return interface to be specified (stdout / structured JSON / artefacts). Stateful sandbox session contract for multi-round workflows. Blocks P-298 (comparison vault). | 06/01 brief |
+| P-290 | Convex Reactive State Integration | Vault = source of truth; Convex = live working state layer. Sync boundary unspecified — what triggers commit from Convex to vault? Who holds vault write key in Convex-backed app? Zero-knowledge property must hold when Convex has live working state. BLOCKED on architect boundary document. Architecturally riskiest integration. | 06/01 brief |
+| P-291 | Pi Coding Agent Harness Integration | Bidirectional base-vault ↔ Pi-Package mapping via open Skills standard. Pi adds agent harness + unified LLM API; does not duplicate vault storage model. Additive, low risk. | 06/01 brief |
+| P-292 | HeyGen Video Agent Integration | HeyGen wrapped as a skill/connector on the MCP path. Vault content → script conversion (agent-side recommended); generated video stored back in vault with provenance edge to source content. | 06/01 brief |
+| P-293 | Tavon White-Label AI Solutions | Channel/GTM decision; no development work from sg-send repo. Assign to Strategy/Ambassador. | 06/01 brief |
+
+### Skills Creator Economy
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-294 | Semantic Knowledge Graphs for Agentic Skills | Document-to-graph pipeline (P-281) applied to SKILL.md files. Skill-specific edge types: prerequisite, composition, conflict, family, capability, provenance. Graph schema is a superset of P-281 compliance graph schema — one unified schema covers both. Persisted in base vault. Drives marketplace discovery (P-297) and comparison (P-298). | 06/01 brief |
+| P-295 | Skill Base Vaults + Creator Economy | Base vault schema for skills: SKILL.md, code samples (multiple languages), guidance, evidence/credibility, certifications, tests/evals, threat model, security materials, version history. Open Standards format (agentskills.io). Base-to-customised promotion path. Creator reputation field (provenance-grounded, portable). Licensing metadata (base open/CC; customised commercial). | 06/01 brief |
+| P-296 | Skills Creator Economy (Branded/Certified/Customised Versions) | Refinement of P-295. Three sellable versions on the open base: branded (creator brand), certified (creator-certified), customised (developed + certified + maintained by creator — the IP-bearing product). IP is specifically in the customised, maintained version. Maintenance as ongoing relationship (version control + provenance). | 06/01 brief |
+| P-297 | Skills Marketplace with Scoring and Community Feedback | Marketplace built on Vault App Store. Composite vault-grounded scoring: provenance score, eval score, security score, behaviour/safety score, usage score, community feedback score, reputation score. Community feedback via sub-vault harvesting (reviews, endorsements, usage, issues) — all with provenance. Multi-marketplace publishing via open standard portable zip. Depends on P-295, P-294, Vault App Store (prior P). | 06/01 brief |
+| P-298 | Skill Comparison + CLI-Wrapping + Token Optimisation | Three capabilities: (1) comparison vault — talk to candidates via vault chat (P-248), run in Daytona (P-289), rank with explainability, publish as cloneable public vault; (2) CLI-wrapping — arbitrary CLI wrapped in sandbox with tests, exposed as agent-usable skill; (3) token optimisation — broken-down optimised delivery sized to consumer's token budget and runtime context. | 06/01 brief |
+
+---
+
+## Skills Creator Economy — Deepened (06/02 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-300 | Skills as Business Knowledge Capture | Skills capture how a business function actually works — GDPR erasure workflow, finance approvals, legal sign-offs, etc. Previous knowledge bases failed as static/dead documents. The breakthrough: agentic maintenance makes living, updated skills sustainable. "Skills are massive" because every business function is a candidate. Relies on P-295 (base vaults) as container. | 06/02 strategy-brief |
+| P-301 | Ownership + Maintenance Model for Delegated LLM Processes | Every delegated LLM process needs a named owner (human or agent team). Customisation triggers a maintenance relationship. Handover is the moment of value creation. Creators and brokers are the best owners. Price the responsibility (ongoing maintenance + accountability), not the bytes. Resolves "who is liable when an LLM process drifts?" | 06/02 strategy-brief |
+| P-303 | Finance Team Skills with Multi-Level Customisation Cascade | Concrete use case: expenses, invoicing, POs, contracts, budgets, approvals, NDAs, due diligence. Multi-level cascade: corporate → group → cyber → ethics. Keep-in-sync is the hard value (when base skill updates, all customised versions get a sync prompt). Requires cascade-sync design (`OQ-cascade-sync-design-1`). Depends on P-295 (base vaults). | 06/02 strategy-brief |
+| P-304 | Expert Brand Vaults — Ivan Ristic / TLS Example | Named expert (e.g. Ivan Ristic, ModSecurity/TLS) maintains a skills vault without seeing confidential customer data (anonymisation path: expert grades the skill class, not the confidential instance). Commercial model: open base vault + branded version + customised version + ongoing maintenance + token monetisation. Applies to any recognised domain expert. | 06/02 strategy-brief |
+| P-305 | Monetising Skills on Aggregators (Tessl + Others) | Vault-layer-on-top of agent-skill aggregators (Tessl, Anthropic marketplace, Pi, etc.). Nine monetisation paths: customisation fee, token/usage, open-core, ownership+SLA, install-and-wire, usage-based, subscription, marketplace split, branded/white-label. Vault layer adds provenance, curation, and maintenance — complementary, not competitive. Depends on vault zip portability (P-295). | 06/02 research-brief |
+
+## Vault Communications Demo + PKI (06/03 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-312 | Three-Agent Comms Demo Vault | Browser harness proving vault-to-vault messaging: 3 agents each with iframe inboxes; internal JS API (ping, send, receive, markReceived); step-by-step validation harness; manual round-trip proof first, then agentic via OpenRouter; key design principle: agents only share what they explicitly message (no full vault access); scale path 3 → 5 → 100s → 1000s; accountant experiment as first real use case. Depends on vault inbox (NOW EXISTS). | 06/03 dev-brief |
+| P-315 | Skills Library as Platform Feature | A vault holding skills from multiple sources (Tessl, Anthropic, Pi, platform own). Library management: provenance tracking, sync from source, applicability scoring, evidence (screenshots, test results). Sharp insight: how-to-deploy-and-run knowledge fills a real gap (Claude couldn't run an Anthropic legal skill from a URL alone — deployment context was missing). Differentiator: talk-to-skill (on-demand vault instance), per-skill budgets, per-skill billing. Foundation for skills marketplace (P-297). | 06/03 strategy-brief |
+| P-316 | SG/Vault as Platform of Primitives — Positioning | SG/Vault is a hyperscaler for shared state, not a category product. Dissolves the protocol/harness/workflow question by sitting beneath all three (noun, not verbs). Three-layer model: bottom (vault primitives), middle (heterogeneous agents/workflows/manual), top (bespoke UX). Two views: invisible-vault (users never see it) and builder-platform (developers see the structure). Restrict-to-unleash flywheel (tight primitive scope → safe, wide autonomy for builders). Superpower: builders are users of the same platform (tight feedback loop, features driven by real use). | 06/03 strategy-brief |

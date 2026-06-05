@@ -39,6 +39,7 @@ on:
         type: choice
         options:
           - dev
+          - main
           - production
       clean_latest:
         description: 'Clean latest/ before deploying (removes stale files from previous versions)'

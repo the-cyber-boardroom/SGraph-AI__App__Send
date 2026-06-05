@@ -58,8 +58,18 @@
             bar.appendChild(_makeSep());
 
             var path = (fileName || '').replace(/^\//, '');
-            var openAsAppLink = _makeAppLink('↗ Open as App',
-                window.location.origin + '/en-gb/app#' + encodeURIComponent(path));
+            // Prefer a self-contained link that carries BOTH the vault key and the file path
+            // through the root hash inbox: /#<key>|app:<path>. runRoot() (vault-loader-routing.js)
+            // saves the key to localStorage, stores the app: deep-link, and redirects to
+            // /en-gb/app — where app-shell opens THIS file as an app (over any default app.json).
+            // Falls back to the legacy /en-gb/app#path (key taken from localStorage) when the
+            // current key is unavailable. encodeURIComponent the path only; runRoot decodes once.
+            var _vk = '';
+            try { _vk = (globalThis.VaultLoaderStorage && VaultLoaderStorage.getCurrentKey()) || ''; } catch (_) {}
+            var _appHref = _vk
+                ? (window.location.origin + '/#' + _vk + '|app:' + encodeURIComponent(path))
+                : (window.location.origin + '/en-gb/app#' + encodeURIComponent(path));
+            var openAsAppLink = _makeAppLink('↗ Open as App', _appHref);
             _addTip(openAsAppLink, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
             bar.appendChild(openAsAppLink);
         }
@@ -760,8 +770,14 @@
                     if (bar && !bar.dataset.sgAppModeBtn) {
                         bar.dataset.sgAppModeBtn = '1';
                         var pagePath = (folderPath || '').replace(/^\//, '');
-                        var btn = _makeAppLink('↗ Open as App',
-                            window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath));
+                        // Self-contained link via the root inbox (/#key|app:path); see the file-tab
+                        // link above. Falls back to legacy /en-gb/app#path when no current key.
+                        var _pvk = '';
+                        try { _pvk = (globalThis.VaultLoaderStorage && VaultLoaderStorage.getCurrentKey()) || ''; } catch (_) {}
+                        var _pageHref = _pvk
+                            ? (window.location.origin + '/#' + _pvk + '|app:' + encodeURIComponent(pagePath))
+                            : (window.location.origin + '/en-gb/app#' + encodeURIComponent(pagePath));
+                        var btn = _makeAppLink('↗ Open as App', _pageHref);
                         _addTip(btn, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
                         bar.appendChild(btn);
                     }
@@ -772,39 +788,43 @@
         };
     }
 
-    // --- Patch header: add Upload Files button ---
+    // --- Patch tree controls: add New file / New folder / Upload (writable vaults) ---
+    // The send-browse action-bar row is hidden in the vault (vault-shell CSS), so the
+    // file-create actions live with the folder tree instead. send-browse builds
+    // .sb-tree__controls (the +/− expand-collapse row) inside _populateTree, which also
+    // re-runs on every tree refresh — so we inject here to survive refreshes.
 
-    var _origBuild = SendBrowse.prototype._build;
+    var _origPopulateTree = SendBrowse.prototype._populateTree;
 
-    SendBrowse.prototype._build = function() {
-        _origBuild.call(this);
+    SendBrowse.prototype._populateTree = function() {
+        _origPopulateTree.call(this);
 
         if (!this.dataSource || !this.dataSource.writable) return;
-
-        var headerRight = this.querySelector('.sb-header__right');
-        if (!headerRight) return;
+        var controls = this.querySelector('.sb-tree__controls');
+        if (!controls || controls.querySelector('.sb-tree-create-btn')) return;
 
         var self = this;
-        var uploadBtn = document.createElement('button');
-        uploadBtn.className = 'sb-action-btn';
-        uploadBtn.innerHTML = '&#8683; Upload Files';
-        uploadBtn.style.cssText = 'font-weight:600;';
-        uploadBtn.addEventListener('click', function() { _showUploadPicker(self); });
-        headerRight.prepend(uploadBtn);
+        var spacer = document.createElement('span');
+        spacer.style.cssText = 'flex:1;';
+        controls.appendChild(spacer);
 
-        // New Folder button
-        var folderBtn = document.createElement('button');
-        folderBtn.className = 'sb-action-btn';
-        folderBtn.innerHTML = '&#128193; New Folder';
-        folderBtn.addEventListener('click', function() { _showNewFolder(self); });
-        headerRight.prepend(folderBtn);
+        function _treeBtn(icon, titleText, onClick) {
+            var b = document.createElement('button');
+            b.className = 'sb-tree__ctrl-btn sb-tree-create-btn';
+            b.innerHTML = icon;
+            b.title = titleText;
+            b.addEventListener('click', function(e) { e.stopPropagation(); onClick(); });
+            return b;
+        }
 
-        // New File button
-        var newFileBtn = document.createElement('button');
-        newFileBtn.className = 'sb-action-btn';
-        newFileBtn.innerHTML = '&#43; New File';
-        newFileBtn.addEventListener('click', function() { _showNewFile(self); });
-        headerRight.prepend(newFileBtn);
+        controls.appendChild(_treeBtn('&#128196;', 'New file',     function() { _showNewFile(self); }));
+        controls.appendChild(_treeBtn('&#128193;', 'New folder',   function() { _showNewFolder(self); }));
+        controls.appendChild(_treeBtn('&#8683;',   'Upload files', function() { _showUploadPicker(self); }));
+        // Add link (sub-vaults + external resources) — only when the convention reader is loaded.
+        // Creates a *.link.json that the composite renders inline.
+        if (typeof VaultLinks !== 'undefined') {
+            controls.appendChild(_treeBtn('&#128279;', 'Add link (another vault, or an external resource)', function() { _showAddLink(self); }));
+        }
     };
 
     // --- Upload file picker ---
@@ -877,6 +897,153 @@
                     window.sgraphVault.messages.error('Create failed: ' + err.message);
                 }
             });
+        });
+    }
+
+    // --- Add link (sub-vault or external resource) ---
+
+    function _slugify(label) {
+        var s = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        return s || ('link-' + Math.random().toString(36).slice(2, 8));
+    }
+    function _genRefId() {
+        var b = (crypto.getRandomValues(new Uint8Array(6)));
+        var hex = ''; for (var i = 0; i < b.length; i++) hex += b[i].toString(16).padStart(2, '0');
+        return 'lk-' + hex;
+    }
+    function _sgSendOf(ds) {
+        if (!ds) return null;
+        if (ds._vault && ds._vault._sgSend) return ds._vault._sgSend;            // plain data source
+        if (ds._root && ds._root._vault && ds._root._vault._sgSend) return ds._root._vault._sgSend;  // composite
+        return null;
+    }
+    function _vaultOf(ds) {
+        if (!ds) return null;
+        if (ds._vault) return ds._vault;                       // plain data source
+        if (ds._root && ds._root._vault) return ds._root._vault;  // composite → the parent (root) vault
+        return null;
+    }
+
+    function _showAddLink(browse) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg-secondary,#12122a);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:1.5rem 1.75rem;min-width:340px;max-width:440px;color:var(--color-text,#e2e8f0);font-size:14px;';
+        var inS = 'width:100%;padding:0.5rem 0.7rem;background:var(--bg-primary,#0a0a18);border:1px solid var(--border,#2a2a4a);border-radius:4px;color:var(--color-text,#e2e8f0);font-size:14px;box-sizing:border-box;outline:none;margin:0.15rem 0 0.75rem;';
+        box.innerHTML =
+            '<p style="margin:0 0 0.9rem;font-weight:700;">Add a link</p>' +
+            '<label style="font-size:12px;color:#8892a4;">Type</label>' +
+            '<select id="al-type" style="' + inS + '">' +
+                '<option value="vault">Linked vault (opens read-only inline)</option>' +
+                '<option value="link">Web page</option>' +
+                '<option value="video">Video (YouTube / file)</option>' +
+                '<option value="image">Image</option>' +
+                '<option value="app">External app</option>' +
+            '</select>' +
+            '<label style="font-size:12px;color:#8892a4;">Label</label>' +
+            '<input id="al-label" type="text" placeholder="e.g. Patient: Alice" style="' + inS + '">' +
+            '<div id="al-vault-row">' +
+                '<label style="font-size:12px;color:#8892a4;">Vault key or read-only token</label>' +
+                '<input id="al-key" type="password" placeholder="apple-river-1234  or  ro-coral-stamp-5678" autocomplete="off" style="' + inS + '">' +
+                '<div style="font-size:12px;color:#4a5568;margin:-0.4rem 0 0.6rem;">Validated + saved on this device. Opens read-only.</div>' +
+            '</div>' +
+            '<div id="al-url-row" style="display:none;">' +
+                '<label style="font-size:12px;color:#8892a4;">URL</label>' +
+                '<input id="al-url" type="url" placeholder="https://…" autocomplete="off" style="' + inS + '">' +
+                '<div style="font-size:12px;color:#4a5568;margin:-0.4rem 0 0.6rem;">Loads in a controlled embed that cannot read this vault.</div>' +
+            '</div>' +
+            '<div id="al-err" style="color:#ff6b6b;font-size:12px;min-height:1rem;"></div>' +
+            '<div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.6rem;">' +
+                '<button id="al-cancel" class="sb-action-btn">Cancel</button>' +
+                '<button id="al-add" class="sb-action-btn" style="font-weight:700;color:var(--accent,#4ECDC4);">Add</button>' +
+            '</div>';
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+
+        var typeEl  = box.querySelector('#al-type');
+        var labelEl = box.querySelector('#al-label');
+        var keyEl   = box.querySelector('#al-key');
+        var urlEl   = box.querySelector('#al-url');
+        var errEl   = box.querySelector('#al-err');
+        var vaultRow = box.querySelector('#al-vault-row');
+        var urlRow   = box.querySelector('#al-url-row');
+
+        function syncRows() {
+            var isVault = typeEl.value === 'vault';
+            vaultRow.style.display = isVault ? '' : 'none';
+            urlRow.style.display   = isVault ? 'none' : '';
+        }
+        typeEl.addEventListener('change', syncRows);
+        syncRows();
+        labelEl.focus();
+
+        box.querySelector('#al-cancel').addEventListener('click', function() { overlay.remove(); });
+
+        box.querySelector('#al-add').addEventListener('click', async function() {
+            errEl.textContent = '';
+            var type  = typeEl.value;
+            var label = (labelEl.value || '').trim();
+            if (!label) { errEl.textContent = 'Please enter a label.'; return; }
+            var fileName = _slugify(label) + '.link.json';
+            var refId = _genRefId();
+
+            try {
+                if (type === 'vault') {
+                    var key = (keyEl.value || '').trim();
+                    if (!key) { errEl.textContent = 'Please enter the vault key or token.'; return; }
+                    var sgSend = _sgSendOf(browse.dataSource);
+                    var parentVault = _vaultOf(browse.dataSource);
+                    if (!sgSend || !parentVault || typeof SGVault === 'undefined') { errEl.textContent = 'Cannot open vaults from here.'; return; }
+                    errEl.style.color = '#8892a4'; errEl.textContent = 'Validating…';
+                    var child;
+                    try {
+                        child = await SGVault.open(sgSend, key);      // validate + get the real vault_id + read key
+                    } catch (eOpen) {
+                        if (/^ro-/i.test(key)) { errEl.style.color = '#ff6b6b'; errEl.textContent = "Paste the vault's full key or simple token (read-only tokens aren't supported here yet)."; return; }
+                        throw eOpen;
+                    }
+                    var vaultId = child.vaultId;
+                    // Write the pointer file first…
+                    var linkObj = { vault_id: vaultId, ref_id: refId, label: label };
+                    await browse.dataSource.saveFile('/', fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+                    // …then write a PORTABLE owner record (read-only triplet) into .vault/owner/ro-links.json,
+                    // so the sub-vault opens silently on ANY device that has the parent vault (not just this one).
+                    var portable = false;
+                    try {
+                        var rawRk = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
+                        var record = { type: 'vault', label: label, pin: { mode: 'latest' },
+                                       vault_id: vaultId, read_key: btoa(String.fromCharCode.apply(null, rawRk)),
+                                       ref_file_id: child._refFileId };
+                        await VaultLinks.saveRoRecord(parentVault, refId, record);   // commits + pushes (portable)
+                        portable = true;
+                    } catch (eRec) {
+                        console.warn('[add-link] portable ro-record failed, falling back to device key:', eRec && eRec.message);
+                        try { VaultLinks.setStoredChildKey(vaultId, key); } catch (_) {}   // this-device fallback
+                    }
+                    if (window.sgraphVault && window.sgraphVault.messages) {
+                        window.sgraphVault.messages.success('Linked vault "' + label + '"' + (portable ? ' (opens on any device)' : ' (saved on this device)'));
+                    }
+                    if (browse.dataSource.scan) { try { await browse.dataSource.scan(); } catch (_) {} }
+                    overlay.remove();
+                    _refreshBrowseTree(browse);
+                    return;
+                } else {
+                    var url = (urlEl.value || '').trim();
+                    if (!url || !/^https?:\/\//i.test(url)) { errEl.textContent = 'Please enter an http(s) URL.'; return; }
+                    var det = VaultLinks.detectResourceType(url);
+                    var resObj = { ref_id: refId, type: type, url: url, label: label };
+                    if (det.provider) resObj.provider = det.provider;
+                    await browse.dataSource.saveFile('/', fileName, new TextEncoder().encode(JSON.stringify(resObj, null, 2)).buffer);
+                }
+                if (browse.dataSource.scan) { try { await browse.dataSource.scan(); } catch (_) {} }
+                overlay.remove();
+                if (window.sgraphVault && window.sgraphVault.messages) window.sgraphVault.messages.success('Added "' + label + '"');
+                _refreshBrowseTree(browse);
+            } catch (err) {
+                errEl.style.color = '#ff6b6b';
+                errEl.textContent = (type === 'vault' ? 'Could not open that vault: ' : 'Add failed: ') + (err && err.message ? err.message : err);
+            }
         });
     }
 
@@ -1130,7 +1297,14 @@
             header.addEventListener('dragstart', function(e) {
                 e.stopPropagation();
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'folder', path: folderEl.dataset.path }));
+                // A sub-vault folder moves by relocating its underlying *.link.json (a file),
+                // not the virtual folder itself.
+                var linkPath = folderEl.dataset.linkPath;
+                if (linkPath) {
+                    e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'file', path: linkPath }));
+                } else {
+                    e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'folder', path: folderEl.dataset.path }));
+                }
                 folderEl.classList.add('sb-dnd--dragging');
             });
             header.addEventListener('dragend', function() {
@@ -1245,6 +1419,7 @@
     }
 
     function _executeDrop(browse, drag, destFolderPath) {
+        if (!drag || !drag.path) return;   // guard: resource/sub-vault nodes without a real path → no-op (no crash)
         if (drag.type === 'file') {
             // drag.path = e.g. "images/photo.jpg" or "photo.jpg"
             var parts      = drag.path.split('/');

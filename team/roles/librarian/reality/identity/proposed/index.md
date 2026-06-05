@@ -100,6 +100,16 @@ All items below are PROPOSED — does not exist yet.
 
 ---
 
+## PKI Identity Envelopes + Identity-Provider Partnership (06/03 brief)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-314 | PKI Not Secrets — Identity Envelopes + Identity-Provider Partnership | Paradigm shift: instead of one vault key (a secret), each identity holds many granular keys. Vault becomes a "travelling envelope" carrying identity proof, evidence of actions, tools, schemas, and scoped capabilities. Supply-chain workflows gated by cryptographic key handoffs (A signs off → only B can continue). Surgical ephemeral privilege elevation (time-limited scoped key, not full vault key). Partnership with identity-provider companies to distribute and manage keys at scale. Phases: P0 append_token model (EXISTS in vault inbox), Phase 1 per-vault scoped keys (P-313), Phase 2 per-identity PKI + IdP integration. Requires key distribution model decision (`OQ-pki-key-distribution-model-1`). | 06/03 arch-brief |
+
+---
+
 ## SG Mail Email Client (05/16 brief — doc 425)
 
 All items below are PROPOSED — does not exist yet.
@@ -112,3 +122,13 @@ All items below are PROPOSED — does not exist yet.
 | P-168 | Gmail API connector v2 (bidirectional sync; OAuth scoped to read + send; mirrors Gmail mailbox into vault) | doc 425 |
 | P-169 | WorkMail migration tool: export mbox/maildir from WorkMail → parse → commit to email-fs vault; reusable for future customers | doc 425 |
 | P-170 | Private email vault isolation: dedicated vault per user; separate encryption key, S3 bucket/account, access path, and backup cadence from public vaults | doc 425 |
+
+---
+
+## LLM API Billing Broker (06/01 brief)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-299 | OpenRouter Key/Credit/Billing Broker | Vault for secrets + auth (Google OAuth, PROPOSED) as foundation. New build: credit-purchase layer, payment-brokering layer (Stripe — do not build custom payment processing). BLOCKED on financial/legal requirements analysis. Payment brokering is regulated. | 06/01 brief |

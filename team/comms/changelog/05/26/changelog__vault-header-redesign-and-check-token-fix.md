@@ -94,3 +94,34 @@ Full-app verification (vault opened against a live backend with cross-origin sen
 was **not** run in this session — the file-toolbar de-dup is logic-only and could not be
 exercised in the isolated harness. Syntax of all four modified files validated with
 `node --check`.
+
+---
+
+## Follow-up — remove the redundant second row (Files action bar)
+
+**Trigger:** Dinis — the send-browse action-bar row (row 2) duplicated the vault name,
+carried Copy Link / email (already on Settings), and held the file-create buttons that
+belong with the tree. "Can't we remove that entire row?"
+
+**Change:**
+- `vault-shell.js` — hide the whole row via CSS: `.vs-view-files .sb-header { display: none; }`
+  (replacing the older rule that only hid the Gallery-view link). Same mechanism
+  `sg-app-banner` already uses to hide `.sb-header`. This removes the duplicated title,
+  the size/`✓ Decrypted` text, Copy Link, email, and Gallery view from that row.
+- `vault-browse-edit.js` — the old `_build` patch added `New File / New Folder /
+  Upload Files` to `.sb-header__right` (now hidden). Replaced it with a wrap of
+  `SendBrowse.prototype._populateTree` that injects three icon buttons (📄 New file,
+  📁 New folder, ⮋ Upload) into the **left tree panel's `.sb-tree__controls`** row
+  (next to the existing `+`/`−` expand/collapse), writable vaults only. Idempotent
+  (guarded by `.sb-tree-create-btn`) and re-injected on every tree refresh because
+  `_refreshBrowseTree` re-runs `_populateTree`. Buttons reuse the `.sb-tree__ctrl-btn`
+  class so they match the existing controls.
+
+**Not preserved (flagged):** the `✓ Decrypted` trust badge and the file-size text were on
+that row; size still shows in the bottom `vault-status-bar`, but the Decrypted indicator
+is gone. Easy to re-add elsewhere (status bar or next to the vault name) if wanted.
+
+**Test impact:** no test asserts on `.sb-header`, `#sb-copy-link`, `#sb-email`, or the old
+header file-buttons (grep-verified). The de-dup/relocation is logic-only and could **not**
+be visually verified in isolation (the tree panel needs the full send-browse + sg-layout +
+a live vault). `node --check` passes on both files.

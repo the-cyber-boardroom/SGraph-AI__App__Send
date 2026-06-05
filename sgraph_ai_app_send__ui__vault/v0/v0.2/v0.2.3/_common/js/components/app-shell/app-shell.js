@@ -34,13 +34,47 @@
             this._iframeStatus    = 'loading';
             this._resourcesLoaded = [];
             this._t               = {};
+            // Nav history for the HUD back/forward arrows. Entries are "path[#fragment]"
+            // strings (e.g. "scenarios/graph.html#c-adequacy"). _navIndex points at the
+            // current entry; -1 means no navigation yet.
+            this._navHistory      = [];
+            this._navIndex        = -1;
         }
 
         connectedCallback() {
+            this._resetConsentsHandler = () => this._resetConsents();
+            document.addEventListener('app-hud:reset-consents', this._resetConsentsHandler);
+            this._printHandler = () => this._onPrint();
+            document.addEventListener('app-hud:print', this._printHandler);
+            // HUD nav row → app-shell. The HUD never owns history; it dispatches actions
+            // and reads back state via 'app-nav:change' events (emitted by _emitNavChange).
+            this._navHudHandler = (ev) => {
+                var action = ev && ev.detail && ev.detail.action;
+                if (action === 'back')    this._navBack();
+                if (action === 'forward') this._navForward();
+                if (action === 'reload')  this._navReload();
+                if (action === 'home')    this._navHome();
+                if (action === 'jump' && ev.detail.path) {
+                    // Recent-pages menu paths are vault-absolute (stored from history).
+                    this._navigateToPath(ev.detail.path, { pushHistory: true, alreadyResolved: true });
+                }
+                if (action === 'exit')    this._exitApp();
+            };
+            document.addEventListener('app-hud:nav', this._navHudHandler);
             this._init();
         }
 
+        // Escape-pill action when HUD is in 'hidden' mode. Sends the user back to the vault
+        // file browser (same destination as the chrome row's 'Open Vault' link).
+        _exitApp() {
+            var base = window.location.pathname.split('/en-gb/')[0];
+            window.location.assign(base + '/en-gb/vault/');
+        }
+
         disconnectedCallback() {
+            if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
+            if (this._printHandler) { document.removeEventListener('app-hud:print', this._printHandler); this._printHandler = null; }
+            if (this._navHudHandler) { document.removeEventListener('app-hud:nav', this._navHudHandler); this._navHudHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -76,7 +110,7 @@
             }
             // Key always from localStorage (set by root inbox /#vault-key handler)
             var saved = '';
-            try { saved = localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
+            try { saved = sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || ''; } catch (_) {}
 
             // Public Vault Preview: /en-gb/app/<public-id> (or ?p=<id>) ALWAYS renders the
             // deliberately-public preview + a key prompt — even if a key is saved.
@@ -148,6 +182,13 @@
 
             var res = { status: 'error', preview: null };
             try { res = await PublicPreviewRead.fetchPreview(endpoint, publicId); } catch (_) {}
+            // Tab title reflects the vault on the unlock screen. Set BEFORE the first render
+            // so the user sees the right tab label as soon as the card paints. If a later
+            // mount (vault opened → app launched) sets its own title via _mountApp /
+            // _mountVaultFile, that takes precedence — this is just the unlock-screen default.
+            if (res && res.preview && res.preview.title) {
+                document.title = 'SG/Vault — ' + res.preview.title;
+            }
             var render = function (extra) { card.setState(Object.assign({ status: res.status, preview: res.preview }, common, extra || {})); };
             render();
 
@@ -216,9 +257,10 @@
             this._t.vaultOpened = performance.now();
             this._emitVaultEvent('open-ok', { label: 'Vault opened', vaultName: vault.name || '', ms: Math.round(this._t.vaultOpened - this._t.start) });
 
-            // Persist vault key for reload recovery (shared with /en-gb/vault/ via sg-vault-key)
+            // Persist vault key for reload recovery. Per-tab: sessionStorage is this tab's
+            // truth; localStorage holds the last-opened key as a fresh-tab fallback.
             if (!isRO) {
-                try { localStorage.setItem('sg-vault-key', key); } catch (_) {}
+                try { sessionStorage.setItem('sg-vault-key', key); localStorage.setItem('sg-vault-key', key); } catch (_) {}
             }
 
             // Key never stays in address bar
@@ -226,9 +268,14 @@
                 window.history.replaceState(null, '', window.location.pathname + window.location.search);
             }
 
-            // Build data source — use presetAccessKey if supplied (from entry form)
+            // Build data source. Resolve the server access token (write gate): the entry-form
+            // preset, else a saved per-vault / backend key. Thread it onto the write transport so
+            // write PUTs carry x-sgraph-access-token (reads are tokenless).
             this._setStatus('Reading vault…');
-            var accessKey = (!isRO && presetAccessKey) ? presetAccessKey : null;
+            var accessKey = !isRO
+                ? (presetAccessKey || this._resolveAccessToken(vault._vaultId || this._vaultKey))
+                : null;
+            this._applyAccessToken(accessKey);
             this._dataSource = new VaultDataSource(vault, accessKey);
             if (accessKey) this._writable = true;
             await this._dataSource.loadAllSubTrees();
@@ -238,9 +285,28 @@
             // Read app.json
             var appJson = await this._readAppJson();
             this._appJson = appJson;
+            this._perm    = AppPermissions.parsePermissions(appJson);   // grant lookup (floor is unconditional)
+            this._appId   = '';
+            try { if (appJson) this._appId = await AppPermissions.appId(JSON.stringify(appJson)); } catch (_) {}   // consent-cache identity (A4)
             this._t.appJsonFetched = performance.now();
             if (appJson) this._emitVaultEvent('app-json', { label: 'app.json found', entry: appJson.entry || 'index.html', title: appJson.title || '', ms: Math.round(this._t.appJsonFetched - this._t.treeLoaded) });
             else         this._emitVaultEvent('app-json-missing', { label: 'No app.json' });
+
+            // In-vault write token: the vault can carry its own server access token in app.json
+            // (`accessToken`, or `auth.token`). Adopt it only when no browser-side token was found,
+            // so an app opened straight from its vault key (e.g. a root-inbox deep link, with no
+            // token in this tab) can still save. Full-key opens only — a read-only (ro-) open never
+            // gains write capability here. NOTE: any holder of the vault read key can decrypt this
+            // token, so embedding it means "whoever can read the vault may also write to it".
+            var vaultToken = (appJson && (appJson.accessToken || (appJson.auth && appJson.auth.token))) || '';
+            if (!isRO && !accessKey && vaultToken) {
+                accessKey = String(vaultToken);
+                this._applyAccessToken(accessKey);
+                this._dataSource._accessKey = accessKey;
+                this._dataSource.writable   = true;
+                this._writable              = true;
+                this._emitVaultEvent('access-token-from-vault', { label: 'Write token loaded from vault app.json' });
+            }
 
             // Update page title
             var appTitle  = appJson && appJson.title  ? appJson.title  : '';
@@ -251,7 +317,11 @@
             // Notify HUD
             this.dispatchEvent(new CustomEvent('app-shell:ready', {
                 bubbles: true, composed: true,
-                detail: { vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey, isRO: isRO }
+                detail: {
+                    vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey,
+                    isRO: isRO, perm: this._perm,
+                    hudCfg: (appJson && appJson.hud) || null   // see AppHud._resolveHudCfg
+                }
             }));
 
             // Auth intercept (auth.required with no cached key and no preset key)
@@ -262,6 +332,7 @@
                     await this._showAuthPrompt(vault, appJson);
                     return;  // _showAuthPrompt calls _continue() when key accepted
                 }
+                this._applyAccessToken(cachedKey);
                 this._dataSource = new VaultDataSource(vault, cachedKey);
                 this._writable   = true;
             }
@@ -295,27 +366,41 @@
         }
 
         async _continue(appJson) {
-            if (!appJson) {
-                // No app.json — check if a file path was given (from /en-gb/app#path).
-                // If so, render that file directly here; do NOT redirect to /en-gb/vault/.
-                // App Mode lives on /en-gb/app, not on the vault page.
-                var deepLink = '';
-                try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
-                try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
-                if (deepLink.startsWith('app:')) {
-                    await this._mountVaultFile(deepLink.slice(4));
-                    return;
-                }
-                // No file path either — open the vault UI
+            // A specific file was requested ("Open as App" on a file, via /#key|app:path or the
+            // direct /en-gb/app/#path link form) — read it now and clear so a reload starts fresh.
+            var deepLink = '';
+            try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
+            try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+            var deepPath = deepLink.indexOf('app:') === 0 ? deepLink.slice(4) : '';
+
+            // The decision (deep-link × app.json present × deep-link is HTML) is delegated to
+            // AppNavHelpers.decideMountStrategy — pure, unit-tested. **The bug it fixes**
+            // (2026-05-31): a deep-link to ANY HTML file other than the default entry used to
+            // fall through to _mountVaultFile (bare file, no app.json resources loaded), so
+            // /en-gb/app/#patient/index.html rendered unstyled. Now an HTML deep-link in an
+            // app vault routes through _mountApp with the deep-link overriding appJson.entry,
+            // so the app's CSS/JS still load.
+            var decision = AppNavHelpers.decideMountStrategy({ deepPath: deepPath, appJson: appJson });
+
+            if (decision.strategy === 'redirect') {
+                // No default app and no file path — App Mode lives on /en-gb/app, not the
+                // vault page; bounce there so the user can browse files instead.
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
             }
+            if (decision.strategy === 'file') {
+                await this._mountVaultFile(decision.filePath);
+                return;
+            }
+            // decision.strategy === 'app' — appJson may be the original or a deep-link-
+            // overridden clone with .entry set to the requested HTML file.
+            var effectiveAppJson = decision.appJson;
             this._setStatus('Loading resources…');
-            var resourcesData = await this._fetchResources(appJson);
+            var resourcesData = await this._fetchResources(effectiveAppJson);
             this._t.resourcesLoaded = performance.now();
             this._emitVaultEvent('resources-loaded', { label: 'Resources pre-fetched', cssCount: resourcesData.css.length, jsCount: resourcesData.js.length, ms: Math.round(this._t.resourcesLoaded - (this._t.appJsonFetched || this._t.treeLoaded)) });
-            await this._mountApp(appJson, resourcesData);
+            await this._mountApp(effectiveAppJson, resourcesData);
         }
 
 
@@ -541,15 +626,19 @@
 
         // ── Credential helpers ────────────────────────────────────────────────────────
 
+        // Resolve `ro-word-word-NNNN` → read creds. The encrypted { vault_id, read_key,
+        // ref_file_id } payload lives at a deterministic transfer-id derived from the
+        // (bare) token; download it and decrypt with the token as PBKDF2 passphrase.
         async _resolveROToken(sgSend, token) {
-            var endpoint = sgSend.endpoint || window.location.origin;
-            var resp = await fetch(endpoint + '/api/transfers/check-token/' + encodeURIComponent(token));
+            var endpoint   = sgSend.endpoint || window.location.origin;
+            var bare       = String(token || '').replace(/^ro-/, '');
+            var transferId = await SGVaultCrypto.deriveRoTokenTransferId(bare);
+            var resp = await fetch(endpoint + '/api/transfers/download/' + encodeURIComponent(transferId));
             if (!resp.ok) throw new Error('RO token not found or expired (HTTP ' + resp.status + ')');
-            var data = await resp.json();
-            if (!data.ciphertext) throw new Error('Invalid RO token response');
+            var cipherBytes = new Uint8Array(await resp.arrayBuffer());
 
             var enc         = new TextEncoder();
-            var keyMaterial = await crypto.subtle.importKey('raw', enc.encode(token), 'PBKDF2', false, ['deriveKey']);
+            var keyMaterial = await crypto.subtle.importKey('raw', enc.encode(bare), 'PBKDF2', false, ['deriveKey']);
             var aesKey      = await crypto.subtle.deriveKey(
                 { name: 'PBKDF2', salt: enc.encode('sgraph-ro-token-v1'), iterations: 100000, hash: 'SHA-256' },
                 keyMaterial,
@@ -557,11 +646,11 @@
                 false,
                 ['decrypt']
             );
-            var cipherBytes = Uint8Array.from(atob(data.ciphertext), function (c) { return c.charCodeAt(0); });
-            var iv          = cipherBytes.slice(0, 12);
-            var ct          = cipherBytes.slice(12);
-            var plain       = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, aesKey, ct);
-            return JSON.parse(new TextDecoder().decode(plain)); // { vaultId, readKeyB64, refFileId }
+            var iv    = cipherBytes.slice(0, 12);
+            var ct    = cipherBytes.slice(12);
+            var plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, aesKey, ct);
+            var p     = JSON.parse(new TextDecoder().decode(plain)); // stored snake_case
+            return { vaultId: p.vault_id, readKeyB64: p.read_key, refFileId: p.ref_file_id };
         }
 
         _getCachedAccessKey(vaultId) {
@@ -569,6 +658,385 @@
                 return localStorage.getItem('sg-access-key:' + vaultId) ||
                        sessionStorage.getItem('sg-access-key:' + vaultId) || null;
             } catch (_) { return null; }
+        }
+
+        // Resolve a server access token for this vault, in priority order:
+        //   per-vault cache → /vault-mode shared token → generic backend key.
+        _resolveAccessToken(vaultId) {
+            var t = this._getCachedAccessKey(vaultId);
+            if (t) return t;
+            // Parity with /vault mode: VaultLoaderStorage (vault-loader-storage.js) keeps the server
+            // access token under these keys. /vault and /app are the same origin, so a token the user
+            // established in /vault mode authorises writes here too. That module is not loaded on the
+            // /app page, so read the raw keys directly rather than calling VaultLoaderStorage.
+            try {
+                var shared = sessionStorage.getItem('sg-vault-access-key')
+                          || localStorage.getItem('sg-vault-access-key-saved');
+                if (shared) return shared;
+            } catch (_) {}
+            try { return localStorage.getItem('sg-backend-access-key') || null; } catch (_) { return null; }
+        }
+
+        // Thread the access token onto the vault's transport so write PUTs carry
+        // x-sgraph-access-token. The VaultDataSource accessKey only flips the `writable`
+        // flag; the actual write requests authorise via vault._sgSend.token (read at request
+        // time by SGSend._authHeaders). Without this, writes 401 "Access token required".
+        _applyAccessToken(token) {
+            try { if (token && this._vault && this._vault._sgSend) this._vault._sgSend.token = token; }
+            catch (_) {}
+        }
+
+        // Combined per-verb gate for the iframe bridge: the §3.4 floor (non-grantable) THEN the
+        // app.json grant (§3.2/3.3). verb is 'fs.read' | 'fs.write' | 'fs.move' | 'fs.delete' |
+        // 'fs.mkdir' | 'vault.create' | 'vault.unlink' | 'vault.delete'. Consent for the powerful
+        // vault verbs is layered on top in Phase 4. Fails safe (deny) on any error.
+        _can(verb, path) {
+            try {
+                var act = verb.indexOf('.') > -1 ? verb.slice(verb.indexOf('.') + 1) : verb;
+                if (AppPermissions.isFloor(act, path)) return false;
+                return AppPermissions.can(this._perm, verb, path);
+            } catch (_) { return false; }
+        }
+
+        // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
+        // vault never inherits a prior app's consent (A4). Single source of truth for _can-layered
+        // consent and the HUD chip/panel.
+        _consentCacheKey(verb) {
+            var vaultId = (this._vault && this._vault._vaultId) || this._vaultKey || '';
+            return 'sg-app-grant:' + vaultId + ':' + (this._appId || '') + ':' + verb;
+        }
+
+        // Resolve consent for a powerful verb. One-time per (vault, app, verb), cached in
+        // localStorage; vault.delete ALWAYS re-confirms (irreversible). The prompt is rendered on
+        // the HUD (host chrome, §3.5) — the sandboxed app cannot satisfy it. Serialised so two
+        // concurrent requests don't collide on the single HUD slot (A10).
+        async _consent(verb, path) {
+            var alwaysConfirm = (verb === 'vault.delete');
+            var ckey = this._consentCacheKey(verb);
+            if (!alwaysConfirm) { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
+            var granted = await this._hudConsent(verb, path);
+            if (granted && !alwaysConfirm) { try { localStorage.setItem(ckey, '1'); } catch (_) {} }
+            return granted;
+        }
+
+        _hudConsent(verb, path) {
+            var run = function () {
+                return new Promise(function (resolve) {
+                    var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                    if (!hud || typeof hud.requestConsent !== 'function') { resolve(false); return; }
+                    hud.requestConsent(verb, path, function (ok) { resolve(!!ok); });
+                });
+            };
+            var next = (this._consentQueue || Promise.resolve()).then(run, run);
+            this._consentQueue = next.catch(function () {});
+            return next;
+        }
+
+        // ── Vault lifecycle helpers (vault.create / vault.unlink) ───────────────────────
+        // High-entropy passphrase that NEVER matches the simple-token shape ^[a-z]+-[a-z]+-\d{4}$,
+        // so SGVault.open derives via the strong PBKDF2 path (proper vault key, never a simple token).
+        _genVaultPassphrase() {
+            var b = crypto.getRandomValues(new Uint8Array(20)), s = '';
+            for (var i = 0; i < b.length; i++) s += b[i].toString(36);
+            return 'k' + s;
+        }
+        _genRefId() {
+            var b = crypto.getRandomValues(new Uint8Array(6)), hex = '';
+            for (var i = 0; i < b.length; i++) hex += b[i].toString(16).padStart(2, '0');
+            return 'lk-' + hex;
+        }
+        _slugify(label) {
+            var s = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            return s || ('link-' + Math.random().toString(36).slice(2, 8));
+        }
+
+        // Create a new child vault and wire it into folder `path` as a read-through sub-vault:
+        // keyless <slug>.link.json in the tree + a portable read-only owner record (read_key tier).
+        // Mirrors the host "Add link" flow (vault-browse-edit _showAddLink). v1 = read-through only.
+        async _createChildVault(path, label) {
+            var parentVault = this._vault;
+            var sgSend = parentVault && parentVault._sgSend;
+            if (!sgSend || typeof SGVault === 'undefined' || typeof VaultLinks === 'undefined') throw new Error('Cannot create vaults here');
+            var child   = await SGVault.create(sgSend, this._genVaultPassphrase(), { name: label });   // proper-vault-key derivation
+            var vaultId = child._vaultId;
+            var refId   = this._genRefId();
+
+            var dir = path ? ('/' + path) : '/';
+            if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
+            var fileName = this._slugify(label) + '.link.json';
+            var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
+            await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+
+            var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
+            var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
+                           read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
+            await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
+            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+            return { vault_id: vaultId, ref_id: refId, ref_file_id: child._refFileId };
+        }
+
+        // Remove a sub-vault pointer (the <name>.link.json). The child vault stays on the server
+        // (reversible). The orphaned read-tier owner record is harmless and left in place.
+        async _unlinkChildVault(path) {
+            var norm  = AppPermissions.normalizePath(path);
+            var slash = norm.lastIndexOf('/');
+            var dir   = slash > 0 ? '/' + norm.slice(0, slash) : '/';
+            var name  = norm.slice(slash + 1);
+            await this._dataSource.deleteFile(dir, name);
+            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+            return { unlinked: true };
+        }
+
+        // Print the running app (HUD print button).
+        //
+        // The app iframe is sandboxed with allow-same-origin, so the parent can read
+        // iframe.contentDocument. We clone the live DOM, then rewrite every blob: URL
+        // to a data: URI — blob URLs are scoped to the iframe's window and would die
+        // in the print window, so they must be inlined. The result is a self-contained
+        // Print is now an RPC into the iframe: ViV Phase 3 flipped app frames to null-origin
+        // srcdoc, so iframe.contentDocument throws SecurityError from the parent (the previous
+        // implementation worked under same-origin blob: frames and broke silently after Phase 3
+        // — Commit A hid the button by default; this restores it).
+        //
+        // The iframe-side listener (see _buildVfsBridgeScript: __sgPrintReq) does the DOM clone,
+        // the blob:→data: URL inlining (which has to happen there anyway, because the blob URLs
+        // belong to the iframe and would dangle in a separate print window), and the <script>
+        // stripping. The parent just kicks it off, awaits the snapshot, and hands the HTML to
+        // SgPrint.printHtml.
+        async _onPrint() {
+            try {
+                if (typeof window.SgPrint === 'undefined' || typeof SgPrint.printHtml !== 'function') {
+                    console.error('[app-shell] SgPrint not loaded — add sg-print.js to the app page');
+                    return;
+                }
+                var iframe = this._iframeEl;
+                if (!iframe || !iframe.contentWindow) {
+                    console.warn('[app-shell] print: no iframe to request snapshot from');
+                    return;
+                }
+                var id   = (Math.random() * 1e9 | 0).toString(36) + Date.now().toString(36);
+                var html = await new Promise(function (res, rej) {
+                    var timer = setTimeout(function () {
+                        window.removeEventListener('message', h);
+                        rej(new Error('print snapshot timed out (5s)'));
+                    }, 5000);
+                    function h(e) {
+                        if (!e.data || e.data.__sgPrintReply !== id) return;
+                        clearTimeout(timer);
+                        window.removeEventListener('message', h);
+                        if (e.data.ok) res(e.data.html);
+                        else rej(new Error(e.data.err || 'print snapshot failed'));
+                    }
+                    window.addEventListener('message', h);
+                    iframe.contentWindow.postMessage({ __sgPrintReq: id }, '*');
+                });
+                var title = (this._appJson && this._appJson.title) || (this._vault && this._vault.name) || 'App';
+                SgPrint.printHtml(html, title);
+            } catch (err) {
+                console.error('[app-shell] print failed:', err);
+            }
+        }
+
+        // ── ViV Phase 2: mount / unmount / mounts ─────────────────────────────────────
+        // Spawn a child kernel (null-origin srcdoc iframe) bound to another vault, fed
+        // its secrets over a SecureChannel. After mount, sg.vfs.* calls with the prefix
+        // relay through the child's kernel — see _handleVfsViv below.
+        // The mount table + broker + relay logic lives in KernelParent (testable, no DOM);
+        // app-shell supplies only the DOM-coupled spawnChannel (iframe + srcdoc) and the
+        // credential resolver. _mounts / _brokerSidecar alias the KernelParent internals so
+        // the message-handler `self._mounts.resolve(...)` checks keep working unchanged.
+        _ensureKernelParent() {
+            if (this._kernelParent) return this._kernelParent;
+            if (typeof KERNEL_SHELL_HTML === 'undefined') {
+                throw Object.assign(new Error('kernel-shell-bundle not loaded; run scripts/build-kernel-shell-bundle.py'), { code: 'EUNREACH' });
+            }
+            if (typeof SecureChannel === 'undefined' || typeof KernelMounts === 'undefined'
+                || typeof KernelBroker === 'undefined' || typeof KernelParent === 'undefined'
+                || typeof VivCustody === 'undefined') {
+                throw Object.assign(new Error('ViV modules missing — load secure-channel + kernel-mounts + kernel-broker + kernel-parent + viv-custody'), { code: 'EUNREACH' });
+            }
+            var self = this;
+            // Classify THIS kernel's App-A iframe origin for the B10 custody gate.
+            // Phase 3 SHIPPED: the 4 app-frame sites now use `allow-scripts allow-forms`
+            // (no allow-same-origin), so VivCustody classifies App-A as 'null-origin' and
+            // the gate no longer refuses parent-held mounts (null-origin App-A cannot read
+            // the parent's secrets — that was the whole point of the coupling rule).
+            var sandboxSpec = (this._iframeEl && this._iframeEl.getAttribute && this._iframeEl.getAttribute('sandbox')) || null;
+            var appOrigin   = VivCustody.classifyAppFrameOrigin(sandboxSpec);
+            // Synthetic-only escape hatch. NEVER set this for real-data trials. The
+            // pack §05 invariant is fail-closed by design; this is the one named opt-in.
+            var unsafeOk = (window.SG_VIV_ALLOW_UNSAFE_SYNTHETIC === true);
+            this._kernelParent = new KernelParent({
+                kernelId: 'k-' + ((this._vault && this._vault._vaultId) || 'top'),
+                brokerUi: { prompt: this._brokerPromptOnHud.bind(this) },
+                resolveCredentials: function (ref) { return self._resolveChildCredentials(ref); },
+                spawnChannel: function (ref, creds) { return self._spawnChildChannel(ref, creds); },
+                appFrameOrigin:       appOrigin,
+                allowUnsafeSynthetic: unsafeOk
+            });
+            // Aliases for the legacy message-handler branches + debug surface.
+            this._mounts        = this._kernelParent.mounts;
+            this._brokerSidecar = this._kernelParent.broker;
+            // Live provider for the ViV Mounts debug tab (gap-doc B4). The pane reads this
+            // on each `app-debug:bridge-call` (relayed ops emit one) + on manual refresh.
+            var kp = this._kernelParent;
+            window._appDebug = window._appDebug || {};
+            window._appDebug.vivProvider = function () {
+                return { mounts: kp.list(), entries: kp.broker.log() };
+            };
+            // Multi-kernel audit provider (Phase 5.1 — VivAuditView). The top kernel exposes
+            // its own mounts + broker log directly; each DIRECT child is polled via
+            // monitorChild (B7 monitored-mode) — children default to CLOSED, so most surface
+            // as honest "monitoring closed" placeholders rather than empty rows. Async: each
+            // monitorChild is a channel round-trip. Returns the source descriptor list
+            // VivAuditView.aggregate() consumes.
+            window._appDebug.vivAuditProvider = async function () {
+                // SecureChannel.request has no timeout (settles only on reply / channel-close),
+                // so an alive-but-unresponsive child would otherwise hang the whole audit poll.
+                // Bound each monitorChild round-trip; a timeout surfaces as 'unreachable'.
+                function _withTimeout(p, ms) {
+                    return Promise.race([ p, new Promise(function (_, reject) {
+                        setTimeout(function () { reject(Object.assign(new Error('monitor timeout'), { code: 'ETIMEDOUT' })); }, ms);
+                    }) ]);
+                }
+                var sources = [{
+                    kernelId: kp.kernelId || 'top',
+                    label:    'top (this app)',
+                    mounts:   kp.list(),
+                    entries:  kp.broker.log(),
+                    monitor:  'top'
+                }];
+                var children = kp.list();
+                for (var i = 0; i < children.length; i++) {
+                    var m = children[i];
+                    try {
+                        var res = await _withTimeout(kp.monitorChild(m.mountId), 3000);   // { mode, entries }
+                        sources.push({
+                            kernelId: m.mountId,
+                            label:    m.label || m.ref || m.mountId,
+                            mounts:   [],
+                            entries:  (res && res.entries) || [],
+                            monitor:  (res && res.mode === 'opt-in') ? 'opt-in' : 'closed'
+                        });
+                    } catch (err) {
+                        sources.push({
+                            kernelId: m.mountId,
+                            label:    m.label || m.ref || m.mountId,
+                            mounts:   [],
+                            entries:  null,
+                            monitor:  (err && err.code === 'ECONSENT') ? 'closed' : 'unreachable'
+                        });
+                    }
+                }
+                return sources;
+            };
+            return this._kernelParent;
+        }
+
+        // DOM-coupled child bring-up: build the null-origin srcdoc iframe, run the handshake,
+        // deliver secrets (WITH the parent's own endpoint — M5), wait for the child's 'ready'.
+        // Cleans up the iframe + channel on any failure. This is the only piece that can't be
+        // unit-tested (it touches document/iframe); KernelParent + bootKernelOnPort cover the rest.
+        async _spawnChildChannel(ref, creds) {
+            var iframe = document.createElement('iframe');
+            iframe.sandbox = 'allow-scripts';            // null origin
+            iframe.style.cssText = 'display:none;';      // headless mount; visible UI mounts are Phase 5
+            iframe.srcdoc = KERNEL_SHELL_HTML;
+            document.body.appendChild(iframe);
+
+            var channel;
+            try {
+                channel = await SecureChannel.create(iframe, { sensitiveKey: true, cid: 'ch-' + ref });
+                // M5: tell the child WHICH server to hit — its own Edge 1. Without this the
+                // child falls back to the hardcoded dev endpoint regardless of where we are.
+                await channel.send('secrets', {
+                    vaultKey:    creds.vaultKey,
+                    accessToken: creds.accessToken || null,
+                    endpoint:    this._sendEndpoint()
+                }, { sensitive: true });
+                await new Promise(function (resolve, reject) {
+                    var t = setTimeout(function () { reject(Object.assign(new Error('child kernel boot timeout'), { code: 'EUNREACH' })); }, 10000);
+                    channel.on('ready', function (p) { clearTimeout(t); resolve(p); });
+                });
+            } catch (err) {
+                if (channel) { try { channel.close(); } catch (_) {} }
+                try { iframe.remove(); } catch (_) {}
+                throw err;
+            }
+            // Stash the iframe on the channel so unmount can tear it down.
+            channel._mountIframe = iframe;
+            return channel;
+        }
+
+        async _mountChildVault(opts) {
+            var kp = this._ensureKernelParent();
+            return kp.mount({ prefix: opts.prefix, ref: opts.ref, label: opts.label });
+        }
+
+        async _unmountChildVault(mountId) {
+            if (!this._kernelParent) return { unmounted: false };
+            var res = await this._kernelParent.unmount(mountId);
+            // Tear down the iframe stashed on the channel (DOM cleanup KernelParent can't do).
+            try {
+                var iframe = res && res.channel && res.channel._mountIframe;
+                if (iframe) iframe.remove();
+            } catch (_) {}
+            return { unmounted: !!res.unmounted, mountId: res.mountId };
+        }
+
+        _listMounts() {
+            if (!this._kernelParent) return [];
+            return this._kernelParent.list();
+        }
+
+        // Trial-only stub. The clinic vault's app.json + an owner record (clinic.json)
+        // can provide child credentials. Real production: Kernel-A holds them
+        // (port-transfer model — architect pack §3 "Cleaner future variant").
+        // Resolved creds are tagged custody:'parent-held' so the B10 gate can refuse
+        // the unsafe combination (this resolver + a same-origin App-A) by default.
+        async _resolveChildCredentials(ref) {
+            if (this._resolveChildCredentialsImpl) return this._resolveChildCredentialsImpl(ref);
+            try {
+                var bytes = await this._dataSource.getFileBytes('clinic.json');
+                var clinic = JSON.parse(new TextDecoder().decode(bytes));
+                var entry = clinic && clinic[ref];
+                if (entry && entry.vaultKey) {
+                    return {
+                        vaultKey:    entry.vaultKey,
+                        accessToken: entry.accessToken || null,
+                        custody:     'parent-held'
+                    };
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        // HUD prompt for broker.mediate(ask). Reuses the existing consent bar infrastructure.
+        async _brokerPromptOnHud(req) {
+            return new Promise((resolve) => {
+                var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                if (!hud || typeof hud.requestConsent !== 'function') { resolve('deny'); return; }
+                hud.requestConsent('vfs.' + req.op, req.path + ' (in ' + req.mountId + ')', function (ok) {
+                    resolve(ok ? 'allow' : 'deny');
+                });
+            });
+        }
+
+        // Cross-mount aware vfs handler. Local path → existing data-source ops; cross-mount
+        // path → broker.mediate + relay over the child's SecureChannel.
+        async _handleVfsViv(op, args) {
+            if (!this._kernelParent) return null;   // no mounts yet → caller does local op
+            return this._kernelParent.relay(op, args);
+        }
+
+        // Clear this app's cached consents for the current vault (HUD permissions panel "reset").
+        _resetConsents() {
+            var prefix = 'sg-app-grant:' + ((this._vault && this._vault._vaultId) || this._vaultKey || '') + ':' + (this._appId || '') + ':';
+            try {
+                var rm = [];
+                for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) rm.push(k); }
+                rm.forEach(function (k) { try { localStorage.removeItem(k); } catch (_) {} });
+            } catch (_) {}
         }
 
         _setCachedAccessKey(vaultId, key, persist) {
@@ -649,6 +1117,7 @@
                         var data = await resp.json();
                         if (!data.valid) throw new Error('Access key is invalid or has expired');
                         this._setCachedAccessKey(vaultId, key, rCheck.checked);
+                        this._applyAccessToken(key);
                         this._dataSource = new VaultDataSource(vault, key);
                         this._writable   = true;
                         resolve();
@@ -732,19 +1201,20 @@
                 });
             }
 
-            // Inject bridge + resources into <head>
+            // Inject bridge + resources into <head> via the unified bootstrap builder (Phase 4).
             var bridgeScript = this._buildVfsBridgeScript(entry.path);
-            var injected     = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript + resBlock);
-            if (injected === htmlText) injected = bridgeScript + resBlock + htmlText;
+            var injected     = AppFrameBootstrap.build({ kind: 'app', htmlText: htmlText, bridgeScript: bridgeScript, resBlock: resBlock });
 
-            var blob    = new Blob([injected], { type: 'text/html' });
-            var blobUrl = URL.createObjectURL(blob);
-            this._objectUrls.push(blobUrl);
-
+            // Phase 3 (pack §5.3 security gate): null-origin app frame. We deliver the
+            // app via `srcdoc`, NOT a parent-origin `blob:` URL — a null-origin sandbox
+            // refuses to load a blob: minted by another origin (pack §5.5; probe P1).
+            // Dropping `allow-same-origin` means app code can no longer read
+            // localStorage / window.parent / ambient-fetch vault paths; every vault
+            // access goes through the postMessage bridge (sg.*), which never needed it.
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-            iframe.src         = blobUrl;
+            iframe.srcdoc      = injected;
             iframe.addEventListener('load', () => {
                 this._iframeStatus  = 'ready';
                 this._t.iframeReady = performance.now();
@@ -757,6 +1227,15 @@
             this.shadowRoot.appendChild(iframe);
 
             this._setupVfsBridgeHandlers(iframe, this._dataSource);
+
+            // Seed nav history with this entry so the HUD back/forward arrows have an origin.
+            // Subsequent in-vault link clicks push onto this stack via _pushNavHistory.
+            // _appEntryPath is remembered separately so the Home button can jump back to
+            // the app's root regardless of how deep nav has wandered.
+            this._appEntryPath = entry.path;
+            this._navHistory   = [entry.path];
+            this._navIndex     = 0;
+            this._emitNavChange();
         }
 
         // _page.json: render via PageLayoutRenderer.
@@ -789,76 +1268,28 @@
                 mdRendererJs  = deps[3], plrJs = deps[4],
                 css1 = deps[5], css2 = deps[6], css3 = deps[7];
 
-            // Path-resolution helpers PageLayoutRenderer expects as globals (from
-            // send-browse-v031.js / send-browse--v0.3.2.js). Inlined here to avoid
-            // loading the full send-browse component just for two utilities.
-            var pathHelpers =
-                'function _resolvePath(base,relative){' +
-                  'if(relative.startsWith("/"))return relative.substring(1);' +
-                  'var combined=base+relative,parts=combined.split("/"),resolved=[];' +
-                  'for(var i=0;i<parts.length;i++){' +
-                    'if(parts[i]==="..")resolved.pop();' +
-                    'else if(parts[i]!=="."&&parts[i]!=="")resolved.push(parts[i]);}' +
-                  'return resolved.join("/");}' +
-                'function _findEntry(fileList,resolved){' +
-                  'try{resolved=decodeURIComponent(resolved);}catch(_){}' +
-                  'var match=fileList.find(function(e){return !e.dir&&e.path===resolved;});if(match)return match;' +
-                  'match=fileList.find(function(e){return !e.dir&&e.path.endsWith("/"+resolved);});if(match)return match;' +
-                  'if(resolved.indexOf(".")===-1){' +
-                    'var exts=[".md",".pdf",".txt",".html",".jpg",".jpeg",".png",".webp"];' +
-                    'for(var i=0;i<exts.length;i++){' +
-                      'match=fileList.find(function(e){return !e.dir&&e.path===resolved+exts[i];});if(match)return match;' +
-                      'match=fileList.find(function(e){return !e.dir&&e.path.endsWith("/"+resolved+exts[i]);});if(match)return match;}}' +
-                  'var filename=resolved.split("/").pop();' +
-                  'if(filename){match=fileList.find(function(e){return !e.dir&&e.path.split("/").pop()===filename;});}' +
-                  'return match||null;}';
+            // Unified app-frame bootstrap (Phase 4). Path-resolution helpers, the
+            // PageLayoutRenderer wiring and the `.vault`-segment fileList filter now live
+            // in AppFrameBootstrap.build({kind:'page-layout'}); the mount method only
+            // fetches deps and passes them in.
+            var html = AppFrameBootstrap.build({
+                kind: 'page-layout',
+                bridgeScript: bridgeScript,
+                deps: {
+                    sendHelpersJs: sendHelpersJs, fileTypeJs: fileTypeJs,
+                    mdParserJs: mdParserJs, mdRendererJs: mdRendererJs, plrJs: plrJs,
+                    css1: css1, css2: css2, css3: css3
+                },
+                fileList:   fileList,
+                folderPath: folderPath,
+                entryPath:  entry.path
+            });
 
-            var html = '<!DOCTYPE html><html><head>' +
-                '<meta charset="utf-8">' +
-                '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-                bridgeScript +
-                '<style>' + css1 + '\n' + css2 + '\n' + css3 + '</style>' +
-                '<style>html,body{margin:0;padding:0;height:100%;overflow-x:hidden;}' +
-                'body{background:#0d1117;}#plr-root{min-height:100vh;}</style>' +
-                '</head><body>' +
-                '<div id="plr-root"></div>' +
-                '<script>' + sendHelpersJs + '<\/script>' +
-                '<script>' + fileTypeJs    + '<\/script>' +
-                '<script>' + mdParserJs    + '<\/script>' +
-                '<script>' + mdRendererJs  + '<\/script>' +
-                '<script>' + pathHelpers   + '<\/script>' +
-                '<script>' + plrJs         + '<\/script>' +
-                '<script>(function(){' +
-                  'var fileList=' + JSON.stringify(fileList) + ';' +
-                  'var folderPath=' + JSON.stringify(folderPath) + ';' +
-                  'var entryPath=' + JSON.stringify(entry.path) + ';' +
-                  'var objectUrls=[];' +
-                  'var browseInstance={' +
-                    '_objectUrls:objectUrls,' +
-                    'dataSource:{' +
-                      'getFileList:function(){return fileList;},' +
-                      'getFileBytes:function(p){return sg.vfs.read(p);}' +
-                    '}' +
-                  '};' +
-                  'sg.vfs.read(entryPath).then(function(buf){' +
-                    'var json=new TextDecoder().decode(buf);' +
-                    'var container=document.getElementById("plr-root");' +
-                    'PageLayoutRenderer.render(container,json,folderPath,null,browseInstance);' +
-                  '}).catch(function(err){' +
-                    'document.getElementById("plr-root").innerHTML=' +
-                      '"<div style=\\"padding:2rem;color:#ff6b6b\\">Error: "+err.message+"</div>";' +
-                  '});' +
-                '}());<\/script>' +
-                '</body></html>';
-
-            var blob    = new Blob([html], { type: 'text/html' });
-            var blobUrl = URL.createObjectURL(blob);
-            this._objectUrls.push(blobUrl);
-
+            // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-            iframe.src         = blobUrl;
+            iframe.srcdoc      = html;
             iframe.addEventListener('load', () => {
                 this._iframeStatus  = 'ready';
                 this._t.iframeReady = performance.now();
@@ -893,6 +1324,12 @@
                 return;
             }
 
+            // Reflect the opened file in the URL hash (the resolved path — non-sensitive; the vault
+            // key stays in localStorage, never the address bar). This makes reloads re-open the same
+            // file and the link copy-shareable. _init re-reads this hash on reload; _continue →
+            // _mountVaultFile re-mounts and re-sets it. The default app (no deep-link) keeps no hash.
+            try { window.history.replaceState(null, '', window.location.pathname + window.location.search + '#' + entry.path); } catch (_) {}
+
             var ext = entry.path.split('.').pop().toLowerCase();
             var bridgeScript = this._buildVfsBridgeScript(entry.path);
 
@@ -901,15 +1338,12 @@
                 this._setStatus('Loading app…');
                 var htmlBytes = await this._dataSource.getFileBytes(entry.path);
                 var htmlText  = new TextDecoder().decode(htmlBytes);
-                var injected  = htmlText.replace(/(<head[^>]*>)/i, '$1' + bridgeScript);
-                if (injected === htmlText) injected = bridgeScript + htmlText;
-                var blob    = new Blob([injected], { type: 'text/html' });
-                var blobUrl = URL.createObjectURL(blob);
-                this._objectUrls.push(blobUrl);
+                var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
+                // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-                iframe.src         = blobUrl;
+                iframe.srcdoc      = injected;
                 iframe.addEventListener('load', () => {
                     this._iframeStatus  = 'ready';
                     this._t.iframeReady = performance.now();
@@ -935,61 +1369,22 @@
 
                 var mdBytes = await this._dataSource.getFileBytes(entry.path);
                 var mdText  = new TextDecoder().decode(mdBytes);
-                // Escape for inline JSON string embedding
-                var mdEscaped = JSON.stringify(mdText);
 
-                var html = '<!DOCTYPE html><html><head>' +
-                    '<meta charset="utf-8">' +
-                    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-                    bridgeScript +
-                    '<style>' + css1 + '\n' + css2 + '</style>' +
-                    '<style>' +
-                        'html,body{margin:0;padding:0;background:#0d1117;color:#e2e8f0;' +
-                            'font-family:var(--font-sans,system-ui,sans-serif);}' +
-                        '#md-root{max-width:860px;margin:0 auto;padding:2rem 1.5rem;}' +
-                        'img{max-width:100%;height:auto;}' +
-                        'pre,code{background:#1a1f2e;border-radius:4px;}' +
-                        'pre{padding:1rem;overflow-x:auto;}' +
-                        'code{padding:0.15em 0.35em;}' +
-                    '</style>' +
-                    '</head><body>' +
-                    '<div id="md-root"></div>' +
-                    '<script>' + mdParserJs + '<\/script>' +
-                    '<script>' + mdRendererJs + '<\/script>' +
-                    '<script>(function(){' +
-                        'var md=' + mdEscaped + ';' +
-                        'var html=new MarkdownParser().parse(md);' +
-                        'var root=document.getElementById("md-root");' +
-                        'root.innerHTML=html;' +
-                        // Resolve images via VFS bridge: img[data-md-src] → blob URL
-                        'var imgs=root.querySelectorAll("img[data-md-src]");' +
-                        'var pending=imgs.length;' +
-                        'function _done(){' +
-                            'if(--pending<=0){' +
-                                'window.parent.postMessage({type:"sg-app-ready"},"*");' +
-                            '}' +
-                        '}' +
-                        'if(!pending){window.parent.postMessage({type:"sg-app-ready"},"*");}' +
-                        'for(var i=0;i<imgs.length;i++){' +
-                            '(function(img){' +
-                                'var src=img.getAttribute("data-md-src");' +
-                                'sg.vfs.read(src).then(function(buf){' +
-                                    'var blob=new Blob([buf]);' +
-                                    'img.src=URL.createObjectURL(blob);' +
-                                    '_done();' +
-                                '}).catch(function(){_done();});' +
-                            '})(imgs[i]);' +
-                        '}' +
-                    '}());<\/script>' +
-                    '</body></html>';
+                // Unified app-frame bootstrap (Phase 4) — markdown render + bridge
+                // image-resolution IIFE now live in AppFrameBootstrap.build({kind:
+                // 'markdown'}); the mount method only fetches deps and the md bytes.
+                var html = AppFrameBootstrap.build({
+                    kind: 'markdown',
+                    bridgeScript: bridgeScript,
+                    deps: { mdParserJs: mdParserJs, mdRendererJs: mdRendererJs, css1: css1, css2: css2 },
+                    mdText: mdText
+                });
 
-                var blob    = new Blob([html], { type: 'text/html' });
-                var blobUrl = URL.createObjectURL(blob);
-                this._objectUrls.push(blobUrl);
+                // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-same-origin';
+                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
-                iframe.src         = blobUrl;
+                iframe.srcdoc      = html;
                 iframe.addEventListener('load', () => {
                     this._iframeStatus  = 'ready';
                     this._t.iframeReady = performance.now();
@@ -1013,6 +1408,184 @@
                 '</div>';
         }
 
+        // ── In-app navigation (HUD back/forward + bridge nav requests) ────────────────
+        //
+        // The iframe's click interceptor (see _buildVfsBridgeScript below) catches every
+        // in-vault link and posts {__sgVfsNavReq: href} to the parent. The message handler
+        // hands it to `_navigateToPath`, which resolves the path against the current dir,
+        // pushes a history entry, swaps the srcdoc, and (if the href had a #fragment) tells
+        // the new doc to scroll to it via __sgVfsScrollToHash. Back/forward arrows on the
+        // HUD bypass the bridge entirely and re-issue from history with pushHistory:false.
+
+        _navigateToPath(href, opts) {
+            opts = opts || {};
+            var pushHistory     = (opts.pushHistory !== false);
+            // History entries (back/forward, home) carry already-resolved vault-absolute
+            // paths — re-running _resolvePath against the *current* this._htmlDir would
+            // double-prefix them (e.g. back from "shared/test-lab/" to "home/index.html"
+            // would resolve to "shared/test-lab/home/index.html", which doesn't exist).
+            // The bridge click-interceptor path is always relative-to-current-dir and so
+            // does need resolution — that's the default (alreadyResolved !== true).
+            var alreadyResolved = (opts.alreadyResolved === true);
+            var iframeEl   = this._iframeEl;
+            var dataSource = this._dataSource;
+            if (!iframeEl || !dataSource) return;
+
+            // Delegates the parsing + resolution to AppNavHelpers so the two pinned
+            // regression rules (hash-link strip, path-doubling alreadyResolved) live in
+            // ONE place with characterization tests. See test__app_shell_nav_helpers.js.
+            var nav      = AppNavHelpers.resolveNavigation({
+                href:            href,
+                htmlDir:         this._htmlDir,
+                alreadyResolved: alreadyResolved
+            });
+            var resolved = nav.resolved;
+            var fragment = nav.fragment;
+            if (AppPermissions.isFloor('read', resolved)) {
+                console.warn('[app-shell] nav blocked (protected path):', resolved);
+                this._renderBrokenLinkOverlay(resolved, 'blocked');
+                if (pushHistory) this._pushNavHistory(resolved);
+                this._emitNavChange();
+                return;
+            }
+            var match = this._findEntry(dataSource.getFileList(), resolved);
+            if (!match) {
+                console.warn('[app-shell] nav not found:', resolved);
+                this._renderBrokenLinkOverlay(resolved, 'missing');
+                if (pushHistory) this._pushNavHistory(resolved);
+                this._emitNavChange();
+                return;
+            }
+            var self = this;
+            dataSource.getFileBytes(match.path).then(function (buf) {
+                var htmlText = new TextDecoder().decode(buf);
+                self._htmlDir = match.path.includes('/')
+                    ? match.path.substring(0, match.path.lastIndexOf('/') + 1) : '';
+                var navBridge = self._buildVfsBridgeScript(match.path);
+                // Phase 3 flipped app frames to null-origin `srcdoc` (ee6f4995). srcdoc
+                // OVERRIDES src, so we must REPLACE srcdoc — not assign a blob: src.
+                var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: navBridge });
+                iframeEl.removeAttribute('src');
+                iframeEl.srcdoc = injected;
+                var entry = match.path + (fragment ? '#' + fragment : '');
+                if (pushHistory) self._pushNavHistory(entry);
+                // Scroll-to-anchor: reach into the null-origin iframe via postMessage. The
+                // bridge script's __sgVfsScrollToHash listener applies it on DOMContentLoaded.
+                if (fragment) {
+                    var onLoad = function () {
+                        iframeEl.removeEventListener('load', onLoad);
+                        try { iframeEl.contentWindow.postMessage({ __sgVfsScrollToHash: fragment }, '*'); } catch (_) {}
+                    };
+                    iframeEl.addEventListener('load', onLoad);
+                }
+                self._emitNavChange();
+                console.log('[app-shell] nav →', entry);
+            }).catch(function (err) { console.error('[app-shell] nav fetch failed:', err); });
+        }
+
+        _pushNavHistory(entry) {
+            // Truncate any forward entries — the new nav replaces them (browser convention).
+            if (this._navIndex < this._navHistory.length - 1) {
+                this._navHistory.length = this._navIndex + 1;
+            }
+            // Don't push a duplicate of the current entry (refresh shouldn't grow history).
+            var last = this._navHistory[this._navHistory.length - 1];
+            if (last !== entry) this._navHistory.push(entry);
+            this._navIndex = this._navHistory.length - 1;
+        }
+
+        _navBack() {
+            if (this._navIndex <= 0) return false;
+            this._navIndex -= 1;
+            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false, alreadyResolved: true });
+            return true;
+        }
+
+        _navForward() {
+            if (this._navIndex >= this._navHistory.length - 1) return false;
+            this._navIndex += 1;
+            this._navigateToPath(this._navHistory[this._navIndex], { pushHistory: false, alreadyResolved: true });
+            return true;
+        }
+
+        _navReload() {
+            var entry = this._navHistory[this._navIndex];
+            if (!entry) return false;
+            this._navigateToPath(entry, { pushHistory: false, alreadyResolved: true });
+            return true;
+        }
+
+        // Jump back to the app's entry file (from app.json — captured at _mountApp time).
+        // Pushes a new history entry rather than rewinding the stack — going Home from
+        // page-deep-in-the-tree shouldn't erase your forward stack the way Back/Forward do.
+        _navHome() {
+            if (!this._appEntryPath) return false;
+            // No-op if we're already on Home (don't pollute history with duplicates).
+            if (this._currentNavPath() === this._appEntryPath) return true;
+            this._navigateToPath(this._appEntryPath, { pushHistory: true, alreadyResolved: true });
+            return true;
+        }
+
+        _canNavBack()    { return this._navIndex > 0; }
+        _canNavForward() { return this._navIndex < this._navHistory.length - 1; }
+        _currentNavPath() { return this._navHistory[this._navIndex] || ''; }
+
+        // Notify the HUD that nav state has changed so it can update arrows + the address bar.
+        _emitNavChange() {
+            var cur  = this._currentNavPath();
+            var home = this._appEntryPath || '';
+            document.dispatchEvent(new CustomEvent('app-nav:change', {
+                bubbles: true, composed: true,
+                detail: {
+                    path:       cur,
+                    canBack:    this._canNavBack(),
+                    canForward: this._canNavForward(),
+                    canHome:    !!home && (cur !== home),
+                    historyLen: this._navHistory.length
+                }
+            }));
+        }
+
+        // Friendly dead-end page for navigations that can't be served. Two reasons:
+        //   'missing'  → the path is not in the vault file list at all
+        //   'blocked'  → the path is in a protected segment (AppPermissions floor)
+        // Rendered as a srcdoc so the user can hit the HUD's ‹ back arrow to escape.
+        _renderBrokenLinkOverlay(missingPath, reason) {
+            var iframe = this._iframeEl;
+            if (!iframe) return;
+            var esc = function (s) {
+                return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            };
+            var isBlocked = (reason === 'blocked');
+            var title  = isBlocked ? 'Access denied' : 'Page not found in this vault';
+            var icon   = isBlocked ? '🔒' : '🔗';
+            var detail = isBlocked
+                ? 'The app tried to navigate to a protected path. The platform blocks reads to vault internals from app code.'
+                : 'The link points to a file that does not exist in this vault. The author may have renamed or moved it.';
+            var html = ''
+              + '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
+              + '<style>'
+              +   'html,body{margin:0;padding:0;}'
+              +   'body{background:#0d1117;color:#e6e6e6;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
+              +     'display:flex;align-items:center;justify-content:center;min-height:100vh;}'
+              +   '.err{text-align:center;max-width:540px;padding:2rem 2.5rem;}'
+              +   '.ico{font-size:3rem;margin:0 0 0.6rem;opacity:0.75;line-height:1;}'
+              +   'h1{color:' + (isBlocked ? '#f0ad4e' : '#ff8a8a') + ';font-size:1.15rem;font-weight:600;margin:0 0 0.5rem;}'
+              +   'p{color:rgba(255,255,255,0.62);font-size:0.9rem;line-height:1.55;margin:0.4rem 0;}'
+              +   'code{background:rgba(255,255,255,0.08);padding:0.18rem 0.55rem;border-radius:3px;'
+              +     'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.82em;word-break:break-all;color:#fff;}'
+              +   '.hint{color:rgba(255,255,255,0.38);font-size:0.78rem;margin-top:1.3rem;}'
+              + '</style></head><body><div class="err">'
+              + '<div class="ico">' + icon + '</div>'
+              + '<h1>' + esc(title) + '</h1>'
+              + '<p>' + esc(detail) + '</p>'
+              + '<p><code>' + esc(missingPath) + '</code></p>'
+              + '<p class="hint">Use the &lsaquo; back arrow in the toolbar to return to where you came from.</p>'
+              + '</div></body></html>';
+            iframe.removeAttribute('src');
+            iframe.srcdoc = html;
+        }
+
         // ── VFS bridge (injected into iframe) ─────────────────────────────────────────
 
         _buildVfsBridgeScript(currentPath) {
@@ -1028,16 +1601,90 @@
 
             return '<script>(function(){' +
 
-                // Nav intercept: relative .html links → postMessage to parent
+                // App-error surfacing (ViV Phase 4 re-spec). Under null-origin app frames
+                // the parent can no longer reach in to inject window.onerror; instead the
+                // frame self-reports uncaught errors OUT over postMessage (null-origin safe).
+                // The parent handler routes {type:"sg-app-error"} to the HUD. See probe P5.
+                'window.onerror=function(m,s,l,c){try{window.parent.postMessage({type:"sg-app-error",message:String(m)+(l?" (line "+l+(c?":"+c:"")+")":"")},"*");}catch(_){}return false;};' +
+                'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
+                // Body-hidden self-check: if the app never makes its body visible, surface a
+                // hint (mirrors the old same-origin display:none probe, now from inside).
+                //
+                // Delay raised from 0 → 2500 ms (2026-05-31): apps with a typical "hidden
+                // until init JS runs" reveal pattern (Private Health Score is one) hit the
+                // 0-ms check before their reveal had a chance to fire, so the banner showed
+                // a false-positive even when the page later rendered fine. 2.5 s is well past
+                // every reasonable init time but short enough to still be useful when the app
+                // GENUINELY never reveals. Apps that take >2.5s to first paint should signal
+                // sg-app-ready (see AUTHORING.md) — the banner reflects a real problem then.
+                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},2500);});' +
+
+                // Nav intercept: relative .html/.htm links → postMessage to parent.
+                // The extension check runs on the path portion only (strip ?query / #frag) so
+                // "page.html#section" still routes through the bridge — otherwise the browser
+                // would do a real GET, the static host 403s, and the iframe lands on a dead end.
+                // The ORIGINAL href (with the fragment) is forwarded so the parent can scroll
+                // to the anchor inside the new srcdoc after navigation.
+                //
+                // External links (http://, https://, //) are opened in a NEW TAB via window.open.
+                // The iframe's sandbox now includes allow-popups + allow-popups-to-escape-sandbox,
+                // so the new window is unrestricted. Doing it from inside the iframe (synchronous
+                // within the click gesture) avoids the popup-blocker hit that a postMessage round-
+                // trip to the parent would incur — postMessage is async, the gesture is lost, and
+                // window.open() in the parent would be blocked.
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");if(!a)return;' +
                   'var h=a.getAttribute("href");if(!h)return;' +
-                  'if(h.startsWith("http")||h.startsWith("//")||h.startsWith("#")||h.startsWith("mailto:"))return;' +
-                  'if(h.endsWith(".html")||h.endsWith(".htm")){' +
+                  'if(h.startsWith("#")||h.startsWith("mailto:"))return;' +
+                  'if(h.startsWith("http")||h.startsWith("//")){' +
+                    'e.preventDefault();e.stopPropagation();' +
+                    'try{window.open(h,"_blank","noopener,noreferrer");}catch(_){}' +
+                    'return;' +
+                  '}' +
+                  'var hp=h.split("?")[0].split("#")[0];' +
+                  'if(hp.endsWith(".html")||hp.endsWith(".htm")){' +
                     'e.preventDefault();e.stopPropagation();' +
                     'window.parent.postMessage({__sgVfsNavReq:h},"*");' +
                   '}' +
                 '},true);' +
+
+                // Scroll-to-anchor after navigation: parent posts {__sgVfsScrollToHash:"section"}
+                // (no leading '#') once the new srcdoc has loaded. Null-origin frames can't be
+                // scripted by the parent directly, so this listener inside the iframe is how
+                // links like "page.html#section" land on the right element after the swap.
+                'window.addEventListener("message",function(e){' +
+                  'if(!e.data||typeof e.data.__sgVfsScrollToHash!=="string")return;' +
+                  'var frag=e.data.__sgVfsScrollToHash;if(!frag)return;' +
+                  'var apply=function(){try{var el=document.getElementById(frag);if(el){el.scrollIntoView();return;}location.hash="#"+frag;}catch(_){}};' +
+                  'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply);else apply();' +
+                '});' +
+
+                // Print snapshot RPC. ViV Phase 3 flipped app frames to null-origin srcdoc, which
+                // means the parent can't read iframe.contentDocument any more (SecurityError). So
+                // print now runs INSIDE the iframe: the parent posts {__sgPrintReq: id}, this
+                // listener clones documentElement, fetches every blob: url (img.src and stylesheet
+                // link.href) and inlines them as data: URIs (so the print window is self-contained
+                // — blob: URLs created in this iframe wouldn't survive a window.open anyway),
+                // strips <script> tags (they would error or hang in the print preview with no
+                // bridge), and posts the resulting HTML back via {__sgPrintReply: id, ok, html|err}.
+                'window.addEventListener("message",function(e){' +
+                  'if(!e.data||!e.data.__sgPrintReq)return;' +
+                  'var id=e.data.__sgPrintReq;' +
+                  '(async function(){' +
+                    'try{' +
+                      'var clone=document.documentElement.cloneNode(true);' +
+                      'function _b2d(u){return fetch(u).then(function(r){return r.blob();}).then(function(b){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.onerror=function(){rej(fr.error);};fr.readAsDataURL(b);});});}' +
+                      'var imgs=Array.prototype.slice.call(clone.querySelectorAll(\'img[src^="blob:"]\'));' +
+                      'var lnks=Array.prototype.slice.call(clone.querySelectorAll(\'link[rel="stylesheet"][href^="blob:"]\'));' +
+                      'await Promise.all(imgs.map(async function(g){try{g.src=await _b2d(g.src);}catch(_){}}).concat(lnks.map(async function(l){try{l.href=await _b2d(l.href);}catch(_){}})));' +
+                      'clone.querySelectorAll("script").forEach(function(s){s.remove();});' +
+                      'var html="<!DOCTYPE html>\\n"+clone.outerHTML;' +
+                      'window.parent.postMessage({__sgPrintReply:id,ok:true,html:html},"*");' +
+                    '}catch(err){' +
+                      'window.parent.postMessage({__sgPrintReply:id,ok:false,err:String(err&&err.message||err)},"*");' +
+                    '}' +
+                  '})();' +
+                '});' +
 
                 // Core VFS bridge
                 '(function(){' +
@@ -1095,7 +1742,31 @@
                   // window.sg.*
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
+                    // sg.fs.* — mutations gated by app.json permissions (move/delete/mkdir)
+                    'fs:{' +
+                      'move:function(from,to){return _sgCmd("fs",{action:"move",from:from,to:to});},' +
+                      'delete:function(path){return _sgCmd("fs",{action:"delete",path:path});},' +
+                      'mkdir:function(path){return _sgCmd("fs",{action:"mkdir",path:path});}' +
+                    '},' +
+                    // sg.vault.* — create a child vault in a folder (read-through), unlink, delete
+                    'vault:{' +
+                      'create:function(path,label){return _sgCmd("vault",{action:"create",path:path,label:label});},' +
+                      'unlink:function(path){return _sgCmd("vault",{action:"unlink",path:path});},' +
+                      'delete:function(path){return _sgCmd("vault",{action:"delete",path:path});},' +
+                      // ViV Phase 2: mount a child vault for cross-vault reads/writes via this kernel.
+                      'mount:function(opts){return _sgCmd("vault",{action:"mount",prefix:opts&&opts.prefix,ref:opts&&opts.ref,label:opts&&opts.label});},' +
+                      'unmount:function(mountId){return _sgCmd("vault",{action:"unmount",mountId:mountId});},' +
+                      'mounts:function(){return _sgCmd("vault",{action:"mounts"});}' +
+                    '},' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
+                    // sg.history.* — read past commits / trees / blobs (read-only)
+                    'history:{' +
+                      'log:function(o){return _sgCmd("history",{action:"log",opts:o||{}});},' +
+                      'list:function(c,p){return _sgCmd("history",{action:"list",commitId:c,path:p||""});},' +
+                      'read:function(c,p){return _sgCmd("history",{action:"read",commitId:c,path:p});},' +
+                      'readText:function(c,p){return _sgCmd("history",{action:"read",commitId:c,path:p}).then(function(b){return new TextDecoder().decode(b);});},' +
+                      'readBlob:function(id){return _sgCmd("history",{action:"readBlob",blobId:id});}' +
+                    '},' +
                     'app:{' +
                       'selfPath:'  + JSON.stringify(currentPath) + ',' +
                       'writable:'  + (writable  ? 'true' : 'false') + ',' +
@@ -1120,7 +1791,26 @@
                     '},' +
                     'ui:{' +
                       'message:function(text,type,opts){opts=opts||{};var h=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);var ttl=opts.ttl===null?null:(typeof opts.ttl==="number"?opts.ttl:3000);window.parent.postMessage({__sgUiMsg:{handle:h,text:String(text||""),msgType:type||"info",ttl:ttl}},"*");return h;},' +
-                      'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");}' +
+                      'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");},' +
+                      // ask the user (on the HUD) to grant a declared-but-consent-gated verb; resolves {granted}
+                      'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});}' +
+                    '},' +
+                    // sg.state.* — device-local preferences (theme, panel widths, "don't show again"
+                    // dismissals). Backed by the TOP-LEVEL kernel's localStorage, namespaced as
+                    // sg-app-state:<vaultId>:<appEntryPath>:<key>. Values are JSON-encoded, capped at
+                    // 64 KiB per key. Apps that want VAULT-PERSISTENT state (travels with the vault,
+                    // visible to other devices opening the same vault key) should continue to use
+                    // sg.fs.write(".app-state/...") directly. **Doctrine deviation note:** the ViV
+                    // impl pack's repair checklist (item #1) prescribes sg.vfs("app-state/<key>.json");
+                    // we deliberately chose localStorage for the device-local-prefs use case to avoid
+                    // a vault write on every theme toggle. Documented in
+                    // team/comms/changelog/05/30/changelog__app-state-print-rpc.md.
+                    'state:{' +
+                      'get:function(key){return _sgCmd("state",{action:"get",key:String(key||"")});},' +
+                      'set:function(key,value){return _sgCmd("state",{action:"set",key:String(key||""),value:value});},' +
+                      'remove:function(key){return _sgCmd("state",{action:"remove",key:String(key||"")});},' +
+                      'clear:function(){return _sgCmd("state",{action:"clear"});},' +
+                      'keys:function(){return _sgCmd("state",{action:"keys"});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -1187,6 +1877,74 @@
         _setupVfsBridgeHandlers(iframeEl, dataSource) {
             var self = this;
 
+            // Transparency for sub-vaults: wrap the data source in a CompositeDataSource so the
+            // app's runtime sg.vfs.* calls can read inner-vault files by path (auto-opened
+            // read-only via stored ro-records — no prompt). Identical behaviour when the vault
+            // has no sub-vaults (the composite delegates everything to the root). Degrades
+            // gracefully if the script isn't loaded.
+            var compositeReady = Promise.resolve();
+            if (typeof CompositeDataSource !== 'undefined' && !(dataSource instanceof CompositeDataSource)) {
+                try {
+                    var composite = new CompositeDataSource(dataSource, { keyProvider: null });  // null = no prompt in app context
+                    compositeReady = composite.scan().catch(function () {});   // register *.link.json mounts
+                    dataSource = composite;
+                } catch (_) { /* keep the plain data source */ }
+            }
+
+            // Sub-vault transparency for app reads: before serving a list/read, make sure the
+            // sub-vault covering that path is opened (read-only, silent). getFileList only exposes
+            // an OPENED mount's inner files, so without this a read of a collapsed sub-vault path
+            // would ENOENT at the file-list pre-check before getFileBytes (which auto-opens) runs.
+            // No-op for ordinary paths and when there are no sub-vaults.
+            function ensureMountOpen(p) {
+                try {
+                    if (dataSource && typeof dataSource._mountForPath === 'function'
+                        && typeof dataSource.loadFolder === 'function'
+                        && dataSource._mountForPath(p)) {
+                        return Promise.resolve(dataSource.loadFolder(p)).catch(function () {});
+                    }
+                } catch (_) {}
+                return Promise.resolve();
+            }
+
+            // Operator REPL surface (ViV pack §3.4). Thin async glue over the SAME composite
+            // data source the running app sees (so read-through sub-vaults resolve identically)
+            // + the KernelParent for mount/broker inspection. Refreshed on every mount/nav.
+            // Pure parse/format is SgReplCore; this only executes. No new mechanism — a consumer.
+            function _replSplit(p) {
+                var n = (window.SgReplCore ? SgReplCore.normPath(p) : String(p || '').replace(/^\/+/, ''));
+                var i = n.lastIndexOf('/');
+                return { folder: i === -1 ? '' : n.slice(0, i), file: i === -1 ? n : n.slice(i + 1), path: n };
+            }
+            window._appDebug = window._appDebug || {};
+            window._appDebug.repl = {
+                get writable() { return !!dataSource.writable; },
+                list: function (p) { var n = (window.SgReplCore ? SgReplCore.normPath(p) : ''); return ensureMountOpen(n).then(function () { return dataSource.getFileList(); }); },
+                read: function (p) {
+                    var s = _replSplit(p);
+                    if (!s.file) throw new Error('not a file: ' + s.path);
+                    return ensureMountOpen(s.path).then(function () { return dataSource.getFileBytes(s.path); })
+                        .then(function (buf) { return new TextDecoder().decode(buf); });
+                },
+                write: function (p, text) {
+                    if (!dataSource.writable) return Promise.reject(new Error('read-only vault'));
+                    var s = _replSplit(p);
+                    if (!s.file) return Promise.reject(new Error('not a file: ' + s.path));
+                    if (AppPermissions.isFloor('write', s.path)) return Promise.reject(new Error('protected path (.vault floor)'));
+                    var bytes = new TextEncoder().encode(String(text == null ? '' : text)).buffer;
+                    return Promise.resolve(dataSource.saveFile(s.folder, s.file, bytes)).then(function () { return { ok: true, path: s.path }; });
+                },
+                del: function (p) {
+                    if (!dataSource.writable) return Promise.reject(new Error('read-only vault'));
+                    var s = _replSplit(p);
+                    if (!s.file) return Promise.reject(new Error('not a file: ' + s.path));
+                    if (AppPermissions.isFloor('write', s.path)) return Promise.reject(new Error('protected path (.vault floor)'));
+                    return Promise.resolve(dataSource.deleteFile(s.folder, s.file)).then(function () { return { ok: true, path: s.path }; });
+                },
+                mounts:    function () { var kp = self._kernelParent; return kp ? kp.list() : []; },
+                brokerLog: function () { var kp = self._kernelParent; return kp && kp.broker ? kp.broker.log() : []; }
+            };
+
             var handler = function (e) {
                 if (!e.data)                              return;
                 if (e.source !== iframeEl.contentWindow)  return;
@@ -1194,25 +1952,11 @@
                 var fileList = dataSource.getFileList();
 
                 // ── Navigation ────────────────────────────────────────────────
+                // All in-vault link clicks land here. The body is in `_navigateToPath` so the
+                // HUD back/forward arrows can re-issue navigations without going through the
+                // bridge (they call `_navBack` / `_navForward` directly on the AppShell instance).
                 if (e.data.__sgVfsNavReq) {
-                    var navHref     = e.data.__sgVfsNavReq;
-                    var navResolved = self._resolvePath(self._htmlDir, navHref);
-                    var navMatch    = self._findEntry(fileList, navResolved);
-                    if (!navMatch) { console.warn('[app-shell] nav not found:', navResolved); return; }
-                    dataSource.getFileBytes(navMatch.path).then(function (buf) {
-                        var htmlText = new TextDecoder().decode(buf);
-                        var newDir   = navMatch.path.includes('/')
-                            ? navMatch.path.substring(0, navMatch.path.lastIndexOf('/') + 1) : '';
-                        self._htmlDir  = newDir;
-                        var navBridge  = self._buildVfsBridgeScript(navMatch.path);
-                        var injected   = htmlText.replace(/(<head[^>]*>)/i, '$1' + navBridge);
-                        if (injected === htmlText) injected = navBridge + htmlText;
-                        var blob = new Blob([injected], { type: 'text/html' });
-                        var url  = URL.createObjectURL(blob);
-                        self._objectUrls.push(url);
-                        iframeEl.src = url;
-                        console.log('[app-shell] nav →', navMatch.path);
-                    }).catch(function (err) { console.error('[app-shell] nav fetch failed:', err); });
+                    self._navigateToPath(e.data.__sgVfsNavReq, { pushHistory: true });
                     return;
                 }
 
@@ -1232,6 +1976,21 @@
                     } catch (_) { wReply(false, { err: 'Bad encoding' }); return; }
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
+                    // Floor is unconditional regardless of mount membership — the .vault floor
+                    // is enforced before the path leaves this parent.
+                    if (AppPermissions.isFloor('write', wResolved)) { wReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPROTECTED' }); return; }
+                    // ViV Phase 2 / pack §4.4: mount resolve BEFORE the parent's own fs.write
+                    // grant. Crossing a mount, the parent's authorization is the broker (Edge 2)
+                    // plus the child's policy — NOT a literal fs.write match on the local path.
+                    // (M2 fix: previously we applied the parent's fs.write to the mounts/* path,
+                    // which forced the parent app.json to add a path it has no business writing to.)
+                    if (self._mounts && self._mounts.resolve(wResolved)) {
+                        self._handleVfsViv('write', { path: wResolved, data: wBytes })
+                            .then(function () { wReply(true, { size: wBytes.byteLength, mounted: true }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: true, mounted: true }); })
+                            .catch(function (err) { wReply(false, { err: err.message || 'Write failed', code: err.code || 'EPROTO' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: err.code || err.message }); });
+                        return;
+                    }
+                    if (!self._can('fs.write', wResolved)) { wReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.write', { path: wResolved, ok: false, err: 'EPERM' }); return; }
                     var wSlash    = wResolved.lastIndexOf('/');
                     var wDir      = wSlash > 0 ? '/' + wResolved.slice(0, wSlash) : '/';
                     var wFile     = wResolved.slice(wSlash + 1);
@@ -1252,24 +2011,48 @@
                 // ── List ──────────────────────────────────────────────────────
                 if (e.data.__sgVfsListReq) {
                     var listId  = e.data.__sgVfsListReq;
-                    var entries = fileList;
+                    var listSrc = e.source;
                     var prefix  = (e.data.path || '').replace(/^\//, '');
-                    if (prefix) {
-                        var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
-                        var filtered = entries.filter(function (f) {
-                            return f.path === prefix || f.path.startsWith(normPfx);
-                        });
-                        if (filtered.length === 0) {
-                            try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {}
-                            return;
-                        }
-                        entries = filtered;
+                    // Floor: never reveal .vault/** — reject a direct list of it (no existence oracle).
+                    if (AppPermissions.hasVaultSegment(prefix)) { try { listSrc.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {} return; }
+                    // M3 fix: ViV Phase 2 — cross-mount list. If the prefix is under a mount,
+                    // relay through the child kernel (parity with read/write above).
+                    if (prefix && self._mounts && self._mounts.resolve(prefix)) {
+                        self._handleVfsViv('list', { path: prefix })
+                            .then(function (entries) {
+                                var listed = (entries || []).map(function (f) {
+                                    return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                                });
+                                self._emitBridgeCall('vfs.list', { path: prefix, count: listed.length, ok: true, mounted: true });
+                                try { listSrc.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed, mounted: true }, '*'); } catch (_) {}
+                            })
+                            .catch(function (err) {
+                                self._emitBridgeCall('vfs.list', { path: prefix, ok: false, err: err.code || err.message });
+                                try { listSrc.postMessage({ __sgVfsListReply: listId, ok: false, err: err.message || 'List failed', code: err.code || 'EPROTO', path: prefix }, '*'); } catch (_) {}
+                            });
+                        return;
                     }
-                    var listed = entries.map(function (f) {
-                        return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                    compositeReady.then(function () { return prefix ? ensureMountOpen(prefix) : null; }).then(function () {
+                        var entries = dataSource.getFileList().filter(function (f) {
+                            return !AppPermissions.hasVaultSegment(f.path) && self._can('fs.read', f.path);   // floor + read grant
+                        });
+                        if (prefix) {
+                            var normPfx  = prefix.endsWith('/') ? prefix : prefix + '/';
+                            var filtered = entries.filter(function (f) {
+                                return f.path === prefix || f.path === normPfx || f.path.startsWith(normPfx);
+                            });
+                            if (filtered.length === 0) {
+                                try { e.source.postMessage({ __sgVfsListReply: listId, ok: false, err: 'ENOENT', path: prefix }, '*'); } catch (_) {}
+                                return;
+                            }
+                            entries = filtered;
+                        }
+                        var listed = entries.map(function (f) {
+                            return { path: f.path, name: f.name || f.path, size: f.size || 0, type: f.dir ? 'folder' : 'file' };
+                        });
+                        self._emitBridgeCall('vfs.list', { path: (e.data.path || ''), count: listed.length, ok: true });
+                        try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
                     });
-                    self._emitBridgeCall('vfs.list', { path: (e.data.path || ''), count: listed.length, ok: true });
-                    try { e.source.postMessage({ __sgVfsListReply: listId, ok: true, entries: listed }, '*'); } catch (_) {}
                     return;
                 }
 
@@ -1282,15 +2065,26 @@
                     }
                     var rPath     = e.data.path || '';
                     var rResolved = rPath.startsWith('/') ? rPath.slice(1) : self._resolvePath(self._htmlDir, rPath);
-                    var rMatch    = self._findEntryStrict(fileList, rResolved);
-                    if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
-                    var _t0r = performance.now();
-                    dataSource.getFileBytes(rMatch.path).then(function (buf) {
-                        rReply(true, { buf: buf, path: rMatch.path });
-                        self._emitBridgeCall('vfs.read', { path: rResolved, bytes: buf.byteLength, ms: Math.round(performance.now() - _t0r), ok: true });
-                    }).catch(function (err) {
-                        rReply(false, { err: err.message || 'Read failed' });
-                        self._emitBridgeCall('vfs.read', { path: rResolved, ms: Math.round(performance.now() - _t0r), ok: false, err: err.message });
+                    if (AppPermissions.isFloor('read', rResolved)) { rReply(false, { err: 'Protected path', code: 'EPROTECTED' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPROTECTED' }); return; }
+                    // M2 (read mirror): mount resolve BEFORE the parent's own fs.read grant.
+                    if (self._mounts && self._mounts.resolve(rResolved)) {
+                        self._handleVfsViv('read', { path: rResolved })
+                            .then(function (buf) { rReply(true, { buf: buf, path: rResolved, mounted: true }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: true, bytes: (buf && buf.byteLength) || 0, mounted: true }); })
+                            .catch(function (err) { rReply(false, { err: err.message || 'Read failed', code: err.code || 'EPROTO' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: err.code || err.message }); });
+                        return;
+                    }
+                    if (!self._can('fs.read', rResolved)) { rReply(false, { err: 'Permission denied', code: 'EPERM' }); self._emitBridgeCall('vfs.read', { path: rResolved, ok: false, err: 'EPERM' }); return; }
+                    compositeReady.then(function () { return ensureMountOpen(rResolved); }).then(function () {
+                        var rMatch = self._findEntryStrict(dataSource.getFileList(), rResolved);
+                        if (!rMatch) { rReply(false, { err: 'ENOENT', path: rResolved }); return; }
+                        var _t0r = performance.now();
+                        return dataSource.getFileBytes(rMatch.path).then(function (buf) {
+                            rReply(true, { buf: buf, path: rMatch.path });
+                            self._emitBridgeCall('vfs.read', { path: rResolved, bytes: buf.byteLength, ms: Math.round(performance.now() - _t0r), ok: true });
+                        }).catch(function (err) {
+                            rReply(false, { err: err.message || 'Read failed' });
+                            self._emitBridgeCall('vfs.read', { path: rResolved, ms: Math.round(performance.now() - _t0r), ok: false, err: err.message });
+                        });
                     });
                     return;
                 }
@@ -1306,6 +2100,148 @@
                     var endpoint = (window.SG_ENDPOINT
                         || (function(){ try{ return sessionStorage.getItem('sg-vault-endpoint'); }catch(_){ return null; } })()
                         || 'https://dev.send.sgraph.ai').replace(/\/$/, '');
+
+                    if (e.data.__sgCmdType === 'history') {
+                        var ha = e.data.action;
+                        if (ha === 'log') {
+                            vault.logCommits(e.data.opts || {}).then(function (r) { cmdReply(true, r); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'list') {
+                            vault.listTreeAt(e.data.commitId, e.data.path || '').then(function (r) { cmdReply(true, r); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'read') {
+                            vault.readFileAt(e.data.commitId, e.data.path).then(function (buf) { cmdReply(true, buf); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        if (ha === 'readBlob') {
+                            vault.readBlob(e.data.blobId).then(function (buf) { cmdReply(true, buf); }).catch(function (err) { cmdReply(false, null, err.message); });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unknown history action: ' + ha);
+                        return;
+                    }
+
+                    // ── fs mutations (move / delete / mkdir) ──────────────────────
+                    if (e.data.__sgCmdType === 'fs') {
+                        var fsAct = e.data.action;
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY (no token)
+                        var _np = function (p) { return AppPermissions.normalizePath(p || ''); };
+                        var _split = function (n) { var s = n.lastIndexOf('/'); return { dir: s > 0 ? '/' + n.slice(0, s) : '/', name: n.slice(s + 1) }; };
+                        if (fsAct === 'move') {
+                            var mFrom = _np(e.data.from), mTo = _np(e.data.to);
+                            if (!self._can('fs.move', mFrom) || !self._can('fs.move', mTo)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: 'EPERM' }); return; }
+                            var f = _split(mFrom), t = _split(mTo);
+                            var p = (f.dir === t.dir)
+                                ? dataSource.renameFile(f.dir, f.name, t.name)
+                                : dataSource.moveFile(f.dir, f.name, t.dir).then(function () { if (t.name !== f.name) return dataSource.renameFile(t.dir, f.name, t.name); });
+                            p.then(function () { cmdReply(true, { moved: true }); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: true }); })
+                             .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (fsAct === 'delete') {
+                            var dPath = _np(e.data.path); var d = _split(dPath);
+                            if (!self._can('fs.delete', dPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: 'EPERM' }); return; }
+                            dataSource.deleteFile(d.dir, d.name)
+                                .then(function () { cmdReply(true, { deleted: true }); self._emitBridgeCall('fs.delete', { path: dPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (fsAct === 'mkdir') {
+                            var kPath = _np(e.data.path);
+                            if (!self._can('fs.mkdir', kPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: 'EPERM' }); return; }
+                            dataSource.createFolder('/' + kPath)
+                                .then(function () { cmdReply(true, { created: true }); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported fs action: ' + fsAct);
+                        return;
+                    }
+
+                    // ── ui: runtime permission request (consent on the HUD) ───────
+                    if (e.data.__sgCmdType === 'ui') {
+                        var uiAct = e.data.action;
+                        if (uiAct === 'requestPermission') {
+                            var rVerb = String(e.data.verb || ''), rPath = e.data.path || '';
+                            var rAct  = rVerb.indexOf('.') > -1 ? rVerb.slice(rVerb.indexOf('.') + 1) : rVerb;
+                            if (AppPermissions.isFloor(rAct, rPath)) { cmdReply(false, null, 'Protected path'); return; }
+                            // app.json is a hard ceiling: can only request a verb the manifest declares.
+                            if (!AppPermissions.can(self._perm, rVerb, rPath)) { cmdReply(false, null, 'Permission not declared'); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: false, err: 'EPERM' }); return; }
+                            if (rVerb === 'vault.create' || rVerb === 'vault.delete') {
+                                self._consent(rVerb, rPath).then(function (ok) { cmdReply(true, { granted: ok }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: ok }); });
+                            } else {
+                                cmdReply(true, { granted: true }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: true });
+                            }
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported ui action: ' + uiAct);
+                        return;
+                    }
+
+                    // ── vault lifecycle (create / unlink / delete) ────────────────
+                    if (e.data.__sgCmdType === 'vault') {
+                        var vAct  = e.data.action;
+                        if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY
+                        var vPath = AppPermissions.normalizePath(e.data.path || '');
+                        if (vAct === 'create') {
+                            var vLabel = String(e.data.label || 'vault');
+                            if (!self._can('vault.create', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.create', vPath).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'ECONSENT' }); return; }
+                                return self._createChildVault(vPath, vLabel).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.create', { path: vPath, ok: true, vault_id: res.vault_id });
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'unlink') {
+                            if (!self._can('vault.unlink', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.unlink', { path: vPath, ok: false, err: 'EPERM' }); return; }
+                            self._unlinkChildVault(vPath)
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unlink', { path: vPath, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unlink', { path: vPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'delete') {
+                            // Server-side destroy needs the child WRITE key. There is no owner-secret
+                            // tier to store it (ro-links.json is read-tier, readable by parent readers),
+                            // so a secure implementation requires a new owner-secret credential store +
+                            // AppSec sign-off on the destructive endpoint. Deferred — Phase 5.
+                            cmdReply(false, null, 'vault.delete not yet available (needs owner-secret credential store + AppSec sign-off)');
+                            self._emitBridgeCall('vault.delete', { path: vPath, ok: false, err: 'ENOTIMPL' });
+                            return;
+                        }
+                        // ── ViV Phase 2: vault.mount / unmount / mounts ────────────────
+                        if (vAct === 'mount') {
+                            var mPrefix = AppPermissions.normalizePath(e.data.prefix || '');
+                            var mRef    = String(e.data.ref || '');
+                            var mLabel  = String(e.data.label || mRef || 'mount');
+                            if (!mPrefix || !mRef) { cmdReply(false, null, 'mount: prefix + ref required'); return; }
+                            if (!self._can('vault.mount', mPrefix)) {
+                                cmdReply(false, null, 'Permission denied');
+                                self._emitBridgeCall('vault.mount', { prefix: mPrefix, ref: mRef, ok: false, err: 'EPERM' });
+                                return;
+                            }
+                            self._mountChildVault({ prefix: mPrefix, ref: mRef, label: mLabel })
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.mount', { prefix: mPrefix, ref: mRef, ok: true, mountId: res.mountId }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.mount', { prefix: mPrefix, ref: mRef, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'unmount') {
+                            var uMountId = String(e.data.mountId || '');
+                            self._unmountChildVault(uMountId)
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: true }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.unmount', { mountId: uMountId, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'mounts') {
+                            cmdReply(true, self._listMounts());
+                            return;
+                        }
+                        cmdReply(false, null, 'Unsupported vault action: ' + vAct);
+                        return;
+                    }
 
                     if (e.data.__sgCmdType === 'git') {
                         var action = e.data.action;
@@ -1334,11 +2270,80 @@
                         return;
                     }
 
+                    // sg.state.* — device-local prefs in the top-level kernel's localStorage.
+                    // See the bridge-side sg.state JSDoc for the rationale (deliberate doctrine
+                    // deviation from the ViV impl pack's sg.vfs('app-state/*') prescription).
+                    // Namespace: sg-app-state:<vaultId>:<entryPath>:<key>.
+                    //   vaultId  → vault._vaultId (a derived non-secret identifier; NOT the
+                    //              vault key, which is sensitive — never put that in localStorage).
+                    //   entryPath → self._appEntryPath (the app's entry HTML path, e.g.
+                    //               "home/index.html").
+                    // Operations are wrapped in try/catch so a single quota/parse error doesn't
+                    // poison the bridge handler.
+                    if (e.data.__sgCmdType === 'state') {
+                        var sAction = e.data.action;
+                        var vId     = (vault && vault._vaultId) ? String(vault._vaultId) : 'unknown';
+                        var ent     = self._appEntryPath || '';
+                        var ns      = 'sg-app-state:' + vId + ':' + ent + ':';
+                        try {
+                            if (sAction === 'get') {
+                                var gk  = String(e.data.key || '');
+                                var raw = window.localStorage.getItem(ns + gk);
+                                cmdReply(true, raw === null ? null : JSON.parse(raw));
+                                return;
+                            }
+                            if (sAction === 'set') {
+                                var sk  = String(e.data.key || '');
+                                var sv  = (e.data.value === undefined) ? null : e.data.value;
+                                var enc = JSON.stringify(sv);
+                                // 64 KiB per key is plenty for prefs; keeps a runaway app from
+                                // exhausting localStorage (which is per-origin, shared with the
+                                // vault browser and any other apps on this domain).
+                                if (enc.length > 65536) { cmdReply(false, null, 'value too large (max 64 KiB)'); return; }
+                                window.localStorage.setItem(ns + sk, enc);
+                                cmdReply(true, { ok: true });
+                                return;
+                            }
+                            if (sAction === 'remove') {
+                                window.localStorage.removeItem(ns + String(e.data.key || ''));
+                                cmdReply(true, { ok: true });
+                                return;
+                            }
+                            if (sAction === 'clear') {
+                                // Snapshot keys first — mutating localStorage during iteration
+                                // shifts indices and can skip entries.
+                                var toRm = [];
+                                for (var ci = 0; ci < window.localStorage.length; ci++) {
+                                    var ck = window.localStorage.key(ci);
+                                    if (ck && ck.indexOf(ns) === 0) toRm.push(ck);
+                                }
+                                toRm.forEach(function (k) { window.localStorage.removeItem(k); });
+                                cmdReply(true, { ok: true, removed: toRm.length });
+                                return;
+                            }
+                            if (sAction === 'keys') {
+                                var ks = [];
+                                for (var ki = 0; ki < window.localStorage.length; ki++) {
+                                    var kk = window.localStorage.key(ki);
+                                    if (kk && kk.indexOf(ns) === 0) ks.push(kk.slice(ns.length));
+                                }
+                                cmdReply(true, ks);
+                                return;
+                            }
+                            cmdReply(false, null, 'Unsupported state action: ' + sAction);
+                        } catch (sErr) {
+                            cmdReply(false, null, (sErr && sErr.message) || 'state op failed');
+                        }
+                        return;
+                    }
+
                     if (e.data.__sgCmdType === 'auth') {
                         var authAction = e.data.action;
                         if (authAction === 'setKey') {
                             var newKey = String(e.data.key || '').trim();
                             if (!newKey) { cmdReply(true, { ok: true, valid: false }); return; }
+                            self._applyAccessToken(newKey);   // thread token onto write transport (the fix)
+                            try { self._setCachedAccessKey(vault._vaultId || self._vaultKey, newKey, false); } catch (_) {}
                             self._dataSource = new VaultDataSource(vault, newKey);
                             dataSource       = self._dataSource;
                             self._writable   = true;
@@ -1387,6 +2392,21 @@
                     }
                     return;
                 }
+
+                // ── App-error surfacing (ViV Phase 4 re-spec) ──────────────────
+                // Null-origin app frames self-report uncaught errors via postMessage
+                // (window.onerror in the injected bridge). Record + surface on the HUD
+                // as a persistent error toast (ttl null). Replaces the old same-origin
+                // contentWindow.onerror injection which is dead under null-origin.
+                if (e.data.type === 'sg-app-error') {
+                    self._lastIframeError = String(e.data.message || 'App error');
+                    self._emitVaultEvent('app-error', { label: 'App error', message: self._lastIframeError });
+                    var ehud = document.getElementById('app-hud') || document.querySelector('app-hud');
+                    if (ehud && typeof ehud.showMessage === 'function') {
+                        ehud.showMessage('sg-app-error', self._lastIframeError, 'error', null);
+                    }
+                    return;
+                }
             };
 
             window.addEventListener('message', handler);
@@ -1396,16 +2416,10 @@
         // ── Path helpers ──────────────────────────────────────────────────────────────
 
         _resolvePath(base, href) {
-            if (href.startsWith('/')) return href.slice(1);
-            if (!base)               return href;
-            var parts    = (base + href).split('/');
-            var resolved = [];
-            for (var i = 0; i < parts.length; i++) {
-                var p = parts[i];
-                if (p === '..')  { if (resolved.length) resolved.pop(); }
-                else if (p !== '.') { resolved.push(p); }
-            }
-            return resolved.join('/');
+            // Pure path math — delegates to AppNavHelpers so the rules are unit-testable
+            // (see test__app_shell_nav_helpers.js). Kept as a method so existing callers
+            // don't change.
+            return AppNavHelpers.resolvePath(base, href);
         }
 
         _findEntry(fileList, path) {

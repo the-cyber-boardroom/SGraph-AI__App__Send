@@ -7,14 +7,14 @@
 #   with setup__send_user_lambda__test_client() as test_objs:
 #       client     = test_objs.fast_api__client
 #       token      = test_objs.access_token
-#       response   = client.get('/info/health')
+#       response   = client.get('/api/info/health')
 #
 # Usage (real HTTP server on random port — for CLI tests):
 #   with setup__send_user_lambda__test_server() as test_objs:
 #       base_url   = test_objs.server_url        # e.g. http://127.0.0.1:54321
 #       token      = test_objs.access_token
 #       write_key  = test_objs.write_key          # pre-generated for convenience
-#       requests.get(f'{base_url}/info/health')
+#       requests.get(f'{base_url}/api/info/health')
 #
 # Both modes use in-memory storage (no S3, no external dependencies).
 # The server starts in ~100ms and is fully functional.
@@ -85,7 +85,7 @@ class Send__User_Lambda__Http_Server:
         with Send__User_Lambda__Http_Server() as test_objs:
             base_url = test_objs.server_url
             token    = test_objs.access_token
-            requests.get(f'{base_url}/info/health')
+            requests.get(f'{base_url}/api/info/health')
     """
 
     def __init__(self):

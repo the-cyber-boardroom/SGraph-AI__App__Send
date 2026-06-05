@@ -21,7 +21,7 @@ class test_Container__App__Auth(TestCase):
         os.environ.pop('FAST_API__AUTH__API_KEY__VALUE', None)
 
     def test__1__unauthenticated_blocked(self):
-        response = self.client.get('/info/health')
+        response = self.client.get('/api/info/health')
         assert response.status_code == 401
 
     def test__2__vault_ui_blocked_without_token(self):
@@ -30,7 +30,7 @@ class test_Container__App__Auth(TestCase):
 
     def test__3__invalid_token_rejected(self):
         headers = {'x-sgraph-access-token': 'wrong-token'}
-        response = self.client.get('/info/health', headers=headers)
+        response = self.client.get('/api/info/health', headers=headers)
         assert response.status_code == 401
 
     def test__4__auth_cookie_form_excluded(self):
@@ -39,7 +39,7 @@ class test_Container__App__Auth(TestCase):
 
     def test__5__authenticated_via_header(self):
         headers = {'x-sgraph-access-token': 'test-secret-token'}
-        response = self.client.get('/info/health', headers=headers)
+        response = self.client.get('/api/info/health', headers=headers)
         assert response.status_code == 200
 
     def test__6__authenticated_vault_ui(self):
@@ -50,5 +50,5 @@ class test_Container__App__Auth(TestCase):
     def test__7__cookie_auth_works(self):
         self.client.post('/auth/set-auth-cookie',
                          json={'cookie_value': 'test-secret-token'})
-        response = self.client.get('/info/health')
+        response = self.client.get('/api/info/health')
         assert response.status_code == 200

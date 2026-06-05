@@ -5,10 +5,10 @@ APP__SEND__USER__FAST_API__TITLE           = "SGraph Send"
 APP__SEND__USER__FAST_API__DESCRIPTION     = "SGraph Send — Zero-Knowledge Encrypted File Sharing"
 APP__SEND__USER__LAMBDA_DEPENDENCIES       = ['fastapi-mcp==0.4.0'                     ,
                                               'httpx==0.28.1'                          ,
-                                              'memory-fs==v0.40.0'                     ,
+                                              'memory-fs==v0.41.0'                     ,
                                               'mgraph-ai-service-cache-client==v0.33.0',
                                               'mgraph-ai-service-cache==v0.14.0'       ,
-                                              'osbot-fast-api-serverless==v1.33.0'     ]
+                                              'osbot-fast-api-serverless==v1.35.0'     ]
 
 
 APP_SEND__UI__USER__ROUTE__PATH__CONSOLE    = 'send'
@@ -28,6 +28,8 @@ ENV_VAR__SGRAPH_SEND__ADMIN__API_KEY__VALUE = 'SGRAPH_SEND__ADMIN__API_KEY__VALU
 
 ENV_VAR__N8N_WEBHOOK_URL                    = 'N8N_WEBHOOK_URL'
 ENV_VAR__N8N_WEBHOOK_SECRET                 = 'N8N_WEBHOOK_SECRET'
+
+HEADER__SGRAPH_VAULT__ENUM_KEY             = 'x-sgraph-vault-enum-key'
 
 HEADER__SGRAPH_VAULT__PUBLIC                = 'x-vault-public'
 HEADER__SGRAPH_VAULT__READ_KEY              = 'x-vault-read-key'

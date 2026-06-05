@@ -4,7 +4,8 @@ from osbot_utils.utils.Env                                                      
 from starlette.testclient                                                           import TestClient
 from osbot_fast_api.api.Fast_API                                                    import ENV_VAR__FAST_API__AUTH__API_KEY__NAME, ENV_VAR__FAST_API__AUTH__API_KEY__VALUE
 from osbot_fast_api.api.schemas.consts.consts__Fast_API                             import EXPECTED_ROUTES__SET_COOKIE
-from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE, ROUTES_PATHS__INFO
+from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Info__SGraph           import ROUTES_PATHS__INFO__SGRAPH
 from sgraph_ai_app_send.lambda__admin.fast_api.Fast_API__SGraph__App__Send__Admin   import Fast_API__SGraph__App__Send__Admin, ROUTES_PATHS__APP_SEND__STATIC__ADMIN, ROUTES_PATHS__ANALYTICS
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Cache__Browser        import ROUTES_PATHS__CACHE
 from sgraph_ai_app_send.lambda__admin.fast_api.routes.Routes__Tokens                import ROUTES_PATHS__TOKENS
@@ -37,7 +38,7 @@ class test_Fast_API__SGraph__App__Send__Admin(TestCase):
             assert self.client              == _.fast_api__client
 
     def test__client__auth(self):
-        path                = '/info/health'
+        path                = '/api/info/health'
         auth_key_name       = get_env(ENV_VAR__FAST_API__AUTH__API_KEY__NAME )
         auth_key_value      = get_env(ENV_VAR__FAST_API__AUTH__API_KEY__VALUE)
         headers             = {auth_key_name: auth_key_value}
@@ -58,7 +59,7 @@ class test_Fast_API__SGraph__App__Send__Admin(TestCase):
     def test__config_fast_api_routes(self):
         fast_api_paths = []
 
-        raw_paths      = sorted(ROUTES_PATHS__INFO                    +
+        raw_paths      = sorted(ROUTES_PATHS__INFO__SGRAPH            +
                                 EXPECTED_ROUTES__SET_COOKIE           +
                                 ROUTES_PATHS__APP_SEND__STATIC__ADMIN +
                                 ROUTES_PATHS__TOKENS                  +

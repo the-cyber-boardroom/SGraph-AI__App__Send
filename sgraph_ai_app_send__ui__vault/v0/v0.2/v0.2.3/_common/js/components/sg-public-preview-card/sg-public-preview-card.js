@@ -45,6 +45,18 @@
             const local = this.shadowRoot.querySelector('.pvp-open-local');
             if (local) local.addEventListener('click', () =>
                 this.dispatchEvent(new CustomEvent('pvp-open-local', { bubbles: true, composed: true })));
+            // Show/hide toggle for the vault-key input. Default is masked (type=password);
+            // click swaps to text + flips the icon/label so screen readers also see the state.
+            const toggle = this.shadowRoot.querySelector('.pvp-keyinput-toggle');
+            const input  = this.shadowRoot.querySelector('.pvp-keyinput');
+            if (toggle && input) toggle.addEventListener('click', () => {
+                const shown = input.type === 'text';
+                input.type = shown ? 'password' : 'text';
+                toggle.textContent = shown ? '👁' : '🙈';
+                const label = shown ? 'Show key' : 'Hide key';
+                toggle.setAttribute('aria-label', label);
+                toggle.setAttribute('title', label);
+            });
         }
 
         _body(s) {
@@ -117,10 +129,15 @@
                 ${local}
                 <h2 class="pvp-klabel">🔑 Enter the vault key to open the contents</h2>
                 <form class="pvp-keyform">
-                    <input id="pvpk" class="pvp-keyinput" type="text" autocomplete="off"
-                           placeholder="passphrase:vaultId  or  read-key…" aria-describedby="pvperr">
+                    <div class="pvp-keyinput-wrap">
+                        <input id="pvpk" class="pvp-keyinput" type="password" autocomplete="off"
+                               placeholder="vault key  ·  or  ro-token (ro-…)" aria-describedby="pvperr">
+                        <button class="pvp-keyinput-toggle" type="button"
+                                aria-label="Show key" title="Show key">👁</button>
+                    </div>
                     <button class="pvp-open" type="submit">Open vault ▶</button>
                 </form>
+                <p class="pvp-keyhint">Have a read-only token? Paste it (e.g. <code>ro-coral-stamp-5678</code>) to browse this vault without write access.</p>
                 <div id="pvperr">${err}</div>
             </section>`;
         }
@@ -152,9 +169,20 @@
             background: rgba(79,143,247,0.06); border: 1px solid rgba(79,143,247,0.30); }
         .pvp-klabel { display: block; margin: 0 0 12px; font-size: 1.05rem; font-weight: 700; color: var(--color-text, #e2e8f0); }
         .pvp-keyform { display: flex; gap: 10px; }
-        .pvp-keyinput { flex: 1; min-width: 0; padding: 13px 14px; font-size: 1rem; border-radius: 8px;
+        .pvp-keyinput-wrap { position: relative; flex: 1; min-width: 0; }
+        .pvp-keyinput { width: 100%; box-sizing: border-box; padding: 13px 44px 13px 14px;
+            font-size: 1rem; border-radius: 8px;
             border: 1px solid var(--color-border, #2a2a44); background: var(--bg-primary, #0a0a18); color: var(--color-text, #e2e8f0); font-family: inherit; }
         .pvp-keyinput:focus { outline: none; border-color: var(--color-primary, #4f8ff7); box-shadow: 0 0 0 3px rgba(79,143,247,0.18); }
+        .pvp-keyinput-toggle {
+            position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+            background: transparent; border: 0; cursor: pointer;
+            padding: 6px 8px; border-radius: 6px;
+            font-size: 1.1rem; line-height: 1;
+            opacity: 0.55; transition: opacity 0.15s ease, background 0.15s ease;
+        }
+        .pvp-keyinput-toggle:hover { opacity: 1; background: rgba(255,255,255,0.05); }
+        .pvp-keyinput-toggle:focus-visible { opacity: 1; outline: 2px solid var(--color-primary, #4f8ff7); outline-offset: 2px; }
         .pvp-open { padding: 13px 22px; border: 0; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 1rem;
             white-space: nowrap; background: var(--color-primary, #4f8ff7); color: #fff; }
         .pvp-open:hover { filter: brightness(1.08); }
@@ -163,6 +191,9 @@
         .pvp-open-local:hover { filter: brightness(1.08); }
         .pvp-or { display: flex; align-items: center; gap: 10px; margin: 12px 0; color: var(--color-text-secondary, #9aa4bf); font-size: 0.82rem; }
         .pvp-or::before, .pvp-or::after { content: ""; flex: 1; height: 1px; background: var(--color-border, #2a2a44); }
+        .pvp-keyhint { margin: 10px 0 0; font-size: 0.8rem; color: var(--color-text-secondary, #9aa4bf); }
+        .pvp-keyhint code { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.92em;
+            background: var(--bg-primary, #0a0a18); border: 1px solid var(--color-border, #2a2a44); border-radius: 4px; padding: 1px 5px; }
         .pvp-err { color: var(--danger, #E94560); font-size: 0.86rem; margin-top: 8px; }
         .pvp-wrongvault { display: inline-block; margin-top: 10px; padding: 10px 16px; border-radius: 8px;
             background: var(--color-primary, #4f8ff7); color: #fff; font-weight: 700; text-decoration: none; }

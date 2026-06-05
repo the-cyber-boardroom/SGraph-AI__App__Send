@@ -16,12 +16,21 @@ class test_Container__App(TestCase):
         cls.client = TestClient(cls.container_app.app())
 
     def test__health(self):
-        response = self.client.get('/info/health')
+        response = self.client.get('/api/info/health')
         assert response.status_code == 200
 
     def test__info_status(self):
-        response = self.client.get('/info/status')
+        response = self.client.get('/api/info/status')
         assert response.status_code == 200
+
+    def test__info_versions_includes_dependencies(self):
+        response = self.client.get('/api/info/versions')
+        assert response.status_code == 200
+        data = response.json()
+        assert 'sgraph_ai_app_send' in data
+        assert 'starlette'          in data                                  # BadHost CVE surface — must be visible in deployed envs
+        assert 'fastapi'            in data
+        assert 'osbot-fast-api'     in data
 
     def test__root_serves_vault_ui(self):
         response = self.client.get('/')
@@ -44,9 +53,9 @@ class test_Container__App(TestCase):
         assert 'SGRAPH_BUILD' in response.text
 
     def test__api_routes_not_shadowed_by_static(self):
-        # Regression: static mounts must not shadow /api/* or /info/* routes
-        assert self.client.get('/info/health').status_code == 200
-        assert self.client.get('/api/docs').status_code    == 200
+        # Regression: static mounts must not shadow /api/* routes
+        assert self.client.get('/api/info/health').status_code == 200
+        assert self.client.get('/api/docs').status_code        == 200
 
     def test__vault_entry_endpoint_is_relative(self):
         # Container build sets VAULT_DEFAULT_ENDPOINT="" so vault API calls are same-origin.

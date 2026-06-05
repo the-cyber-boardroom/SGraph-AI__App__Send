@@ -155,6 +155,16 @@ class SendBrowse extends SendComponent {
         const treeEl = this._sgLayout.getPanelElement('t-tree');
         if (!treeEl) return;
 
+        // Preserve which folders are open across the rebuild. A lazy sub-vault expand
+        // re-renders the whole tree from scratch (all folders default collapsed); without
+        // this, expanding a child collapses its ancestors and the child appears to vanish.
+        const cssEsc   = p => (window.CSS && CSS.escape) ? CSS.escape(p) : p;
+        const expanded = [];
+        treeEl.querySelectorAll('.sb-tree__folder').forEach(f => {
+            const c = f.querySelector('.sb-tree__folder-content');
+            if (f.dataset.path && c && c.style.display !== 'none') expanded.push(f.dataset.path);
+        });
+
         treeEl.style.cssText = 'overflow-y: auto; height: 100%; padding: 0.5rem;';
         treeEl.innerHTML = '';
 
@@ -170,6 +180,16 @@ class SendBrowse extends SendComponent {
         `;
 
         this._setupTreeListeners(treeEl);
+
+        // Restore the open folders captured above.
+        expanded.forEach(p => {
+            const f = treeEl.querySelector('.sb-tree__folder[data-path="' + cssEsc(p) + '"]');
+            if (!f) return;
+            const c = f.querySelector('.sb-tree__folder-content');
+            const t = f.querySelector('.sb-tree__toggle');
+            if (c) c.style.display = 'block';
+            if (t) t.textContent = '▾';
+        });
     }
 
     _buildFolderTree() {
@@ -191,18 +211,33 @@ class SendBrowse extends SendComponent {
             const isLazy     = !!(child && child._lazy === true && child._folderPath);
             const isSubvault = !!(child && child._subvault === true);
             const lazyAttrs  = isLazy ? ` data-lazy="1" data-loaded="0" data-folder-path="${SendHelpers.escapeHtml(child._folderPath)}"` : '';
+            const linkAttr   = (child && child._linkPath) ? ` data-link-path="${SendHelpers.escapeHtml(child._linkPath)}"` : '';
             const folderCls  = isSubvault ? 'sb-tree__folder sb-tree__folder--subvault' : 'sb-tree__folder';
             const folderIcon = isSubvault ? '🗄' : SendIcons.FOLDER_SM;
-            const chip       = isSubvault ? `<span class="sb-tree__subvault-chip">·${SendHelpers.escapeHtml(child._access || 'ro')}</span>` : '';
+            // Sub-vault status chip (ViV pack §3.3). Status-aware when VaultSubvaultsView is
+            // loaded (in /vault); falls back to the plain `·ro` access chip otherwise.
+            let chip = '';
+            if (isSubvault) {
+                if (window.VaultSubvaultsView && typeof VaultSubvaultsView.chip === 'function') {
+                    const c = VaultSubvaultsView.chip(child._status, child._access);
+                    const txt = [c.symbol, c.access, c.state ? '· ' + c.state : ''].filter(Boolean).join(' ');
+                    const col = { ok: '#4ade80', pending: '#8892a4', err: '#ff6b6b' }[c.cls] || '#8892a4';
+                    chip = `<span class="sb-tree__subvault-chip sb-tree__subvault-chip--${SendHelpers.escapeHtml(c.cls)}" title="${SendHelpers.escapeHtml(c.title)}" style="color:${col};font-size:0.78em;margin-left:0.3em;white-space:nowrap;">${SendHelpers.escapeHtml(txt)}</span>`;
+                } else {
+                    chip = `<span class="sb-tree__subvault-chip">·${SendHelpers.escapeHtml(child._access || 'ro')}</span>`;
+                }
+            }
+            const editBtn    = (child && child._linkPath) ? `<span class="sb-link-edit" data-link-path="${SendHelpers.escapeHtml(child._linkPath)}" title="Edit link file">&#9998;</span>` : '';
             const countHtml  = isLazy ? '' : `<span class="sb-tree__count">${this._countFiles(child)}</span>`;
             const innerHtml  = isLazy ? '' : this._renderFolderNode(child, childPath);
             html += `
-                <div class="${folderCls}" data-path="${SendHelpers.escapeHtml(childPath)}"${lazyAttrs}>
+                <div class="${folderCls}" data-path="${SendHelpers.escapeHtml(childPath)}"${lazyAttrs}${linkAttr}>
                     <div class="sb-tree__folder-header">
                         <span class="sb-tree__toggle">▸</span>
                         <span class="sb-tree__folder-icon">${folderIcon}</span>
                         <span class="sb-tree__folder-name">${SendHelpers.escapeHtml(name)}</span>
                         ${chip}
+                        ${editBtn}
                         ${countHtml}
                     </div>
                     <div class="sb-tree__folder-content" style="display: none;">
@@ -215,6 +250,25 @@ class SendBrowse extends SendComponent {
         // BRW-001: Files — show basename only, sorted alphanumerically
         const sortedFiles = [...node.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         for (const file of sortedFiles) {
+            // v0.2.x external resource (sub-vaults): a controlled embed, not a vault file
+            if (file._resource) {
+                const rIcon = file._resourceType === 'image' ? '🖼' : file._resourceType === 'video' ? '▶' : file._resourceType === 'app' ? '🧩' : '🌐';
+                html += `
+                    <div class="sb-tree__file sb-tree__resource" data-resource="1"
+                         data-path="${SendHelpers.escapeHtml(file.path)}"
+                         data-link-path="${SendHelpers.escapeHtml(file.path)}"
+                         data-res-url="${SendHelpers.escapeHtml(file._url || '')}"
+                         data-res-type="${SendHelpers.escapeHtml(file._resourceType || 'link')}"
+                         data-res-provider="${SendHelpers.escapeHtml(file._provider || '')}"
+                         data-res-label="${SendHelpers.escapeHtml(file._label || file.name)}">
+                        <span class="sb-tree__file-icon">${rIcon}</span>
+                        <span class="sb-tree__file-name">${SendHelpers.escapeHtml(file._label || file.name)}</span>
+                        <span class="sb-link-edit" data-link-path="${SendHelpers.escapeHtml(file.path)}" title="Edit link file">&#9998;</span>
+                        <span class="sb-tree__file-name" style="opacity:.5">↗</span>
+                    </div>
+                `;
+                continue;
+            }
             var basename = file.name.includes('/') ? file.name.split('/').pop() : file.name;
             const type = typeof FileTypeDetect !== 'undefined' ? FileTypeDetect.detect(basename, null) : null;
             const icon = SendBrowse.FILE_ICONS[type] || SendBrowse.FILE_ICONS.other;
@@ -251,14 +305,28 @@ class SendBrowse extends SendComponent {
                 if (opening && folder.dataset.lazy === '1' && folder.dataset.loaded !== '1'
                     && this.dataSource && typeof this.dataSource.loadFolder === 'function') {
                     const fp = folder.dataset.folderPath;
+                    const dp = folder.dataset.path;   // to re-expand after the re-render
                     toggle.textContent = '⋯';
                     try {
                         await this.dataSource.loadFolder(fp);
                         folder.dataset.loaded = '1';
                         this._populateTree();   // re-render from the now-updated data source + re-bind
+                        // Auto-expand the just-loaded node so it opens on the FIRST click
+                        try {
+                            const nf = treeEl.querySelector('.sb-tree__folder[data-path="' + (window.CSS && CSS.escape ? CSS.escape(dp) : dp) + '"]');
+                            if (nf) {
+                                const nc = nf.querySelector('.sb-tree__folder-content');
+                                const nt = nf.querySelector('.sb-tree__toggle');
+                                if (nc) nc.style.display = 'block';
+                                if (nt) nt.textContent = '▾';
+                            }
+                        } catch (_) {}
                     } catch (err) {
                         toggle.textContent = '⚠';
                         console.warn('[send-browse] lazy expand failed for', fp, err && err.message);
+                        // Re-render so the node reflects its new mount status (locked / error)
+                        // in the §3.3 status chip, instead of staying on a stale "not opened".
+                        try { this._populateTree(); } catch (_) {}
                     }
                     return;
                 }
@@ -272,15 +340,33 @@ class SendBrowse extends SendComponent {
             });
         });
 
-        // File click → open in tab
+        // File click → open in tab (or open a controlled embed for external resources)
         treeEl.querySelectorAll('.sb-tree__file').forEach(fileEl => {
             fileEl.addEventListener('click', () => {
-                const path = fileEl.dataset.path;
-                if (path) this._openFileTab(path);
-
+                if (fileEl.dataset.resource === '1') {
+                    this._openResourceTab({
+                        url:      fileEl.dataset.resUrl,
+                        type:     fileEl.dataset.resType || 'link',
+                        provider: fileEl.dataset.resProvider || null,
+                        label:    fileEl.dataset.resLabel || ''
+                    });
+                } else {
+                    const path = fileEl.dataset.path;
+                    if (path) this._openFileTab(path);
+                }
                 // Highlight active file
                 treeEl.querySelectorAll('.sb-tree__file').forEach(f => f.classList.remove('sb-tree__file--active'));
                 fileEl.classList.add('sb-tree__file--active');
+            });
+        });
+
+        // v0.2.x: edit the raw *.link.json behind a sub-vault / resource node (✎)
+        treeEl.querySelectorAll('.sb-link-edit').forEach(ed => {
+            ed.style.cursor = 'pointer';
+            ed.addEventListener('click', e => {
+                e.stopPropagation();
+                const lp = ed.dataset.linkPath;
+                if (lp) this._openFileTab(lp);   // composite serves the raw link bytes from the root vault
             });
         });
 
@@ -462,6 +548,34 @@ class SendBrowse extends SendComponent {
             if (self._sgLayout && self._sgLayout.shadowRoot) {
                 var newTabEl = self._sgLayout.shadowRoot.querySelector('.sgl-tab[data-tab-id="' + newId + '"]');
                 if (newTabEl) newTabEl.scrollIntoView({ inline: 'end', block: 'nearest', behavior: 'smooth' });
+            }
+        });
+    }
+
+    // Open an external resource (sub-vaults) in a controlled embed tab.
+    // Uses <sg-embed-frame> when available (default-deny iframe / media element, click-to-load).
+    _openResourceTab(res) {
+        if (!this._sgLayout || !res || !res.url) return;
+        _injectTabBarScrollCSS(this._sgLayout);
+        const title = res.label || res.url;
+        this._ensurePreviewStack();
+        const newId = this._sgLayout.addTabToStack('s-preview', { tag: 'div', title: title }, true);
+        if (!newId) return;
+        const self = this;
+        requestAnimationFrame(function () {
+            const el = self._sgLayout.getPanelElement(newId);
+            if (!el) return;
+            el.style.cssText = 'display:flex;flex-direction:column;height:100%;overflow:hidden;';
+            if (window.customElements && customElements.get('sg-embed-frame')) {
+                el.innerHTML = '';
+                const frame = document.createElement('sg-embed-frame');
+                el.appendChild(frame);
+                frame.setResource(res);
+            } else {
+                // Fallback: a plain external link (no embed component loaded)
+                el.innerHTML = '<div style="padding:1rem;font-size:0.85rem;">External resource: '
+                    + '<a href="' + SendHelpers.escapeHtml(res.url) + '" target="_blank" rel="noopener noreferrer">'
+                    + SendHelpers.escapeHtml(res.label || res.url) + ' ↗</a></div>';
             }
         });
     }

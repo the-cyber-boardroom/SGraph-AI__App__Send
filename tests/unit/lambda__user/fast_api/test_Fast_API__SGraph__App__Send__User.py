@@ -1,11 +1,13 @@
 from unittest                                                                       import TestCase
 from fastapi                                                                        import FastAPI
 from starlette.testclient                                                           import TestClient
-from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE, ROUTES_PATHS__INFO
+from osbot_fast_api_serverless.fast_api.routes.Routes__Info                         import ROUTES_INFO__HEALTH__RETURN_VALUE
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Info__SGraph           import ROUTES_PATHS__INFO__SGRAPH
 from sgraph_ai_app_send.lambda__user.fast_api.Fast_API__SGraph__App__Send__User     import Fast_API__SGraph__App__Send__User, ROUTES_PATHS__API_DOCS
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Transfers              import ROUTES_PATHS__TRANSFERS
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Presigned              import ROUTES_PATHS__PRESIGNED
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Early_Access           import ROUTES_PATHS__EARLY_ACCESS
+from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Vault__Inbox          import ROUTES_PATHS__VAULT_INBOX
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Vault__Pointer        import ROUTES_PATHS__VAULT
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Vault__Presigned      import ROUTES_PATHS__VAULT_PRESIGNED
 from sgraph_ai_app_send.lambda__user.fast_api.routes.Routes__Public_Preview        import ROUTES_PATHS__PUBLIC_PREVIEW
@@ -40,7 +42,7 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
         assert 'x-sgraph-transfer-delete-auth' in headers                          # else the public-preview update/unpublish DELETE preflight fails
 
     def test__client__no_auth_required(self):
-        path     = '/info/health'
+        path     = '/api/info/health'
         response = self.client.get(url=path)
         assert response.status_code == 200
         assert response.json()      == ROUTES_INFO__HEALTH__RETURN_VALUE
@@ -48,10 +50,11 @@ class test_Fast_API__SGraph__App__Send__User(TestCase):
     def test__config_fast_api_routes(self):
         fast_api_paths = []
 
-        raw_paths      = sorted(ROUTES_PATHS__INFO                    +
+        raw_paths      = sorted(ROUTES_PATHS__INFO__SGRAPH            +
                                 ROUTES_PATHS__TRANSFERS               +
                                 ROUTES_PATHS__PRESIGNED               +
                                 ROUTES_PATHS__EARLY_ACCESS            +
+                                ROUTES_PATHS__VAULT_INBOX             +
                                 ROUTES_PATHS__VAULT                   +
                                 ROUTES_PATHS__VAULT_PRESIGNED         +
                                 ROUTES_PATHS__PUBLIC_PREVIEW          +

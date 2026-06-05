@@ -169,6 +169,7 @@
     <script src="_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
     <script src="_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
     <script src="_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="_common/js/lib/sg-vault/sg-vault--history.js"></script>
     <script src="_common/js/lib/sg-vault/sg-vault--branches.js"></script>
 
     <!-- 6. Vault base system (local) -->
@@ -198,6 +199,8 @@
     <script src="_common/js/components/events-viewer/events-viewer.js"></script>
     <script src="_common/js/components/api-logger/api-logger.js"></script>
     <script src="_common/js/components/storage-viewer/storage-viewer.js"></script>
+    <script src="_common/js/components/vault-subvaults-panel/vault-subvaults-view.js"></script>
+    <script src="_common/js/components/vault-subvaults-panel/vault-subvaults-panel.js"></script>
 
     <!-- 9. Vault components -->
     <script src="_common/js/components/vault-entry/vault-entry.js"></script>
@@ -222,6 +225,10 @@
     <script src="_common/js/lib/sg-public-preview/public-preview-write.js"></script>
     <script src="_common/js/components/sg-public-preview-card/sg-public-preview-card.js"></script>
     <script src="_common/js/components/sg-public-preview-editor/sg-public-preview-editor.js"></script>
+    <!-- Sub-vaults: link card (public-info-before-key open surface; uses PublicPreviewRead above) -->
+    <script src="_common/js/components/sg-link-card/sg-link-card.js"></script>
+    <!-- Sub-vaults: controlled external-resource embed (default-deny iframe / media element) -->
+    <script src="_common/js/components/sg-embed-frame/sg-embed-frame.js"></script>
     <script src="_common/js/components/vault-settings/vault-settings.js"></script>
     <script src="_common/js/components/vault-status-bar/vault-status-bar.js"></script>
     <script src="_common/js/components/vault-shell/vault-shell.js"></script>
@@ -462,7 +469,7 @@
         // localStorage('sg-vault-key') before this runs.
         (function () {
             var token = '';
-            try { token = (localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
+            try { token = (sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
             if (!token) return;
             var shell    = document.querySelector('vault-shell');
             var entryDiv = shell && shell.querySelector('.vs-entry');
@@ -474,7 +481,7 @@
         // crypto key derivation and initial commit network call complete.
         (function () {
             var token = '';
-            try { token = (localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
+            try { token = (sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
             if (!token) return;
             var creating = sessionStorage.getItem('sg-vault-creating');
             if (!creating || creating !== token) return;

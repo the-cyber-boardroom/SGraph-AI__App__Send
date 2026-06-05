@@ -45,6 +45,9 @@
             document.addEventListener('visibilitychange', this._visibilityHandler);
             window.sgraphVault.shell = this;
             window.sgraphVault.events.emit('shell-ready', {});
+            // Restore the debug pane (right-side, resizable) from the last session — matches
+            // /app mode: open/width/active-tab persisted to sessionStorage, survives reload.
+            this._restoreDebugState();
         }
 
         disconnectedCallback() {
@@ -102,11 +105,8 @@
                             </div>
                         </div>
 
-                        <!-- Debug sidebar (right column, toggled by Debug button) -->
-                        <div class="vs-debug-sidebar" hidden>
-                            <div class="vs-debug-handle" title="Drag to resize"></div>
-                            <sg-layout id="vault-debug-layout"></sg-layout>
-                        </div>
+                        <!-- Right-side debug pane (built lazily by _ensureDebugContent) -->
+                        <div class="vs-debug-sidebar" hidden></div>
                     </div>
 
                     <vault-status-bar></vault-status-bar>
@@ -279,7 +279,7 @@
             header?.showLockButton(false);
 
             window.history.replaceState(null, '', window.location.pathname);
-            try { localStorage.removeItem('sg-vault-key'); } catch (_) {}
+            try { sessionStorage.removeItem('sg-vault-key'); localStorage.removeItem('sg-vault-key'); } catch (_) {}
             window.sgraphVault.events.emit('vault-locked', {});
 
             // Refresh the entry screen so recent vaults list is up to date
@@ -360,16 +360,40 @@
             await rootDataSource.loadAllSubTrees();
 
             // Wrap so `*.link.json` sub-vaults splice in as inline, expandable folders.
-            // Phase 0: key comes from localStorage (VaultLinks) or a prompt; child opens
-            // read-only. Falls back to the plain data source if the script isn't loaded.
+            // Key comes from an ro-links record (silent), else localStorage, else the
+            // <sg-link-card> prompt (public-info-before-key); child opens read-only.
+            // Falls back to the plain data source if the composite script isn't loaded.
+            const _endpoint = (this._vault && this._vault._sgSend && this._vault._sgSend.endpoint)
+                || (window.VaultLoaderStorage && VaultLoaderStorage.getEndpoint && VaultLoaderStorage.getEndpoint())
+                || 'https://dev.send.sgraph.ai';
+            const _keyProvider = (mount) => new Promise((resolve) => {
+                const label = (mount.link && mount.link.label) || mount.nodeName;
+                // Rich surface: the link card (public info → key → save choice → open / new window)
+                if (window.customElements && customElements.get('sg-link-card')) {
+                    const card = document.createElement('sg-link-card');
+                    const done = (val) => { try { card.remove(); } catch (_) {} resolve(val); };
+                    card.addEventListener('sg-link-open', (e) => {
+                        if (e.detail.save === 'local' && mount.link && mount.link.vault_id) {
+                            try { VaultLinks.setStoredChildKey(mount.link.vault_id, e.detail.key); } catch (_) {}
+                        }
+                        done(e.detail.key);
+                    });
+                    card.addEventListener('sg-link-open-new-window', (e) => {
+                        if (e.detail.key) window.open('/#' + encodeURIComponent(e.detail.key), '_blank', 'noopener');
+                        done(null);   // opened elsewhere; cancel the inline open
+                    });
+                    card.addEventListener('sg-link-cancel', () => done(null));
+                    document.body.appendChild(card);
+                    card.openCard({ label: label, vaultId: mount.link && mount.link.vault_id,
+                                    publicId: mount.link && mount.link.public_id, apiBase: _endpoint });
+                    return;
+                }
+                // Fallback: plain prompt
+                const key = window.prompt('Enter the key for linked vault "' + label + '" (opens read-only):', '');
+                resolve(key && key.trim() ? key.trim() : null);
+            });
             const dataSource = (typeof CompositeDataSource !== 'undefined')
-                ? new CompositeDataSource(rootDataSource, {
-                    keyProvider: async (mount) => {
-                        const label = (mount.link && mount.link.label) || mount.nodeName;
-                        const key = window.prompt('Enter the key for linked vault "' + label + '" (opens read-only):', '');
-                        return key && key.trim() ? key.trim() : null;
-                    }
-                  })
+                ? new CompositeDataSource(rootDataSource, { keyProvider: _keyProvider })
                 : rootDataSource;
             dataSource.onTreeChanged = () => this._onTreeChanged();
             if (typeof dataSource.scan === 'function') {
@@ -435,6 +459,10 @@
 
             // After a local write, check if published branch also moved
             this._scheduleAutoSyncCheck();
+
+            // Notify debug panes (e.g. Sub-vaults) that the mount table may have changed
+            // (sub-vault opened/expanded → status collapsed → mounted).
+            try { window.sgraphVault.events.emit('tree-changed', {}); } catch (_) {}
         }
 
         _onFileAdded() {
@@ -882,40 +910,119 @@
 
         // --- Debug Panel ----------------------------------------------------------
 
-        _toggleDebug() {
-            // Open debug as a simple panel below the content (future: sg-layout panel)
-            let debugEl = this.querySelector('.vs-debug');
-            if (debugEl) {
-                debugEl.remove();
-                return;
-            }
+        // ── Debug pane (right-side, resizable, reload-persistent — mirrors /app mode) ──
+        // Tabs: Sub-vaults (read-through CompositeDataSource mounts — the /vault analogue
+        // of /app's ViV Mounts), Msgs, Events, API, Storage. State (open / width / active
+        // tab) persists to sessionStorage so it survives a page reload, same as /app.
 
-            debugEl = document.createElement('div');
-            debugEl.className = 'vs-debug';
-            debugEl.innerHTML = `
-                <div class="vs-debug-tabs">
-                    <button class="vs-debug-tab vs-debug-tab--active" data-tab="messages">Msgs</button>
-                    <button class="vs-debug-tab" data-tab="events">Events</button>
-                    <button class="vs-debug-tab" data-tab="api">API</button>
-                    <button class="vs-debug-tab" data-tab="storage">Storage</button>
-                </div>
-                <div class="vs-debug-body">
-                    <div class="vs-debug-pane" data-pane="messages"><vault-messages-panel></vault-messages-panel></div>
-                    <div class="vs-debug-pane" data-pane="events" style="display:none"><vault-events-viewer></vault-events-viewer></div>
-                    <div class="vs-debug-pane" data-pane="api" style="display:none"><vault-api-logger></vault-api-logger></div>
-                    <div class="vs-debug-pane" data-pane="storage" style="display:none"><vault-storage-viewer></vault-storage-viewer></div>
+        static get _DBG_KEYS() { return { open: 'vault-debug-open', width: 'vault-debug-width', tab: 'vault-debug-tab' }; }
+
+        // Build the sidebar content once (tab bar + lazily-instantiated panes).
+        _ensureDebugContent() {
+            const sidebar = this.querySelector('.vs-debug-sidebar');
+            if (!sidebar || sidebar.dataset.built === '1') return sidebar;
+
+            sidebar.innerHTML = `
+                <div class="vs-debug-handle" title="Drag to resize"></div>
+                <div class="vs-debug-inner">
+                    <div class="vs-debug-tabs">
+                        <button class="vs-debug-tab vs-debug-tab--active" data-tab="subvaults">Sub-vaults</button>
+                        <button class="vs-debug-tab" data-tab="messages">Msgs</button>
+                        <button class="vs-debug-tab" data-tab="events">Events</button>
+                        <button class="vs-debug-tab" data-tab="api">API</button>
+                        <button class="vs-debug-tab" data-tab="storage">Storage</button>
+                        <button class="vs-debug-close" title="Close debug panel">✕</button>
+                    </div>
+                    <div class="vs-debug-body">
+                        <div class="vs-debug-pane" data-pane="subvaults"><vault-subvaults-panel></vault-subvaults-panel></div>
+                        <div class="vs-debug-pane" data-pane="messages" style="display:none"><vault-messages-panel></vault-messages-panel></div>
+                        <div class="vs-debug-pane" data-pane="events" style="display:none"><vault-events-viewer></vault-events-viewer></div>
+                        <div class="vs-debug-pane" data-pane="api" style="display:none"><vault-api-logger></vault-api-logger></div>
+                        <div class="vs-debug-pane" data-pane="storage" style="display:none"><vault-storage-viewer></vault-storage-viewer></div>
+                    </div>
                 </div>
             `;
 
-            debugEl.addEventListener('click', (e) => {
+            sidebar.addEventListener('click', (e) => {
+                if (e.target.closest('.vs-debug-close')) { this._setDebugOpen(false); return; }
                 const tab = e.target.closest('.vs-debug-tab');
-                if (!tab) return;
-                debugEl.querySelectorAll('.vs-debug-tab').forEach(t => t.classList.toggle('vs-debug-tab--active', t === tab));
-                debugEl.querySelectorAll('.vs-debug-pane').forEach(p => p.style.display = p.dataset.pane === tab.dataset.tab ? '' : 'none');
+                if (tab) this._setDebugTab(tab.dataset.tab);
             });
 
-            const body = this.querySelector('.vs-body');
-            if (body) body.after(debugEl);
+            this._initDebugResize(sidebar);
+            sidebar.dataset.built = '1';
+            return sidebar;
+        }
+
+        _setDebugTab(tab) {
+            const sidebar = this.querySelector('.vs-debug-sidebar');
+            if (!sidebar) return;
+            sidebar.querySelectorAll('.vs-debug-tab').forEach(t => t.classList.toggle('vs-debug-tab--active', t.dataset.tab === tab));
+            sidebar.querySelectorAll('.vs-debug-pane').forEach(p => p.style.display = p.dataset.pane === tab ? '' : 'none');
+            try { sessionStorage.setItem(VaultShell._DBG_KEYS.tab, tab); } catch (_) {}
+        }
+
+        _setDebugWidth(px) {
+            const sidebar = this.querySelector('.vs-debug-sidebar');
+            if (!sidebar) return;
+            const w = Math.max(260, Math.min(720, px | 0));
+            sidebar.style.flex = '0 0 ' + w + 'px';
+            try { sessionStorage.setItem(VaultShell._DBG_KEYS.width, String(w)); } catch (_) {}
+        }
+
+        _setDebugOpen(open) {
+            const sidebar = this._ensureDebugContent();
+            if (!sidebar) return;
+            sidebar.hidden = !open;
+            if (open) {
+                let w = 360;
+                try { w = parseInt(sessionStorage.getItem(VaultShell._DBG_KEYS.width) || '360', 10) || 360; } catch (_) {}
+                this._setDebugWidth(w);
+                let tab = 'subvaults';
+                try { tab = sessionStorage.getItem(VaultShell._DBG_KEYS.tab) || 'subvaults'; } catch (_) {}
+                this._setDebugTab(tab);
+            }
+            try { sessionStorage.setItem(VaultShell._DBG_KEYS.open, open ? '1' : '0'); } catch (_) {}
+        }
+
+        _toggleDebug() {
+            const sidebar = this.querySelector('.vs-debug-sidebar');
+            const isOpen = sidebar && !sidebar.hidden && sidebar.dataset.built === '1';
+            this._setDebugOpen(!isOpen);
+        }
+
+        _restoreDebugState() {
+            let open = false;
+            try { open = sessionStorage.getItem(VaultShell._DBG_KEYS.open) === '1'; } catch (_) {}
+            if (open) this._setDebugOpen(true);
+        }
+
+        // Pointer-drag resize via the left-edge handle (sidebar grows as the pointer moves left).
+        _initDebugResize(sidebar) {
+            const handle = sidebar.querySelector('.vs-debug-handle');
+            if (!handle) return;
+            let startX = 0, startW = 0, dragging = false;
+            const onMove = (e) => {
+                if (!dragging) return;
+                const dx = startX - e.clientX;          // moving left → wider
+                this._setDebugWidth(startW + dx);
+                e.preventDefault();
+            };
+            const onUp = () => {
+                dragging = false;
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup', onUp);
+                document.body.style.userSelect = '';
+            };
+            handle.addEventListener('pointerdown', (e) => {
+                dragging = true;
+                startX = e.clientX;
+                startW = sidebar.getBoundingClientRect().width;
+                document.body.style.userSelect = 'none';
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+                e.preventDefault();
+            });
         }
 
         // --- Sync Notice Banner ---------------------------------------------------
@@ -1091,30 +1198,52 @@
         .vs-view-files send-browse {
             display: block; height: 100%;
         }
-        /* Gallery view link doesn't apply in the vault context */
-        .vs-view-files a.sb-action-btn { display: none; }
+        /* The send-browse action-bar row is redundant in the vault: the vault name is
+           in the top header, file size is in the bottom status bar, copy-link/email
+           live on the Settings page, and the Gallery view doesn't apply here. File
+           create actions move to the tree-panel controls (vault-browse-edit). */
+        .vs-view-files .sb-header { display: none; }
         .vs-view-sgit {
             padding: var(--space-4); box-sizing: border-box;
         }
 
-        /* Debug panel */
-        .vs-debug {
-            grid-area: debug; max-height: 250px; overflow: hidden;
-            display: flex; flex-direction: column;
-            border-top: 1px solid var(--color-border); background: var(--bg-surface);
+        /* Debug pane — right-side, resizable, reload-persistent (mirrors /app mode).
+           Lives as the last flex child of .vs-body (a flex row), so it sits to the
+           right of vault-nav + .vs-main. Width is driven by inline flex-basis (drag /
+           sessionStorage); a left-edge handle resizes it. */
+        .vs-debug-sidebar {
+            flex: 0 0 360px; min-width: 260px; position: relative;
+            display: flex; overflow: hidden;
+            border-left: 1px solid var(--color-border); background: var(--bg-surface);
+        }
+        .vs-debug-sidebar[hidden] { display: none; }
+        .vs-debug-handle {
+            position: absolute; left: 0; top: 0; width: 6px; height: 100%;
+            cursor: col-resize; z-index: 5; background: transparent;
+        }
+        .vs-debug-handle:hover { background: var(--color-primary); opacity: 0.4; }
+        .vs-debug-inner {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+            padding-left: 6px;
         }
         .vs-debug-tabs {
-            display: flex; border-bottom: 1px solid var(--color-border); flex-shrink: 0;
+            display: flex; align-items: stretch; border-bottom: 1px solid var(--color-border); flex-shrink: 0;
         }
         .vs-debug-tab {
-            flex: 1; padding: 0.5rem; font-size: var(--text-small); font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.04em; background: transparent;
+            flex: 1; padding: 0.45rem 0.3rem; font-size: var(--text-small); font-weight: 600;
+            letter-spacing: 0.02em; background: transparent;
             border: none; border-bottom: 2px solid transparent;
-            color: var(--color-text-secondary); cursor: pointer;
+            color: var(--color-text-secondary); cursor: pointer; white-space: nowrap;
         }
         .vs-debug-tab:hover { background: var(--bg-secondary); color: var(--color-text); }
         .vs-debug-tab--active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
-        .vs-debug-body { flex: 1; overflow-y: auto; }
+        .vs-debug-close {
+            flex: 0 0 auto; padding: 0.45rem 0.6rem; background: transparent; border: none;
+            border-left: 1px solid var(--color-border);
+            color: var(--color-text-secondary); cursor: pointer; font-size: 0.85rem;
+        }
+        .vs-debug-close:hover { background: var(--bg-secondary); color: var(--color-text); }
+        .vs-debug-body { flex: 1; overflow-y: auto; min-height: 0; }
         .vs-debug-pane { height: 100%; }
     `;
 
