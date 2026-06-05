@@ -81,6 +81,8 @@ Append-only inbox layer for vault-to-vault communications. Four-tier capability 
 
 **101 new tests** (62 service-level + 39 HTTP route tests). Shipped: commit `9d727b5`.
 
+**Security hardening** (commit `e365c60`, 2026-06-05): path traversal closed via `Safe_Str__Vault__Append_Token` + `Safe_Str__Vault__Inbox__File_Id`; S3 `folder__folders` silent-empty bug fixed; metadata listing reads zero payload bytes; batch cap 100 `file_ids`; additional traversal negative tests added.
+
 ### Other — 2 endpoints
 
 | Method | Path | What It Does | Tested |

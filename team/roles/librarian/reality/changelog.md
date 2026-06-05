@@ -7,6 +7,35 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-05
+
+Code-change-only session: 0 new briefs; 4 commits since the 06/04 session (`57edba8`, `e365c60`, `2539220`, `33dc551`).
+
+- `security/index.md` — Added "Vault Inbox Hardening" section: B-1 S3 silent-empty fix; B-2 path traversal closed via `Safe_Str__Vault__Append_Token` + `Safe_Str__Vault__Inbox__File_Id`; I-1/2/3 perf/DoS mitigations; batch cap 100 file_ids (commit `e365c60`)
+- `send-api/index.md` — Vault inbox section updated: hardening note, Safe_Str schemas, revised test count
+- `qa/index.md` — Test count updated to 957 Python (confirmed via commit `e365c60`); total ~1556+ with JS suites
+- `index.md` — Version v0.32.2 → v0.32.3; last updated 06/04 → 06/05; unit tests ~1358+ → ~1556+
+
+Master index (06/05): `team/roles/librarian/reviews/06/05/v0.32.3__master-index__no-new-briefs-05-june.md`
+Processed: 0 new human briefs | New EXISTS items: Safe_Str vault inbox primitives, S3 folder__folders fix | New PROPOSED items: 0
+
+---
+
+## 2026-06-04 *(retroactive — omitted from prior session)*
+
+- `index.md` — Version v0.31.18 → v0.32.2; date 06/03 → 06/04; docs 546 → 567; PROPOSED 416+ → 433+ (P-300–P-316); vault inbox EXISTS (+6 endpoints, +101 tests); unit tests ~1257+ → ~1358+
+- `send-api/index.md` — Vault inbox endpoints section added (6 endpoints, 101 tests, commit `9d727b5`)
+- `ai-agents/proposed/index.md` — P-300, P-301, P-303, P-304, P-305, P-312, P-315, P-316 added
+- `vault/proposed/index.md` — P-302, P-307, P-311, P-313 added
+- `identity/proposed/index.md` — P-314 added
+- `alchemist/index.md` — P-309, P-310 added
+- `website/proposed/index.md` — P-306, P-308 added
+
+Master index (06/04): `team/roles/librarian/reviews/06/04/v0.32.2__master-index__briefs-02-to-03-june.md`
+Processed: 21 new human briefs (06/02 × 12, 06/03 × 9) | New EXISTS items: 6 vault inbox endpoints | New PROPOSED items: 17 (P-300–P-316)
+
+---
+
 ## 2026-06-03
 
 Second librarian session on the same briefs (first was 06/02, ref `team/roles/librarian/reviews/06/02/`). This session produced more detailed architect/dev reviews and a debrief; the reality document updates were carried forward from the 06/02 session (canonical P-numbers). Index date updated to 06/03.
