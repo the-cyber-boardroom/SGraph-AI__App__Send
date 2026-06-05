@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.32.2 | **Last updated:** 2026-06-04 | **Maintained by:** Librarian (daily run)
+**Version:** v0.32.3 | **Last updated:** 2026-06-05 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,21 +31,21 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-06-03)
+## Quick Stats (as of 2026-06-05)
 
 | Metric | Count |
 |--------|-------|
 | User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
-| Unit tests passing | **~1358+** (~602 Python + ~157 vault-UI JS from sub-vaults/public-previews/app-perms/VaultSubvaultsView + ~364 ViV loader suite from Phase 1–5.1 inc. B4–B10/KernelParent/AppFrameBootstrap/VivAuditView/SgReplCore + ~78 app-shell extraction AppHudConfig:31+AppNavHelpers:47 + 5 Python browser integration tests + 101 vault inbox tests) |
+| Unit tests passing | **~1556+** (957 Python confirmed via commit `e365c60` + ~157 vault-UI JS from sub-vaults/public-previews/app-perms/VaultSubvaultsView + ~364 ViV loader suite from Phase 1–5.1 inc. B4–B10/KernelParent/AppFrameBootstrap/VivAuditView/SgReplCore + ~78 app-shell extraction AppHudConfig:31+AppNavHelpers:47) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
 | Open PROPOSED items (across all domains) | 433+ (416+ previous + 17 new P-300–P-316 from 06/02–06/03 briefs processed 06/04) |
-| Total documents catalogued | 567 (546 + 21 new human briefs from 06/02, 06/03) |
+| Total documents catalogued | 567 (no new human briefs 06/05) |
 
 ---
 

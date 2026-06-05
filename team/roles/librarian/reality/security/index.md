@@ -1,6 +1,6 @@
 # Security — Reality Index
 
-**Domain:** security/ | **Last updated:** 2026-06-01 | **Maintained by:** Librarian (daily run)
+**Domain:** security/ | **Last updated:** 2026-06-05 | **Maintained by:** Librarian (daily run)
 
 This domain covers the security properties verified in code, known violations flagged for remediation, AppSec findings, external validations, and the performance baseline. It is the authoritative record for any security-related claim about SGraph Send.
 
@@ -40,6 +40,24 @@ This domain covers the security properties verified in code, known violations fl
 |----|----------|--------|-------------|
 | SEC-VIV-001 | High | Latent (see above) | same-origin app bypass — remedied by Phase 3 null-origin (shipped v0.31.3) |
 | **SEC-VIV-002** | **Medium** | **OPEN** | **`allow-popups-to-escape-sandbox` over-granted to inner-vault content.** The four app-frame render paths (`_mountApp`, `_mountPageLayout`, `_mountVaultFile` HTML, `_mountVaultFile` markdown) unconditionally set `allow-popups allow-popups-to-escape-sandbox` in the iframe sandbox. These same methods also render mounted sub-vault content via `CompositeDataSource`. Result: HTML/markdown from an inner vault inherits the ability to open a fully unsandboxed, real-origin browsing context — a capability it never requested and the security model never intended to grant. **Decision (Dinis, 05/31):** gate popups to the root vault only; inner/mounted sub-vault content must not receive popup capability; an inner vault wanting popups becomes a future request + parent-consent flow. **Fix:** PROPOSED (P-280) — depends on kernel path unification (P-279) for clean detection of inner-vault render paths. **Source:** `team/roles/appsec/reviews/05/31/v0.31.12__appsec__popup-capability-over-grant-to-inner-vaults.md` |
+
+### Vault Inbox Security Hardening (v0.32.3 — Added 2026-06-05, commit `e365c60`)
+
+Following a dev code-review (`57edba8`) that identified two blocking and three important findings:
+
+| Finding | ID | Severity | Fix Applied |
+|---------|-----|----------|------------|
+| `Storage_FS__S3.folder__folders` returned `[]` on Lambda/S3 backend, silently draining the inbox | B-1 | Blocking | `folder__folders` implemented for S3 + regression test |
+| Path traversal via unvalidated `file_id`/inbox strings on local-disk backend | B-2 | Blocking | `Safe_Str__Vault__Append_Token` + `Safe_Str__Vault__Inbox__File_Id` Type_Safe primitives enforce format; traversal sequences rejected with 400 |
+| Metadata listing read full payload bytes on every call | I-1 | Important | Listing now reads zero payload bytes; content only when explicitly requested, paged window only |
+| Per-append byte-sum required full-folder download | I-2 | Important | Byte-sum dropped; cheap file-count cap retained |
+| fetch/mark-processed/purge accepted unbounded `file_ids` batches | I-3 | Important | Hard cap: 100 `file_ids` per request |
+
+**New Type_Safe schemas (code-verified):**
+- `sgraph_ai_app_send/lambda__user/schemas/Safe_Str__Vault__Append_Token.py` — validates append token format; rejects traversal sequences
+- `sgraph_ai_app_send/lambda__user/schemas/Safe_Str__Vault__Inbox__File_Id.py` — validates inbox file ID format; rejects traversal sequences
+
+**Test coverage after hardening:** 957 Python unit tests green (includes traversal negative tests).
 
 ### Token Security
 

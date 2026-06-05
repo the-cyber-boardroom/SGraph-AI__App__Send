@@ -1,6 +1,6 @@
 # QA — Reality Index
 
-**Domain:** qa/ | **Last updated:** 2026-06-01 | **Maintained by:** Librarian (daily run)
+**Domain:** qa/ | **Last updated:** 2026-06-05 | **Maintained by:** Librarian (daily run)
 
 This domain covers the test suite, QA infrastructure (browser automation, Playwright), and test strategy. SGraph Send uses an all-real-implementations philosophy: no mocks, no patches. The full stack starts in-memory in ~100ms.
 
@@ -8,9 +8,15 @@ This domain covers the test suite, QA infrastructure (browser automation, Playwr
 
 ## EXISTS (Code-Verified)
 
-### Test Suite: ~1257+ Tests, All Passing
+### Test Suite: ~1556+ Tests, All Passing
 
 **Strategy:** No mocks, no patches. In-memory Memory-FS stack. ~100ms startup.
+
+**Python unit tests: 957 (confirmed via commit `e365c60`, 2026-06-05).** This includes the vault inbox suite (62 service + 39 route), the inbox hardening regression tests (S3 folder fix + traversal negatives), and all prior transfer/presigned/vault/token/data-room/audit/metrics tests.
+
+**Total ~1556+** = 957 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~364 ViV loader suite + ~78 app-shell JS.
+
+
 
 **ViV Loader Suite (2026-05-29, 335+ jsdom-free assertions, all green):**
 
