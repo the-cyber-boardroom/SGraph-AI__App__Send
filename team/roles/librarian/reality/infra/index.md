@@ -128,6 +128,16 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 
 ---
 
+### CloudFront Immutable Object Bypass (DEPLOYED 2026-06-03)
+
+- **Guide:** `library/guides/infrastructure/v0.29.1__guide__cloudfront-immutable-object-bypass.md`
+- **Proposal:** `team/roles/architect/reviews/06/03/v0.29.1__proposal__cloudfront-immutable-object-bypass.md`
+- **CF Function source:** `sgraph_ai_app_send/cloudfront/imm-object-rewrite.js`
+- **What:** Requests for immutable vault objects (`obj-cas-imm-*`) bypass Lambda and go directly from CloudFront to S3, with 1-year edge caching
+- **Three changes:** CF Function (URI rewrite + validation), S3 transfers bucket origin (OAC), new behavior at Prec 0 matching `/api/vault/read/*/bare/data/obj-cas-imm-*`
+- **Security:** Three independent gates (behavior pattern, CF Function regex, S3 bucket policy) + content is encrypted ciphertext
+- **Performance:** First request ~50ms (S3 direct), repeat ~1ms (CF edge cache), browser cache ~0ms
+
 ### Lambda Dependency Update Workflow
 
 - **Guide:** `library/guides/development/dependencies/v0.29.1__guide__updating-dependencies-lambda-and-docker.md`
@@ -137,7 +147,7 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 
 ## PROPOSED (Not Yet Implemented)
 
-- CloudFront behavior bypass for `obj-cas-imm-*` immutable objects — skip Lambda@Edge, cache at edge for 1 year (`team/roles/architect/reviews/06/03/v0.29.1__proposal__cloudfront-immutable-object-bypass.md`)
+- ~~CloudFront behavior bypass for `obj-cas-imm-*` immutable objects~~ — **MOVED TO EXISTS** (deployed 2026-06-03)
 - Deploy Infrastructure — Ephemeral EC2 Deploy Service (control plane, Router Lambda) (Section 16)
 - Docker-based local LLM chat (`sg_send_deploy__local_llm/`) with FastAPI Ollama proxy (Section 16)
 - 3 local LLM chat UI Web Components (`chat-panel`, `session-list`, `model-picker`) (Section 16)

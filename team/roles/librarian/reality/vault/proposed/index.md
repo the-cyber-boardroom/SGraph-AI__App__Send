@@ -223,6 +223,19 @@ Architecture dev pack (12 documents, code-grounded against real `__Send` code): 
 
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
+---
+
+## Vault as Operational Substrate + Communications (06/02–06/03 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-302 | Webify/AI-fi Your Spreadsheets | Don't replace painful-but-working spreadsheet mini-apps — improve them. Spreadsheet becomes an external connected vault; each tab becomes a mini-app (metadata UIs, infographics, vault-chat on live data). Consultant-delivered; shipping is the hard problem, not the AI. Bridges the gap between "has working Excel" and "wants a web app." | 06/02 strategy-brief |
+| P-307 | Vaults for the Blast Radius Company Use Case | Each blast-radius = one vault holding enrichment data, sign-off records, semantic graphs, mini-apps for multi-audience delivery (exec summary, technical deep-dive, board report). Safe send-for-enrichment workflow: data encrypted, recipient enriches, owner reads back. No-database architecture (vault IS the database). Agent peer review with provenance. | 06/02 arch-brief |
+| P-311 | Publishing Mode — Static Publish via GitHub Actions | Vault holds the editable source content; GitHub Actions workflow publishes the static public element. Data stays encrypted even at rest in GitHub. Reuses existing read-only-key approach for decryption in the GHA worker. Second publish path alongside Netlify (P-288). Enables "vault edits, GitHub publishes" workflow for GitHub-native projects without Netlify dependency. | 06/03 dev-brief |
+| P-313 | Vault-to-Vault Comms via Append Token + PKI | Concrete messaging mechanism using the existing vault inbox (NOW EXISTS): sender receives parent vault's public key + append_token via template-vault provisioning; sender encrypts payload with public key, appends via append_token; only the parent (holding private_key) can decrypt. Bidirectional via symmetric provisioning. Prove 2-5 vaults first. Blocked on template-vault provisioning spec (`AD-provisioning-spec-1`). | 06/03 dev-brief |
+
 | P-153 | Discovery endpoint at `/.well-known/vaults` | Returns structured JSON listing of public vaults with metadata | doc 422 |
 | P-154 | Vault visibility model | Four levels: public / unlisted / private / count-only | doc 422 |
 | P-155 | Ed25519 signing + X25519 encryption key pair per vault | New PKI layer — public key safe to expose; private key never leaves owner | doc 422 |
