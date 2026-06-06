@@ -3,8 +3,8 @@
 **Domain:** `send-api/` | **Last updated:** 2026-05-12 | **Maintained by:** Librarian (daily run)
 
 The User Lambda: the public-facing API at `send.sgraph.ai`. Handles encrypted file transfers,
-multipart uploads, vault blob storage (pointer model), room joins, early access signups, and
-MCP tool exposure. All 26 API endpoints are tested and passing.
+multipart uploads, vault blob storage (pointer model), vault-to-vault inbox communication,
+room joins, early access signups, and MCP tool exposure. All 32 API endpoints are tested and passing.
 
 ---
 
@@ -57,6 +57,37 @@ Read-base64 response size limited to 3.75MB (Lambda response limit).
 Destroy without `purge` writes a tombstone at `vault/{id[:2]}/{id}/deleted.json` to block vault_id reuse.
 Destroy with `purge: true` skips the tombstone — vault_id is fully reusable afterwards.
 
+### Vault Inbox (`/vault/inbox/*`) — 6 endpoints
+
+Vault-to-vault append communication. Four-tier capability model: `append_token` (write-only),
+`enum_key` (list/fetch/mark-processed), `private_key` (decrypt — client-only, never on server),
+`write_key` (purge + configure). Gates use `H(key) == stored_hash` pattern (SHA-256).
+
+| Method | Path | What It Does | Auth | Tested |
+|--------|------|-------------|------|--------|
+| POST | `/vault/inbox/configure/{vault_id}` | Store inbox hashes (enum_key_hash, append_token_hash) | write_key | Yes |
+| POST | `/vault/inbox/append/{vault_id}` | Append encrypted message (blind — no id/count returned) | append_token (body) | Yes |
+| POST | `/vault/inbox/list/{vault_id}` | List inbox entries (metadata or with content, paginated) | enum_key (header) | Yes |
+| POST | `/vault/inbox/fetch/{vault_id}` | Fetch content for specific file_ids (batched, max 100) | enum_key (header) | Yes |
+| POST | `/vault/inbox/mark-processed/{vault_id}` | Move entries inbox → processed (copy+delete, idempotent) | enum_key (header) | Yes |
+| POST | `/vault/inbox/purge/{vault_id}` | Delete processed entries (batched, max 100) | write_key (header) | Yes |
+
+**Security hardening:**
+- Path-component inputs validated via `Safe_Str__Vault__Append_Token` and `Safe_Str__Vault__Inbox__File_Id` (Type_Safe strict validation) — blocks path traversal
+- Batch operations capped at `INBOX_BATCH_MAX_FILE_IDS = 100`
+- Per-message size cap: `APPEND_MAX_PAYLOAD = 5 MB`; inbox file-count cap: `INBOX_MAX_FILES = 1000`
+- Metadata-only listing reads zero payloads; content reads only for the paged window
+- `Storage_FS__S3.folder__folders` implemented to prevent silent-empty drain on Lambda/S3
+
+**Storage model:** Inbox files at `transfers/vault/{vault_id}/inbox/{append_token}/{timestamp}_{random}.enc`.
+Processed files at `transfers/vault/{vault_id}/processed/{append_token}/{filename}`.
+
+**TODO — LocalStack S3 integration tests:** All 124 inbox tests run on the memory backend.
+Behavioural parity on S3 is verified structurally (method-override assertions in `test_Storage_FS__S3.py`)
+but not exercised end-to-end via LocalStack. This is not urgent — the memory backend faithfully
+exercises all service logic — but should be done before production launch. See code review
+`team/roles/dev/reviews/06/04/v0.29.1__code-review__vault-inbox-implementation.md`, finding B-1.
+
 ### Room Join (`/join/*`) — 3 endpoints
 
 | Method | Path | What It Does | Tested |
@@ -73,7 +104,7 @@ Destroy with `purge: true` skips the tombstone — vault_id is fully reusable af
 | GET | `/` | Redirect to latest user UI | Yes |
 | GET | `/mcp` | MCP server (stateless HTTP transport) | Yes |
 
-**Total:** 34 route paths (26 unique API endpoints). All tested.
+**Total:** 40 route paths (32 unique API endpoints). All tested.
 
 ### MCP Exposure
 
