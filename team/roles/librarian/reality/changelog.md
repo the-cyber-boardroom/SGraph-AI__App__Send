@@ -7,6 +7,19 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-06
+
+Brief-processing session: 27 new human briefs from 06/04 (1 day-index + 8 skills + 2 research + 16 NHI 2.0).
+
+- `index.md` — Version v0.32.3 → v0.32.4; last updated 06/05 → 06/06; docs 567 → 594; PROPOSED 433+ → 455+ (P-317–P-338)
+- `identity/proposed/index.md` — NHI 2.0 platform section added: P-322 through P-336 (15 new items)
+- `ai-agents/proposed/index.md` — Skills economy section added (P-317–P-321); NHI 2.0 cross-domain items added (P-325, P-328, P-332)
+
+Master index (06/06): `team/roles/librarian/reviews/06/06/v0.32.4__master-index__briefs-04-june-2026.md`
+Processed: 27 new human briefs | New EXISTS items: 0 | New PROPOSED items: 22 (P-317–P-338)
+
+---
+
 ## 2026-06-05
 
 Code-change-only session: 0 new briefs; 4 commits since the 06/04 session (`57edba8`, `e365c60`, `2539220`, `33dc551`).
