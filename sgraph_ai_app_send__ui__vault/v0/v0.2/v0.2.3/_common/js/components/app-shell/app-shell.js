@@ -194,11 +194,14 @@
                 window.removeEventListener('message', self._embedOpenHandler);
                 self._embedOpenHandler = null;
 
-                // Deep-link round-trips through sessionStorage because _continue()
-                // already reads from there (see app-shell.js:_continue). It's not
-                // a secret, so the partitioned-storage concern doesn't apply here.
+                // Deep-link goes to INSTANCE MEMORY, not sessionStorage. In a null-
+                // origin parent (App Iframe srcdoc), storage access throws — the
+                // catch would swallow the SET silently, then _continue's GET would
+                // also throw silently, and the deep-link would be lost without any
+                // signal. _continue prefers self._embedDeepLink when it's set, so
+                // the embed deep-link is null-origin-safe.
                 if (parsed.deepLink) {
-                    try { sessionStorage.setItem('sg-vault-deep-link', parsed.deepLink); } catch (_) {}
+                    self._embedDeepLink = parsed.deepLink;
                 }
 
                 self._showLoading('Opening vault…');
@@ -463,10 +466,21 @@
 
         async _continue(appJson) {
             // A specific file was requested ("Open as App" on a file, via /#key|app:path or the
-            // direct /en-gb/app/#path link form) — read it now and clear so a reload starts fresh.
+            // direct /en-gb/app/#path link form, OR via vault-open's deepLink field in embed
+            // mode) — read it now and clear so a reload starts fresh.
+            //
+            // Embed flow prefers instance memory because sessionStorage throws in null-origin
+            // iframes (App Iframe srcdoc parents). The non-embed flow still reads from
+            // sessionStorage where the hash handlers put it. The embed deep-link is a raw
+            // path (no 'app:' prefix); the legacy session-storage form has the prefix.
             var deepLink = '';
-            try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
-            try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+            if (typeof this._embedDeepLink === 'string') {
+                deepLink = 'app:' + this._embedDeepLink;
+                this._embedDeepLink = null;
+            } else {
+                try { deepLink = sessionStorage.getItem('sg-vault-deep-link') || ''; } catch (_) {}
+                try { sessionStorage.removeItem('sg-vault-deep-link'); } catch (_) {}
+            }
             var deepPath = deepLink.indexOf('app:') === 0 ? deepLink.slice(4) : '';
 
             // The decision (deep-link × app.json present × deep-link is HTML) is delegated to

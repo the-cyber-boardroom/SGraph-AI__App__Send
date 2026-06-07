@@ -45,8 +45,19 @@ _HOME_HTML = (
     '</body></html>'
 )
 
+_PATIENT_HTML = (
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+    '<title>Embed Patient</title></head><body>'
+    '<div class="tag" id="content">EMBEDDED_PATIENT</div>'
+    '<script>'
+    'try { window.parent && window.parent.postMessage({type:"sg-app-ready"}, "*"); }'
+    'catch(_){}'
+    '</script>'
+    '</body></html>'
+)
 
-def _parent_html(vault_url: str, vault_key: str) -> str:
+
+def _parent_html(vault_url: str, vault_key: str, deep_link: str = '') -> str:
     """Build the parent test page. It loads an iframe at `vault_url?embed=1`,
     waits for 'vault-embed-ready', responds with 'vault-open' carrying the key,
     and exposes the resulting state on window globals for the test to inspect."""
@@ -58,6 +69,7 @@ def _parent_html(vault_url: str, vault_key: str) -> str:
         'style="width:800px;height:600px;border:1px solid #444"></iframe>'
         '<script>'
         f'const VAULT_KEY = {json.dumps(vault_key)};'
+        f'const DEEP_LINK = {json.dumps(deep_link)};'
         'const iframe = document.getElementById("vault");'
         'const status = document.getElementById("status");'
         'window.__readyPings = [];'
@@ -67,10 +79,9 @@ def _parent_html(vault_url: str, vault_key: str) -> str:
         '  if (e.data.sg === "vault-embed-ready") {'
         '    window.__readyPings.push(e.data);'
         '    status.textContent = "sending-key";'
-        '    iframe.contentWindow.postMessage('
-        '      { sg: "vault-open", key: VAULT_KEY, mode: "app" },'
-        '      "*"'   # in real code use the iframe's origin; '*' is fine for the test
-        '    );'
+        '    const openMsg = { sg: "vault-open", key: VAULT_KEY, mode: "app" };'
+        '    if (DEEP_LINK) openMsg.deepLink = DEEP_LINK;'
+        '    iframe.contentWindow.postMessage(openMsg, "*");'   # in real code use the iframe's origin
         '  } else if (e.data.sg === "vault-ready") {'
         '    window.__vaultReady = e.data;'
         '    status.textContent = "vault-ready:" + e.data.vaultName;'
@@ -85,9 +96,10 @@ class test__embed_handshake(BrowserHarnessTestCase):
     def test__parent_drives_handshake_and_vault_mounts_with_no_key_in_storage(self):
         # ── seed a real vault on the local backend ─────────────────────────
         vault_key, _ = self.create_seeded_vault(files = {
-            'app.json':        _APP_JSON,
-            'styles.css':      _STYLES_CSS,
-            'home/index.html': _HOME_HTML,
+            'app.json':           _APP_JSON,
+            'styles.css':         _STYLES_CSS,
+            'home/index.html':    _HOME_HTML,
+            'patient/index.html': _PATIENT_HTML,
         })
 
         # ── build the parent page and serve it at the same origin as the iframe ──
@@ -208,6 +220,63 @@ class test__embed_handshake(BrowserHarnessTestCase):
         )
         assert storage_state['session_key'] is None or storage_state['session_key'] != vault_key, (
             f'vault key leaked into iframe sessionStorage in embed mode; got {storage_state!r}.'
+        )
+
+        page.close()
+
+    def test__embed_deep_link_uses_in_memory_path_not_sessionStorage(self):
+        """The deep-link in vault-open MUST flow through instance memory so it
+        works in null-origin iframes (where sessionStorage throws). Same-origin
+        here, but the in-memory code path is the same one a null-origin parent
+        would exercise — if the implementation regressed to sessionStorage-only,
+        a future null-origin test would silently land on home/index.html
+        instead of patient/index.html. This test pins the in-memory path."""
+
+        vault_key, _ = self.create_seeded_vault(files = {
+            'app.json':           _APP_JSON,
+            'styles.css':         _STYLES_CSS,
+            'home/index.html':    _HOME_HTML,
+            'patient/index.html': _PATIENT_HTML,
+        })
+
+        # Parent sends vault-open WITH deepLink='patient/index.html'.
+        vault_iframe_url = f'{self.ui_url}/en-gb/app/?embed=1'
+        parent_url        = f'{self.ui_url}/__test_embed_parent_deeplink__'
+        parent_html       = _parent_html(vault_iframe_url, vault_key,
+                                         deep_link='patient/index.html')
+
+        page = self.new_app_page()
+        page.route(parent_url, lambda route: route.fulfill(
+            status=200, content_type='text/html; charset=utf-8', body=parent_html
+        ))
+        page.goto(parent_url, wait_until='load', timeout=15000)
+
+        # Wait for handshake completion then drill to the rendered app frame.
+        page.wait_for_function('() => window.__vaultReady !== null', timeout=25000)
+
+        vault_iframe = page.frame_locator('iframe#vault')
+        vault_iframe.locator('app-shell').wait_for(state='attached', timeout=10000)
+        page.wait_for_function(
+            '() => {'
+            '  const i = document.querySelector("iframe#vault");'
+            '  if (!i || !i.contentDocument) return false;'
+            '  const s = i.contentDocument.querySelector("app-shell");'
+            '  return !!(s && s.shadowRoot && s.shadowRoot.querySelector("iframe"));'
+            '}',
+            timeout=15000
+        )
+        app_frame = vault_iframe.frame_locator('app-shell >> iframe')
+        app_frame.locator('#content').wait_for(state='attached', timeout=10000)
+        content_text = app_frame.locator('#content').text_content()
+
+        # The CRITICAL assertion — if the deep-link path regressed to
+        # sessionStorage-only, this would say 'EMBEDDED_OK' (default entry,
+        # home/index.html) instead of 'EMBEDDED_PATIENT' (deep-link target).
+        assert content_text == 'EMBEDDED_PATIENT', (
+            f'expected the embed deep-link to land on patient/index.html '
+            f'(text "EMBEDDED_PATIENT"); got {content_text!r}. The deep-link '
+            f'in vault-open did not flow through to _continue\'s mount-strategy '
+            f'decision — this is the null-origin regression we are guarding against.'
         )
 
         page.close()
