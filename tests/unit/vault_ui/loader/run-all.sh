@@ -37,6 +37,7 @@ node tests/unit/vault_ui/loader/test__sg_app_stub.js
 node tests/unit/vault_ui/loader/test__app_frame_bootstrap.js
 node tests/unit/vault_ui/loader/test__app_shell_nav_helpers.js
 node tests/unit/vault_ui/loader/test__app_hud_config.js
+node tests/unit/vault_ui/loader/test__embed_protocol.js
 node tests/unit/vault_ui/loader/test__bundle_freshness.js
 echo ""
 echo "=== All vault unit tests passed ==="
