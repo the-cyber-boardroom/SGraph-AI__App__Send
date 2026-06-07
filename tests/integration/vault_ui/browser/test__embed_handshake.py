@@ -57,15 +57,21 @@ _PATIENT_HTML = (
 )
 
 
-def _parent_html(vault_url: str, vault_key: str, deep_link: str = '') -> str:
+def _parent_html(vault_url: str, vault_key: str, deep_link: str = '', sandbox: str = '') -> str:
     """Build the parent test page. It loads an iframe at `vault_url?embed=1`,
     waits for 'vault-embed-ready', responds with 'vault-open' carrying the key,
-    and exposes the resulting state on window globals for the test to inspect."""
+    and exposes the resulting state on window globals for the test to inspect.
+
+    sandbox (optional): if set, applied as the iframe's sandbox attribute. The
+    sandboxed-no-allow-same-origin case ('allow-scripts') exercises the null-
+    origin path that broke vault-open before the typeof-caches guard was moved
+    inside the try block in sg-vault-object-store.js (commit d5f6f0a0)."""
+    sandbox_attr = f'sandbox="{sandbox}"' if sandbox else ''
     return (
         '<!doctype html><html><head><meta charset="utf-8">'
         '<title>Embed Parent</title></head><body>'
         '<div id="status">init</div>'
-        f'<iframe id="vault" src="{vault_url}" '
+        f'<iframe id="vault" {sandbox_attr} src="{vault_url}" '
         'style="width:800px;height:600px;border:1px solid #444"></iframe>'
         '<script>'
         f'const VAULT_KEY = {json.dumps(vault_key)};'
@@ -244,6 +250,109 @@ class test__embed_handshake(BrowserHarnessTestCase):
         assert storage_state['session_key'] is None or storage_state['session_key'] != vault_key, (
             f'vault key leaked into iframe sessionStorage in embed mode; got {storage_state!r}.'
         )
+
+        page.close()
+
+    def test__sandboxed_iframe_vault_open_succeeds_despite_caches_throw(self):
+        """Regression test for sg-vault-object-store's typeof-caches fix
+        (commit d5f6f0a0). When the embed iframe has sandbox='allow-scripts'
+        (no allow-same-origin), it becomes null-origin for storage purposes
+        even though loaded from a real URL. In that state, window.caches is a
+        DEFINED accessor that throws SecurityError on read — the typeof guard
+        the original code used was outside the surrounding try/catch, so the
+        throw escaped and aborted vault-open on the first immutable-block read.
+
+        Post-fix the typeof guard is inside the try and the catch's network-
+        fallback handles the sandbox case. Test asserts vault-ready fires and
+        the iframe content actually rendered — both would have failed pre-fix
+        with the brief's reported 'Failed to read the caches property' error.
+
+        Note: window.crypto.subtle still works in this scenario because the
+        secure-context determination tracks the URL's origin (127.0.0.1 →
+        secure / localhost), not the sandbox flags. Only the SAME-ORIGIN-
+        scoped APIs (localStorage, sessionStorage, caches) become unavailable."""
+
+        vault_key, _ = self.create_seeded_vault(files = {
+            'app.json':        _APP_JSON,
+            'styles.css':      _STYLES_CSS,
+            'home/index.html': _HOME_HTML,
+        })
+
+        vault_iframe_url = f'{self.ui_url}/en-gb/app/?embed=1'
+        parent_url        = f'{self.ui_url}/__test_embed_sandboxed__'
+        # sandbox='allow-scripts' — NO allow-same-origin. This is the case the
+        # brief reported: iframe is null-origin → caches access throws.
+        parent_html       = _parent_html(vault_iframe_url, vault_key,
+                                         sandbox='allow-scripts')
+
+        page = self.new_app_page()
+
+        console_msgs = []
+        page_errors  = []
+        page.on('console',   lambda m: console_msgs.append(f'[{m.type}] {m.text}'))
+        page.on('pageerror', lambda e: page_errors.append(str(e)))
+
+        page.route(parent_url, lambda route: route.fulfill(
+            status=200, content_type='text/html; charset=utf-8', body=parent_html
+        ))
+        page.goto(parent_url, wait_until='load', timeout=15000)
+
+        # The critical wait: if the typeof-caches throw weren't caught, vault-
+        # open would fail BEFORE vault-ready fires. So this timeout failing
+        # would be the pre-fix symptom.
+        try:
+            page.wait_for_function('() => window.__vaultReady !== null', timeout=25000)
+        except Exception:
+            print('\n--- parent console (sandboxed embed) ---')
+            for m in console_msgs: print(m)
+            print('\n--- parent errors ---')
+            for e in page_errors:  print(e)
+            raise
+
+        # ── The headline assertion ─────────────────────────────────────────
+        # vault-ready fires only AFTER app-shell:ready, which fires only AFTER
+        # _initWithKey resolves, which requires reading the first immutable
+        # block from the cache path. Pre-fix the typeof-caches throw aborted
+        # that read in sandboxed iframes, vault-ready never fired, and the
+        # wait above would have timed out. The fact that we got here means
+        # the fix is in place and the network-fallback path is working.
+        ready = page.evaluate('window.__vaultReady')
+        assert ready['sg']     == 'vault-ready', f'unexpected ready payload: {ready!r}'
+        assert ready['hasApp'] is True
+        assert ready['fileCount'] >= 2
+
+        # ── Confirm we actually exercised the throwing-caches branch ──────
+        # If the sandbox attribute somehow didn't produce the null-origin
+        # state (e.g. browser changed behaviour), the test would be passing
+        # vacuously. Probe from inside the iframe's own JS context (the only
+        # context that observes the same window.caches the vault code sees).
+        # Playwright's evaluate runs through CDP, so it can execute even in
+        # sandboxed contexts; the read of `caches` is what matters and that
+        # IS subject to the sandbox restriction.
+        vault_iframe = page.frame_locator('iframe#vault')
+        threw = vault_iframe.locator('app-shell').first.evaluate("""
+            () => {
+                try { void caches; return false; }
+                catch (e) {
+                    return e.name === 'SecurityError'
+                        || /sandbox/i.test(String(e && e.message || e));
+                }
+            }
+        """)
+        assert threw, (
+            'caches access did NOT throw in this iframe — the sandbox '
+            'attribute apparently did not produce the null-origin state. '
+            'The fix code path was not actually exercised; this test would '
+            'pass vacuously and miss future regressions.'
+        )
+
+        # ── Note: cross-origin iframe drill skipped intentionally ──────────
+        # The parent is at the UI server's origin; the iframe is sandboxed →
+        # null-origin → cross-origin to the parent. iframe.contentDocument
+        # access from the parent throws SecurityError (same protection that
+        # blocks caches). The vault-ready signal is the proof of vault-open;
+        # the inside-iframe content can't be inspected from this side without
+        # adding a postMessage hop, which is fragile and out of scope here.
 
         page.close()
 
