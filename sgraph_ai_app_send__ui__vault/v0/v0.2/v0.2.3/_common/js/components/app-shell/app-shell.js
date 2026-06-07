@@ -1150,6 +1150,11 @@
         }
 
         _setCachedAccessKey(vaultId, key, persist) {
+            // Embed mode: never persist. The parent owns credentials lifecycle
+            // (same reasoning as the vault-key skip in _initWithKey). Null-origin
+            // embed parents would throw here too — the existing catch keeps things
+            // quiet, but skipping the call entirely is cleaner and signals intent.
+            if (this._embedMode) return;
             try {
                 if (persist) localStorage.setItem('sg-access-key:' + vaultId, key);
                 else         sessionStorage.setItem('sg-access-key:' + vaultId, key);
