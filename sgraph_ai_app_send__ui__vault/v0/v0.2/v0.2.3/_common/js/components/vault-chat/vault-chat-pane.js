@@ -25,8 +25,13 @@
             this._mode = 'mock';      // 'mock' | 'real'
         }
 
-        // Optional: app-shell / host injects the bridge here (Phase 3+ uses it for the key too).
-        setBridge(sg) { this._sg = sg; }
+        // Optional: app-shell / host injects the bridge here. When the chat is mounted
+        // as a kernel app, the iframe wires this after sg-app:ready. We rebuild the
+        // runners so pull-through engages on the next turn.
+        setBridge(sg) {
+            this._sg = sg;
+            if (this._ec) this._ec.runners = this._runners(this._ecRef);
+        }
 
         connectedCallback() {
             this.shadowRoot.innerHTML = `
