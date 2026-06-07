@@ -75,6 +75,8 @@
             if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
             if (this._printHandler) { document.removeEventListener('app-hud:print', this._printHandler); this._printHandler = null; }
             if (this._navHudHandler) { document.removeEventListener('app-hud:nav', this._navHudHandler); this._navHudHandler = null; }
+            if (this._embedOpenHandler)  { window.removeEventListener('message', this._embedOpenHandler); this._embedOpenHandler = null; }
+            if (this._embedReadyHandler) { this.removeEventListener('app-shell:ready', this._embedReadyHandler); this._embedReadyHandler = null; }
             if (this._vfsBridgeHandler) {
                 window.removeEventListener('message', this._vfsBridgeHandler);
                 this._vfsBridgeHandler = null;
@@ -97,6 +99,16 @@
         // ── Init flow ─────────────────────────────────────────────────────────────────
 
         _init() {
+            // ── Embed mode: ?embed=1 → bypass URL hash + localStorage, wait for
+            // parent to postMessage the key. See embed-protocol.js for the protocol
+            // and the rationale (storage partitioning + key-in-URL avoidance).
+            // Has to run BEFORE the localStorage read so a stray saved key from a
+            // previous non-embed session doesn't auto-open the wrong vault here.
+            if (typeof EmbedProtocol !== 'undefined' && EmbedProtocol.isEmbedMode()) {
+                this._initEmbed();
+                return;
+            }
+
             // The hash on /en-gb/app is a FILE PATH for App Mode — NOT a vault key.
             // Vault key always comes from localStorage (set by /#vault-key → root inbox).
             // /en-gb/app#vault-key is no longer supported; use /#vault-key instead.
@@ -137,6 +149,85 @@
                 return;
             }
             this._showEntryForm();
+        }
+
+        // ── Embed mode init ────────────────────────────────────────────────────────────
+        //
+        // The vault is loaded inside an iframe (typically inside another origin's app
+        // or inside a null-origin App Iframe). The parent passes the vault key via
+        // postMessage rather than via URL hash, so the key stays out of the URL and
+        // out of partitioned localStorage. See embed-protocol.js for the wire format.
+        //
+        // Sequence:
+        //   1. We post {sg:'vault-embed-ready', v:1} to the parent.
+        //   2. Parent responds with {sg:'vault-open', key, mode?, deepLink?}.
+        //   3. We open the vault with the supplied key (one-shot — listener removed
+        //      after the first valid message so a misbehaving parent can't re-key
+        //      mid-session).
+        //   4. Once mounted (app-shell:ready fires), we post {sg:'vault-ready', ...}
+        //      back so the parent knows the vault is interactive.
+        _initEmbed() {
+            var self           = this;
+            var expectedParent = EmbedProtocol.getExpectedParentOrigin();
+            var targetOrigin   = expectedParent || '*';
+
+            // Sentinel for downstream code (_initWithKey) to skip the storage-
+            // persist step. The key stays in memory only for the embed session.
+            this._embedMode = true;
+
+            this._setStatus('Waiting for vault key…');
+
+            // Post the ready ping. Wrapped in try because window.parent may throw
+            // in pathological setups (sandboxed top-level page with no parent, etc.).
+            try {
+                window.parent.postMessage(EmbedProtocol.readyMessage(), targetOrigin);
+            } catch (_) {}
+
+            // One-shot listener for the open message. Removed on first valid message
+            // so subsequent stray postMessages (e.g. a misbehaving parent re-keying)
+            // can't reset the vault under the user.
+            this._embedOpenHandler = function (event) {
+                if (!EmbedProtocol.validateSource(event, expectedParent, window.parent)) return;
+                var parsed = EmbedProtocol.parseOpenMessage(event.data);
+                if (!parsed) return;
+
+                window.removeEventListener('message', self._embedOpenHandler);
+                self._embedOpenHandler = null;
+
+                // Deep-link round-trips through sessionStorage because _continue()
+                // already reads from there (see app-shell.js:_continue). It's not
+                // a secret, so the partitioned-storage concern doesn't apply here.
+                if (parsed.deepLink) {
+                    try { sessionStorage.setItem('sg-vault-deep-link', parsed.deepLink); } catch (_) {}
+                }
+
+                self._showLoading('Opening vault…');
+                self._initWithKey(parsed.key, null).catch(function (err) {
+                    console.error('[app-shell] embed init failed:', err);
+                    self._showError('Vault open failed: ' + (err && err.message || err));
+                });
+            };
+            window.addEventListener('message', this._embedOpenHandler);
+
+            // Forward 'app-shell:ready' to the parent. This fires AFTER _initWithKey
+            // resolves and the app is mounted, so the parent knows the vault is live.
+            this._embedReadyHandler = function (event) {
+                var detail = (event && event.detail) || {};
+                var fileCount = 0;
+                try {
+                    if (self._dataSource && self._dataSource.getFileList) {
+                        fileCount = self._dataSource.getFileList().length;
+                    }
+                } catch (_) {}
+                try {
+                    window.parent.postMessage(EmbedProtocol.vaultReadyMessage({
+                        vaultName: detail.vaultName,
+                        fileCount: fileCount,
+                        hasApp:    !!self._appJson
+                    }), targetOrigin);
+                } catch (_) {}
+            };
+            this.addEventListener('app-shell:ready', this._embedReadyHandler);
         }
 
         // ── Public Vault Preview (Mode A: preview + ask for the key) ───────────────────
@@ -259,7 +350,12 @@
 
             // Persist vault key for reload recovery. Per-tab: sessionStorage is this tab's
             // truth; localStorage holds the last-opened key as a fresh-tab fallback.
-            if (!isRO) {
+            // EMBED MODE: do NOT persist — the parent has the key and re-sends it via
+            // postMessage on reload. Writing here would leak the key into the iframe's
+            // (potentially partitioned) storage past the embed session — defeating the
+            // whole point of the embed flow. The protocol assumes ephemeral, parent-driven
+            // re-handshake on reload.
+            if (!isRO && !this._embedMode) {
                 try { sessionStorage.setItem('sg-vault-key', key); localStorage.setItem('sg-vault-key', key); } catch (_) {}
             }
 
