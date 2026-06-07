@@ -208,11 +208,33 @@ class test__embed_handshake(BrowserHarnessTestCase):
             '  const i = document.querySelector("iframe#vault");'
             '  const ls = i.contentWindow.localStorage;'
             '  const ss = i.contentWindow.sessionStorage;'
+            '  // Collect any sg-* keys in either store. The embed flow promises'
+            '  // that no vault credentials persist past the iframe lifetime;'
+            '  // catching ANY sg-vault-key / sg-access-key:* / sg-vault-deep-link'
+            '  // here guards against future regressions in any of the persistence'
+            '  // sites (vault key, access tokens, deep-link).'
+            '  const all = {};'
+            '  for (let i = 0; i < ls.length; i++) {'
+            '    const k = ls.key(i); if (k && k.startsWith("sg-")) all["local:" + k] = ls.getItem(k);'
+            '  }'
+            '  for (let i = 0; i < ss.length; i++) {'
+            '    const k = ss.key(i); if (k && k.startsWith("sg-")) all["session:" + k] = ss.getItem(k);'
+            '  }'
             '  return {'
             '    local_key:   ls.getItem("sg-vault-key"),'
-            '    session_key: ss.getItem("sg-vault-key")'
+            '    session_key: ss.getItem("sg-vault-key"),'
+            '    all_sg_keys: all'
             '  };'
             '}'
+        )
+        # Scan for any sg-access-key:* leak. This vault has no auth.required so
+        # the access-token path is never triggered, but if a future test ever
+        # introduces an authed vault and the _setCachedAccessKey guard regresses,
+        # this assertion catches it.
+        access_keys = {k: v for k, v in storage_state['all_sg_keys'].items()
+                       if 'sg-access-key:' in k}
+        assert not access_keys, (
+            f'access-key keys leaked into iframe storage in embed mode: {access_keys}'
         )
         assert storage_state['local_key'] is None or storage_state['local_key'] != vault_key, (
             f'vault key leaked into iframe localStorage in embed mode; got {storage_state!r}. '
