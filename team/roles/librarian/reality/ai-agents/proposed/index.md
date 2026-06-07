@@ -256,3 +256,27 @@ All items below are PROPOSED — does not exist yet.
 | P-312 | Three-Agent Comms Demo Vault | Browser harness proving vault-to-vault messaging: 3 agents each with iframe inboxes; internal JS API (ping, send, receive, markReceived); step-by-step validation harness; manual round-trip proof first, then agentic via OpenRouter; key design principle: agents only share what they explicitly message (no full vault access); scale path 3 → 5 → 100s → 1000s; accountant experiment as first real use case. Depends on vault inbox (NOW EXISTS). | 06/03 dev-brief |
 | P-315 | Skills Library as Platform Feature | A vault holding skills from multiple sources (Tessl, Anthropic, Pi, platform own). Library management: provenance tracking, sync from source, applicability scoring, evidence (screenshots, test results). Sharp insight: how-to-deploy-and-run knowledge fills a real gap (Claude couldn't run an Anthropic legal skill from a URL alone — deployment context was missing). Differentiator: talk-to-skill (on-demand vault instance), per-skill budgets, per-skill billing. Foundation for skills marketplace (P-297). | 06/03 strategy-brief |
 | P-316 | SG/Vault as Platform of Primitives — Positioning | SG/Vault is a hyperscaler for shared state, not a category product. Dissolves the protocol/harness/workflow question by sitting beneath all three (noun, not verbs). Three-layer model: bottom (vault primitives), middle (heterogeneous agents/workflows/manual), top (bespoke UX). Two views: invisible-vault (users never see it) and builder-platform (developers see the structure). Restrict-to-unleash flywheel (tight primitive scope → safe, wide autonomy for builders). Superpower: builders are users of the same platform (tight feedback loop, features driven by real use). | 06/03 strategy-brief |
+
+---
+
+## Skills Economy — Deepened (06/04 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-317 | Consulting-firm skills use case | Positioning page and example firm-methodology skill; T&M consulting inefficiencies named; service-to-product shift via skills | 06/04 strategy-brief (consulting-firms) |
+| P-318 | Skills-as-software-packages model | Formalised taxonomy (macro/mini/micro skills); SKILL.md schema validation; intent-over-capability as the evolution of software packages | 06/04 strategy-brief (skills-are-software-packages) |
+| P-319 | OWASP expert skills archetype | Evidence-as-deliverable skill packs for security experts; buy-side revenue streams; expert-as-quality-gate model | 06/04 strategy-brief (owasp-expert-skills) |
+| P-320 | Skills-as-semantic-graph model | Skill as projection of typed-primitive semantic graph; forking ecosystem with open-source-tax governance | 06/04 arch-brief (skill-as-projection) |
+| P-321 | Skill lifecycle tooling | Explorer→Town Planner progression tooling; high-token-spend as engineering problem; English-to-code as direction of travel | 06/04 strategy-brief (skill-lifecycle) |
+
+## NHI 2.0 — Agent Identity (Cross-Domain Items from 06/04)
+
+Items below are the ai-agents-specific cross-domain entries from the NHI 2.0 series. Full NHI 2.0 platform definition is in `../identity/proposed/index.md` (P-322 through P-336).
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-325 | Multi-identity agent chains | Signed, encrypted agent chains using vault inbox; per-agent identities and keys; capability limited by code — see identity/proposed P-325 | 06/04 arch-brief (multiple-identities) |
+| P-328 | Agent trust scoring and web of trust | Trust by connectivity; agent trust scores built over time; distributed identity — see identity/proposed P-328 | 06/04 arch-brief (trust-and-identity) |
+| P-332 | Skills-with-identity model | A skill bundles its own identity and permission set; joiner-mover-leaver lifecycle — see identity/proposed P-332 | 06/04 arch-brief (skills-and-permissions) |
