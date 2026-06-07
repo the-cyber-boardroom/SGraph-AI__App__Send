@@ -40,18 +40,29 @@ class SGVaultObjectStore {
     }
 
     async _cacheGet(objectId, filePath) {
-        if (!objectId.includes('-imm-') || typeof caches === 'undefined') return null
+        // -muw- (mutable) objects bypass the cache entirely — short-circuit before
+        // touching `caches` so we don't pay the feature-detect cost on every read.
+        if (!objectId.includes('-imm-')) return null
         try {
+            // `typeof caches` is NOT a safe probe for the sandboxed-context case:
+            // in an iframe without `allow-same-origin`, `window.caches` is a defined
+            // accessor that THROWS a SecurityError on read. `typeof` only suppresses
+            // the ReferenceError for genuinely undeclared identifiers — once the
+            // binding exists, the throw escapes. Hence the check MUST be inside the
+            // try, not outside (bug 2026-06-07: blocked vault-open in null-origin
+            // embed iframes; the catch's network-fallback path is the correct sink).
+            if (typeof caches === 'undefined') return null
             const cache = await caches.open(SG_VAULT_CACHE_NAME)
             const hit   = await cache.match(this._cacheKey(filePath))
             if (hit) return hit.arrayBuffer()
-        } catch (_) { /* storage unavailable — fall through to network */ }
+        } catch (_) { /* sandboxed / unavailable — fall through to network */ }
         return null
     }
 
     async _cachePut(objectId, filePath, data) {
-        if (!objectId.includes('-imm-') || typeof caches === 'undefined') return
+        if (!objectId.includes('-imm-')) return
         try {
+            if (typeof caches === 'undefined') return     // sandbox-safe; see _cacheGet
             const cache = await caches.open(SG_VAULT_CACHE_NAME)
             // data.slice(0) copies the ArrayBuffer — the original is returned to caller
             await cache.put(
