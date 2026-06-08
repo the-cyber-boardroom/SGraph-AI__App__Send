@@ -80,21 +80,29 @@ Objects are stored in a content-addressable store (CAS) with opaque IDs:
 **Known constraint:** Claude.ai bash_tool egress proxy blocks direct HTTP to `send.sgraph.ai`
 unless domain is on allowlist. Domain allowlist changes only take effect in a new conversation.
 
-### Vault Inbox — Vault-to-Vault Append Communication (v0.29.1)
+### Vault Append — Append-Only Gate-Controlled Storage (v0.32.7)
 
-Server-side inbox for vault-to-vault messaging. The server stores encrypted ciphertext and
-checks capability gates (`H(key) == stored_hash`). All crypto (key derivation, encryption,
-decryption) is **client-side** — done in sgit CLI and vault web, not in SG/API.
+Generic append-only storage primitive. Not messaging-specific — same infrastructure serves
+logs, signals, control messages, state flows, and email-style workflows. The server stores
+encrypted ciphertext and checks capability gates (`H(key) == stored_hash`). All crypto
+(key derivation, encryption, decryption) is **client-side** — done in sgit CLI and vault web.
+
+**Storage lives inside `bare/append/`** — managed by sgit but not in the commit DAG
+(managed-but-unversioned). This preserves zero-knowledge while enabling sgit awareness.
 
 | Capability | Status | Evidence |
 |------------|--------|---------|
-| Four-tier gate model (append_token, enum_key, private_key, write_key) | **EXISTS** | `Service__Vault__Inbox.py`, 124 tests |
-| Blind append (no id/count leaked to sender) | **EXISTS** | `test__append__response_is_blind` |
-| Paginated listing with cursor (`after_file_id`) | **EXISTS** | `test__inbox_list__*` |
-| Metadata-only listing (zero payload reads) | **EXISTS** | `test__inbox_list__metadata_only_omits_size_and_content` |
+| Four-tier gate model (append_token, enum_key, write_key, private_key) | **EXISTS** | `Service__Vault__Append.py`, 130 tests |
+| Blind append (no id/count leaked to sender) | **EXISTS** | `test__append__blindness_no_file_id_returned` |
+| Paginated listing with cursor (`after_file_id`) | **EXISTS** | `test__list_entries__*` |
+| Metadata-only listing (zero payload reads) | **EXISTS** | `test__list_entries__metadata_only_omits_size_and_content` |
 | Copy+delete mark-processed (idempotent) | **EXISTS** | `test__mark_processed__*` |
 | Path traversal defense via `Safe_Str__*` | **EXISTS** | 8 traversal negative tests |
 | Batch operation cap (100 file_ids) | **EXISTS** | `test__*_rejects_oversized_batch` |
+| Incremental content ceiling check (M-1 fix) | **EXISTS** | `test__list_entries__incremental_ceiling_check` |
+| Separate append config file (L-2 fix) | **EXISTS** | `test__configure__writes_separate_config_file` |
+| list_files never returns append entries | **EXISTS** | `test__list_files__never_returns_append_entries` |
+| Account-less write surface (no access token) | **EXISTS** | `test__write__no_auth_token_required` |
 
 **What lives where:**
 - Server (SG/API): stores `H(enum_key)`, `H(append_token)`; gate checks; file storage; no crypto
@@ -129,7 +137,7 @@ Key proposals for this domain. Full details: see sub-files in `proposed/`.
 - **PKI Modes 2–4** — device provenance, author-identified, countersigned (Mode 1 exists) → `proposed/pki-modes.md`
 - **Vault migration / multi-remote** — pull from multiple remotes, migration tooling → `proposed/multi-remote.md`
 - **Named branch private key re-keying** — move from `read_key` to `write_key` (deferred, low current impact) → `proposed/structure-key-split.md`
-- **Vault Inbox client crypto (P1/P2 from briefing pack v0.32.1)** — HKDF derivations (`enum_key`, `append_token = H(pubkey)`), X25519 keygen, seal/open, cross-language KAT suite. **This is client-side work (sgit CLI + vault web), not SG/API server work.** The server's P0 (storage + gates) is done; the remaining phases belong to the vault client repos.
+- **Vault Append client crypto (P1/P2 from briefing pack v0.32.1)** — HKDF derivations (`enum_key`, `append_token = H(pubkey)`), X25519 keygen, seal/open, cross-language KAT suite. **This is client-side work (sgit CLI + vault web), not SG/API server work.** The server's P0 (storage + gates) is done; the remaining phases belong to the vault client repos.
 - **P-227: Vault-per-user as SG/Send storage substrate** — PROPOSED: one vault per user for SG/Send; SG/Sentinel rules write user activity to their vault; removes backend complexity; zero-knowledge nuance preserved (activity visible, content unseen). Requires SG/Sentinel deployed. Source: doc 468, 05/24 briefs.
 - **Sub-Vaults via Web UI (Phases 1–3)** — EXISTS as of 05/25–26: `.link.json` convention files + ro-links owner records; link card UI (Phase 2); owner "Add link" UI (Phase 3); portable ro-links (open on any device); lazy-load (preserve open folders); sub-vault reads/lists via app bridge. Implements P-231 for the Web UI access point. CLI access remains PROPOSED (P-248).
 - **P-248: Sub-vaults CLI access (clone-within-clone)** — PROPOSED: sgit CLI path for sub-vaults — track storage locations, resolve nested clones step by step. Deferred; Web UI prioritised first. Source: doc 490, 05/25 briefs.

@@ -1,31 +1,26 @@
-# ===============================================================================
-# SGraph Send - Vault Inbox Routes
-# Append-only inbox: append, list, fetch, mark-processed, purge, configure
-# ===============================================================================
-
 import base64
 from   fastapi                                                                     import HTTPException, Request
 from   osbot_fast_api.api.routes.Fast_API__Routes                                  import Fast_API__Routes
 from   osbot_utils.type_safe.primitives.domains.identifiers.safe_str.Safe_Str__Id  import Safe_Str__Id
-from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Inbox               import Service__Vault__Inbox
+from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Append              import Service__Vault__Append
 from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Pointer             import VAULT_ID_PATTERN
 from   sgraph_ai_app_send.lambda__user.user__config                                import (HEADER__SGRAPH_SEND__ACCESS_TOKEN ,
                                                                                            HEADER__SGRAPH_VAULT__WRITE_KEY  ,
                                                                                            HEADER__SGRAPH_VAULT__ENUM_KEY   )
 
-TAG__ROUTES_VAULT_INBOX = 'api/vault/inbox'
+TAG__ROUTES_VAULT_APPEND = 'api/vault/append'
 
-ROUTES_PATHS__VAULT_INBOX = [f'/{TAG__ROUTES_VAULT_INBOX}/append/{{vault_id}}'          ,
-                             f'/{TAG__ROUTES_VAULT_INBOX}/list/{{vault_id}}'            ,
-                             f'/{TAG__ROUTES_VAULT_INBOX}/fetch/{{vault_id}}'           ,
-                             f'/{TAG__ROUTES_VAULT_INBOX}/mark-processed/{{vault_id}}'  ,
-                             f'/{TAG__ROUTES_VAULT_INBOX}/purge/{{vault_id}}'           ,
-                             f'/{TAG__ROUTES_VAULT_INBOX}/configure/{{vault_id}}'       ]
+ROUTES_PATHS__VAULT_APPEND = [f'/{TAG__ROUTES_VAULT_APPEND}/write/{{vault_id}}'           ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/list/{{vault_id}}'            ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/fetch/{{vault_id}}'           ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/mark-processed/{{vault_id}}'  ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/purge/{{vault_id}}'           ,
+                              f'/{TAG__ROUTES_VAULT_APPEND}/configure/{{vault_id}}'       ]
 
 
-class Routes__Vault__Inbox(Fast_API__Routes):
-    tag           : str = TAG__ROUTES_VAULT_INBOX
-    inbox_service : Service__Vault__Inbox
+class Routes__Vault__Append(Fast_API__Routes):
+    tag            : str = TAG__ROUTES_VAULT_APPEND
+    append_service : Service__Vault__Append
     admin_service_client : object = None
 
     @staticmethod
@@ -60,8 +55,8 @@ class Routes__Vault__Inbox(Fast_API__Routes):
             raise HTTPException(status_code = 401, detail = 'Access token required')
         return provided_token
 
-    async def append__vault_id(self, vault_id: Safe_Str__Id,
-                                     request : Request      ) -> dict:
+    async def write__vault_id(self, vault_id: Safe_Str__Id,
+                                    request : Request      ) -> dict:
         self._validate_vault_id(vault_id)
         body = await request.json()
         append_token = body.get('append_token', '')
@@ -74,7 +69,7 @@ class Routes__Vault__Inbox(Fast_API__Routes):
             payload_bytes = base64.b64decode(payload_b64)
         except Exception:
             raise HTTPException(status_code = 400, detail = 'Invalid base64 payload')
-        result = self.inbox_service.append(vault_id      = str(vault_id)  ,
+        result = self.append_service.append(vault_id      = str(vault_id)  ,
                                             append_token  = append_token  ,
                                             payload_bytes = payload_bytes )
         if result['status'] == 'invalid_input':
@@ -94,7 +89,7 @@ class Routes__Vault__Inbox(Fast_API__Routes):
         if not enum_key:
             raise HTTPException(status_code = 403, detail = 'Forbidden')
         body = await request.json()
-        result = self.inbox_service.inbox_list(
+        result = self.append_service.list_entries(
             vault_id        = str(vault_id)                     ,
             enum_key        = enum_key                          ,
             inbox           = body.get('inbox')                 ,
@@ -120,10 +115,10 @@ class Routes__Vault__Inbox(Fast_API__Routes):
         file_ids = body.get('file_ids', [])
         if not inbox or not file_ids:
             raise HTTPException(status_code = 400, detail = 'Missing inbox or file_ids')
-        result = self.inbox_service.inbox_fetch(vault_id = str(vault_id),
-                                                 enum_key = enum_key    ,
-                                                 inbox    = inbox       ,
-                                                 file_ids = file_ids    )
+        result = self.append_service.fetch(vault_id = str(vault_id),
+                                           enum_key = enum_key    ,
+                                           inbox    = inbox       ,
+                                           file_ids = file_ids    )
         if result['status'] == 'invalid_input':
             raise HTTPException(status_code = 400, detail = 'Invalid inbox or file_ids')
         if result['status'] == 'gate_failed':
@@ -141,7 +136,7 @@ class Routes__Vault__Inbox(Fast_API__Routes):
         file_ids = body.get('file_ids', [])
         if not inbox or not file_ids:
             raise HTTPException(status_code = 400, detail = 'Missing inbox or file_ids')
-        result = self.inbox_service.mark_processed(vault_id = str(vault_id),
+        result = self.append_service.mark_processed(vault_id = str(vault_id),
                                                     enum_key = enum_key    ,
                                                     inbox    = inbox       ,
                                                     file_ids = file_ids    )
@@ -164,9 +159,9 @@ class Routes__Vault__Inbox(Fast_API__Routes):
         file_ids = body.get('file_ids')
         if not inbox:
             raise HTTPException(status_code = 400, detail = 'Missing inbox')
-        if folder not in ('inbox', 'processed'):
-            raise HTTPException(status_code = 400, detail = 'folder must be "inbox" or "processed"')
-        result = self.inbox_service.purge(vault_id      = str(vault_id),
+        if folder not in ('pending', 'processed'):
+            raise HTTPException(status_code = 400, detail = 'folder must be "pending" or "processed"')
+        result = self.append_service.purge(vault_id      = str(vault_id),
                                            write_key_hex = write_key   ,
                                            folder        = folder      ,
                                            inbox         = inbox       ,
@@ -185,7 +180,7 @@ class Routes__Vault__Inbox(Fast_API__Routes):
         if not write_key:
             raise HTTPException(status_code = 400, detail = 'Missing write key')
         body = await request.json()
-        result = self.inbox_service.configure(
+        result = self.append_service.configure(
             vault_id       = str(vault_id)                ,
             write_key_hex  = write_key                    ,
             append_anchors = body.get('append_anchors')   ,
@@ -195,7 +190,7 @@ class Routes__Vault__Inbox(Fast_API__Routes):
         return result
 
     def setup_routes(self):
-        self.add_route_post(self.append__vault_id         )
+        self.add_route_post(self.write__vault_id          )
         self.add_route_post(self.list__vault_id           )
         self.add_route_post(self.fetch__vault_id          )
         self.add_route_post(self.mark_processed__vault_id )

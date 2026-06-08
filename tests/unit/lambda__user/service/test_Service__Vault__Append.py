@@ -1,29 +1,23 @@
-# ===============================================================================
-# Tests — Service__Vault__Inbox
-# Full coverage: gates, append, list, fetch, mark-processed, purge, configure
-# Uses real in-memory stack (no mocks, no patches)
-# ===============================================================================
-
 import base64
 import hashlib
 import json
 import time
 from   unittest                                                                    import TestCase
-from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Inbox               import (Service__Vault__Inbox     ,
-                                                                                           INBOX_MAX_FILES          ,
+from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Append              import (Service__Vault__Append    ,
+                                                                                           APPEND_MAX_FILES         ,
                                                                                            APPEND_MAX_PAYLOAD       ,
-                                                                                           INBOX_DEFAULT_LIMIT      ,
-                                                                                           INBOX_MAX_LIMIT          ,
-                                                                                           INBOX_BATCH_MAX_FILE_IDS )
+                                                                                           APPEND_DEFAULT_LIMIT     ,
+                                                                                           APPEND_MAX_LIMIT         ,
+                                                                                           APPEND_BATCH_MAX_FILE_IDS)
 from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import path__vault_manifest
 
 
-VAULT_ID     = 'inboxvault01'
-WRITE_KEY    = 'deadbeef1234567890abcdef'                                        # only hashed for the gate — need not be hex
-ENUM_KEY     = hashlib.sha256(b'enum-key-seed').hexdigest()                     # hex so tier tests can present it as a token and reach the gate
-APPEND_TOKEN = hashlib.sha256(b'recipient-public-key').hexdigest()              # token = H(pubkey) — hex, also the folder name
+VAULT_ID     = 'appendvault01'
+WRITE_KEY    = 'deadbeef1234567890abcdef'
+ENUM_KEY     = hashlib.sha256(b'enum-key-seed').hexdigest()
+APPEND_TOKEN = hashlib.sha256(b'recipient-public-key').hexdigest()
 PAYLOAD      = b'\x00\x01\x02\x03encrypted-test-payload'
-GHOST_FILE_ID = '1700000000000_aaaaaaaaaaaaaaaaaaaaaaaa.enc'                     # well-formed but never written
+GHOST_FILE_ID = '1700000000000_aaaaaaaaaaaaaaaaaaaaaaaa.enc'
 
 
 def _hex_token(seed):
@@ -34,13 +28,13 @@ def _hash(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-class test_Service__Vault__Inbox(TestCase):
+class test_Service__Vault__Append(TestCase):
 
     def setUp(self):
-        self.service = Service__Vault__Inbox()
-        self._create_vault_with_inbox(VAULT_ID, WRITE_KEY, APPEND_TOKEN, ENUM_KEY)
+        self.service = Service__Vault__Append()
+        self._create_vault_with_append(VAULT_ID, WRITE_KEY, APPEND_TOKEN, ENUM_KEY)
 
-    def _create_vault_with_inbox(self, vault_id, write_key, append_token, enum_key):
+    def _create_vault_with_append(self, vault_id, write_key, append_token, enum_key):
         manifest = dict(vault_id       = vault_id                  ,
                         write_key_hash = _hash(write_key)          ,
                         append_anchors = [_hash(append_token)]     ,
@@ -111,6 +105,17 @@ class test_Service__Vault__Inbox(TestCase):
             assert self.service._check_append_token(VAULT_ID, t) is True
         assert self.service._check_append_token(VAULT_ID, 'token_d') is False
 
+    def test__configure__writes_separate_config_file(self):
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_append_config
+        self.service.configure(VAULT_ID, WRITE_KEY,
+                                append_anchors=[_hash('cfg_token')],
+                                enum_key_hash=_hash('cfg_enum'))
+        config_path = path__vault_append_config(VAULT_ID)
+        assert self.service.storage_fs.file__exists(config_path) is True
+        config = self.service.storage_fs.file__json(config_path)
+        assert 'append_anchors' in config
+        assert 'enum_key_hash'  in config
+
     # =========================================================================
     # Gate checks
     # =========================================================================
@@ -139,7 +144,7 @@ class test_Service__Vault__Inbox(TestCase):
         assert self.service._check_write_key('nonexist00001', WRITE_KEY) is False
 
     def test__gate__append_token_cannot_enumerate(self):
-        result = self.service.inbox_list(VAULT_ID, APPEND_TOKEN)
+        result = self.service.list_entries(VAULT_ID, APPEND_TOKEN)
         assert result['status'] == 'gate_failed'
 
     def test__gate__enum_key_cannot_purge(self):
@@ -155,19 +160,19 @@ class test_Service__Vault__Inbox(TestCase):
         assert result['status'] == 'ok'
 
     def test__append__wrong_token(self):
-        result = self.service.append(VAULT_ID, _hex_token('wrong'), PAYLOAD)    # well-formed but not an anchor
+        result = self.service.append(VAULT_ID, _hex_token('wrong'), PAYLOAD)
         assert result['status'] == 'gate_failed'
 
     def test__append__payload_stored(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY, include_content=True)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY, include_content=True)
         assert len(listing['entries']) == 1
         content = base64.b64decode(listing['entries'][0]['content'])
         assert content == PAYLOAD
 
     def test__append__server_assigned_filename(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         assert file_id.endswith('.enc')
         assert '_' in file_id
@@ -177,7 +182,7 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__append__multiple_files_chronological(self):
         self._append_n(5)
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_ids = [e['file_id'] for e in listing['entries']]
         assert file_ids == sorted(file_ids)
         assert len(file_ids) == 5
@@ -188,11 +193,11 @@ class test_Service__Vault__Inbox(TestCase):
         assert result['status'] == 'payload_too_large'
 
     def test__append__at_file_capacity(self):
-        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_inbox
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_append_pending
         import secrets
-        for i in range(INBOX_MAX_FILES):
+        for i in range(APPEND_MAX_FILES):
             file_name = f'{int(time.time()*1000):013d}_{secrets.token_hex(12)}.enc'
-            path = path__vault_inbox(VAULT_ID, APPEND_TOKEN, file_name)
+            path = path__vault_append_pending(VAULT_ID, APPEND_TOKEN, file_name)
             self.service.storage_fs.file__save(path, b'x')
         result = self._append()
         assert result['status'] == 'at_capacity'
@@ -209,64 +214,64 @@ class test_Service__Vault__Inbox(TestCase):
                                 append_anchors=[_hash(token_a), _hash(token_b)])
         self.service.append(VAULT_ID, token_a, b'from-alpha')
         self.service.append(VAULT_ID, token_b, b'from-beta')
-        listing_a = self.service.inbox_list(VAULT_ID, ENUM_KEY, inbox=token_a)
-        listing_b = self.service.inbox_list(VAULT_ID, ENUM_KEY, inbox=token_b)
+        listing_a = self.service.list_entries(VAULT_ID, ENUM_KEY, inbox=token_a)
+        listing_b = self.service.list_entries(VAULT_ID, ENUM_KEY, inbox=token_b)
         assert len(listing_a['entries']) == 1
         assert len(listing_b['entries']) == 1
 
     # =========================================================================
-    # Inbox list
+    # List entries
     # =========================================================================
 
-    def test__inbox_list__empty(self):
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+    def test__list_entries__empty(self):
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert result['status']    == 'ok'
         assert result['entries']   == []
         assert result['truncated'] is False
 
-    def test__inbox_list__wrong_enum_key(self):
-        result = self.service.inbox_list(VAULT_ID, 'wrong_key')
+    def test__list_entries__wrong_enum_key(self):
+        result = self.service.list_entries(VAULT_ID, 'wrong_key')
         assert result['status'] == 'gate_failed'
 
-    def test__inbox_list__returns_metadata(self):
+    def test__list_entries__returns_metadata(self):
         self._append()
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY)
         entry  = result['entries'][0]
         assert 'file_id'  in entry
         assert 'received' in entry
         assert 'inbox'    in entry
-        assert 'size'     not in entry                                          # size is read-free now: only present with content (I-1)
+        assert 'size'     not in entry
         assert 'content'  not in entry
 
-    def test__inbox_list__include_content(self):
+    def test__list_entries__include_content(self):
         self._append()
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, include_content=True)
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, include_content=True)
         entry  = result['entries'][0]
         assert 'content' in entry
         assert base64.b64decode(entry['content']) == PAYLOAD
 
-    def test__inbox_list__pagination_limit(self):
+    def test__list_entries__pagination_limit(self):
         self._append_n(10)
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit=3)
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, limit=3)
         assert len(result['entries']) == 3
         assert result['truncated']    is True
 
-    def test__inbox_list__pagination_cursor(self):
+    def test__list_entries__pagination_cursor(self):
         self._append_n(5)
-        page1 = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit=2)
+        page1 = self.service.list_entries(VAULT_ID, ENUM_KEY, limit=2)
         cursor = page1['entries'][-1]['file_id']
-        page2 = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit=2, after_file_id=cursor)
+        page2 = self.service.list_entries(VAULT_ID, ENUM_KEY, limit=2, after_file_id=cursor)
         page1_ids = {e['file_id'] for e in page1['entries']}
         page2_ids = {e['file_id'] for e in page2['entries']}
         assert len(page1_ids & page2_ids) == 0
 
-    def test__inbox_list__full_drain_via_cursor(self):
+    def test__list_entries__full_drain_via_cursor(self):
         self._append_n(7)
         all_ids = []
         cursor  = None
         while True:
-            page = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit=3,
-                                            after_file_id=cursor)
+            page = self.service.list_entries(VAULT_ID, ENUM_KEY, limit=3,
+                                              after_file_id=cursor)
             if not page['entries']:
                 break
             all_ids.extend(e['file_id'] for e in page['entries'])
@@ -276,12 +281,12 @@ class test_Service__Vault__Inbox(TestCase):
         assert len(all_ids) == 7
         assert len(set(all_ids)) == 7
 
-    def test__inbox_list__max_limit_enforced(self):
+    def test__list_entries__max_limit_enforced(self):
         self._append_n(5)
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit=99999)
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, limit=99999)
         assert len(result['entries']) == 5
 
-    def test__inbox_list__filter_by_inbox(self):
+    def test__list_entries__filter_by_inbox(self):
         token_a = _hex_token('filter-a')
         token_b = _hex_token('filter-b')
         self.service.configure(VAULT_ID, WRITE_KEY,
@@ -289,54 +294,62 @@ class test_Service__Vault__Inbox(TestCase):
         self.service.append(VAULT_ID, token_a, b'msg-a-1')
         self.service.append(VAULT_ID, token_a, b'msg-a-2')
         self.service.append(VAULT_ID, token_b, b'msg-b-1')
-        result_a = self.service.inbox_list(VAULT_ID, ENUM_KEY, inbox=token_a)
-        result_b = self.service.inbox_list(VAULT_ID, ENUM_KEY, inbox=token_b)
+        result_a = self.service.list_entries(VAULT_ID, ENUM_KEY, inbox=token_a)
+        result_b = self.service.list_entries(VAULT_ID, ENUM_KEY, inbox=token_b)
         assert len(result_a['entries']) == 2
         assert len(result_b['entries']) == 1
 
+    def test__list_entries__incremental_ceiling_check(self):
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Append import INLINE_CONTENT_CEILING
+        chunk = b'x' * (INLINE_CONTENT_CEILING // 2 + 1)
+        self._append(payload=chunk)
+        self._append(payload=chunk)
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, include_content=True)
+        assert result['status'] == 'content_too_large'
+
     # =========================================================================
-    # Inbox fetch
+    # Fetch
     # =========================================================================
 
-    def test__inbox_fetch__success(self):
+    def test__fetch__success(self):
         self._append()
-        listing  = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing  = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id  = listing['entries'][0]['file_id']
         inbox    = listing['entries'][0]['inbox']
-        result   = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, inbox, [file_id])
+        result   = self.service.fetch(VAULT_ID, ENUM_KEY, inbox, [file_id])
         assert result['status']  == 'ok'
         assert len(result['files'])   == 1
         assert len(result['missing']) == 0
         assert base64.b64decode(result['files'][0]['content']) == PAYLOAD
 
-    def test__inbox_fetch__wrong_enum_key(self):
-        result = self.service.inbox_fetch(VAULT_ID, 'wrong', APPEND_TOKEN, ['any.enc'])
+    def test__fetch__wrong_enum_key(self):
+        result = self.service.fetch(VAULT_ID, 'wrong', APPEND_TOKEN, ['any.enc'])
         assert result['status'] == 'gate_failed'
 
-    def test__inbox_fetch__missing_file(self):
-        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
-                                           [GHOST_FILE_ID])                      # well-formed but never written
+    def test__fetch__missing_file(self):
+        result = self.service.fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
+                                     [GHOST_FILE_ID])
         assert result['status']  == 'ok'
         assert len(result['files'])   == 0
         assert len(result['missing']) == 1
 
-    def test__inbox_fetch__mixed_found_and_missing(self):
+    def test__fetch__mixed_found_and_missing(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
-        result  = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, inbox,
-                                            [file_id, GHOST_FILE_ID])
+        result  = self.service.fetch(VAULT_ID, ENUM_KEY, inbox,
+                                      [file_id, GHOST_FILE_ID])
         assert len(result['files'])   == 1
         assert len(result['missing']) == 1
         assert result['missing'][0]   == GHOST_FILE_ID
 
-    def test__inbox_fetch__multiple_files(self):
+    def test__fetch__multiple_files(self):
         self._append_n(3)
-        listing  = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing  = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_ids = [e['file_id'] for e in listing['entries']]
         inbox    = listing['entries'][0]['inbox']
-        result   = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, inbox, file_ids)
+        result   = self.service.fetch(VAULT_ID, ENUM_KEY, inbox, file_ids)
         assert len(result['files']) == 3
         assert len(result['missing']) == 0
 
@@ -346,14 +359,14 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__mark_processed__success(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
         result  = self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, [file_id])
         assert result['status'] == 'ok'
         assert file_id in result['moved']
         assert len(result['missing']) == 0
-        after = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        after = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert len(after['entries']) == 0
 
     def test__mark_processed__wrong_enum_key(self):
@@ -362,7 +375,7 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__mark_processed__idempotent(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
         self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, [file_id])
@@ -373,19 +386,19 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__mark_processed__file_exists_in_processed(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
         self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, [file_id])
-        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_processed
-        processed_path = path__vault_processed(VAULT_ID, inbox, file_id)
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_append_processed
+        processed_path = path__vault_append_processed(VAULT_ID, inbox, file_id)
         assert self.service.storage_fs.file__exists(processed_path) is True
         content = self.service.storage_fs.file__bytes(processed_path)
         assert content == PAYLOAD
 
     def test__mark_processed__batch_partial(self):
         self._append_n(3)
-        listing  = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing  = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_ids = [e['file_id'] for e in listing['entries']]
         inbox    = listing['entries'][0]['inbox']
         batch    = [file_ids[0], GHOST_FILE_ID, file_ids[2]]
@@ -400,16 +413,16 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__purge__processed_files(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
         self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, [file_id])
         result = self.service.purge(VAULT_ID, WRITE_KEY, 'processed', inbox, [file_id])
         assert result['status'] == 'ok'
         assert file_id in result['purged']
-        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_processed
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_append_processed
         assert self.service.storage_fs.file__exists(
-            path__vault_processed(VAULT_ID, inbox, file_id)) is False
+            path__vault_append_processed(VAULT_ID, inbox, file_id)) is False
 
     def test__purge__wrong_write_key(self):
         result = self.service.purge(VAULT_ID, 'wrongkey', 'processed', APPEND_TOKEN)
@@ -417,7 +430,7 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__purge__idempotent(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
         self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, [file_id])
@@ -428,21 +441,21 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__purge__all_processed(self):
         self._append_n(3)
-        listing  = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing  = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_ids = [e['file_id'] for e in listing['entries']]
         inbox    = listing['entries'][0]['inbox']
         self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, file_ids)
         result = self.service.purge(VAULT_ID, WRITE_KEY, 'processed', inbox)
         assert len(result['purged']) == 3
 
-    def test__purge__inbox_files_directly(self):
+    def test__purge__pending_files_directly(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
-        result = self.service.purge(VAULT_ID, WRITE_KEY, 'inbox', inbox, [file_id])
+        result = self.service.purge(VAULT_ID, WRITE_KEY, 'pending', inbox, [file_id])
         assert file_id in result['purged']
-        after = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        after = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert len(after['entries']) == 0
 
     # =========================================================================
@@ -451,16 +464,16 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__full_drain_cycle(self):
         self._append_n(5)
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert len(listing['entries']) == 5
         file_ids = [e['file_id'] for e in listing['entries']]
         inbox    = listing['entries'][0]['inbox']
         for file_id in file_ids:
-            fetched = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, inbox, [file_id])
+            fetched = self.service.fetch(VAULT_ID, ENUM_KEY, inbox, [file_id])
             assert len(fetched['files']) == 1
         move_result = self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, file_ids)
         assert len(move_result['moved']) == 5
-        after_move = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        after_move = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert len(after_move['entries']) == 0
         purge_result = self.service.purge(VAULT_ID, WRITE_KEY, 'processed', inbox)
         assert len(purge_result['purged']) == 5
@@ -471,8 +484,8 @@ class test_Service__Vault__Inbox(TestCase):
         cursor = None
         inbox  = None
         while True:
-            page = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit=3,
-                                            after_file_id=cursor)
+            page = self.service.list_entries(VAULT_ID, ENUM_KEY, limit=3,
+                                              after_file_id=cursor)
             if not page['entries']:
                 break
             for entry in page['entries']:
@@ -484,7 +497,7 @@ class test_Service__Vault__Inbox(TestCase):
                 break
         assert len(all_file_ids) == 7
         self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, all_file_ids)
-        empty = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        empty = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert len(empty['entries']) == 0
 
     # =========================================================================
@@ -492,11 +505,11 @@ class test_Service__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__tier__append_cannot_list(self):
-        result = self.service.inbox_list(VAULT_ID, APPEND_TOKEN)
+        result = self.service.list_entries(VAULT_ID, APPEND_TOKEN)
         assert result['status'] == 'gate_failed'
 
     def test__tier__append_cannot_fetch(self):
-        result = self.service.inbox_fetch(VAULT_ID, APPEND_TOKEN, APPEND_TOKEN, ['f.enc'])
+        result = self.service.fetch(VAULT_ID, APPEND_TOKEN, APPEND_TOKEN, ['f.enc'])
         assert result['status'] == 'gate_failed'
 
     def test__tier__append_cannot_mark_processed(self):
@@ -516,7 +529,7 @@ class test_Service__Vault__Inbox(TestCase):
         assert result['status'] == 'gate_failed'
 
     def test__tier__write_key_cannot_enumerate(self):
-        result = self.service.inbox_list(VAULT_ID, WRITE_KEY)
+        result = self.service.list_entries(VAULT_ID, WRITE_KEY)
         assert result['status'] == 'gate_failed'
 
     # =========================================================================
@@ -525,7 +538,7 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__deleted_vault_blocks_all_operations(self):
         vault = 'deletedvlt01'
-        self._create_vault_with_inbox(vault, WRITE_KEY, APPEND_TOKEN, ENUM_KEY)
+        self._create_vault_with_append(vault, WRITE_KEY, APPEND_TOKEN, ENUM_KEY)
         from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_tombstone, path__vault_manifest as _manifest_path
         self.service.storage_fs.file__delete(_manifest_path(vault))
         tombstone = dict(vault_id=vault, status='deleted')
@@ -533,36 +546,36 @@ class test_Service__Vault__Inbox(TestCase):
                                             json.dumps(tombstone).encode())
         self.service._manifest_cache.pop(vault, None)
         assert self.service.append(vault, APPEND_TOKEN, PAYLOAD)['status'] == 'gate_failed'
-        assert self.service.inbox_list(vault, ENUM_KEY)['status'] == 'gate_failed'
+        assert self.service.list_entries(vault, ENUM_KEY)['status'] == 'gate_failed'
         assert self.service.purge(vault, WRITE_KEY, 'processed', APPEND_TOKEN)['status'] == 'gate_failed'
 
     def test__empty_batch_rejected(self):
-        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, [])
+        result = self.service.fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, [])
         assert result['status'] == 'invalid_input'
 
     def test__mark_processed_preserves_content(self):
         payload = b'important-encrypted-message'
         self.service.append(VAULT_ID, APPEND_TOKEN, payload)
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
         self.service.mark_processed(VAULT_ID, ENUM_KEY, inbox, [file_id])
-        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_processed
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_append_processed
         content = self.service.storage_fs.file__bytes(
-            path__vault_processed(VAULT_ID, inbox, file_id))
+            path__vault_append_processed(VAULT_ID, inbox, file_id))
         assert content == payload
 
     def test__concurrent_append_and_list(self):
         self._append_n(3)
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert len(listing['entries']) == 3
         self._append()
-        listing2 = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing2 = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert len(listing2['entries']) == 4
 
-    def test__inbox_list__received_timestamp_from_filename(self):
+    def test__list_entries__received_timestamp_from_filename(self):
         self._append()
-        listing = self.service.inbox_list(VAULT_ID, ENUM_KEY)
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
         received = listing['entries'][0]['received']
         now_ms = int(time.time() * 1000)
         assert abs(received - now_ms) < 5000
@@ -573,26 +586,26 @@ class test_Service__Vault__Inbox(TestCase):
 
     def test__append__rejects_traversal_token(self):
         self.service.configure(VAULT_ID, WRITE_KEY,
-                                append_anchors=[_hash('../../etc')])             # even if an anchor somehow matched...
-        result = self.service.append(VAULT_ID, '../../etc', PAYLOAD)            # ...the token is rejected before path use
+                                append_anchors=[_hash('../../etc')])
+        result = self.service.append(VAULT_ID, '../../etc', PAYLOAD)
         assert result['status'] == 'invalid_input'
 
     def test__append__rejects_non_hex_token(self):
         result = self.service.append(VAULT_ID, 'not_hex_token!!', PAYLOAD)
         assert result['status'] == 'invalid_input'
 
-    def test__inbox_list__rejects_traversal_inbox(self):
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, inbox='../../bare')
+    def test__list_entries__rejects_traversal_inbox(self):
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, inbox='../../bare')
         assert result['status'] == 'invalid_input'
 
     def test__fetch__rejects_traversal_inbox(self):
-        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, '../../bare',
-                                           [GHOST_FILE_ID])
+        result = self.service.fetch(VAULT_ID, ENUM_KEY, '../../bare',
+                                     [GHOST_FILE_ID])
         assert result['status'] == 'invalid_input'
 
     def test__fetch__rejects_traversal_file_id(self):
-        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
-                                           ['../../bare/data/obj/payload'])
+        result = self.service.fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
+                                     ['../../bare/data/obj/payload'])
         assert result['status'] == 'invalid_input'
 
     def test__mark_processed__rejects_traversal_file_id(self):
@@ -601,7 +614,7 @@ class test_Service__Vault__Inbox(TestCase):
         assert result['status'] == 'invalid_input'
 
     def test__purge__rejects_traversal_file_id(self):
-        result = self.service.purge(VAULT_ID, WRITE_KEY, 'inbox', APPEND_TOKEN,
+        result = self.service.purge(VAULT_ID, WRITE_KEY, 'pending', APPEND_TOKEN,
                                      ['../../manifest.json'])
         assert result['status'] == 'invalid_input'
 
@@ -609,63 +622,63 @@ class test_Service__Vault__Inbox(TestCase):
         result = self.service.purge(VAULT_ID, WRITE_KEY, 'processed', '../../bare')
         assert result['status'] == 'invalid_input'
 
-    def test__enum_holder_cannot_escape_inbox_via_file_id(self):                 # the core tier-escalation the typing prevents
-        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
-                                           ['../../../bare/data/secret/payload'])
-        assert result['status'] == 'invalid_input'                              # never reaches storage
+    def test__enum_holder_cannot_escape_via_file_id(self):
+        result = self.service.fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN,
+                                     ['../../../bare/data/secret/payload'])
+        assert result['status'] == 'invalid_input'
 
     # =========================================================================
     # I-3 — batch size cap (DoS guard)
     # =========================================================================
 
     def test__fetch__rejects_oversized_batch(self):
-        ids = [GHOST_FILE_ID] * (INBOX_BATCH_MAX_FILE_IDS + 1)
-        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, ids)
+        ids = [GHOST_FILE_ID] * (APPEND_BATCH_MAX_FILE_IDS + 1)
+        result = self.service.fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, ids)
         assert result['status'] == 'invalid_input'
 
     def test__mark_processed__rejects_oversized_batch(self):
-        ids = [GHOST_FILE_ID] * (INBOX_BATCH_MAX_FILE_IDS + 1)
+        ids = [GHOST_FILE_ID] * (APPEND_BATCH_MAX_FILE_IDS + 1)
         result = self.service.mark_processed(VAULT_ID, ENUM_KEY, APPEND_TOKEN, ids)
         assert result['status'] == 'invalid_input'
 
     def test__purge__rejects_oversized_batch(self):
-        ids = [GHOST_FILE_ID] * (INBOX_BATCH_MAX_FILE_IDS + 1)
-        result = self.service.purge(VAULT_ID, WRITE_KEY, 'inbox', APPEND_TOKEN, ids)
+        ids = [GHOST_FILE_ID] * (APPEND_BATCH_MAX_FILE_IDS + 1)
+        result = self.service.purge(VAULT_ID, WRITE_KEY, 'pending', APPEND_TOKEN, ids)
         assert result['status'] == 'invalid_input'
 
     def test__fetch__accepts_max_batch(self):
-        ids = [GHOST_FILE_ID] * INBOX_BATCH_MAX_FILE_IDS
-        result = self.service.inbox_fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, ids)
+        ids = [GHOST_FILE_ID] * APPEND_BATCH_MAX_FILE_IDS
+        result = self.service.fetch(VAULT_ID, ENUM_KEY, APPEND_TOKEN, ids)
         assert result['status'] == 'ok'
 
     # =========================================================================
     # M-4 — limit coercion
     # =========================================================================
 
-    def test__inbox_list__limit_string_coerced(self):
+    def test__list_entries__limit_string_coerced(self):
         self._append_n(3)
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit='2')
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, limit='2')
         assert result['status'] == 'ok'
         assert len(result['entries']) == 2
 
-    def test__inbox_list__limit_garbage_rejected(self):
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, limit='abc')
+    def test__list_entries__limit_garbage_rejected(self):
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, limit='abc')
         assert result['status'] == 'invalid_input'
 
     # =========================================================================
     # I-1 — metadata listing performs no payload reads
     # =========================================================================
 
-    def test__inbox_list__metadata_only_omits_size_and_content(self):
+    def test__list_entries__metadata_only_omits_size_and_content(self):
         self._append_n(2)
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, include_content=False)
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, include_content=False)
         for entry in result['entries']:
             assert 'size'    not in entry
             assert 'content' not in entry
 
-    def test__inbox_list__content_includes_size(self):
+    def test__list_entries__content_includes_size(self):
         self._append()
-        result = self.service.inbox_list(VAULT_ID, ENUM_KEY, include_content=True)
+        result = self.service.list_entries(VAULT_ID, ENUM_KEY, include_content=True)
         entry = result['entries'][0]
         assert entry['size'] == len(PAYLOAD)
         assert base64.b64decode(entry['content']) == PAYLOAD

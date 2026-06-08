@@ -569,3 +569,14 @@ class test_Service__Vault__Pointer(TestCase):
             self.service.write(self.vault_id, f'file-{i}', self.write_key, f'data-{i}'.encode())
         result = self.service.delete_vault(self.vault_id, self.write_key)
         assert result['files_deleted'] == 6                               # 5 payload files + manifest
+
+    def test__list_files__never_returns_append_entries(self):
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_append_pending
+        self.service.write(self.vault_id, 'legit-file', self.write_key, b'data')
+        append_path = path__vault_append_pending(self.vault_id, 'a' * 64, '1700000000000_' + 'b' * 24 + '.enc')
+        self.service.storage_fs.file__save(append_path, b'append-data')
+        result = self.service.list_files(self.vault_id)
+        file_ids = result['files']
+        assert 'legit-file' in file_ids
+        for fid in file_ids:
+            assert '.enc' not in fid                                      # append entries never leak into list_files
