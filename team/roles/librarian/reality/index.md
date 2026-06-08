@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.32.4 | **Last updated:** 2026-06-06 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.5 | **Last updated:** 2026-06-08 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,21 +31,21 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-06-05)
+## Quick Stats (as of 2026-06-08)
 
 | Metric | Count |
 |--------|-------|
 | User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
-| Unit tests passing | **~1556+** (957 Python confirmed via commit `e365c60` + ~157 vault-UI JS from sub-vaults/public-previews/app-perms/VaultSubvaultsView + ~364 ViV loader suite from Phase 1–5.1 inc. B4–B10/KernelParent/AppFrameBootstrap/VivAuditView/SgReplCore + ~78 app-shell extraction AppHudConfig:31+AppNavHelpers:47; no new tests 06/06) |
+| Unit tests passing | **~1600+** (957 Python + ~157 vault-UI JS + ~364 ViV loader suite + ~78 app-shell extraction + 37 embed-protocol; browser integration: 8 tests; no new briefs 06/07–06/08) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 455+ (433+ previous + 22 new P-317–P-338 from 06/04 briefs processed 06/06) |
-| Total documents catalogued | 594 (27 new human briefs from 06/04 processed 06/06) |
+| Open PROPOSED items (across all domains) | 455+ (unchanged — no new briefs 06/07–06/08) |
+| Total documents catalogued | 594 (unchanged — no new briefs 06/07–06/08) |
 
 ---
 

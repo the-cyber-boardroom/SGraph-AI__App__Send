@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-08
+
+Code-change-only session: 0 new briefs; 9 substantive commits since the 06/07 librarian session (plus CI version bumps → v0.33.5).
+
+- `ui/index.md` — Added: vault-embed postMessage handshake (embed-protocol.js, _initEmbed, _initWithKey embed gating, deepLink memory path, _setCachedAccessKey gate); sg-vault-object-store.js typeof-caches sandbox fix + bundle rebuild; favicon.ico + `<link rel="icon">` tags in 5 HTML files; last updated 05/31 → 06/08
+- `qa/index.md` — Added: test__embed_protocol.js (37 assertions, run-all.sh suite → ~113); browser integration extended to 8 tests (test__embed_handshake.py: 4 tests — handshake + deep-link + sandboxed iframe + storage isolation); last updated 06/05 → 06/08
+- `security/index.md` — Added: Vault-Embed Security Model section (key in memory, one-shot listener, sibling rejection, origin validation, unresolved consent gap); sg-vault-object-store.js sandbox safety note; last updated 06/05 → 06/08
+- `index.md` — Version v0.32.4 → v0.33.5; last updated 06/06 → 06/08; unit tests ~1556+ → ~1600+; docs 594 (unchanged); PROPOSED 455+ (unchanged)
+
+Master index (06/08): `team/roles/librarian/reviews/06/08/v0.33.5__master-index__code-changes-07-june-2026.md`
+Processed: 0 new human briefs | New EXISTS items: 7 (embed-protocol module, 3 embed browser tests, sandboxed regression test, favicon.ico, caches guard fix) | New PROPOSED items: 0
+
+---
+
 ## 2026-06-06
 
 Brief-processing session: 27 new human briefs from 06/04 (1 day-index + 8 skills + 2 research + 16 NHI 2.0).

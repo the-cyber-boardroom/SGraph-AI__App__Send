@@ -498,6 +498,42 @@ Phase 1 (SecureChannel) + Phase 2 (spawn + cross-vault write) + Phase 3 sub-step
 
 **Known deferred bug (L2):** `Envelope._canonicalParse` treats any `{__u8: "<string>"}` as bytes. Edge case; fix deferred to Phase 6 with `{__u8b64}` tag.
 
+**Vault-Embed postMessage Handshake (SHIPPED — 07 June 2026, commit `3b30347` + follow-ups):**
+
+Opt-in embed flow for running a vault inside a foreign iframe without exposing the vault key in URL history, localStorage, or sessionStorage. Activated via `?embed=1` on the vault app URL.
+
+Protocol (3-message handshake):
+- iframe → parent: `{ sg: 'vault-embed-ready', v: 1 }` (fired on load)
+- parent → iframe: `{ sg: 'vault-open', key, mode?, deepLink? }` (one-shot, listened once)
+- iframe → parent: `{ sg: 'vault-ready', vaultName, fileCount, hasApp }` (fired on mount)
+
+**New module `embed-protocol.js`** (pure/DOM-free, ~110 lines, loaded before `app-shell.js`):
+- `isEmbedMode` / `getExpectedParentOrigin` / `validateSource` / `parseOpenMessage` / `readyMessage` / `vaultReadyMessage`
+- `globalThis.EmbedProtocol`
+
+**`app-shell.js` changes:**
+- `_init`: early-out to `_initEmbed` when `?embed=1` (before any localStorage read)
+- `_initEmbed`: posts `vault-embed-ready`, listens one-shot for `vault-open`, opens via `_initWithKey` in memory, forwards `app-shell:ready` as `vault-ready` to parent; cleans up on `disconnectedCallback`
+- `_initWithKey`: localStorage/sessionStorage persistence skipped when `this._embedMode` is true
+- `_embedDeepLink`: deepLink stored on instance memory (not sessionStorage — avoids SecurityError in null-origin iframes, fix `84ba117`)
+- `_setCachedAccessKey`: early-return on `this._embedMode` (fix `159ec76`)
+
+**Security properties (embed mode):**
+- Key in memory only — never touches localStorage or sessionStorage
+- Reload re-triggers the handshake (forced re-auth, no persistence)
+- One-shot listener: removed after first valid `vault-open` message
+- `event.source === window.parent` check rejects sibling iframes
+- `?parent=<origin>` optional validation; accepts any origin including `null` when not specified
+
+**Browser-verified:** Full handshake + deep-link routing + storage isolation + sandboxed iframe all tested (see qa/index.md).
+
+**`sg-vault-object-store.js` sandbox safety (fix `d5f6f0a`, 07 June 2026):** `typeof caches` guard moved inside the `try` block in both `_cacheGet` and `_cachePut`. The `window.caches` accessor throws `SecurityError` in sandboxed iframes without `allow-same-origin`, causing vault-open to fail on the first immutable-block read. Moving the guard inside the `try` allows the existing catch to take the documented network-fallback path. `kernel-shell-bundle.js` rebuilt (`8bccfdc`). Regression test added (see qa/index.md).
+
+**Vault UI favicon (fix `cdb0072`, 07 June 2026):**
+- `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/favicon.ico` — NEW, 211 bytes, 32×32 PNG-in-ICO, brand palette (dark navy + teal S-curve + red slash)
+- `<link rel="icon" type="image/svg+xml" href="/favicon.svg">` + `<link rel="icon" sizes="32x32" href="/favicon.ico">` added to `index.html`, `en-gb/index.html`, `en-gb/app/index.html`, `en-gb/browse/index.html`, `en-gb/preview/index.html`
+- Resolves 403 on `/favicon.ico` in browser devtools console
+
 ---
 
 ## PROPOSED
