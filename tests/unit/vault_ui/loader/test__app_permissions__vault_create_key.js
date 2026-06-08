@@ -20,11 +20,12 @@ function ok(name, cond) { if (cond) { pass++; console.log('  ✓ ' + name); } el
 console.log('\n[suite] vault grants — parse');
 const pNone   = AP.parsePermissions(null);
 const pCreate = AP.parsePermissions({ permissions: { vault: { create: ['patients/'] } } });
-const pKey    = AP.parsePermissions({ permissions: { vault: { createKey: ['patients/'], standalone: true, openApp: true, seedFrom: ['templates/patient/'] } } });
+const pKey    = AP.parsePermissions({ permissions: { vault: { createKey: ['patients/'], standalone: true, openApp: true, seedFrom: ['templates/patient/'], embedAccessToken: true } } });
 
 ok('createKey path-grant parsed',       Array.isArray(pKey.vault.createKey) && pKey.vault.createKey[0] === 'patients/');
 ok('standalone bool parsed',            pKey.vault.standalone === true);
 ok('openApp bool parsed',               pKey.vault.openApp === true);
+ok('embedAccessToken bool parsed',      pKey.vault.embedAccessToken === true);
 ok('seedFrom path-grant parsed',        Array.isArray(pKey.vault.seedFrom) && pKey.vault.seedFrom[0] === 'templates/patient/');
 ok('absent standalone defaults false',  pCreate.vault.standalone === false);
 ok('absent openApp defaults false',     pCreate.vault.openApp === false);
@@ -37,6 +38,8 @@ ok('createKey on granted path',         AP.can(pKey, 'vault.createKey', 'patient
 ok('createKey off ungranted path',     !AP.can(pKey, 'vault.createKey', 'staff/bob'));
 ok('standalone bool true',              AP.can(pKey, 'vault.standalone', ''));
 ok('openApp bool true',                 AP.can(pKey, 'vault.openApp', ''));
+ok('embedAccessToken bool true',        AP.can(pKey, 'vault.embedAccessToken', ''));
+ok('embedAccessToken default-deny',    !AP.can(pCreate, 'vault.embedAccessToken', ''));
 ok('seedFrom on granted path',          AP.can(pKey, 'vault.seedFrom', 'templates/patient/x'));
 ok('seedFrom off ungranted path',      !AP.can(pKey, 'vault.seedFrom', 'secrets/'));
 

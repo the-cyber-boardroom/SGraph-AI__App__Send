@@ -14,7 +14,7 @@
 
    Verbs: 'fs.read' 'fs.list' 'fs.write' 'fs.move' 'fs.delete' 'fs.mkdir'
           'vault.create' 'vault.createKey' 'vault.standalone' 'vault.seedFrom'
-          'vault.openApp' 'vault.unlink' 'vault.mount' 'vault.delete'
+          'vault.openApp' 'vault.embedAccessToken' 'vault.unlink' 'vault.mount' 'vault.delete'
    ================================================================================= */
 
 (function () {
@@ -97,14 +97,15 @@
                 mkdir:  _grant(fs.mkdir)
             },
             vault: {
-                create:     _grant(vault.create),      // read-through create (existing)
-                createKey:  _grant(vault.createKey),   // create + RETURN key / getKey (stronger; path-grant)
-                standalone: vault.standalone === true,  // allow create with no parent link (bool)
-                seedFrom:   _grant(vault.seedFrom),    // source paths/refs allowed as seedFrom (path-grant)
-                openApp:    vault.openApp === true,      // allow sg.vault.openApp (bool)
-                unlink:     _grant(vault.unlink),
-                mount:      _grant(vault.mount),       // ViV Phase 2: parent → child kernel spawn
-                'delete':   vault['delete'] === true     // bool only (always consent-gated)
+                create:           _grant(vault.create),      // read-through create (existing)
+                createKey:        _grant(vault.createKey),   // create + RETURN key / getKey (stronger; path-grant)
+                standalone:       vault.standalone === true,   // allow create with no parent link (bool)
+                seedFrom:         _grant(vault.seedFrom),    // source paths/refs allowed as seedFrom (path-grant)
+                openApp:          vault.openApp === true,       // allow sg.vault.openApp (bool)
+                embedAccessToken: vault.embedAccessToken === true, // embed a backend access token in a vault (bool)
+                unlink:           _grant(vault.unlink),
+                mount:            _grant(vault.mount),       // ViV Phase 2: parent → child kernel spawn
+                'delete':         vault['delete'] === true     // bool only (always consent-gated)
             }
         };
     }
@@ -142,9 +143,10 @@
             return _match(perm.fs[act], path);
         }
         if (grp === 'vault') {
-            if (act === 'delete')     return perm.vault['delete'] === true;
-            if (act === 'standalone') return perm.vault.standalone === true;
-            if (act === 'openApp')    return perm.vault.openApp === true;
+            if (act === 'delete')           return perm.vault['delete'] === true;
+            if (act === 'standalone')       return perm.vault.standalone === true;
+            if (act === 'openApp')          return perm.vault.openApp === true;
+            if (act === 'embedAccessToken') return perm.vault.embedAccessToken === true;
             return _match(perm.vault[act], path);   // create, createKey, seedFrom, unlink, mount
         }
         return false;
