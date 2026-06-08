@@ -99,6 +99,18 @@ kernel bridge, gated by `app.json` grants. Code: `app-shell.js` (`_createChildVa
 | New grants: `vault.createKey`/`standalone`/`seedFrom`/`openApp`/`embedAccessToken` (default-deny; `createKey` stronger than `create`) | **EXISTS** | `app-permissions.js` (30 tests) |
 | **Per-verb consent policy** — `app.json` `permissions.consent[verb]` = `always`/`once`/`auto`; tunes (never grants) the HUD confirmation. Default unchanged: always-confirm for createKey/delete. Lets a trusted app disable repeated prompts. | **EXISTS** | `_consentPolicy`/`_consent` |
 | HUD consent banner ellipsizes (no overflow over title/buttons); message shortened, ref-id hidden | **EXISTS** | `app-hud.js` CSS |
+
+### CLI Interop — branch index + reconcile-on-open (v0.33.5, 2026-06-08)
+
+Closes two `sgit`-CLI-team briefs about web↔CLI two-ref-model interop.
+
+| Fix | Status | Evidence |
+|-----|--------|---------|
+| Web vaults now write a single-branch index (`branch_index_v1`) at `bare/indexes/<idx-pid-muw-*>` on **create** and every **push** → `sgit clone <web-vault>` no longer errors "No branch index found" | **EXISTS** | `SGVaultRefManager.writeBranchIndex` (9 tests); called in `SGVault.create` + `push()` |
+| `SGVault.open` reconcile-on-open: when the clone ref is **cleanly behind** the named ref (strict ancestor), load the **named** head, not the stale clone — fixes the "open prefers clone, silently shadows CLI pushes" bug | **EXISTS** | `sg-vault.js` open (`_isAncestor` clean-behind check); diverged/ahead clones keep their head (no data loss) |
+| Branch-index path already aligned (`bare/indexes/`, not the CLI brief's feared `bare/idx/`) | **EXISTS** | `sg-vault-ref-manager.js` |
+
+The web writes the index pointing at the **named** ref only (never the clone ref), so the CLI keeps cloning the canonical published branch. Brief responses: `team/comms/briefs/06/08/v0.33.5__brief__cli-interop-branch-index-and-reconcile.md`.
 | `sg.vault.mount({mode:'rw'})` writable mount | **PROPOSED** | separate brief `team/comms/briefs/06/08/v0.33.5__brief__vault-writable-mount.md` |
 
 Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.
