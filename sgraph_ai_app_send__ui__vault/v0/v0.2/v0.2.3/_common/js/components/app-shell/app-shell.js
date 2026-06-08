@@ -974,11 +974,17 @@
         // the HUD (host chrome, §3.5) — the sandboxed app cannot satisfy it. Serialised so two
         // concurrent requests don't collide on the single HUD slot (A10).
         async _consent(verb, path) {
-            var alwaysConfirm = (verb === 'vault.delete' || verb === 'vault.createKey');   // key-return / destroy never silently cache
+            // Effective policy: app.json permissions.consent[verb] overrides the per-verb default.
+            //   default 'always' for key-return / destroy; 'once' for the rest.
+            //   'auto' → no prompt (the app.json author opted into trusting the grant alone).
+            var policy = (this._perm && this._perm.consent && this._perm.consent[verb]) || null;
+            var defaultAlways = (verb === 'vault.delete' || verb === 'vault.createKey');
+            var mode = policy || (defaultAlways ? 'always' : 'once');
+            if (mode === 'auto') return true;                              // pre-granted in app.json — no prompt
             var ckey = this._consentCacheKey(verb);
-            if (!alwaysConfirm) { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
+            if (mode === 'once') { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
             var granted = await this._hudConsent(verb, path);
-            if (granted && !alwaysConfirm) { try { localStorage.setItem(ckey, '1'); } catch (_) {} }
+            if (granted && mode === 'once') { try { localStorage.setItem(ckey, '1'); } catch (_) {} }
             return granted;
         }
 

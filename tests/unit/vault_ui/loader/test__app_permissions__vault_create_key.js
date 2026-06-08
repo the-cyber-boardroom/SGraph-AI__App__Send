@@ -54,5 +54,13 @@ ok('openApp default-deny',    !AP.can(pNone, 'vault.openApp', ''));
 ok('seedFrom default-deny',   !AP.can(pNone, 'vault.seedFrom', 'x'));
 ok('delete default-deny',     !AP.can(pNone, 'vault.delete', 'x'));
 
+console.log('\n[suite] consent policy (permissions.consent)');
+const pConsent = AP.parsePermissions({ permissions: { vault: { createKey: ['patients/'] }, consent: { 'vault.createKey': 'auto', 'vault.delete': 'once', 'vault.unlink': 'bogus' } } });
+ok('parses auto',                  pConsent.consent['vault.createKey'] === 'auto');
+ok('parses once',                  pConsent.consent['vault.delete'] === 'once');
+ok('drops invalid value',          pConsent.consent['vault.unlink'] === undefined);
+ok('absent consent → empty map',   Object.keys(pCreate.consent || {}).length === 0);
+ok('no consent key → undefined',   (pConsent.consent['vault.create'] === undefined));
+
 console.log('\n' + (fail ? '✗ ' + fail + ' FAILED, ' : '✓ ') + pass + ' passed');
 process.exit(fail ? 1 : 0);
