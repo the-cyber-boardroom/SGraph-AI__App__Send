@@ -379,9 +379,20 @@
             // preset, else a saved per-vault / backend key. Thread it onto the write transport so
             // write PUTs carry x-sgraph-access-token (reads are tokenless).
             this._setStatus('Reading vault…');
-            var accessKey = !isRO
-                ? (presetAccessKey || this._resolveAccessToken(vault._vaultId || this._vaultKey))
-                : null;
+            // Token resolution priority (writes only): explicit entry-form input → EMBEDDED token
+            // in .vault/access-token.json (Q2: embedded wins over the localStorage cache, since it
+            // is the current vault-bound intent) → legacy app.json.accessToken (below) → cache.
+            // This is what makes a key-only link open WRITABLE: the patient holds the vault key
+            // (reads decrypt), the embedded token authorises backend writes — never in the URL.
+            var accessKey = null;
+            if (!isRO) {
+                if (presetAccessKey) {
+                    accessKey = presetAccessKey;
+                } else {
+                    accessKey = await this._readEmbeddedAccessToken(vault);     // .vault/access-token.json
+                    if (!accessKey) accessKey = this._resolveAccessToken(vault._vaultId || this._vaultKey);
+                }
+            }
             this._applyAccessToken(accessKey);
             this._dataSource = new VaultDataSource(vault, accessKey);
             if (accessKey) this._writable = true;
@@ -886,6 +897,49 @@
             try { return localStorage.getItem('sg-backend-access-key') || null; } catch (_) { return null; }
         }
 
+        // ── Embedded access token (.vault/access-token.json) ────────────────────────────
+        // A backend access token can live INSIDE the vault, encrypted under read_key and under
+        // the .vault/** floor (so a sandboxed app can't read it via the bridge — only the kernel
+        // does, to authorise writes). This lets a KEY-ONLY link/QR open writable: the holder has
+        // the vault key (reads), the embedded token upgrades to writes. The token is NEVER in the
+        // URL. A vault without this file opens read-only from a key-only link (today's behaviour).
+        async _readEmbeddedAccessToken(vault) {
+            try {
+                var listed = vault.listFolder('/.vault') || [];
+                if (!listed.some(function (e) { return e.name === 'access-token.json'; })) return null;
+                var bytes = await vault.getFile('/.vault', 'access-token.json');   // read_key decrypt
+                var obj   = JSON.parse(new TextDecoder().decode(bytes));
+                return (obj && obj.token) ? String(obj.token) : null;
+            } catch (_) { return null; }
+        }
+
+        async _writeEmbeddedAccessToken(vault, token, source) {
+            if (!vault || !vault.writable) throw Object.assign(new Error('Read-only vault'), { code: 'EREADONLY' });
+            if (!vault.listFolder('/.vault')) { try { await vault.createFolder('/.vault'); } catch (_) {} }
+            var rec   = { token: String(token), created: Date.now(), source: source || 'explicit' };
+            var bytes = new TextEncoder().encode(JSON.stringify(rec));
+            var exists = (vault.listFolder('/.vault') || []).some(function (e) { return e.name === 'access-token.json'; });
+            if (exists) await vault.updateFile('/.vault', 'access-token.json', bytes);
+            else        await vault.addFile('/.vault', 'access-token.json', bytes);
+        }
+
+        // Resolve a create/setAccessToken `accessToken` option to a concrete token string.
+        //   'inherit'    → this (parent/doctor) vault's current access token
+        //   '<explicit>' → use the supplied token string as-is
+        //   'new'        → ENOTIMPL (mint endpoint exists but uses a separate API-key workflow,
+        //                  not wired here — use 'inherit' or an explicit token for now)
+        _resolveEmbedToken(spec) {
+            if (spec === 'inherit') {
+                var t = (this._dataSource && this._dataSource._accessKey)
+                        || this._resolveAccessToken(this._vault && this._vault._vaultId);
+                if (!t) throw Object.assign(new Error('nothing to inherit — this vault has no access token'), { code: 'ENOTOKEN' });
+                return t;
+            }
+            if (spec === 'new') throw Object.assign(new Error("accessToken:'new' not wired yet — use 'inherit' or an explicit token"), { code: 'ENOTIMPL' });
+            if (typeof spec === 'string' && spec) return spec;
+            return null;
+        }
+
         // Thread the access token onto the vault's transport so write PUTs carry
         // x-sgraph-access-token. The VaultDataSource accessKey only flips the `writable`
         // flag; the actual write requests authorise via vault._sgSend.token (read at request
@@ -1031,9 +1085,12 @@
         }
 
         // ── Create a child vault (read-through link / standalone / return-key / seedFrom) ──
-        // opts = { label, link:{path}|false, returnKey:bool, custody:bool(default true), seedFrom }
+        // opts = { label, link:{path}|false, returnKey:bool, custody:bool(default true),
+        //          seedFrom, accessToken:'inherit'|'<explicit>'|undefined }
         // The returned `key` (when requested) is the OPENABLE composed form `passphrase:vault_id`
         // — the bare passphrase has no colon and would fail SGVaultCrypto.parseVaultKey.
+        // accessToken embeds a backend token in the new vault (.vault/access-token.json) so a
+        // key-only link opens it WRITABLE — the token is never put in the link.
         async _createChildVault(opts) {
             opts = opts || {};
             var parentVault = this._vault, sgSend = parentVault && parentVault._sgSend;
@@ -1044,16 +1101,27 @@
             var custody   = opts.custody !== false;                 // default: kernel custodies the key
             if (!wantsLink && !wantsKey && !custody) throw Object.assign(new Error('unreachable vault: needs link, returnKey, or custody'), { code: 'EINVAL' });
 
+            // Resolve the embed token BEFORE creating (fail fast on a bad 'inherit'/'new').
+            var embedToken = opts.accessToken ? this._resolveEmbedToken(opts.accessToken) : null;
+
             var passphrase = this._genVaultPassphrase();            // strong shape; never simple-token
             var child      = await SGVault.create(sgSend, passphrase, { name: label });
             var vaultId    = child._vaultId;
             var key        = child._passphrase + ':' + child._vaultId;   // composed openable key
             var refId      = this._genRefId();
 
+            if (embedToken) {
+                await this._writeEmbeddedAccessToken(child, embedToken, opts.accessToken === 'inherit' ? 'inherit' : 'explicit');
+            }
+
             if (opts.seedFrom) {
                 try { await this._seedVaultTree(child, opts.seedFrom); }
                 catch (e) { console.warn('[app-shell] seedFrom failed:', e && e.message); }
             }
+
+            // Publish the child (embedded token + any seed) to its named ref so a fresh open elsewhere
+            // sees them. _seedVaultTree also pushes; a re-push of the same head is harmless.
+            if (embedToken && typeof child.push === 'function') { try { await child.push(); } catch (_) {} }
 
             var result = { vault_id: vaultId, ref_id: refId };
 
@@ -1077,6 +1145,7 @@
             }
 
             if (wantsKey) result.key = key;                         // raw key returned only on demand
+            result.writable_link = !!embedToken;                    // key-only link opens writable
             return result;
         }
 
@@ -1085,6 +1154,21 @@
             var sec = await this._ownerSecretGet(String(refId));
             if (!sec || !sec.key) throw Object.assign(new Error('no key on file for ' + refId), { code: 'ENOKEY' });
             return { key: sec.key };
+        }
+
+        // Set / rotate the embedded access token of a vault (Q4). ref = a custodied ref_id
+        // (resolved kernel-side via the owner-secret store) or a raw key. value = 'inherit' or an
+        // explicit token. Opens the target writable, writes .vault/access-token.json, pushes.
+        async _setVaultAccessToken(ref, value) {
+            var token = this._resolveEmbedToken(value);
+            if (!token) throw Object.assign(new Error('no token to set'), { code: 'EINVAL' });
+            var key = (ref && String(ref).indexOf(':') > -1) ? String(ref) : null;
+            if (!key) { var sec = await this._ownerSecretGet(String(ref)); key = sec && sec.key; }
+            if (!key) throw Object.assign(new Error('cannot resolve vault for ' + ref), { code: 'ENOKEY' });
+            var target = await SGVault.open(this._vault._sgSend, key);
+            await this._writeEmbeddedAccessToken(target, token, value === 'inherit' ? 'inherit' : 'explicit');
+            if (typeof target.push === 'function') { try { await target.push(); } catch (_) {} }
+            return { set: true, vault_id: target._vaultId };
         }
 
         // Launch a vault as an app. A raw key (contains ':') is used directly; a ref is resolved
@@ -2166,9 +2250,11 @@
                     // sg.vault.* — create / manage child vaults. create(opts) takes an opts object
                     // (matches mount(opts)): { label, link:{path}|false, returnKey, custody, seedFrom }.
                     'vault:{' +
-                      'create:function(opts){opts=opts||{};return _sgCmd("vault",{action:"create",label:opts.label,link:opts.link,returnKey:opts.returnKey,custody:opts.custody,seedFrom:opts.seedFrom});},' +
+                      'create:function(opts){opts=opts||{};return _sgCmd("vault",{action:"create",label:opts.label,link:opts.link,returnKey:opts.returnKey,custody:opts.custody,seedFrom:opts.seedFrom,accessToken:opts.accessToken});},' +
                       // getKey(ref) → {key}: retrieve a custodied key to re-share (always-confirm consent).
                       'getKey:function(ref){return _sgCmd("vault",{action:"getKey",ref:ref});},' +
+                      // setAccessToken(ref,value): embed/rotate a backend token (value="inherit"|"<token>").
+                      'setAccessToken:function(ref,value){return _sgCmd("vault",{action:"setAccessToken",ref:ref,value:value});},' +
                       // openApp(ref,opts): launch a vault as an app. ref = raw key or a custodied ref.
                       'openApp:function(ref,opts){opts=opts||{};return _sgCmd("vault",{action:"openApp",ref:ref,deepLink:opts.deepLink,target:opts.target});},' +
                       // list() → {vaults:[{ref_id,vault_id,label,tier}]}: roster of managed vaults.
@@ -2617,7 +2703,8 @@
                             var cLinkPath  = (cLink && cLink.path != null) ? AppPermissions.normalizePath(cLink.path) : '';
                             var cReturnKey = e.data.returnKey === true;
                             var cOpts = { label: String(e.data.label || 'vault'), link: cLink,
-                                          returnKey: cReturnKey, custody: e.data.custody !== false, seedFrom: e.data.seedFrom };
+                                          returnKey: cReturnKey, custody: e.data.custody !== false, seedFrom: e.data.seedFrom,
+                                          accessToken: e.data.accessToken };
                             // gate: linked create needs vault.create on the path; standalone needs vault.standalone
                             if (cLink && cLink.path != null) {
                                 if (!self._can('vault.create', cLinkPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'EPERM' }); return; }
@@ -2628,6 +2715,10 @@
                             if (cReturnKey) {
                                 var keyOk = (cLink && cLink.path != null) ? self._can('vault.createKey', cLinkPath) : self._can('vault.standalone', '');
                                 if (!keyOk) { cmdReply(false, null, 'Permission denied (createKey)'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'EPERM' }); return; }
+                            }
+                            // gate: embedding a backend access token needs vault.embedAccessToken
+                            if (cOpts.accessToken) {
+                                if (!self._can('vault.embedAccessToken', cLinkPath)) { cmdReply(false, null, 'Permission denied (embedAccessToken)'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'EPERM' }); return; }
                             }
                             // gate: seedFrom (skip for raw keys — possession is authority, Q4)
                             if (cOpts.seedFrom && String(cOpts.seedFrom).indexOf(':') === -1) {
@@ -2640,7 +2731,7 @@
                                 if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'ECONSENT' }); return; }
                                 return self._createChildVault(cOpts).then(function (res) {
                                     cmdReply(true, res);
-                                    self._emitBridgeCall('vault.create', { path: cLinkPath, ok: true, vault_id: res.vault_id, returnedKey: !!res.key, custody: cOpts.custody });   // NEVER log the key
+                                    self._emitBridgeCall('vault.create', { path: cLinkPath, ok: true, vault_id: res.vault_id, returnedKey: !!res.key, custody: cOpts.custody, writableLink: !!res.writable_link });   // NEVER log the key/token
                                 });
                             }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: err.message }); });
                             return;
@@ -2669,6 +2760,17 @@
                             self._listChildVaults()
                                 .then(function (res) { cmdReply(true, { vaults: res }); self._emitBridgeCall('vault.list', { ok: true, count: res.length }); })
                                 .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.list', { ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'setAccessToken') {
+                            var stRef = String(e.data.ref || '');
+                            if (!self._can('vault.embedAccessToken', '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.setAccessToken', { ref: stRef, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.embedAccessToken', stRef).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.setAccessToken', { ref: stRef, ok: false, err: 'ECONSENT' }); return; }
+                                return self._setVaultAccessToken(stRef, e.data.value).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.setAccessToken', { ref: stRef, ok: true });   // NEVER log the token
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.setAccessToken', { ref: stRef, ok: false, err: err.message }); });
                             return;
                         }
                         if (vAct === 'unlink') {
