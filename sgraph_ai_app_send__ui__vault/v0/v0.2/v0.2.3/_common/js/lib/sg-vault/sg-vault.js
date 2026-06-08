@@ -209,6 +209,21 @@ class SGVault {
     get writeKeyHex() { return this._writeKey || null   }   // hex string (owner-secret store input); null in RO sessions
     get aheadOf()   { return this._namedHeadId          }
 
+    // Raw bytes of the read_key — needed to derive the inbox enum_key
+    // (enum_key = SHA256("sg-inbox-enum:" || read_key_bytes)). The read_key is
+    // imported extractable in the owner paths (deriveKeys / deriveKeysFromSimpleToken),
+    // so export succeeds; RO opens import it non-extractable, so this returns null and
+    // inbox enumeration is owner-only until an RO derivation path is added.
+    async readKeyRawBytes() {
+        if (!this._readKey) return null
+        try {
+            const raw = await crypto.subtle.exportKey('raw', this._readKey)
+            return new Uint8Array(raw)                                            // a fresh copy — callers may not mutate the key
+        } catch (_) {
+            return null                                                           // non-extractable (RO session)
+        }
+    }
+
     async setName(newName) {
         if (!this._settings) throw new Error('Vault not initialized')
         if (this._settings.vault_name === newName) return     // no-op rename
