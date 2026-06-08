@@ -63,6 +63,47 @@ class SGVaultObjectStore {
         this._sgSend  = sgSend
         this._vaultId = vaultId
         this._writeKey = writeKey
+        this._batch   = null                                                     // write-buffer (array) when a batch scope is open
+    }
+
+    // --- Write-batch scope (collapse a commit's PUTs into one POST /batch) --------
+    //
+    // A commit emits many writes — blob + tree + commit objects + clone/named refs +
+    // branch index. As individual PUTs each is a non-simple cross-origin request, so the
+    // browser sends a CORS preflight FIRST, and each object URL is unique (content-addressed)
+    // so the preflight can never be cached. Batching them into one POST to the FIXED url
+    // `…/batch/{vault_id}` turns N PUTs (+N preflights) into 1 POST (+1 preflight that DOES
+    // cache via Access-Control-Max-Age). Re-entrant: nested begin/flush share the outermost
+    // scope so an addFile's blob and the _commit it triggers land in a single batch.
+    get batching() { return Array.isArray(this._batch) }
+
+    beginBatch() { if (!this._batch) this._batch = [] }
+
+    // Stage a raw write (objects via store(), refs/index via the ref manager). filePath is the
+    // server file_id (e.g. bare/data/obj-…, bare/refs/ref-…). bytes is a Uint8Array/ArrayBuffer.
+    _stage(filePath, bytes) {
+        const u8 = bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes
+        this._batch.push({ filePath, bytes: u8 })
+    }
+
+    discardBatch() { this._batch = null }
+
+    async flushBatch() {
+        const staged = this._batch
+        this._batch = null
+        if (!staged || !staged.length) return
+        // Ordering is a correctness requirement: a ref/index must never be written before the
+        // object it points at. Objects (bare/data/) first, then indexes, then refs. The server
+        // processes batch ops in array order; vaultBatch chunks at 50 preserving order.
+        const rank = (p) => p.startsWith('bare/data/') ? 0 : (p.startsWith('bare/indexes/') ? 1 : 2)
+        staged.sort((a, b) => rank(a.filePath) - rank(b.filePath))
+        const ops = staged.map(s => ({ op: 'write', file_id: s.filePath, data: SGVaultObjectStore._abToB64(s.bytes) }))
+        await this._sgSend.vaultBatch(this._vaultId, this._writeKey, ops)
+        // Populate the imm cache only AFTER a successful flush (so the cache reflects server truth).
+        for (const s of staged) {
+            const id = s.filePath.startsWith('bare/data/') ? s.filePath.slice('bare/data/'.length) : ''
+            if (id.includes('-imm-')) this._cachePut(id, s.filePath, s.bytes.buffer.slice(s.bytes.byteOffset, s.bytes.byteOffset + s.bytes.byteLength))
+        }
     }
 
     // --- Cache helpers (Cache API, imm blocks only) ------------------------------
@@ -132,7 +173,13 @@ class SGVaultObjectStore {
     async store(ciphertext) {
         const objectId = await this.computeObjectId(ciphertext)
         const filePath = `bare/data/${objectId}`
-        await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, new Uint8Array(ciphertext))
+        const bytes    = new Uint8Array(ciphertext)
+        if (this.batching) {
+            this._stage(filePath, bytes)                                         // one POST /batch at flush time
+            return objectId                                                      // id is the content hash — no network needed
+        }
+        await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, bytes)
+        await this._cachePut(objectId, filePath, ciphertext)                      // serve our own write back from cache
         return objectId
     }
 
@@ -231,5 +278,13 @@ class SGVaultObjectStore {
         const bytes = new Uint8Array(bin.length)
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
         return bytes.buffer
+    }
+
+    // ArrayBuffer/Uint8Array → base64 (for batch write op `data`)
+    static _abToB64(buf) {
+        const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf
+        let binary = ''
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+        return btoa(binary)
     }
 }
