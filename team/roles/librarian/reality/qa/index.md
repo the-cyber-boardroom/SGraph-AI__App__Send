@@ -1,6 +1,6 @@
 # QA — Reality Index
 
-**Domain:** qa/ | **Last updated:** 2026-06-05 | **Maintained by:** Librarian (daily run)
+**Domain:** qa/ | **Last updated:** 2026-06-08 | **Maintained by:** Librarian (daily run)
 
 This domain covers the test suite, QA infrastructure (browser automation, Playwright), and test strategy. SGraph Send uses an all-real-implementations philosophy: no mocks, no patches. The full stack starts in-memory in ~100ms.
 
@@ -97,7 +97,15 @@ Run with: `bash tests/unit/vault_ui/loader/run-all.sh`
 | `test__app_hud_config.js` | 31 | `AppHudConfig.resolve()` — per-mode defaults, explicit overrides, sovereignty-rail constraints |
 | `test__app_shell_nav_helpers.js` | 47 | `AppNavHelpers` deep-link routing (DM1–DM11), path resolution, history management |
 
-**Browser Integration Tests — Python + Playwright (added 2026-05-31):**
+**Vault-Embed protocol (added 2026-06-07, commit `3b30347`):**
+
+| File | Assertions | What It Tests |
+|------|-----------|---------------|
+| `test__embed_protocol.js` | 37 | `EmbedProtocol` module: `isEmbedMode` (legal/illegal query strings), `getExpectedParentOrigin` (empty/null/literal), `validateSource` (source-window/origin/sibling/null-origin — 8 scenarios), `parseOpenMessage` (valid/missing-field/wrong-type/wrong-sg — 13 scenarios), `readyMessage` and `vaultReadyMessage` (version constant + coercion) |
+
+`run-all.sh` suite total after adding embed_protocol: **~113 assertions** (was ~76 before).
+
+**Browser Integration Tests — Python + Playwright (added 2026-05-31, extended 2026-06-07):**
 
 Exercises a real local file server + headless Chromium + sgit-ai. End-to-end coverage of live-vault scenarios not reachable by Node/jsdom tests.
 
@@ -106,6 +114,19 @@ Exercises a real local file server + headless Chromium + sgit-ai. End-to-end cov
 | `tests/integration/vault_ui/browser/test__harness_smoke.py` | 3 | Harness boots, vault server responds, Playwright connects |
 | `tests/integration/vault_ui/browser/test__app_mode_deep_link.py` | 1 | Deep-link HTML fix: CSS/JS loads correctly in a real browser |
 | `tests/integration/vault_ui/browser/test__sgit_round_trip.py` | 1 | sgit-ai round-trip: create vault, modify, push, verify browser sees update |
+| `tests/integration/vault_ui/browser/test__embed_handshake.py` | 4 | Vault-embed handshake (full protocol + storage isolation + deep-link memory path + sandboxed iframe vault-open) |
+
+**Total browser integration: 8 tests, ~16–20s.**
+
+Key assertions in `test__embed_handshake.py`:
+- Full handshake: `vault-embed-ready` fired, `vault-ready` payload shape verified
+- App frame content rendered (proves key actually opened the vault)
+- `sg-vault-key` NOT in localStorage OR sessionStorage of the iframe (security assertion — caught a real leak during initial implementation)
+- Deep-link content check: `EMBEDDED_PATIENT` rendered (not default `EMBEDDED_OK`)
+- Sandboxed iframe (sandbox=`allow-scripts`, no `allow-same-origin`): `vault-ready` fires; `typeof caches` throws (precondition pinned); verified to FAIL pre-fix
+
+QA brief: `team/comms/qa/briefs/06/01/brief__vault-test-embed-handshake.md` (manual testing checklist for the test-vault-creator agent role)
+Caches guard brief: `team/comms/qa/briefs/06/07/brief__embed_caches_object_store_guard.md` (triggered `d5f6f0a` fix)
 
 Base class: `tests/integration/vault_ui/browser/_browser_harness.py` (193 lines) — `self._sgit()`, `self._new_vault_key()`, `self.create_seeded_vault(files)` shared helpers.
 
