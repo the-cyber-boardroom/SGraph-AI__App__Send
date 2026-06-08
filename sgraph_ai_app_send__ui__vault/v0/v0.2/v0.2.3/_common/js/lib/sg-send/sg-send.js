@@ -139,10 +139,18 @@ class SGSend {
 
     async vaultRead(vaultId, fileId) {
         const url      = `${this.endpoint}/api/vault/read/${vaultId}/${fileId}`
-        // cache: 'no-store' — refs are mutable server-side (overwritten by every push). The browser's
-        // default heuristic freshness would otherwise serve a stale ref ciphertext from disk cache,
-        // causing the Files panel to render a previous commit's tree after a Cmd-R reload.
-        const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' })     // No auth required (zero-knowledge)
+        // Immutable objects (obj-cas-imm-*, key-rnd-imm-*) never change → allow the browser HTTP
+        // cache (use the default mode). This persists across reloads EVEN in null-origin sandboxed
+        // iframes, where the Cache API / localStorage / IndexedDB are all unavailable — the HTTP
+        // cache is browser-managed and not gated by origin-storage permissions. Needs the server to
+        // send a cacheable response for these paths (recommended: `Cache-Control: public, max-age=
+        // 31536000, immutable`); without it the browser may still heuristically cache.
+        // Everything else (mutable refs ref-pid-*, indexes idx-pid-*) MUST stay no-store, or a
+        // Cmd-R reload would render a previous commit's tree from a stale ref ciphertext.
+        const isImmutable = typeof fileId === 'string' && fileId.includes('-imm-')
+        const fetchOpts   = isImmutable ? { method: 'GET', mode: 'cors' }
+                                        : { method: 'GET', mode: 'cors', cache: 'no-store' }
+        const response = await fetch(url, fetchOpts)     // No auth required (zero-knowledge)
         if (response.status === 404) return null
         if (!response.ok) {
             const detail = await response.text().catch(() => response.statusText)

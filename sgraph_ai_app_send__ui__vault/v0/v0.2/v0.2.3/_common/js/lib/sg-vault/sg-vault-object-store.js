@@ -25,6 +25,38 @@
 const SG_VAULT_CACHE_NAME = 'sg-vault-blocks'
 const SG_VAULT_CACHE_URL  = 'https://sgvault/'   // synthetic scheme — not a real network request
 
+// --- In-memory imm-block cache (universal tier) ----------------------------------
+// The Cache API tier below is PERSISTENT but unavailable in null-origin sandboxed
+// iframes (`sandbox="allow-scripts"` with no `allow-same-origin`) — `caches`,
+// `localStorage`, and `indexedDB` all throw/are absent there. The ViV kernel and
+// embedded apps run in exactly that context, so the Cache API tier is inert for them
+// and every imm read re-hit the network. This in-memory Map needs no storage API, so
+// it works EVERYWHERE (including null-origin). It is session-scoped (cleared on reload)
+// and content-addressed-safe (imm objectId = SHA256(ciphertext), so a key never maps to
+// stale bytes). Module-level: shared across object-store instances, byte-capped LRU.
+const SG_MEM_CACHE      = new Map()                 // "vaultId/filePath" → ArrayBuffer
+const SG_MEM_MAX_BYTES  = 64 * 1024 * 1024          // 64 MB ceiling (oldest evicted first)
+let   SG_MEM_BYTES      = 0
+
+function _sgMemGet(key) {
+    const ab = SG_MEM_CACHE.get(key)
+    if (ab === undefined) return null
+    SG_MEM_CACHE.delete(key); SG_MEM_CACHE.set(key, ab)   // LRU touch (move to newest)
+    return ab.slice(0)                                     // copy: callers may transfer/detach
+}
+function _sgMemPut(key, ab) {
+    if (!ab || typeof ab.byteLength !== 'number') return
+    if (ab.byteLength > SG_MEM_MAX_BYTES) return          // single block too big to cache
+    if (SG_MEM_CACHE.has(key)) { SG_MEM_BYTES -= SG_MEM_CACHE.get(key).byteLength; SG_MEM_CACHE.delete(key) }
+    const copy = ab.slice(0)
+    SG_MEM_CACHE.set(key, copy); SG_MEM_BYTES += copy.byteLength
+    while (SG_MEM_BYTES > SG_MEM_MAX_BYTES && SG_MEM_CACHE.size) {
+        const oldest = SG_MEM_CACHE.keys().next().value
+        SG_MEM_BYTES -= SG_MEM_CACHE.get(oldest).byteLength
+        SG_MEM_CACHE.delete(oldest)
+    }
+}
+
 class SGVaultObjectStore {
 
     constructor(sgSend, vaultId, writeKey) {
@@ -38,11 +70,20 @@ class SGVaultObjectStore {
     _cacheKey(filePath) {
         return SG_VAULT_CACHE_URL + this._vaultId + '/' + filePath
     }
+    _memKey(filePath) {
+        return this._vaultId + '/' + filePath
+    }
 
     async _cacheGet(objectId, filePath) {
         // -muw- (mutable) objects bypass the cache entirely — short-circuit before
-        // touching `caches` so we don't pay the feature-detect cost on every read.
+        // touching any cache so we don't pay the feature-detect cost on every read.
         if (!objectId.includes('-imm-')) return null
+
+        // Tier 1: in-memory (works EVERYWHERE incl. null-origin sandboxed iframes).
+        const mem = _sgMemGet(this._memKey(filePath))
+        if (mem) return mem
+
+        // Tier 2: Cache API (persistent, but unavailable in null-origin sandboxes).
         try {
             // `typeof caches` is NOT a safe probe for the sandboxed-context case:
             // in an iframe without `allow-same-origin`, `window.caches` is a defined
@@ -54,13 +95,20 @@ class SGVaultObjectStore {
             if (typeof caches === 'undefined') return null
             const cache = await caches.open(SG_VAULT_CACHE_NAME)
             const hit   = await cache.match(this._cacheKey(filePath))
-            if (hit) return hit.arrayBuffer()
+            if (hit) {
+                const ab = await hit.arrayBuffer()
+                _sgMemPut(this._memKey(filePath), ab)   // promote into the fast in-memory tier
+                return ab
+            }
         } catch (_) { /* sandboxed / unavailable — fall through to network */ }
         return null
     }
 
     async _cachePut(objectId, filePath, data) {
         if (!objectId.includes('-imm-')) return
+        // Tier 1: in-memory — always (the only tier that works in null-origin iframes).
+        _sgMemPut(this._memKey(filePath), data)
+        // Tier 2: Cache API — persistent, best-effort.
         try {
             if (typeof caches === 'undefined') return     // sandbox-safe; see _cacheGet
             const cache = await caches.open(SG_VAULT_CACHE_NAME)
@@ -74,6 +122,9 @@ class SGVaultObjectStore {
             )
         } catch (_) { /* quota exceeded or storage unavailable — ignore */ }
     }
+
+    // Test/diagnostic accessor for the module-level in-memory cache.
+    static _memStats() { return { entries: SG_MEM_CACHE.size, bytes: SG_MEM_BYTES } }
 
     // --- Store an encrypted blob, return its content-addressed ID ----------------
     //     Stored at bare/data/{objectId} on server

@@ -80,6 +80,9 @@ class SGVault {
         // Point named ref at the same commit so ahead count starts at 0
         await vault._refManager.writeRef(vault._refFileId, vault._headCommitId)
         vault._namedHeadId = vault._headCommitId
+        // Write a single-branch index so the vault is immediately clonable by the sgit CLI
+        // (web vaults previously never wrote one → "No branch index found" on clone). Best-effort.
+        try { await vault._refManager.writeBranchIndex(vault._branchIndexFileId, vault._refFileId) } catch (_) {}
 
         return vault
     }
@@ -168,7 +171,23 @@ class SGVault {
 
         // Clone ref created lazily on first commit; 404 is expected on read-only open
         const cloneCommitId = await vault._refManager.readRef(vault._cloneRefFileId)
-        vault._headCommitId = cloneCommitId || namedCommitId
+
+        // Reconcile-on-open (CLI interop): the named ref is canonical. If the clone branch is
+        // CLEANLY BEHIND the named head (clone is a strict ancestor of named — e.g. the CLI or
+        // another session published while this clone sat still), load the NAMED head, not the
+        // stale clone. This is the bug the CLI team flagged: `cloneCommitId || namedCommitId`
+        // pinned every web open to the clone branch once any web commit existed, silently
+        // shadowing CLI pushes. We only fast-forward the VIEW — we do NOT rewrite the clone ref
+        // here (no access token yet at open time; the next commit naturally advances it from the
+        // named head). Diverged / clone-ahead cases keep the clone head so unpushed web edits are
+        // never lost — the shell surfaces the divergence.
+        let head = cloneCommitId || namedCommitId
+        if (cloneCommitId && namedCommitId && cloneCommitId !== namedCommitId) {
+            let cleanBehind = false
+            try { cleanBehind = await vault._isAncestor(cloneCommitId, namedCommitId) } catch (_) {}
+            if (cleanBehind) head = namedCommitId
+        }
+        vault._headCommitId = head
 
         await vault._loadTreeFromCommit(vault._headCommitId)
 
