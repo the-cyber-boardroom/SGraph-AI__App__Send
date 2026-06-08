@@ -96,7 +96,9 @@ kernel bridge, gated by `app.json` grants. Code: `app-shell.js` (`_createChildVa
 | `sg.vault.delete(ref)` — key custody solved; **server teardown pending** `SGVault.destroy()` | **PARTIAL** | `_deleteChildVault` returns `server_teardown:false` until the endpoint ships |
 | `sg.vault.seedFrom` — copy a template tree into the new vault (skips `.vault/**`) | **EXISTS** | `_seedVaultTree`/`_collectTree` |
 | **Embedded access token** — `create({accessToken:'inherit'\|'<token>'})` writes `.vault/access-token.json` (floored, read_key-encrypted) so a **key-only link opens WRITABLE**; token never in the URL. `accessToken:'new'` → ENOTIMPL (mint endpoint = separate workflow). `sg.vault.setAccessToken(ref,value)` rotates it. Embedded token wins over the localStorage cache at open. | **EXISTS** | `_readEmbeddedAccessToken`/`_writeEmbeddedAccessToken`/`_resolveEmbedToken`/`_setVaultAccessToken` |
-| New grants: `vault.createKey`/`standalone`/`seedFrom`/`openApp`/`embedAccessToken` (default-deny; `createKey` stronger than `create`) | **EXISTS** | `app-permissions.js` (25 tests) |
+| New grants: `vault.createKey`/`standalone`/`seedFrom`/`openApp`/`embedAccessToken` (default-deny; `createKey` stronger than `create`) | **EXISTS** | `app-permissions.js` (30 tests) |
+| **Per-verb consent policy** — `app.json` `permissions.consent[verb]` = `always`/`once`/`auto`; tunes (never grants) the HUD confirmation. Default unchanged: always-confirm for createKey/delete. Lets a trusted app disable repeated prompts. | **EXISTS** | `_consentPolicy`/`_consent` |
+| HUD consent banner ellipsizes (no overflow over title/buttons); message shortened, ref-id hidden | **EXISTS** | `app-hud.js` CSS |
 | `sg.vault.mount({mode:'rw'})` writable mount | **PROPOSED** | separate brief `team/comms/briefs/06/08/v0.33.5__brief__vault-writable-mount.md` |
 
 Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.

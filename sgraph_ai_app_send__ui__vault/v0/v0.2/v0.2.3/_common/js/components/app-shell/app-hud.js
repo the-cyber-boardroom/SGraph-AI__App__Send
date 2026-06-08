@@ -214,13 +214,16 @@
 
         static _consentLabel(verb, path) {
             const map = {
-                'vault.create':    'create a vault',
-                'vault.createKey': 'create a vault and receive its full key',
-                'vault.delete':    'permanently delete a vault',
-                'vault.unlink':    'unlink a vault'
+                'vault.create':           'create a vault',
+                'vault.createKey':        'create a vault and receive its key',
+                'vault.delete':           'permanently delete a vault',
+                'vault.unlink':           'unlink a vault',
+                'vault.embedAccessToken': 'embed an access token in a vault'
             };
             const what = map[verb] || ('use ' + verb);
-            return 'This app wants to ' + what + (path ? ' in “' + path + '”' : '') + '.';
+            // Only show the location for real folder paths — a ref id (e.g. "lk-abc…") is noise.
+            const showPath = path && path.indexOf('/') > -1;
+            return 'This app wants to ' + what + (showPath ? ' in “' + path + '”' : '') + '.';
         }
 
         // Clicking the privileges chip opens the (minimal) permissions panel: the manifest grants
@@ -514,8 +517,8 @@
             background: #12122a; border-bottom: 1px solid #2a2a4a;
         }
         .hud-left  { display: flex; align-items: center; gap: 0.625rem; min-width: 0; }
-        .hud-center { flex: 1; display: flex; align-items: center; justify-content: center; }
-        .hud-right { display: flex; align-items: center; gap: 0.5rem; }
+        .hud-center { flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; }
+        .hud-right { display: flex; align-items: center; gap: 0.5rem; flex: 0 0 auto; }
         .hud-brand { font-weight: 700; font-size: 1rem; color: #e2e8f0; white-space: nowrap; }
         .hud-slash { color: #4ECDC4; }
         .hud-vault-badge {
@@ -571,8 +574,9 @@
             border: 1px solid rgba(233,196,69,0.3); white-space: nowrap; font-family: monospace; cursor: pointer;
         }
         .hud-privs-chip:hover { border-color: #E9C445; }
-        .hud-consent { display: inline-flex; align-items: center; gap: 0.5rem; }
-        .hud-consent-text { font-size: 0.8rem; color: #e2e8f0; }
+        .hud-consent { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; max-width: 100%; }
+        .hud-consent-text { font-size: 0.8rem; color: #e2e8f0; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hud-consent-allow, .hud-consent-deny { flex: 0 0 auto; }
         .hud-consent-allow, .hud-consent-deny {
             font-size: 0.75rem; padding: 0.2rem 0.7rem; border-radius: 4px; cursor: pointer;
             border: 1px solid #2a2a4a; background: transparent; white-space: nowrap;

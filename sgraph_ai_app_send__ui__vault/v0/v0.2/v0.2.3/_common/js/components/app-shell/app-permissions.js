@@ -84,11 +84,31 @@
     // Parse app.json.permissions into a normalised shape. Defensive: missing/junk blocks
     // collapse to deny-all-mutations (reads still follow READ_DEFAULT). `fs.read` absent is
     // kept as undefined so `can` can apply the default; present-but-false denies reads.
+    // Consent policy per verb (how the HUD confirmation behaves). Declared by the app's author
+    // in app.json — the same trust boundary as the grants themselves. Values:
+    //   'always' — re-confirm every time (default for createKey/delete; never cached)
+    //   'once'   — prompt once per (vault, app, verb), then remember
+    //   'auto'   — never prompt (trust the grant alone). For high-privilege verbs this is a
+    //              deliberate "I trust this app" choice by whoever authored the manifest.
+    // Anything malformed → undefined (callers fall back to the per-verb default).
+    function _consentPolicy(c) {
+        var out = {};
+        if (c && typeof c === 'object') {
+            for (var k in c) {
+                if (!Object.prototype.hasOwnProperty.call(c, k)) continue;
+                var v = c[k];
+                if (v === 'always' || v === 'once' || v === 'auto') out[k] = v;
+            }
+        }
+        return out;
+    }
+
     function parsePermissions(appJson) {
         var p     = (appJson && appJson.permissions) || {};
         var fs    = (p.fs    && typeof p.fs    === 'object') ? p.fs    : {};
         var vault = (p.vault && typeof p.vault === 'object') ? p.vault : {};
         return {
+            consent: _consentPolicy(p.consent),
             fs: {
                 read:  ('read' in fs) ? _grant(fs.read) : undefined,
                 write:  _grant(fs.write),
