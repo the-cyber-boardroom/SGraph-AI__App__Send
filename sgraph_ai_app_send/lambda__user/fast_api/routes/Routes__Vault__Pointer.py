@@ -129,8 +129,18 @@ class Routes__Vault__Pointer(Fast_API__Routes):                                 
         if payload is None:
             raise HTTPException(status_code = 404,
                                 detail      = 'Vault file not found')
-        return Response(content    = payload                    ,
-                        media_type = 'application/octet-stream')
+        # Immutable objects (obj-cas-imm-*, key-rnd-imm-*) are content-addressed and never
+        # change → let the browser HTTP cache keep them forever. This is the ONLY cache tier
+        # that survives a reload in null-origin sandboxed iframes (Cache API / localStorage /
+        # IndexedDB are all unavailable there). Mutable refs/indexes must never be cached, or a
+        # reload would render a previous commit's tree from a stale ref ciphertext.
+        if '-imm-' in str(file_id):
+            cache_control = 'public, max-age=31536000, immutable'
+        else:
+            cache_control = 'no-store'
+        return Response(content    = payload                          ,
+                        media_type = 'application/octet-stream'       ,
+                        headers    = {'Cache-Control': cache_control} )
 
     @route_path('/read-base64/{vault_id}/{file_id:path}')
     def read_base64__vault_id__file_id(self, vault_id : Safe_Str__Id,           # GET /vault/{vault_id}/read-base64/{file_id:path} — JSON-safe base64 read
