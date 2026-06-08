@@ -34,7 +34,18 @@
             this._autoSyncCheckPending = false;
             this._lastBehindCheckTime  = 0;
             this._behindCheckTimer     = null;
-            this._visibilityHandler    = () => { if (!document.hidden) this._scheduleBehindCheck(500); };
+            // Inbox check-on-events (no polling) — mirrors the behind-check machinery.
+            // Dormant until the owner enables the inbox (config.enabled), so vaults
+            // without an inbox never hit the server or surface errors.
+            this._inboxChecker         = null;
+            this._inboxConfig          = { enabled: false, auto_fetch: false };
+            this._lastInboxCheckTime   = 0;
+            this._inboxCheckTimer      = null;
+            this._visibilityHandler    = () => {
+                if (document.hidden) return;
+                this._scheduleBehindCheck(500);
+                this._scheduleInboxCheck(500);
+            };
         }
 
         connectedCallback() {
@@ -53,6 +64,7 @@
         disconnectedCallback() {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
             clearTimeout(this._behindCheckTimer);
+            clearTimeout(this._inboxCheckTimer);
         }
 
         // --- Render ---------------------------------------------------------------
@@ -252,6 +264,12 @@
             // Check server for upstream changes shortly after open
             this._scheduleBehindCheck(1500);
 
+            // Build the inbox checker for this vault and run one check on open. It is a
+            // no-op while config.enabled is false (the default until the owner turns the
+            // inbox on in Settings — see C5), so this never touches the server for vaults
+            // that have no inbox configured.
+            await this._initInbox(vault);
+
             // Ensure files view is active
             this._switchView('files');
 
@@ -265,6 +283,9 @@
             this._vaultKey  = '';
             this._accessKey = '';
             this._isROMode  = false;
+            clearTimeout(this._inboxCheckTimer);
+            this._inboxChecker = null;
+            this._inboxConfig  = { enabled: false, auto_fetch: false };
 
             this.querySelector('.vs-shell').style.display  = 'none';
             this.querySelector('.vs-entry').style.display   = '';
@@ -716,6 +737,46 @@
             } catch (_) { /* silent — network errors don't need user notification */ } finally {
                 header?.setCheckBusy(false);
             }
+        }
+
+        // --- Inbox check (check-on-events, no polling) ---------------------------------
+
+        // Build an SGInbox + SGInboxChecker for the open vault. enum_key is derived from
+        // the read_key's raw bytes (owner sessions only — RO sessions get a null enum_key
+        // and the checker stays effectively idle). Config persistence + the enable toggle
+        // live in Settings (C5); until then this is dormant (config.enabled = false).
+        async _initInbox(vault) {
+            this._inboxChecker = null;
+            if (typeof SGInbox === 'undefined' || typeof SGInboxChecker === 'undefined') return;
+            try {
+                const sgSend   = vault._sgSend || null;
+                const endpoint = (sgSend && sgSend.endpoint) || '';
+                const rawBytes = await vault.readKeyRawBytes();
+                const enumKey  = rawBytes ? await SGInbox.deriveEnumKey(rawBytes) : null;
+                const inbox    = new SGInbox({
+                    endpoint,
+                    vaultId    : vault.vaultId,
+                    enumKey,
+                    writeKeyHex: vault.writeKeyHex,
+                    accessToken: (sgSend && sgSend.token) || this._accessKey || null
+                });
+                this._inboxChecker = new SGInboxChecker(inbox, window.sgraphVault.events, () => this._inboxConfig);
+                // One check on open (no-op while disabled).
+                this._scheduleInboxCheck(0, 'vault-open');
+            } catch (_) { /* inbox is best-effort; never block vault open */ }
+        }
+
+        _scheduleInboxCheck(delayMs, trigger) {
+            if (!this._inboxChecker) return;
+            const DEBOUNCE_MS = 1000;                                            // shorter floor than the behind-check: inbox list is cheap
+            const since = Date.now() - this._lastInboxCheckTime;
+            const wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
+            const label = trigger || 'visibility';
+            clearTimeout(this._inboxCheckTimer);
+            this._inboxCheckTimer = setTimeout(() => {
+                this._lastInboxCheckTime = Date.now();
+                if (this._inboxChecker) this._inboxChecker.check(label);
+            }, Math.max(0, wait));
         }
 
         // --- Auto-sync (activity-triggered, no polling) --------------------------------
