@@ -111,6 +111,19 @@ Closes two `sgit`-CLI-team briefs about web↔CLI two-ref-model interop.
 | Branch-index path already aligned (`bare/indexes/`, not the CLI brief's feared `bare/idx/`) | **EXISTS** | `sg-vault-ref-manager.js` |
 
 The web writes the index pointing at the **named** ref only (never the clone ref), so the CLI keeps cloning the canonical published branch. Brief responses: `team/comms/briefs/06/08/v0.33.5__brief__cli-interop-branch-index-and-reconcile.md`.
+
+### Immutable-block caching in null-origin iframes (v0.33.5, 2026-06-08)
+
+The Cache-API imm-block cache (`sg-vault-blocks`) is **inert in null-origin sandboxed iframes**
+(the ViV kernel / embed context) — `caches`, `localStorage`, `indexedDB` all throw/are absent
+there, so every imm read re-hit the network. Added a universal tier + HTTP-cache cooperation:
+
+| Tier | Status | Notes |
+|------|--------|-------|
+| In-memory imm cache (module-level Map, 64 MB LRU) in `SGVaultObjectStore` | **EXISTS** | Works EVERYWHERE incl. null-origin; session-scoped; promotes Cache-API hits; content-addressed-safe. Tests: `test__object_store_mem_cache.js` (7) |
+| Cache API tier (`sg-vault-blocks`) | EXISTS (unchanged) | Persistent where available; bypassed in sandboxes |
+| `vaultRead` allows HTTP caching for `-imm-` GETs (keeps `no-store` for refs) | **EXISTS** | Browser HTTP cache survives reload even in null-origin (not storage-gated) |
+| Server sends `Cache-Control: public, max-age=31536000, immutable` for `-imm-` reads (`no-store` for refs) | **EXISTS** | `Routes__Vault__Pointer.read__vault_id__file_id`; tests `test_Routes__Vault__Pointer.py` (+2) |
 | `sg.vault.mount({mode:'rw'})` writable mount | **PROPOSED** | separate brief `team/comms/briefs/06/08/v0.33.5__brief__vault-writable-mount.md` |
 
 Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.
