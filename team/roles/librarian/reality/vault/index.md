@@ -135,6 +135,22 @@ there, so every imm read re-hit the network. Added a universal tier + HTTP-cache
 | Cache API tier (`sg-vault-blocks`) | EXISTS (unchanged) | Persistent where available; bypassed in sandboxes |
 | `vaultRead` allows HTTP caching for `-imm-` GETs (keeps `no-store` for refs) | **EXISTS** | Browser HTTP cache survives reload even in null-origin (not storage-gated) |
 | Server sends `Cache-Control: public, max-age=31536000, immutable` for `-imm-` reads (`no-store` for refs) | **EXISTS** | `Routes__Vault__Pointer.read__vault_id__file_id`; tests `test_Routes__Vault__Pointer.py` (+2) |
+
+### Batched commit writes — one POST /batch instead of N preflighted PUTs (v0.33.5, 2026-06-08)
+
+A commit/push emitted ~5 separate PUTs (blob, tree, commit, clone-ref, named-ref + index), each a
+CORS-preflighted, unique-URL (uncacheable) request → ~half of a one-message send was OPTIONS rows.
+
+| Change | Status | Evidence |
+|--------|--------|---------|
+| Transparent write-batch scope on `SGVaultObjectStore` (`beginBatch`/`flushBatch`/`discardBatch`/`batching`/`_stage`); `store()` stages when batching | **EXISTS** | `sg-vault-object-store.js`; tests `test__write_batch.js` (15) |
+| `SGVaultRefManager.writeRef`/`writeBranchIndex` join the active batch (objectStore ref) | **EXISTS** | `sg-vault-ref-manager.js` |
+| Re-entrant `SGVault._withBatch`; `_commit`, `create`, `push`, `addFile`/`addFiles`/`updateFile` wrapped → each logical write = ONE `POST /api/vault/batch/{vault_id}` | **EXISTS** | `sg-vault.js`, `sg-vault--sync.js`, `sg-vault--file-ops.js` |
+| Ordering: objects → indexes → refs within the batch (a ref never precedes its target) | **EXISTS** | `flushBatch` sort; test asserts ordering |
+
+Reuses the existing write-capable batch endpoint (`Service__Vault__Pointer.batch`); no backend change.
+The fixed batch URL makes the single preflight cacheable. Architect spec + debrief:
+`team/roles/architect/reviews/06/08/v0.33.5__architect-spec__batched-commit-writes.md`.
 | `sg.vault.mount({mode:'rw'})` writable mount | **PROPOSED** | separate brief `team/comms/briefs/06/08/v0.33.5__brief__vault-writable-mount.md` |
 
 Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.

@@ -15,11 +15,21 @@
 
 class SGVaultRefManager {
 
-    constructor(sgSend, vaultId, writeKey, readKey) {
-        this._sgSend   = sgSend
-        this._vaultId  = vaultId
-        this._writeKey = writeKey
-        this._readKey  = readKey
+    constructor(sgSend, vaultId, writeKey, readKey, objectStore = null) {
+        this._sgSend      = sgSend
+        this._vaultId     = vaultId
+        this._writeKey    = writeKey
+        this._readKey     = readKey
+        this._objectStore = objectStore       // when set + batching, ref writes JOIN the commit batch
+    }
+
+    // Stage into the object store's active batch (one POST /batch) if one is open, else PUT now.
+    async _putOrStage(filePath, bytes) {
+        if (this._objectStore && this._objectStore.batching) {
+            this._objectStore._stage(filePath, bytes)
+        } else {
+            await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, bytes)
+        }
     }
 
     // --- Write ref: encrypt commit_id and store at bare/refs/{refFileId} --------
@@ -28,7 +38,7 @@ class SGVaultRefManager {
         const filePath  = `bare/refs/${refFileId}`
         const payload   = new TextEncoder().encode(JSON.stringify({ commit_id: commitId }))
         const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)
-        await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, new Uint8Array(encrypted))
+        await this._putOrStage(filePath, new Uint8Array(encrypted))
     }
 
     // --- Read ref: decrypt and return commit_id ----------------------------------
@@ -82,6 +92,6 @@ class SGVaultRefManager {
         ]}
         const payload   = new TextEncoder().encode(JSON.stringify(index))
         const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)
-        await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, new Uint8Array(encrypted))
+        await this._putOrStage(filePath, new Uint8Array(encrypted))
     }
 }
