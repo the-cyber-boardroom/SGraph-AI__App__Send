@@ -107,6 +107,7 @@
         var p     = (appJson && appJson.permissions) || {};
         var fs    = (p.fs    && typeof p.fs    === 'object') ? p.fs    : {};
         var vault = (p.vault && typeof p.vault === 'object') ? p.vault : {};
+        var inbox = (p.inbox && typeof p.inbox === 'object') ? p.inbox : {};
         return {
             consent: _consentPolicy(p.consent),
             fs: {
@@ -125,7 +126,19 @@
                 embedAccessToken: vault.embedAccessToken === true, // embed a backend access token in a vault (bool)
                 unlink:           _grant(vault.unlink),
                 mount:            _grant(vault.mount),       // ViV Phase 2: parent → child kernel spawn
+                notify:           vault.notify === true,       // cross-vault peer wake (sg.vault.notify) — bool, default-deny
                 'delete':         vault['delete'] === true     // bool only (always consent-gated)
+            },
+            // Inbox transport (sg.inbox.*) — all booleans, default-deny. Not path-scoped:
+            // inbox anchors are server-held, not vault paths. The kernel holds the keys and
+            // attaches the gate headers; these grants decide which verbs an app may call.
+            inbox: {
+                configure:     inbox.configure     === true,
+                append:        inbox.append        === true,
+                list:          inbox.list          === true,
+                read:          inbox.read          === true,   // fetch ciphertext
+                markProcessed: inbox.markProcessed === true,
+                purge:         inbox.purge         === true
             }
         };
     }
@@ -167,7 +180,11 @@
             if (act === 'standalone')       return perm.vault.standalone === true;
             if (act === 'openApp')          return perm.vault.openApp === true;
             if (act === 'embedAccessToken') return perm.vault.embedAccessToken === true;
+            if (act === 'notify')           return perm.vault.notify === true;
             return _match(perm.vault[act], path);   // create, createKey, seedFrom, unlink, mount
+        }
+        if (grp === 'inbox') {
+            return !!(perm.inbox && perm.inbox[act] === true);   // all booleans, default-deny
         }
         return false;
     }

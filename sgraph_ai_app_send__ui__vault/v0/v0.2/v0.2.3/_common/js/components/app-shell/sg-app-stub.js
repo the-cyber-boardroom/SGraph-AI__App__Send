@@ -45,6 +45,22 @@
     let _ready   = false;
     const _onReady = [];            // queued callers awaiting _ready
 
+    // ─── Kernel→app event channel (sg.on / sg.off) ──────────────────────────────────
+    // The kernel pushes events as a single channel message: send('sg-event', {name, payload}).
+    // Whether a given event is delivered at all is decided KERNEL-side by the host_events
+    // allowlist (AppHostEvents) — this frame just fans the message out to subscribers.
+    // Registering for a name the kernel never sends is a harmless no-op: the handler
+    // simply never fires (indistinguishable from "no events occurred").
+    const _eventHandlers = new Map();   // name → Set<callback>   ('*' = wildcard)
+
+    function _dispatchEvent(name, payload) {
+        if (!name) return;
+        const set = _eventHandlers.get(name);
+        if (set) for (const cb of set) { try { cb(payload); } catch (_) {} }
+        const star = _eventHandlers.get('*');
+        if (star) for (const cb of star) { try { cb(name, payload); } catch (_) {} }
+    }
+
     function _whenReady() {
         if (_ready) return Promise.resolve(_channel);
         return new Promise((resolve) => _onReady.push(resolve));
@@ -98,6 +114,11 @@
                 try {
                     window.dispatchEvent(new CustomEvent('sg-app:ready', { detail: meta || null }));
                 } catch (_) {}
+            });
+            // Kernel→app events arrive as a single 'sg-event' message carrying {name, payload}.
+            // Fan them out to sg.on subscribers (the kernel already applied the host_events gate).
+            ch.on('sg-event', (env) => {
+                if (env && typeof env === 'object') _dispatchEvent(env.name, env.payload);
             });
             // Tell the kernel we're alive and ready for it to send 'sg.ready'.
             return ch.send('sg.alive', { ts: Date.now() });
@@ -195,6 +216,21 @@
             isRO:      false,
             appTitle:  '',
             selfPath:  '',    // set by the kernel via injected page-layout meta when applicable
+        },
+
+        // ── events (kernel→app push; gated kernel-side by app.json.host_events) ──
+        // sg.on('inbox.new-messages', cb) — subscribe. Returns an unsubscribe handle.
+        // sg.on('*', (name, payload) => ...) — wildcard over events this app may receive.
+        // Subscribing for a name the kernel never pushes is a silent no-op.
+        on: (name, cb) => {
+            if (typeof cb !== 'function' || !name) return () => {};
+            if (!_eventHandlers.has(name)) _eventHandlers.set(name, new Set());
+            _eventHandlers.get(name).add(cb);
+            return () => window.sg.off(name, cb);
+        },
+        off: (name, cb) => {
+            const set = _eventHandlers.get(name);
+            if (set) { set.delete(cb); if (set.size === 0) _eventHandlers.delete(name); }
         },
 
         // Internal accessor for tests and the rare app that needs to await ready
