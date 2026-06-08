@@ -270,14 +270,33 @@ class SGVault {
     // (e.g. addFile opened it, then _commit calls this), just run inline and let the OUTERMOST
     // scope flush — so a file write and the commit it triggers collapse into a single request.
     async _withBatch(fn) {
-        if (this._objectStore.batching) return fn()
+        if (this._objectStore.batching) return fn()       // nested — the outermost scope owns flush + rollback
         this._objectStore.beginBatch()
+        // Snapshot the head pointers BEFORE running fn. _commit advances _headCommitId (and clears
+        // _settingsDirty / sets _currentSettingsEntry) inside fn, but the writes don't land until
+        // flushBatch() below. If the flush throws (network drop — the waterfall showed a 9.77s
+        // write), the staged writes are discarded yet the client would otherwise be left AHEAD of
+        // the server, and the next commit would build on a phantom parent → a dangling pointer on
+        // the next push. Restoring these on failure preserves the pre-batch semantics (head only
+        // advances on a durable write), so a retry re-stages from the correct parent and self-heals.
+        // (The in-memory tree mutation is intentionally NOT rolled back — that was already the
+        // pre-batch behaviour and self-corrects once head is restored.)
+        const snap = {
+            head:          this._headCommitId,
+            namedHead:     this._namedHeadId,
+            settingsDirty: this._settingsDirty,
+            settingsEntry: this._currentSettingsEntry
+        }
         try {
             const result = await fn()
             await this._objectStore.flushBatch()
             return result
         } catch (err) {
             this._objectStore.discardBatch()
+            this._headCommitId         = snap.head
+            this._namedHeadId          = snap.namedHead
+            this._settingsDirty        = snap.settingsDirty
+            this._currentSettingsEntry = snap.settingsEntry
             throw err
         }
     }
