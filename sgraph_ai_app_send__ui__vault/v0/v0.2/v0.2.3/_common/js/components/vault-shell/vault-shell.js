@@ -341,6 +341,13 @@
 
                 this._refreshSyncState();
                 this.querySelector('vault-header')?.setRefreshAvailable(false);
+                // Refresh the SGit view too — it holds its own _vault reference (now stale after
+                // the re-open) and only re-renders on tab switch, so without this the history/tree
+                // stayed stale until you navigated away and back (or reloaded the page).
+                if (this._activeView === 'sgit') {
+                    const sgit = this.querySelector('vault-sgit-view');
+                    if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                }
                 window.sgraphVault.messages.success('Vault refreshed');
             } catch (err) {
                 window.sgraphVault.messages.error(`Refresh failed: ${err.message}`);
@@ -615,6 +622,11 @@
                 window.dispatchEvent(new CustomEvent('sg-vault-synced', {
                     detail: { prevHead, newHead }
                 }));
+                // Keep the SGit view in sync (same gap as _onRefresh — it doesn't re-render itself).
+                if (this._activeView === 'sgit') {
+                    const sgit = this.querySelector('vault-sgit-view');
+                    if (sgit) { sgit.vault = this._vault; sgit.refresh(); }
+                }
             }
 
             return { from: prevHead, to: newHead, changed: !!changed };
@@ -761,6 +773,10 @@
                     window.dispatchEvent(new CustomEvent('sg-vault-synced', {
                         detail: { prevHead: autoSyncPrevHead, newHead: this._vault._headCommitId }
                     }))
+                    if (this._activeView === 'sgit') {
+                        const sgit = this.querySelector('vault-sgit-view')
+                        if (sgit) { sgit.vault = this._vault; sgit.refresh() }
+                    }
                     if (result.conflicts?.length > 0) {
                         window.sgraphVault.messages.warn(
                             `Synced \u2014 ${result.conflicts.length} conflict(s) saved as _conflict copies`
