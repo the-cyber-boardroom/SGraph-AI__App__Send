@@ -219,6 +219,22 @@ const findChild = (tree, name) => tree.children[name];
     ok('getFileList: raw resource link hidden', compR.getFileList().every(e => !/intro\.link\.json$/.test(e.path)));
     ok('getFileList: normal file kept', compR.getFileList().some(e => e.path === 'readme.md'));
 
+    // ── identity delegation (`_vault` getter) ──
+    // Regression guard for the editor-preview parity bug: send-browse--v0.3.2.js reads
+    // `self.dataSource._vault.vaultId` to populate sg.app.vaultId. When the composite wraps
+    // the root, that access was undefined → sg.app.vaultId fell to '' (header showed "?").
+    // The getter delegates to _root._vault so the composite is transparent for identity.
+    console.log('\n[suite] CompositeDataSource — identity delegation (`_vault` getter)');
+    const sentinel = { _vaultId: 'identity123', name: 'demo' };
+    const rootWithVault = new FakeDS({ _vault: sentinel, tree: { name:'', children:{}, files:[] }, list:[], bytes:{} }, null);
+    const compIdent = new CompositeDataSource(rootWithVault, {});
+    ok('delegates _vault to _root._vault', compIdent._vault === sentinel);
+    ok('delegated _vault carries _vaultId', compIdent._vault && compIdent._vault._vaultId === 'identity123');
+    const rootNoVault = new FakeDS({ tree: { name:'', children:{}, files:[] }, list:[], bytes:{} }, null);
+    delete rootNoVault._vault;   // simulate a root without _vault
+    const compNo = new CompositeDataSource(rootNoVault, {});
+    ok('returns undefined when root has no _vault (no throw)', compNo._vault === undefined);
+
     console.log('  ' + pass + ' pass, ' + fail + ' fail\n');
     process.exit(fail === 0 ? 0 : 1);
 })();
