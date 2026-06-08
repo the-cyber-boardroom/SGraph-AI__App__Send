@@ -4,8 +4,11 @@
 # ===============================================================================
 
 from typing                                                                     import List
+from botocore.exceptions                                                        import ClientError
 from osbot_aws.AWS_Config                                                       import aws_config
 from osbot_aws.aws.s3.S3                                                        import S3
+
+S3_NOT_FOUND_CODES = ('NoSuchKey', 'NoSuchBucket', 'NotFound', '404')           # ClientError codes that mean "key absent", not a real failure
 from osbot_utils.type_safe.primitives.domains.files.safe_str.Safe_Str__File__Path import Safe_Str__File__Path
 from osbot_utils.type_safe.type_safe_core.decorators.type_safe                  import type_safe
 from osbot_utils.utils.Json                                                     import bytes_to_json
@@ -40,12 +43,20 @@ class Storage_FS__S3(Storage_FS):                                               
             key    = f"{prefix}{key}"
         return key
 
+    @staticmethod
+    def _is_not_found(error: ClientError) -> bool:                              # True when a boto ClientError signals an absent key (vs a real failure)
+        code = (getattr(error, 'response', None) or {}).get('Error', {}).get('Code', '')
+        return code in S3_NOT_FOUND_CODES
+
     @type_safe
     def file__bytes(self, path: Safe_Str__File__Path) -> bytes:                 # Read file bytes from S3
         key = self.s3_key(path)
-        if self.file__exists(path):
-            return self._s3().file_bytes(bucket=self.s3_bucket, key=key)
-        return None
+        try:                                                                    # Single GetObject; catch the missing-key error instead of a pre-HeadObject
+            return self._s3().file_bytes(bucket=self.s3_bucket, key=key)        # (saves 1 S3 call on every read; matches Memory backend's None-on-miss)
+        except ClientError as error:
+            if self._is_not_found(error):
+                return None
+            raise
 
     @type_safe
     def file__delete(self, path: Safe_Str__File__Path) -> bool:                 # Delete file from S3
@@ -78,9 +89,12 @@ class Storage_FS__S3(Storage_FS):                                               
     @type_safe
     def file__str(self, path: Safe_Str__File__Path) -> str:                     # Read file as string from S3
         key = self.s3_key(path)
-        if self.file__exists(path):
+        try:                                                                    # Single GetObject; catch missing-key instead of a pre-HeadObject (see file__bytes)
             return self._s3().file_contents(bucket=self.s3_bucket, key=key)
-        return None
+        except ClientError as error:
+            if self._is_not_found(error):
+                return None
+            raise
 
     def folder__files__all(self, parent_folder) -> List[Safe_Str__File__Path]:   # List files under a specific prefix (scoped S3 list)
         s3_prefix = self.s3_key(parent_folder)

@@ -67,6 +67,17 @@ Objects are stored in a content-addressable store (CAS) with opaque IDs:
 | Refs | `bare/refs/` | Mutable |
 | Branch index | `bare/indexes/` | Mutable |
 
+### Server-Side I/O — Auth Cache + Catch-404 Reads (v0.33.5, 2026-06-08)
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **Access-token validation cache** — positive `token_lookup` results cached for a Lambda-lifetime TTL (default 60s, `SGRAPH_SEND__TOKEN_CACHE_TTL`) so repeated writes/batches in a warm instance do **not** re-hit the Admin Lambda. Negatives never cached. Mirrors `_manifest_cache`. | **EXISTS** | `Service__Access_Token` (6 tests); used by `Routes__Vault__Pointer.check_access_token` + `Routes__Vault__Inbox._check_access_token` |
+| **Catch-404 reads** — `Storage_FS__S3.file__bytes`/`file__str` do a single GetObject and catch the missing-key `ClientError` (return `None`) instead of a pre-`HeadObject`. `file__json` inherits it. `file__delete` unchanged (S3 delete is idempotent; its existence check is semantic). | **EXISTS** | `Storage_FS__S3._is_not_found` + tests in `test_Storage_FS__S3.py` |
+| **No service-level pre-exists checks** — `Service__Vault__Pointer.read`/`_batch_read`/`_cas_write`/`write_if_match` rely on `file__bytes` returning `None` on miss (one read, not Head+read). | **EXISTS** | `test_Service__Vault__Pointer.py` (existing not-found cases still green) |
+| **Write-key auth** — manifest loaded once per Lambda lifetime via `_manifest_cache`; warm writes do 0 S3 for auth, 1 PutObject for the object. | **EXISTS** | `Service__Vault__Pointer._load_manifest` |
+
+> **Still client-side (PROPOSED — does not exist yet):** batching the commit's per-object `PUT`s into one `POST /api/vault/batch`. The backend `batch` endpoint already supports write ops (one auth check for the whole list); the `sg-vault` browser library does not yet use it. Owned by the vault team — see `team/roles/architect/reviews/06/08/v0.33.5__architect-plan__vault-write-path-s3-and-auth-reduction.md` §4.
+
 ### Vault Round-Trip: AI-Native Access (v0.13.22)
 
 | Capability | Status | Evidence |
