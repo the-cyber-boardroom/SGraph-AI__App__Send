@@ -185,6 +185,7 @@ class SGVault {
     get name()      { return this._settings?.vault_name }
     get created()   { return this._settings?.created    }
     get writable()  { return !!this._writeKey           }
+    get writeKeyHex() { return this._writeKey || null   }   // hex string (owner-secret store input); null in RO sessions
     get aheadOf()   { return this._namedHeadId          }
 
     async setName(newName) {

@@ -80,6 +80,26 @@ Objects are stored in a content-addressable store (CAS) with opaque IDs:
 **Known constraint:** Claude.ai bash_tool egress proxy blocks direct HTTP to `send.sgraph.ai`
 unless domain is on allowlist. Domain allowlist changes only take effect in a new conversation.
 
+### Vault-App Vault Management — `sg.vault.*` create/manage (v0.33.5, 2026-06-08)
+
+A vault app (sandboxed iframe under `/en-gb/app/`) can create and manage other vaults via the
+kernel bridge, gated by `app.json` grants. Code: `app-shell.js` (`_createChildVault`,
+`_ownerSecret*`, `_getVaultKey`, `_openAppVault`, `_listChildVaults`, `_deleteChildVault`,
+`_seedVaultTree`), `app-permissions.js` (new vault grants), `sg-vault-owner-secrets.js` (new).
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| `sg.vault.create({returnKey})` returns the **composed** openable key `passphrase:vault_id` | **EXISTS** | `_createChildVault`; round-trip in tests |
+| Standalone create (no parent-tree mutation) | **EXISTS** | `_createChildVault` (link omitted) |
+| **Owner-secret store** — child write-keys sealed under a `write_key`-derived key at `.vault/owner/secrets/` (owner-tier; RO sessions cannot decrypt) | **EXISTS** | `SGVaultOwnerSecrets` (9 tests); `_ownerSecret*` |
+| `sg.vault.getKey(ref)` / `openApp(ref)` / `list()` | **EXISTS** | bridge dispatch + helpers |
+| `sg.vault.delete(ref)` — key custody solved; **server teardown pending** `SGVault.destroy()` | **PARTIAL** | `_deleteChildVault` returns `server_teardown:false` until the endpoint ships |
+| `sg.vault.seedFrom` — copy a template tree into the new vault (skips `.vault/**`) | **EXISTS** | `_seedVaultTree`/`_collectTree` |
+| New grants: `vault.createKey`/`standalone`/`seedFrom`/`openApp` (default-deny; `createKey` stronger than `create`) | **EXISTS** | `app-permissions.js` (22 tests) |
+| `sg.vault.mount({mode:'rw'})` writable mount | **PROPOSED** | separate brief `team/comms/briefs/06/08/v0.33.5__brief__vault-writable-mount.md` |
+
+Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.
+
 ---
 
 ## DOES NOT EXIST (Commonly Confused)
