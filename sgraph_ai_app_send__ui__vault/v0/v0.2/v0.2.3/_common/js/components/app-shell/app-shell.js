@@ -61,6 +61,11 @@
                 if (action === 'exit')    this._exitApp();
             };
             document.addEventListener('app-hud:nav', this._navHudHandler);
+            // Auto-sync parity with /vault: re-check the published head when the tab regains
+            // focus, so an app left open picks up code/data another session pushed. Debounced
+            // in _scheduleBehindCheck. Gated by the shared 'sg-vault-autosync' flag.
+            this._visibilityHandler = () => { if (!document.hidden) this._scheduleBehindCheck(500); };
+            document.addEventListener('visibilitychange', this._visibilityHandler);
             this._init();
         }
 
@@ -75,6 +80,9 @@
             if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
             if (this._printHandler) { document.removeEventListener('app-hud:print', this._printHandler); this._printHandler = null; }
             if (this._navHudHandler) { document.removeEventListener('app-hud:nav', this._navHudHandler); this._navHudHandler = null; }
+            if (this._visibilityHandler) { document.removeEventListener('visibilitychange', this._visibilityHandler); this._visibilityHandler = null; }
+            clearTimeout(this._autoPushTimer);
+            clearTimeout(this._behindCheckTimer);
             if (this._embedOpenHandler)  { window.removeEventListener('message', this._embedOpenHandler); this._embedOpenHandler = null; }
             if (this._embedReadyHandler) { this.removeEventListener('app-shell:ready', this._embedReadyHandler); this._embedReadyHandler = null; }
             if (this._vfsBridgeHandler) {
@@ -423,6 +431,12 @@
                 }
             }));
 
+            // Auto-sync parity with /vault: after the app is up, check whether another session
+            // published newer commits and fast-forward the view if so (clean-behind only). The
+            // 1.5s delay lets the iframe settle first; the check is debounced + a no-op when in sync.
+            this._lastBehindCheckTime = 0;
+            setTimeout(() => { this._scheduleBehindCheck(0); }, 1500);
+
             // Auth intercept (auth.required with no cached key and no preset key)
             if (!isRO && !accessKey && appJson && appJson.auth && appJson.auth.required) {
                 var vaultId   = vault._vaultId || this._vaultKey;
@@ -437,6 +451,91 @@
             }
 
             await this._continue(appJson);
+        }
+
+        // ── Auto-sync (parity with /vault) ──────────────────────────────────────────────
+        // /vault has an auto-sync engine (vault-shell.js _checkAndAutoSync) that auto-PUSHES
+        // local commits and auto-PULLS upstream changes, gated by localStorage 'sg-vault-autosync'.
+        // /app historically had NEITHER, so app writes (sg.fs.write) committed to the working
+        // clone but never pushed → the clone DIVERGED from the named ref → going to /vault showed
+        // "↑N to push" and /app refresh showed stale code (a diverged clone can't fast-forward to
+        // the published head). Porting the same behaviour, reading the SAME flag, fixes both.
+        _isAutoSyncEnabled() {
+            try { var v = localStorage.getItem('sg-vault-autosync'); return v === null ? true : v === 'true'; }
+            catch (_) { return true; }
+        }
+
+        // Debounced auto-push (Commit Queue style): coalesce a burst of app writes into one push
+        // ~2.5s after the last write. Skips when read-only, auto-sync off, nothing to push, or
+        // diverged (a diverged push would clobber published commits — surface it instead).
+        _scheduleAutoPush() {
+            if (!this._vault || !this._vault.writable) return;
+            if (!this._isAutoSyncEnabled()) { this._surfaceUnpushed('autosync-off'); return; }
+            clearTimeout(this._autoPushTimer);
+            this._autoPushTimer = setTimeout(() => { this._autoPushNow(); }, 2500);
+        }
+
+        async _autoPushNow() {
+            if (!this._vault || !this._vault.writable || !this._isAutoSyncEnabled()) return;
+            try {
+                var ahead = await this._vault.getAheadCount();
+                if (!ahead) return;
+                // Diverged guard: named advanced under us (another session pushed) AND we have
+                // local commits → don't push (would lose their work). Surface + let the behind
+                // check fast-forward when it can.
+                var liveNamed = await this._vault._refManager.readRef(this._vault._refFileId);
+                var diverged  = liveNamed && liveNamed !== this._vault._namedHeadId;
+                if (diverged) { this._surfaceUnpushed('diverged'); return; }
+                await this._vault.push();
+                this._emitVaultEvent('auto-push', { label: 'Auto-pushed ' + ahead + ' commit(s)', count: ahead });
+                this._clearUnpushedNotice();
+            } catch (e) {
+                console.warn('[app-shell] auto-push failed:', e && e.message);
+                this._surfaceUnpushed('error');
+            }
+        }
+
+        // Debounced behind-check: read the live named ref; if the clone is cleanly behind, fast-
+        // forward the view (reuse _syncViewToPublishedHead) and remount the app so new code shows.
+        _scheduleBehindCheck(delayMs) {
+            var DEBOUNCE_MS = 30 * 1000;
+            if (Date.now() - (this._lastBehindCheckTime || 0) < DEBOUNCE_MS) return;
+            clearTimeout(this._behindCheckTimer);
+            this._behindCheckTimer = setTimeout(() => { this._checkBehind(); }, delayMs || 0);
+        }
+
+        async _checkBehind() {
+            if (!this._vault) return;
+            this._lastBehindCheckTime = Date.now();
+            try {
+                var liveNamed = await this._vault._refManager.readRef(this._vault._refFileId);
+                if (!liveNamed || liveNamed === this._vault._namedHeadId) return;   // up to date
+                this._vault._namedHeadId = liveNamed;
+                // If we have unpushed local commits, this is divergence — surface, don't clobber.
+                var ahead = await this._vault.getAheadCount();
+                if (ahead > 0) { this._surfaceUnpushed('diverged'); return; }
+                // Clean behind → fast-forward the view and remount so the new code renders.
+                await this._syncViewToPublishedHead(this._vault);
+                if (this._appJson) { try { await this._continue(this._appJson); } catch (_) {} }
+                this._emitVaultEvent('auto-pull', { label: 'View synced to published head', head: liveNamed });
+            } catch (_) { /* network errors are silent — retried on next focus */ }
+        }
+
+        // Make the "unpushed commits" state VISIBLE — a persistent HUD warning (ttl=null), since
+        // the small status pill is easy to miss. Cleared on a successful push.
+        _surfaceUnpushed(reason) {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (!hud || typeof hud.showMessage !== 'function') return;
+            var text = reason === 'diverged'
+                ? 'Unsynced changes — the vault changed elsewhere. Open in the vault view to merge.'
+                : (reason === 'autosync-off'
+                    ? 'Auto-sync is off — your changes are saved locally but not pushed.'
+                    : 'Could not push your changes — they are saved locally. Will retry.');
+            hud.showMessage('unpushed', text, 'warn', null);   // null ttl = persistent
+        }
+        _clearUnpushedNotice() {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (hud && typeof hud.clearMessage === 'function') { try { hud.clearMessage('unpushed'); } catch (_) {} }
         }
 
         // ── Sync view to published head ────────────────────────────────────────────────
@@ -1054,6 +1153,9 @@
                 try { await childVault.addFile(dir, name, entries[i].bytes); }
                 catch (_) { try { await childVault.updateFile(dir, name, entries[i].bytes); } catch (__) {} }
             }
+            // addFile commits to the child's CLONE ref only — push so the seeded content is on
+            // the child's published (named) ref, i.e. visible to anyone who opens the new vault.
+            if (entries.length && typeof childVault.push === 'function') { try { await childVault.push(); } catch (_) {} }
         }
 
         // Walk a vault's tree under basePath → [{ relPath, bytes }]; skips .vault/** (floor).
@@ -2324,6 +2426,7 @@
                         .then(function () {
                             wReply(true, { size: wSize });
                             self._emitBridgeCall('vfs.write', { path: wResolved, bytes: wSize, ms: Math.round(performance.now() - _t0w), ok: true });
+                            self._scheduleAutoPush();   // sync app writes to the server (debounced)
                         })
                         .catch(function (err) {
                             wReply(false, { err: err.message || 'Write failed' });
@@ -2460,7 +2563,7 @@
                             var p = (f.dir === t.dir)
                                 ? dataSource.renameFile(f.dir, f.name, t.name)
                                 : dataSource.moveFile(f.dir, f.name, t.dir).then(function () { if (t.name !== f.name) return dataSource.renameFile(t.dir, f.name, t.name); });
-                            p.then(function () { cmdReply(true, { moved: true }); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: true }); })
+                            p.then(function () { cmdReply(true, { moved: true }); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: true }); self._scheduleAutoPush(); })
                              .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.move', { from: mFrom, to: mTo, ok: false, err: err.message }); });
                             return;
                         }
@@ -2468,7 +2571,7 @@
                             var dPath = _np(e.data.path); var d = _split(dPath);
                             if (!self._can('fs.delete', dPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: 'EPERM' }); return; }
                             dataSource.deleteFile(d.dir, d.name)
-                                .then(function () { cmdReply(true, { deleted: true }); self._emitBridgeCall('fs.delete', { path: dPath, ok: true }); })
+                                .then(function () { cmdReply(true, { deleted: true }); self._emitBridgeCall('fs.delete', { path: dPath, ok: true }); self._scheduleAutoPush(); })
                                 .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.delete', { path: dPath, ok: false, err: err.message }); });
                             return;
                         }
@@ -2476,7 +2579,7 @@
                             var kPath = _np(e.data.path);
                             if (!self._can('fs.mkdir', kPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: 'EPERM' }); return; }
                             dataSource.createFolder('/' + kPath)
-                                .then(function () { cmdReply(true, { created: true }); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: true }); })
+                                .then(function () { cmdReply(true, { created: true }); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: true }); self._scheduleAutoPush(); })
                                 .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('fs.mkdir', { path: kPath, ok: false, err: err.message }); });
                             return;
                         }

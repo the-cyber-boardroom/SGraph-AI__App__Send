@@ -100,6 +100,23 @@ kernel bridge, gated by `app.json` grants. Code: `app-shell.js` (`_createChildVa
 
 Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.
 
+### `/app` Auto-Sync Parity (v0.33.5, 2026-06-08)
+
+`/en-gb/app/` (app-shell.js) now has the auto-sync engine `/vault` already had — previously
+it had neither auto-push nor auto-pull, so app writes committed to the working clone but never
+pushed → the clone diverged from the named ref → "↑N to push" on return to `/vault` + stale code
+on `/app` refresh (a diverged clone can't fast-forward).
+
+| Capability | Status |
+|------------|--------|
+| Debounced auto-push of app writes (`sg.fs.write`/`fs.*`) — coalesces a burst ~2.5s after the last write | **EXISTS** (`_scheduleAutoPush`/`_autoPushNow`) |
+| Auto-pull on tab focus + 1.5s after mount — fast-forwards a clean-behind clone + remounts the app | **EXISTS** (`_scheduleBehindCheck`/`_checkBehind`) |
+| Shared `localStorage['sg-vault-autosync']` flag governs BOTH `/app` and `/vault` | **EXISTS** |
+| Persistent HUD warning when unpushed + (auto-sync off / diverged / push-failed) | **EXISTS** (`_surfaceUnpushed`) |
+| `seedFrom` now pushes the child's named ref so seeded content is visible to other openers | **EXISTS** (fix) |
+
+Brief: `team/comms/briefs/06/08/v0.33.5__brief__app-vault-sync-parity.md`.
+
 ---
 
 ## DOES NOT EXIST (Commonly Confused)
