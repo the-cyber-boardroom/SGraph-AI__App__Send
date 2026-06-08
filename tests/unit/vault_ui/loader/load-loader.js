@@ -42,7 +42,7 @@ global.sgraphVault = {
 // --- Source the vault-loader files ----------------------------------------------
 
 const LOADER = new URL(
-    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/vault-loader/',
+    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/vault-loader/',
     import.meta.url
 );
 

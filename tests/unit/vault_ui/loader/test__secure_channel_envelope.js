@@ -7,7 +7,7 @@ import { fileURLToPath }    from 'node:url';
 import { runInThisContext } from 'node:vm';
 
 const MOD = new URL(
-    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/components/app-shell/secure-channel-envelope.js',
+    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/components/app-shell/secure-channel-envelope.js',
     import.meta.url
 );
 runInThisContext(readFileSync(fileURLToPath(MOD), 'utf8'), { filename: 'secure-channel-envelope.js', displayErrors: true });

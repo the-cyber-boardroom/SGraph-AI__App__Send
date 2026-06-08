@@ -20,7 +20,7 @@ SEND_BROWSE = path_combine(
 )
 VAULT_SHELL = path_combine(
     sgraph_ai_app_send__ui__vault.path,
-    'v0/v0.2/v0.2.3/_common/js/components/vault-shell/vault-shell.js'
+    'v0/v0.2/v0.2.4/_common/js/components/vault-shell/vault-shell.js'
 )
 
 

@@ -134,9 +134,34 @@ dark mode background.
 
 ---
 
-### Vault Browser UI (latest: v0.2.3)
+### Vault Browser UI (latest: v0.2.4)
 
 **Package:** `sgraph_ai_app_send__ui__vault/` — distinct UI product.
+
+**v0.2.4** — phone-first responsiveness + "Desktop view" toggle. Code at `v0/v0.2/v0.2.4/`.
+First committed 2026-06-08. A verbatim superset copy of v0.2.3 (all features carried forward)
+plus a mobile delta on the `/vault` shell chrome:
+- **`_common/js/vault-loader/vault-view-mode.js`** (NEW) — `window.SGVaultViewMode` API
+  (`getMode`/`isDesktop`/`setMode`/`toggle`). Persists a per-device choice in
+  `localStorage['sg-vault-view-mode']` (`mobile` default | `desktop`). In `desktop` it rewrites
+  the viewport meta to `width=1280` (browser fits-to-width → full desktop layout, zoomed out —
+  Dinis's "desktop is the canonical layout, mobile is a skin you can shed" model). Loaded
+  synchronously in `<head>` of the two shell hosts (`index.html`, `en-gb/browse/index.html`) so
+  the saved viewport applies before first paint. No-ops when embedded in an iframe (parent owns
+  the viewport).
+- **"💻 Desktop view" / "📱 Mobile view" toggle** in the `vault-header` overflow (⋯) menu;
+  re-labels live and stays in sync via the `sg-vault-view-mode-changed` document event.
+- **Phone-first `@media (max-width: 600px)` rules** (floor 390px) added to `vault-header`,
+  `vault-nav`, `vault-status-bar`, `vault-auth`, `vault-settings`, and the `vault-shell` layout:
+  stacked auth banner, full-width settings rows, capped debug sidebar (88vw), scrollable
+  settings sub-tabs, 44px touch targets. New `--touch-target: 44px` design token. These rules
+  only fire in Mobile view; in Desktop view the layout viewport is 1280px so they never match.
+- **Out of scope (deferred):** `<sg-layout>` reconfiguration, bottom-tab chrome, sheet-style
+  modals, QR vault-key entry, touch drag-and-drop, and the external CDN `send-browse` file
+  browser (the Desktop-view toggle is the lever that makes that surface usable on phones).
+- Deploy workflow `deploy-ui-vault.yml` and the kernel-bundle build script / vault UI test
+  suite repointed `v0.2.3 → v0.2.4`. The `kernel-shell-bundle.js` was regenerated (the v0.2.3
+  committed bundle was stale vs its app-shell sources; v0.2.4's is fresh — freshness test green).
 
 **v0.2.1** — landing page: `en-gb/index.html` + `browse/index.html`. "Open a vault." hero,
 auto-detect input (vault key or share token), recent vaults localStorage.

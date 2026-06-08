@@ -9,7 +9,7 @@ import { readFileSync }     from 'node:fs';
 import { fileURLToPath }    from 'node:url';
 import { runInThisContext } from 'node:vm';
 
-const VAULT = '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/';
+const VAULT = '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/';
 function load(rel) {
     const p = fileURLToPath(new URL(VAULT + rel, import.meta.url));
     runInThisContext(readFileSync(p, 'utf8'), { filename: rel, displayErrors: true });

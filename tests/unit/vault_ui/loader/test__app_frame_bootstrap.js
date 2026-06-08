@@ -11,7 +11,7 @@ import { readFileSync }     from 'node:fs';
 import { fileURLToPath }    from 'node:url';
 import { runInThisContext } from 'node:vm';
 
-const ROOT = '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/components/app-shell/';
+const ROOT = '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/components/app-shell/';
 function load(file) {
     const p = new URL(ROOT + file, import.meta.url);
     runInThisContext(readFileSync(fileURLToPath(p), 'utf8'), { filename: file, displayErrors: true });

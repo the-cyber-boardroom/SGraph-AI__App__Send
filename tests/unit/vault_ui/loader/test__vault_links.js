@@ -8,7 +8,7 @@ import { fileURLToPath }    from 'node:url';
 import { runInThisContext } from 'node:vm';
 
 const LIB = new URL(
-    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/links/vault-links.js',
+    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/lib/links/vault-links.js',
     import.meta.url
 );
 runInThisContext(readFileSync(fileURLToPath(LIB), 'utf8'), { filename: 'vault-links.js', displayErrors: true });

@@ -32,9 +32,9 @@ from sgraph_ai_app_send.lambda__user.testing.Send__User_Lambda__Test_Server impo
     setup__send_user_lambda__test_server,
 )
 
-# Repo root → sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/
+# Repo root → sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/
 REPO_ROOT = Path(__file__).resolve().parents[4]
-UI_ROOT   = REPO_ROOT / 'sgraph_ai_app_send__ui__vault' / 'v0' / 'v0.2' / 'v0.2.3'
+UI_ROOT   = REPO_ROOT / 'sgraph_ai_app_send__ui__vault' / 'v0' / 'v0.2' / 'v0.2.4'
 
 
 def _find_free_port() -> int:
@@ -76,7 +76,7 @@ class BrowserHarnessTestCase(TestCase):
         cls.access_token = cls._api_objs.access_token
         cls.write_key    = cls._api_objs.write_key
 
-        # 2. UI static-file server. Serves the vault UI bundle (v0.2.3) on a
+        # 2. UI static-file server. Serves the vault UI bundle (v0.2.4) on a
         # random port — no path rewrites needed for /en-gb/app/ (the directory
         # has an index.html so SimpleHTTPRequestHandler resolves it).
         cls._ui_server, ui_port, _ = _start_ui_server(UI_ROOT)

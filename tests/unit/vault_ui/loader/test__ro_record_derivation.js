@@ -7,7 +7,7 @@ import { readFileSync }     from 'node:fs';
 import { fileURLToPath }    from 'node:url';
 import { runInThisContext } from 'node:vm';
 
-const SRC = fileURLToPath(new URL('../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/sg-vault/sg-vault-crypto.js', import.meta.url));
+const SRC = fileURLToPath(new URL('../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/lib/sg-vault/sg-vault-crypto.js', import.meta.url));
 runInThisContext(readFileSync(SRC, 'utf8'), { filename: 'sg-vault-crypto.js', displayErrors: true });
 runInThisContext('globalThis.SGVaultCrypto = SGVaultCrypto;');
 const { SGVaultCrypto } = globalThis;

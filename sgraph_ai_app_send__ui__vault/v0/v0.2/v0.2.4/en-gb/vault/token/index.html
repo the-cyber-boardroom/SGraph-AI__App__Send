@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — Token Test Harness</title>
+    <meta name="robots" content="noindex">
+    <!-- Standalone debug page: not for production use. -->
+
+    <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --bg:       #0d1117;
+        --bg2:      #111820;
+        --bg3:      #161d27;
+        --border:   rgba(255,255,255,0.08);
+        --text:     #e0e6f0;
+        --muted:    #6e7a8a;
+        --teal:     #4ecdc4;
+        --teal-dim: rgba(78,205,196,0.12);
+        --warn:     #e0ac4e;
+        --warn-dim: rgba(224,172,78,0.10);
+        --err:      #e06c75;
+    }
+
+    html, body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        overflow: hidden;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    .vt-header {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        padding: 0.4rem 1rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg2);
+        flex-shrink: 0;
+        height: 38px;
+    }
+    .vt-header__title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .vt-header__badge {
+        font-size: 0.6rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--warn);
+        background: var(--warn-dim);
+        border: 1px solid rgba(224,172,78,0.25);
+        border-radius: 4px;
+        padding: 0.1rem 0.4rem;
+    }
+    .vt-header__nav {
+        margin-left: auto;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+    .vt-header__nav a {
+        color: var(--muted);
+        font-size: 0.78rem;
+        text-decoration: none;
+    }
+    .vt-header__nav a:hover { color: var(--teal); }
+
+    /* ── Layout container ───────────────────────────────────────────────── */
+    .vt-body {
+        height: calc(100vh - 38px);
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* ── sg-layout theming ──────────────────────────────────────────────── */
+    sg-layout {
+        --sgl-bg:         var(--bg);
+        --sgl-surface:    var(--bg2);
+        --sgl-border:     var(--border);
+        --sgl-accent:     var(--teal);
+        --sgl-text:       var(--text);
+        --sgl-text-muted: var(--muted);
+        flex: 1;
+        min-height: 0;
+    }
+
+    /* ── Shared button styles (used by custom elements) ─────────────────── */
+    .pk-btn {
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        font-size: 0.68rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        white-space: nowrap;
+        font-family: inherit;
+    }
+    .pk-btn:hover { border-color: rgba(78,205,196,0.4); color: var(--teal); }
+    .pk-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pk-btn--primary { border-color: rgba(78,205,196,0.4); color: var(--teal); }
+    .pk-btn--danger  { color: var(--err); border-color: rgba(224,108,117,0.3); }
+    .pk-btn--danger:hover { background: rgba(224,108,117,0.08); }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<div class="vt-header">
+    <span class="vt-header__title">SG/Vault — Token Test Harness</span>
+    <span class="vt-header__badge">dev only</span>
+    <nav class="vt-header__nav">
+        <a href="/en-gb/vault">Vault shell</a>
+        <a href="/en-gb/vault/peek">Peek</a>
+        <a href="/en-gb/vault/markdown">Markdown</a>
+        <a href="/en-gb/">Landing</a>
+    </nav>
+</div>
+
+<!-- ── sg-layout workspace ─────────────────────────────────────────────── -->
+<div class="vt-body">
+    <sg-layout id="sg-layout-root"></sg-layout>
+</div>
+
+<!--
+    ── _common/ vault library (load order matters — each file extends SGVault.prototype) ──
+    Path from en-gb/vault/token/ up three levels to v0.2.4/ root, then into _common/
+-->
+<script src="../../../_common/js/lib/sg-send/sg-send-crypto.js"></script>
+<script src="../../../_common/js/lib/sg-send/sg-send.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+<script src="../../../_common/js/lib/sg-vault/sg-vault--branches.js"></script>
+
+<!-- ── sg-layout from CDN (pinned) ───────────────────────────────────── -->
+<script type="module">
+import 'https://tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js';
+import { SGL_EVENTS } from 'https://tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout-events.js';
+
+// Wait for sg-layout to define itself
+customElements.whenDefined('sg-layout').then(() => {
+    const layout = document.getElementById('sg-layout-root');
+
+    const LAYOUT_KEY = 'vt-layout';
+
+    const defaultLayout = {
+        type: 'row',
+        sizes: [0.28, 0.72],
+        children: [
+            {
+                type: 'stack', id: 'left',
+                tabs: [
+                    { tag: 'vt-vault-loader',      title: '🔑 Vault Loader',   locked: false },
+                    { tag: 'vt-token-manager',      title: '🎟 Token Manager',  locked: false },
+                    { tag: 'vt-storage-inspector',  title: '💾 Storage',        locked: false }
+                ]
+            },
+            {
+                type: 'column', sizes: [0.60, 0.40],
+                children: [
+                    {
+                        type: 'stack', id: 'main-views',
+                        tabs: [
+                            { tag: 'vt-vault-frame', title: '🔑 Owner View', locked: false, state: { mode: 'owner' } },
+                            { tag: 'vt-vault-frame', title: '👁 RO View',    locked: false, state: { mode: 'ro'    } },
+                            { tag: 'vt-crypto-lab',  title: '🔬 Crypto Lab', locked: false }
+                        ]
+                    },
+                    {
+                        type: 'stack', id: 'bottom',
+                        tabs: [
+                            { tag: 'vt-api-log', title: '📡 API Log', locked: false }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+
+    // Restore saved layout or use default
+    let savedLayout = null;
+    try {
+        const raw = localStorage.getItem(LAYOUT_KEY);
+        if (raw) savedLayout = JSON.parse(raw);
+    } catch (_) {}
+
+    layout.setLayout(savedLayout || defaultLayout);
+
+    // Pass mode state to vt-vault-frame instances
+    layout.addEventListener(SGL_EVENTS.PANEL_CREATED, (e) => {
+        const { element, state } = e.detail || {};
+        if (element && element.tagName === 'VT-VAULT-FRAME' && state && state.mode) {
+            element.dataset.mode = state.mode;
+        }
+    });
+
+    // Persist layout changes
+    layout.addEventListener(SGL_EVENTS.LAYOUT_CHANGED, () => {
+        try {
+            const current = layout.getLayout ? layout.getLayout() : null;
+            if (current) localStorage.setItem(LAYOUT_KEY, JSON.stringify(current));
+        } catch (_) {}
+    });
+});
+</script>
+
+<!-- ── Our own harness modules (ES module, loads after sg-layout CDN import) ── -->
+<script type="module" src="./vault-token-harness.js"></script>
+
+</body>
+</html>

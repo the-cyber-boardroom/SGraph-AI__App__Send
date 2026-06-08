@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SG/Vault — Public Preview Editor</title>
+
+    <!-- Crypto + transport + vault libs (same set as the App page) -->
+    <script src="/_common/js/lib/sg-send/sg-send-crypto.js"></script>
+    <script src="/_common/js/lib/sg-send/sg-send.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-crypto.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-object-store.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-ref-manager.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault-commit.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--file-ops.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--folder-ops.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--sync.js"></script>
+    <script src="/_common/js/lib/sg-vault/sg-vault--branches.js"></script>
+
+    <!-- Public-preview core + components (self-contained: editor opens the vault from
+         localStorage; the card self-updates from the editor's pvp-preview-changed events) -->
+    <script src="/_common/js/lib/sg-public-preview/public-preview-crypto.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-schema.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-read.js"></script>
+    <script src="/_common/js/lib/sg-public-preview/public-preview-write.js"></script>
+    <script src="/_common/js/components/sg-public-preview-editor/sg-public-preview-editor.js"></script>
+    <script src="/_common/js/components/sg-public-preview-card/sg-public-preview-card.js"></script>
+
+    <!-- sg-layout (fractal window manager) — provides the tabbed panes -->
+    <script type="module" src="https://dev.tools.sgraph.ai/core/sg-layout/v0.1.0/sg-layout.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; background: #0a0a18; color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+        body { display: flex; flex-direction: column; }
+        .pvp-top { flex: 0 0 auto; padding: 12px 18px; border-bottom: 1px solid #2a2a44;
+            font-size: 0.95rem; font-weight: 600; }
+        .pvp-top small { color: #9aa4bf; font-weight: 400; margin-left: 8px; }
+        #layout-host { flex: 1; min-height: 0; position: relative; }
+        sg-layout { display: block; width: 100%; height: 100%; }
+        /* editor + card panes scroll independently inside their sg-layout stacks */
+        sg-public-preview-editor, sg-public-preview-card { display: block; padding: 20px; overflow-y: auto; height: 100%; }
+    </style>
+</head>
+<body>
+    <div class="pvp-top">Public preview <small id="pvp-vault">— edit &amp; publish a deliberately-public preview for this vault</small></div>
+    <div id="layout-host"><sg-layout id="layout"></sg-layout></div>
+
+    <script>
+    (function () {
+        'use strict';
+        // Two tabbed panes side-by-side: Edit | Live preview (the fractal sg-layout
+        // pattern used by /en-gb/app). The editor self-opens the vault; the card
+        // self-updates from the editor's pvp-preview-changed events — no manual wiring.
+        var cfg = {
+            type: 'row', sizes: [0.58, 0.42],
+            children: [
+                { type: 'stack', id: 'edit-area', tabs: [{ tag: 'sg-public-preview-editor', title: 'Edit preview',  locked: true }] },
+                { type: 'stack', id: 'live-area', tabs: [{ tag: 'sg-public-preview-card',    title: 'Live preview', locked: true }] }
+            ]
+        };
+        Promise.all([
+            customElements.whenDefined('sg-layout'),
+            customElements.whenDefined('sg-public-preview-editor'),
+            customElements.whenDefined('sg-public-preview-card')
+        ]).then(function () {
+            document.getElementById('layout').setLayout(cfg);
+        });
+
+        // Reflect the opened vault's name in the top bar (editor announces it).
+        document.addEventListener('pvp-vault-ready', function (e) {
+            var el = document.getElementById('pvp-vault');
+            if (el && e.detail && e.detail.name) el.textContent = '— ' + e.detail.name;
+        });
+    })();
+    </script>
+</body>
+</html>

@@ -10,7 +10,7 @@ import { runInThisContext } from 'node:vm';
 globalThis.SGVault = function SGVault() {};
 globalThis.SGSendCrypto = { decrypt: async (cipher /*, key */) => cipher };   // identity
 
-const SRC = fileURLToPath(new URL('../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/sg-vault/sg-vault--history.js', import.meta.url));
+const SRC = fileURLToPath(new URL('../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/lib/sg-vault/sg-vault--history.js', import.meta.url));
 runInThisContext(readFileSync(SRC, 'utf8'), { filename: 'sg-vault--history.js', displayErrors: true });
 
 const enc = s => new TextEncoder().encode(s);

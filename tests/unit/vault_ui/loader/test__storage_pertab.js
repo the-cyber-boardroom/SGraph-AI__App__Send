@@ -18,7 +18,7 @@ globalThis.localStorage      = makeStore();                                   //
 globalThis.sessionStorage    = makeStore();
 globalThis.VaultLoaderEvents = { VAULT_KEY_SET: 'set', VAULT_KEY_CLEARED: 'clr' };
 
-const SRC = fileURLToPath(new URL('../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/vault-loader/vault-loader-storage.js', import.meta.url));
+const SRC = fileURLToPath(new URL('../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/vault-loader/vault-loader-storage.js', import.meta.url));
 runInThisContext(readFileSync(SRC, 'utf8'), { filename: 'vault-loader-storage.js', displayErrors: true });
 const S = globalThis.VaultLoaderStorage;
 

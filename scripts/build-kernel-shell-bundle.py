@@ -19,7 +19,7 @@ import json
 import os
 import sys
 
-ROOT = 'sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common'
+ROOT = 'sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common'
 
 # Dependency order — same order the /app page loads, with kernel-* added.
 # kernel-app-handlers.js and kernel-bootstrap.js are bundled at the end so the

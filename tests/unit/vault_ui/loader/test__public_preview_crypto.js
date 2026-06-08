@@ -12,7 +12,7 @@ import { runInThisContext }   from 'node:vm';
 import { strict as assert }   from 'node:assert';
 
 const LIB = new URL(
-    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/sg-public-preview/',
+    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/lib/sg-public-preview/',
     import.meta.url
 );
 

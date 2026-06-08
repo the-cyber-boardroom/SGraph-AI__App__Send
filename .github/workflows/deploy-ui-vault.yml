@@ -52,8 +52,8 @@ concurrency:
 
 env:
   AWS_REGION        : eu-west-2
-  UI_VERSION        : v0.2.3
-  SOURCE_DIR        : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3
+  UI_VERSION        : v0.2.4
+  SOURCE_DIR        : sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4
 
 jobs:
   # Gate: vault UI tests must pass before deploy runs.

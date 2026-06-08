@@ -14,7 +14,7 @@ import { execFileSync }     from 'node:child_process';
 import { fileURLToPath }    from 'node:url';
 
 const REPO_ROOT = new URL('../../../../', import.meta.url);
-const BUNDLE = fileURLToPath(new URL('sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/components/app-shell/kernel-shell-bundle.js', REPO_ROOT));
+const BUNDLE = fileURLToPath(new URL('sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/components/app-shell/kernel-shell-bundle.js', REPO_ROOT));
 const BUILD  = fileURLToPath(new URL('scripts/build-kernel-shell-bundle.py', REPO_ROOT));
 
 let pass = 0, fail = 0;

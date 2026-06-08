@@ -1,6 +1,6 @@
 /* =================================================================================
    Vault UI E2E — Static File Server
-   Serves the vault UI at v0.2.3 from a single Node.js http server.
+   Serves the vault UI at v0.2.4 from a single Node.js http server.
 
    Path mapping:
      /                     → index.html (root — hash inbox)
@@ -21,7 +21,7 @@ import path   from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
-const VAULT_ROOT = path.resolve(__dirname, '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3');
+const VAULT_ROOT = path.resolve(__dirname, '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4');
 
 const MIME = {
     '.html':  'text/html; charset=utf-8',

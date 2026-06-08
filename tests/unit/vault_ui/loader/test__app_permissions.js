@@ -8,7 +8,7 @@ import { fileURLToPath }    from 'node:url';
 import { runInThisContext } from 'node:vm';
 
 const MOD = new URL(
-    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/components/app-shell/app-permissions.js',
+    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.4/_common/js/components/app-shell/app-permissions.js',
     import.meta.url
 );
 runInThisContext(readFileSync(fileURLToPath(MOD), 'utf8'), { filename: 'app-permissions.js', displayErrors: true });
