@@ -190,7 +190,9 @@ class SGVault {
 
     async setName(newName) {
         if (!this._settings) throw new Error('Vault not initialized')
+        if (this._settings.vault_name === newName) return     // no-op rename
         this._settings.vault_name = newName
+        this._settingsDirty = true
         await this._commit(`Rename vault to "${newName}"`)
     }
 
@@ -247,18 +249,33 @@ class SGVault {
     async _commit(message) {
         const entries = await this._buildTreeEntries(this._tree['/'])
 
-        const settingsPlain     = new TextEncoder().encode(JSON.stringify(this._settings))
-        const settingsEncrypted = await this._sgSend.encrypt(settingsPlain, this._readKey)
-        const settingsBlobId    = await this._objectStore.store(settingsEncrypted)
-        const settingsHash      = await this._commitManager.computeContentHash(settingsPlain)
+        // .vault-settings.json: write it on the initial commit, and on subsequent commits
+        // ONLY when settings actually changed (`_settingsDirty`) — rewriting it on every commit
+        // makes it appear in the file browser as "auto-added orphan" content. Track the dirty
+        // flag via setName/setDescription/setSettings; clear it after a successful commit.
+        const isInitial    = !this._headCommitId
+        const settingsDirty = !!this._settingsDirty
+        let writeSettings  = isInitial || settingsDirty
 
-        entries.push({
-            name:         '.vault-settings.json',
-            size:         settingsPlain.byteLength,
-            content_hash: settingsHash,
-            blob_id:      settingsBlobId,
-            tree_id:      null
-        })
+        // Honour an existing settings entry from the parent tree if we're not rewriting:
+        // if a previous commit wrote one, carry it forward (re-emit the same blob ref).
+        if (!writeSettings && this._currentSettingsEntry) {
+            entries.push(this._currentSettingsEntry)
+        } else if (writeSettings) {
+            const settingsPlain     = new TextEncoder().encode(JSON.stringify(this._settings))
+            const settingsEncrypted = await this._sgSend.encrypt(settingsPlain, this._readKey)
+            const settingsBlobId    = await this._objectStore.store(settingsEncrypted)
+            const settingsHash      = await this._commitManager.computeContentHash(settingsPlain)
+            const settingsEntry = {
+                name:         '.vault-settings.json',
+                size:         settingsPlain.byteLength,
+                content_hash: settingsHash,
+                blob_id:      settingsBlobId,
+                tree_id:      null
+            }
+            entries.push(settingsEntry)
+            this._currentSettingsEntry = settingsEntry
+        }
 
         const treeId    = await this._commitManager.createTree(entries)
         const parentIds = this._headCommitId ? [this._headCommitId] : []
@@ -269,6 +286,7 @@ class SGVault {
         const targetRef = this._cloneRefFileId || this._refFileId
         await this._refManager.writeRef(targetRef, commitId)
         this._headCommitId = commitId
+        this._settingsDirty = false        // committed → no longer dirty
     }
 
     // --- Build tree entries with sub-tree objects for folders -------------------
@@ -316,12 +334,17 @@ class SGVault {
 
         this._tree     = { '/': { type: 'folder', children: {} } }
         this._settings = null
+        this._currentSettingsEntry = null
+        this._settingsDirty        = false
 
         for (const entry of tree.entries) {
             if (entry.name === '.vault-settings.json' || entry.name === '.vault-settings') {
                 const blob      = await this._objectStore.load(entry.blob_id)
                 const decrypted = await SGSendCrypto.decrypt(blob, this._readKey)
                 this._settings  = JSON.parse(new TextDecoder().decode(decrypted))
+                // Capture the original entry so subsequent commits can carry it forward
+                // un-rewritten (avoid producing a new blob_id when nothing changed).
+                this._currentSettingsEntry = entry
             } else if (entry.tree_id) {
                 this._tree['/'].children[entry.name] = {
                     type: 'folder', children: {}, _tree_id: entry.tree_id, _loaded: false

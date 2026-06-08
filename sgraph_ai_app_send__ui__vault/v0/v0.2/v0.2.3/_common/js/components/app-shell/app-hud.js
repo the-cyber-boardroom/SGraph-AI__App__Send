@@ -39,10 +39,12 @@
                         </div>
                         <div class="hud-center">
                             <span class="hud-msg" style="display:none"></span>
-                            <span class="hud-consent" style="display:none">
-                                <span class="hud-consent-text"></span>
-                                <button class="hud-consent-allow">Allow</button>
-                                <button class="hud-consent-deny">Deny</button>
+                            <span class="hud-consent" style="display:none"
+                                  role="alertdialog" aria-label="Vault permission request" aria-live="polite"
+                                  data-testid="hud-consent">
+                                <span class="hud-consent-text" data-testid="hud-consent-text"></span>
+                                <button class="hud-consent-allow" data-testid="hud-consent-allow" aria-label="Approve">Allow</button>
+                                <button class="hud-consent-deny"  data-testid="hud-consent-deny"  aria-label="Deny">Deny</button>
                             </span>
                         </div>
                         <div class="hud-right">
@@ -212,9 +214,10 @@
 
         static _consentLabel(verb, path) {
             const map = {
-                'vault.create': 'create a vault',
-                'vault.delete': 'permanently delete a vault',
-                'vault.unlink': 'unlink a vault'
+                'vault.create':    'create a vault',
+                'vault.createKey': 'create a vault and receive its full key',
+                'vault.delete':    'permanently delete a vault',
+                'vault.unlink':    'unlink a vault'
             };
             const what = map[verb] || ('use ' + verb);
             return 'This app wants to ' + what + (path ? ' in “' + path + '”' : '') + '.';

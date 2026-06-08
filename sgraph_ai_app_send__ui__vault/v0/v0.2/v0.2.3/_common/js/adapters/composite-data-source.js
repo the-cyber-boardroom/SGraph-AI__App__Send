@@ -46,6 +46,11 @@ class CompositeDataSource {
     set writable(v)   { this._root.writable = v; }
     get _accessKey()  { return this._root._accessKey; }
     set _accessKey(v) { this._root._accessKey = v; }
+    // Identity delegate: consumers (send-browse, vault-shell, app-shell etc.) historically
+    // read `dataSource._vault` to get the underlying SGVault. When the root is wrapped by
+    // CompositeDataSource (the editor's preview path), that field was undefined → callers
+    // saw an empty vaultId/vaultName. Delegate explicitly so the composite is transparent.
+    get _vault()      { return this._root && this._root._vault; }
 
     // ── Scan the root for *.link.json → register vault mounts + external resources ──
     async scan() {

@@ -880,6 +880,14 @@ class SendBrowse extends SendComponent {
                     'loadCss:_loadCss,' +
                     'loadJs:_loadJs,' +
                     'app:{' +
+                      // context: 'preview' = SG/Vault editor inline preview path; pair with
+                      // 'app' (set by /en-gb/app/ app-shell). Apps feature-detect on this
+                      // value rather than on the presence of individual namespaces. See
+                      // team/comms/briefs/06/08/v0.33.5__brief__vault-preview-app-parity.md
+                      // for the full unification roadmap. NOTE: sg.vault.* is currently
+                      // available only in 'app' context — the editor preview deliberately
+                      // surfaces a reduced API until the shared builder is extracted.
+                      'context:"preview",' +
                       'selfPath:'   + JSON.stringify(currentPath) + ',' +
                       'writable:'   + (self.dataSource && self.dataSource.writable ? 'true' : 'false') + ',' +
                       'vaultName:'  + JSON.stringify((self.dataSource && self.dataSource._vault && self.dataSource._vault.name) || '') + ',' +
