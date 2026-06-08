@@ -76,7 +76,7 @@ Objects are stored in a content-addressable store (CAS) with opaque IDs:
 | **No service-level pre-exists checks** — `Service__Vault__Pointer.read`/`_batch_read`/`_cas_write`/`write_if_match` rely on `file__bytes` returning `None` on miss (one read, not Head+read). | **EXISTS** | `test_Service__Vault__Pointer.py` (existing not-found cases still green) |
 | **Write-key auth** — manifest loaded once per Lambda lifetime via `_manifest_cache`; warm writes do 0 S3 for auth, 1 PutObject for the object. | **EXISTS** | `Service__Vault__Pointer._load_manifest` |
 
-> **Still client-side (PROPOSED — does not exist yet):** batching the commit's per-object `PUT`s into one `POST /api/vault/batch`. The backend `batch` endpoint already supports write ops (one auth check for the whole list); the `sg-vault` browser library does not yet use it. Owned by the vault team — see `team/roles/architect/reviews/06/08/v0.33.5__architect-plan__vault-write-path-s3-and-auth-reduction.md` §4.
+> **Client-side commit batching — SHIPPED (was PROPOSED here):** the `sg-vault` browser library now collapses a commit's per-object/ref `PUT`s into one `POST /api/vault/batch`. See the **"Batched commit writes"** section below for the code-verified details. The note that this was "not yet used by the browser library" predates that change.
 
 ### Vault Round-Trip: AI-Native Access (v0.13.22)
 
