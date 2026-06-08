@@ -2088,6 +2088,10 @@
                       'readBlob:function(id){return _sgCmd("history",{action:"readBlob",blobId:id});}' +
                     '},' +
                     'app:{' +
+                      // context: 'app' here ('/en-gb/app/' full surface). The SG/Vault editor's
+                      // inline preview should set 'preview' so apps can feature-detect deliberately
+                      // (cross-repo parity work — see brief v0.33.5__brief__vault-preview-app-parity).
+                      'context:"app",' +
                       'selfPath:'  + JSON.stringify(currentPath) + ',' +
                       'writable:'  + (writable  ? 'true' : 'false') + ',' +
                       'vaultName:' + JSON.stringify(vaultName) + ',' +
