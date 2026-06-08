@@ -13,8 +13,10 @@ const load = (rel) => runInThisContext(readFileSync(fileURLToPath(new URL(VAULT 
 load('lib/sg-send/sg-send-crypto.js');
 load('lib/sg-vault/sg-vault-object-store.js');
 load('lib/sg-vault/sg-vault-ref-manager.js');
-runInThisContext('globalThis.SGVaultObjectStore = SGVaultObjectStore; globalThis.SGVaultRefManager = SGVaultRefManager; globalThis.SGSendCrypto = SGSendCrypto;');
-const { SGVaultObjectStore, SGVaultRefManager } = globalThis;
+load('lib/sg-vault/sg-vault-commit.js');
+load('lib/sg-vault/sg-vault.js');
+runInThisContext('globalThis.SGVaultObjectStore = SGVaultObjectStore; globalThis.SGVaultRefManager = SGVaultRefManager; globalThis.SGSendCrypto = SGSendCrypto; globalThis.SGVault = SGVault;');
+const { SGVaultObjectStore, SGVaultRefManager, SGVault } = globalThis;
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n); } };
@@ -84,6 +86,45 @@ const buf = (s) => new TextEncoder().encode(s).buffer;
     const rmD = new SGVaultRefManager(sgD, 'vaultD', 'wk', readKey, osD);   // not batching
     await rmD.writeRef('ref-pid-muw-solo000000', 'obj-cas-imm-aaaaaaaaaaaa');
     ok('ref write → 1 PUT, 0 batch', sgD.puts === 1 && sgD.batches === 0);
+
+    // --- flush-failure rollback (the SG/API team's blocking issue) ---
+    // _commit advances _headCommitId inside fn(), but the write lands only at flushBatch().
+    // If flush throws, _withBatch must restore the head pointers so the client is never left
+    // ahead of the server (which would build the next commit on a phantom parent).
+    console.log('\n[suite] flush failure → head pointers rolled back (no phantom parent)');
+    const failingStore = {
+        _on: false,
+        get batching() { return this._on; },
+        beginBatch() { this._on = true; },
+        discardBatch() { this._on = false; },
+        async flushBatch() { this._on = false; throw new Error('network drop during flush'); }
+    };
+    const vault = {
+        _objectStore: failingStore,
+        _headCommitId: 'commit-OLD', _namedHeadId: 'named-OLD',
+        _settingsDirty: false, _currentSettingsEntry: { blob_id: 'settings-OLD' },
+        _withBatch: SGVault.prototype._withBatch
+    };
+    let threw = false;
+    try {
+        await vault._withBatch(async () => {           // simulate _commit's in-fn mutations
+            vault._headCommitId        = 'commit-NEW';
+            vault._settingsDirty       = true;
+            vault._currentSettingsEntry = { blob_id: 'settings-NEW' };
+        });
+    } catch (_) { threw = true; }
+    ok('flush failure propagates (throws)',          threw === true);
+    ok('head rolled back to OLD',                     vault._headCommitId === 'commit-OLD');
+    ok('namedHead rolled back to OLD',               vault._namedHeadId === 'named-OLD');
+    ok('settingsDirty rolled back',                  vault._settingsDirty === false);
+    ok('currentSettingsEntry rolled back',           vault._currentSettingsEntry.blob_id === 'settings-OLD');
+    ok('batch discarded (not batching)',             failingStore.batching === false);
+
+    console.log('\n[suite] success path leaves advanced head intact');
+    const okStore = { _on:false, get batching(){return this._on;}, beginBatch(){this._on=true;}, discardBatch(){this._on=false;}, async flushBatch(){ this._on=false; } };
+    const vault2 = { _objectStore: okStore, _headCommitId:'OLD', _namedHeadId:'OLD', _settingsDirty:false, _currentSettingsEntry:null, _withBatch: SGVault.prototype._withBatch };
+    await vault2._withBatch(async () => { vault2._headCommitId = 'NEW'; });
+    ok('head advanced after successful flush', vault2._headCommitId === 'NEW');
 
     console.log('\n' + (fail ? '✗ ' + fail + ' FAILED, ' : '✓ ') + pass + ' passed');
     process.exit(fail ? 1 : 0);
