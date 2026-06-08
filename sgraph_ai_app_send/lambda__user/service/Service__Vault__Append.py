@@ -28,6 +28,7 @@ INLINE_CONTENT_CEILING    = 3 * 1024 * 1024
 class Service__Vault__Append(Type_Safe):
     storage_fs      : Storage_FS = None
     _manifest_cache : dict       = None
+    _config_cache   : dict       = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -35,6 +36,8 @@ class Service__Vault__Append(Type_Safe):
             self.storage_fs = Storage_FS__Memory()
         if self._manifest_cache is None:
             self._manifest_cache = {}
+        if self._config_cache is None:
+            self._config_cache = {}
 
     def _load_manifest(self, vault_id):
         if vault_id in self._manifest_cache:
@@ -50,6 +53,16 @@ class Service__Vault__Append(Type_Safe):
         manifest = self.storage_fs.file__json(manifest_path)
         self._manifest_cache[vault_id] = manifest
         return manifest
+
+    def _load_append_config(self, vault_id):
+        if vault_id in self._config_cache:
+            return self._config_cache[vault_id]
+        config_path = path__vault_append_config(vault_id)
+        if not self.storage_fs.file__exists(config_path):
+            return {}
+        config = self.storage_fs.file__json(config_path)
+        self._config_cache[vault_id] = config
+        return config
 
     @staticmethod
     def _hash(value):
@@ -67,14 +80,16 @@ class Service__Vault__Append(Type_Safe):
         manifest = self._load_manifest(vault_id)
         if manifest is None or manifest.get('status') == 'deleted':
             return False
-        anchors = manifest.get('append_anchors', [])
+        config  = self._load_append_config(vault_id)
+        anchors = config.get('append_anchors', [])
         return self._hash(presented_token) in anchors
 
     def _check_enum_key(self, vault_id, presented_key):
         manifest = self._load_manifest(vault_id)
         if manifest is None or manifest.get('status') == 'deleted':
             return False
-        expected = manifest.get('enum_key_hash')
+        config   = self._load_append_config(vault_id)
+        expected = config.get('enum_key_hash')
         if not expected:
             return False
         return self._hash(presented_key) == expected
@@ -98,14 +113,10 @@ class Service__Vault__Append(Type_Safe):
             config = {}
         if append_anchors is not None:
             config['append_anchors'] = append_anchors
-            manifest['append_anchors'] = append_anchors
         if enum_key_hash is not None:
             config['enum_key_hash'] = enum_key_hash
-            manifest['enum_key_hash'] = enum_key_hash
         self.storage_fs.file__save(config_path, json.dumps(config).encode())
-        manifest_path = path__vault_manifest(vault_id)
-        self.storage_fs.file__save(manifest_path, json.dumps(manifest).encode())
-        self._manifest_cache[vault_id] = manifest
+        self._config_cache[vault_id] = config
         return dict(vault_id = vault_id, status = 'configured')
 
     def append(self, vault_id, append_token, payload_bytes):

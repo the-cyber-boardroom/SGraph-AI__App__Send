@@ -92,7 +92,7 @@ encrypted ciphertext and checks capability gates (`H(key) == stored_hash`). All 
 
 | Capability | Status | Evidence |
 |------------|--------|---------|
-| Four-tier gate model (append_token, enum_key, write_key, private_key) | **EXISTS** | `Service__Vault__Append.py`, 130 tests |
+| Four-tier gate model (append_token, enum_key, write_key, private_key) | **EXISTS** | `Service__Vault__Append.py`, 133 tests |
 | Blind append (no id/count leaked to sender) | **EXISTS** | `test__append__blindness_no_file_id_returned` |
 | Paginated listing with cursor (`after_file_id`) | **EXISTS** | `test__list_entries__*` |
 | Metadata-only listing (zero payload reads) | **EXISTS** | `test__list_entries__metadata_only_omits_size_and_content` |
@@ -100,7 +100,7 @@ encrypted ciphertext and checks capability gates (`H(key) == stored_hash`). All 
 | Path traversal defense via `Safe_Str__*` | **EXISTS** | 8 traversal negative tests |
 | Batch operation cap (100 file_ids) | **EXISTS** | `test__*_rejects_oversized_batch` |
 | Incremental content ceiling check (M-1 fix) | **EXISTS** | `test__list_entries__incremental_ceiling_check` |
-| Separate append config file (L-2 fix) | **EXISTS** | `test__configure__writes_separate_config_file` |
+| Separate append config — authoritative (L-2 fix) | **EXISTS** | `test__configure__writes_separate_config_file`, `test__configure__does_not_write_append_fields_to_manifest` |
 | list_files never returns append entries | **EXISTS** | `test__list_files__never_returns_append_entries` |
 | Account-less write surface (no access token) | **EXISTS** | `test__write__no_auth_token_required` |
 

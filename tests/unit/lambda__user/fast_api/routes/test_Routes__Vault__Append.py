@@ -6,7 +6,8 @@ from   unittest                                                                 
 from   tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User        import setup__fast_api__user__test_objs
 from   sgraph_ai_app_send.lambda__user.user__config                                import (HEADER__SGRAPH_VAULT__WRITE_KEY ,
                                                                                            HEADER__SGRAPH_VAULT__ENUM_KEY  )
-from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import path__vault_manifest
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import (path__vault_manifest      ,
+                                                                                          path__vault_append_config )
 
 
 VAULT_ID     = 'appendrt0001'
@@ -36,12 +37,15 @@ class test_Routes__Vault__Append(TestCase):
     def _create_vault(self, vault_id=VAULT_ID):
         manifest = dict(vault_id       = vault_id                  ,
                         write_key_hash = _hash(WRITE_KEY)          ,
-                        append_anchors = [_hash(APPEND_TOKEN)]     ,
-                        enum_key_hash  = _hash(ENUM_KEY)           ,
                         created_at     = int(time.time() * 1000)   )
-        path = path__vault_manifest(vault_id)
-        self.append_service.storage_fs.file__save(path, json.dumps(manifest).encode())
+        self.append_service.storage_fs.file__save(
+            path__vault_manifest(vault_id), json.dumps(manifest).encode())
+        config = dict(append_anchors = [_hash(APPEND_TOKEN)]       ,
+                      enum_key_hash  = _hash(ENUM_KEY)             )
+        self.append_service.storage_fs.file__save(
+            path__vault_append_config(vault_id), json.dumps(config).encode())
         self.append_service._manifest_cache.pop(vault_id, None)
+        self.append_service._config_cache.pop(vault_id, None)
 
     def _write(self, vault_id=VAULT_ID, token=APPEND_TOKEN, payload=PAYLOAD):
         return self.client.post(
@@ -504,12 +508,15 @@ class test_Routes__Vault__Append(TestCase):
         token_b = _hex_token('correspondent-beta')
         manifest = dict(vault_id       = vault                                ,
                         write_key_hash = _hash(WRITE_KEY)                     ,
-                        append_anchors = [_hash(token_a), _hash(token_b)]     ,
-                        enum_key_hash  = _hash(ENUM_KEY)                      ,
                         created_at     = int(time.time() * 1000)              )
         self.append_service.storage_fs.file__save(
             path__vault_manifest(vault), json.dumps(manifest).encode())
+        config = dict(append_anchors = [_hash(token_a), _hash(token_b)]       ,
+                      enum_key_hash  = _hash(ENUM_KEY)                        )
+        self.append_service.storage_fs.file__save(
+            path__vault_append_config(vault), json.dumps(config).encode())
         self.append_service._manifest_cache.pop(vault, None)
+        self.append_service._config_cache.pop(vault, None)
         self._write(vault, token=token_a, payload=b'from-alpha-1')
         self._write(vault, token=token_a, payload=b'from-alpha-2')
         self._write(vault, token=token_b, payload=b'from-beta-1')
@@ -556,3 +563,38 @@ class test_Routes__Vault__Append(TestCase):
         self._create_vault(vault)
         response = self._list(vault, limit='abc')
         assert response.status_code == 400
+
+    # =========================================================================
+    # HTTP status mapping tests (G-4)
+    # =========================================================================
+
+    def test__write__payload_too_large_returns_413(self):
+        vault = 'httpat000001'
+        self._create_vault(vault)
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Append import APPEND_MAX_PAYLOAD
+        big_payload = b'x' * (APPEND_MAX_PAYLOAD + 1)
+        response = self._write(vault, payload=big_payload)
+        assert response.status_code == 413
+
+    def test__write__at_capacity_returns_507(self):
+        vault = 'httpat000002'
+        self._create_vault(vault)
+        import secrets
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Append import APPEND_MAX_FILES
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths         import path__vault_append_pending
+        for i in range(APPEND_MAX_FILES):
+            file_name = f'{int(time.time()*1000):013d}_{secrets.token_hex(12)}.enc'
+            path = path__vault_append_pending(vault, APPEND_TOKEN, file_name)
+            self.append_service.storage_fs.file__save(path, b'x')
+        response = self._write(vault)
+        assert response.status_code == 507
+
+    def test__list__content_too_large_returns_413(self):
+        vault = 'httpat000003'
+        self._create_vault(vault)
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Append import INLINE_CONTENT_CEILING
+        chunk = b'x' * (INLINE_CONTENT_CEILING // 2 + 1)
+        self._write(vault, payload=chunk)
+        self._write(vault, payload=chunk)
+        response = self._list(vault, include_content=True)
+        assert response.status_code == 413

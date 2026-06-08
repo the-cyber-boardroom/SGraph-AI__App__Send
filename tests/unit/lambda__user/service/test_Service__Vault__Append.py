@@ -9,7 +9,8 @@ from   sgraph_ai_app_send.lambda__user.service.Service__Vault__Append           
                                                                                            APPEND_DEFAULT_LIMIT     ,
                                                                                            APPEND_MAX_LIMIT         ,
                                                                                            APPEND_BATCH_MAX_FILE_IDS)
-from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import path__vault_manifest
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import (path__vault_manifest      ,
+                                                                                          path__vault_append_config )
 
 
 VAULT_ID     = 'appendvault01'
@@ -37,11 +38,13 @@ class test_Service__Vault__Append(TestCase):
     def _create_vault_with_append(self, vault_id, write_key, append_token, enum_key):
         manifest = dict(vault_id       = vault_id                  ,
                         write_key_hash = _hash(write_key)          ,
-                        append_anchors = [_hash(append_token)]     ,
-                        enum_key_hash  = _hash(enum_key)           ,
                         created_at     = int(time.time() * 1000)   )
         manifest_path = path__vault_manifest(vault_id)
         self.service.storage_fs.file__save(manifest_path, json.dumps(manifest).encode())
+        config = dict(append_anchors = [_hash(append_token)]       ,
+                      enum_key_hash  = _hash(enum_key)             )
+        config_path = path__vault_append_config(vault_id)
+        self.service.storage_fs.file__save(config_path, json.dumps(config).encode())
 
     def _append(self, vault_id=VAULT_ID, token=APPEND_TOKEN, payload=PAYLOAD):
         return self.service.append(vault_id, token, payload)
@@ -90,8 +93,8 @@ class test_Service__Vault__Append(TestCase):
         assert self.service._check_append_token(VAULT_ID, APPEND_TOKEN) is True
         assert self.service._check_enum_key(VAULT_ID, 'new_enum') is True
 
-    def test__configure__updates_manifest_cache(self):
-        self.service._load_manifest(VAULT_ID)
+    def test__configure__updates_config_cache(self):
+        self.service._load_append_config(VAULT_ID)
         new_token = 'cache_test_token'
         self.service.configure(VAULT_ID, WRITE_KEY,
                                 append_anchors=[_hash(new_token)])
@@ -106,7 +109,6 @@ class test_Service__Vault__Append(TestCase):
         assert self.service._check_append_token(VAULT_ID, 'token_d') is False
 
     def test__configure__writes_separate_config_file(self):
-        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths import path__vault_append_config
         self.service.configure(VAULT_ID, WRITE_KEY,
                                 append_anchors=[_hash('cfg_token')],
                                 enum_key_hash=_hash('cfg_enum'))
@@ -115,6 +117,39 @@ class test_Service__Vault__Append(TestCase):
         config = self.service.storage_fs.file__json(config_path)
         assert 'append_anchors' in config
         assert 'enum_key_hash'  in config
+        assert self.service._check_append_token(VAULT_ID, 'cfg_token') is True
+        assert self.service._check_enum_key(VAULT_ID, 'cfg_enum')      is True
+
+    def test__configure__merge_preserves_existing_config(self):
+        vault = 'cfgmerge0001'
+        manifest = dict(vault_id       = vault              ,
+                        write_key_hash = _hash(WRITE_KEY)   ,
+                        created_at     = int(time.time() * 1000))
+        self.service.storage_fs.file__save(path__vault_manifest(vault),
+                                            json.dumps(manifest).encode())
+        self.service.configure(vault, WRITE_KEY,
+                                append_anchors=[_hash('anchor1')])
+        self.service.configure(vault, WRITE_KEY,
+                                enum_key_hash=_hash('new_enum'))
+        config = self.service.storage_fs.file__json(path__vault_append_config(vault))
+        assert config['append_anchors'] == [_hash('anchor1')]
+        assert config['enum_key_hash']  == _hash('new_enum')
+        assert self.service._check_append_token(vault, 'anchor1')  is True
+        assert self.service._check_enum_key(vault, 'new_enum')     is True
+
+    def test__configure__does_not_write_append_fields_to_manifest(self):
+        vault = 'cfgnoman0001'
+        manifest = dict(vault_id       = vault              ,
+                        write_key_hash = _hash(WRITE_KEY)   ,
+                        created_at     = int(time.time() * 1000))
+        self.service.storage_fs.file__save(path__vault_manifest(vault),
+                                            json.dumps(manifest).encode())
+        self.service.configure(vault, WRITE_KEY,
+                                append_anchors=[_hash('token1')],
+                                enum_key_hash=_hash('enum1'))
+        stored_manifest = self.service.storage_fs.file__json(path__vault_manifest(vault))
+        assert 'append_anchors' not in stored_manifest
+        assert 'enum_key_hash'  not in stored_manifest
 
     # =========================================================================
     # Gate checks
@@ -149,6 +184,18 @@ class test_Service__Vault__Append(TestCase):
 
     def test__gate__enum_key_cannot_purge(self):
         result = self.service.purge(VAULT_ID, ENUM_KEY, 'processed', APPEND_TOKEN)
+        assert result['status'] == 'gate_failed'
+
+    def test__gate__enum_not_configured_rejects_list(self):
+        vault = 'noenum000001'
+        manifest = dict(vault_id       = vault              ,
+                        write_key_hash = _hash(WRITE_KEY)   ,
+                        created_at     = int(time.time() * 1000))
+        self.service.storage_fs.file__save(path__vault_manifest(vault),
+                                            json.dumps(manifest).encode())
+        self.service.configure(vault, WRITE_KEY,
+                                append_anchors=[_hash(APPEND_TOKEN)])
+        result = self.service.list_entries(vault, ENUM_KEY)
         assert result['status'] == 'gate_failed'
 
     # =========================================================================
@@ -457,6 +504,14 @@ class test_Service__Vault__Append(TestCase):
         assert file_id in result['purged']
         after = self.service.list_entries(VAULT_ID, ENUM_KEY)
         assert len(after['entries']) == 0
+
+    def test__purge__pending_no_file_ids_is_noop(self):
+        self._append()
+        result = self.service.purge(VAULT_ID, WRITE_KEY, 'pending', APPEND_TOKEN)
+        assert result['status'] == 'ok'
+        assert result['purged'] == []
+        listing = self.service.list_entries(VAULT_ID, ENUM_KEY)
+        assert len(listing['entries']) == 1
 
     # =========================================================================
     # Full drain cycle

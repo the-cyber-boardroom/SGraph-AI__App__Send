@@ -85,7 +85,7 @@ without requiring both parties to have SGraph accounts.
 - Per-message size cap: `APPEND_MAX_PAYLOAD = 5 MB`; per-token file-count cap: `APPEND_MAX_FILES = 1000`
 - Metadata-only listing reads zero payloads; content reads only for the paged window
 - Incremental ceiling check on include_content (M-1 fix) — bails early instead of reading all files
-- Append config stored in separate `config.json` (L-2 fix) — no manifest co-ownership
+- Append config stored in separate `config.json` (L-2 fix) — `config.json` is the authoritative source for gates; manifest never written with append fields
 - `Storage_FS__S3.folder__folders` implemented to prevent silent-empty drain on Lambda/S3
 - `list_files` on vault pointer never returns append entries (regression-tested)
 
