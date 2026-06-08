@@ -1,6 +1,6 @@
 # Alchemist — Reality Index
 
-**Domain:** alchemist/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** alchemist/ | **Last updated:** 2026-06-04 | **Maintained by:** Librarian (daily run)
 
 This domain covers investor-facing materials, the Alchemist system (Town Planner team output), and business strategy documents. The Alchemist role translates technical output into investment and business value. Note: items in this domain are documents and strategic materials, not code features.
 
@@ -66,6 +66,13 @@ This domain covers investor-facing materials, the Alchemist system (Town Planner
 - AWS Marketplace strategy (three AMI types) (Section 30)
 - Two-tier team model methodology for partner dev packs (Section 16)
 - Ecosystem founder pack ("Build on SG/Send") (Section 16)
+
+### New PROPOSED Items (06/02 briefs)
+
+| # | Item | Status |
+|---|------|--------|
+| P-309 | **Investment Strategy — Why Now + Alchemist Guidance** — investment thesis: operationalisation breakthrough + initial PMF as "why now"; use-of-funds model (humans own areas, agentic teams execute); foundational platform play; revenue: consumption/credit + model-access markup (25% OpenRouter premium) + premium gen-AI; B2C2B go-to-market; investor-as-user thesis; open-source as sovereignty signal; compliance via disclaimer; needs Alchemist session to translate into investor materials | PROPOSED — does not exist yet |
+| P-310 | **Investor Disclaimer Options for sgraph.ai/invest/the-ask** — five disclaimer versions (A: very short / B: short / C: moderate / D: comprehensive / E: most protective); open-company positioning with gated investment opportunity; needs compliance adviser review before going live; currently draft options only, not live on site | PROPOSED — does not exist yet |
 
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 

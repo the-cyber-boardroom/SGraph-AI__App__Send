@@ -7,6 +7,126 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-08
+
+Code-change-only session: 0 new briefs; 9 substantive commits since the 06/07 librarian session (plus CI version bumps → v0.33.5).
+
+- `ui/index.md` — Added: vault-embed postMessage handshake (embed-protocol.js, _initEmbed, _initWithKey embed gating, deepLink memory path, _setCachedAccessKey gate); sg-vault-object-store.js typeof-caches sandbox fix + bundle rebuild; favicon.ico + `<link rel="icon">` tags in 5 HTML files; last updated 05/31 → 06/08
+- `qa/index.md` — Added: test__embed_protocol.js (37 assertions, run-all.sh suite → ~113); browser integration extended to 8 tests (test__embed_handshake.py: 4 tests — handshake + deep-link + sandboxed iframe + storage isolation); last updated 06/05 → 06/08
+- `security/index.md` — Added: Vault-Embed Security Model section (key in memory, one-shot listener, sibling rejection, origin validation, unresolved consent gap); sg-vault-object-store.js sandbox safety note; last updated 06/05 → 06/08
+- `index.md` — Version v0.32.4 → v0.33.5; last updated 06/06 → 06/08; unit tests ~1556+ → ~1600+; docs 594 (unchanged); PROPOSED 455+ (unchanged)
+
+Master index (06/08): `team/roles/librarian/reviews/06/08/v0.33.5__master-index__code-changes-07-june-2026.md`
+Processed: 0 new human briefs | New EXISTS items: 7 (embed-protocol module, 3 embed browser tests, sandboxed regression test, favicon.ico, caches guard fix) | New PROPOSED items: 0
+
+---
+
+## 2026-06-06
+
+Brief-processing session: 27 new human briefs from 06/04 (1 day-index + 8 skills + 2 research + 16 NHI 2.0).
+
+- `index.md` — Version v0.32.3 → v0.32.4; last updated 06/05 → 06/06; docs 567 → 594; PROPOSED 433+ → 455+ (P-317–P-338)
+- `identity/proposed/index.md` — NHI 2.0 platform section added: P-322 through P-336 (15 new items)
+- `ai-agents/proposed/index.md` — Skills economy section added (P-317–P-321); NHI 2.0 cross-domain items added (P-325, P-328, P-332)
+
+Master index (06/06): `team/roles/librarian/reviews/06/06/v0.32.4__master-index__briefs-04-june-2026.md`
+Processed: 27 new human briefs | New EXISTS items: 0 | New PROPOSED items: 22 (P-317–P-338)
+
+---
+
+## 2026-06-05
+
+Code-change-only session: 0 new briefs; 4 commits since the 06/04 session (`57edba8`, `e365c60`, `2539220`, `33dc551`).
+
+- `security/index.md` — Added "Vault Inbox Hardening" section: B-1 S3 silent-empty fix; B-2 path traversal closed via `Safe_Str__Vault__Append_Token` + `Safe_Str__Vault__Inbox__File_Id`; I-1/2/3 perf/DoS mitigations; batch cap 100 file_ids (commit `e365c60`)
+- `send-api/index.md` — Vault inbox section updated: hardening note, Safe_Str schemas, revised test count
+- `qa/index.md` — Test count updated to 957 Python (confirmed via commit `e365c60`); total ~1556+ with JS suites
+- `index.md` — Version v0.32.2 → v0.32.3; last updated 06/04 → 06/05; unit tests ~1358+ → ~1556+
+
+Master index (06/05): `team/roles/librarian/reviews/06/05/v0.32.3__master-index__no-new-briefs-05-june.md`
+Processed: 0 new human briefs | New EXISTS items: Safe_Str vault inbox primitives, S3 folder__folders fix | New PROPOSED items: 0
+
+---
+
+## 2026-06-04 *(retroactive — omitted from prior session)*
+
+- `index.md` — Version v0.31.18 → v0.32.2; date 06/03 → 06/04; docs 546 → 567; PROPOSED 416+ → 433+ (P-300–P-316); vault inbox EXISTS (+6 endpoints, +101 tests); unit tests ~1257+ → ~1358+
+- `send-api/index.md` — Vault inbox endpoints section added (6 endpoints, 101 tests, commit `9d727b5`)
+- `ai-agents/proposed/index.md` — P-300, P-301, P-303, P-304, P-305, P-312, P-315, P-316 added
+- `vault/proposed/index.md` — P-302, P-307, P-311, P-313 added
+- `identity/proposed/index.md` — P-314 added
+- `alchemist/index.md` — P-309, P-310 added
+- `website/proposed/index.md` — P-306, P-308 added
+
+Master index (06/04): `team/roles/librarian/reviews/06/04/v0.32.2__master-index__briefs-02-to-03-june.md`
+Processed: 21 new human briefs (06/02 × 12, 06/03 × 9) | New EXISTS items: 6 vault inbox endpoints | New PROPOSED items: 17 (P-300–P-316)
+
+---
+
+## 2026-06-03
+
+Second librarian session on the same briefs (first was 06/02, ref `team/roles/librarian/reviews/06/02/`). This session produced more detailed architect/dev reviews and a debrief; the reality document updates were carried forward from the 06/02 session (canonical P-numbers). Index date updated to 06/03.
+
+- `index.md` — Date updated 06/02 → 06/03 (second session); all other stats from 06/02 session retained
+- `vault/proposed/index.md` — Added P-281 (vault-per-standard pipeline), P-282 (public preview + embedded RO key), P-284 (vulnerability debriefs as vault artefacts); already carried from 06/02 session
+
+Master index (06/03 session): `team/roles/librarian/reviews/06/03/v0.31.18__master-index__briefs-30-may-to-01-june.md`
+Architect review: `team/roles/architect/reviews/06/03/v0.31.18__architect-review__briefs-30-may-to-01-june.md`
+Dev review: `team/roles/dev/reviews/06/03/v0.31.18__dev-review__briefs-30-may-to-01-june.md`
+
+## 2026-06-02
+
+- `index.md` — Updated: version v0.31.15 → v0.31.18; date 06/01 → 06/02; PROPOSED 397+ → 416+ (P-281–P-299 canonical); total docs 524 → 546 (22 new human briefs from 05/30, 05/31, 06/01)
+- `vault/proposed/index.md` — Added P-281 (vault-per-standard pipeline), P-282 (public preview + embedded RO key), P-284 (vulnerability debriefs); last updated 05/25 → 06/02
+- `ai-agents/proposed/index.md` — Added P-283 (library as shop front + FS email), P-286 (per-page semantic graphs), P-288–P-299 (Netlify, Daytona, Convex, Pi, HeyGen, Tavon, skills graph, base vaults, creator economy, marketplace, comparison, OpenRouter broker); last updated 05/21 → 06/02
+- `website/proposed/index.md` — Added P-283 (library as shop front), P-285 (agent-controlled website + vault CI), P-286 (per-page semantic graphs), P-287 (industry use-case pages); last updated 05/17 → 06/02
+- `identity/proposed/index.md` — Added P-299 (OpenRouter key/credit/billing broker service); last updated (previous) → 06/02
+
+Master index (06/02 session): `team/roles/librarian/reviews/06/02/v0.31.18__master-index__briefs-30-31-may-01-june.md`
+Processed: 22 new human briefs (05/30 ×5, 05/31 ×4, 06/01 ×13) | New PROPOSED: 19 (P-281–P-299 canonical)
+
+---
+
+## 2026-06-01
+
+- `index.md` — Updated: version v0.31.12 → v0.31.15; date 05/31 → 06/01; unit tests ~1240+ → ~1257+; PROPOSED 395+ → 397+ (P-279–P-280)
+- `ui/index.md` — Added: deep-link HTML fix (CSS/JS loading in `/en-gb/app/#deep-link`); AppNavHelpers test count 35→47; last updated 05/31 → 06/01
+- `qa/index.md` — Added: browser integration harness (5 pytest functions, 4 files, Python+Playwright+sgit-ai); test count ~1139+ → ~1257+; last updated 05/30 → 06/01
+- `security/index.md` — Added: SEC-VIV-002 (popup capability over-grant to inner vaults — OPEN, Medium); last updated 05/29 → 06/01
+- `infra/index.md` — Added: `_test-ui-vault.yml` reusable vault UI test workflow (4-job pipeline); `test:vault-browser-integration` npm script; last updated 05/13 → 06/01
+- `ui/proposed/index.md` — Added P-279 (kernel path unification) + P-280 (popup gate fix); last updated 05/31 → 06/01
+
+Master index: `team/roles/librarian/reviews/06/01/v0.31.15__master-index__no-new-briefs-code-31-may.md`
+Processed: 0 new human briefs (no June briefs yet — first day of month)
+New EXISTS items: 7 (deep-link fix, AppNavHelpers 35→47, browser integration harness ×4 files, CI reusable workflow) | New PROPOSED items: 2 (P-279, P-280)
+
+---
+
+## 2026-05-29
+
+- `index.md` — Updated: version v0.28.7 → v0.31.3; date 05/28 → 05/29; doc count 493 → 504; JS assertions +152; API endpoints +1 (Routes__Info__SGraph); PROPOSED 366+ → 379+
+- `ui/index.md` — Added: ViV kernel modules (SecureChannel, KernelMounts, KernelBroker, KernelAppHandlers, KernelBootstrap, sg-app-stub, kernel-shell-bundle); P-250 through P-262; 10 bugs fixed notation
+- `security/index.md` — Added: Vault App Trust Model section (SEC-VIV-001 same-origin bypass; trust assumption caveat; CORS fix); last updated 04/28 → 05/29
+- `qa/index.md` — Updated: test count ~760+ → ~912+; added ViV loader suite table (152 jsdom-free assertions across 10 test files); last updated 04/28 → 05/29
+
+Master index: `team/roles/librarian/reviews/05/29/v0.31.3__master-index__briefs-viv-28-29-may.md`
+Processed: 11 new human briefs (briefs/05/vault-in-vault/version-1 × 3 + version-2 × 8)
+New EXISTS items: 14 (ViV kernel modules, CORS fix, Routes__Info, Container, 152 JS tests) | New PROPOSED items: 13 (P-250–P-262)
+
+---
+
+## 2026-05-28
+
+- `index.md` — Updated: version v0.27.79 → v0.28.7; date 05/26 → 05/28; doc count 488 → 493; PROPOSED 365+ → 366+; P-231 resolved to EXISTS
+- `ui/index.md` — Added: Public Vault Previews (full set); Sub-Vaults Phases 1–3; App-Mode Permissions Phases 1–4B; vault header pill; sg.history.* API
+- `vault/index.md` — Added: P-231 resolved EXISTS (Web UI); P-248 (sub-vaults CLI) PROPOSED
+
+Master index: `team/roles/librarian/reviews/05/28/v0.28.7__master-index__briefs-25-may-and-code-25-27-may.md`
+Processed: 5 new human briefs (briefs/05/25/)
+New EXISTS items: 6 | New PROPOSED items: 2 (P-248, P-249)
+
+---
+
 ## 2026-05-26
 
 - `index.md` — Updated: version v0.27.61 → v0.27.79; date 05/25 → 05/26; doc count 463 → 488; PROPOSED count 341+ → 365+

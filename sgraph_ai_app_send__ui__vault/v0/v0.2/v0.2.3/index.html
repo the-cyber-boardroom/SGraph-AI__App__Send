@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" sizes="32x32" href="/favicon.ico">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SG/Vault (v0.2.2) — Zero-knowledge encrypted vault</title>
@@ -199,6 +201,8 @@
     <script src="_common/js/components/events-viewer/events-viewer.js"></script>
     <script src="_common/js/components/api-logger/api-logger.js"></script>
     <script src="_common/js/components/storage-viewer/storage-viewer.js"></script>
+    <script src="_common/js/components/vault-subvaults-panel/vault-subvaults-view.js"></script>
+    <script src="_common/js/components/vault-subvaults-panel/vault-subvaults-panel.js"></script>
 
     <!-- 9. Vault components -->
     <script src="_common/js/components/vault-entry/vault-entry.js"></script>
@@ -408,35 +412,16 @@
             return vault;
         };
 
-        // Patch VaultDataSource to expose .vault-settings as a browseable + editable file.
-        // The file is synthetic: read → serialised from vault._settings; write → parsed back
-        // into vault._settings and re-committed (same path the internal _commit() takes).
-        // This makes the metadata visible in the file browser without duplicating it in the tree.
+        // .vault-settings.json is internal vault metadata. We deliberately DO NOT list it in
+        // the editor's file tree (it appeared as an "auto-added orphan" otherwise). The synthetic
+        // read/write hooks are kept so any consumer that asks for the path directly (e.g. the
+        // Settings tab round-tripping JSON) still works — but getTree/getFileList no longer
+        // surface it. The kernel also only re-writes .vault-settings.json when settings actually
+        // change (initial commit, or _settingsDirty after setName/setSettings) — see sg-vault.js.
         (function () {
             var proto = window.VaultDataSource && window.VaultDataSource.prototype;
             if (!proto) return;
-
-            // Settings are stored as .vault-settings.json in the encrypted commit tree
-            // (v0.2.1+; v0.2.0 used .vault-settings — _loadTreeFromCommit handles both).
             var VSFILE = '.vault-settings.json';
-
-            var _origGetTree = proto.getTree;
-            proto.getTree = function () {
-                var tree = _origGetTree.call(this);
-                var json = JSON.stringify(this._vault._settings || {}, null, 2);
-                tree.files.push({ path: VSFILE, name: VSFILE,
-                                  size: new TextEncoder().encode(json).length });
-                return tree;
-            };
-
-            var _origGetFileList = proto.getFileList;
-            proto.getFileList = function () {
-                var list = _origGetFileList.call(this);
-                var json = JSON.stringify(this._vault._settings || {}, null, 2);
-                list.push({ path: VSFILE, name: VSFILE,
-                            dir: false, size: new TextEncoder().encode(json).length });
-                return list;
-            };
 
             var _origGetFileBytes = proto.getFileBytes;
             proto.getFileBytes = async function (path) {
@@ -454,6 +439,7 @@
                     var buf  = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes).buffer;
                     var text = new TextDecoder().decode(buf);
                     this._vault._settings = JSON.parse(text);
+                    this._vault._settingsDirty = true;       // ensure next commit writes it
                     await this._vault._commit('Update .vault-settings');
                     if (this.onTreeChanged) this.onTreeChanged();
                     return;

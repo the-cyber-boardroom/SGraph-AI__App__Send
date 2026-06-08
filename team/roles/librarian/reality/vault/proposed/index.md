@@ -190,6 +190,16 @@ Builds entirely on EXISTING foundations: the SG/Send transfer flow + **DELETE** 
 | P-176 | Preview management list + **delete** (not just unpublish) | The editor lists every bookkeeping record under `.vault/owner/public-previews/` (a vault may hold several) with a published/unpublished badge and per-row Edit / Delete. **Unpublish** = `DELETE` the transfer but keep an inactive record (republish at the same link). **Delete** (`PublicPreviewWrite.deletePreview`) = best-effort `DELETE` the transfer **and** `removeFile` the bookkeeping record. Auto-load-into-form only when exactly one record is active; otherwise the owner picks from the list | lead clarification (delete accumulated preview files) |
 | P-177 | RO-token entry on the `/en-gb/app/<public-id>` key prompt | The preview card's key prompt (`sg-public-preview-card.js`) invites a read-only token alongside the vault key (placeholder + hint `ro-…`). The opener path `app-shell._initWithKey` branches on `key.startsWith('ro-')` → `_resolveROToken` → `SGVault.openReadOnly` (read-only; wrong-vault guard applies; not persisted as `sg-vault-key`). **WIRED:** the RO round-trip now resolves via a **deterministic transfer-id** — `SGVaultCrypto.deriveRoTokenTransferId(token)` = `SHA-256('ro-token-transfer-v1:'+bare)[:12]` — used by BOTH the writer (`vault-token-manager.createTransferToken` creates the creds transfer at that id) and the readers (`app-shell._resolveROToken` + `vault-loader.openROToken` derive the id, `GET /download/<id>`, decrypt with the token, `openReadOnly`). Drops the broken `check-token`-ciphertext dependency; no backend change (the `/create` schema already accepts a client `transfer_id`). Also fixed app-shell latent bugs: it had used the `ro-` prefix in the PBKDF2 passphrase and read camelCase fields from a snake_case payload. Guarded by `tests/unit/vault_ui/loader/test__ro_token_resolution.js`. **Pending:** browser verification of the full create→share→open flow; only newly-created tokens resolve (old random-id tokens never resolved anyway) | lead clarification (enter ro token in pic1) |
 
+## Compliance + Vulnerability Artefacts (05/30–06/01 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-281 | Vault-per-Standard Document-to-Graph Pipeline | Universal pipeline: document → structured form → semantic graph + ontologies → validation → feedback. Section-level ontologies connecting to fractal top-level ontology. Provenance model distinguishes standard text / ruling / regulator guidance. Raw input, LLM responses, and transformed artefacts all stored in vault with provenance. GDPR as pilot standard; intersection vaults drawing on two parent per-standard vaults via VIV sub-vault link (P-159/P-160). | 05/30 brief |
+| P-282 | Public Preview with Embedded Read-Only Key | Extends the public preview convention JSON (P-167) with an embedded `read_only_key` field so the public link carries the RO token. Auto-load path on `/en-gb/app/<public-id>` detects and uses the embedded RO token (resolves via deterministic transfer-id, P-177). Field-name guard (P-167) extended to ban full vault keys — only RO token allowed. Depends on P-166–P-177 merge. | 05/30 brief |
+| P-284 | Vulnerability Debriefs as First-Class Platform Artefacts | Vault template + schema for vulnerability debriefs: metadata (`cve_id`/`title`/`severity`/`date`/`affected_versions`/`status`), timeline, indicators of compromise, lessons learned, recommendations. Published as public vault via public preview path (P-166–P-177). Website library page rendering debriefs from vault. Version-controlled audit history of debrief updates. | 05/31 brief |
+
 ## Talk to the Vault — Vault Chat with Tool-Calling (05/25 brief — doc 493)
 
 All items below are **PROPOSED — does not exist yet.**
@@ -213,6 +223,19 @@ Architecture dev pack (12 documents, code-grounded against real `__Send` code): 
 
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
+---
+
+## Vault as Operational Substrate + Communications (06/02–06/03 briefs)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-302 | Webify/AI-fi Your Spreadsheets | Don't replace painful-but-working spreadsheet mini-apps — improve them. Spreadsheet becomes an external connected vault; each tab becomes a mini-app (metadata UIs, infographics, vault-chat on live data). Consultant-delivered; shipping is the hard problem, not the AI. Bridges the gap between "has working Excel" and "wants a web app." | 06/02 strategy-brief |
+| P-307 | Vaults for the Blast Radius Company Use Case | Each blast-radius = one vault holding enrichment data, sign-off records, semantic graphs, mini-apps for multi-audience delivery (exec summary, technical deep-dive, board report). Safe send-for-enrichment workflow: data encrypted, recipient enriches, owner reads back. No-database architecture (vault IS the database). Agent peer review with provenance. | 06/02 arch-brief |
+| P-311 | Publishing Mode — Static Publish via GitHub Actions | Vault holds the editable source content; GitHub Actions workflow publishes the static public element. Data stays encrypted even at rest in GitHub. Reuses existing read-only-key approach for decryption in the GHA worker. Second publish path alongside Netlify (P-288). Enables "vault edits, GitHub publishes" workflow for GitHub-native projects without Netlify dependency. | 06/03 dev-brief |
+| P-313 | Vault-to-Vault Comms via Append Token + PKI | Concrete messaging mechanism using the existing vault inbox (NOW EXISTS): sender receives parent vault's public key + append_token via template-vault provisioning; sender encrypts payload with public key, appends via append_token; only the parent (holding private_key) can decrypt. Bidirectional via symmetric provisioning. Prove 2-5 vaults first. Blocked on template-vault provisioning spec (`AD-provisioning-spec-1`). | 06/03 dev-brief |
+
 | P-153 | Discovery endpoint at `/.well-known/vaults` | Returns structured JSON listing of public vaults with metadata | doc 422 |
 | P-154 | Vault visibility model | Four levels: public / unlisted / private / count-only | doc 422 |
 | P-155 | Ed25519 signing + X25519 encryption key pair per vault | New PKI layer — public key safe to expose; private key never leaves owner | doc 422 |

@@ -88,7 +88,11 @@
         async push() {
             if (!this._cloneRefFileId) throw new Error('No clone branch initialised')
             if (!this.writable)        throw new Error('Read-only: no write key')
-            await this._refManager.writeRef(this._refFileId, this._headCommitId)
+            // named ref + branch index in ONE POST /batch (fixed url → cacheable preflight).
+            await this._withBatch(async () => {
+                await this._refManager.writeRef(this._refFileId, this._headCommitId)
+                try { await this._refManager.writeBranchIndex(this._branchIndexFileId, this._refFileId) } catch (_) {}
+            })
             this._namedHeadId = this._headCommitId
         },
 

@@ -44,7 +44,9 @@ Anything that goes through a JavaScript API works without modification:
 | `sg.loadCss(path)` / `sg.loadJs(path)` | ✅ Works | loaders that read vault bytes over the bridge and inject `<style>`/`<script>` |
 | `img.src = 'photo.png'` (assigned **from JS**) | ✅ Works | `HTMLImageElement.prototype.src` setter is patched to decrypt + serve a `blob:` |
 | `<a href="other.html">` (clicked) | ✅ Works | Click handler postMessages parent, which re-renders the iframe |
-| `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*` | ✅ Works | postMessage command protocol (see below) |
+| `<a href="other.html#section">` (clicked) | ✅ Works | Fixed 2026-05-30 — the `?query`/`#fragment` is stripped before the extension check; the fragment is forwarded and scrolled-to in the new doc |
+| `<a href="https://example.com">` (clicked) | ✅ Opens in a new tab | Fixed 2026-05-30 — the iframe sandbox got `allow-popups allow-popups-to-escape-sandbox`; the click interceptor calls `window.open(href, '_blank', 'noopener,noreferrer')` synchronously from the gesture |
+| `sg.fs.*`, `sg.vault.*`, `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*`, `sg.state.*` | ✅ Works | postMessage command protocol (see below) |
 
 If you stick to these patterns, your page just works.
 
@@ -119,8 +121,44 @@ window.sg = {
     },
     // Toast notifications surfaced in the host chrome (app-hud).
     ui: {
-        message : (text, type, opts) => handle,   // type: 'info' | 'success' | 'error'; opts: {ttl}
-        dismiss : (handle) => void,
+        message          : (text, type, opts) => handle,            // type: 'info' | 'success' | 'error' | 'warn'; opts: {ttl}
+        dismiss          : (handle) => void,
+        // Ask the user (via a HUD overlay) to grant a declared-but-consent-gated verb.
+        // Returns { granted: bool }. The grant is cached per (vault, appId, verb) in the
+        // top-level kernel's localStorage so repeated calls don't re-prompt. vault.delete
+        // ALWAYS re-confirms regardless of cache.
+        requestPermission: (verb, path) => Promise<{granted: boolean}>,
+    },
+    // Mutations against the host vault — gated by app.json `permissions.fs.*` grants
+    // AND a user-consent overlay on first call per (vault, appId, verb). Reads use the
+    // standard vfs.* namespace; these are for non-read changes. Throws on read-only views.
+    fs: {
+        move  : (from, to) => Promise<{ok: true, from, to}>,
+        delete: (path)     => Promise<{ok: true, path}>,
+        mkdir : (path)     => Promise<{ok: true, path}>,
+    },
+    // Vault lifecycle — create / unlink / delete sub-vaults, and ViV mount/unmount for
+    // cross-vault reads/writes through this kernel. Each verb is independently grantable
+    // and consent-gated (vault.delete always re-confirms regardless of cache).
+    vault: {
+        create  : (path, label)  => Promise<{vaultKey, path}>,
+        unlink  : (path)         => Promise<{ok: true}>,
+        delete  : (path)         => Promise<{ok: true}>,
+        mount   : ({prefix, ref, label}) => Promise<{mountId}>,
+        unmount : (mountId)      => Promise<{ok: true}>,
+        mounts  : ()             => Promise<[{mountId, prefix, label, ref}]>,
+    },
+    // Device-local preferences for THIS app on THIS browser (NEW 2026-05-30).
+    // Backed by the top-level kernel's localStorage, namespaced as
+    // sg-app-state:<vaultId>:<appEntryPath>:<key>. Values are JSON-encoded, capped
+    // at 64 KiB per key. Does NOT travel with the vault; use sg.fs.write('.app-state/...')
+    // for vault-persistent state that should sync across devices.
+    state: {
+        get   : (key)        => Promise<value | null>,
+        set   : (key, value) => Promise<{ok: true}>,
+        remove: (key)        => Promise<{ok: true}>,
+        clear : ()           => Promise<{ok: true, removed}>,    // only this app's keys
+        keys  : ()           => Promise<string[]>,               // un-namespaced (just the key part)
     },
 };
 ```
@@ -260,9 +298,32 @@ Just use anchor tags. Click handling is intercepted automatically:
 ```html
 <a href="other-page.html">Go to the other page</a>
 <a href="/absolute/from/root.html">Vault-rooted absolute path</a>
+<a href="other-page.html#section">Page anchor — fragment scrolls into view</a>
+<a href="https://example.com">External link — opens in a new tab</a>
 ```
 
-External links and `mailto:` / `#fragment` / `javascript:` are passed through unchanged.
+**What the host does for you (so your app shouldn't reinvent these):**
+
+- **Hash anchors** — `<a href="page.html#section">` was historically broken (the `.html`
+  endsWith check failed because the href ended in `#section`, the click fell through,
+  the static host 403'd). Fixed 2026-05-30. The fragment is forwarded to the new srcdoc
+  and applied on `DOMContentLoaded` via a postMessage from the parent. Apps don't need
+  any workaround.
+- **External links** (`http://`, `https://`, protocol-relative `//`) open in a new tab
+  via `window.open(..., '_blank', 'noopener,noreferrer')`. The iframe sandbox has
+  `allow-popups allow-popups-to-escape-sandbox`, so the new window is unrestricted.
+  Don't add `target="_blank"` markup — the host handles it.
+- **`mailto:` and `javascript:`** are passed through unchanged.
+- **Pure-fragment links** (`<a href="#section">`) are passed through — the browser
+  scrolls within the current page without the host being involved.
+- **Friendly 404** — clicks pointing to files that don't exist (or are inside the
+  `.vault/**` floor) land on a host-rendered "Page not found in this vault" overlay
+  with a back arrow. You don't need to handle broken-link routing yourself.
+- **Back / forward / Home / Reload / Recent pages** — the SG/App HUD has a browser-style
+  nav row above your iframe with all five. The path is editable like a real URL bar
+  (click → type a vault-absolute path → Enter to navigate). Apps that used to build
+  their own back button can drop it. The nav row can be hidden via `app.json` if it
+  conflicts with the app's design — see "Configuring the host chrome" below.
 
 ### 6. Images
 
@@ -295,6 +356,77 @@ sg.vfs.read('cover.jpg').then(buf => {
 
 Note: relative `src` is resolved against the current page's directory; an absolute vault path
 (`/photos/x.png`) is taken from the vault root. `<picture>`/`<source srcset>` is **not** intercepted.
+
+---
+
+## Configuring the host chrome — `app.json` `hud.*`
+
+The SG/App host renders chrome around every app: a top row (brand, vault badge, app
+title, copy-link, debug, etc.) and — as of 2026-05-30 — a browser-style nav row below
+it (back / forward / reload / home / editable path / copy-path / ⋯ recent). Apps can
+declare how much of this chrome they want via `app.json`:
+
+```json
+{
+  "entry": "index.html",
+  "present": true,
+  "title": "My App",
+  "hud": {
+    "mode": "full",
+    "show": {
+      "vaultName":  true,
+      "appTitle":   true,
+      "openVault":  true,
+      "copyLink":   true,
+      "print":      true,
+      "debug":      true,
+      "navBar":     true,
+      "navArrows":  true,
+      "navPath":    true,
+      "navRefresh": true,
+      "navHome":    true
+    }
+  }
+}
+```
+
+`hud.mode` is the headline switch:
+
+- **`"full"`** *(default)* — chrome row + nav row both visible. Best for apps with
+  multiple pages where users benefit from back/forward.
+- **`"minimal"`** — chrome row collapsed to vault name + title only; no nav row;
+  no Debug button. Best for single-page reading-mode apps that want to feel less
+  "appy". Defaults: `vaultName, appTitle: true`, everything else off.
+- **`"hidden"`** — chrome row + nav row both hidden; iframe takes the full viewport.
+  A **corner `× Exit app` pill** (`position: fixed; top: 8px; right: 8px; z-index: 9999`)
+  remains visible regardless. Best for immersive experiences (lightbox-first
+  galleries, presentations, kiosk mode).
+
+`hud.show.*` granular flags override the per-mode defaults. Set to `false` to hide;
+omit to use the default.
+
+### Sovereignty rail — what apps **cannot** suppress
+
+The HUD config is for *app preferences*, not *app authority*. Three guarantees the
+host enforces no matter what `app.json` says:
+
+1. **Consent prompts always render.** When the app calls `sg.fs.delete(...)` or
+   `sg.vault.create(...)` etc., the host's HUD consent overlay appears for the user
+   to allow/deny — regardless of `hud.mode`.
+2. **The escape pill is non-suppressible** in `mode: "hidden"`. Users always have a
+   one-click way back to the vault file browser.
+3. **User-side override.** Power users can set
+   `localStorage['sg-app-force-show-hud'] = '1'` and reload to force `mode: "full"`
+   regardless of what `app.json` requests. (Read at page-script level — not bypassable
+   by app code.)
+
+### Recommendation
+
+Don't ship `hud` at all unless you've thought about it; `full` is the right default
+for almost everything. Use `minimal` if your app is single-page reading content and
+the nav row would confuse users (e.g. a long-form essay with no internal navigation).
+Reach for `hidden` only when the chrome actively breaks the experience — and even
+then, prefer `minimal` first.
 
 ---
 

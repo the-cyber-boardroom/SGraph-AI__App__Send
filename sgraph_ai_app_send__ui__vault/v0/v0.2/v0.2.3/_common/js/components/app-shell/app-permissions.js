@@ -13,7 +13,8 @@
      appId(bytes)              — SHA-256 hex of the canonical app.json bytes (consent-cache identity)
 
    Verbs: 'fs.read' 'fs.list' 'fs.write' 'fs.move' 'fs.delete' 'fs.mkdir'
-          'vault.create' 'vault.unlink' 'vault.delete'
+          'vault.create' 'vault.createKey' 'vault.standalone' 'vault.seedFrom'
+          'vault.openApp' 'vault.embedAccessToken' 'vault.unlink' 'vault.mount' 'vault.delete'
    ================================================================================= */
 
 (function () {
@@ -83,11 +84,31 @@
     // Parse app.json.permissions into a normalised shape. Defensive: missing/junk blocks
     // collapse to deny-all-mutations (reads still follow READ_DEFAULT). `fs.read` absent is
     // kept as undefined so `can` can apply the default; present-but-false denies reads.
+    // Consent policy per verb (how the HUD confirmation behaves). Declared by the app's author
+    // in app.json — the same trust boundary as the grants themselves. Values:
+    //   'always' — re-confirm every time (default for createKey/delete; never cached)
+    //   'once'   — prompt once per (vault, app, verb), then remember
+    //   'auto'   — never prompt (trust the grant alone). For high-privilege verbs this is a
+    //              deliberate "I trust this app" choice by whoever authored the manifest.
+    // Anything malformed → undefined (callers fall back to the per-verb default).
+    function _consentPolicy(c) {
+        var out = {};
+        if (c && typeof c === 'object') {
+            for (var k in c) {
+                if (!Object.prototype.hasOwnProperty.call(c, k)) continue;
+                var v = c[k];
+                if (v === 'always' || v === 'once' || v === 'auto') out[k] = v;
+            }
+        }
+        return out;
+    }
+
     function parsePermissions(appJson) {
         var p     = (appJson && appJson.permissions) || {};
         var fs    = (p.fs    && typeof p.fs    === 'object') ? p.fs    : {};
         var vault = (p.vault && typeof p.vault === 'object') ? p.vault : {};
         return {
+            consent: _consentPolicy(p.consent),
             fs: {
                 read:  ('read' in fs) ? _grant(fs.read) : undefined,
                 write:  _grant(fs.write),
@@ -96,9 +117,15 @@
                 mkdir:  _grant(fs.mkdir)
             },
             vault: {
-                create:   _grant(vault.create),
-                unlink:   _grant(vault.unlink),
-                'delete': vault['delete'] === true   // bool only (always consent-gated)
+                create:           _grant(vault.create),      // read-through create (existing)
+                createKey:        _grant(vault.createKey),   // create + RETURN key / getKey (stronger; path-grant)
+                standalone:       vault.standalone === true,   // allow create with no parent link (bool)
+                seedFrom:         _grant(vault.seedFrom),    // source paths/refs allowed as seedFrom (path-grant)
+                openApp:          vault.openApp === true,       // allow sg.vault.openApp (bool)
+                embedAccessToken: vault.embedAccessToken === true, // embed a backend access token in a vault (bool)
+                unlink:           _grant(vault.unlink),
+                mount:            _grant(vault.mount),       // ViV Phase 2: parent → child kernel spawn
+                'delete':         vault['delete'] === true     // bool only (always consent-gated)
             }
         };
     }
@@ -136,8 +163,11 @@
             return _match(perm.fs[act], path);
         }
         if (grp === 'vault') {
-            if (act === 'delete') return perm.vault['delete'] === true;
-            return _match(perm.vault[act], path);
+            if (act === 'delete')           return perm.vault['delete'] === true;
+            if (act === 'standalone')       return perm.vault.standalone === true;
+            if (act === 'openApp')          return perm.vault.openApp === true;
+            if (act === 'embedAccessToken') return perm.vault.embedAccessToken === true;
+            return _match(perm.vault[act], path);   // create, createKey, seedFrom, unlink, mount
         }
         return false;
     }

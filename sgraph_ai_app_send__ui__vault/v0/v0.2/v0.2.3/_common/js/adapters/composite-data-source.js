@@ -46,6 +46,11 @@ class CompositeDataSource {
     set writable(v)   { this._root.writable = v; }
     get _accessKey()  { return this._root._accessKey; }
     set _accessKey(v) { this._root._accessKey = v; }
+    // Identity delegate: consumers (send-browse, vault-shell, app-shell etc.) historically
+    // read `dataSource._vault` to get the underlying SGVault. When the root is wrapped by
+    // CompositeDataSource (the editor's preview path), that field was undefined → callers
+    // saw an empty vaultId/vaultName. Delegate explicitly so the composite is transparent.
+    get _vault()      { return this._root && this._root._vault; }
 
     // ── Scan the root for *.link.json → register vault mounts + external resources ──
     async scan() {
@@ -127,12 +132,12 @@ class CompositeDataSource {
     _mountTreeNode(m) {
         if (m.status === 'mounted' && m.child) {
             const pfx = this._prefixTree(m.child.getTree(), m.mountPath);
-            return { name: m.nodeName, _subvault: true, _access: m.access, _linkPath: m.linkPath,
+            return { name: m.nodeName, _subvault: true, _access: m.access, _status: 'mounted', _linkPath: m.linkPath,
                      children: pfx.children, files: pfx.files };
         }
         // collapsed / locked / error → lazy, empty node (send-browse loads on expand)
         return { name: m.nodeName, _subvault: true, _lazy: true,
-                 _folderPath: '/' + m.mountPath, _access: m.access, _linkPath: m.linkPath,
+                 _folderPath: '/' + m.mountPath, _access: m.access, _status: m.status, _linkPath: m.linkPath,
                  children: {}, files: [] };
     }
 

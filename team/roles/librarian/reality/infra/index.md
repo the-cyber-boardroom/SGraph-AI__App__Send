@@ -1,6 +1,6 @@
 # Infrastructure — Reality Index
 
-**Domain:** infra/ | **Last updated:** 2026-05-13 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/ | **Last updated:** 2026-06-01 | **Maintained by:** Librarian (daily run)
 
 This domain covers deployment infrastructure: storage backends, Lambda functions, CI/CD pipelines, container deployments, and the 7 deployment targets. It does not cover the application API (see `../api/`) or security properties (see `../security/`).
 
@@ -84,6 +84,21 @@ Code: `sgraph_ai_app_send/lambda__user/storage/Storage_FS__S3.py` (commit `b61a1
 ### CI Configuration Notes
 
 - **Admin Lambda deploy skipped on `main` and `prod`** — Admin Lambda is not active on main/prod targets. CI steps for admin lambda deploy are bypassed on both (commits `c792383`, `a06a112`, 01 May 2026). Admin Lambda still deploys to `dev`.
+
+### Vault UI Test Pipeline — Reusable Workflow (added 01 June 2026)
+
+**`.github/workflows/_test-ui-vault.yml`** (commit `101d5a35`): Reusable workflow defining the vault UI test pipeline in one place so it cannot drift across callers.
+
+| Job | Runner | Timeout | Command | Notes |
+|-----|--------|---------|---------|-------|
+| `unit` | ubuntu-latest | 5 min | `npm run test:vault-unit` | Pure JS + jsdom, ~5s |
+| `integration` | ubuntu-latest | 5 min | `npm run test:vault-integration` | Node + jsdom + in-memory SGVault stub, ~10s |
+| `e2e` | ubuntu-latest | 2 min | `npm run test:vault-e2e` | Playwright Chromium, ~60s |
+| `browser-integration` | ubuntu-latest | 5 min | `poetry run pytest tests/integration/vault_ui/browser/` | Python + Playwright + sgit-ai, ~15s |
+
+`package.json` new script: `"test:vault-browser-integration": ".venv/bin/python3 -m pytest tests/integration/vault_ui/browser/ -v"`
+
+**Note:** This workflow is defined as a reusable caller (`on: workflow_call`). Verify that `deploy-ui-vault.yml` invokes it as a pre-deploy gate (OQ-browser-int-tests-ci-1).
 
 ### CI Python Scripts
 

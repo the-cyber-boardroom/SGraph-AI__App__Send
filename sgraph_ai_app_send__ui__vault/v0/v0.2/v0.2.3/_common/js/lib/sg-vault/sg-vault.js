@@ -75,11 +75,16 @@ class SGVault {
         // 5. Create initial empty tree (in-memory)
         vault._tree = { '/': { type: 'folder', children: {} } }
 
-        // 6. Create initial commit — goes to both named and clone refs (they start in sync)
-        await vault._commit('Initial vault creation')
-        // Point named ref at the same commit so ahead count starts at 0
-        await vault._refManager.writeRef(vault._refFileId, vault._headCommitId)
-        vault._namedHeadId = vault._headCommitId
+        // 6. Create initial commit + both refs + branch index as ONE POST /batch.
+        //    _commit nests inside this batch (won't flush), the named ref + index stage, and the
+        //    outer _withBatch flushes everything together → a brand-new vault is one request.
+        await vault._withBatch(async () => {
+            await vault._commit('Initial vault creation')                         // tree + commit + clone-ref (staged)
+            await vault._refManager.writeRef(vault._refFileId, vault._headCommitId)   // named ref → ahead count starts at 0
+            vault._namedHeadId = vault._headCommitId
+            // Single-branch index so the vault is immediately clonable by the sgit CLI.
+            try { await vault._refManager.writeBranchIndex(vault._branchIndexFileId, vault._refFileId) } catch (_) {}
+        })
 
         return vault
     }
@@ -168,7 +173,23 @@ class SGVault {
 
         // Clone ref created lazily on first commit; 404 is expected on read-only open
         const cloneCommitId = await vault._refManager.readRef(vault._cloneRefFileId)
-        vault._headCommitId = cloneCommitId || namedCommitId
+
+        // Reconcile-on-open (CLI interop): the named ref is canonical. If the clone branch is
+        // CLEANLY BEHIND the named head (clone is a strict ancestor of named — e.g. the CLI or
+        // another session published while this clone sat still), load the NAMED head, not the
+        // stale clone. This is the bug the CLI team flagged: `cloneCommitId || namedCommitId`
+        // pinned every web open to the clone branch once any web commit existed, silently
+        // shadowing CLI pushes. We only fast-forward the VIEW — we do NOT rewrite the clone ref
+        // here (no access token yet at open time; the next commit naturally advances it from the
+        // named head). Diverged / clone-ahead cases keep the clone head so unpushed web edits are
+        // never lost — the shell surfaces the divergence.
+        let head = cloneCommitId || namedCommitId
+        if (cloneCommitId && namedCommitId && cloneCommitId !== namedCommitId) {
+            let cleanBehind = false
+            try { cleanBehind = await vault._isAncestor(cloneCommitId, namedCommitId) } catch (_) {}
+            if (cleanBehind) head = namedCommitId
+        }
+        vault._headCommitId = head
 
         await vault._loadTreeFromCommit(vault._headCommitId)
 
@@ -185,11 +206,14 @@ class SGVault {
     get name()      { return this._settings?.vault_name }
     get created()   { return this._settings?.created    }
     get writable()  { return !!this._writeKey           }
+    get writeKeyHex() { return this._writeKey || null   }   // hex string (owner-secret store input); null in RO sessions
     get aheadOf()   { return this._namedHeadId          }
 
     async setName(newName) {
         if (!this._settings) throw new Error('Vault not initialized')
+        if (this._settings.vault_name === newName) return     // no-op rename
         this._settings.vault_name = newName
+        this._settingsDirty = true
         await this._commit(`Rename vault to "${newName}"`)
     }
 
@@ -237,27 +261,60 @@ class SGVault {
 
     _initManagers() {
         this._objectStore   = new SGVaultObjectStore(this._sgSend, this._vaultId, this._writeKey)
-        this._refManager    = new SGVaultRefManager(this._sgSend, this._vaultId, this._writeKey, this._readKey)
+        this._refManager    = new SGVaultRefManager(this._sgSend, this._vaultId, this._writeKey, this._readKey, this._objectStore)
         this._commitManager = new SGVaultCommit(this._objectStore, this._readKey)
+    }
+
+    // Run `fn` with the object-store write-batch open, flushing all staged writes (objects +
+    // refs + index) as ONE POST /batch at the end. Re-entrant: if a batch is already open
+    // (e.g. addFile opened it, then _commit calls this), just run inline and let the OUTERMOST
+    // scope flush — so a file write and the commit it triggers collapse into a single request.
+    async _withBatch(fn) {
+        if (this._objectStore.batching) return fn()
+        this._objectStore.beginBatch()
+        try {
+            const result = await fn()
+            await this._objectStore.flushBatch()
+            return result
+        } catch (err) {
+            this._objectStore.discardBatch()
+            throw err
+        }
     }
 
     // --- Commit: serialize tree → create tree object → create commit → update ref
 
     async _commit(message) {
+      return this._withBatch(async () => {
         const entries = await this._buildTreeEntries(this._tree['/'])
 
-        const settingsPlain     = new TextEncoder().encode(JSON.stringify(this._settings))
-        const settingsEncrypted = await this._sgSend.encrypt(settingsPlain, this._readKey)
-        const settingsBlobId    = await this._objectStore.store(settingsEncrypted)
-        const settingsHash      = await this._commitManager.computeContentHash(settingsPlain)
+        // .vault-settings.json: write it on the initial commit, and on subsequent commits
+        // ONLY when settings actually changed (`_settingsDirty`) — rewriting it on every commit
+        // makes it appear in the file browser as "auto-added orphan" content. Track the dirty
+        // flag via setName/setDescription/setSettings; clear it after a successful commit.
+        const isInitial    = !this._headCommitId
+        const settingsDirty = !!this._settingsDirty
+        let writeSettings  = isInitial || settingsDirty
 
-        entries.push({
-            name:         '.vault-settings.json',
-            size:         settingsPlain.byteLength,
-            content_hash: settingsHash,
-            blob_id:      settingsBlobId,
-            tree_id:      null
-        })
+        // Honour an existing settings entry from the parent tree if we're not rewriting:
+        // if a previous commit wrote one, carry it forward (re-emit the same blob ref).
+        if (!writeSettings && this._currentSettingsEntry) {
+            entries.push(this._currentSettingsEntry)
+        } else if (writeSettings) {
+            const settingsPlain     = new TextEncoder().encode(JSON.stringify(this._settings))
+            const settingsEncrypted = await this._sgSend.encrypt(settingsPlain, this._readKey)
+            const settingsBlobId    = await this._objectStore.store(settingsEncrypted)
+            const settingsHash      = await this._commitManager.computeContentHash(settingsPlain)
+            const settingsEntry = {
+                name:         '.vault-settings.json',
+                size:         settingsPlain.byteLength,
+                content_hash: settingsHash,
+                blob_id:      settingsBlobId,
+                tree_id:      null
+            }
+            entries.push(settingsEntry)
+            this._currentSettingsEntry = settingsEntry
+        }
 
         const treeId    = await this._commitManager.createTree(entries)
         const parentIds = this._headCommitId ? [this._headCommitId] : []
@@ -268,6 +325,8 @@ class SGVault {
         const targetRef = this._cloneRefFileId || this._refFileId
         await this._refManager.writeRef(targetRef, commitId)
         this._headCommitId = commitId
+        this._settingsDirty = false        // committed → no longer dirty
+      })
     }
 
     // --- Build tree entries with sub-tree objects for folders -------------------
@@ -315,12 +374,17 @@ class SGVault {
 
         this._tree     = { '/': { type: 'folder', children: {} } }
         this._settings = null
+        this._currentSettingsEntry = null
+        this._settingsDirty        = false
 
         for (const entry of tree.entries) {
             if (entry.name === '.vault-settings.json' || entry.name === '.vault-settings') {
                 const blob      = await this._objectStore.load(entry.blob_id)
                 const decrypted = await SGSendCrypto.decrypt(blob, this._readKey)
                 this._settings  = JSON.parse(new TextDecoder().decode(decrypted))
+                // Capture the original entry so subsequent commits can carry it forward
+                // un-rewritten (avoid producing a new blob_id when nothing changed).
+                this._currentSettingsEntry = entry
             } else if (entry.tree_id) {
                 this._tree['/'].children[entry.name] = {
                     type: 'folder', children: {}, _tree_id: entry.tree_id, _loaded: false

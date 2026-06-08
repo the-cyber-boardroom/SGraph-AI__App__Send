@@ -95,9 +95,7 @@ class Service__Vault__Pointer(Type_Safe):                                       
 
     def read(self, vault_id, file_id):                                           # Read a vault file's payload bytes
         payload_path = self.vault_payload_path(vault_id, file_id)
-        if not self.storage_fs.file__exists(payload_path):
-            return None
-        return self.storage_fs.file__bytes(payload_path)
+        return self.storage_fs.file__bytes(payload_path)                         # None when absent — no pre-exists check (backend catches the miss)
 
     def delete(self, vault_id, file_id, write_key_hex):                          # Delete a vault file (requires write key)
         payload_path   = self.vault_payload_path(vault_id, file_id)
@@ -123,7 +121,7 @@ class Service__Vault__Pointer(Type_Safe):                                       
         self._ensure_manifest(vault_id, submitted_hash)
 
         payload_path = self.vault_payload_path(vault_id, file_id)
-        current      = self.storage_fs.file__bytes(payload_path) if self.storage_fs.file__exists(payload_path) else None
+        current      = self.storage_fs.file__bytes(payload_path)                 # None when absent — single read, no pre-exists check
         expected     = base64.b64decode(match_b64) if match_b64 else None
 
         if current == expected:                                                  # Match — perform the write
@@ -256,16 +254,16 @@ class Service__Vault__Pointer(Type_Safe):                                       
 
     def _batch_read(self, vault_id, file_id):                                    # Internal: read single file for batch response
         payload_path = self.vault_payload_path(vault_id, file_id)
-        if not self.storage_fs.file__exists(payload_path):
+        payload      = self.storage_fs.file__bytes(payload_path)                 # None when absent — single read, no pre-exists check
+        if payload is None:
             return dict(file_id = file_id, status = 'not_found')
-        payload = self.storage_fs.file__bytes(payload_path)
         return dict(file_id = file_id                                ,
                     status  = 'ok'                                   ,
                     data    = base64.b64encode(payload).decode('ascii'))
 
     def _cas_write(self, vault_id, file_id, match_b64, data_b64):               # Internal CAS for batch use (no auth check — already validated)
         payload_path = self.vault_payload_path(vault_id, file_id)
-        current      = self.storage_fs.file__bytes(payload_path) if self.storage_fs.file__exists(payload_path) else None
+        current      = self.storage_fs.file__bytes(payload_path)                 # None when absent — single read, no pre-exists check
         expected     = base64.b64decode(match_b64) if match_b64 else None
 
         if current == expected:

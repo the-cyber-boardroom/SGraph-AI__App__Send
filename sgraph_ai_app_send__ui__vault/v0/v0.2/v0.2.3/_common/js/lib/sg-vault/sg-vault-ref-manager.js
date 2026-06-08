@@ -15,11 +15,21 @@
 
 class SGVaultRefManager {
 
-    constructor(sgSend, vaultId, writeKey, readKey) {
-        this._sgSend   = sgSend
-        this._vaultId  = vaultId
-        this._writeKey = writeKey
-        this._readKey  = readKey
+    constructor(sgSend, vaultId, writeKey, readKey, objectStore = null) {
+        this._sgSend      = sgSend
+        this._vaultId     = vaultId
+        this._writeKey    = writeKey
+        this._readKey     = readKey
+        this._objectStore = objectStore       // when set + batching, ref writes JOIN the commit batch
+    }
+
+    // Stage into the object store's active batch (one POST /batch) if one is open, else PUT now.
+    async _putOrStage(filePath, bytes) {
+        if (this._objectStore && this._objectStore.batching) {
+            this._objectStore._stage(filePath, bytes)
+        } else {
+            await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, bytes)
+        }
     }
 
     // --- Write ref: encrypt commit_id and store at bare/refs/{refFileId} --------
@@ -28,7 +38,7 @@ class SGVaultRefManager {
         const filePath  = `bare/refs/${refFileId}`
         const payload   = new TextEncoder().encode(JSON.stringify({ commit_id: commitId }))
         const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)
-        await this._sgSend.vaultWrite(this._vaultId, filePath, this._writeKey, new Uint8Array(encrypted))
+        await this._putOrStage(filePath, new Uint8Array(encrypted))
     }
 
     // --- Read ref: decrypt and return commit_id ----------------------------------
@@ -59,5 +69,29 @@ class SGVaultRefManager {
         if (!encrypted) return null
         const decrypted = await SGSendCrypto.decrypt(encrypted, this._readKey)
         return JSON.parse(new TextDecoder().decode(decrypted))
+    }
+
+    // --- Write a single-branch index (interop with the sgit CLI) -----------------
+    //
+    // Web-created vaults historically never wrote a CLI-format branch index, so
+    // `sgit clone <web-vault>` hard-errored with "No branch index found" (the CLI now
+    // has a fallback, but writing the index makes web vaults clonable by ANY CLI
+    // version and discoverable by agents). Written on create() and on every push()
+    // so the index always points at the current named ref. Stored at the same path
+    // the CLI reads (`bare/indexes/`), encrypted under read_key like every ref.
+    //
+    // Stable plaintext per refFileId (no timestamp); the encrypted blob still carries a
+    // fresh AES-GCM IV per write, so the index is small and cheap to re-write each push.
+    // head_ref_id points at the NAMED ref (ref-pid-muw-*) — never the clone ref — so the
+    // CLI keeps cloning the canonical published branch (see the CLI interop briefs).
+    async writeBranchIndex(branchIndexFileId, refFileId) {
+        if (!branchIndexFileId || !refFileId) return
+        const filePath = `bare/indexes/${branchIndexFileId}`
+        const index    = { schema: 'branch_index_v1', branches: [
+            { branch_id: 'branch-named-main', branch_type: 'named', head_ref_id: refFileId, name: 'main' }
+        ]}
+        const payload   = new TextEncoder().encode(JSON.stringify(index))
+        const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)
+        await this._putOrStage(filePath, new Uint8Array(encrypted))
     }
 }

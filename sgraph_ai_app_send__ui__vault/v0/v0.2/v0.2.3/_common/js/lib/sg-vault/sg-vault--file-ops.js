@@ -11,6 +11,9 @@
     Object.assign(SGVault.prototype, {
 
         async addFile(folderPath, fileName, fileData) {
+          // Batch scope: the blob store + the commit it triggers (tree+commit+clone-ref) flush
+          // as ONE POST /batch instead of 4 preflighted PUTs.
+          return this._withBatch(async () => {
             const data = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData
 
             const encrypted   = await this._sgSend.encrypt(data, this._readKey)
@@ -28,6 +31,7 @@
             this._markDirty(folderPath)
             await this._commit(`Add ${fileName}`)
             return { blobId, fileName, folderPath }
+          })
         },
 
         // --- Batch add: encrypt+store all files, then commit once -----------------
@@ -36,7 +40,8 @@
 
         async addFiles(items) {
             if (!items || items.length === 0) return []
-
+          // All blobs + the single commit flush as ONE POST /batch.
+          return this._withBatch(async () => {
             const results = []
 
             // Encrypt and store all blobs, then mutate the in-memory tree
@@ -70,9 +75,12 @@
             await this._commit(message)
 
             return results
+          })
         },
 
         async updateFile(folderPath, fileName, fileData) {
+          // Batch scope: blob store + commit → ONE POST /batch.
+          return this._withBatch(async () => {
             const data   = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : fileData
             const folder = this._findNode(folderPath)
             if (!folder || folder.type !== 'folder') throw new Error(`Folder not found: ${folderPath}`)
@@ -92,6 +100,7 @@
             this._markDirty(folderPath)
             await this._commit(`Edit ${fileName}`)
             return { blobId, fileName, folderPath }
+          })
         },
 
         async getFile(folderPath, fileName) {
