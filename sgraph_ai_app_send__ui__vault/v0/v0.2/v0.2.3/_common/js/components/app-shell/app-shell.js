@@ -821,7 +821,7 @@
         // the HUD (host chrome, §3.5) — the sandboxed app cannot satisfy it. Serialised so two
         // concurrent requests don't collide on the single HUD slot (A10).
         async _consent(verb, path) {
-            var alwaysConfirm = (verb === 'vault.delete');
+            var alwaysConfirm = (verb === 'vault.delete' || verb === 'vault.createKey');   // key-return / destroy never silently cache
             var ckey = this._consentCacheKey(verb);
             if (!alwaysConfirm) { try { if (localStorage.getItem(ckey) === '1') return true; } catch (_) {} }
             var granted = await this._hudConsent(verb, path);
@@ -860,29 +860,227 @@
             return s || ('link-' + Math.random().toString(36).slice(2, 8));
         }
 
-        // Create a new child vault and wire it into folder `path` as a read-through sub-vault:
-        // keyless <slug>.link.json in the tree + a portable read-only owner record (read_key tier).
-        // Mirrors the host "Add link" flow (vault-browse-edit _showAddLink). v1 = read-through only.
-        async _createChildVault(path, label) {
-            var parentVault = this._vault;
-            var sgSend = parentVault && parentVault._sgSend;
-            if (!sgSend || typeof SGVault === 'undefined' || typeof VaultLinks === 'undefined') throw new Error('Cannot create vaults here');
-            var child   = await SGVault.create(sgSend, this._genVaultPassphrase(), { name: label });   // proper-vault-key derivation
-            var vaultId = child._vaultId;
-            var refId   = this._genRefId();
+        // ── Owner-secret store (owner-tier custody for child write-keys) ─────────────
+        // Secrets live at .vault/owner/secrets/<ref>.json, sealed with a key derived from
+        // THIS vault's write_key (SGVaultOwnerSecrets). RO sessions (write_key=null) cannot
+        // derive the key → cannot open them. The outer vault-file read_key encryption is
+        // incidental; the inner seal provides the owner tier. Distinct from ro-links.json
+        // (read-tier, readable by any parent reader).
+        _secretsFolder() { return '/.vault/owner/secrets'; }
 
-            var dir = path ? ('/' + path) : '/';
-            if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
-            var fileName = this._slugify(label) + '.link.json';
-            var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
-            await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+        async _ownerSecretKey() {
+            if (this._ownerSecretCryptoKey) return this._ownerSecretCryptoKey;
+            var wk = this._vault && this._vault.writeKeyHex;
+            if (!wk) throw Object.assign(new Error('Read-only: owner secrets unavailable'), { code: 'EREADONLY' });
+            this._ownerSecretCryptoKey = await SGVaultOwnerSecrets.deriveKey(wk);
+            return this._ownerSecretCryptoKey;
+        }
 
-            var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
-            var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
-                           read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
-            await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
-            if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
-            return { vault_id: vaultId, ref_id: refId, ref_file_id: child._refFileId };
+        async _ensureSecretsFolder() {
+            var v = this._vault, parts = ['.vault', 'owner', 'secrets'], cur = '';
+            for (var i = 0; i < parts.length; i++) {
+                var next = cur ? cur + '/' + parts[i] : parts[i];
+                if (!v.listFolder('/' + next)) { try { await v.createFolder('/' + next); } catch (_) {} }
+                cur = next;
+            }
+        }
+
+        async _ownerSecretPut(refId, secret) {
+            var v = this._vault;
+            if (!v || !v.writable) throw Object.assign(new Error('Read-only vault'), { code: 'EREADONLY' });
+            var key = await this._ownerSecretKey();
+            var rec = await SGVaultOwnerSecrets.seal(key, secret);
+            await this._ensureSecretsFolder();
+            var folder = this._secretsFolder(), name = refId + '.json';
+            var bytes  = new TextEncoder().encode(JSON.stringify(rec));
+            var exists = (v.listFolder(folder) || []).some(function (e) { return e.name === name; });
+            if (exists) await v.updateFile(folder, name, bytes); else await v.addFile(folder, name, bytes);
+            if (typeof v.push === 'function') { try { await v.push(); } catch (_) {} }
+        }
+
+        async _ownerSecretGet(refId) {
+            var v = this._vault, folder = this._secretsFolder(), name = refId + '.json';
+            if (!(v.listFolder(folder) || []).some(function (e) { return e.name === name; })) return null;
+            var bytes = await v.getFile(folder, name);               // read_key (outer) decrypt
+            var rec   = JSON.parse(new TextDecoder().decode(bytes));
+            var key   = await this._ownerSecretKey();
+            return await SGVaultOwnerSecrets.open(key, rec);         // owner-tier (inner) decrypt
+        }
+
+        async _ownerSecretList() {
+            var v = this._vault, folder = this._secretsFolder(), out = [], key;
+            try { key = await this._ownerSecretKey(); } catch (_) { return out; }
+            var listed = v.listFolder(folder) || [];
+            for (var i = 0; i < listed.length; i++) {
+                var e = listed[i];
+                if (e.type !== 'file' || !/\.json$/.test(e.name)) continue;
+                try {
+                    var bytes = await v.getFile(folder, e.name);
+                    var sec   = await SGVaultOwnerSecrets.open(key, JSON.parse(new TextDecoder().decode(bytes)));
+                    out.push({ ref_id: e.name.replace(/\.json$/, ''), vault_id: sec.vault_id, label: sec.label });
+                } catch (_) {}
+            }
+            return out;
+        }
+
+        async _ownerSecretRemove(refId) {
+            var v = this._vault, folder = this._secretsFolder(), name = refId + '.json';
+            if ((v.listFolder(folder) || []).some(function (e) { return e.name === name; })) {
+                await v.removeFile(folder, name);
+                if (typeof v.push === 'function') { try { await v.push(); } catch (_) {} }
+            }
+        }
+
+        // ── Create a child vault (read-through link / standalone / return-key / seedFrom) ──
+        // opts = { label, link:{path}|false, returnKey:bool, custody:bool(default true), seedFrom }
+        // The returned `key` (when requested) is the OPENABLE composed form `passphrase:vault_id`
+        // — the bare passphrase has no colon and would fail SGVaultCrypto.parseVaultKey.
+        async _createChildVault(opts) {
+            opts = opts || {};
+            var parentVault = this._vault, sgSend = parentVault && parentVault._sgSend;
+            if (!sgSend || typeof SGVault === 'undefined') throw new Error('Cannot create vaults here');
+            var label     = String(opts.label || 'vault');
+            var wantsLink = !!(opts.link && opts.link.path != null);
+            var wantsKey  = !!opts.returnKey;
+            var custody   = opts.custody !== false;                 // default: kernel custodies the key
+            if (!wantsLink && !wantsKey && !custody) throw Object.assign(new Error('unreachable vault: needs link, returnKey, or custody'), { code: 'EINVAL' });
+
+            var passphrase = this._genVaultPassphrase();            // strong shape; never simple-token
+            var child      = await SGVault.create(sgSend, passphrase, { name: label });
+            var vaultId    = child._vaultId;
+            var key        = child._passphrase + ':' + child._vaultId;   // composed openable key
+            var refId      = this._genRefId();
+
+            if (opts.seedFrom) {
+                try { await this._seedVaultTree(child, opts.seedFrom); }
+                catch (e) { console.warn('[app-shell] seedFrom failed:', e && e.message); }
+            }
+
+            var result = { vault_id: vaultId, ref_id: refId };
+
+            if (custody) {
+                try { await this._ownerSecretPut(refId, { vault_id: vaultId, key: key, label: label, created: Date.now() }); }
+                catch (e) { if (!wantsKey) throw e; }               // if returning the key, custody failure is non-fatal
+            }
+
+            if (wantsLink) {
+                var dir = opts.link.path ? ('/' + AppPermissions.normalizePath(opts.link.path)) : '/';
+                if (dir !== '/' && !parentVault.listFolder(dir)) { try { await this._dataSource.createFolder(dir); } catch (_) {} }
+                var fileName = this._slugify(label) + '.link.json';
+                var linkObj  = { vault_id: vaultId, ref_id: refId, label: label };
+                await this._dataSource.saveFile(dir, fileName, new TextEncoder().encode(JSON.stringify(linkObj, null, 2)).buffer);
+                var rawRk  = new Uint8Array(await crypto.subtle.exportKey('raw', child._readKey));
+                var record = { type: 'vault', label: label, pin: { mode: 'latest' }, vault_id: vaultId,
+                               read_key: btoa(String.fromCharCode.apply(null, rawRk)), ref_file_id: child._refFileId };
+                await VaultLinks.saveRoRecord(parentVault, refId, record);   // read-tier owner record; commits + pushes
+                if (this._dataSource.scan) { try { await this._dataSource.scan(); } catch (_) {} }
+                result.ref_file_id = child._refFileId;
+            }
+
+            if (wantsKey) result.key = key;                         // raw key returned only on demand
+            return result;
+        }
+
+        // Retrieve a custodied key to re-share. As powerful as createKey → consent always re-confirms.
+        async _getVaultKey(refId) {
+            var sec = await this._ownerSecretGet(String(refId));
+            if (!sec || !sec.key) throw Object.assign(new Error('no key on file for ' + refId), { code: 'ENOKEY' });
+            return { key: sec.key };
+        }
+
+        // Launch a vault as an app. A raw key (contains ':') is used directly; a ref is resolved
+        // from the owner-secret store kernel-side (the key never crosses the iframe boundary).
+        async _openAppVault(ref, opts) {
+            opts = opts || {};
+            var key = (ref && String(ref).indexOf(':') > -1) ? String(ref) : null;
+            if (!key) { var sec = await this._ownerSecretGet(String(ref)); key = sec && sec.key; }
+            if (!key) throw Object.assign(new Error('cannot resolve key for ' + ref), { code: 'ENOKEY' });
+            var url = location.origin + '/en-gb/app/#' + encodeURIComponent(key) +
+                      (opts.deepLink ? ('/' + String(opts.deepLink).replace(/^\//, '')) : '');
+            if (opts.target === 'replace') { location.href = url; return { opened: 'replace' }; }
+            if (opts.target === 'embed')   { throw Object.assign(new Error('embed target deferred'), { code: 'ENOTIMPL' }); }
+            window.open(url, '_blank');
+            return { opened: 'tab' };
+        }
+
+        // Roster: custodied secrets (owner-tier, rw) ∪ read-through links (read-tier, ro).
+        async _listChildVaults() {
+            var self = this;
+            var rows = await this._ownerSecretList();
+            var seen = {}, out = rows.map(function (r) { seen[r.ref_id] = true; return { ref_id: r.ref_id, vault_id: r.vault_id, label: r.label, tier: 'rw' }; });
+            try {
+                var links = await VaultLinks.loadRoLinks(self._vault).catch(function () { return {}; });
+                Object.keys(links || {}).forEach(function (refId) {
+                    if (seen[refId]) return;
+                    var rec = links[refId] || {};
+                    out.push({ ref_id: refId, vault_id: rec.vault_id || null, label: rec.label || refId, tier: 'ro' });
+                });
+            } catch (_) {}
+            return out;
+        }
+
+        // Destroy a child vault. Key custody is solved (owner-secret store); the server-side
+        // teardown requires SGVault.destroy() — if absent, the custody record + link are removed
+        // and { server_teardown:false } is reported (the server vault is retained until the
+        // teardown endpoint ships — see the dev plan §16 server dependency).
+        async _deleteChildVault(refId) {
+            var sec = await this._ownerSecretGet(String(refId));
+            var serverTeardown = false;
+            if (sec && sec.key) {
+                try {
+                    var child = await SGVault.open(this._vault._sgSend, sec.key);
+                    if (typeof child.destroy === 'function') { await child.destroy(); serverTeardown = true; }
+                } catch (e) { console.warn('[app-shell] vault.delete server teardown failed:', e && e.message); }
+            }
+            await this._ownerSecretRemove(String(refId));
+            return { deleted: true, vault_id: sec && sec.vault_id, server_teardown: serverTeardown };
+        }
+
+        // ── seedFrom: copy a template tree into the freshly-created (writable) child ──────
+        // source 'self:<path>' → a folder in THIS vault; '<ref_id>' → a custodied/linked
+        // source; '<raw key>' (contains ':') → open read-only by possession (Q4). The walk
+        // SKIPS any .vault/** segment so a template copy can never exfiltrate owner secrets.
+        async _seedVaultTree(childVault, source) {
+            var src = String(source || ''), entries;
+            if (src.indexOf('self:') === 0) {
+                entries = await this._collectTree(this._vault, AppPermissions.normalizePath(src.slice(5)));
+            } else {
+                entries = await this._collectTree(await this._resolveReadableVault(src), '');
+            }
+            for (var i = 0; i < entries.length; i++) {
+                var rel = entries[i].relPath, slash = rel.lastIndexOf('/');
+                var dir = slash > 0 ? '/' + rel.slice(0, slash) : '/', name = slash > 0 ? rel.slice(slash + 1) : rel;
+                if (dir !== '/' && !childVault.listFolder(dir)) { try { await childVault.createFolder(dir); } catch (_) {} }
+                try { await childVault.addFile(dir, name, entries[i].bytes); }
+                catch (_) { try { await childVault.updateFile(dir, name, entries[i].bytes); } catch (__) {} }
+            }
+        }
+
+        // Walk a vault's tree under basePath → [{ relPath, bytes }]; skips .vault/** (floor).
+        async _collectTree(vault, basePath) {
+            var out = [], stack = [{ abs: basePath ? ('/' + basePath) : '/', rel: '' }];
+            while (stack.length) {
+                var node = stack.pop(), listed = vault.listFolder(node.abs) || [];
+                for (var i = 0; i < listed.length; i++) {
+                    var e = listed[i], rel = node.rel ? node.rel + '/' + e.name : e.name;
+                    if (AppPermissions.hasVaultSegment(rel)) continue;          // floor
+                    var abs = node.abs === '/' ? '/' + e.name : node.abs + '/' + e.name;
+                    if (e.type === 'folder') { stack.push({ abs: abs, rel: rel }); }
+                    else { try { out.push({ relPath: rel, bytes: await vault.getFile(node.abs, e.name) }); } catch (_) {} }
+                }
+            }
+            return out;
+        }
+
+        // Resolve a ref_id or raw key to a readable SGVault (raw key = possession authority, Q4).
+        async _resolveReadableVault(refOrKey) {
+            var s = String(refOrKey);
+            if (s.indexOf(':') > -1) return await SGVault.open(this._vault._sgSend, s);
+            var sec = await this._ownerSecretGet(s);
+            if (sec && sec.key) return await SGVault.open(this._vault._sgSend, sec.key);
+            var link = await VaultLinks.effectiveLink(this._vault, s).catch(function () { return null; });
+            if (link && link.read_key) return await SGVault.openReadOnly(this._vault._sgSend, link.vault_id, link.read_key, link.ref_file_id);
+            throw Object.assign(new Error('cannot resolve source vault: ' + s), { code: 'ENOKEY' });
         }
 
         // Remove a sub-vault pointer (the <name>.link.json). The child vault stays on the server
@@ -1863,12 +2061,19 @@
                       'delete:function(path){return _sgCmd("fs",{action:"delete",path:path});},' +
                       'mkdir:function(path){return _sgCmd("fs",{action:"mkdir",path:path});}' +
                     '},' +
-                    // sg.vault.* — create a child vault in a folder (read-through), unlink, delete
+                    // sg.vault.* — create / manage child vaults. create(opts) takes an opts object
+                    // (matches mount(opts)): { label, link:{path}|false, returnKey, custody, seedFrom }.
                     'vault:{' +
-                      'create:function(path,label){return _sgCmd("vault",{action:"create",path:path,label:label});},' +
+                      'create:function(opts){opts=opts||{};return _sgCmd("vault",{action:"create",label:opts.label,link:opts.link,returnKey:opts.returnKey,custody:opts.custody,seedFrom:opts.seedFrom});},' +
+                      // getKey(ref) → {key}: retrieve a custodied key to re-share (always-confirm consent).
+                      'getKey:function(ref){return _sgCmd("vault",{action:"getKey",ref:ref});},' +
+                      // openApp(ref,opts): launch a vault as an app. ref = raw key or a custodied ref.
+                      'openApp:function(ref,opts){opts=opts||{};return _sgCmd("vault",{action:"openApp",ref:ref,deepLink:opts.deepLink,target:opts.target});},' +
+                      // list() → {vaults:[{ref_id,vault_id,label,tier}]}: roster of managed vaults.
+                      'list:function(){return _sgCmd("vault",{action:"list"});},' +
                       'unlink:function(path){return _sgCmd("vault",{action:"unlink",path:path});},' +
-                      'delete:function(path){return _sgCmd("vault",{action:"delete",path:path});},' +
-                      // ViV Phase 2: mount a child vault for cross-vault reads/writes via this kernel.
+                      'delete:function(ref){return _sgCmd("vault",{action:"delete",ref:ref});},' +
+                      // ViV Phase 2: mount a child vault for cross-vault reads via this kernel (rw mount → separate brief).
                       'mount:function(opts){return _sgCmd("vault",{action:"mount",prefix:opts&&opts.prefix,ref:opts&&opts.ref,label:opts&&opts.label});},' +
                       'unmount:function(mountId){return _sgCmd("vault",{action:"unmount",mountId:mountId});},' +
                       'mounts:function(){return _sgCmd("vault",{action:"mounts"});}' +
@@ -2301,14 +2506,62 @@
                         if (!dataSource.writable) { cmdReply(false, null, 'Read-only vault'); return; }   // EREADONLY
                         var vPath = AppPermissions.normalizePath(e.data.path || '');
                         if (vAct === 'create') {
-                            var vLabel = String(e.data.label || 'vault');
-                            if (!self._can('vault.create', vPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'EPERM' }); return; }
-                            self._consent('vault.create', vPath).then(function (ok) {
-                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: 'ECONSENT' }); return; }
-                                return self._createChildVault(vPath, vLabel).then(function (res) {
-                                    cmdReply(true, res); self._emitBridgeCall('vault.create', { path: vPath, ok: true, vault_id: res.vault_id });
+                            var cLink      = e.data.link;
+                            var cLinkPath  = (cLink && cLink.path != null) ? AppPermissions.normalizePath(cLink.path) : '';
+                            var cReturnKey = e.data.returnKey === true;
+                            var cOpts = { label: String(e.data.label || 'vault'), link: cLink,
+                                          returnKey: cReturnKey, custody: e.data.custody !== false, seedFrom: e.data.seedFrom };
+                            // gate: linked create needs vault.create on the path; standalone needs vault.standalone
+                            if (cLink && cLink.path != null) {
+                                if (!self._can('vault.create', cLinkPath)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'EPERM' }); return; }
+                            } else {
+                                if (!self._can('vault.standalone', '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.create', { ok: false, err: 'EPERM', standalone: true }); return; }
+                            }
+                            // gate: returning the key needs the stronger grant (createKey on the path, or standalone)
+                            if (cReturnKey) {
+                                var keyOk = (cLink && cLink.path != null) ? self._can('vault.createKey', cLinkPath) : self._can('vault.standalone', '');
+                                if (!keyOk) { cmdReply(false, null, 'Permission denied (createKey)'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'EPERM' }); return; }
+                            }
+                            // gate: seedFrom (skip for raw keys — possession is authority, Q4)
+                            if (cOpts.seedFrom && String(cOpts.seedFrom).indexOf(':') === -1) {
+                                var sgPath = String(cOpts.seedFrom).indexOf('self:') === 0 ? AppPermissions.normalizePath(String(cOpts.seedFrom).slice(5)) : String(cOpts.seedFrom);
+                                if (!self._can('vault.seedFrom', sgPath)) { cmdReply(false, null, 'Permission denied (seedFrom)'); self._emitBridgeCall('vault.create', { ok: false, err: 'EPERM', seedFrom: cOpts.seedFrom }); return; }
+                            }
+                            // key-return ALWAYS re-confirms (vault.createKey); plain create one-time cached
+                            var cVerb = cReturnKey ? 'vault.createKey' : 'vault.create';
+                            self._consent(cVerb, cLinkPath).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: 'ECONSENT' }); return; }
+                                return self._createChildVault(cOpts).then(function (res) {
+                                    cmdReply(true, res);
+                                    self._emitBridgeCall('vault.create', { path: cLinkPath, ok: true, vault_id: res.vault_id, returnedKey: !!res.key, custody: cOpts.custody });   // NEVER log the key
                                 });
-                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: vPath, ok: false, err: err.message }); });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.create', { path: cLinkPath, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'getKey') {
+                            var gkRef    = String(e.data.ref || '');
+                            var ckGrant  = self._perm && self._perm.vault && self._perm.vault.createKey;
+                            var canGetKey = (ckGrant === true) || (Array.isArray(ckGrant) && ckGrant.length > 0);
+                            if (!canGetKey) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.getKey', { ref: gkRef, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.createKey', gkRef).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.getKey', { ref: gkRef, ok: false, err: 'ECONSENT' }); return; }
+                                return self._getVaultKey(gkRef).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.getKey', { ref: gkRef, ok: true, returnedKey: true });   // NEVER log the key
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.getKey', { ref: gkRef, ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'openApp') {
+                            if (!self._can('vault.openApp', '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.openApp', { ok: false, err: 'EPERM' }); return; }
+                            self._openAppVault(e.data.ref, { deepLink: e.data.deepLink, target: e.data.target })
+                                .then(function (res) { cmdReply(true, res); self._emitBridgeCall('vault.openApp', { ok: true, opened: res.opened }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.openApp', { ok: false, err: err.message }); });
+                            return;
+                        }
+                        if (vAct === 'list') {
+                            self._listChildVaults()
+                                .then(function (res) { cmdReply(true, { vaults: res }); self._emitBridgeCall('vault.list', { ok: true, count: res.length }); })
+                                .catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.list', { ok: false, err: err.message }); });
                             return;
                         }
                         if (vAct === 'unlink') {
@@ -2319,12 +2572,19 @@
                             return;
                         }
                         if (vAct === 'delete') {
-                            // Server-side destroy needs the child WRITE key. There is no owner-secret
-                            // tier to store it (ro-links.json is read-tier, readable by parent readers),
-                            // so a secure implementation requires a new owner-secret credential store +
-                            // AppSec sign-off on the destructive endpoint. Deferred — Phase 5.
-                            cmdReply(false, null, 'vault.delete not yet available (needs owner-secret credential store + AppSec sign-off)');
-                            self._emitBridgeCall('vault.delete', { path: vPath, ok: false, err: 'ENOTIMPL' });
+                            // Key custody is solved by the owner-secret store; the key is retrieved
+                            // kernel-side to authorise teardown. Server-side destroy needs
+                            // SGVault.destroy() — if absent, the custody record + link are removed and
+                            // { server_teardown:false } is reported (the server vault is retained until
+                            // the teardown endpoint ships — see dev plan §16). Always-confirm consent.
+                            var dRef = String(e.data.ref || e.data.path || '');
+                            if (!self._can('vault.delete', dRef)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vault.delete', { ref: dRef, ok: false, err: 'EPERM' }); return; }
+                            self._consent('vault.delete', dRef).then(function (ok) {
+                                if (!ok) { cmdReply(false, null, 'Consent declined'); self._emitBridgeCall('vault.delete', { ref: dRef, ok: false, err: 'ECONSENT' }); return; }
+                                return self._deleteChildVault(dRef).then(function (res) {
+                                    cmdReply(true, res); self._emitBridgeCall('vault.delete', { ref: dRef, ok: true, server_teardown: res.server_teardown });
+                                });
+                            }).catch(function (err) { cmdReply(false, null, err.message); self._emitBridgeCall('vault.delete', { ref: dRef, ok: false, err: err.message }); });
                             return;
                         }
                         // ── ViV Phase 2: vault.mount / unmount / mounts ────────────────
