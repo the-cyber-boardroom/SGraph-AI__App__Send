@@ -27,6 +27,7 @@ class Routes__Vault__Inbox(Fast_API__Routes):
     tag           : str = TAG__ROUTES_VAULT_INBOX
     inbox_service : Service__Vault__Inbox
     admin_service_client : object = None
+    access_token_service : object = None                                         # Lazily-built Service__Access_Token (token-validation cache)
 
     @staticmethod
     def _validate_vault_id(vault_id):
@@ -34,31 +35,20 @@ class Routes__Vault__Inbox(Fast_API__Routes):
             raise HTTPException(status_code = 400,
                                 detail      = 'vault_id must be an opaque lowercase alphanumeric string (8-24 chars, no hyphens)')
 
-    def _check_access_token(self, request: Request):
-        from osbot_utils.utils.Env import get_env
-        from sgraph_ai_app_send.lambda__user.user__config import ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN
+    def _access_token_service(self):                                            # Lazy singleton — cache persists for the Lambda lifetime (like _manifest_cache)
+        if self.access_token_service is None:
+            from osbot_utils.utils.Env                                 import get_env
+            from sgraph_ai_app_send.lambda__user.service.Service__Access_Token import Service__Access_Token
+            from sgraph_ai_app_send.lambda__user.user__config          import (ENV_VAR__SGRAPH_SEND__TOKEN_CACHE_TTL ,
+                                                                               DEFAULT__SGRAPH_SEND__TOKEN_CACHE_TTL )
+            ttl = int(get_env(ENV_VAR__SGRAPH_SEND__TOKEN_CACHE_TTL, DEFAULT__SGRAPH_SEND__TOKEN_CACHE_TTL))
+            self.access_token_service = Service__Access_Token(admin_service_client = self.admin_service_client,
+                                                              ttl_seconds          = ttl                      )
+        return self.access_token_service
+
+    def _check_access_token(self, request: Request):                            # Validate access token from header (cached — see Service__Access_Token)
         provided_token = request.headers.get(HEADER__SGRAPH_SEND__ACCESS_TOKEN, '')
-        if self.admin_service_client is not None:
-            if not provided_token:
-                raise HTTPException(status_code = 401, detail = 'Access token required')
-            try:
-                response = self.admin_service_client.token_lookup(provided_token)
-                if response.status_code == 404:
-                    raise HTTPException(status_code = 401, detail = 'Invalid access token')
-                data = response.json()
-                if data.get('status') != 'active':
-                    raise HTTPException(status_code = 401, detail = f'Access token {data.get("status", "invalid")}')
-                return provided_token
-            except HTTPException:
-                raise
-            except Exception:
-                raise HTTPException(status_code = 503, detail = 'Token validation service unavailable')
-        expected_token = get_env(ENV_VAR__SGRAPH_SEND__ACCESS_TOKEN, '')
-        if not expected_token:
-            return provided_token or None
-        if provided_token != expected_token:
-            raise HTTPException(status_code = 401, detail = 'Access token required')
-        return provided_token
+        return self._access_token_service().check(provided_token)
 
     async def append__vault_id(self, vault_id: Safe_Str__Id,
                                      request : Request      ) -> dict:
