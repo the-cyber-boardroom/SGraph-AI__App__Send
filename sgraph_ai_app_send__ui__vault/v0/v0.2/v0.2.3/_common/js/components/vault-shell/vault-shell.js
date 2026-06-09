@@ -333,6 +333,13 @@
         // can decrypt it. Returns the token string or null when the file is absent / malformed.
         async _readEmbeddedAccessToken(vault) {
             try {
+                // `.vault` is a LAZY sub-tree right after open (_loadTreeFromCommit marks every
+                // top-level folder _loaded:false). listFolder('/.vault') therefore returns [] —
+                // and the token is never found — until the sub-tree is expanded. This was the
+                // real reason the editor stayed read-only despite the token being present.
+                if (vault.needsLoading && vault.needsLoading('/.vault')) {
+                    await vault.loadSubTreeOnDemand('/.vault');
+                }
                 const listed = vault.listFolder('/.vault') || [];
                 if (!listed.some((e) => e.name === 'access-token.json')) return null;
                 const bytes = await vault.getFile('/.vault', 'access-token.json');

@@ -347,12 +347,34 @@
             this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail: detail || null }));
         }
 
-        _fetchAppVersion() {
-            const el    = this.shadowRoot.querySelector('.vh-version');
-            const build = window.SGRAPH_BUILD;
-            if (el && build) {
-                el.textContent = `${build.appVersion}  .  UI ${build.uiVersion} (IFD)`;
-            }
+        async _fetchAppVersion() {
+            const el = this.shadowRoot.querySelector('.vh-version');
+            if (!el) return;
+
+            const build      = window.SGRAPH_BUILD || {};
+            const uiVersion  = build.uiVersion || 'v0.2.3';
+            let   appVersion = build.appVersion || '';
+
+            const render = () => {
+                el.textContent = appVersion
+                    ? `${appVersion}  .  UI ${uiVersion} (IFD)`
+                    : `UI ${uiVersion} (IFD)`;
+            };
+            render();   // show build-info.js value immediately (no blank flash)
+
+            // The authoritative app version (CI-incremented on every push to dev) is published
+            // as a plain-text /version file at the site root by the deploy pipeline. Fetch it so
+            // the header always reflects the actual running build — both deployed and locally.
+            // This supersedes build-info.js, which on the vault UI is either absent (SGRAPH_BUILD
+            // undefined → header fell back to a hardcoded UI version) or stamped 'local-dev'. A
+            // reliable way to confirm you are looking at the latest version of the files.
+            try {
+                const resp = await fetch('/version', { cache: 'no-store' });
+                if (resp.ok) {
+                    const text = (await resp.text()).trim();
+                    if (text && /^v?\d/.test(text)) { appVersion = text; render(); }
+                }
+            } catch (_) { /* offline / 404 — keep the build-info.js value */ }
         }
 
         _openApp() {
