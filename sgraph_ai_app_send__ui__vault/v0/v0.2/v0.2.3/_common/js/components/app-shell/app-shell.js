@@ -64,7 +64,11 @@
             // Auto-sync parity with /vault: re-check the published head when the tab regains
             // focus, so an app left open picks up code/data another session pushed. Debounced
             // in _scheduleBehindCheck. Gated by the shared 'sg-vault-autosync' flag.
-            this._visibilityHandler = () => { if (!document.hidden) this._scheduleBehindCheck(500); };
+            this._visibilityHandler = () => {
+                if (document.hidden) return;
+                this._scheduleBehindCheck(500);
+                this._scheduleInboxCheck(500);          // inbox check rides the same focus trigger (no-op unless an app opted in)
+            };
             document.addEventListener('visibilitychange', this._visibilityHandler);
             this._init();
         }
@@ -83,6 +87,7 @@
             if (this._visibilityHandler) { document.removeEventListener('visibilitychange', this._visibilityHandler); this._visibilityHandler = null; }
             clearTimeout(this._autoPushTimer);
             clearTimeout(this._behindCheckTimer);
+            clearTimeout(this._inboxCheckTimer);
             if (this._embedOpenHandler)  { window.removeEventListener('message', this._embedOpenHandler); this._embedOpenHandler = null; }
             if (this._embedReadyHandler) { this.removeEventListener('app-shell:ready', this._embedReadyHandler); this._embedReadyHandler = null; }
             if (this._vfsBridgeHandler) {
@@ -530,6 +535,56 @@
                 if (this._appJson) { try { await this._continue(this._appJson); } catch (_) {} }
                 this._emitVaultEvent('auto-pull', { label: 'View synced to published head', head: liveNamed });
             } catch (_) { /* network errors are silent — retried on next focus */ }
+        }
+
+        // ── Inbox check-on-events → host_events-gated push to the app ────────────────────
+        // Built only when the mounted app declared an inbox host_event (default-deny). Runs
+        // on the same quasi-events as the behind-check (focus, app open). Each emit is filtered
+        // through app.json.host_events before it reaches the iframe — an app cannot receive an
+        // event it didn't declare. auto_fetch is off here: apps pull ciphertext on demand via
+        // sg.inbox.fetch when they get the notification.
+        async _initInboxChecker(appJson) {
+            this._hostEvents = AppHostEvents.parse(appJson);
+            if (typeof SGInbox === 'undefined' || typeof SGInboxChecker === 'undefined' || typeof AppHostEvents === 'undefined') return;
+            var wantsInbox = AppHostEvents.allows(this._hostEvents, 'inbox.new-messages')
+                          || AppHostEvents.allows(this._hostEvents, 'inbox.error');
+            if (!wantsInbox || !this._vault) { this._inboxChecker = null; return; }
+            // Reuse the checker across re-mounts of the same vault (seen-set persists).
+            if (this._inboxChecker && this._inboxCheckerVaultId === this._vault._vaultId) {
+                this._scheduleInboxCheck(0, 'app-remount');
+                return;
+            }
+            var inbox = await this._getInbox();
+            if (!inbox) { this._inboxChecker = null; return; }
+            var self = this;
+            var bus = { emit: function (name, payload) { self._pushHostEvent(name, payload); } };
+            this._inboxChecker = new SGInboxChecker(inbox, bus, function () {
+                return { enabled: AppHostEvents.allows(self._hostEvents, 'inbox.new-messages'), auto_fetch: false };
+            });
+            this._inboxCheckerVaultId = this._vault._vaultId;
+            this._scheduleInboxCheck(0, 'app-open');
+        }
+
+        _scheduleInboxCheck(delayMs, trigger) {
+            if (!this._inboxChecker) return;
+            var DEBOUNCE_MS = 1000;
+            var since = Date.now() - (this._lastInboxCheckTime || 0);
+            var wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
+            var label = trigger || 'visibility';
+            clearTimeout(this._inboxCheckTimer);
+            this._inboxCheckTimer = setTimeout(() => {
+                this._lastInboxCheckTime = Date.now();
+                if (this._inboxChecker) this._inboxChecker.check(label);
+            }, Math.max(0, wait));
+        }
+
+        // Push a kernel event to the app iframe, gated by app.json.host_events.
+        _pushHostEvent(name, payload) {
+            try {
+                if (!AppHostEvents.allows(this._hostEvents, name)) { this._emitBridgeCall('event.' + name, { ok: false, err: 'not in host_events' }); return; }
+                var win = this._iframeEl && this._iframeEl.contentWindow;
+                if (win) { win.postMessage({ type: 'sg-event', name: name, payload: payload }, '*'); this._emitBridgeCall('event.' + name, { ok: true, pushed: true }); }
+            } catch (_) { /* iframe gone / cross-origin — drop */ }
         }
 
         // Make the "unpushed commits" state VISIBLE — a persistent HUD warning (ttl=null), since
@@ -1766,6 +1821,9 @@
             this._navHistory   = [entry.path];
             this._navIndex     = 0;
             this._emitNavChange();
+
+            // Start the inbox checker if this app opted into inbox host_events (no-op otherwise).
+            this._initInboxChecker(appJson);
         }
 
         // _page.json: render via PageLayoutRenderer.
