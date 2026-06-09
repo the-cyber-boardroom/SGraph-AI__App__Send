@@ -263,5 +263,31 @@ console.log('\n[suite] AppNavHelpers — decideMountStrategy (DEEP-LINK BUG ANCH
         d11.strategy === 'file' && d11.filePath === 'html-templates/readme.md');
 }
 
+// --- resolveFolderManifest (per-folder app.json for "Open as App" in a sub-folder) ---
+{
+    var folder   = 'tools/release-tester';
+    var deepPath = 'tools/release-tester/index.html';
+
+    var r1 = H.resolveFolderManifest(
+        { entry: 'index.html', resources: { css: ['app.css', 'theme/x.css'], js: ['app.js'] },
+          permissions: { fs: { write: true } }, host_events: { 'inbox.new-messages': true }, title: 'Release Tester' },
+        folder, deepPath);
+    ok('RFM entry = the opened file (not folderJson.entry)', r1.entry === deepPath);
+    ok('RFM relative css → folder-prefixed',     r1.resources.css[0] === 'tools/release-tester/app.css');
+    ok('RFM nested relative css → folder-prefixed', r1.resources.css[1] === 'tools/release-tester/theme/x.css');
+    ok('RFM relative js → folder-prefixed',      r1.resources.js[0] === 'tools/release-tester/app.js');
+    ok('RFM permissions preserved verbatim',     r1.permissions && r1.permissions.fs.write === true);
+    ok('RFM host_events preserved verbatim',     r1.host_events && r1.host_events['inbox.new-messages'] === true);
+    ok('RFM title preserved',                    r1.title === 'Release Tester');
+
+    var r2 = H.resolveFolderManifest(
+        { resources: { css: ['/shared/global.css'], js: [] } }, folder, deepPath);
+    ok('RFM leading-slash css = vault-absolute (slash stripped)', r2.resources.css[0] === 'shared/global.css');
+
+    var r3 = H.resolveFolderManifest({}, folder, deepPath);
+    ok('RFM empty manifest → entry still = opened file', r3.entry === deepPath);
+    ok('RFM empty manifest → no resources synthesised',  r3.resources === undefined);
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);

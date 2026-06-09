@@ -25,6 +25,9 @@
             this._vault           = null;
             this._dataSource      = null;
             this._appJson         = null;
+            this._effectiveAppJson = null;    // the manifest actually mounted (folder app.json or deep-link override)
+            this._mountStrategy    = null;    // 'app' | 'file' | 'redirect' — replayed by _remountCurrent on auto-pull
+            this._mountedFilePath  = null;    // the file path when _mountStrategy === 'file'
             this._vaultKey        = null;
             this._writable        = false;
             this._htmlDir         = '';
@@ -531,8 +534,12 @@
                 var ahead = await this._vault.getAheadCount();
                 if (ahead > 0) { this._surfaceUnpushed('diverged'); return; }
                 // Clean behind → fast-forward the view and remount so the new code renders.
+                // _remountCurrent replays the SAME mount the user is looking at (the opened
+                // "as an app" file / folder manifest), expanding lazy sub-trees first — the old
+                // path re-ran _continue with the stale root app.json + a consumed deep-link, so it
+                // remounted the DEFAULT app (or 404'd the entry on the now-lazy sub-tree).
                 await this._syncViewToPublishedHead(this._vault);
-                if (this._appJson) { try { await this._continue(this._appJson); } catch (_) {} }
+                try { await this._remountCurrent(); } catch (_) {}
                 this._emitVaultEvent('auto-pull', { label: 'View synced to published head', head: liveNamed });
             } catch (_) { /* network errors are silent — retried on next focus */ }
         }
@@ -655,27 +662,100 @@
             // /en-gb/app/#patient/index.html rendered unstyled. Now an HTML deep-link in an
             // app vault routes through _mountApp with the deep-link overriding appJson.entry,
             // so the app's CSS/JS still load.
+            var deepIsHtml = deepPath && (deepPath.lastIndexOf('.html') === deepPath.length - 5 ||
+                                          deepPath.lastIndexOf('.htm')  === deepPath.length - 4);
+
+            // Per-folder app.json (Bug 2): if the deep-linked HTML lives in a sub-folder that has
+            // its OWN app.json, that folder is its own app — use THAT manifest (its resources/
+            // auth/hud/permissions/host_events, paths resolved relative to the folder), not the
+            // root manifest. "Open as App" on tools/release-tester/index.html now loads
+            // tools/release-tester/app.json, not the vault-root app.json.
+            if (deepIsHtml && deepPath.indexOf('/') > -1) {
+                var folderJson = await this._resolveFolderAppJson(deepPath);
+                if (folderJson) {
+                    await this._setActiveManifest(folderJson);   // its OWN permissions / host_events / appId
+                    await this._mountAppFlow(folderJson);
+                    return;
+                }
+            }
+
             var decision = AppNavHelpers.decideMountStrategy({ deepPath: deepPath, appJson: appJson });
 
             if (decision.strategy === 'redirect') {
                 // No default app and no file path — App Mode lives on /en-gb/app, not the
                 // vault page; bounce there so the user can browse files instead.
+                this._mountStrategy = 'redirect';
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
             }
             if (decision.strategy === 'file') {
+                this._mountStrategy   = 'file';
+                this._mountedFilePath = decision.filePath;
                 await this._mountVaultFile(decision.filePath);
                 return;
             }
             // decision.strategy === 'app' — appJson may be the original or a deep-link-
             // overridden clone with .entry set to the requested HTML file.
-            var effectiveAppJson = decision.appJson;
+            await this._mountAppFlow(decision.appJson);
+        }
+
+        // Fetch resources for `appJson` and mount it. Records the effective manifest + strategy so
+        // an auto-refresh remount (_remountCurrent) replays the SAME app/entry, not the root default.
+        async _mountAppFlow(appJson) {
+            this._mountStrategy    = 'app';
+            this._effectiveAppJson = appJson;
             this._setStatus('Loading resources…');
-            var resourcesData = await this._fetchResources(effectiveAppJson);
+            var resourcesData = await this._fetchResources(appJson);
             this._t.resourcesLoaded = performance.now();
             this._emitVaultEvent('resources-loaded', { label: 'Resources pre-fetched', cssCount: resourcesData.css.length, jsCount: resourcesData.js.length, ms: Math.round(this._t.resourcesLoaded - (this._t.appJsonFetched || this._t.treeLoaded)) });
-            await this._mountApp(effectiveAppJson, resourcesData);
+            await this._mountApp(appJson, resourcesData);
+        }
+
+        // Read a sub-folder's app.json (next to the opened HTML) and resolve it into the manifest
+        // to mount. Returns null when the folder has no app.json. Path resolution is the pure
+        // AppNavHelpers.resolveFolderManifest (folder-relative resources, entry = the opened file).
+        async _resolveFolderAppJson(deepPath) {
+            var slash = deepPath.lastIndexOf('/');
+            if (slash < 0) return null;
+            var folder    = deepPath.slice(0, slash);
+            var candidate = folder + '/app.json';
+            var fileList  = this._dataSource.getFileList();
+            var fileEntry = fileList.find(function (f) { return f.path === candidate; });
+            if (!fileEntry) return null;
+            try {
+                var buf        = await this._dataSource.getFileBytes(fileEntry.path);
+                var folderJson = JSON.parse(new TextDecoder().decode(buf));
+                return AppNavHelpers.resolveFolderManifest(folderJson, folder, deepPath);
+            } catch (e) {
+                console.warn('[app-shell] folder app.json parse error at ' + candidate + ':', e.message);
+                return null;
+            }
+        }
+
+        // Make `appJson` the active app manifest — its permissions, host_events, consent identity
+        // and title govern the running app. Used when a folder app.json takes over from the root.
+        async _setActiveManifest(appJson) {
+            this._appJson = appJson;
+            this._perm    = AppPermissions.parsePermissions(appJson);
+            this._appId   = '';
+            try { this._appId = await AppPermissions.appId(JSON.stringify(appJson)); } catch (_) {}
+            try { if (typeof AppHostEvents !== 'undefined') this._hostEvents = AppHostEvents.parse(appJson); } catch (_) {}
+        }
+
+        // Re-mount the CURRENT view after an auto-pull fast-forward — replays the same strategy
+        // (app/file) and the same entry/manifest the user is looking at, NOT the root default.
+        // Crucially expands lazy sub-trees first: _syncViewToPublishedHead reloads the tree with
+        // sub-folders unloaded, so without this the entry-file lookup (and folder app.json) 404.
+        async _remountCurrent() {
+            try { await this._dataSource.loadAllSubTrees(); } catch (_) {}
+            if (this._mountStrategy === 'file' && this._mountedFilePath) {
+                await this._mountVaultFile(this._mountedFilePath);
+            } else if (this._effectiveAppJson) {
+                await this._mountAppFlow(this._effectiveAppJson);
+            } else if (this._appJson) {
+                await this._mountAppFlow(this._appJson);
+            }
         }
 
 
