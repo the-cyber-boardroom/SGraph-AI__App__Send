@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-06-09 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -155,6 +155,20 @@ The fixed batch URL makes the single preflight cacheable. Architect spec + debri
 
 Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.
 
+### Vault Inbox — Foundation (v0.33.14, 2026-06-09)
+
+The inbox transport client and check-on-events model are shipped. The **full inbox spec** (CLI support, main UI section, app methods) remains PROPOSED — see the PROPOSED section.
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| `sg-inbox.js` — inbox transport client; reads inbox objects from vault storage via raw pointer API; `read_key` raw-bytes getter for inbox objects | **EXISTS** | C1 commit; `tests/unit/vault_ui/loader/test__sg_inbox_client.js` (182 assertions) |
+| `sg-inbox-checker.js` — check-on-events model; polls/checks inbox on trigger events; vault-shell triggers on receive | **EXISTS** | C2 commit; `tests/unit/vault_ui/loader/test__sg_inbox_checker.js` (152 assertions) |
+| Host-events allowlist + `sg.on/off` event subscription API + inbox permission grants | **EXISTS** | C3 commits; `tests/unit/vault_ui/loader/test__app_host_events.js` |
+
+The inbox transport uses the raw vault-pointer API (not the commit/push flow). Inbox objects live outside the version-controlled commit tree by design.
+
+---
+
 ### `/app` Auto-Sync Parity (v0.33.5, 2026-06-08)
 
 `/en-gb/app/` (app-shell.js) now has the auto-sync engine `/vault` already had — previously
@@ -201,6 +215,11 @@ Key proposals for this domain. Full details: see sub-files in `proposed/`.
 - **P-227: Vault-per-user as SG/Send storage substrate** — PROPOSED: one vault per user for SG/Send; SG/Sentinel rules write user activity to their vault; removes backend complexity; zero-knowledge nuance preserved (activity visible, content unseen). Requires SG/Sentinel deployed. Source: doc 468, 05/24 briefs.
 - **Sub-Vaults via Web UI (Phases 1–3)** — EXISTS as of 05/25–26: `.link.json` convention files + ro-links owner records; link card UI (Phase 2); owner "Add link" UI (Phase 3); portable ro-links (open on any device); lazy-load (preserve open folders); sub-vault reads/lists via app bridge. Implements P-231 for the Web UI access point. CLI access remains PROPOSED (P-248).
 - **P-248: Sub-vaults CLI access (clone-within-clone)** — PROPOSED: sgit CLI path for sub-vaults — track storage locations, resolve nested clones step by step. Deferred; Web UI prioritised first. Source: doc 490, 05/25 briefs.
+- **Vault Inbox Full Spec** — PROPOSED: CLI commands (`sgit inbox list/read/accept-key`), main UI section (left-hand, refresh-checked, message count + key ID + config view), vault-app inbox methods (`sg.inbox.read()` under permission mapping), accepted-key configuration per vault. Email-FS-lite primitive. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-vault-inbox-cli-ui-app-public-key-controlled.md`. Foundation shipped (C1/C2/C3 — see EXISTS above).
+- **Deterministic Value Indexes** — PROPOSED: index files at `bare/indexes/val-{sha256(value)}` where the hash is computed from the value (e.g. an email, a name), not the key. Requesting the file answers existence; reading it answers location (object ID + metadata). Derived from the value, not the key — the novel element. Enables hash-based existence check for large-file deduplication. Source: `briefs/06/07/v0.32.7__arch-brief__sg-send-deterministic-value-indexes-finding-in-encrypted-store.md`.
+- **PKI Public Key Registry** — PROPOSED: a vault that stores public keys + trust relationships (graph database); two-level trust (downward explicit: A trusts B; upward self-declared: B says A should trust it); clues not storage; federation across registries; caller-side resolver with graded partial results. Replaces a prior FastAPI prototype. Source: `briefs/06/05/v0.32.4__dev-brief__sg-send-pki-public-key-registry-on-vaults.md`.
+- **Large-File Chunked Vault Upload** — PROPOSED: 100% vault upload workflow for large files (live case: 15 GB); `file.slice()` streaming chunks; SHA-256 per chunk; existence check via deterministic value index; resumable upload; recipient loads vault structure without downloading data; selective chunk download; video slices (FFmpeg) + first-frame thumbnails. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-large-file-sharing-chunked-upload-ui.md`.
+- **Central Key Management / OpenRouter Distribution** — PROPOSED: parent vault manages OpenRouter key centrally; distributes to child vaults via vault-to-vault comms inbox; children use key for in-vault LLM capabilities (infographics, chat); return results to parent over comms. Per-child billing + credit allocation. Source: `briefs/06/07/v0.32.7__dev-brief__sg-send-central-key-management-openrouter-keys-to-child-vaults.md`.
 
 ---
 

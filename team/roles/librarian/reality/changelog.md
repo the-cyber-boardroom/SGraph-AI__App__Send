@@ -7,6 +7,18 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-09
+
+Brief-processing session: 20 new human briefs (06/05: 11 docs; 06/07: 9 docs); plus 6 new code commits (vault-inbox C1/C2/C3 foundation + CLI interop fix + vault refresh fix + rollback fix).
+
+- `vault/index.md` — Added EXISTS: vault inbox foundation (C1 sg-inbox.js transport client, C2 sg-inbox-checker.js check-on-events, C3 host-events + sg.on/off + inbox perms); last updated 04/28 → 06/09. Added PROPOSED: vault inbox full spec (CLI + UI section + app methods), deterministic value indexes (value-derived file naming), PKI public key registry (two-level trust, graph DB, federation), large-file chunked vault upload (chunk+hash+resume), central key management (OpenRouter distribution to child vaults).
+- `index.md` — Version v0.33.5 → v0.33.14; last updated 06/08 → 06/09; unit tests ~1600+ → ~1950+; docs 594 → 614; PROPOSED 455+ → 469+.
+
+Master index (06/09): `team/roles/librarian/reviews/06/09/v0.33.14__master-index__briefs-05-07-june-2026.md`
+Processed: 20 new human briefs (06/05–07/07) | New EXISTS items: 3 (inbox C1/C2/C3 foundation) | New PROPOSED items: 14
+
+---
+
 ## 2026-06-08
 
 Code-change-only session: 0 new briefs; 9 substantive commits since the 06/07 librarian session (plus CI version bumps → v0.33.5).
