@@ -84,11 +84,24 @@ class SGVaultRefManager {
     // fresh AES-GCM IV per write, so the index is small and cheap to re-write each push.
     // head_ref_id points at the NAMED ref (ref-pid-muw-*) — never the clone ref — so the
     // CLI keeps cloning the canonical published branch (see the CLI interop briefs).
+    //
+    // CLI wire contract — pinned to the sgit CLI's Schema__Branch_Index (round 2 review):
+    //   - `branch_id`  MUST match  ^branch-(named|clone)-[0-9a-f]{8,64}$  (opaque hex; NOT a label).
+    //     We derive it from `branchIndexFileId`'s hex suffix (`idx-pid-muw-{12 hex}` → 12 hex chars),
+    //     so it's deterministic per vault, opaque, and well inside the regex bounds.
+    //   - `name`       MUST be  "current"  (hardcoded in 10+ CLI workflow steps; changing the CLI
+    //     would break every CLI-created vault in the wild). Human-readable display labels belong
+    //     in a separate field (see the in-flight architect interop contract).
+    // Earlier wire ("branch-named-main" / "main") was strictly worse than no index: it tripped
+    // the CLI's `Safe_Str__Branch_Id` parse → crash, bypassing their absent-index fallback.
     async writeBranchIndex(branchIndexFileId, refFileId) {
         if (!branchIndexFileId || !refFileId) return
         const filePath = `bare/indexes/${branchIndexFileId}`
+        // Derive the opaque hex id from the index file id's hex tail.
+        const hex      = (branchIndexFileId.match(/[0-9a-f]+$/) || ['00000000'])[0]
+        const branchId = 'branch-named-' + hex
         const index    = { schema: 'branch_index_v1', branches: [
-            { branch_id: 'branch-named-main', branch_type: 'named', head_ref_id: refFileId, name: 'main' }
+            { branch_id: branchId, branch_type: 'named', head_ref_id: refFileId, name: 'current' }
         ]}
         const payload   = new TextEncoder().encode(JSON.stringify(index))
         const encrypted = await SGSendCrypto.encrypt(payload, this._readKey)

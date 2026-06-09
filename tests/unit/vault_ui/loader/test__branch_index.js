@@ -54,6 +54,31 @@ function fakeSgSend() {
     const named = idx.branches.find(b => b.branch_type === 'named');
     ok('named branch resolvable',            !!(named && named.head_ref_id === REF));
 
+    // --- CLI wire contract (sgit Schema__Branch_Index — round 2 review) -------------
+    // branch_id must match the CLI's Safe_Str__Branch_Id regex; name must be "current"
+    // (hardcoded in 10+ CLI workflow steps). A malformed index is strictly worse than
+    // no index — it bypasses the CLI's absent-index fallback and crashes parse.
+    console.log('\n[suite] CLI wire contract — branch_id regex + name == "current"');
+    const BRANCH_ID_RE = /^branch-(named|clone)-[0-9a-f]{8,64}$/;
+    ok('branch_id matches CLI regex',        BRANCH_ID_RE.test(idx.branches[0].branch_id));
+    ok('branch_id is NOT "branch-named-main" (would fail regex)',
+                                              idx.branches[0].branch_id !== 'branch-named-main');
+    ok('name is "current" (CLI hardcode)',   idx.branches[0].name === 'current');
+    ok('name is NOT "main" (would fail lookup)', idx.branches[0].name !== 'main');
+
+    console.log('\n[suite] branch_id is deterministic + opaque (per-vault)');
+    const sg2 = fakeSgSend();
+    const rm2 = new SGVaultRefManager(sg2, 'vaultB', 'wk2', readKey);
+    await rm2.writeBranchIndex(IDX, REF);
+    const idx2 = await rm2.readBranchIndex(IDX);
+    ok('same idx → same branch_id (deterministic)',
+                                              idx.branches[0].branch_id === idx2.branches[0].branch_id);
+    const IDX_OTHER = 'idx-pid-muw-ffffffffffff';
+    await rm.writeBranchIndex(IDX_OTHER, REF);
+    const idxOther = await rm.readBranchIndex(IDX_OTHER);
+    ok('different idx → different branch_id (per-vault)',
+                                              idx.branches[0].branch_id !== idxOther.branches[0].branch_id);
+
     console.log('\n[suite] guards');
     const before = Object.keys(sg._store).length;
     await rm.writeBranchIndex('', REF);          // missing idx → no-op
