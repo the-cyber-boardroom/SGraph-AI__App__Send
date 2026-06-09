@@ -208,6 +208,23 @@
             this._vaultKey  = vaultKey;
             this._accessKey = accessKey || '';
 
+            // Embedded access token (parity with /app): if the vault carries .vault/access-token.json
+            // AND it's a writable open (read_key available to decrypt; true RO-token opens have
+            // _passphrase === null and can't read the .vault/ floor cleanly), adopt it as the access
+            // key. The /app shell already does this (app-shell.js:_readEmbeddedAccessToken); /vault
+            // didn't, so a vault created with create({ accessToken:'inherit' }) opened READ-ONLY
+            // here even though the token was right there in the tree. Explicit accessKey (from the
+            // entry form) still wins — embedded only fills the gap.
+            if (!this._accessKey && vault && vault._passphrase !== null) {
+                try {
+                    const embedded = await this._readEmbeddedAccessToken(vault);
+                    if (embedded) {
+                        this._accessKey = embedded;
+                        if (vault._sgSend) vault._sgSend.token = embedded;
+                    }
+                } catch (_) {}
+            }
+
             // Switch views
             this.querySelector('.vs-entry').style.display = 'none';
             this.querySelector('.vs-shell').style.display = 'grid';
@@ -309,6 +326,21 @@
 
         // --- Sync Helper ----------------------------------------------------------
         // Aligns the in-memory working tree with the published named ref before render.
+        // Read the optional embedded backend access token at .vault/access-token.json. The /app
+        // shell has its own copy of this (app-shell.js:_readEmbeddedAccessToken); kept in sync
+        // here intentionally so both shells produce the same writable-from-key-only behaviour.
+        // The .vault/ folder is read_key-encrypted like the rest of the tree, so a writable open
+        // can decrypt it. Returns the token string or null when the file is absent / malformed.
+        async _readEmbeddedAccessToken(vault) {
+            try {
+                const listed = vault.listFolder('/.vault') || [];
+                if (!listed.some((e) => e.name === 'access-token.json')) return null;
+                const bytes = await vault.getFile('/.vault', 'access-token.json');
+                const obj   = JSON.parse(new TextDecoder().decode(bytes));
+                return (obj && obj.token) ? String(obj.token) : null;
+            } catch (_) { return null; }
+        }
+
         // Writable vaults fast-forward the clone ref (vault.merge); read-only vaults
         // load the named commit's tree in memory only — without this, a read-only
         // collaborator's Refresh button silently caught the merge error and left the
