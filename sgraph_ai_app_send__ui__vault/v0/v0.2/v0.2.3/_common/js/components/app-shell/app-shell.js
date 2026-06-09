@@ -961,6 +961,31 @@
             } catch (_) { return false; }
         }
 
+        // Lazily build (and cache per vault) the SGInbox transport for the open vault.
+        // enum_key is derived from the read_key's raw bytes (owner sessions; RO sessions
+        // get a null enum_key and the read verbs fail closed). Re-derives if the vault changed.
+        async _getInbox() {
+            var vault = this._vault;
+            if (!vault || typeof SGInbox === 'undefined') return null;
+            if (this._inbox && this._inboxVaultId === vault._vaultId) return this._inbox;
+            var sgSend   = vault._sgSend || null;
+            var endpoint = (sgSend && sgSend.endpoint)
+                || (window.SG_ENDPOINT
+                    || (function () { try { return sessionStorage.getItem('sg-vault-endpoint'); } catch (_) { return null; } })()
+                    || 'https://dev.send.sgraph.ai');
+            var rawBytes = await vault.readKeyRawBytes();
+            var enumKey  = rawBytes ? await SGInbox.deriveEnumKey(rawBytes) : null;
+            this._inbox = new SGInbox({
+                endpoint:    endpoint,
+                vaultId:     vault._vaultId,
+                enumKey:     enumKey,
+                writeKeyHex: vault.writeKeyHex,
+                accessToken: (sgSend && sgSend.token) || null
+            });
+            this._inboxVaultId = vault._vaultId;
+            return this._inbox;
+        }
+
         // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
         // vault never inherits a prior app's consent (A4). Single source of truth for _can-layered
         // consent and the HUD chip/panel.
@@ -2112,6 +2137,18 @@
                 // The parent handler routes {type:"sg-app-error"} to the HUD. See probe P5.
                 'window.onerror=function(m,s,l,c){try{window.parent.postMessage({type:"sg-app-error",message:String(m)+(l?" (line "+l+(c?":"+c:"")+")":"")},"*");}catch(_){}return false;};' +
                 'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
+
+                // Kernel→app event channel (sg.on / sg.off). The kernel postMessages
+                // {type:"sg-event",name,payload} ONLY for events this app declared in
+                // app.json.host_events (gate is enforced parent-side). We fan them out to
+                // subscribers here. Registering for a name the kernel never sends is a
+                // harmless no-op (no enumeration leak). "*" is a wildcard over received events.
+                'var _sgEvtH={};' +
+                'function _sgOn(name,cb){if(typeof cb!=="function"||!name)return function(){};(_sgEvtH[name]=_sgEvtH[name]||[]).push(cb);return function(){_sgOff(name,cb);};}' +
+                'function _sgOff(name,cb){var a=_sgEvtH[name];if(!a)return;var i=a.indexOf(cb);if(i>=0)a.splice(i,1);if(a.length===0)delete _sgEvtH[name];}' +
+                'function _sgDispatch(name,payload){if(!name)return;var a=(_sgEvtH[name]||[]).slice(),i;for(i=0;i<a.length;i++){try{a[i](payload);}catch(_){}}' +
+                  'var s=(_sgEvtH["*"]||[]).slice();for(i=0;i<s.length;i++){try{s[i](name,payload);}catch(_){}}}' +
+                'window.addEventListener("message",function(e){if(e&&e.data&&e.data.type==="sg-event")_sgDispatch(e.data.name,e.data.payload);});' +
                 // Body-hidden self-check: if the app never makes its body visible, surface a
                 // hint (mirrors the old same-origin display:none probe, now from inside).
                 //
@@ -2270,8 +2307,23 @@
                       // ViV Phase 2: mount a child vault for cross-vault reads via this kernel (rw mount → separate brief).
                       'mount:function(opts){return _sgCmd("vault",{action:"mount",prefix:opts&&opts.prefix,ref:opts&&opts.ref,label:opts&&opts.label});},' +
                       'unmount:function(mountId){return _sgCmd("vault",{action:"unmount",mountId:mountId});},' +
-                      'mounts:function(){return _sgCmd("vault",{action:"mounts"});}' +
+                      'mounts:function(){return _sgCmd("vault",{action:"mounts"});},' +
+                      // Cross-vault peer wake — ask a mounted child to check its inbox now (C6).
+                      'notify:function(mountId,name,payload){return _sgCmd("vault",{action:"notify",mountId:mountId,name:name,payload:payload});}' +
                     '},' +
+                    // sg.inbox.* — append-only inbox transport (six verbs, 1:1 with the server).
+                    // The kernel holds the keys and attaches the gate header per verb; app.json
+                    // permissions.inbox.* decides which verbs are callable.
+                    'inbox:{' +
+                      'configure:function(o){o=o||{};return _sgCmd("inbox",{action:"configure",append_anchors:o.append_anchors});},' +
+                      'append:function(o){o=o||{};return _sgCmd("inbox",{action:"append",vault_id:o.vault_id,append_token:o.append_token,payload:o.payload});},' +
+                      'list:function(o){o=o||{};return _sgCmd("inbox",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content});},' +
+                      'fetch:function(o){o=o||{};return _sgCmd("inbox",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids});},' +
+                      'markProcessed:function(o){o=o||{};return _sgCmd("inbox",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids});},' +
+                      'purge:function(o){o=o||{};return _sgCmd("inbox",{action:"purge",folder:o.folder,inbox:o.inbox,file_ids:o.file_ids});}' +
+                    '},' +
+                    // sg.on / sg.off — kernel→app events (see the _sgEvtH registry above).
+                    'on:_sgOn,off:_sgOff,' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
                     // sg.history.* — read past commits / trees / blobs (read-only)
                     'history:{' +
@@ -2639,6 +2691,35 @@
                             return;
                         }
                         cmdReply(false, null, 'Unknown history action: ' + ha);
+                        return;
+                    }
+
+                    // ── inbox transport (configure / append / list / fetch / markProcessed / purge) ──
+                    // The kernel holds the keys; SGInbox attaches the gate header per verb.
+                    // app.json permissions.inbox.* decides which verbs the app may call.
+                    if (e.data.__sgCmdType === 'inbox') {
+                        var ibAct = e.data.action;
+                        var ibCap = { configure: 'inbox.configure', append: 'inbox.append', list: 'inbox.list',
+                                      fetch: 'inbox.read', markProcessed: 'inbox.markProcessed', purge: 'inbox.purge' }[ibAct];
+                        if (!ibCap) { cmdReply(false, null, 'Unknown inbox action: ' + ibAct); return; }
+                        if (!self._can(ibCap, '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('inbox.' + ibAct, { ok: false, err: 'EPERM' }); return; }
+                        var ibData = e.data;
+                        self._getInbox().then(function (inbox) {
+                            if (!inbox) throw new Error('inbox transport unavailable');
+                            switch (ibAct) {
+                                case 'configure':     return inbox.configure({ append_anchors: ibData.append_anchors });
+                                case 'append':        return inbox.append({ vault_id: ibData.vault_id, append_token: ibData.append_token, payload: ibData.payload });
+                                case 'list':          return inbox.list({ inbox: ibData.inbox, after_file_id: ibData.after_file_id, limit: ibData.limit, include_content: ibData.include_content });
+                                case 'fetch':         return inbox.fetch({ inbox: ibData.inbox, file_ids: ibData.file_ids });
+                                case 'markProcessed': return inbox.markProcessed({ inbox: ibData.inbox, file_ids: ibData.file_ids });
+                                case 'purge':         return inbox.purge({ folder: ibData.folder, inbox: ibData.inbox, file_ids: ibData.file_ids });
+                            }
+                        }).then(function (r) {
+                            cmdReply(true, r); self._emitBridgeCall('inbox.' + ibAct, { ok: true });
+                        }).catch(function (err) {
+                            cmdReply(false, null, (err && err.message) || String(err));
+                            self._emitBridgeCall('inbox.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
+                        });
                         return;
                     }
 
