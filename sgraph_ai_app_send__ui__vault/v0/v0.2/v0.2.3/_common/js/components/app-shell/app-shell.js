@@ -25,6 +25,9 @@
             this._vault           = null;
             this._dataSource      = null;
             this._appJson         = null;
+            this._effectiveAppJson = null;    // the manifest actually mounted (folder app.json or deep-link override)
+            this._mountStrategy    = null;    // 'app' | 'file' | 'redirect' — replayed by _remountCurrent on auto-pull
+            this._mountedFilePath  = null;    // the file path when _mountStrategy === 'file'
             this._vaultKey        = null;
             this._writable        = false;
             this._htmlDir         = '';
@@ -64,7 +67,11 @@
             // Auto-sync parity with /vault: re-check the published head when the tab regains
             // focus, so an app left open picks up code/data another session pushed. Debounced
             // in _scheduleBehindCheck. Gated by the shared 'sg-vault-autosync' flag.
-            this._visibilityHandler = () => { if (!document.hidden) this._scheduleBehindCheck(500); };
+            this._visibilityHandler = () => {
+                if (document.hidden) return;
+                this._scheduleBehindCheck(500);
+                this._scheduleInboxCheck(500);          // inbox check rides the same focus trigger (no-op unless an app opted in)
+            };
             document.addEventListener('visibilitychange', this._visibilityHandler);
             this._init();
         }
@@ -83,6 +90,7 @@
             if (this._visibilityHandler) { document.removeEventListener('visibilitychange', this._visibilityHandler); this._visibilityHandler = null; }
             clearTimeout(this._autoPushTimer);
             clearTimeout(this._behindCheckTimer);
+            clearTimeout(this._inboxCheckTimer);
             if (this._embedOpenHandler)  { window.removeEventListener('message', this._embedOpenHandler); this._embedOpenHandler = null; }
             if (this._embedReadyHandler) { this.removeEventListener('app-shell:ready', this._embedReadyHandler); this._embedReadyHandler = null; }
             if (this._vfsBridgeHandler) {
@@ -526,10 +534,64 @@
                 var ahead = await this._vault.getAheadCount();
                 if (ahead > 0) { this._surfaceUnpushed('diverged'); return; }
                 // Clean behind → fast-forward the view and remount so the new code renders.
+                // _remountCurrent replays the SAME mount the user is looking at (the opened
+                // "as an app" file / folder manifest), expanding lazy sub-trees first — the old
+                // path re-ran _continue with the stale root app.json + a consumed deep-link, so it
+                // remounted the DEFAULT app (or 404'd the entry on the now-lazy sub-tree).
                 await this._syncViewToPublishedHead(this._vault);
-                if (this._appJson) { try { await this._continue(this._appJson); } catch (_) {} }
+                try { await this._remountCurrent(); } catch (_) {}
                 this._emitVaultEvent('auto-pull', { label: 'View synced to published head', head: liveNamed });
             } catch (_) { /* network errors are silent — retried on next focus */ }
+        }
+
+        // ── Inbox check-on-events → host_events-gated push to the app ────────────────────
+        // Built only when the mounted app declared an inbox host_event (default-deny). Runs
+        // on the same quasi-events as the behind-check (focus, app open). Each emit is filtered
+        // through app.json.host_events before it reaches the iframe — an app cannot receive an
+        // event it didn't declare. auto_fetch is off here: apps pull ciphertext on demand via
+        // sg.inbox.fetch when they get the notification.
+        async _initInboxChecker(appJson) {
+            this._hostEvents = AppHostEvents.parse(appJson);
+            if (typeof SGInbox === 'undefined' || typeof SGInboxChecker === 'undefined' || typeof AppHostEvents === 'undefined') return;
+            var wantsInbox = AppHostEvents.allows(this._hostEvents, 'inbox.new-messages')
+                          || AppHostEvents.allows(this._hostEvents, 'inbox.error');
+            if (!wantsInbox || !this._vault) { this._inboxChecker = null; return; }
+            // Reuse the checker across re-mounts of the same vault (seen-set persists).
+            if (this._inboxChecker && this._inboxCheckerVaultId === this._vault._vaultId) {
+                this._scheduleInboxCheck(0, 'app-remount');
+                return;
+            }
+            var inbox = await this._getInbox();
+            if (!inbox) { this._inboxChecker = null; return; }
+            var self = this;
+            var bus = { emit: function (name, payload) { self._pushHostEvent(name, payload); } };
+            this._inboxChecker = new SGInboxChecker(inbox, bus, function () {
+                return { enabled: AppHostEvents.allows(self._hostEvents, 'inbox.new-messages'), auto_fetch: false };
+            });
+            this._inboxCheckerVaultId = this._vault._vaultId;
+            this._scheduleInboxCheck(0, 'app-open');
+        }
+
+        _scheduleInboxCheck(delayMs, trigger) {
+            if (!this._inboxChecker) return;
+            var DEBOUNCE_MS = 1000;
+            var since = Date.now() - (this._lastInboxCheckTime || 0);
+            var wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
+            var label = trigger || 'visibility';
+            clearTimeout(this._inboxCheckTimer);
+            this._inboxCheckTimer = setTimeout(() => {
+                this._lastInboxCheckTime = Date.now();
+                if (this._inboxChecker) this._inboxChecker.check(label);
+            }, Math.max(0, wait));
+        }
+
+        // Push a kernel event to the app iframe, gated by app.json.host_events.
+        _pushHostEvent(name, payload) {
+            try {
+                if (!AppHostEvents.allows(this._hostEvents, name)) { this._emitBridgeCall('event.' + name, { ok: false, err: 'not in host_events' }); return; }
+                var win = this._iframeEl && this._iframeEl.contentWindow;
+                if (win) { win.postMessage({ type: 'sg-event', name: name, payload: payload }, '*'); this._emitBridgeCall('event.' + name, { ok: true, pushed: true }); }
+            } catch (_) { /* iframe gone / cross-origin — drop */ }
         }
 
         // Make the "unpushed commits" state VISIBLE — a persistent HUD warning (ttl=null), since
@@ -600,27 +662,100 @@
             // /en-gb/app/#patient/index.html rendered unstyled. Now an HTML deep-link in an
             // app vault routes through _mountApp with the deep-link overriding appJson.entry,
             // so the app's CSS/JS still load.
+            var deepIsHtml = deepPath && (deepPath.lastIndexOf('.html') === deepPath.length - 5 ||
+                                          deepPath.lastIndexOf('.htm')  === deepPath.length - 4);
+
+            // Per-folder app.json (Bug 2): if the deep-linked HTML lives in a sub-folder that has
+            // its OWN app.json, that folder is its own app — use THAT manifest (its resources/
+            // auth/hud/permissions/host_events, paths resolved relative to the folder), not the
+            // root manifest. "Open as App" on tools/release-tester/index.html now loads
+            // tools/release-tester/app.json, not the vault-root app.json.
+            if (deepIsHtml && deepPath.indexOf('/') > -1) {
+                var folderJson = await this._resolveFolderAppJson(deepPath);
+                if (folderJson) {
+                    await this._setActiveManifest(folderJson);   // its OWN permissions / host_events / appId
+                    await this._mountAppFlow(folderJson);
+                    return;
+                }
+            }
+
             var decision = AppNavHelpers.decideMountStrategy({ deepPath: deepPath, appJson: appJson });
 
             if (decision.strategy === 'redirect') {
                 // No default app and no file path — App Mode lives on /en-gb/app, not the
                 // vault page; bounce there so the user can browse files instead.
+                this._mountStrategy = 'redirect';
                 var base = window.location.pathname.split('/en-gb/')[0];
                 window.location.replace(base + '/en-gb/vault/');
                 return;
             }
             if (decision.strategy === 'file') {
+                this._mountStrategy   = 'file';
+                this._mountedFilePath = decision.filePath;
                 await this._mountVaultFile(decision.filePath);
                 return;
             }
             // decision.strategy === 'app' — appJson may be the original or a deep-link-
             // overridden clone with .entry set to the requested HTML file.
-            var effectiveAppJson = decision.appJson;
+            await this._mountAppFlow(decision.appJson);
+        }
+
+        // Fetch resources for `appJson` and mount it. Records the effective manifest + strategy so
+        // an auto-refresh remount (_remountCurrent) replays the SAME app/entry, not the root default.
+        async _mountAppFlow(appJson) {
+            this._mountStrategy    = 'app';
+            this._effectiveAppJson = appJson;
             this._setStatus('Loading resources…');
-            var resourcesData = await this._fetchResources(effectiveAppJson);
+            var resourcesData = await this._fetchResources(appJson);
             this._t.resourcesLoaded = performance.now();
             this._emitVaultEvent('resources-loaded', { label: 'Resources pre-fetched', cssCount: resourcesData.css.length, jsCount: resourcesData.js.length, ms: Math.round(this._t.resourcesLoaded - (this._t.appJsonFetched || this._t.treeLoaded)) });
-            await this._mountApp(effectiveAppJson, resourcesData);
+            await this._mountApp(appJson, resourcesData);
+        }
+
+        // Read a sub-folder's app.json (next to the opened HTML) and resolve it into the manifest
+        // to mount. Returns null when the folder has no app.json. Path resolution is the pure
+        // AppNavHelpers.resolveFolderManifest (folder-relative resources, entry = the opened file).
+        async _resolveFolderAppJson(deepPath) {
+            var slash = deepPath.lastIndexOf('/');
+            if (slash < 0) return null;
+            var folder    = deepPath.slice(0, slash);
+            var candidate = folder + '/app.json';
+            var fileList  = this._dataSource.getFileList();
+            var fileEntry = fileList.find(function (f) { return f.path === candidate; });
+            if (!fileEntry) return null;
+            try {
+                var buf        = await this._dataSource.getFileBytes(fileEntry.path);
+                var folderJson = JSON.parse(new TextDecoder().decode(buf));
+                return AppNavHelpers.resolveFolderManifest(folderJson, folder, deepPath);
+            } catch (e) {
+                console.warn('[app-shell] folder app.json parse error at ' + candidate + ':', e.message);
+                return null;
+            }
+        }
+
+        // Make `appJson` the active app manifest — its permissions, host_events, consent identity
+        // and title govern the running app. Used when a folder app.json takes over from the root.
+        async _setActiveManifest(appJson) {
+            this._appJson = appJson;
+            this._perm    = AppPermissions.parsePermissions(appJson);
+            this._appId   = '';
+            try { this._appId = await AppPermissions.appId(JSON.stringify(appJson)); } catch (_) {}
+            try { if (typeof AppHostEvents !== 'undefined') this._hostEvents = AppHostEvents.parse(appJson); } catch (_) {}
+        }
+
+        // Re-mount the CURRENT view after an auto-pull fast-forward — replays the same strategy
+        // (app/file) and the same entry/manifest the user is looking at, NOT the root default.
+        // Crucially expands lazy sub-trees first: _syncViewToPublishedHead reloads the tree with
+        // sub-folders unloaded, so without this the entry-file lookup (and folder app.json) 404.
+        async _remountCurrent() {
+            try { await this._dataSource.loadAllSubTrees(); } catch (_) {}
+            if (this._mountStrategy === 'file' && this._mountedFilePath) {
+                await this._mountVaultFile(this._mountedFilePath);
+            } else if (this._effectiveAppJson) {
+                await this._mountAppFlow(this._effectiveAppJson);
+            } else if (this._appJson) {
+                await this._mountAppFlow(this._appJson);
+            }
         }
 
 
@@ -959,6 +1094,31 @@
                 if (AppPermissions.isFloor(act, path)) return false;
                 return AppPermissions.can(this._perm, verb, path);
             } catch (_) { return false; }
+        }
+
+        // Lazily build (and cache per vault) the SGInbox transport for the open vault.
+        // enum_key is derived from the read_key's raw bytes (owner sessions; RO sessions
+        // get a null enum_key and the read verbs fail closed). Re-derives if the vault changed.
+        async _getInbox() {
+            var vault = this._vault;
+            if (!vault || typeof SGInbox === 'undefined') return null;
+            if (this._inbox && this._inboxVaultId === vault._vaultId) return this._inbox;
+            var sgSend   = vault._sgSend || null;
+            var endpoint = (sgSend && sgSend.endpoint)
+                || (window.SG_ENDPOINT
+                    || (function () { try { return sessionStorage.getItem('sg-vault-endpoint'); } catch (_) { return null; } })()
+                    || 'https://dev.send.sgraph.ai');
+            var rawBytes = await vault.readKeyRawBytes();
+            var enumKey  = rawBytes ? await SGInbox.deriveEnumKey(rawBytes) : null;
+            this._inbox = new SGInbox({
+                endpoint:    endpoint,
+                vaultId:     vault._vaultId,
+                enumKey:     enumKey,
+                writeKeyHex: vault.writeKeyHex,
+                accessToken: (sgSend && sgSend.token) || null
+            });
+            this._inboxVaultId = vault._vaultId;
+            return this._inbox;
         }
 
         // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
@@ -1741,6 +1901,9 @@
             this._navHistory   = [entry.path];
             this._navIndex     = 0;
             this._emitNavChange();
+
+            // Start the inbox checker if this app opted into inbox host_events (no-op otherwise).
+            this._initInboxChecker(appJson);
         }
 
         // _page.json: render via PageLayoutRenderer.
@@ -2112,6 +2275,18 @@
                 // The parent handler routes {type:"sg-app-error"} to the HUD. See probe P5.
                 'window.onerror=function(m,s,l,c){try{window.parent.postMessage({type:"sg-app-error",message:String(m)+(l?" (line "+l+(c?":"+c:"")+")":"")},"*");}catch(_){}return false;};' +
                 'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
+
+                // Kernel→app event channel (sg.on / sg.off). The kernel postMessages
+                // {type:"sg-event",name,payload} ONLY for events this app declared in
+                // app.json.host_events (gate is enforced parent-side). We fan them out to
+                // subscribers here. Registering for a name the kernel never sends is a
+                // harmless no-op (no enumeration leak). "*" is a wildcard over received events.
+                'var _sgEvtH={};' +
+                'function _sgOn(name,cb){if(typeof cb!=="function"||!name)return function(){};(_sgEvtH[name]=_sgEvtH[name]||[]).push(cb);return function(){_sgOff(name,cb);};}' +
+                'function _sgOff(name,cb){var a=_sgEvtH[name];if(!a)return;var i=a.indexOf(cb);if(i>=0)a.splice(i,1);if(a.length===0)delete _sgEvtH[name];}' +
+                'function _sgDispatch(name,payload){if(!name)return;var a=(_sgEvtH[name]||[]).slice(),i;for(i=0;i<a.length;i++){try{a[i](payload);}catch(_){}}' +
+                  'var s=(_sgEvtH["*"]||[]).slice();for(i=0;i<s.length;i++){try{s[i](name,payload);}catch(_){}}}' +
+                'window.addEventListener("message",function(e){if(e&&e.data&&e.data.type==="sg-event")_sgDispatch(e.data.name,e.data.payload);});' +
                 // Body-hidden self-check: if the app never makes its body visible, surface a
                 // hint (mirrors the old same-origin display:none probe, now from inside).
                 //
@@ -2270,8 +2445,23 @@
                       // ViV Phase 2: mount a child vault for cross-vault reads via this kernel (rw mount → separate brief).
                       'mount:function(opts){return _sgCmd("vault",{action:"mount",prefix:opts&&opts.prefix,ref:opts&&opts.ref,label:opts&&opts.label});},' +
                       'unmount:function(mountId){return _sgCmd("vault",{action:"unmount",mountId:mountId});},' +
-                      'mounts:function(){return _sgCmd("vault",{action:"mounts"});}' +
+                      'mounts:function(){return _sgCmd("vault",{action:"mounts"});},' +
+                      // Cross-vault peer wake — ask a mounted child to check its inbox now (C6).
+                      'notify:function(mountId,name,payload){return _sgCmd("vault",{action:"notify",mountId:mountId,name:name,payload:payload});}' +
                     '},' +
+                    // sg.inbox.* — append-only inbox transport (six verbs, 1:1 with the server).
+                    // The kernel holds the keys and attaches the gate header per verb; app.json
+                    // permissions.inbox.* decides which verbs are callable.
+                    'inbox:{' +
+                      'configure:function(o){o=o||{};return _sgCmd("inbox",{action:"configure",append_anchors:o.append_anchors});},' +
+                      'append:function(o){o=o||{};return _sgCmd("inbox",{action:"append",vault_id:o.vault_id,append_token:o.append_token,payload:o.payload});},' +
+                      'list:function(o){o=o||{};return _sgCmd("inbox",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content});},' +
+                      'fetch:function(o){o=o||{};return _sgCmd("inbox",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids});},' +
+                      'markProcessed:function(o){o=o||{};return _sgCmd("inbox",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids});},' +
+                      'purge:function(o){o=o||{};return _sgCmd("inbox",{action:"purge",folder:o.folder,inbox:o.inbox,file_ids:o.file_ids});}' +
+                    '},' +
+                    // sg.on / sg.off — kernel→app events (see the _sgEvtH registry above).
+                    'on:_sgOn,off:_sgOff,' +
                     'loadCss:_loadCss,loadJs:_loadJs,' +
                     // sg.history.* — read past commits / trees / blobs (read-only)
                     'history:{' +
@@ -2639,6 +2829,35 @@
                             return;
                         }
                         cmdReply(false, null, 'Unknown history action: ' + ha);
+                        return;
+                    }
+
+                    // ── inbox transport (configure / append / list / fetch / markProcessed / purge) ──
+                    // The kernel holds the keys; SGInbox attaches the gate header per verb.
+                    // app.json permissions.inbox.* decides which verbs the app may call.
+                    if (e.data.__sgCmdType === 'inbox') {
+                        var ibAct = e.data.action;
+                        var ibCap = { configure: 'inbox.configure', append: 'inbox.append', list: 'inbox.list',
+                                      fetch: 'inbox.read', markProcessed: 'inbox.markProcessed', purge: 'inbox.purge' }[ibAct];
+                        if (!ibCap) { cmdReply(false, null, 'Unknown inbox action: ' + ibAct); return; }
+                        if (!self._can(ibCap, '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('inbox.' + ibAct, { ok: false, err: 'EPERM' }); return; }
+                        var ibData = e.data;
+                        self._getInbox().then(function (inbox) {
+                            if (!inbox) throw new Error('inbox transport unavailable');
+                            switch (ibAct) {
+                                case 'configure':     return inbox.configure({ append_anchors: ibData.append_anchors });
+                                case 'append':        return inbox.append({ vault_id: ibData.vault_id, append_token: ibData.append_token, payload: ibData.payload });
+                                case 'list':          return inbox.list({ inbox: ibData.inbox, after_file_id: ibData.after_file_id, limit: ibData.limit, include_content: ibData.include_content });
+                                case 'fetch':         return inbox.fetch({ inbox: ibData.inbox, file_ids: ibData.file_ids });
+                                case 'markProcessed': return inbox.markProcessed({ inbox: ibData.inbox, file_ids: ibData.file_ids });
+                                case 'purge':         return inbox.purge({ folder: ibData.folder, inbox: ibData.inbox, file_ids: ibData.file_ids });
+                            }
+                        }).then(function (r) {
+                            cmdReply(true, r); self._emitBridgeCall('inbox.' + ibAct, { ok: true });
+                        }).catch(function (err) {
+                            cmdReply(false, null, (err && err.message) || String(err));
+                            self._emitBridgeCall('inbox.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
+                        });
                         return;
                     }
 

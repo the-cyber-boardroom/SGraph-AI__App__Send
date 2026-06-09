@@ -160,6 +160,38 @@
                 return { strategy: 'app', appJson: appJson };
             }
             return { strategy: 'redirect' };
+        },
+
+        // Resolve a per-folder app.json into the manifest to mount when an HTML file in a
+        // sub-folder is opened "as an app". Pure: no `this`, no DOM, no I/O.
+        //
+        //   folderJson — the parsed app.json found NEXT TO the opened file
+        //   folder     — the folder path (e.g. "tools/release-tester")
+        //   deepPath   — the HTML file the user opened (e.g. "tools/release-tester/index.html")
+        //
+        // Rules:
+        //   - entry = deepPath (honour the file the user actually opened, not folderJson.entry).
+        //   - resources (css/js) resolve RELATIVE TO THE FOLDER: a bare "style.css" →
+        //     "{folder}/style.css"; a leading-slash "/shared/x.css" is treated as vault-absolute
+        //     (leading slash stripped). So a folder app.json can use folder-relative paths.
+        //   - every other field (permissions, host_events, auth, hud, title, …) is preserved
+        //     verbatim — the folder app is its OWN app with its OWN policy.
+        resolveFolderManifest: function (folderJson, folder, deepPath) {
+            folderJson = folderJson || {};
+            var rel = function (p) {
+                if (!p) return p;
+                p = String(p);
+                return p.charAt(0) === '/' ? p.slice(1) : folder + '/' + p;
+            };
+            var out = Object.assign({}, folderJson);
+            out.entry = deepPath;
+            if (folderJson.resources) {
+                out.resources = {
+                    css: (folderJson.resources.css || []).map(rel),
+                    js:  (folderJson.resources.js  || []).map(rel)
+                };
+            }
+            return out;
         }
     };
 
