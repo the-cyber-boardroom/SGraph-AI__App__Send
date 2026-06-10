@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.14 | **Last updated:** 2026-06-09 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.16 | **Last updated:** 2026-06-10 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,21 +31,21 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-06-09)
+## Quick Stats (as of 2026-06-10)
 
 | Metric | Count |
 |--------|-------|
 | User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
-| Unit tests passing | **~1950+** (957 Python + ~157 vault-UI JS + ~364 ViV loader suite + ~78 app-shell extraction + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests) |
+| Unit tests passing | **~1960+** (957 Python + ~167 vault-UI JS + ~364 ViV loader suite + ~78 app-shell extraction + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 from app-shell-nav-helpers inbox/folder-app.json) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 469+ (+14 from 06/05–07 briefs: PKI registry, ephemeral compute, deterministic indexes, search engine × 2, semantic search MVP, public data front-end, large-file upload, vault inbox full spec, investor vaults, IR platform, tool replacement MVP, central key management, Email-FS-lite) |
-| Total documents catalogued | 614 (+20 from 06/05 and 06/07 briefs) |
+| Open PROPOSED items (across all domains) | 469+ (unchanged — no new briefs today) |
+| Total documents catalogued | 617 (+3 comms/debrief docs from 06/08–10 session) |
 
 ---
 
