@@ -1040,6 +1040,12 @@
         // URL. A vault without this file opens read-only from a key-only link (today's behaviour).
         async _readEmbeddedAccessToken(vault) {
             try {
+                // `.vault` is a lazy sub-tree after open (listFolder returns [] until expanded),
+                // so expand it on demand before reading — otherwise the token is missed and the
+                // app opens read-only despite the embedded token being present.
+                if (vault.needsLoading && vault.needsLoading('/.vault')) {
+                    await vault.loadSubTreeOnDemand('/.vault');
+                }
                 var listed = vault.listFolder('/.vault') || [];
                 if (!listed.some(function (e) { return e.name === 'access-token.json'; })) return null;
                 var bytes = await vault.getFile('/.vault', 'access-token.json');   // read_key decrypt
