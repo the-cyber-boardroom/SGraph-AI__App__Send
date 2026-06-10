@@ -1,0 +1,174 @@
+<!doctype html>
+<!--
+  Vault Chat — kernel PoC (Phase 3 MVP)
+
+  Proof of concept that Vault Chat runs against the NEW vault-UI architecture:
+  the chat lives in a null-origin sandboxed iframe and talks to this parent
+  through a real SecureChannel (PKI handshake, AES-GCM envelopes, replay guard);
+  the parent registers the kernel's vfs.* handlers against an in-memory dataSource
+  and enforces AppPermissions.isFloor (so /.vault/** is unreachable to the app,
+  regardless of what the model is told to do).
+
+  What this PoC demonstrates:
+    1. SecureChannel handshake between parent (this page) and the chat iframe.
+    2. The chat iframe holds NO secrets — vault key, access token, dataSource
+       all live here in the parent; the iframe is null-origin and reaches the
+       vault only via window.sg.*  RPC.
+    3. AppPermissions.isFloor blocks /.vault/** at the kernel boundary —
+       the app cannot read the reserved prefix even if it tries.
+    4. The chat's existing UI (vault-chat-pane) keeps working with the new
+       window.sg implementation provided by sg-app-stub.
+
+  What this PoC explicitly defers (still future work):
+    - sg.vfs.writeBatch (commit coalescing) — currently each write is one commit
+    - Vault-stored OpenRouter key + harness-held custody — no app-secret registry
+      exists yet (P-5.x); the chat's existing real-LLM key field is used instead
+    - Real vault under the dataSource — the PoC uses an in-memory fake
+-->
+<html lang="en-gb"><head>
+<meta charset="utf-8">
+<title>Vault Chat — kernel PoC</title>
+<style>
+  html,body{margin:0;height:100vh;background:#0a0a18;color:#e2e8f0;font:14px/1.4 system-ui,sans-serif}
+  header{padding:10px 14px;background:#111122;border-bottom:1px solid #1a1a3a;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  header b{color:#4ECDC4}
+  .grid{display:grid;grid-template-columns:1fr 320px;height:calc(100vh - 50px)}
+  iframe{border:none;width:100%;height:100%;display:block}
+  .side{padding:10px;overflow:auto;border-left:1px solid #1a1a3a;background:#0e0e20;font:12px/1.45 monospace}
+  .side h3{font-size:11px;text-transform:uppercase;color:#8892a4;margin:12px 0 6px}
+  .row{padding:2px 4px;border-bottom:1px solid #1a1a3a;word-break:break-all}
+  .row.ok{color:#4ECDC4}.row.err{color:#ff6b6b}.row.dim{color:#5a6478}
+  .dim{color:#5a6478}
+  code{color:#4ECDC4}
+</style>
+
+<!-- The new architecture's RPC + permissions primitives, loaded in this parent scope -->
+<script src="../../../../_common/js/components/app-shell/secure-channel-envelope.js"></script>
+<script src="../../../../_common/js/components/app-shell/secure-channel.js"></script>
+<script src="../../../../_common/js/components/app-shell/app-permissions.js"></script>
+<script src="../../../../_common/js/components/app-shell/kernel-app-handlers.js"></script>
+</head><body>
+
+<header>
+  <b>Vault Chat — kernel PoC</b>
+  <span class="dim">parent ↔ null-origin iframe ↔ SecureChannel (PKI + AES-GCM)</span>
+  <span id="status" class="dim">booting…</span>
+</header>
+<div class="grid">
+  <iframe id="app" sandbox="allow-scripts" src="./iframe.html"></iframe>
+  <div class="side">
+    <h3>Channel</h3>
+    <div id="channel" class="row dim">handshake pending…</div>
+    <h3>Kernel handler activity</h3>
+    <div id="activity"></div>
+    <h3>Floor probes</h3>
+    <div id="probes"></div>
+  </div>
+</div>
+
+<script>
+(async function () {
+    'use strict';
+    const $ = (id) => document.getElementById(id);
+    const setStatus = (t, cls) => { $('status').textContent = t; $('status').className = cls || 'dim'; };
+    const log = (where, text, cls) => {
+        const d = document.createElement('div');
+        d.className = 'row ' + (cls || '');
+        d.textContent = text;
+        $(where).appendChild(d);
+    };
+
+    // --- 1. Build the parent-side fake vault (in-memory) -----------------------
+    // The dataSource interface required by registerKernelVfsHandlers:
+    //   getFileBytes, listFolder, saveFile, deleteFile, createFolder, writable
+    const enc = new TextEncoder();
+    const dec = new TextDecoder();
+    const files = new Map([
+        ['/notes.md',       enc.encode('Quarterly notes: revenue up 12%, churn down 3%.')],
+        ['/data.csv',       enc.encode('quarter,amount\nq1,100\nq2,112\n')],
+        ['/work/.keep',     enc.encode('')],
+        // A "reserved" path the app must NOT be able to reach via window.sg.vfs.*
+        ['/.vault/secrets/openrouter.key', enc.encode('sk-NEVER-EXPOSED-TO-APP')],
+    ]);
+
+    function dirname(p) { const i = p.lastIndexOf('/'); return i <= 0 ? '/' : p.slice(0, i); }
+    function basename(p) { return p.slice(p.lastIndexOf('/') + 1); }
+
+    const dataSource = {
+        writable: true,
+        async getFileBytes(path) {
+            if (!files.has(path)) { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; }
+            return files.get(path);
+        },
+        listFolder(folder) {
+            const pre = folder === '/' ? '/' : folder.replace(/\/?$/, '/');
+            const out = new Map();
+            for (const [k, v] of files) {
+                if (!k.startsWith(pre)) continue;
+                const rest = k.slice(pre.length); const slash = rest.indexOf('/');
+                if (slash === -1) out.set(rest, { path: k, name: rest, size: v.length, type: 'file' });
+                else { const n = rest.slice(0, slash); if (!out.has(n)) out.set(n, { path: pre + n, name: n, size: 0, type: 'folder' }); }
+            }
+            return Array.from(out.values());
+        },
+        async saveFile(dir, name, bytes) {
+            const path = (dir === '/' ? '' : dir) + '/' + name;
+            files.set(path, bytes); log('activity', '✏️ write ' + path + ' (' + bytes.length + 'b)', 'ok');
+        },
+        async deleteFile(dir, name) {
+            const path = (dir === '/' ? '' : dir) + '/' + name;
+            files.delete(path); log('activity', '🗑 delete ' + path, 'ok');
+        },
+        async createFolder(path) {
+            files.set(path.replace(/\/?$/, '/') + '.keep', enc.encode(''));
+            log('activity', '📁 mkdir ' + path, 'ok');
+        },
+    };
+
+    // App's declared permissions (app.json shape; kernel checks AppPermissions.can on each call)
+    const perm = AppPermissions.parsePermissions({
+        permissions: { fs: { read: true, write: true, 'delete': true, mkdir: true } }
+    });
+
+    // --- 2. Wait for the iframe, run the SecureChannel handshake --------------
+    const iframe = $('app');
+    await new Promise((r) => iframe.addEventListener('load', r, { once: true }));
+
+    const cid = 'chat-poc-' + Math.random().toString(36).slice(2, 8);
+    const mc = new MessageChannel();
+    // Hand over port2 to the app; parent keeps port1 to drive SecureChannel.accept.
+    iframe.contentWindow.postMessage({ type: 'init', cid, mode: 'message-boot' }, '*', [mc.port2]);
+
+    setStatus('handshaking…', 'dim');
+    let channel;
+    try {
+        // CRITICAL: pass the SAME cid both sides will use; otherwise the responder
+        // generates a random cid and post-handshake envelopes are silently dropped
+        // by the `if (msg.cid !== this._cid) return;` pin in _dispatch.
+        channel = await SecureChannel.accept(mc.port1, { expectSensitive: true, cid });
+    } catch (e) {
+        setStatus('handshake FAILED: ' + e.message, 'err');
+        $('channel').className = 'row err'; $('channel').textContent = 'failed: ' + e.message;
+        return;
+    }
+    $('channel').className = 'row ok';
+    $('channel').textContent = 'up · cid=' + cid + ' · sensitiveKey · ECDSA P-256 + ECDH P-256 + AES-GCM';
+    setStatus('connected', 'ok');
+
+    // --- 3. Register the kernel's vfs.* handlers on the parent side of the channel
+    // (these enforce AppPermissions.isFloor + .can BEFORE serving from the dataSource).
+    registerKernelVfsHandlers(channel, { dataSource, perm });
+
+    // --- 4. Probe results stream FROM the iframe as ui.message REQUESTS (PoC stub
+    // uses request, not send, to avoid depending on event-delivery details).
+    channel.handle('ui.message', function (m) {
+        const text = (m && m.text) || '';
+        const cls = m && m.msgType === 'error' ? 'err' : 'ok';
+        log('probes', text, cls);
+        return { ok: true };
+    });
+    // chat-app-stub unblocks _whenReady() as soon as SecureChannel.create resolves on
+    // its side, so we don't need to round-trip sg.ready. (sg-app-stub would need it.)
+})();
+</script>
+</body></html>

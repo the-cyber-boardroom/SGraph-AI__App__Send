@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en-gb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vault Chat — Standalone Test Harness (Phase 0)</title>
+<!--
+  Phase 0 standalone harness (dev pack doc 07 §4). Decoupled from the vault: a MOCK
+  window.sg (in-memory) and a MOCK LLM drive the full tool loop, so every property
+  (tools, CONFIRM, budget refusal, read-only degrade, flush) is exercisable with no
+  vault and no OpenRouter key. Phase 1 swaps the mock LLM for sg-llm-request over the
+  data-llm-bus, and the mock sg for the real app-shell bridge.
+-->
+<style>
+  :root { --bg:#0a0a18; --surface:#111122; --border:#1a1a3a; --text:#e2e8f0; --muted:#8892a4; --accent:#4ECDC4; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header b { color:var(--accent); }
+  .grid { display:grid; grid-template-columns:1fr 360px; gap:0; height:calc(100vh - 52px); }
+  .col { display:flex; flex-direction:column; overflow:hidden; border-right:1px solid var(--border); }
+  .scroll { flex:1; overflow:auto; padding:12px; }
+  .msg { margin:0 0 10px; padding:8px 10px; border-radius:6px; background:#0e0e20; }
+  .msg.user { border-left:3px solid #4F8FF7; }
+  .msg.assistant { border-left:3px solid var(--accent); }
+  .role { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .tool { font-family:monospace; font-size:12px; background:#0b1a1a; border:1px solid #143; border-radius:5px; padding:6px 8px; margin:6px 0; }
+  .confirm { border:1px solid var(--accent); border-radius:6px; padding:8px; margin:6px 0; background:rgba(78,205,196,.06); }
+  .confirm button { margin-right:6px; cursor:pointer; }
+  .composer { display:flex; gap:8px; padding:10px; border-top:1px solid var(--border); }
+  .composer input { flex:1; background:var(--bg); border:1px solid #333d5a; color:var(--text); border-radius:5px; padding:8px; }
+  button { background:var(--accent); color:#0d0d1a; border:none; border-radius:5px; padding:7px 12px; font-weight:700; cursor:pointer; }
+  button.ghost { background:#1a1a3a; color:var(--text); font-weight:500; }
+  .side { padding:10px; }
+  .side h3 { font-size:12px; text-transform:uppercase; color:var(--muted); margin:14px 0 6px; }
+  .logrow { font-family:monospace; font-size:11px; padding:2px 4px; display:flex; gap:6px; }
+  .logrow .ic { width:18px; }
+  .logrow.err { color:#ff6b6b; }
+  .ledger { font-family:monospace; font-size:12px; }
+  .controls button { font-size:12px; margin:2px 2px; }
+  code { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <b>SG/Vault Chat — Standalone Test Harness</b>
+  <span>vfs: <code>memory</code></span>
+  <span>sg: <code>MOCK</code></span>
+  <span>llm: <code>MOCK</code></span>
+  <label>mode:
+    <select id="mode"><option>ephemeral</option><option>snapshot</option><option>synced</option></select>
+  </label>
+  <label>loadout:
+    <select id="loadout"><option>edit</option><option>read-only</option><option>memory-curation</option></select>
+  </label>
+  <label><input type="checkbox" id="writable" checked> writable</label>
+</header>
+
+<div class="grid">
+  <div class="col">
+    <div class="scroll" id="transcript"></div>
+    <div class="composer">
+      <input id="input" placeholder="try: list /   ·   read /notes.md   ·   write /work/x.md hello   ·   make infographic">
+      <button id="send">Send</button>
+    </div>
+  </div>
+  <div class="col" style="border-right:none;">
+    <div class="side scroll">
+      <div class="controls">
+        <h3>Test controls</h3>
+        <button class="ghost" id="seed">seed working set</button>
+        <button class="ghost" id="cap">force budget cap</button>
+        <button class="ghost" id="flush">trigger flush</button>
+        <button class="ghost" id="reset">reset</button>
+      </div>
+      <h3>Ledger</h3>
+      <div class="ledger" id="ledger"></div>
+      <h3>Execution log</h3>
+      <div id="log"></div>
+      <h3>Commits (mock vault)</h3>
+      <div id="commits" class="ledger"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Phase 0 modules (IIFE globals on window.VaultChat) -->
+<script src="../../../../_common/js/lib/vault-chat/memory-vfs.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/tool-policies.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/builtin-tools.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/execution-center.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/vault-flush-controller.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/chat-session.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/vault-chat-loop.js"></script>
+<script src="../../../../_common/js/lib/vault-chat/mock-sg.js"></script>
+<script src="./mock-llm.js"></script>
+<script src="./harness.js"></script>
+</body>
+</html>
