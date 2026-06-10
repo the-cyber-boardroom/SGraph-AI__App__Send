@@ -347,34 +347,21 @@
             this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail: detail || null }));
         }
 
-        async _fetchAppVersion() {
+        _fetchAppVersion() {
+            // window.SGRAPH_BUILD is set by /_common/js/build-info.js, generated on every
+            // CI deploy by scripts/inject_build_version.py (and locally by build-vault-static.sh)
+            // from sgraph_ai_app_send/version. Showing this in the header is the reliable way
+            // to confirm you're looking at the latest version of the files. Falls back to the
+            // hardcoded UI version if build-info.js wasn't loaded (which would itself be a
+            // deploy bug — the script tag is in index.html).
             const el = this.shadowRoot.querySelector('.vh-version');
             if (!el) return;
-
             const build      = window.SGRAPH_BUILD || {};
-            const uiVersion  = build.uiVersion || 'v0.2.3';
-            let   appVersion = build.appVersion || '';
-
-            const render = () => {
-                el.textContent = appVersion
-                    ? `${appVersion}  .  UI ${uiVersion} (IFD)`
-                    : `UI ${uiVersion} (IFD)`;
-            };
-            render();   // show build-info.js value immediately (no blank flash)
-
-            // The authoritative app version (CI-incremented on every push to dev) is published
-            // as a plain-text /version file at the site root by the deploy pipeline. Fetch it so
-            // the header always reflects the actual running build — both deployed and locally.
-            // This supersedes build-info.js, which on the vault UI is either absent (SGRAPH_BUILD
-            // undefined → header fell back to a hardcoded UI version) or stamped 'local-dev'. A
-            // reliable way to confirm you are looking at the latest version of the files.
-            try {
-                const resp = await fetch('/version', { cache: 'no-store' });
-                if (resp.ok) {
-                    const text = (await resp.text()).trim();
-                    if (text && /^v?\d/.test(text)) { appVersion = text; render(); }
-                }
-            } catch (_) { /* offline / 404 — keep the build-info.js value */ }
+            const appVersion = build.appVersion || '';
+            const uiVersion  = build.uiVersion  || 'v0.2.3';
+            el.textContent = appVersion
+                ? `${appVersion}  .  UI ${uiVersion} (IFD)`
+                : `UI ${uiVersion} (IFD)`;
         }
 
         _openApp() {
