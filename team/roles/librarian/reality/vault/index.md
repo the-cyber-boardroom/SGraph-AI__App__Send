@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-06-09 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-06-10 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -155,17 +155,42 @@ The fixed batch URL makes the single preflight cacheable. Architect spec + debri
 
 Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.md`.
 
-### Vault Inbox — Foundation (v0.33.14, 2026-06-09)
+### Vault Inbox — C1 through C4 (v0.33.14–v0.33.16, 2026-06-09/10)
 
-The inbox transport client and check-on-events model are shipped. The **full inbox spec** (CLI support, main UI section, app methods) remains PROPOSED — see the PROPOSED section.
+The inbox transport, check-on-events model, and app bridge are all shipped. The **full inbox spec** (CLI support, main UI section, app methods beyond the bridge) remains PROPOSED — see the PROPOSED section.
 
 | Component | Status | Evidence |
 |-----------|--------|---------|
-| `sg-inbox.js` — inbox transport client; reads inbox objects from vault storage via raw pointer API; `read_key` raw-bytes getter for inbox objects | **EXISTS** | C1 commit; `tests/unit/vault_ui/loader/test__sg_inbox_client.js` (182 assertions) |
-| `sg-inbox-checker.js` — check-on-events model; polls/checks inbox on trigger events; vault-shell triggers on receive | **EXISTS** | C2 commit; `tests/unit/vault_ui/loader/test__sg_inbox_checker.js` (152 assertions) |
-| Host-events allowlist + `sg.on/off` event subscription API + inbox permission grants | **EXISTS** | C3 commits; `tests/unit/vault_ui/loader/test__app_host_events.js` |
+| `sg-inbox.js` — inbox transport client; reads inbox objects from vault storage via raw pointer API; `read_key` raw-bytes getter for inbox objects | **EXISTS** | C1 (`ab62be8`); `tests/unit/vault_ui/loader/test__sg_inbox_client.js` (182 assertions) |
+| `sg-inbox-checker.js` — check-on-events model; polls/checks inbox on trigger events; vault-shell triggers on receive | **EXISTS** | C2 (`7f19541`); `tests/unit/vault_ui/loader/test__sg_inbox_checker.js` (152 assertions) |
+| Host-events allowlist + `sg.on/off` event subscription API + inbox permission grants | **EXISTS** | C3 foundation (`a7a1239`); `tests/unit/vault_ui/loader/test__app_host_events.js` |
+| Kernel→app event push: `_initInboxChecker` + `_pushHostEvent` + `_scheduleInboxCheck` in `app-shell.js`; checker runs on tab focus, pushes `inbox.new-messages` / `inbox.error` gated by `app.json host_events` allowlist | **EXISTS** | C3 kernel push (`bb41013`); `sg-inbox-checker.js` loaded in `en-gb/app/index.html` |
+| `sg.inbox.*` transport bridge (request/response) in `/en-gb/app/` — verbs: `configure`, `append`, `list`, `fetch`, `markProcessed`, `purge`; `_getInbox()` per-vault transport helper; `sg.on/sg.off` event registry + `sg-event` receiver in iframe surface; RO sessions fail closed (null `enum_key`) | **EXISTS** | C4 (`a0c16c5`); `app-shell.js` `_buildVfsBridgeScript` + `_setupVfsBridgeHandlers`; `sg-inbox.js` loaded in `en-gb/app/index.html` |
 
-The inbox transport uses the raw vault-pointer API (not the commit/push flow). Inbox objects live outside the version-controlled commit tree by design.
+The inbox transport uses the raw vault-pointer API (not the commit/push flow). Inbox objects live outside the version-controlled commit tree by design. End-to-end: app declares `permissions.inbox.*` + `host_events['inbox.new-messages']`, calls `sg.on('inbox.new-messages', cb)` — one line in app code.
+
+---
+
+### Open-as-App Auto-Refresh + Per-Folder app.json (v0.33.16, 2026-06-10)
+
+Two connected bugs in the `/en-gb/app/` mount path fixed (`6583aca`):
+
+| Fix | Status | Evidence |
+|-----|--------|---------|
+| **Auto-refresh keeps the opened file** — `_remountCurrent()` replays the persisted mount (`_mountStrategy`, `_effectiveAppJson`, `_mountedFilePath`) instead of re-running `_continue(root_manifest)`. `loadAllSubTrees()` called first so the entry is found. | **EXISTS** | `app-shell.js` `_remountCurrent`; `_checkBehind` calls it instead of `_continue` |
+| **Per-folder app.json governs sub-folder apps** — `_resolveFolderAppJson(deepPath)` loads the folder's own `app.json` when a sub-folder HTML is opened as an app; folder-relative resources resolve via `AppNavHelpers.resolveFolderManifest`; permissions / host_events / auth / title come from the folder manifest, not the root vault manifest. Sub-folders without their own `app.json` fall back to existing behaviour. | **EXISTS** | `app-shell.js` `_resolveFolderAppJson`/`_setActiveManifest`; `app-shell-nav-helpers.js` `resolveFolderManifest`; `test__app_shell_nav_helpers.js` (now 56, +10 assertions) |
+
+**Known limitation (out of scope):** The `app-shell:ready` HUD/auth intercept fires before the folder manifest is resolved — so `hud.*` config and `auth.required` still use the root manifest on first mount. Deferred.
+
+### /vault Editor — Embedded Access Token (v0.33.16, 2026-06-10)
+
+`vault-shell.js` now reads `.vault/access-token.json` on open (`_readEmbeddedAccessToken` helper), matching the existing `/app` behaviour (`f468ac5`):
+
+| Fix | Status | Evidence |
+|-----|--------|---------|
+| `_onVaultOpened` reads the embedded access token after vault open when no explicit `accessKey` was provided and the vault is writable; token threaded onto `vault._sgSend.token` so subsequent writes carry `x-sgraph-access-token` immediately | **EXISTS** | `vault-shell.js` `_readEmbeddedAccessToken` / `_onVaultOpened` |
+
+Consequence: vaults created with `create({ accessToken:'inherit' })` now open WRITABLE in both `/vault` and `/app` from the same key-only link. Previously `/vault` opened read-only while `/app` opened writable.
 
 ---
 
