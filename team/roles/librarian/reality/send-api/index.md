@@ -107,24 +107,6 @@ exercises all service logic — but should be done before production launch.
 | POST | `/join/accept/{invite_code}` | Accept invite, join room, get session | Yes |
 | GET | `/join/session-validate` | Validate room session token | Yes |
 
-### Vault Inbox (`/api/vault/inbox/*`) — 6 endpoints
-
-Append-only inbox layer for vault-to-vault communications. Four-tier capability model:
-`append_token` (write-only) → `enum_key` (list/fetch/mark-processed) → `private_key` (decrypt, client-side) → `write_key` (purge + configure).
-
-| Method | Path | Auth | What It Does | Tested |
-|--------|------|------|-------------|--------|
-| POST | `/api/vault/inbox/append/{vault_id}` | append_token in body | Write-blind append of encrypted payload | Yes |
-| POST | `/api/vault/inbox/list/{vault_id}` | x-sgraph-vault-enum-key header | Paginated list; optional inline content | Yes |
-| POST | `/api/vault/inbox/fetch/{vault_id}` | x-sgraph-vault-enum-key header | Batch fetch by file_ids | Yes |
-| POST | `/api/vault/inbox/mark-processed/{vault_id}` | x-sgraph-vault-enum-key header | Reversible move: inbox/ → processed/ | Yes |
-| POST | `/api/vault/inbox/purge/{vault_id}` | x-sgraph-vault-write-key header | Irreversible delete (owner only) | Yes |
-| POST | `/api/vault/inbox/configure/{vault_id}` | x-sgraph-vault-write-key header | Set append_anchors + enum_key_hash | Yes |
-
-**101 new tests** (62 service-level + 39 HTTP route tests). Shipped: commit `9d727b5`.
-
-**Security hardening** (commit `e365c60`, 2026-06-05): path traversal closed via `Safe_Str__Vault__Append_Token` + `Safe_Str__Vault__Inbox__File_Id`; S3 `folder__folders` silent-empty bug fixed; metadata listing reads zero payload bytes; batch cap 100 `file_ids`; additional traversal negative tests added.
-
 ### Other — 2 endpoints
 
 | Method | Path | What It Does | Tested |
