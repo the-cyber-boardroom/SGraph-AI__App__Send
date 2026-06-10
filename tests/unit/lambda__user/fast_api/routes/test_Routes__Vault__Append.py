@@ -1,9 +1,3 @@
-# ===============================================================================
-# Tests — Routes__Vault__Inbox
-# HTTP-level tests for all 6 inbox endpoints via TestClient
-# Uses real in-memory stack (no mocks, no patches)
-# ===============================================================================
-
 import base64
 import hashlib
 import json
@@ -12,15 +6,16 @@ from   unittest                                                                 
 from   tests.unit.lambda__user.Fast_API__Test_Objs__SGraph__App__Send__User        import setup__fast_api__user__test_objs
 from   sgraph_ai_app_send.lambda__user.user__config                                import (HEADER__SGRAPH_VAULT__WRITE_KEY ,
                                                                                            HEADER__SGRAPH_VAULT__ENUM_KEY  )
-from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import path__vault_manifest
+from   sgraph_ai_app_send.lambda__user.storage.Storage__Paths                      import (path__vault_manifest      ,
+                                                                                          path__vault_append_config )
 
 
-VAULT_ID     = 'inboxrt00001'
-WRITE_KEY    = 'route_test_write_key_1234'                                       # only hashed for the gate — need not be hex
-ENUM_KEY     = hashlib.sha256(b'route-enum-key').hexdigest()                    # hex so the tier test can present it as a token and reach the gate
-APPEND_TOKEN = hashlib.sha256(b'route-recipient-pubkey').hexdigest()            # token = H(pubkey) — hex, also the folder name
+VAULT_ID     = 'appendrt0001'
+WRITE_KEY    = 'route_test_write_key_1234'
+ENUM_KEY     = hashlib.sha256(b'route-enum-key').hexdigest()
+APPEND_TOKEN = hashlib.sha256(b'route-recipient-pubkey').hexdigest()
 PAYLOAD      = b'\x00\x01\x02encrypted-route-test'
-GHOST_FILE_ID = '1700000000000_aaaaaaaaaaaaaaaaaaaaaaaa.enc'                     # well-formed but never written
+GHOST_FILE_ID = '1700000000000_aaaaaaaaaaaaaaaaaaaaaaaa.enc'
 
 
 def _hash(value):
@@ -31,27 +26,30 @@ def _hex_token(seed):
     return hashlib.sha256(seed.encode()).hexdigest()
 
 
-class test_Routes__Vault__Inbox(TestCase):
+class test_Routes__Vault__Append(TestCase):
 
     @classmethod
     def setUpClass(cls):
         with setup__fast_api__user__test_objs() as _:
-            cls.client       = _.fast_api__client
-            cls.inbox_service = _.fast_api.inbox_service
+            cls.client         = _.fast_api__client
+            cls.append_service = _.fast_api.append_service
 
     def _create_vault(self, vault_id=VAULT_ID):
         manifest = dict(vault_id       = vault_id                  ,
                         write_key_hash = _hash(WRITE_KEY)          ,
-                        append_anchors = [_hash(APPEND_TOKEN)]     ,
-                        enum_key_hash  = _hash(ENUM_KEY)           ,
                         created_at     = int(time.time() * 1000)   )
-        path = path__vault_manifest(vault_id)
-        self.inbox_service.storage_fs.file__save(path, json.dumps(manifest).encode())
-        self.inbox_service._manifest_cache.pop(vault_id, None)
+        self.append_service.storage_fs.file__save(
+            path__vault_manifest(vault_id), json.dumps(manifest).encode())
+        config = dict(append_anchors = [_hash(APPEND_TOKEN)]       ,
+                      enum_key_hash  = _hash(ENUM_KEY)             )
+        self.append_service.storage_fs.file__save(
+            path__vault_append_config(vault_id), json.dumps(config).encode())
+        self.append_service._manifest_cache.pop(vault_id, None)
+        self.append_service._config_cache.pop(vault_id, None)
 
-    def _append(self, vault_id=VAULT_ID, token=APPEND_TOKEN, payload=PAYLOAD):
+    def _write(self, vault_id=VAULT_ID, token=APPEND_TOKEN, payload=PAYLOAD):
         return self.client.post(
-            f'/api/vault/inbox/append/{vault_id}',
+            f'/api/vault/append/write/{vault_id}',
             content = json.dumps({
                 'append_token': token,
                 'payload'     : base64.b64encode(payload).decode('ascii')
@@ -60,21 +58,21 @@ class test_Routes__Vault__Inbox(TestCase):
 
     def _list(self, vault_id=VAULT_ID, enum_key=ENUM_KEY, **body_kwargs):
         return self.client.post(
-            f'/api/vault/inbox/list/{vault_id}',
+            f'/api/vault/append/list/{vault_id}',
             content = json.dumps(body_kwargs),
             headers = {'content-type'                 : 'application/json',
                        HEADER__SGRAPH_VAULT__ENUM_KEY : enum_key          })
 
     def _fetch(self, vault_id=VAULT_ID, enum_key=ENUM_KEY, inbox='', file_ids=None):
         return self.client.post(
-            f'/api/vault/inbox/fetch/{vault_id}',
+            f'/api/vault/append/fetch/{vault_id}',
             content = json.dumps({'inbox': inbox, 'file_ids': file_ids or []}),
             headers = {'content-type'                 : 'application/json',
                        HEADER__SGRAPH_VAULT__ENUM_KEY : enum_key          })
 
     def _mark_processed(self, vault_id=VAULT_ID, enum_key=ENUM_KEY, inbox='', file_ids=None):
         return self.client.post(
-            f'/api/vault/inbox/mark-processed/{vault_id}',
+            f'/api/vault/append/mark-processed/{vault_id}',
             content = json.dumps({'inbox': inbox, 'file_ids': file_ids or []}),
             headers = {'content-type'                 : 'application/json',
                        HEADER__SGRAPH_VAULT__ENUM_KEY : enum_key          })
@@ -85,14 +83,14 @@ class test_Routes__Vault__Inbox(TestCase):
         if file_ids is not None:
             body['file_ids'] = file_ids
         return self.client.post(
-            f'/api/vault/inbox/purge/{vault_id}',
+            f'/api/vault/append/purge/{vault_id}',
             content = json.dumps(body),
             headers = {'content-type'                  : 'application/json',
                        HEADER__SGRAPH_VAULT__WRITE_KEY : write_key         })
 
     def _configure(self, vault_id=VAULT_ID, write_key=WRITE_KEY, **body_kwargs):
         return self.client.post(
-            f'/api/vault/inbox/configure/{vault_id}',
+            f'/api/vault/append/configure/{vault_id}',
             content = json.dumps(body_kwargs),
             headers = {'content-type'                  : 'application/json',
                        HEADER__SGRAPH_VAULT__WRITE_KEY : write_key         })
@@ -102,13 +100,13 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__configure__success(self):
-        vault = 'cfgrt0000001'
+        vault = 'cfgat0000001'
         manifest = dict(vault_id       = vault              ,
                         write_key_hash = _hash(WRITE_KEY)   ,
                         created_at     = int(time.time() * 1000))
-        self.inbox_service.storage_fs.file__save(
+        self.append_service.storage_fs.file__save(
             path__vault_manifest(vault), json.dumps(manifest).encode())
-        self.inbox_service._manifest_cache.pop(vault, None)
+        self.append_service._manifest_cache.pop(vault, None)
         response = self._configure(vault,
                                     append_anchors=[_hash(APPEND_TOKEN)],
                                     enum_key_hash=_hash(ENUM_KEY))
@@ -116,20 +114,20 @@ class test_Routes__Vault__Inbox(TestCase):
         assert response.json()['status'] == 'configured'
 
     def test__configure__wrong_write_key(self):
-        vault = 'cfgrt0000002'
+        vault = 'cfgat0000002'
         manifest = dict(vault_id       = vault              ,
                         write_key_hash = _hash(WRITE_KEY)   ,
                         created_at     = int(time.time() * 1000))
-        self.inbox_service.storage_fs.file__save(
+        self.append_service.storage_fs.file__save(
             path__vault_manifest(vault), json.dumps(manifest).encode())
-        self.inbox_service._manifest_cache.pop(vault, None)
+        self.append_service._manifest_cache.pop(vault, None)
         response = self._configure(vault, write_key='wrongkey',
                                     append_anchors=[_hash('t')])
         assert response.status_code == 403
 
     def test__configure__missing_write_key(self):
         response = self.client.post(
-            f'/api/vault/inbox/configure/{VAULT_ID}',
+            f'/api/vault/append/configure/{VAULT_ID}',
             content = json.dumps({'append_anchors': []}),
             headers = {'content-type': 'application/json'})
         assert response.status_code == 400
@@ -139,59 +137,59 @@ class test_Routes__Vault__Inbox(TestCase):
         assert response.status_code == 400
 
     # =========================================================================
-    # Append endpoint
+    # Write endpoint
     # =========================================================================
 
-    def test__append__success(self):
-        self._create_vault('appendrt0001')
-        response = self._append('appendrt0001')
+    def test__write__success(self):
+        self._create_vault('writeat00001')
+        response = self._write('writeat00001')
         assert response.status_code == 200
         assert response.json() == {'ok': True}
 
-    def test__append__wrong_token(self):
-        self._create_vault('appendrt0002')
-        response = self._append('appendrt0002', token=_hex_token('wrong'))      # well-formed but not an anchor
+    def test__write__wrong_token(self):
+        self._create_vault('writeat00002')
+        response = self._write('writeat00002', token=_hex_token('wrong'))
         assert response.status_code == 403
 
-    def test__append__malformed_token(self):
-        self._create_vault('appendrt0007')
-        response = self._append('appendrt0007', token='../../etc')             # traversal attempt → 400
+    def test__write__malformed_token(self):
+        self._create_vault('writeat00007')
+        response = self._write('writeat00007', token='../../etc')
         assert response.status_code == 400
 
-    def test__append__missing_token(self):
-        self._create_vault('appendrt0003')
+    def test__write__missing_token(self):
+        self._create_vault('writeat00003')
         response = self.client.post(
-            '/api/vault/inbox/append/appendrt0003',
+            '/api/vault/append/write/writeat00003',
             content = json.dumps({'payload': base64.b64encode(b'x').decode()}),
             headers = {'content-type': 'application/json'})
         assert response.status_code == 400
 
-    def test__append__missing_payload(self):
-        self._create_vault('appendrt0004')
+    def test__write__missing_payload(self):
+        self._create_vault('writeat00004')
         response = self.client.post(
-            '/api/vault/inbox/append/appendrt0004',
+            '/api/vault/append/write/writeat00004',
             content = json.dumps({'append_token': APPEND_TOKEN}),
             headers = {'content-type': 'application/json'})
         assert response.status_code == 400
 
-    def test__append__invalid_vault_id(self):
-        response = self._append('tools-patches')
+    def test__write__invalid_vault_id(self):
+        response = self._write('tools-patches')
         assert response.status_code == 400
 
-    def test__append__response_is_blind(self):
-        self._create_vault('appendrt0005')
-        response = self._append('appendrt0005')
+    def test__write__response_is_blind(self):
+        self._create_vault('writeat00005')
+        response = self._write('writeat00005')
         data = response.json()
         assert data == {'ok': True}
         assert 'file_id' not in data
         assert 'inbox'   not in data
 
-    def test__append__no_auth_token_required(self):
-        self._create_vault('appendrt0006')
+    def test__write__no_auth_token_required(self):
+        self._create_vault('writeat00006')
         from starlette.testclient import TestClient
         unauthenticated = TestClient(self.client.app)
         response = unauthenticated.post(
-            '/api/vault/inbox/append/appendrt0006',
+            '/api/vault/append/write/writeat00006',
             content = json.dumps({
                 'append_token': APPEND_TOKEN,
                 'payload'     : base64.b64encode(PAYLOAD).decode('ascii')
@@ -204,9 +202,9 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__list__success(self):
-        vault = 'listrt000001'
+        vault = 'listat000001'
         self._create_vault(vault)
-        self._append(vault)
+        self._write(vault)
         response = self._list(vault)
         assert response.status_code == 200
         data = response.json()
@@ -215,24 +213,24 @@ class test_Routes__Vault__Inbox(TestCase):
         assert data['truncated'] is False
 
     def test__list__wrong_enum_key(self):
-        vault = 'listrt000002'
+        vault = 'listat000002'
         self._create_vault(vault)
         response = self._list(vault, enum_key='wrong')
         assert response.status_code == 403
 
     def test__list__missing_enum_key(self):
-        vault = 'listrt000003'
+        vault = 'listat000003'
         self._create_vault(vault)
         response = self.client.post(
-            f'/api/vault/inbox/list/{vault}',
+            f'/api/vault/append/list/{vault}',
             content = json.dumps({}),
             headers = {'content-type': 'application/json'})
         assert response.status_code == 403
 
     def test__list__with_content(self):
-        vault = 'listrt000004'
+        vault = 'listat000004'
         self._create_vault(vault)
-        self._append(vault)
+        self._write(vault)
         response = self._list(vault, include_content=True)
         assert response.status_code == 200
         entry = response.json()['entries'][0]
@@ -240,10 +238,10 @@ class test_Routes__Vault__Inbox(TestCase):
         assert base64.b64decode(entry['content']) == PAYLOAD
 
     def test__list__pagination(self):
-        vault = 'listrt000005'
+        vault = 'listat000005'
         self._create_vault(vault)
         for i in range(5):
-            self._append(vault, payload=f'msg-{i}'.encode())
+            self._write(vault, payload=f'msg-{i}'.encode())
         page1 = self._list(vault, limit=2).json()
         assert len(page1['entries']) == 2
         assert page1['truncated'] is True
@@ -263,9 +261,9 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__fetch__success(self):
-        vault = 'fetchrt00001'
+        vault = 'fetchat00001'
         self._create_vault(vault)
-        self._append(vault)
+        self._write(vault)
         listing  = self._list(vault).json()
         file_id  = listing['entries'][0]['file_id']
         inbox    = listing['entries'][0]['inbox']
@@ -276,26 +274,26 @@ class test_Routes__Vault__Inbox(TestCase):
         assert base64.b64decode(data['files'][0]['content']) == PAYLOAD
 
     def test__fetch__wrong_enum_key(self):
-        vault = 'fetchrt00002'
+        vault = 'fetchat00002'
         self._create_vault(vault)
         response = self._fetch(vault, enum_key='wrong', inbox=APPEND_TOKEN,
                                 file_ids=['x.enc'])
         assert response.status_code == 403
 
     def test__fetch__missing_inbox(self):
-        vault = 'fetchrt00003'
+        vault = 'fetchat00003'
         self._create_vault(vault)
         response = self._fetch(vault, inbox='', file_ids=['x.enc'])
         assert response.status_code == 400
 
     def test__fetch__missing_file_ids(self):
-        vault = 'fetchrt00004'
+        vault = 'fetchat00004'
         self._create_vault(vault)
         response = self._fetch(vault, inbox=APPEND_TOKEN, file_ids=[])
         assert response.status_code == 400
 
     def test__fetch__missing_files_reported(self):
-        vault = 'fetchrt00005'
+        vault = 'fetchat00005'
         self._create_vault(vault)
         response = self._fetch(vault, inbox=APPEND_TOKEN,
                                 file_ids=[GHOST_FILE_ID])
@@ -309,9 +307,9 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__mark_processed__success(self):
-        vault = 'markrt000001'
+        vault = 'markat000001'
         self._create_vault(vault)
-        self._append(vault)
+        self._write(vault)
         listing = self._list(vault).json()
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
@@ -323,16 +321,16 @@ class test_Routes__Vault__Inbox(TestCase):
         assert len(after['entries']) == 0
 
     def test__mark_processed__wrong_enum_key(self):
-        vault = 'markrt000002'
+        vault = 'markat000002'
         self._create_vault(vault)
         response = self._mark_processed(vault, enum_key='wrong',
                                           inbox=APPEND_TOKEN, file_ids=['x.enc'])
         assert response.status_code == 403
 
     def test__mark_processed__idempotent(self):
-        vault = 'markrt000003'
+        vault = 'markat000003'
         self._create_vault(vault)
-        self._append(vault)
+        self._write(vault)
         listing = self._list(vault).json()
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
@@ -342,7 +340,7 @@ class test_Routes__Vault__Inbox(TestCase):
         assert file_id in response.json()['missing']
 
     def test__mark_processed__missing_inbox(self):
-        vault = 'markrt000004'
+        vault = 'markat000004'
         self._create_vault(vault)
         response = self._mark_processed(vault, inbox='', file_ids=['x.enc'])
         assert response.status_code == 400
@@ -352,9 +350,9 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__purge__processed_files(self):
-        vault = 'purgert00001'
+        vault = 'purgeat00001'
         self._create_vault(vault)
-        self._append(vault)
+        self._write(vault)
         listing = self._list(vault).json()
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
@@ -364,31 +362,31 @@ class test_Routes__Vault__Inbox(TestCase):
         assert file_id in response.json()['purged']
 
     def test__purge__wrong_write_key(self):
-        vault = 'purgert00002'
+        vault = 'purgeat00002'
         self._create_vault(vault)
         response = self._purge(vault, write_key='wrongkey', inbox=APPEND_TOKEN)
         assert response.status_code == 403
 
     def test__purge__missing_write_key(self):
-        vault = 'purgert00003'
+        vault = 'purgeat00003'
         self._create_vault(vault)
         response = self.client.post(
-            f'/api/vault/inbox/purge/{vault}',
+            f'/api/vault/append/purge/{vault}',
             content = json.dumps({'folder': 'processed', 'inbox': APPEND_TOKEN}),
             headers = {'content-type': 'application/json'})
         assert response.status_code == 400
 
     def test__purge__invalid_folder(self):
-        vault = 'purgert00004'
+        vault = 'purgeat00004'
         self._create_vault(vault)
         response = self._purge(vault, folder='invalid', inbox=APPEND_TOKEN)
         assert response.status_code == 400
 
     def test__purge__all_processed(self):
-        vault = 'purgert00005'
+        vault = 'purgeat00005'
         self._create_vault(vault)
         for i in range(3):
-            self._append(vault, payload=f'msg-{i}'.encode())
+            self._write(vault, payload=f'msg-{i}'.encode())
         listing  = self._list(vault).json()
         file_ids = [e['file_id'] for e in listing['entries']]
         inbox    = listing['entries'][0]['inbox']
@@ -398,9 +396,9 @@ class test_Routes__Vault__Inbox(TestCase):
         assert len(response.json()['purged']) == 3
 
     def test__purge__idempotent(self):
-        vault = 'purgert00006'
+        vault = 'purgeat00006'
         self._create_vault(vault)
-        self._append(vault)
+        self._write(vault)
         listing = self._list(vault).json()
         file_id = listing['entries'][0]['file_id']
         inbox   = listing['entries'][0]['inbox']
@@ -415,10 +413,10 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__full_drain_cycle__http(self):
-        vault = 'drainrt00001'
+        vault = 'drainat00001'
         self._create_vault(vault)
         for i in range(5):
-            resp = self._append(vault, payload=f'encrypted-msg-{i}'.encode())
+            resp = self._write(vault, payload=f'encrypted-msg-{i}'.encode())
             assert resp.status_code == 200
         listing = self._list(vault).json()
         assert len(listing['entries']) == 5
@@ -438,10 +436,10 @@ class test_Routes__Vault__Inbox(TestCase):
         assert len(purge_resp.json()['purged']) == 5
 
     def test__drain_with_pagination__http(self):
-        vault = 'drainrt00002'
+        vault = 'drainat00002'
         self._create_vault(vault)
         for i in range(7):
-            self._append(vault, payload=f'msg-{i}'.encode())
+            self._write(vault, payload=f'msg-{i}'.encode())
         all_ids = []
         cursor  = None
         inbox   = None
@@ -468,30 +466,30 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__tier__append_token_cannot_list(self):
-        vault = 'tiersec00001'
+        vault = 'tierat000001'
         self._create_vault(vault)
         response = self._list(vault, enum_key=APPEND_TOKEN)
         assert response.status_code == 403
 
-    def test__tier__enum_key_cannot_append(self):
-        vault = 'tiersec00002'
+    def test__tier__enum_key_cannot_write(self):
+        vault = 'tierat000002'
         self._create_vault(vault)
-        response = self._append(vault, token=ENUM_KEY)
+        response = self._write(vault, token=ENUM_KEY)
         assert response.status_code == 403
 
     def test__tier__enum_key_cannot_purge(self):
-        vault = 'tiersec00003'
+        vault = 'tierat000003'
         self._create_vault(vault)
         response = self._purge(vault, write_key=ENUM_KEY, inbox=APPEND_TOKEN)
         assert response.status_code == 403
 
     def test__tier__different_vaults_isolated(self):
-        vault_a = 'tiersec00004'
-        vault_b = 'tiersec00005'
+        vault_a = 'tierat000004'
+        vault_b = 'tierat000005'
         self._create_vault(vault_a)
         self._create_vault(vault_b)
-        self._append(vault_a, payload=b'secret-for-a')
-        self._append(vault_b, payload=b'secret-for-b')
+        self._write(vault_a, payload=b'secret-for-a')
+        self._write(vault_b, payload=b'secret-for-b')
         listing_a = self._list(vault_a).json()
         listing_b = self._list(vault_b).json()
         assert len(listing_a['entries']) == 1
@@ -505,20 +503,23 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__multiple_correspondents(self):
-        vault = 'multicor0001'
+        vault = 'multicor0002'
         token_a = _hex_token('correspondent-alpha')
         token_b = _hex_token('correspondent-beta')
         manifest = dict(vault_id       = vault                                ,
                         write_key_hash = _hash(WRITE_KEY)                     ,
-                        append_anchors = [_hash(token_a), _hash(token_b)]     ,
-                        enum_key_hash  = _hash(ENUM_KEY)                      ,
                         created_at     = int(time.time() * 1000)              )
-        self.inbox_service.storage_fs.file__save(
+        self.append_service.storage_fs.file__save(
             path__vault_manifest(vault), json.dumps(manifest).encode())
-        self.inbox_service._manifest_cache.pop(vault, None)
-        self._append(vault, token=token_a, payload=b'from-alpha-1')
-        self._append(vault, token=token_a, payload=b'from-alpha-2')
-        self._append(vault, token=token_b, payload=b'from-beta-1')
+        config = dict(append_anchors = [_hash(token_a), _hash(token_b)]       ,
+                      enum_key_hash  = _hash(ENUM_KEY)                        )
+        self.append_service.storage_fs.file__save(
+            path__vault_append_config(vault), json.dumps(config).encode())
+        self.append_service._manifest_cache.pop(vault, None)
+        self.append_service._config_cache.pop(vault, None)
+        self._write(vault, token=token_a, payload=b'from-alpha-1')
+        self._write(vault, token=token_a, payload=b'from-alpha-2')
+        self._write(vault, token=token_b, payload=b'from-beta-1')
         listing = self._list(vault).json()
         assert len(listing['entries']) == 3
         listing_a = self._list(vault, inbox=token_a).json()
@@ -531,34 +532,69 @@ class test_Routes__Vault__Inbox(TestCase):
     # =========================================================================
 
     def test__fetch__traversal_file_id_400(self):
-        vault = 'travrt000001'
+        vault = 'travat000001'
         self._create_vault(vault)
         response = self._fetch(vault, inbox=APPEND_TOKEN,
                                 file_ids=['../../bare/data/obj/payload'])
         assert response.status_code == 400
 
     def test__fetch__traversal_inbox_400(self):
-        vault = 'travrt000002'
+        vault = 'travat000002'
         self._create_vault(vault)
         response = self._fetch(vault, inbox='../../bare', file_ids=[GHOST_FILE_ID])
         assert response.status_code == 400
 
     def test__purge__traversal_file_id_400(self):
-        vault = 'travrt000003'
+        vault = 'travat000003'
         self._create_vault(vault)
-        response = self._purge(vault, folder='inbox', inbox=APPEND_TOKEN,
+        response = self._purge(vault, folder='pending', inbox=APPEND_TOKEN,
                                 file_ids=['../../manifest.json'])
         assert response.status_code == 400
 
     def test__fetch__oversized_batch_400(self):
-        vault = 'travrt000004'
+        vault = 'travat000004'
         self._create_vault(vault)
         response = self._fetch(vault, inbox=APPEND_TOKEN,
                                 file_ids=[GHOST_FILE_ID] * 101)
         assert response.status_code == 400
 
     def test__list__garbage_limit_400(self):
-        vault = 'travrt000005'
+        vault = 'travat000005'
         self._create_vault(vault)
         response = self._list(vault, limit='abc')
         assert response.status_code == 400
+
+    # =========================================================================
+    # HTTP status mapping tests (G-4)
+    # =========================================================================
+
+    def test__write__payload_too_large_returns_413(self):
+        vault = 'httpat000001'
+        self._create_vault(vault)
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Append import APPEND_MAX_PAYLOAD
+        big_payload = b'x' * (APPEND_MAX_PAYLOAD + 1)
+        response = self._write(vault, payload=big_payload)
+        assert response.status_code == 413
+
+    def test__write__at_capacity_returns_507(self):
+        vault = 'httpat000002'
+        self._create_vault(vault)
+        import secrets
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Append import APPEND_MAX_FILES
+        from sgraph_ai_app_send.lambda__user.storage.Storage__Paths         import path__vault_append_pending
+        for i in range(APPEND_MAX_FILES):
+            file_name = f'{int(time.time()*1000):013d}_{secrets.token_hex(12)}.enc'
+            path = path__vault_append_pending(vault, APPEND_TOKEN, file_name)
+            self.append_service.storage_fs.file__save(path, b'x')
+        response = self._write(vault)
+        assert response.status_code == 507
+
+    def test__list__content_too_large_returns_413(self):
+        vault = 'httpat000003'
+        self._create_vault(vault)
+        from sgraph_ai_app_send.lambda__user.service.Service__Vault__Append import INLINE_CONTENT_CEILING
+        chunk = b'x' * (INLINE_CONTENT_CEILING // 2 + 1)
+        self._write(vault, payload=chunk)
+        self._write(vault, payload=chunk)
+        response = self._list(vault, include_content=True)
+        assert response.status_code == 413

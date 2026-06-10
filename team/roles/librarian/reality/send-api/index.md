@@ -3,8 +3,8 @@
 **Domain:** `send-api/` | **Last updated:** 2026-05-12 | **Maintained by:** Librarian (daily run)
 
 The User Lambda: the public-facing API at `send.sgraph.ai`. Handles encrypted file transfers,
-multipart uploads, vault blob storage (pointer model), room joins, early access signups, and
-MCP tool exposure. All 26 API endpoints are tested and passing.
+multipart uploads, vault blob storage (pointer model), vault append-only storage,
+room joins, early access signups, and MCP tool exposure. All 32 API endpoints are tested and passing.
 
 ---
 
@@ -56,6 +56,48 @@ Write-key hash stored in `transfers/vault/{vault_id}/vault_pointer.json`.
 Read-base64 response size limited to 3.75MB (Lambda response limit).
 Destroy without `purge` writes a tombstone at `vault/{id[:2]}/{id}/deleted.json` to block vault_id reuse.
 Destroy with `purge: true` skips the tombstone — vault_id is fully reusable afterwards.
+
+### Vault Append (`/vault/append/*`) — 6 endpoints
+
+Generic append-only, gate-controlled storage primitive. Not messaging-specific — same infrastructure
+serves logs, signals, control messages, state flows, and email-style workflows.
+
+Four-tier capability model: `append_token` (write-only), `enum_key` (list/fetch/mark-processed),
+`write_key` (purge + configure), `private_key` (decrypt — client-only, never on server).
+Gates use `H(key) == stored_hash` pattern (SHA-256).
+
+**Account-less write surface:** No SGraph access token required for write/list/fetch/mark-processed.
+The append_token is the only gate. Deliberate design choice — enables cross-vault communication
+without requiring both parties to have SGraph accounts.
+
+| Method | Path | What It Does | Auth | Tested |
+|--------|------|-------------|------|--------|
+| POST | `/vault/append/configure/{vault_id}` | Store append config (enum_key_hash, append_token hashes) | write_key | Yes |
+| POST | `/vault/append/write/{vault_id}` | Append encrypted payload (blind — no id/count returned) | append_token (body) | Yes |
+| POST | `/vault/append/list/{vault_id}` | List pending entries (metadata or with content, paginated) | enum_key (header) | Yes |
+| POST | `/vault/append/fetch/{vault_id}` | Fetch content for specific file_ids (batched, max 100) | enum_key (header) | Yes |
+| POST | `/vault/append/mark-processed/{vault_id}` | Move entries pending → processed (copy+delete, idempotent) | enum_key (header) | Yes |
+| POST | `/vault/append/purge/{vault_id}` | Delete entries from pending or processed (batched, max 100) | write_key (header) | Yes |
+
+**Security hardening:**
+- Path-component inputs validated via `Safe_Str__Vault__Append_Token` and `Safe_Str__Vault__Append__File_Id` (Type_Safe strict validation) — blocks path traversal
+- Batch operations capped at `APPEND_BATCH_MAX_FILE_IDS = 100`
+- Per-message size cap: `APPEND_MAX_PAYLOAD = 5 MB`; per-token file-count cap: `APPEND_MAX_FILES = 1000`
+- Metadata-only listing reads zero payloads; content reads only for the paged window
+- Incremental ceiling check on include_content (M-1 fix) — bails early instead of reading all files
+- Append config stored in separate `config.json` (L-2 fix) — `config.json` is the authoritative source for gates; manifest never written with append fields
+- `Storage_FS__S3.folder__folders` implemented to prevent silent-empty drain on Lambda/S3
+- `list_files` on vault pointer never returns append entries (regression-tested)
+
+**Storage model:** Files stored inside `bare/append/` under the vault tree (managed-but-unversioned by sgit):
+- Pending: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/pending/{timestamp}_{random}.enc`
+- Processed: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/processed/{filename}`
+- Config: `{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/config.json`
+
+**TODO — LocalStack S3 integration tests:** All append tests run on the memory backend.
+Behavioural parity on S3 is verified structurally (method-override assertions in `test_Storage_FS__S3.py`)
+but not exercised end-to-end via LocalStack. This is not urgent — the memory backend faithfully
+exercises all service logic — but should be done before production launch.
 
 ### Room Join (`/join/*`) — 3 endpoints
 

@@ -45,14 +45,20 @@ def path__vault_zip_prefix(vault_id: str) -> str:
 def path__vault_public_vault_json(vault_id: str) -> str:
     return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/public-vault.json'
 
-def path__vault_inbox(vault_id: str, append_token: str, file_name: str) -> str:
-    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/inbox/{append_token}/{file_name}'
+def path__vault_append_base(vault_id: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append'
 
-def path__vault_inbox_prefix(vault_id: str, append_token: str) -> str:
-    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/inbox/{append_token}/'
+def path__vault_append_config(vault_id: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/config.json'
 
-def path__vault_processed(vault_id: str, append_token: str, file_name: str) -> str:
-    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/processed/{append_token}/{file_name}'
+def path__vault_append_pending(vault_id: str, token: str, file_name: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/pending/{file_name}'
 
-def path__vault_processed_prefix(vault_id: str, append_token: str) -> str:
-    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/processed/{append_token}/'
+def path__vault_append_pending_prefix(vault_id: str, token: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/pending/'
+
+def path__vault_append_processed(vault_id: str, token: str, file_name: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/processed/{file_name}'
+
+def path__vault_append_processed_prefix(vault_id: str, token: str) -> str:
+    return f'{_ROOT}/vault/{vault_id[:2]}/{vault_id}/bare/append/{token}/processed/'

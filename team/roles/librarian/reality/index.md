@@ -15,7 +15,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 | Domain | Directory | What It Covers | EXISTS items |
 |--------|-----------|----------------|-------------|
-| **User API** | [`send-api/`](send-api/index.md) | User Lambda: send.sgraph.ai HTTP endpoints | 26 endpoints (all tested) |
+| **User API** | [`send-api/`](send-api/index.md) | User Lambda: send.sgraph.ai HTTP endpoints | 32 endpoints (all tested) |
 | **Admin API** | [`admin-api/`](admin-api/index.md) | Admin Lambda: auth-protected endpoints | 51 endpoints (all tested) |
 | **Vault** | [`vault/`](vault/index.md) | Vault/SGit crypto + storage layer | Key derivation, object CAS, AES-256-GCM |
 | **CLI** | [`cli/`](cli/index.md) | sgit CLI (PyPI: sgit-ai) | 20+ commands, verified integrations |
