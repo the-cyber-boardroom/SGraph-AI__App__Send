@@ -2701,6 +2701,30 @@
                         wReply(false, { err: 'Bad base64 payload (' + rawLen + ' chars): ' + (err && err.message || err) + '. The sg.vfs.write encoder must chunk in multiples of 3.', code: 'EBADENC' });
                         return;
                     }
+                    // Pre-Lambda-413 friendly guard. A single sg.vfs.write becomes one POST
+                    // /api/vault/batch carrying the new blob + new tree + commit + ref + index,
+                    // each base64-encoded inside JSON. AWS Lambda URL Functions cap the request
+                    // payload at 6 MB; base64 inflates ~1.33x and the other batch entries take
+                    // ~10–50 KB. 3 MB plaintext leaves comfortable headroom; above that, the
+                    // app would get an opaque 413 mid-batch (with a partial corrupted state).
+                    // A presigned-PUT large-write path is the proper fix — until then, refuse
+                    // here with a clear EFBIG so the app author knows exactly what to do.
+                    var MAX_WRITE_BYTES = 3 * 1024 * 1024;
+                    if (wBytes.byteLength > MAX_WRITE_BYTES) {
+                        wReply(false, {
+                            err:  'File too large for a single write: ' + wBytes.byteLength
+                                + ' bytes > ' + MAX_WRITE_BYTES + ' (~3 MB). The vault batch '
+                                + 'endpoint carries the blob+tree+commit+ref base64-in-JSON, so '
+                                + 'AWS Lambda\'s 6 MB request cap with ~1.33x base64 inflation '
+                                + 'means a single write tops out around 3 MB. Large-file write '
+                                + '(presigned-PUT) is not yet supported.',
+                            code: 'EFBIG',
+                            limit: MAX_WRITE_BYTES,
+                            actual: wBytes.byteLength
+                        });
+                        self._emitBridgeCall('vfs.write', { path: e.data.path || '', ok: false, err: 'EFBIG', bytes: wBytes.byteLength });
+                        return;
+                    }
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
                     // Floor is unconditional regardless of mount membership — the .vault floor

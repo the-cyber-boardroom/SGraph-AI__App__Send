@@ -469,7 +469,10 @@
             var token = '';
             try { token = (sessionStorage.getItem('sg-vault-key') || localStorage.getItem('sg-vault-key') || '').toLowerCase(); } catch (_) {}
             if (!token) return;
-            var creating = sessionStorage.getItem('sg-vault-creating');
+            // Null-origin sandbox safe: wrap so the splash IIFE doesn't crash the page
+            // when this vault loads inside a parent vault's null-origin iframe (embed mode).
+            var creating = null;
+            try { creating = sessionStorage.getItem('sg-vault-creating'); } catch (_) {}
             if (!creating || creating !== token) return;
 
             var splash = document.createElement('div');

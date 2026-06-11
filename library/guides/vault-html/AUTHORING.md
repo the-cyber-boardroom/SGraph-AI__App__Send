@@ -283,6 +283,21 @@ await sg.vfs.write('responses/2026-05-09.json', JSON.stringify(data, null, 2));
 > grant — e.g. `{ "permissions": { "fs": { "write": ["responses/"] } } }`. The vault must also be
 > writable (an access token). See **[MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)**.
 
+> **Size limit (single write).** A single `sg.vfs.write` is capped at **~3 MB** of plaintext
+> (`EFBIG`). One `write` becomes one commit → one `POST /api/vault/batch` carrying the new
+> blob + new tree + commit + ref + index, all base64-encoded inside JSON. AWS Lambda URL
+> Functions cap the request payload at 6 MB, base64 inflates ~1.33×, and the rest of the
+> batch eats some room — so 3 MB is the conservative ceiling the host enforces. Above it,
+> the write rejects with code `EFBIG` (no partial state — nothing was committed).
+>
+> **Reads scale further than writes.** Reads above ~4 MB use a presigned-S3 URL that bypasses
+> Lambda's response cap; there's no equivalent presigned-PUT for writes yet. So an app can
+> read multi-MB blobs (videos, PDFs, datasets) but can't `write` them in one call. Until
+> presigned-PUT ships, large writes must be split across multiple files at the app layer.
+>
+> (Note: the historical "Bad encoding" cap at ~8 KB was a base64 chunking bug, fixed
+> 2026-06-11. Anything ≤ 3 MB now Just Works in a single `write`.)
+
 Always check `sg.app.writable` before showing UI that suggests editing — in a share-token (read-only) view, writes will reject with `Read-only vault`.
 
 ```js
