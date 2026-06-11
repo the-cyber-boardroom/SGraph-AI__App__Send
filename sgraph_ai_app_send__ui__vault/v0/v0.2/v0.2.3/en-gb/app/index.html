@@ -181,7 +181,11 @@
                 var cfg = e.detail.hudCfg;
                 try {
                     var force = localStorage.getItem('sg-app-force-show-hud') === '1';
-                    if (force && cfg && cfg.mode === 'hidden') cfg = Object.assign({}, cfg, { mode: 'full' });
+                    // Force-show upgrades BOTH chrome-less modes (hidden + none) to full, so a
+                    // power user is never trapped in a vault app with no visible way back.
+                    if (force && cfg && (cfg.mode === 'hidden' || cfg.mode === 'none')) {
+                        cfg = Object.assign({}, cfg, { mode: 'full' });
+                    }
                 } catch (_) {}
                 hud.applyHudConfig(cfg);
             }

@@ -394,13 +394,22 @@ declare how much of this chrome they want via `app.json`:
 
 - **`"full"`** *(default)* — chrome row + nav row both visible. Best for apps with
   multiple pages where users benefit from back/forward.
-- **`"minimal"`** — chrome row collapsed to vault name + title only; no nav row;
-  no Debug button. Best for single-page reading-mode apps that want to feel less
-  "appy". Defaults: `vaultName, appTitle: true`, everything else off.
+- **`"minimal"`** — chrome row collapsed to vault name + title + **Open Vault** button;
+  no nav row; no Debug button. Best for single-page reading-mode apps that want to feel
+  less "appy" while still giving the user a visible way back. Defaults:
+  `vaultName, appTitle, openVault: true`, everything else off. (Copy Link / Print / Debug
+  now live behind a `⋯` overflow button in `full` mode — they don't need their own slots.)
 - **`"hidden"`** — chrome row + nav row both hidden; iframe takes the full viewport.
   A **corner `× Exit app` pill** (`position: fixed; top: 8px; right: 8px; z-index: 9999`)
   remains visible regardless. Best for immersive experiences (lightbox-first
   galleries, presentations, kiosk mode).
+- **`"none"`** — like `hidden`, but **the escape pill is gone too**. The app is visually
+  indistinguishable from a standalone web page; the **only** way back to the vault is to
+  edit the URL. Use this deliberately for a patient/end-user-facing surface (e.g. a
+  check-in form) where *any* host chrome — even a corner pill — would break the illusion
+  that this is "just an app". Because there's no visual clue, reach for `none` only when
+  that invisibility is the point; prefer `hidden` otherwise. Consent prompts still render
+  (see the sovereignty rail).
 
 `hud.show.*` granular flags override the per-mode defaults. Set to `false` to hide;
 omit to use the default.
@@ -411,13 +420,17 @@ The HUD config is for *app preferences*, not *app authority*. Three guarantees t
 host enforces no matter what `app.json` says:
 
 1. **Consent prompts always render.** When the app calls `sg.fs.delete(...)` or
-   `sg.vault.create(...)` etc., the host's HUD consent overlay appears for the user
-   to allow/deny — regardless of `hud.mode`.
+   `sg.vault.create(...)` etc., the host's consent bar appears for the user to allow/deny
+   — **regardless of `hud.mode`, including `none`**. The consent bar is a full-width
+   sibling of the chrome row (not inside it), so hiding the chrome never hides consent.
 2. **The escape pill is non-suppressible** in `mode: "hidden"`. Users always have a
-   one-click way back to the vault file browser.
+   one-click way back to the vault file browser. (`mode: "none"` *does* drop the pill by
+   design — that's the whole point of `none` — so for those apps the user-side override
+   below is the escape hatch.)
 3. **User-side override.** Power users can set
    `localStorage['sg-app-force-show-hud'] = '1'` and reload to force `mode: "full"`
-   regardless of what `app.json` requests. (Read at page-script level — not bypassable
+   regardless of what `app.json` requests — this upgrades **both `hidden` and `none`**, so
+   a curious user can always reveal the chrome. (Read at page-script level — not bypassable
    by app code.)
 
 ### Recommendation

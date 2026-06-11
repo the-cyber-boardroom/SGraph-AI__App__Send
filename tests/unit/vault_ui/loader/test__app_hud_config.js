@@ -32,6 +32,7 @@ console.log('\n[suite] AppHudConfig — mode resolution');
     ok('M7 unknown mode (typo) → full (forgiving fallback, app isn\'t bricked)',
         C.resolve({ mode: 'mineimal' }).mode === 'full');
     ok('M8 non-string mode → full',          C.resolve({ mode: 42 }).mode === 'full');
+    ok('M9 mode=none → none',                C.resolve({ mode: 'none' }).mode === 'none');
 }
 
 console.log('\n[suite] AppHudConfig — full-mode defaults (everything visible)');
@@ -55,7 +56,8 @@ console.log('\n[suite] AppHudConfig — minimal-mode defaults (nav row off, chro
     var r = C.resolve({ mode: 'minimal' });
     ok('MN1 minimal: vaultName still on',     r.show.vaultName === true);
     ok('MN2 minimal: appTitle still on',      r.show.appTitle === true);
-    ok('MN3 minimal: openVault off',          r.show.openVault === false);
+    ok('MN3 minimal: openVault ON (a stripped HUD still needs a visible way back)',
+        r.show.openVault === true);
     ok('MN4 minimal: copyLink off',           r.show.copyLink === false);
     ok('MN5 minimal: print off',              r.show.print === false);
     ok('MN6 minimal: debug off',              r.show.debug === false);
@@ -71,14 +73,14 @@ console.log('\n[suite] AppHudConfig — show.* overrides on top of defaults');
     ok('O1 full + show.debug=false → debug false, others stay default',
         r1.show.debug === false && r1.show.vaultName === true && r1.show.navBar === true);
 
-    // Override on top of minimal: opt IN to print
+    // Override on top of minimal: opt IN to print (openVault is on by default in minimal)
     var r2 = C.resolve({ mode: 'minimal', show: { print: true } });
-    ok('O2 minimal + show.print=true → print true, others stay minimal-default',
-        r2.show.print === true && r2.show.navBar === false && r2.show.openVault === false);
+    ok('O2 minimal + show.print=true → print true, navBar stays off, openVault stays on',
+        r2.show.print === true && r2.show.navBar === false && r2.show.openVault === true);
 
-    // Multiple overrides
-    var r3 = C.resolve({ mode: 'minimal', show: { navBar: true, navArrows: true, navPath: true } });
-    ok('O3 minimal can opt-in to nav row piecewise',
+    // Multiple overrides — and opt OUT of the default openVault
+    var r3 = C.resolve({ mode: 'minimal', show: { navBar: true, navArrows: true, navPath: true, openVault: false } });
+    ok('O3 minimal can opt-in to nav row piecewise + opt-out of openVault',
         r3.show.navBar === true && r3.show.navArrows === true && r3.show.navPath === true
         && r3.show.openVault === false);
 
@@ -99,6 +101,19 @@ console.log('\n[suite] AppHudConfig — hidden mode keeps full-style show defaul
     ok('H1 hidden mode preserves mode=hidden',  r.mode === 'hidden');
     ok('H2 hidden mode show.* uses FULL defaults (so force-show is sensible)',
         r.show.vaultName === true && r.show.navBar === true && r.show.print === true);
+}
+
+console.log('\n[suite] AppHudConfig — none mode (no chrome AND no escape pill)');
+{
+    // 'none' is like 'hidden' at the resolver level — full show defaults so a force-show
+    // override yields a sensible chrome. The DIFFERENCE (no escape pill, total invisibility)
+    // is enforced by AppHud.applyHudConfig keying off mode, not by this resolver.
+    var r = C.resolve({ mode: 'none' });
+    ok('N1 none mode preserves mode=none',      r.mode === 'none');
+    ok('N2 none mode show.* uses FULL defaults (force-show upgrades to a full chrome)',
+        r.show.vaultName === true && r.show.navBar === true && r.show.openVault === true);
+    ok('N3 none + show override still merges',
+        C.resolve({ mode: 'none', show: { debug: false } }).show.debug === false);
 }
 
 console.log('\n[suite] AppHudConfig — output shape');
