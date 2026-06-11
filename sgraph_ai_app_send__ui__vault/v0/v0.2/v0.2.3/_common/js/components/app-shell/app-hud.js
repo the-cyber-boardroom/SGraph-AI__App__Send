@@ -39,21 +39,22 @@
                         </div>
                         <div class="hud-center">
                             <span class="hud-msg" style="display:none"></span>
-                            <span class="hud-consent" style="display:none"
-                                  role="alertdialog" aria-label="Vault permission request" aria-live="polite"
-                                  data-testid="hud-consent">
-                                <span class="hud-consent-text" data-testid="hud-consent-text"></span>
-                                <button class="hud-consent-allow" data-testid="hud-consent-allow" aria-label="Approve">Allow</button>
-                                <button class="hud-consent-deny"  data-testid="hud-consent-deny"  aria-label="Deny">Deny</button>
-                            </span>
                         </div>
                         <div class="hud-right">
-                            <a class="hud-vault-link" data-hud-el="openVault" href="#" style="display:none" title="Open vault">Open Vault</a>
-                            <button class="hud-copy-btn" data-hud-el="copyLink" style="display:none" title="Copy app link">⎘ Copy Link</button>
-                            <button class="hud-print-btn" data-hud-el="print" style="display:none" title="Print this app (opens a print-friendly preview)">&#128424; Print</button>
-                            <span class="hud-privs-chip" style="display:none" title="What this app is allowed to do"></span>
+                            <a class="hud-vault-link" data-hud-el="openVault" href="#" style="display:none" title="Open the vault file browser">&#8612; Open Vault</a>
+                            <div class="hud-privs-wrap" style="display:none">
+                                <button class="hud-privs-chip" type="button" aria-haspopup="true" aria-expanded="false" title="What this app is allowed to do"></button>
+                                <div class="hud-privs-pop" style="display:none"></div>
+                            </div>
                             <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
-                            <button class="hud-debug-btn" data-hud-el="debug" title="Toggle debug panel">🔍 Debug</button>
+                            <div class="hud-more-wrap" data-hud-el="more">
+                                <button class="hud-more-btn" type="button" aria-haspopup="true" aria-expanded="false" title="More actions">&#8943;</button>
+                                <div class="hud-more-panel" style="display:none">
+                                    <button class="hud-mi hud-copy-btn"  data-hud-el="copyLink" style="display:none">⎘ Copy app link</button>
+                                    <button class="hud-mi hud-print-btn" data-hud-el="print"    style="display:none">&#128424; Print…</button>
+                                    <button class="hud-mi hud-debug-btn" data-hud-el="debug">🔍 Debug panel</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="navrow" data-hud-el="navBar" style="display:none">
@@ -74,14 +75,34 @@
                         </div>
                     </div>
                 </div>
+                <!-- Consent bar — a SIBLING of .hud-wrap so it renders even when the chrome row
+                     is hidden (modes 'hidden'/'none'). Full-width so the message never truncates;
+                     co-locates the request, the app's standing grants, and Allow/Deny. -->
+                <div class="hud-consent-bar" style="display:none"
+                     role="alertdialog" aria-label="Vault permission request" aria-live="assertive"
+                     data-testid="hud-consent">
+                    <span class="hud-consent-icon" aria-hidden="true">🔐</span>
+                    <div class="hud-consent-body">
+                        <div class="hud-consent-text" data-testid="hud-consent-text"></div>
+                        <div class="hud-consent-grants" data-testid="hud-consent-grants" style="display:none"></div>
+                    </div>
+                    <div class="hud-consent-actions">
+                        <button class="hud-consent-deny"  data-testid="hud-consent-deny"  aria-label="Deny">Deny</button>
+                        <button class="hud-consent-allow" data-testid="hud-consent-allow" aria-label="Approve">Allow</button>
+                    </div>
+                </div>
                 <button class="hud-escape" style="display:none" title="Exit app and return to vault">×&nbsp;Exit app</button>
             `;
 
             this.shadowRoot.addEventListener('click', (e) => {
-                if (e.target.closest('.hud-copy-btn'))   this._copyLink();
-                if (e.target.closest('.hud-print-btn'))  this._onPrintClick();
-                if (e.target.closest('.hud-debug-btn'))  this._toggleDebug();
-                if (e.target.closest('.hud-privs-chip')) this._onPrivsClick();
+                // ⋯ overflow menu + privileges popover (expand-on-click).
+                if (e.target.closest('.hud-more-btn'))    { e.stopPropagation(); return this._toggleMore(); }
+                if (e.target.closest('.hud-privs-chip'))  { e.stopPropagation(); return this._togglePrivsPop(); }
+                if (e.target.closest('.hud-privs-reset')) { return this._resetConsents(); }
+                // Menu actions — run, then collapse the menu.
+                if (e.target.closest('.hud-copy-btn'))   { this._copyLink();      this._toggleMore(false); }
+                if (e.target.closest('.hud-print-btn'))  { this._onPrintClick();  this._toggleMore(false); }
+                if (e.target.closest('.hud-debug-btn'))  { this._toggleDebug();   this._toggleMore(false); }
                 // Nav row buttons — dispatch events that app-shell listens to.
                 if (e.target.closest('.navrow-back'))    this._emitNavEvent('back');
                 if (e.target.closest('.navrow-forward')) this._emitNavEvent('forward');
@@ -171,64 +192,178 @@
         // makes the otherwise-invisible grants legible to the user. Phase 4 makes it clickable
         // (permissions panel / revoke). No grants beyond default reads → chip hidden.
         setPrivileges(perm) {
+            var wrap = this.shadowRoot.querySelector('.hud-privs-wrap');
             var chip = this.shadowRoot.querySelector('.hud-privs-chip');
-            if (!chip) return;
-            var labels = [];
+            if (!wrap || !chip) return;
+
+            // Map raw grant verbs to user-facing language + a risk tier. Destructive
+            // (irreversible) grants are flagged so they can be visually separated from
+            // benign ones — collapsing them all into one neutral yellow blob hid the risk.
             var fs = (perm && perm.fs) || {};
             var vault = (perm && perm.vault) || {};
             function granted(v) { return v === true || (Array.isArray(v) && v.length > 0); }
-            if (granted(fs.write))  labels.push('write');
-            if (granted(fs.move))   labels.push('move');
-            if (granted(fs['delete'])) labels.push('delete');
-            if (granted(fs.mkdir))  labels.push('mkdir');
-            if (granted(vault.create)) labels.push('create-vault');
-            if (granted(vault.unlink)) labels.push('unlink-vault');
-            if (vault['delete'] === true) labels.push('delete-vault');
-            if (labels.length === 0) { chip.style.display = 'none'; return; }
-            chip.textContent = '🔓 ' + labels.join(' · ');
-            chip.title = 'This app is allowed to: ' + labels.join(', ');
-            chip.style.display = '';
+            var list = [];
+            if (granted(fs.write))        list.push({ label: 'write files',    danger: false });
+            if (granted(fs.move))         list.push({ label: 'move files',     danger: false });
+            if (granted(fs.mkdir))        list.push({ label: 'create folders', danger: false });
+            if (granted(vault.create))    list.push({ label: 'create vaults',  danger: false });
+            if (granted(fs['delete']))    list.push({ label: 'delete files',   danger: true  });
+            if (granted(vault.unlink))    list.push({ label: 'unlink vaults',  danger: true  });
+            if (vault['delete'] === true) list.push({ label: 'delete vaults',  danger: true  });
+            // Destructive grants sort last so the expanded list ends on the ones that matter.
+            list.sort(function (a, b) { return (a.danger ? 1 : 0) - (b.danger ? 1 : 0); });
+            this._privList = list;
+
+            if (list.length === 0) { wrap.style.display = 'none'; return; }
+            var hasDanger = list.some(function (p) { return p.danger; });
+            // Compact chip: a lock + count. Click expands the full list (see _renderPrivsPop).
+            chip.innerHTML = '🔒 <span class="hud-privs-count">' + list.length + '</span>';
+            chip.title = 'This app is allowed to: ' + list.map(function (p) { return p.label; }).join(', ')
+                       + ' — click for details';
+            chip.classList.toggle('hud-privs-chip--danger', hasDanger);
+            wrap.style.display = '';
+            this._renderPrivsPop();
+        }
+
+        // Build the expanded privileges popover content from the parsed grant list.
+        _renderPrivsPop() {
+            var pop = this.shadowRoot && this.shadowRoot.querySelector('.hud-privs-pop');
+            if (!pop) return;
+            var rows = (this._privList || []).map(function (p) {
+                return '<div class="hud-priv-row' + (p.danger ? ' hud-priv-row--danger' : '') + '">'
+                     + (p.danger ? '⚠ ' : '• ') + AppHud._escapeHtml(p.label) + '</div>';
+            }).join('');
+            pop.innerHTML = '<div class="hud-priv-head">This app is allowed to</div>'
+                          + rows
+                          + '<button class="hud-privs-reset" type="button">Reset granted consents…</button>';
+        }
+
+        _togglePrivsPop(force) {
+            var pop  = this.shadowRoot && this.shadowRoot.querySelector('.hud-privs-pop');
+            var chip = this.shadowRoot && this.shadowRoot.querySelector('.hud-privs-chip');
+            if (!pop) return;
+            var open = (typeof force === 'boolean') ? force : (pop.style.display === 'none');
+            // Only one popover open at a time.
+            var more = this.shadowRoot.querySelector('.hud-more-panel');
+            if (open && more) more.style.display = 'none';
+            pop.style.display = open ? '' : 'none';
+            if (chip) chip.setAttribute('aria-expanded', open ? 'true' : 'false');
+            this._armOutsideClose(open, () => this._togglePrivsPop(false));
+        }
+
+        _toggleMore(force) {
+            var panel = this.shadowRoot && this.shadowRoot.querySelector('.hud-more-panel');
+            var btn   = this.shadowRoot && this.shadowRoot.querySelector('.hud-more-btn');
+            if (!panel) return;
+            var open = (typeof force === 'boolean') ? force : (panel.style.display === 'none');
+            var pop = this.shadowRoot.querySelector('.hud-privs-pop');
+            if (open && pop) pop.style.display = 'none';
+            panel.style.display = open ? '' : 'none';
+            if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            this._armOutsideClose(open, () => this._toggleMore(false));
+        }
+
+        // Shared one-shot outside-click closer for the ⋯ menu / privs popover. Armed on the
+        // next tick so the opening click (which bubbles up composed from the shadow root)
+        // doesn't immediately close it.
+        _armOutsideClose(open, closeFn) {
+            if (this._popClickHandler) {
+                document.removeEventListener('click', this._popClickHandler);
+                this._popClickHandler = null;
+            }
+            if (!open) return;
+            var self = this;
+            setTimeout(function () {
+                self._popClickHandler = function () { closeFn(); self._popClickHandler = null; };
+                document.addEventListener('click', self._popClickHandler, { once: true });
+            }, 0);
         }
 
         // Render a consent prompt in the HUD (host chrome — the app cannot draw or dismiss this).
         // Resolves cb(true/false) only on a real user click. Called by app-shell._consent.
         requestConsent(verb, path, cb) {
-            const c = this.shadowRoot.querySelector('.hud-consent');
-            const t = this.shadowRoot.querySelector('.hud-consent-text');
-            const allow = this.shadowRoot.querySelector('.hud-consent-allow');
-            const deny  = this.shadowRoot.querySelector('.hud-consent-deny');
-            if (!c || !t || !allow || !deny) { try { cb(false); } catch (_) {} return; }
-            t.textContent = AppHud._consentLabel(verb, path);
-            c.style.display = '';
+            const bar    = this.shadowRoot.querySelector('.hud-consent-bar');
+            const t      = this.shadowRoot.querySelector('.hud-consent-text');
+            const grants = this.shadowRoot.querySelector('.hud-consent-grants');
+            const allow  = this.shadowRoot.querySelector('.hud-consent-allow');
+            const deny   = this.shadowRoot.querySelector('.hud-consent-deny');
+            if (!bar || !t || !allow || !deny) { try { cb(false); } catch (_) {} return; }
+
+            const info = AppHud._consentInfo(verb, path);
+            t.textContent = info.message;
+            bar.classList.toggle('hud-consent-bar--danger', info.danger);
+
+            // Surface the cumulative power the app already holds (destructive ones flagged),
+            // so a single-verb prompt doesn't understate what saying "Allow" repeatedly means.
+            if (grants) {
+                if (this._privList && this._privList.length) {
+                    grants.innerHTML = '<span class="hud-grants-label">Already allowed:</span> '
+                        + this._privList.map(function (p) {
+                            return '<span class="hud-grant' + (p.danger ? ' hud-grant--danger' : '') + '">'
+                                 + AppHud._escapeHtml(p.label) + '</span>';
+                        }).join('');
+                    grants.style.display = '';
+                } else {
+                    grants.style.display = 'none';
+                    grants.innerHTML = '';
+                }
+            }
+
+            bar.style.display = '';
+            // Remember focus so we can restore it after the decision (a11y).
+            this._consentPrevFocus = (document.activeElement && document.activeElement !== document.body)
+                ? document.activeElement : null;
+
+            const onKey = (ev) => {
+                if (ev.key === 'Escape') { ev.preventDefault(); done(false); }
+            };
             const done = (ok) => {
-                c.style.display = 'none';
+                bar.style.display = 'none';
+                bar.classList.remove('hud-consent-bar--danger');
                 allow.removeEventListener('click', onAllow);
                 deny.removeEventListener('click', onDeny);
+                bar.removeEventListener('keydown', onKey);
+                try { if (this._consentPrevFocus && this._consentPrevFocus.focus) this._consentPrevFocus.focus(); } catch (_) {}
                 try { cb(ok); } catch (_) {}
             };
             const onAllow = () => done(true);
             const onDeny  = () => done(false);
             allow.addEventListener('click', onAllow);
             deny.addEventListener('click', onDeny);
+            bar.addEventListener('keydown', onKey);
+            // Safe default: focus DENY (not Allow) so a stray Enter/keypress never grants —
+            // the user must deliberately move to Allow. Esc also denies.
+            setTimeout(() => { try { deny.focus(); } catch (_) {} }, 0);
         }
 
-        static _consentLabel(verb, path) {
+        // Returns { message, danger } for a consent verb. Destructive (irreversible) verbs
+        // get a ⚠ prefix and flip the bar to a danger colour.
+        static _consentInfo(verb, path) {
             const map = {
-                'vault.create':           'create a vault',
-                'vault.createKey':        'create a vault and receive its key',
-                'vault.delete':           'permanently delete a vault',
-                'vault.unlink':           'unlink a vault',
-                'vault.embedAccessToken': 'embed an access token in a vault'
+                'vault.create':           { what: 'create a vault',                     danger: false },
+                'vault.createKey':        { what: 'create a vault and receive its key', danger: false },
+                'vault.delete':           { what: 'permanently delete a vault',         danger: true  },
+                'vault.unlink':           { what: 'unlink a vault',                     danger: false },
+                'vault.embedAccessToken': { what: 'embed an access token in a vault',    danger: true  },
+                'vfs.write':              { what: 'write files',                        danger: false },
+                'vfs.delete':             { what: 'delete files',                       danger: true  },
+                'vfs.move':               { what: 'move files',                         danger: false },
+                'vfs.mkdir':              { what: 'create folders',                     danger: false }
             };
-            const what = map[verb] || ('use ' + verb);
+            const e = map[verb] || { what: 'use ' + verb, danger: /delete|destroy|unlink/i.test(verb) };
             // Only show the location for real folder paths — a ref id (e.g. "lk-abc…") is noise.
             const showPath = path && path.indexOf('/') > -1;
-            return 'This app wants to ' + what + (showPath ? ' in “' + path + '”' : '') + '.';
+            return {
+                message: (e.danger ? '⚠ ' : '') + 'This app wants to ' + e.what
+                       + (showPath ? ' in “' + path + '”' : '') + '.',
+                danger: e.danger
+            };
         }
 
-        // Clicking the privileges chip opens the (minimal) permissions panel: the manifest grants
-        // are a fixed ceiling, but the user can reset this app's cached create/delete consents.
-        _onPrivsClick() {
+        // The manifest grants are a fixed ceiling; the user can still reset this app's cached
+        // create/delete consents so the prompts are asked again. Triggered from the privs popover.
+        _resetConsents() {
+            this._togglePrivsPop(false);
             const ok = window.confirm('Reset this app’s granted consents (e.g. create/delete prompts will be asked again)?');
             if (ok) this.dispatchEvent(new CustomEvent('app-hud:reset-consents', { bubbles: true, composed: true }));
         }
@@ -469,8 +604,18 @@
             var escape = sr.querySelector('.hud-escape');
 
             if (cfg.mode === 'hidden') {
+                // Chrome row hidden, but the corner escape pill stays — a visible clue
+                // that this is a vault app + a one-click way back.
                 if (wrap)   wrap.style.display = 'none';
                 if (escape) escape.style.display = '';
+                return;
+            }
+            if (cfg.mode === 'none') {
+                // No chrome AND no escape pill — the app is visually indistinguishable from a
+                // standalone page; the only way back is to edit the URL. Author-only, opt-in.
+                // (Consent prompts still render — the consent bar is a sibling of .hud-wrap.)
+                if (wrap)   wrap.style.display = 'none';
+                if (escape) escape.style.display = 'none';
                 return;
             }
             if (wrap)   wrap.style.display = '';
@@ -491,6 +636,14 @@
                     el.style.display = 'none';
                 }
             });
+
+            // The ⋯ menu only holds Copy / Print / Debug — collapse the whole control when
+            // all three are hidden (e.g. minimal mode) so there's no empty dangling button.
+            var moreWrap = sr.querySelector('.hud-more-wrap');
+            if (moreWrap) {
+                var anyMore = cfg.show.copyLink || cfg.show.print || cfg.show.debug;
+                moreWrap.style.display = anyMore ? '' : 'none';
+            }
 
             var navbar = sr.querySelector('.navrow');
             if (navbar) navbar.style.display = cfg.show.navBar ? '' : 'none';
@@ -530,13 +683,11 @@
         .hud-app-title {
             font-size: 0.875rem; font-weight: 600; color: #e2e8f0;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            min-width: 0;
-            /* No max-width — title grows to its natural width and only ellipsizes
-               when the row genuinely runs out of space (hud-left shrinks via flex,
-               hud-center is flex:1 so it absorbs the squeeze first). The previous
-               200px cap was a leftover from when the HUD was a packed 48px row;
-               with app.json hud.show.* it's common to have only brand+title in
-               hud-left and they should use whatever room is available. */
+            min-width: 0; max-width: 40vw;
+            /* Cap at 40vw so a long title ellipsizes inside hud-left instead of growing
+               until it butts against centre content. (The consent prompt now lives in
+               its own full-width bar, so it no longer collides — but the cap keeps the
+               top row tidy when brand+badge+title are all long.) */
         }
         .hud-msg {
             font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 4px;
@@ -551,47 +702,93 @@
             border: 1px solid #2a2a4a; white-space: nowrap;
         }
         .hud-vault-link:hover { color: #4ECDC4; border-color: #4ECDC4; }
-        .hud-copy-btn {
-            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
-            border: 1px solid #2a2a4a; background: transparent;
-            color: #8892a4; cursor: pointer; white-space: nowrap;
-        }
-        .hud-copy-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
-        .hud-print-btn {
-            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
-            border: 1px solid #2a2a4a; background: transparent;
-            color: #8892a4; cursor: pointer; white-space: nowrap;
-        }
-        .hud-print-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
         .hud-ro-badge {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(100,160,220,0.12); color: #64a0dc;
             border: 1px solid rgba(100,160,220,0.25); white-space: nowrap;
         }
+        /* ── Privileges chip (compact 🔒 N) + expandable popover ─────────────────────── */
+        .hud-privs-wrap { position: relative; display: inline-flex; }
         .hud-privs-chip {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(233,196,69,0.12); color: #E9C445;
-            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap; font-family: monospace; cursor: pointer;
+            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap;
+            font-family: inherit; cursor: pointer; line-height: 1.4;
         }
         .hud-privs-chip:hover { border-color: #E9C445; }
-        .hud-consent { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; max-width: 100%; }
-        .hud-consent-text { font-size: 0.8rem; color: #e2e8f0; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .hud-consent-allow, .hud-consent-deny { flex: 0 0 auto; }
+        .hud-privs-count { font-weight: 700; }
+        .hud-privs-chip--danger {
+            background: rgba(255,107,107,0.12); color: #ff8a8a; border-color: rgba(255,107,107,0.45);
+        }
+        .hud-privs-chip--danger:hover { border-color: #ff6b6b; }
+        .hud-privs-pop {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            min-width: 200px; background: #14142a; border: 1px solid #2a2a4a;
+            border-radius: 6px; padding: 0.35rem; box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+            z-index: 200; display: flex; flex-direction: column; gap: 0.1rem;
+        }
+        .hud-priv-head {
+            color: rgba(255,255,255,0.38); font-size: 0.66rem;
+            text-transform: uppercase; letter-spacing: 0.08em; padding: 0.2rem 0.45rem 0.3rem;
+        }
+        .hud-priv-row { padding: 0.22rem 0.45rem; font-size: 0.78rem; color: #cbd3e1; white-space: nowrap; }
+        .hud-priv-row--danger { color: #ff8a8a; font-weight: 600; }
+        .hud-privs-reset {
+            margin-top: 0.3rem; font-size: 0.72rem; padding: 0.3rem 0.45rem; border-radius: 4px;
+            border: 1px solid #2a2a4a; background: transparent; color: #8892a4;
+            cursor: pointer; text-align: left; font-family: inherit;
+        }
+        .hud-privs-reset:hover { color: #ff8a8a; border-color: rgba(255,107,107,0.4); }
+
+        /* ── ⋯ overflow menu (Copy link / Print / Debug) ─────────────────────────────── */
+        .hud-more-wrap { position: relative; display: inline-flex; }
+        .hud-more-btn {
+            font-size: 0.95rem; line-height: 1; padding: 0.15rem 0.5rem; border-radius: 4px;
+            border: 1px solid #2a2a4a; background: transparent; color: #8892a4;
+            cursor: pointer; font-family: inherit;
+        }
+        .hud-more-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
+        .hud-more-panel {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            min-width: 170px; background: #14142a; border: 1px solid #2a2a4a;
+            border-radius: 6px; padding: 0.3rem; box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+            z-index: 200; display: flex; flex-direction: column; gap: 0.1rem;
+        }
+        .hud-mi {
+            font-size: 0.78rem; padding: 0.35rem 0.5rem; border-radius: 4px;
+            border: 1px solid transparent; background: transparent; color: #cbd3e1;
+            cursor: pointer; text-align: left; white-space: nowrap; font-family: inherit;
+        }
+        .hud-mi:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+        .hud-debug-btn.active { color: #4ECDC4; }
+
+        /* ── Consent bar (full-width sibling of .hud-wrap — sovereignty: always rendered) ── */
+        .hud-consent-bar {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.5rem 1rem; min-height: 44px; box-sizing: border-box;
+            background: #15264a; border-bottom: 1px solid #2a3a6a; color: #e2e8f0;
+        }
+        .hud-consent-bar--danger { background: #3a1a22; border-bottom-color: #7a2a3a; }
+        .hud-consent-icon { flex: 0 0 auto; font-size: 1.05rem; }
+        .hud-consent-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+        .hud-consent-text { font-size: 0.85rem; color: #fff; line-height: 1.3; }   /* wraps — never truncates */
+        .hud-consent-grants {
+            font-size: 0.72rem; color: #aeb6c6;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem;
+        }
+        .hud-grants-label { color: rgba(255,255,255,0.4); }
+        .hud-grant { white-space: nowrap; }
+        .hud-grant--danger { color: #ff8a8a; font-weight: 600; }
+        .hud-consent-actions { flex: 0 0 auto; display: flex; gap: 0.5rem; }
         .hud-consent-allow, .hud-consent-deny {
-            font-size: 0.75rem; padding: 0.2rem 0.7rem; border-radius: 4px; cursor: pointer;
-            border: 1px solid #2a2a4a; background: transparent; white-space: nowrap;
+            font-size: 0.78rem; padding: 0.3rem 0.9rem; border-radius: 4px; cursor: pointer;
+            border: 1px solid #2a2a4a; background: transparent; white-space: nowrap; font-family: inherit;
         }
         .hud-consent-allow { background: #4ECDC4; color: #0a0a18; border-color: #4ECDC4; font-weight: 700; }
         .hud-consent-allow:hover { background: #3dbdb5; }
         .hud-consent-deny { color: #ff6b6b; border-color: rgba(255,107,107,0.4); }
-        .hud-consent-deny:hover { border-color: #ff6b6b; }
-        .hud-debug-btn {
-            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 4px;
-            border: 1px solid #2a2a4a; background: transparent;
-            color: #4a5568; cursor: pointer; white-space: nowrap;
-        }
-        .hud-debug-btn:hover  { color: #4ECDC4; border-color: #4ECDC4; }
-        .hud-debug-btn.active { color: #4ECDC4; border-color: #4ECDC4; background: rgba(78,205,196,0.08); }
+        .hud-consent-deny:hover  { border-color: #ff6b6b; }
+        .hud-consent-deny:focus, .hud-consent-allow:focus { outline: 2px solid #4ECDC4; outline-offset: 1px; }
 
         /* ── Nav row (HUD V1: back/forward/refresh + path display + copy + recent menu) ── */
         .hud-wrap { display: block; }
