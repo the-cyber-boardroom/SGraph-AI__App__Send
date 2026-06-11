@@ -840,18 +840,23 @@
         }
         /* ── Privileges chip (compact 🔒 N) + expandable popover ─────────────────────── */
         .hud-privs-wrap { position: relative; display: inline-flex; }
+        /* Privileges chip — standing grants, NOT an error. Default state is a calm slate
+           (informational); presence of any destructive grant lifts it to amber. We deliberately
+           do NOT use red here — red is reserved for active errors and the active consent prompt.
+           Red on a permanent status chip read as "something is wrong" in user testing. */
         .hud-privs-chip {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
-            background: rgba(233,196,69,0.12); color: #E9C445;
-            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap;
+            background: rgba(136,146,164,0.10); color: #aeb6c6;
+            border: 1px solid rgba(136,146,164,0.30); white-space: nowrap;
             font-family: inherit; cursor: pointer; line-height: 1.4;
         }
-        .hud-privs-chip:hover { border-color: #E9C445; }
+        .hud-privs-chip:hover { color: #e2e8f0; border-color: rgba(174,182,198,0.55); }
         .hud-privs-count { font-weight: 700; }
         .hud-privs-chip--danger {
-            background: rgba(255,107,107,0.12); color: #ff8a8a; border-color: rgba(255,107,107,0.45);
+            background: rgba(245,164,67,0.10); color: #f5a443;
+            border-color: rgba(245,164,67,0.45);
         }
-        .hud-privs-chip--danger:hover { border-color: #ff6b6b; }
+        .hud-privs-chip--danger:hover { color: #ffba5c; border-color: #f5a443; }
         .hud-privs-pop {
             position: absolute; top: calc(100% + 6px); right: 0;
             min-width: 200px; background: #14142a; border: 1px solid #2a2a4a;
@@ -863,7 +868,7 @@
             text-transform: uppercase; letter-spacing: 0.08em; padding: 0.2rem 0.45rem 0.3rem;
         }
         .hud-priv-row { padding: 0.22rem 0.45rem; font-size: 0.78rem; color: #cbd3e1; white-space: nowrap; }
-        .hud-priv-row--danger { color: #ff8a8a; font-weight: 600; }
+        .hud-priv-row--danger { color: #f5a443; font-weight: 600; }
         .hud-privs-reset {
             margin-top: 0.3rem; font-size: 0.72rem; padding: 0.3rem 0.45rem; border-radius: 4px;
             border: 1px solid #2a2a4a; background: transparent; color: #8892a4;
