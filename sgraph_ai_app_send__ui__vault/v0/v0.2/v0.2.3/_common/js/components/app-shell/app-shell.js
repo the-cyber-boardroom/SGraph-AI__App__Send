@@ -2390,7 +2390,12 @@
                     'var bytes;' +
                     'if(typeof content==="string"){bytes=new TextEncoder().encode(content);}' +
                     'else{bytes=content instanceof Uint8Array?content:new Uint8Array(content);}' +
-                    'var b64="",chunk=8192;' +
+                    // chunk MUST be a multiple of 3 — otherwise each chunk\'s btoa() output ends
+                    // in \'=\' padding and the concatenated string has \'=\'s mid-stream, which the
+                    // host\'s atob() rejects as invalid (surfacing as "Bad encoding"). 8192 was 2
+                    // mod 3, so any payload over 8 KB failed. 8190 = 3*2730 — well under the
+                    // String.fromCharCode.apply argument limit on every browser we care about.
+                    'var b64="",chunk=8190;' +
                     'for(var i=0;i<bytes.length;i+=chunk)b64+=btoa(String.fromCharCode.apply(null,bytes.subarray(i,i+chunk)));' +
                     'return _vfsMsg("__sgVfsWriteReq",{path:path,data:b64,encoding:"base64"}).then(function(d){return{path:path,size:d.size};});' +
                   '}' +
@@ -2687,7 +2692,15 @@
                         var bin = atob(e.data.data || '');
                         wBytes  = new Uint8Array(bin.length);
                         for (var i = 0; i < bin.length; i++) wBytes[i] = bin.charCodeAt(i);
-                    } catch (_) { wReply(false, { err: 'Bad encoding' }); return; }
+                    } catch (err) {
+                        // atob() rejects if the base64 string has '=' padding mid-stream — which is
+                        // what happened when the sender chunked at a non-multiple of 3. The sender
+                        // now uses chunk=8190, but surface a precise error if anything else corrupts
+                        // the payload (so the next ticket isn\'t another 8-KB witch-hunt).
+                        var rawLen = (e.data.data || '').length;
+                        wReply(false, { err: 'Bad base64 payload (' + rawLen + ' chars): ' + (err && err.message || err) + '. The sg.vfs.write encoder must chunk in multiples of 3.', code: 'EBADENC' });
+                        return;
+                    }
                     var wPath     = e.data.path || '';
                     var wResolved = wPath.startsWith('/') ? wPath.slice(1) : self._resolvePath(self._htmlDir, wPath);
                     // Floor is unconditional regardless of mount membership — the .vault floor
