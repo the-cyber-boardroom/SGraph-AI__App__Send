@@ -38,13 +38,15 @@ console.log('\n[suite] AppHudConfig — mode resolution');
 console.log('\n[suite] AppHudConfig — full-mode defaults (everything visible)');
 {
     var r = C.resolve({ mode: 'full' });
-    var FULL_KEYS = ['vaultName','appTitle','openVault','copyLink','print','debug',
+    var FULL_KEYS = ['vaultName','appTitle','openVault','copyLink','print','debug','activity',
                      'navBar','navArrows','navPath','navRefresh','navHome'];
     var allOn = FULL_KEYS.every(function (k) { return r.show[k] === true; });
     ok('F1 full mode: all show.* flags default to true',
         allOn, JSON.stringify(r.show));
     ok('F2 full mode: show.print specifically true (Commit B2 flipped this from false)',
         r.show.print === true);
+    ok('F2b full mode: show.activity true (file read/write meter on for power users)',
+        r.show.activity === true);
     ok('F3 full mode: show.navBar specifically true',
         r.show.navBar === true);
     ok('F4 full mode: show.navHome specifically true',
@@ -61,6 +63,7 @@ console.log('\n[suite] AppHudConfig — minimal-mode defaults (nav row off, chro
     ok('MN4 minimal: copyLink off',           r.show.copyLink === false);
     ok('MN5 minimal: print off',              r.show.print === false);
     ok('MN6 minimal: debug off',              r.show.debug === false);
+    ok('MN6b minimal: activity off (power-user surface)', r.show.activity === false);
     ok('MN7 minimal: navBar off',             r.show.navBar === false);
     ok('MN8 minimal: navArrows off',          r.show.navArrows === false);
     ok('MN9 minimal: navHome off',            r.show.navHome === false);

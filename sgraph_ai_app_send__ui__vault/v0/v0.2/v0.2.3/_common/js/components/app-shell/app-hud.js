@@ -25,6 +25,10 @@
             // HUD config from app.json (resolved with defaults — see _resolvedHudCfg).
             this._hudCfg    = null;
             this._menuOpen  = false;
+            // Live file-activity meter (power-user value): session-cumulative read/write
+            // counts + a recent-ops list, fed by the `app-debug:bridge-call` event the
+            // kernel already emits for every vfs/fs op. Pure consumer — no kernel change.
+            this._actR = 0; this._actW = 0; this._actErr = 0; this._actRecent = [];
         }
 
         connectedCallback() {
@@ -45,6 +49,10 @@
                             <div class="hud-privs-wrap" style="display:none">
                                 <button class="hud-privs-chip" type="button" aria-haspopup="true" aria-expanded="false" title="What this app is allowed to do"></button>
                                 <div class="hud-privs-pop" style="display:none"></div>
+                            </div>
+                            <div class="hud-activity-wrap" data-hud-el="activity">
+                                <button class="hud-activity-chip" type="button" aria-haspopup="true" aria-expanded="false" title="Files this app has read / written this session">⇅ <span class="hud-act-r">R0</span> <span class="hud-act-w">W0</span></button>
+                                <div class="hud-activity-pop" style="display:none"></div>
                             </div>
                             <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
                             <div class="hud-more-wrap" data-hud-el="more">
@@ -96,9 +104,10 @@
 
             this.shadowRoot.addEventListener('click', (e) => {
                 // ⋯ overflow menu + privileges popover (expand-on-click).
-                if (e.target.closest('.hud-more-btn'))    { e.stopPropagation(); return this._toggleMore(); }
-                if (e.target.closest('.hud-privs-chip'))  { e.stopPropagation(); return this._togglePrivsPop(); }
-                if (e.target.closest('.hud-privs-reset')) { return this._resetConsents(); }
+                if (e.target.closest('.hud-more-btn'))     { e.stopPropagation(); return this._toggleMore(); }
+                if (e.target.closest('.hud-privs-chip'))   { e.stopPropagation(); return this._togglePrivsPop(); }
+                if (e.target.closest('.hud-privs-reset'))  { return this._resetConsents(); }
+                if (e.target.closest('.hud-activity-chip')){ e.stopPropagation(); return this._toggleActivityPop(); }
                 // Menu actions — run, then collapse the menu.
                 if (e.target.closest('.hud-copy-btn'))   { this._copyLink();      this._toggleMore(false); }
                 if (e.target.closest('.hud-print-btn'))  { this._onPrintClick();  this._toggleMore(false); }
@@ -136,11 +145,18 @@
             // Listen for nav-state changes from app-shell (back/forward arrows + path display).
             this._navChangeHandler = (ev) => this.setNavState(ev.detail || {});
             document.addEventListener('app-nav:change', this._navChangeHandler);
+
+            // Live file-activity meter: the kernel already dispatches `app-debug:bridge-call`
+            // for every vfs/fs op (it's what the debug pane consumes). We just tally it.
+            this._bridgeCallHandler = (ev) => this._onBridgeCall(ev.detail || {});
+            document.addEventListener('app-debug:bridge-call', this._bridgeCallHandler);
         }
 
         disconnectedCallback() {
             if (this._navChangeHandler) document.removeEventListener('app-nav:change', this._navChangeHandler);
+            if (this._bridgeCallHandler) document.removeEventListener('app-debug:bridge-call', this._bridgeCallHandler);
             if (this._docClickHandler) document.removeEventListener('click', this._docClickHandler);
+            clearTimeout(this._actPulseTimer);
         }
 
         // Called by page script with vault/app metadata.
@@ -238,14 +254,21 @@
                           + '<button class="hud-privs-reset" type="button">Reset granted consents…</button>';
         }
 
+        // Hide every popover EXCEPT the selector passed (so only one is open at a time).
+        _closeOtherPops(except) {
+            ['.hud-privs-pop', '.hud-more-panel', '.hud-activity-pop'].forEach((sel) => {
+                if (sel === except) return;
+                var el = this.shadowRoot.querySelector(sel);
+                if (el) el.style.display = 'none';
+            });
+        }
+
         _togglePrivsPop(force) {
             var pop  = this.shadowRoot && this.shadowRoot.querySelector('.hud-privs-pop');
             var chip = this.shadowRoot && this.shadowRoot.querySelector('.hud-privs-chip');
             if (!pop) return;
             var open = (typeof force === 'boolean') ? force : (pop.style.display === 'none');
-            // Only one popover open at a time.
-            var more = this.shadowRoot.querySelector('.hud-more-panel');
-            if (open && more) more.style.display = 'none';
+            if (open) this._closeOtherPops('.hud-privs-pop');
             pop.style.display = open ? '' : 'none';
             if (chip) chip.setAttribute('aria-expanded', open ? 'true' : 'false');
             this._armOutsideClose(open, () => this._togglePrivsPop(false));
@@ -256,11 +279,113 @@
             var btn   = this.shadowRoot && this.shadowRoot.querySelector('.hud-more-btn');
             if (!panel) return;
             var open = (typeof force === 'boolean') ? force : (panel.style.display === 'none');
-            var pop = this.shadowRoot.querySelector('.hud-privs-pop');
-            if (open && pop) pop.style.display = 'none';
+            if (open) this._closeOtherPops('.hud-more-panel');
             panel.style.display = open ? '' : 'none';
             if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
             this._armOutsideClose(open, () => this._toggleMore(false));
+        }
+
+        // ── File-activity meter ─────────────────────────────────────────────────────────
+        // Consumes `app-debug:bridge-call` (one per vfs/fs op). Tallies reads vs writes,
+        // tracks the last 15 ops, and flashes the chip green (ok) / red (error) per event.
+        _onBridgeCall(detail) {
+            var method = detail.method || '';
+            var kind;
+            if (method === 'vfs.read' || method === 'vfs.list') kind = 'r';
+            else if (method === 'vfs.write' || method === 'fs.move'
+                  || method === 'fs.delete' || method === 'fs.mkdir') kind = 'w';
+            else return;   // not a file op (vault.*, ui.*, state.* …) — the meter is files-only
+
+            if (kind === 'r') this._actR++; else this._actW++;
+            var okFlag = detail.ok !== false;     // ok defaults true unless explicitly false
+            if (!okFlag) this._actErr++;
+
+            this._actRecent.unshift({
+                method: method, kind: kind,
+                path: detail.path || detail.from || detail.to || '',
+                bytes: (typeof detail.bytes === 'number') ? detail.bytes : null,
+                count: (typeof detail.count === 'number') ? detail.count : null,
+                ms: (typeof detail.ms === 'number') ? detail.ms : null,
+                ok: okFlag, err: detail.err || ''
+            });
+            if (this._actRecent.length > 15) this._actRecent.length = 15;
+            this._renderActivity(okFlag);
+        }
+
+        _renderActivity(lastOk) {
+            var sr = this.shadowRoot; if (!sr) return;
+            var chip = sr.querySelector('.hud-activity-chip');
+            var r = sr.querySelector('.hud-act-r');
+            var w = sr.querySelector('.hud-act-w');
+            if (!chip) return;
+            if (r) r.textContent = 'R' + this._actR;
+            if (w) w.textContent = 'W' + this._actW;
+            // Error tally only appears once something has failed.
+            var e = chip.querySelector('.hud-act-e');
+            if (this._actErr > 0) {
+                if (!e) { e = document.createElement('span'); e.className = 'hud-act-e'; chip.appendChild(document.createTextNode(' ')); chip.appendChild(e); }
+                e.textContent = '!' + this._actErr;
+            } else if (e) { e.remove(); }
+
+            var last = this._actRecent[0];
+            chip.title = last
+                ? (last.method + ' ' + (last.path || '')
+                   + (last.bytes != null ? ' · ' + AppHud._fmtBytes(last.bytes) : '')
+                   + (last.count != null ? ' · ' + last.count + ' items' : '')
+                   + (last.ms != null ? ' · ' + last.ms + ' ms' : '')
+                   + (last.ok ? '' : ' · FAILED'))
+                : 'Files this app has read / written this session';
+
+            // Flash: add the pulse class, then remove after a beat (CSS transitions it back).
+            chip.classList.remove('pulse-ok', 'pulse-err');
+            // force reflow so a back-to-back event re-triggers the transition
+            void chip.offsetWidth;
+            chip.classList.add(lastOk ? 'pulse-ok' : 'pulse-err');
+            clearTimeout(this._actPulseTimer);
+            this._actPulseTimer = setTimeout(function () {
+                chip.classList.remove('pulse-ok', 'pulse-err');
+            }, 500);
+
+            if (this._actPopOpen) this._renderActivityPop();
+        }
+
+        _renderActivityPop() {
+            var pop = this.shadowRoot && this.shadowRoot.querySelector('.hud-activity-pop');
+            if (!pop) return;
+            var rows = (this._actRecent || []).map(function (o) {
+                var meta = [];
+                if (o.bytes != null) meta.push(AppHud._fmtBytes(o.bytes));
+                if (o.count != null) meta.push(o.count + ' items');
+                if (o.ms != null)    meta.push(o.ms + ' ms');
+                return '<div class="hud-act-row' + (o.ok ? '' : ' hud-act-row--err') + '">'
+                     + '<span class="hud-act-tag hud-act-tag--' + o.kind + '">' + (o.kind === 'r' ? 'R' : 'W') + '</span>'
+                     + '<span class="hud-act-path">' + AppHud._escapeHtml(o.path || o.method) + '</span>'
+                     + '<span class="hud-act-meta">' + AppHud._escapeHtml(meta.join(' · ')) + '</span>'
+                     + '</div>';
+            }).join('');
+            pop.innerHTML = '<div class="hud-priv-head">File activity · this session</div>'
+                + '<div class="hud-act-summary">' + this._actR + ' read · ' + this._actW + ' written'
+                + (this._actErr ? ' · <span class="hud-act-e">' + this._actErr + ' failed</span>' : '') + '</div>'
+                + (rows || '<div class="hud-act-empty">No file activity yet</div>');
+        }
+
+        _toggleActivityPop(force) {
+            var pop  = this.shadowRoot && this.shadowRoot.querySelector('.hud-activity-pop');
+            var chip = this.shadowRoot && this.shadowRoot.querySelector('.hud-activity-chip');
+            if (!pop) return;
+            var open = (typeof force === 'boolean') ? force : (pop.style.display === 'none');
+            if (open) { this._closeOtherPops('.hud-activity-pop'); this._renderActivityPop(); }
+            pop.style.display = open ? '' : 'none';
+            this._actPopOpen = open;
+            if (chip) chip.setAttribute('aria-expanded', open ? 'true' : 'false');
+            this._armOutsideClose(open, () => this._toggleActivityPop(false));
+        }
+
+        static _fmtBytes(n) {
+            if (n == null) return '';
+            if (n < 1024) return n + ' B';
+            if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+            return (n / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
         // Shared one-shot outside-click closer for the ⋯ menu / privs popover. Armed on the
@@ -645,6 +770,12 @@
                 moreWrap.style.display = anyMore ? '' : 'none';
             }
 
+            // Activity meter has no data-gating (it's always meaningful, starts at R0/W0), so
+            // drive its visibility explicitly — both hide AND restore — off the show flag. The
+            // per-element loop above only hides, which wouldn't re-show it on a force-show.
+            var actWrap = sr.querySelector('.hud-activity-wrap');
+            if (actWrap) actWrap.style.display = cfg.show.activity ? '' : 'none';
+
             var navbar = sr.querySelector('.navrow');
             if (navbar) navbar.style.display = cfg.show.navBar ? '' : 'none';
         }
@@ -739,6 +870,47 @@
             cursor: pointer; text-align: left; font-family: inherit;
         }
         .hud-privs-reset:hover { color: #ff8a8a; border-color: rgba(255,107,107,0.4); }
+
+        /* ── File-activity meter (⇅ R N  W N) + expandable popover ────────────────────── */
+        .hud-activity-wrap { position: relative; display: inline-flex; }
+        .hud-activity-chip {
+            font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
+            background: rgba(255,255,255,0.04); color: #8892a4;
+            border: 1px solid #2a2a4a; white-space: nowrap; cursor: pointer;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            transition: border-color 0.45s ease, color 0.45s ease, background 0.45s ease;
+        }
+        .hud-activity-chip:hover { border-color: #4ECDC4; }
+        .hud-act-r { color: #64a0dc; }     /* reads — blue */
+        .hud-act-w { color: #4ECDC4; }     /* writes — teal */
+        .hud-act-e { color: #ff6b6b; font-weight: 700; }   /* errors — red */
+        .hud-activity-chip.pulse-ok  { border-color: #4ECDC4; background: rgba(78,205,196,0.16); }
+        .hud-activity-chip.pulse-err { border-color: #ff6b6b; background: rgba(255,107,107,0.16); }
+        .hud-activity-pop {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            min-width: 240px; max-width: 360px; background: #14142a; border: 1px solid #2a2a4a;
+            border-radius: 6px; padding: 0.35rem; box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+            z-index: 200; display: flex; flex-direction: column; gap: 0.05rem;
+        }
+        .hud-act-summary {
+            font-size: 0.74rem; color: #cbd3e1; padding: 0.15rem 0.45rem 0.35rem;
+            border-bottom: 1px solid #23233f; margin-bottom: 0.2rem;
+        }
+        .hud-act-row {
+            display: flex; align-items: center; gap: 0.4rem;
+            padding: 0.2rem 0.45rem; font-size: 0.74rem; color: #cbd3e1;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+        .hud-act-row--err { color: #ff8a8a; }
+        .hud-act-tag {
+            flex: 0 0 auto; width: 1.1rem; text-align: center; border-radius: 3px;
+            font-size: 0.66rem; font-weight: 700; padding: 0.02rem 0;
+        }
+        .hud-act-tag--r { background: rgba(100,160,220,0.18); color: #64a0dc; }
+        .hud-act-tag--w { background: rgba(78,205,196,0.18); color: #4ECDC4; }
+        .hud-act-path { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hud-act-meta { flex: 0 0 auto; color: rgba(255,255,255,0.4); font-size: 0.68rem; }
+        .hud-act-empty { padding: 0.4rem 0.45rem 0.55rem; color: rgba(255,255,255,0.32); font-style: italic; font-size: 0.74rem; }
 
         /* ── ⋯ overflow menu (Copy link / Print / Debug) ─────────────────────────────── */
         .hud-more-wrap { position: relative; display: inline-flex; }

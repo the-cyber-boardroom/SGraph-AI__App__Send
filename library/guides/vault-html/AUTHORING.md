@@ -380,6 +380,7 @@ declare how much of this chrome they want via `app.json`:
       "copyLink":   true,
       "print":      true,
       "debug":      true,
+      "activity":   true,
       "navBar":     true,
       "navArrows":  true,
       "navPath":    true,
@@ -413,6 +414,14 @@ declare how much of this chrome they want via `app.json`:
 
 `hud.show.*` granular flags override the per-mode defaults. Set to `false` to hide;
 omit to use the default.
+
+**`activity` — the file-activity meter** (`full`-default on, `minimal`/`hidden`/`none` off).
+A compact `⇅ R N  W N` chip in the top row that tallies the files this app has **read**
+(`vfs.read`/`vfs.list`) vs **written** (`vfs.write`/`fs.move`/`fs.delete`/`fs.mkdir`) this
+session, flashes green/red per op, and expands on click to the last 15 ops (path · size ·
+ms · outcome). It's a transparency surface for power users — *"what is this app actually
+touching?"* — so it's only shown in `full` (the mode power users see). Purely passive; it
+doesn't change what the app can do.
 
 ### Sovereignty rail — what apps **cannot** suppress
 
