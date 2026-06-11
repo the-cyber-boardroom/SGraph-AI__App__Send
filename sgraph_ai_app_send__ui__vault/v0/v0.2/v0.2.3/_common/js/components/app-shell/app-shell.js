@@ -1857,6 +1857,15 @@
             var htmlBytes = await this._dataSource.getFileBytes(entry.path);
             var htmlText  = new TextDecoder().decode(htmlBytes);
 
+            // Empty-entry guard. A 0-byte or whitespace-only entry file (e.g. a broken
+            // reassembled app, a failed write, or a placeholder that never got content)
+            // would otherwise mount a blank iframe with NO clue for the user — the worst
+            // case. Catch it here with a clear host-drawn error instead.
+            if (!htmlText || !htmlText.trim()) {
+                this._showError('Entry file "' + entryFile + '" is empty — the app has no content to display.');
+                return;
+            }
+
             // Track html dir for relative path resolution
             this._htmlDir = entry.path.includes('/')
                 ? entry.path.substring(0, entry.path.lastIndexOf('/') + 1) : '';
@@ -2293,17 +2302,30 @@
                 'function _sgDispatch(name,payload){if(!name)return;var a=(_sgEvtH[name]||[]).slice(),i;for(i=0;i<a.length;i++){try{a[i](payload);}catch(_){}}' +
                   'var s=(_sgEvtH["*"]||[]).slice();for(i=0;i<s.length;i++){try{s[i](name,payload);}catch(_){}}}' +
                 'window.addEventListener("message",function(e){if(e&&e.data&&e.data.type==="sg-event")_sgDispatch(e.data.name,e.data.payload);});' +
-                // Body-hidden self-check: if the app never makes its body visible, surface a
+                // Blank-app self-check: if the app never paints anything visible, surface a
                 // hint (mirrors the old same-origin display:none probe, now from inside).
                 //
-                // Delay raised from 0 → 2500 ms (2026-05-31): apps with a typical "hidden
-                // until init JS runs" reveal pattern (Private Health Score is one) hit the
-                // 0-ms check before their reveal had a chance to fire, so the banner showed
-                // a false-positive even when the page later rendered fine. 2.5 s is well past
+                // Detects MORE than display:none — an app can be blank without it: an empty
+                // body (no children), a visibility:hidden / opacity:0 reveal that never fired,
+                // or nothing rendered at all (scrollHeight 0). The previous check only caught
+                // display:none, so an empty/hidden body left the user staring at a blank screen
+                // with no console error and no host clue (the worst case).
+                //
+                // Delay 2500 ms (2026-05-31): apps with a "hidden until init JS runs" reveal
+                // pattern (Private Health Score is one) need time to paint; 2.5 s is well past
                 // every reasonable init time but short enough to still be useful when the app
-                // GENUINELY never reveals. Apps that take >2.5s to first paint should signal
-                // sg-app-ready (see AUTHORING.md) — the banner reflects a real problem then.
-                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{var b=document.body;if(b&&getComputedStyle(b).display==="none"){window.parent.postMessage({type:"sg-app-error",message:"App body is hidden (display:none) — initialisation may have failed."},"*");}}catch(_){}},2500);});' +
+                // GENUINELY never renders. A working app that has painted by then has body
+                // children + non-zero height, so it never trips this — no false positives.
+                'window.addEventListener("DOMContentLoaded",function(){setTimeout(function(){try{' +
+                  'var b=document.body;if(!b)return;' +
+                  'var cs=getComputedStyle(b);' +
+                  'var reason=cs.display==="none"?"hidden (display:none)":' +
+                    '(cs.visibility==="hidden"?"hidden (visibility:hidden)":' +
+                    '(parseFloat(cs.opacity)===0?"hidden (opacity:0)":' +
+                    '(b.children.length===0?"empty (rendered no content)":' +
+                    '((b.scrollHeight||0)<2&&!(b.textContent||"").trim()?"blank (no visible content)":null))));' +
+                  'if(reason){window.parent.postMessage({type:"sg-app-error",message:"App loaded but is showing nothing — "+reason+". Its initialisation may have failed."},"*");}' +
+                '}catch(_){}},2500);});' +
 
                 // Nav intercept: relative .html/.htm links → postMessage to parent.
                 // The extension check runs on the path portion only (strip ?query / #frag) so

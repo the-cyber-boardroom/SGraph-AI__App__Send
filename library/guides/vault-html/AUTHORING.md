@@ -334,6 +334,16 @@ Just use anchor tags. Click handling is intercepted automatically:
 - **Friendly 404** — clicks pointing to files that don't exist (or are inside the
   `.vault/**` floor) land on a host-rendered "Page not found in this vault" overlay
   with a back arrow. You don't need to handle broken-link routing yourself.
+- **Blank-app detection** — if your entry file is empty, the host shows a clear
+  "Entry file is empty" error instead of a blank screen. And ~2.5 s after load, if
+  your `<body>` is still showing nothing (hidden via `display:none`/`visibility`/
+  `opacity:0`, has no children, or rendered zero-height content) the host surfaces a
+  *"App loaded but is showing nothing…"* hint on the HUD. A working app that has
+  painted by then never trips this. **If your app legitimately reveals later than
+  2.5 s** (heavy async init), paint *something* — even a spinner — before then so the
+  hint doesn't fire. (Errors thrown during init are already caught by the host's
+  `window.onerror` bridge and surfaced as an error toast — you don't need to do that
+  yourself.)
 - **Back / forward / Home / Reload / Recent pages** — the SG/App HUD has a browser-style
   nav row above your iframe with all five. The path is editable like a real URL bar
   (click → type a vault-absolute path → Enter to navigate). Apps that used to build
