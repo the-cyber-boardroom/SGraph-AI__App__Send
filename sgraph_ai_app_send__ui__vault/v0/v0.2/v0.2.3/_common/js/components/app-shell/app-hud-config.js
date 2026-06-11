@@ -31,7 +31,7 @@
     // Per-mode defaults for the show.* flags.
     var DEFAULTS_FULL = {
         vaultName:  true,  appTitle:  true,  openVault:  true,  copyLink: true,
-        print:      true,  debug:     true,
+        print:      true,  debug:     true,  activity:   true,
         navBar:     true,  navArrows: true,  navPath:    true,  navRefresh: true,
         navHome:    true
     };
@@ -39,8 +39,9 @@
     var DEFAULTS_MINIMAL = {
         // openVault stays ON in minimal: a stripped HUD still needs a visible way back
         // to the vault file browser (otherwise the user must know to edit the URL).
+        // activity (the read/write meter) is a power-user surface — off in minimal.
         vaultName:  true,  appTitle:  true,  openVault:  true,  copyLink: false,
-        print:      false, debug:     false,
+        print:      false, debug:     false, activity:   false,
         navBar:     false, navArrows: false, navPath:    false, navRefresh: false,
         navHome:    false
     };
