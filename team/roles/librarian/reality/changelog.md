@@ -7,6 +7,19 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-11
+
+Brief-processing session: 22 new human briefs (June 8: 7 docs; June 10: 13 docs + 1 artifact); plus Librarian memo and 10 Issues-FS import documents.
+
+- `index.md` — Version v0.33.16 → v0.33.22; last updated 06/10 → 06/11; docs 617 → 649; PROPOSED 469+ → 496+.
+- **No domain-level reality updates** — all features in the June 8–10 briefs are PROPOSED and do not yet appear in domain index files (they are logged in the master index).
+- **Library additions** — `library/concepts/` created (3 foundational Issues-FS docs imported); `library/guides/agentic-setup/` (3 role coordination docs imported); `team/roles/cartographer/REFERENCE__from-issues-fs.md`, `team/roles/historian/REFERENCE__from-issues-fs.md`, `team/roles/journalist/REFERENCE__from-issues-fs.md` (role reference docs imported).
+
+Master index (06/11): `team/roles/librarian/reviews/06/11/v0.33.22__master-index__briefs-08-10-june-2026.md`
+Processed: 22 new human briefs (June 8–10) + 10 Issues-FS imports | New EXISTS items: 0 | New PROPOSED items: 27
+
+---
+
 ## 2026-06-09
 
 Brief-processing session: 20 new human briefs (06/05: 11 docs; 06/07: 9 docs); plus 6 new code commits (vault-inbox C1/C2/C3 foundation + CLI interop fix + vault refresh fix + rollback fix).
