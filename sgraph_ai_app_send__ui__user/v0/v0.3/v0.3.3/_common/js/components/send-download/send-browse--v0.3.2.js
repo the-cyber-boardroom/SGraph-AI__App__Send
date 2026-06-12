@@ -628,6 +628,60 @@ class SendBrowse extends SendComponent {
         revealBtn.addEventListener('click', function() { _revealInTree(self, fileName); });
         bar.appendChild(revealBtn);
 
+        // ── Copy contents (text-based files only) ───────────────────────
+        // For source / structured-text / markdown / plain-text we offer a one-click
+        // copy of the decoded contents. Suppressed for binary (images, video, pdf,
+        // archives) where copying bytes makes no sense. Heuristic: known textual
+        // FileTypeDetect categories. Falls back to a tab+textarea+document.execCommand
+        // copy when navigator.clipboard isn't available (e.g. insecure context).
+        var _isTextual = (function () {
+            if (type === 'code' || type === 'text' || type === 'markdown' || type === 'csv') return true;
+            if (type === 'html') return true;
+            return false;
+        })();
+        if (_isTextual) {
+            var copyBtn = document.createElement('button');
+            copyBtn.className = 'sb-action-btn sb-file__copy';
+            copyBtn.innerHTML = '&#10697; Copy';
+            copyBtn.title = 'Copy this file’s contents to the clipboard';
+            copyBtn.addEventListener('click', function () {
+                var text;
+                try { text = new TextDecoder().decode(bytes); }
+                catch (_) { copyBtn.innerHTML = '✕ Cannot decode'; return; }
+                var orig = copyBtn.innerHTML;
+                var flash = function (label) {
+                    copyBtn.innerHTML = label;
+                    setTimeout(function () { copyBtn.innerHTML = orig; }, 1600);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text)
+                        .then(function () { flash('&#10003; Copied'); })
+                        .catch(function () {
+                            // Insecure context or permission denied — fall back to a hidden textarea.
+                            try {
+                                var ta = document.createElement('textarea');
+                                ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                                document.body.appendChild(ta); ta.select();
+                                var ok = document.execCommand('copy');
+                                document.body.removeChild(ta);
+                                flash(ok ? '&#10003; Copied' : '✕ Copy blocked');
+                            } catch (_) { flash('✕ Copy blocked'); }
+                        });
+                } else {
+                    // Old browsers / no clipboard API.
+                    try {
+                        var ta2 = document.createElement('textarea');
+                        ta2.value = text; ta2.style.position = 'fixed'; ta2.style.opacity = '0';
+                        document.body.appendChild(ta2); ta2.select();
+                        var ok2 = document.execCommand('copy');
+                        document.body.removeChild(ta2);
+                        flash(ok2 ? '&#10003; Copied' : '✕ Copy blocked');
+                    } catch (_) { flash('✕ Copy blocked'); }
+                }
+            });
+            bar.appendChild(copyBtn);
+        }
+
         // Content area
         var content = document.createElement('div');
         content.className = 'sb-file__content';

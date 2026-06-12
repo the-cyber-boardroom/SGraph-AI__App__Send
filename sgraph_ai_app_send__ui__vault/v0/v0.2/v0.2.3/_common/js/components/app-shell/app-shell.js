@@ -104,7 +104,9 @@
         getDebugState() {
             return {
                 appJson:         this._appJson,
-                writable:        this._writable,
+                writable:        !!(this._writable && this._dataSource && this._dataSource.writable),
+                writableCrypto:  this._writable,
+                writableAuth:    !!(this._dataSource && this._dataSource.writable),
                 entry:           this._appJson && this._appJson.entry ? this._appJson.entry : null,
                 iframeStatus:    this._iframeStatus,
                 resourcesLoaded: this._resourcesLoaded,
@@ -441,11 +443,16 @@
             else if (vaultName) document.title = vaultName + ' — SG/App';
 
             // Notify HUD
+            // isRO covers BOTH the crypto tier (ro-token open, no read_key) AND the auth tier
+            // (full key but no access token → server rejects writes). The HUD should show
+            // "read-only" in either case — surfacing only the crypto state left a key-only
+            // open with no token mis-labelled as writable and the chip absent.
+            var effectiveRO = isRO || !(this._dataSource && this._dataSource.writable);
             this.dispatchEvent(new CustomEvent('app-shell:ready', {
                 bubbles: true, composed: true,
                 detail: {
                     vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey,
-                    isRO: isRO, perm: this._perm,
+                    isRO: effectiveRO, perm: this._perm,
                     hudCfg: (appJson && appJson.hud) || null   // see AppHud._resolveHudCfg
                 }
             }));
@@ -2272,7 +2279,15 @@
         // ── VFS bridge (injected into iframe) ─────────────────────────────────────────
 
         _buildVfsBridgeScript(currentPath) {
-            var writable  = this._writable;
+            // EFFECTIVE writability — match what the bridge ACTUALLY enforces (and what the
+            // SG/Vault editor preview reports via send-browse). Two distinct gates:
+            //   • this._writable      = read_key tier: do we have a full key (not an ro-token)?
+            //   • dataSource.writable = access-token tier: is the server-side write gate open?
+            // Both must be true for a write to land. Reporting only the crypto tier (the old
+            // behaviour) meant a key-only open with no access token surfaced sg.app.writable
+            // as TRUE; the app then tried to write, the host rejected, and the user saw a
+            // red "Read-only vault" error — exactly the parity bug vs the Vault UI preview.
+            var writable  = !!(this._writable && this._dataSource && this._dataSource.writable);
             var vaultName = (this._vault && this._vault.name)     || '';
             var vaultId   = (this._vault && this._vault._vaultId) || '';
             var fileList  = this._dataSource ? this._dataSource.getFileList() : [];
