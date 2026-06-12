@@ -7,6 +7,18 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-12
+
+Code-change-only session: 0 new human briefs; 1 substantive commit since the 06/11 librarian session (VFS write bridge fix + privileges chip colour, v0.33.22 → v0.33.23).
+
+- `ui/index.md` — Added: VFS write bridge base64 chunking fix (chunk 8192→8190, EBADENC diagnostic); privileges chip colour update (default slate, destructive grants amber; popover rows amber not red); last updated 05/31 → 06/12
+- `index.md` — Version v0.33.22 → v0.33.23; last updated 2026-06-11 → 2026-06-12
+
+Master index (06/12): `team/roles/librarian/reviews/06/12/v0.33.23__master-index__no-new-briefs-code-11-june.md`
+Processed: 0 new human briefs | New EXISTS items: 2 (VFS write fix + privileges chip colour) | New PROPOSED items: 0
+
+---
+
 ## 2026-06-11
 
 Brief-processing session: 22 new human briefs (June 8: 7 docs; June 10: 13 docs + 1 artifact); plus Librarian memo and 10 Issues-FS import documents.
