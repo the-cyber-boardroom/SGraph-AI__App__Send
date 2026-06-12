@@ -37,8 +37,15 @@ class VaultEntry extends VaultComponent {
     }
 
     onReady() {
-        // Restore server endpoint — only if a non-default value is stored
-        const savedEndpoint = sessionStorage.getItem('sg-vault-endpoint')
+        // Restore server endpoint — only if a non-default value is stored.
+        // Wrap in try/catch: when this vault is hosted inside a sandboxed (null-origin)
+        // iframe — e.g. a parent vault opening another vault via the embed protocol —
+        // sessionStorage access throws synchronously ("The document is sandboxed and
+        // lacks the 'allow-same-origin' flag."). Without this guard, onReady crashes
+        // BEFORE getCurrentKey() runs and the parent's postMessage handshake never
+        // gets a chance to auto-open the vault.
+        let savedEndpoint = null;
+        try { savedEndpoint = sessionStorage.getItem('sg-vault-endpoint'); } catch (_) {}
         if (savedEndpoint) this._endpointInput.value = savedEndpoint
 
         // Restore access key

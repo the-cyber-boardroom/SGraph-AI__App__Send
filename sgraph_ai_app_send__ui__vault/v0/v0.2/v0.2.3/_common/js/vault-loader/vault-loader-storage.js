@@ -35,7 +35,36 @@
         }
     }
 
+    // --- Null-origin / sandboxed-iframe detection ------------------------------
+    // When this vault loads inside a sandboxed iframe without `allow-same-origin`
+    // (e.g. a parent vault hosting another vault as an embedded app), accessing
+    // localStorage/sessionStorage throws synchronously:
+    //   "Failed to read the 'localStorage' property from 'Window': The document is
+    //    sandboxed and lacks the 'allow-same-origin' flag."
+    // Every getter/setter in this module already swallows that exception, so call
+    // sites that just need a value/silent-no-op don't need to feature-detect. Use
+    // `available()` only when the UI BRANCHES on it (e.g. "show 'remember me'?
+    // hide it if there's no storage"). Cached because feature-detect performs a
+    // round-trip write — cheap, but only once.
+    var _availCache = null;
+    function _detectAvailable() {
+        try {
+            var k = '__sg_storage_probe__';
+            sessionStorage.setItem(k, '1'); sessionStorage.removeItem(k);
+            localStorage.setItem(k, '1');   localStorage.removeItem(k);
+            return true;
+        } catch (_) { return false; }
+    }
+
     globalThis.VaultLoaderStorage = {
+
+        // True when both sessionStorage and localStorage are usable. False in a
+        // null-origin sandboxed iframe (or when the user disabled site storage).
+        // Result is cached after first call.
+        available: function () {
+            if (_availCache === null) _availCache = _detectAvailable();
+            return _availCache;
+        },
 
         // --- Current vault key (per-tab: sessionStorage first, localStorage fallback) ---
         // The vault KEY is per-tab. setCurrentKey writes BOTH sessionStorage (this tab's truth)

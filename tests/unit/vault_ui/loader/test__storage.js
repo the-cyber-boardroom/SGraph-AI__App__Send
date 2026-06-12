@@ -152,3 +152,53 @@ suite('VaultLoader.lock() clears all vault session state', ({ test, before }) =>
         assert.ok(ev, 'vault-locked event emitted');
     });
 });
+
+// ---------------------------------------------------------------------------
+// Null-origin / sandboxed-iframe survival
+// ---------------------------------------------------------------------------
+// When this vault loads inside a sandboxed iframe without `allow-same-origin`
+// (parent vault embedding another vault as an "app"), the browser throws on
+// every storage access. None of the getters/setters may propagate that throw —
+// they must return null / silently no-op. Verifies the contract that lets the
+// vault entry page survive in that context so the parent's postMessage
+// handshake can auto-open without the user typing the key.
+suite('VaultLoaderStorage — survives null-origin (storage throws)', ({ test, before }) => {
+    before(clearVaultStorage);
+
+    function withThrowingStorage(fn) {
+        const origLS = globalThis.localStorage;
+        const origSS = globalThis.sessionStorage;
+        // Define synthetic throwing objects on the global scope, mirroring how
+        // a sandboxed iframe surfaces the failure: getItem/setItem/removeItem
+        // all throw a DOMException-like error.
+        const throwImpl = () => { throw new Error('Sandboxed: lacks allow-same-origin'); };
+        const throwing  = { getItem: throwImpl, setItem: throwImpl, removeItem: throwImpl };
+        try {
+            Object.defineProperty(globalThis, 'localStorage',   { value: throwing, configurable: true });
+            Object.defineProperty(globalThis, 'sessionStorage', { value: throwing, configurable: true });
+            fn();
+        } finally {
+            Object.defineProperty(globalThis, 'localStorage',   { value: origLS, configurable: true });
+            Object.defineProperty(globalThis, 'sessionStorage', { value: origSS, configurable: true });
+        }
+    }
+
+    test('all getters return null instead of throwing', () => {
+        withThrowingStorage(() => {
+            assert.equal(VaultLoader.storage.getCurrentKey(),   null);
+            assert.equal(VaultLoader.storage.getAccessKey(),    null);
+            assert.equal(VaultLoader.storage.getCreatingFlag(), null);
+        });
+    });
+
+    test('all setters silently no-op instead of throwing', () => {
+        withThrowingStorage(() => {
+            VaultLoader.storage.setCurrentKey('apple-river-1234');
+            VaultLoader.storage.setAccessKey('tok');
+            VaultLoader.storage.setCreatingFlag('apple-river-1234');
+            VaultLoader.storage.clearCurrentKey();
+            VaultLoader.storage.clearAccessKey();
+            VaultLoader.storage.clearCreatingFlag();
+        });
+    });
+});
