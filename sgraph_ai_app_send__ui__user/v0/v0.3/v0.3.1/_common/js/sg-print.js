@@ -15,20 +15,30 @@
      On screen: invisible. In print: forces a page break.
 
    v0.3.1 changes over v0.3.0:
-     - @page margin set to 0 (was 2cm 2.5cm) — browser dialog controls margins
      - Screen preview padding reduced from 2cm 2.5cm → 0.8cm 1.2cm
      - Dark inline backgrounds stripped before printing (prevents dark-themed
        HTML blocks from creating dark pages in the PDF output)
      - .page-break CSS support added
+
+   v1.0.3 (2026-06-13) — print margin parity fix:
+     - The printed page used @page { margin: 1cm 1.25cm } while the on-screen
+       preview card used padding 0.8cm 1.2cm, so the PDF margins didn't match
+       what the preview showed (and 1cm top read as cramped). Both now use a
+       single symmetric 1.5cm so the preview is WYSIWYG with the printed output.
    ============================================================================= */
 
 var SgPrint = (function() {
     'use strict';
 
+    // The document margin, used in BOTH places so the screen preview faithfully
+    // represents the printed page: as @page margin in print, and as the preview
+    // card's padding on screen. Keep these in sync — that's the whole point.
+    var PAGE_MARGIN = '1.5cm';
+
     // ─── Print styles (A4-ready, screen preview + print media) ───────────────
     var PRINT_STYLES = [
         '*, *::before, *::after { box-sizing: border-box; }',
-        '@page { margin: 1cm 1.25cm; }',  /* Half original 2cm/2.5cm — user can override with "None" */
+        '@page { margin: ' + PAGE_MARGIN + '; }',   /* user can still override with the dialog's "Margins" control */
         'body {',
         '    font-family: "DM Sans", system-ui, -apple-system, sans-serif;',
         '    font-size: 11pt; line-height: 1.6; color: #1a1a1a; background: #fff;',
@@ -68,7 +78,7 @@ var SgPrint = (function() {
         '    .sg-print-toolbar .btn-close:hover { background: #444; color: #fff; }',
         '    .sg-print-page {',
         '        max-width: 210mm; margin: 24px auto; background: #fff;',
-        '        padding: 0.8cm 1.2cm; box-shadow: 0 2px 12px rgba(0,0,0,0.15);',
+        '        padding: ' + PAGE_MARGIN + '; box-shadow: 0 2px 12px rgba(0,0,0,0.15);',  /* matches @page margin so preview == print */
         '        border-radius: 2px; min-height: 297mm;',
         '    }',
         '    /* Page break marker: dashed line on screen so authors can see it */',
@@ -267,6 +277,6 @@ var SgPrint = (function() {
         printHtml:     printHtml,
         printMarkdown: printMarkdown,
         PRINT_STYLES:  PRINT_STYLES,
-        version:       '1.0.2'
+        version:       '1.0.3'
     };
 })();
