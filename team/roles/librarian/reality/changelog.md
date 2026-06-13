@@ -7,6 +7,18 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-13
+
+Code-change-only session: 0 new human briefs; 3 substantive commits since the 06/12 librarian session (2 missed from June 11, 1 new from June 12). v0.33.23 → v0.33.25.
+
+- `ui/index.md` — Added: EFBIG guard for `sg.vfs.write` (b3987ba3); `sg.app.writable` parity fix + `writableCrypto`/`writableAuth` debug state (0c34e1c9); null-origin localStorage crash fix + `VaultLoaderStorage.available()` (b3987ba3); send-browse v0.3.3 IFD overlay — Copy contents button (0c34e1c9); P-269 presigned-PUT write path (PROPOSED); open item for send-browse _write encoder 8192 chunk bug.
+- `index.md` — Version v0.33.23 → v0.33.25; last updated 2026-06-12 → 2026-06-13; PROPOSED 496+ → 499+.
+
+Master index (06/13): `team/roles/librarian/reviews/06/13/v0.33.25__master-index__code-changes-11-12-june.md`
+Processed: 0 new human briefs | New EXISTS items: 6 | New PROPOSED items: 3 (P-269 + 2 open items)
+
+---
+
 ## 2026-06-12
 
 Code-change-only session: 0 new human briefs; 1 substantive commit since the 06/11 librarian session (VFS write bridge fix + privileges chip colour, v0.33.22 → v0.33.23).
