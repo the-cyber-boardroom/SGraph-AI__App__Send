@@ -7,6 +7,18 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-14
+
+Code-change-only session: 0 new human briefs; 1 substantive commit since the 06/13 librarian session (`c32bfed6`: sg-print WYSIWYG margin parity fix). v0.33.25 → v0.33.26.
+
+- `ui/index.md` — Added `sg-print.js` v1.0.3 entry in the v0.3.1 section: `PAGE_MARGIN` single-constant fix, WYSIWYG screen-preview ↔ print parity, open follow-up for wide-`<pre>` overflow; last updated 06/12 → 06/14.
+- `index.md` — Version v0.33.25 → v0.33.26; last updated 2026-06-13 → 2026-06-14.
+
+Master index (06/14): `team/roles/librarian/reviews/06/14/v0.33.26__master-index__code-changes-13-june.md`
+Processed: 0 new human briefs | New EXISTS items: 1 (sg-print v1.0.3) | New PROPOSED items: 0
+
+---
+
 ## 2026-06-13
 
 Code-change-only session: 0 new human briefs; 3 substantive commits since the 06/12 librarian session (2 missed from June 11, 1 new from June 12). v0.33.23 → v0.33.25.
