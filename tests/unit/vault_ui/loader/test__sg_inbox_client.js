@@ -81,7 +81,7 @@ async function main() {
         const c = client();
         await c.list({ limit: 25 });
         const call = c._fetch.calls[0];
-        ok('list URL is /api/vault/inbox/list/{vault_id}', call.url === 'https://send.example/api/vault/inbox/list/vault1234');
+        ok('list URL is /api/vault/append/list/{vault_id}', call.url === 'https://send.example/api/vault/append/list/vault1234');
         ok('list sends enum-key header', call.headers['x-sgraph-vault-enum-key'] === 'a'.repeat(64));
         ok('list does NOT send write-key', !call.headers['x-sgraph-vault-write-key']);
         ok('list omits include_content by default', call.body.include_content === undefined);
@@ -93,7 +93,7 @@ async function main() {
         const c = client();
         await c.append({ vault_id: 'remote99', append_token: 'deadbeef', payload: new Uint8Array([65, 66, 67]) });
         const call = c._fetch.calls[0];
-        ok('append targets the REMOTE vault_id', call.url === 'https://send.example/api/vault/inbox/append/remote99');
+        ok('append targets the REMOTE vault_id via /write/', call.url === 'https://send.example/api/vault/append/write/remote99');
         ok('append sends NO enum-key header', !call.headers['x-sgraph-vault-enum-key']);
         ok('append sends NO write-key header', !call.headers['x-sgraph-vault-write-key']);
         ok('append sends NO access-token header', !call.headers['x-sgraph-access-token']);
@@ -142,6 +142,15 @@ async function main() {
         let badFolder = null;
         try { await client().purge({ folder: 'nope', inbox: 'h1' }); } catch (e) { badFolder = e; }
         ok('purge rejects bad folder name', badFolder && badFolder.code === 'EINVAL');
+
+        // v0.32.7 rename regression: 'pending' is the new value, 'inbox' is gone.
+        const c3 = client();
+        await c3.purge({ folder: 'pending', inbox: 'h1', file_ids: ['a'] });
+        ok("purge accepts folder 'pending'", c3._fetch.calls.length === 1 && c3._fetch.calls[0].body.folder === 'pending');
+
+        let oldFolder = null;
+        try { await client().purge({ folder: 'inbox', inbox: 'h1' }); } catch (e) { oldFolder = e; }
+        ok("purge rejects retired folder 'inbox' (EINVAL)", oldFolder && oldFolder.code === 'EINVAL');
     }
 
     console.log('\n[suite] SGInbox — HTTP error → coded error mapping');

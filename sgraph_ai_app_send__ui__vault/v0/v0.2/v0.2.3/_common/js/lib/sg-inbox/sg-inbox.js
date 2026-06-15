@@ -1,8 +1,14 @@
 /* =================================================================================
    SGraph Vault Inbox — Transport Client  (Phase C1 — v0.33.5)
 
-   A thin, secret-aware HTTP client for the six append-only inbox endpoints under
-   `/api/vault/inbox/*` (see Routes__Vault__Inbox.py). One method per endpoint.
+   A thin, secret-aware HTTP client for the six append-only endpoints under
+   `/api/vault/append/*` (see Routes__Vault__Append.py). One method per endpoint.
+
+   NOTE (v0.32.7 rename): the server renamed inbox → append. URL paths and the
+   purge folder value are updated here. The CLASS name (SGInbox), file/dir name,
+   the `inbox` body field (intentionally retained server-side — it identifies the
+   token folder), and the host-event names are unchanged in this pass and are
+   tracked as a separate, app-contract-affecting rename increment.
 
    This module is the L1.5 (Vault Native) transport. It holds the gate credentials
    the server expects and attaches the right header per verb:
@@ -10,7 +16,7 @@
      | verb           | endpoint                     | gate header(s)                              |
      |----------------|------------------------------|---------------------------------------------|
      | configure      | POST /configure/{vault_id}   | x-sgraph-vault-write-key + x-sgraph-access-token; body carries enum_key_hash |
-     | append         | POST /append/{vault_id}      | (none — append_token is in the body)        |
+     | append         | POST /write/{vault_id}       | (none — append_token is in the body)        |
      | list           | POST /list/{vault_id}        | x-sgraph-vault-enum-key                      |
      | fetch          | POST /fetch/{vault_id}       | x-sgraph-vault-enum-key                      |
      | markProcessed  | POST /mark-processed/{vid}   | x-sgraph-vault-enum-key                      |
@@ -83,7 +89,7 @@ class SGInbox {
         if (!append_token) throw SGInbox._err('EINVAL', 'append_token required')
         const payload_b64 = (typeof payload === 'string') ? payload : SGInbox._b64(payload)
         if (!payload_b64)  throw SGInbox._err('EINVAL', 'payload required')
-        return this._post(`/append/${vault_id}`, { append_token, payload: payload_b64 }, {})
+        return this._post(`/write/${vault_id}`, { append_token, payload: payload_b64 }, {})    // v0.32.7: /append/ → /write/
     }
 
     async list({ inbox, after_file_id, limit, include_content } = {}) {         // metadata-only by default (cheap; the checker's hot path)
@@ -109,8 +115,8 @@ class SGInbox {
 
     async purge({ folder = 'processed', inbox, file_ids } = {}) {              // owner: delete; empty file_ids + processed = bulk purge
         if (!inbox) throw SGInbox._err('EINVAL', 'inbox required')
-        if (folder !== 'inbox' && folder !== 'processed') {
-            throw SGInbox._err('EINVAL', "folder must be 'inbox' or 'processed'")
+        if (folder !== 'pending' && folder !== 'processed') {                  // v0.32.7: 'inbox' folder value → 'pending'
+            throw SGInbox._err('EINVAL', "folder must be 'pending' or 'processed'")
         }
         if (file_ids) SGInbox._assertBatch(file_ids)
         const body = { folder, inbox }
@@ -135,7 +141,7 @@ class SGInbox {
     // --- Internal POST ----------------------------------------------------------
 
     async _post(path, body, extraHeaders) {
-        const url = `${this.endpoint}/api/vault/inbox${path}`
+        const url = `${this.endpoint}/api/vault/append${path}`                  // v0.32.7: /api/vault/inbox → /api/vault/append
         let res
         try {
             res = await this._fetch(url, {
@@ -160,7 +166,7 @@ class SGInbox {
         if (s === 400) return 'EINVAL'                                          // invalid input
         if (s === 403) return 'EPERM'                                           // gate failed (token/key mismatch)
         if (s === 413) return 'E2BIG'                                           // payload / content too large
-        if (s === 507) return 'ENOSPC'                                          // inbox at capacity
+        if (s === 507) return 'ENOSPC'                                          // append lane at capacity
         return 'EHTTP'
     }
 
