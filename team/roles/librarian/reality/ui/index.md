@@ -108,6 +108,15 @@ drag-drop, multi-file paste, AES-256-GCM, direct + multipart (up to 1GB), 17 loc
 `_common/js/components/send-download/send-browse-v031.js`. Fixes: text selection visibility,
 dark mode background.
 
+**`sg-print.js` (shared print-to-PDF utility — `v0.3.1/_common/js/sg-print.js`)**
+
+Standalone print utility; zero dependencies. Used by the SG/Vault file-viewer Print button and
+`app-shell._onPrint` (both consume the v0.3.1 `_common/` copy). Exposes `SgPrint.printHtml(html, filename)` and `SgPrint.printMarkdown(md, filename)`. Opens a clean print window with a toolbar (Print / Close) on screen, and a branded A4 document on print/PDF.
+
+- **v0.3.1 base**: screen preview padding 0.8cm 1.2cm; dark inline background stripping; `.page-break` CSS support.
+- **v1.0.3 (2026-06-13, commit `c32bfed6`)** — WYSIWYG margin parity fix: single constant `PAGE_MARGIN = '1.5cm'` used as both `@page { margin }` (print) and `.sg-print-page { padding }` (screen preview), so the on-screen preview faithfully matches the printed PDF. Prior to this, the preview used `0.8cm 1.2cm` padding while the actual PDF used `1cm 1.25cm @page` margin — they disagreed, and `1cm` read as cramped. Print media still resets the page element's own padding/margin to 0 so `@page` is the sole margin source (no doubling). **Browser-unverified** — no Save-as-PDF CI pass; fix is code-correct.
+- **Open follow-up (not done):** If output still looks scaled/shifted, the likely cause is wide ASCII `<pre>` diagrams overflowing the page width and triggering Chrome's shrink-to-fit. Separate fix needed (wrap/clip/scale wide `pre` in print media).
+
 **v0.3.2** — IFD overlay on v0.3.0 + v0.3.1. 8 surgical overlay scripts + new secret page.
 - Share a Secret: `<send-secret-view>` Web Component; ephemeral text viewer; kill flow
 - Options Step: `<upload-step-options>` consolidates Delivery + Share into one step (6→5 steps)
