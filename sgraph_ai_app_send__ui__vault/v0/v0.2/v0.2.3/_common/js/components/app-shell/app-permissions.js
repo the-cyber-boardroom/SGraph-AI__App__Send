@@ -107,7 +107,7 @@
         var p     = (appJson && appJson.permissions) || {};
         var fs    = (p.fs    && typeof p.fs    === 'object') ? p.fs    : {};
         var vault = (p.vault && typeof p.vault === 'object') ? p.vault : {};
-        var inbox = (p.inbox && typeof p.inbox === 'object') ? p.inbox : {};
+        var append = (p.append && typeof p.append === 'object') ? p.append : {};
         return {
             consent: _consentPolicy(p.consent),
             fs: {
@@ -129,16 +129,16 @@
                 notify:           vault.notify === true,       // cross-vault peer wake (sg.vault.notify) — bool, default-deny
                 'delete':         vault['delete'] === true     // bool only (always consent-gated)
             },
-            // Inbox transport (sg.inbox.*) — all booleans, default-deny. Not path-scoped:
-            // inbox anchors are server-held, not vault paths. The kernel holds the keys and
+            // Append transport (sg.append.*) — all booleans, default-deny. Not path-scoped:
+            // append anchors are server-held, not vault paths. The kernel holds the keys and
             // attaches the gate headers; these grants decide which verbs an app may call.
-            inbox: {
-                configure:     inbox.configure     === true,
-                append:        inbox.append        === true,
-                list:          inbox.list          === true,
-                read:          inbox.read          === true,   // fetch ciphertext
-                markProcessed: inbox.markProcessed === true,
-                purge:         inbox.purge         === true
+            append: {
+                configure:     append.configure     === true,
+                write:         append.write         === true,
+                list:          append.list          === true,
+                read:          append.read          === true,   // fetch ciphertext
+                markProcessed: append.markProcessed === true,
+                purge:         append.purge         === true
             }
         };
     }
@@ -183,8 +183,8 @@
             if (act === 'notify')           return perm.vault.notify === true;
             return _match(perm.vault[act], path);   // create, createKey, seedFrom, unlink, mount
         }
-        if (grp === 'inbox') {
-            return !!(perm.inbox && perm.inbox[act] === true);   // all booleans, default-deny
+        if (grp === 'append') {
+            return !!(perm.append && perm.append[act] === true);   // all booleans, default-deny
         }
         return false;
     }

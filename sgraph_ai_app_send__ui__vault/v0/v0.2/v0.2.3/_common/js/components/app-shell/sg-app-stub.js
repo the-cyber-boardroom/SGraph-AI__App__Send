@@ -219,7 +219,7 @@
         },
 
         // ── events (kernel→app push; gated kernel-side by app.json.host_events) ──
-        // sg.on('inbox.new-messages', cb) — subscribe. Returns an unsubscribe handle.
+        // sg.on('append.new-messages', cb) — subscribe. Returns an unsubscribe handle.
         // sg.on('*', (name, payload) => ...) — wildcard over events this app may receive.
         // Subscribing for a name the kernel never pushes is a silent no-op.
         on: (name, cb) => {

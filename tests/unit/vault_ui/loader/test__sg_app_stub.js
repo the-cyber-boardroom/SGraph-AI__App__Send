@@ -165,25 +165,25 @@ console.log('\n[suite] sg-app-stub — sg.on / sg.off (kernel→app event channe
     // sg.on(name, cb) subscribes; the gate (host_events) is applied kernel-side, so anything
     // the kernel actually sends should fan out to subscribers here.
     let got = [];
-    const unsub = stubSg.on('inbox.new-messages', (p) => got.push(p));
+    const unsub = stubSg.on('append.new-messages', (p) => got.push(p));
 
-    await kernelCh.send('sg-event', { name: 'inbox.new-messages', payload: { total: 2 } });
+    await kernelCh.send('sg-event', { name: 'append.new-messages', payload: { total: 2 } });
     await new Promise(r => setTimeout(r, 10));   // let the port message round-trip
     ok('E1 sg.on handler fires on a matching sg-event', got.length === 1 && got[0].total === 2);
 
     // A second subscriber for the same name both fire.
     let got2 = 0;
-    stubSg.on('inbox.new-messages', () => got2++);
-    await kernelCh.send('sg-event', { name: 'inbox.new-messages', payload: { total: 3 } });
+    stubSg.on('append.new-messages', () => got2++);
+    await kernelCh.send('sg-event', { name: 'append.new-messages', payload: { total: 3 } });
     await new Promise(r => setTimeout(r, 10));
     ok('E2 multiple subscribers for one name all fire', got.length === 2 && got2 === 1);
 
     // Wildcard receives (name, payload).
     let wild = null;
     stubSg.on('*', (name, payload) => { wild = { name, payload }; });
-    await kernelCh.send('sg-event', { name: 'inbox.error', payload: { code: 'EPERM' } });
+    await kernelCh.send('sg-event', { name: 'append.error', payload: { code: 'EPERM' } });
     await new Promise(r => setTimeout(r, 10));
-    ok('E3 wildcard handler receives (name, payload)', wild && wild.name === 'inbox.error' && wild.payload.code === 'EPERM');
+    ok('E3 wildcard handler receives (name, payload)', wild && wild.name === 'append.error' && wild.payload.code === 'EPERM');
 
     // Events for a name with no subscriber are harmless no-ops (no throw).
     let threw = false;
@@ -196,7 +196,7 @@ console.log('\n[suite] sg-app-stub — sg.on / sg.off (kernel→app event channe
     // off() / the returned unsubscribe handle stops delivery.
     unsub();
     const before = got.length;
-    await kernelCh.send('sg-event', { name: 'inbox.new-messages', payload: { total: 9 } });
+    await kernelCh.send('sg-event', { name: 'append.new-messages', payload: { total: 9 } });
     await new Promise(r => setTimeout(r, 10));
     ok('E5 unsubscribe handle stops the first subscriber', got.length === before);
     ok('E5 the still-subscribed second handler kept firing', got2 === 2);

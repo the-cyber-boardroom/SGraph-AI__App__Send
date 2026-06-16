@@ -10,25 +10,27 @@
    seen-set, and — only when the count or membership changed — emits on the internal
    vault bus (window.sgraphVault.events):
 
-     inbox.new-messages  { total, per_anchor, entries, new_count, trigger, last_check }
+     append.new-messages { total, per_anchor, entries, new_count, trigger, last_check }
                            entries is null unless config.auto_fetch is true.
-     inbox.error         { code, message, http?, trigger }
+     append.error        { code, message, http?, trigger }
 
    C2 emits to the INTERNAL bus only. C3 (the kernel→app event channel) fans these
    out to subscribed apps. Splitting the two means the kernel's own observability
    (debug pane, owner panel) works before any app subscribes.
 
    Duck-typed dependencies (kept decoupled so it is Node-testable with fakes):
-     inbox      — anything with .list({include_content}) and .fetch({inbox,file_ids})
-                  (an SGInbox instance in production).
+     client     — anything with .list({include_content}) and .fetch({inbox,file_ids})
+                  (an SGAppend instance in production). NOTE: the `inbox` arg to
+                  .fetch / the `e.inbox` entry field are the server's token-folder
+                  identifier (retained name), NOT the renamed feature.
      bus        — anything with .emit(name, payload).
      getConfig  — () => ({ enabled:bool, auto_fetch:bool }).
    ================================================================================= */
 
-class SGInboxChecker {
+class SGAppendChecker {
 
-    constructor(inbox, bus, getConfig) {
-        this._inbox     = inbox
+    constructor(client, bus, getConfig) {
+        this._client    = client
         this._bus       = bus
         this._getConfig = getConfig || (() => ({ enabled: false, auto_fetch: false }))
         this._seen      = new Map()                                              // anchor → Set<file_id>
@@ -41,7 +43,7 @@ class SGInboxChecker {
 
         let res
         try {
-            res = await this._inbox.list({ include_content: false })            // cheap: metadata only, the hot path
+            res = await this._client.list({ include_content: false })           // cheap: metadata only, the hot path
         } catch (err) {
             this._emitError(err, trigger)
             return
@@ -61,7 +63,7 @@ class SGInboxChecker {
             fetched = await this._fetchNew(newEntries, trigger)
         }
 
-        this._bus.emit('inbox.new-messages', {
+        this._bus.emit('append.new-messages', {
             total      : entries.length ,
             per_anchor : perAnchor      ,
             entries    : fetched        ,                                        // null when auto_fetch is off
@@ -84,10 +86,10 @@ class SGInboxChecker {
         const fetched = []
         for (const [anchor, anchorEntries] of this._groupByAnchor(newEntries)) {
             const fileIds = anchorEntries.map(e => e.file_id)
-            for (let i = 0; i < fileIds.length; i += 100) {                      // server caps a batch at 100 (INBOX_BATCH_MAX_FILE_IDS)
+            for (let i = 0; i < fileIds.length; i += 100) {                      // server caps a batch at 100 (APPEND_BATCH_MAX_FILE_IDS)
                 const chunk = fileIds.slice(i, i + 100)
                 try {
-                    const fr = await this._inbox.fetch({ inbox: anchor, file_ids: chunk })
+                    const fr = await this._client.fetch({ inbox: anchor, file_ids: chunk })
                     for (const f of (fr && fr.files) || []) {
                         fetched.push(Object.assign({ inbox: anchor }, f))
                     }
@@ -100,7 +102,7 @@ class SGInboxChecker {
     }
 
     _emitError(err, trigger) {
-        this._bus.emit('inbox.error', {
+        this._bus.emit('append.error', {
             code   : (err && err.code) || 'EUNKNOWN',
             message: String((err && err.message) || err),
             http   : err && err.http,
@@ -142,4 +144,4 @@ class SGInboxChecker {
     }
 }
 
-if (typeof globalThis !== 'undefined') globalThis.SGInboxChecker = SGInboxChecker
+if (typeof globalThis !== 'undefined') globalThis.SGAppendChecker = SGAppendChecker

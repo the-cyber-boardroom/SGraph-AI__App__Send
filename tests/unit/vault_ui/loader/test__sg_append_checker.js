@@ -1,4 +1,4 @@
-/* Unit tests — SGInboxChecker (Phase C2, v0.33.5)
+/* Unit tests — SGAppendChecker (Phase C2, v0.33.5)
    Run: node tests/unit/vault_ui/loader/test__sg_inbox_checker.js
 
    No deps. Sources the browser global-scope module via runInThisContext. The checker
@@ -10,11 +10,11 @@ import { fileURLToPath }    from 'node:url';
 import { runInThisContext } from 'node:vm';
 
 const MOD = new URL(
-    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/sg-inbox/sg-inbox-checker.js',
+    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/sg-append/sg-append-checker.js',
     import.meta.url
 );
-runInThisContext(readFileSync(fileURLToPath(MOD), 'utf8'), { filename: 'sg-inbox-checker.js', displayErrors: true });
-const SGInboxChecker = globalThis.SGInboxChecker;
+runInThisContext(readFileSync(fileURLToPath(MOD), 'utf8'), { filename: 'sg-append-checker.js', displayErrors: true });
+const SGAppendChecker = globalThis.SGAppendChecker;
 
 let pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; console.log('  ✓ ' + name); } else { fail++; console.log('  ✗ ' + name); } }
@@ -48,24 +48,24 @@ function fakeBus() {
 const coded = (code, http) => { const e = new Error(code); e.code = code; if (http) e.http = http; return e; };
 
 async function main() {
-    console.log('\n[suite] SGInboxChecker — disabled config is a no-op');
+    console.log('\n[suite] SGAppendChecker — disabled config is a no-op');
     {
         const inbox = fakeInbox(); const bus = fakeBus();
         inbox.state.entries = [entry('h1', '001')];
-        const ck = new SGInboxChecker(inbox, bus, () => ({ enabled: false, auto_fetch: false }));
+        const ck = new SGAppendChecker(inbox, bus, () => ({ enabled: false, auto_fetch: false }));
         await ck.check('vault-open');
         ok('disabled → no list call (no network)', inbox.state.listCalls === 0);
         ok('disabled → no events', bus.events.length === 0);
     }
 
-    console.log('\n[suite] SGInboxChecker — emits on count delta only');
+    console.log('\n[suite] SGAppendChecker — emits on count delta only');
     {
         const inbox = fakeInbox(); const bus = fakeBus();
-        const ck = new SGInboxChecker(inbox, bus, () => ({ enabled: true, auto_fetch: false }));
+        const ck = new SGAppendChecker(inbox, bus, () => ({ enabled: true, auto_fetch: false }));
 
         inbox.state.entries = [entry('h1', '001'), entry('h1', '002')];
         await ck.check('vault-open');
-        ok('first check with entries emits inbox.new-messages', bus.events.length === 1 && bus.events[0].name === 'inbox.new-messages');
+        ok('first check with entries emits append.new-messages', bus.events.length === 1 && bus.events[0].name === 'append.new-messages');
         ok('payload.total counts all entries', bus.events[0].payload.total === 2);
         ok('payload.per_anchor groups by anchor', bus.events[0].payload.per_anchor.h1 === 2);
         ok('payload.new_count = 2 on first sight', bus.events[0].payload.new_count === 2);
@@ -82,10 +82,10 @@ async function main() {
         ok('second emit total = 3', bus.events[1].payload.total === 3);
     }
 
-    console.log('\n[suite] SGInboxChecker — count shrink (processed/purged) re-emits');
+    console.log('\n[suite] SGAppendChecker — count shrink (processed/purged) re-emits');
     {
         const inbox = fakeInbox(); const bus = fakeBus();
-        const ck = new SGInboxChecker(inbox, bus, () => ({ enabled: true, auto_fetch: false }));
+        const ck = new SGAppendChecker(inbox, bus, () => ({ enabled: true, auto_fetch: false }));
         inbox.state.entries = [entry('h1', '001'), entry('h1', '002')];
         await ck.check('open');
         inbox.state.entries = [entry('h1', '002')];                              // 001 processed elsewhere
@@ -98,10 +98,10 @@ async function main() {
         ok('re-arrived id counts as new after being dropped', bus.events[2].payload.new_count === 1);
     }
 
-    console.log('\n[suite] SGInboxChecker — auto_fetch pulls ciphertext');
+    console.log('\n[suite] SGAppendChecker — auto_fetch pulls ciphertext');
     {
         const inbox = fakeInbox(); const bus = fakeBus();
-        const ck = new SGInboxChecker(inbox, bus, () => ({ enabled: true, auto_fetch: true }));
+        const ck = new SGAppendChecker(inbox, bus, () => ({ enabled: true, auto_fetch: true }));
         inbox.state.entries = [entry('h1', '001'), entry('h2', '009')];
         await ck.check('open');
         ok('auto_fetch issues a fetch per anchor', inbox.state.fetchCalls.length === 2);
@@ -111,13 +111,13 @@ async function main() {
         ok('fetched entry carries content', ev.entries[0].content === 'QUJD');
     }
 
-    console.log('\n[suite] SGInboxChecker — error paths emit inbox.error');
+    console.log('\n[suite] SGAppendChecker — error paths emit append.error');
     {
         const inbox = fakeInbox(); const bus = fakeBus();
         inbox.state.failList = coded('EPERM', 403);
-        const ck = new SGInboxChecker(inbox, bus, () => ({ enabled: true, auto_fetch: false }));
+        const ck = new SGAppendChecker(inbox, bus, () => ({ enabled: true, auto_fetch: false }));
         await ck.check('focus');
-        ok('list failure emits inbox.error', bus.events.length === 1 && bus.events[0].name === 'inbox.error');
+        ok('list failure emits append.error', bus.events.length === 1 && bus.events[0].name === 'append.error');
         ok('error carries code', bus.events[0].payload.code === 'EPERM');
         ok('error carries http status', bus.events[0].payload.http === 403);
         ok('error carries trigger', bus.events[0].payload.trigger === 'focus');
@@ -126,17 +126,17 @@ async function main() {
         const inbox2 = fakeInbox(); const bus2 = fakeBus();
         inbox2.state.entries = [entry('h1', '001')];
         inbox2.state.failFetch = coded('EUNREACH');
-        const ck2 = new SGInboxChecker(inbox2, bus2, () => ({ enabled: true, auto_fetch: true }));
+        const ck2 = new SGAppendChecker(inbox2, bus2, () => ({ enabled: true, auto_fetch: true }));
         await ck2.check('open');
         const names = bus2.events.map(e => e.name);
-        ok('fetch failure emits inbox.error', names.includes('inbox.error'));
-        ok('still emits new-messages (partial)', names.includes('inbox.new-messages'));
+        ok('fetch failure emits append.error', names.includes('append.error'));
+        ok('still emits new-messages (partial)', names.includes('append.new-messages'));
     }
 
-    console.log('\n[suite] SGInboxChecker — reset() re-arms the seen-set');
+    console.log('\n[suite] SGAppendChecker — reset() re-arms the seen-set');
     {
         const inbox = fakeInbox(); const bus = fakeBus();
-        const ck = new SGInboxChecker(inbox, bus, () => ({ enabled: true, auto_fetch: false }));
+        const ck = new SGAppendChecker(inbox, bus, () => ({ enabled: true, auto_fetch: false }));
         inbox.state.entries = [entry('h1', '001')];
         await ck.check('open');
         ok('initial emit', bus.events.length === 1);

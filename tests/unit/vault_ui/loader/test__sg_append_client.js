@@ -1,4 +1,4 @@
-/* Unit tests — SGInbox transport client (Phase C1, v0.33.5)
+/* Unit tests — SGAppend transport client (Phase C1, v0.33.5)
    Run: node tests/unit/vault_ui/loader/test__sg_inbox_client.js
 
    No deps. Sources the browser global-scope module via runInThisContext (same pattern
@@ -13,11 +13,11 @@ import { createHash }       from 'node:crypto';
 import { strict as assert } from 'node:assert';
 
 const MOD = new URL(
-    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/sg-inbox/sg-inbox.js',
+    '../../../../sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/lib/sg-append/sg-append.js',
     import.meta.url
 );
-runInThisContext(readFileSync(fileURLToPath(MOD), 'utf8'), { filename: 'sg-inbox.js', displayErrors: true });
-const SGInbox = globalThis.SGInbox;
+runInThisContext(readFileSync(fileURLToPath(MOD), 'utf8'), { filename: 'sg-append.js', displayErrors: true });
+const SGAppend = globalThis.SGAppend;
 
 let pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; console.log('  ✓ ' + name); } else { fail++; console.log('  ✗ ' + name); } }
@@ -35,7 +35,7 @@ function makeFetch(response) {
 }
 
 function client(overrides = {}) {
-    return new SGInbox(Object.assign({
+    return new SGAppend(Object.assign({
         endpoint   : 'https://send.example/',          // trailing slash must be stripped
         vaultId    : 'vault1234',
         enumKey    : 'a'.repeat(64),
@@ -46,10 +46,10 @@ function client(overrides = {}) {
 }
 
 async function main() {
-    console.log('\n[suite] SGInbox — enum_key derivation');
+    console.log('\n[suite] SGAppend — enum_key derivation');
     {
         const bytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
-        const enumKey = await SGInbox.deriveEnumKey(bytes);
+        const enumKey = await SGAppend.deriveEnumKey(bytes);
         // Independent cross-check: SHA256("sg-inbox-enum:" || bytes)
         const expected = createHash('sha256')
             .update(Buffer.concat([Buffer.from('sg-inbox-enum:'), Buffer.from(bytes)]))
@@ -57,26 +57,26 @@ async function main() {
         ok('enum_key matches SHA256("sg-inbox-enum:"||read_key_bytes)', enumKey === expected);
         ok('enum_key is 64 hex chars', /^[0-9a-f]{64}$/.test(enumKey));
 
-        const again = await SGInbox.deriveEnumKey(bytes);
+        const again = await SGAppend.deriveEnumKey(bytes);
         ok('enum_key derivation is deterministic', again === enumKey);
 
-        const other = await SGInbox.deriveEnumKey(new Uint8Array([9, 9, 9]));
+        const other = await SGAppend.deriveEnumKey(new Uint8Array([9, 9, 9]));
         ok('different read_key → different enum_key', other !== enumKey);
 
-        await assert.rejects(() => SGInbox.deriveEnumKey(new Uint8Array(0)), /read_key bytes required/)
+        await assert.rejects(() => SGAppend.deriveEnumKey(new Uint8Array(0)), /read_key bytes required/)
             .then(() => ok('empty read_key rejects (EINVAL)', true))
             .catch(() => ok('empty read_key rejects (EINVAL)', false));
     }
 
-    console.log('\n[suite] SGInbox — enum_key_hash (what configure stores)');
+    console.log('\n[suite] SGAppend — enum_key_hash (what configure stores)');
     {
         const enumKey = 'a'.repeat(64);
-        const hash = await SGInbox.deriveEnumKeyHash(enumKey);
+        const hash = await SGAppend.deriveEnumKeyHash(enumKey);
         const expected = createHash('sha256').update(enumKey).digest('hex');   // server: _hash(presented_key)
         ok('enum_key_hash = SHA256(enum_key_utf8)', hash === expected);
     }
 
-    console.log('\n[suite] SGInbox — list (enum-key header, metadata-only body)');
+    console.log('\n[suite] SGAppend — list (enum-key header, metadata-only body)');
     {
         const c = client();
         await c.list({ limit: 25 });
@@ -88,12 +88,12 @@ async function main() {
         ok('list passes through limit', call.body.limit === 25);
     }
 
-    console.log('\n[suite] SGInbox — append (no auth headers, base64 payload)');
+    console.log('\n[suite] SGAppend — write (no auth headers, base64 payload)');
     {
         const c = client();
-        await c.append({ vault_id: 'remote99', append_token: 'deadbeef', payload: new Uint8Array([65, 66, 67]) });
+        await c.write({ vault_id: 'remote99', append_token: 'deadbeef', payload: new Uint8Array([65, 66, 67]) });
         const call = c._fetch.calls[0];
-        ok('append targets the REMOTE vault_id via /write/', call.url === 'https://send.example/api/vault/append/write/remote99');
+        ok('write targets the REMOTE vault_id via /write/', call.url === 'https://send.example/api/vault/append/write/remote99');
         ok('append sends NO enum-key header', !call.headers['x-sgraph-vault-enum-key']);
         ok('append sends NO write-key header', !call.headers['x-sgraph-vault-write-key']);
         ok('append sends NO access-token header', !call.headers['x-sgraph-access-token']);
@@ -101,11 +101,11 @@ async function main() {
         ok('append passes a string payload through unchanged', true);
 
         const c2 = client();
-        await c2.append({ vault_id: 'r', append_token: 't', payload: 'QUJD' });   // already-b64
+        await c2.write({ vault_id: 'r', append_token: 't', payload: 'QUJD' });   // already-b64
         ok('append leaves a string payload as-is', c2._fetch.calls[0].body.payload === 'QUJD');
     }
 
-    console.log('\n[suite] SGInbox — configure (owner headers + enum_key_hash in body)');
+    console.log('\n[suite] SGAppend — configure (owner headers + enum_key_hash in body)');
     {
         const c = client();
         await c.configure({ append_anchors: ['h1', 'h2'] });
@@ -117,7 +117,7 @@ async function main() {
         ok('configure derives enum_key_hash from enumKey', call.body.enum_key_hash === expectedHash);
     }
 
-    console.log('\n[suite] SGInbox — fetch / markProcessed / purge batch guard (≤100)');
+    console.log('\n[suite] SGAppend — fetch / markProcessed / purge batch guard (≤100)');
     {
         const c = client();
         await c.fetch({ inbox: 'h1', file_ids: ['a', 'b'] });
@@ -153,7 +153,7 @@ async function main() {
         ok("purge rejects retired folder 'inbox' (EINVAL)", oldFolder && oldFolder.code === 'EINVAL');
     }
 
-    console.log('\n[suite] SGInbox — HTTP error → coded error mapping');
+    console.log('\n[suite] SGAppend — HTTP error → coded error mapping');
     {
         const cases = [
             [400, 'EINVAL'], [403, 'EPERM'], [413, 'E2BIG'], [507, 'ENOSPC'], [500, 'EHTTP']
@@ -166,7 +166,7 @@ async function main() {
         }
     }
 
-    console.log('\n[suite] SGInbox — network failure + missing-credential guards');
+    console.log('\n[suite] SGAppend — network failure + missing-credential guards');
     {
         const c = client({ fetchImpl: () => { throw new Error('down'); } });
         let err = null;

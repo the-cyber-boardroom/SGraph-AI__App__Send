@@ -17,7 +17,7 @@ node tests/unit/vault_ui/loader/test__vault_history.js
 node tests/unit/vault_ui/loader/test__ro_record_derivation.js
 node tests/unit/vault_ui/loader/test__sgsend_access_token.js
 node tests/unit/vault_ui/loader/test__app_permissions.js
-node tests/unit/vault_ui/loader/test__app_permissions__inbox.js
+node tests/unit/vault_ui/loader/test__app_permissions__append.js
 node tests/unit/vault_ui/loader/test__app_host_events.js
 node tests/unit/vault_ui/loader/test__secure_channel_envelope.js
 node tests/unit/vault_ui/loader/test__secure_channel.js
@@ -41,8 +41,8 @@ node tests/unit/vault_ui/loader/test__app_shell_nav_helpers.js
 node tests/unit/vault_ui/loader/test__app_hud_config.js
 node tests/unit/vault_ui/loader/test__sgit_diff.js
 node tests/unit/vault_ui/loader/test__embed_protocol.js
-node tests/unit/vault_ui/loader/test__sg_inbox_client.js
-node tests/unit/vault_ui/loader/test__sg_inbox_checker.js
+node tests/unit/vault_ui/loader/test__sg_append_client.js
+node tests/unit/vault_ui/loader/test__sg_append_checker.js
 node tests/unit/vault_ui/loader/test__bundle_freshness.js
 echo ""
 echo "=== All vault unit tests passed ==="
