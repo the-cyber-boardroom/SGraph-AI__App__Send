@@ -22,9 +22,9 @@ console.log('\n[suite] AppHostEvents — parse (default-deny, explicit opt-in)')
     ok('missing host_events → empty set',    AHE.parse({ permissions: {} }).size === 0);
     ok('host_events not an object → empty',  AHE.parse({ host_events: 'nope' }).size === 0);
 
-    const s = AHE.parse({ host_events: { 'inbox.new-messages': true, 'inbox.config-changed': false } });
-    ok('true entry is allowed',              s.has('inbox.new-messages'));
-    ok('false entry is NOT allowed',        !s.has('inbox.config-changed'));
+    const s = AHE.parse({ host_events: { 'append.new-messages': true, 'append.config-changed': false } });
+    ok('true entry is allowed',              s.has('append.new-messages'));
+    ok('false entry is NOT allowed',        !s.has('append.config-changed'));
     ok('only the true entry is present',     s.size === 1);
 
     const truthy = AHE.parse({ host_events: { 'a.b': 1, 'c.d': 'yes', 'e.f': true } });
@@ -36,7 +36,7 @@ console.log('\n[suite] AppHostEvents — parse (default-deny, explicit opt-in)')
 console.log('\n[suite] AppHostEvents — name validation (no wildcards, no junk)');
 {
     const s = AHE.parse({ host_events: {
-        'inbox.new-messages': true,   // ok
+        'append.new-messages': true,   // ok
         'vault.commits-behind': true, // ok (hyphen)
         'a_b.c': true,                // ok (underscore)
         '*': true,                    // rejected — no wildcard in the allowlist
@@ -46,7 +46,7 @@ console.log('\n[suite] AppHostEvents — name validation (no wildcards, no junk)
         '.bad': true,                 // rejected — leading dot
         '': true                      // rejected — empty
     }});
-    ok('dotted lowercase allowed',     s.has('inbox.new-messages'));
+    ok('dotted lowercase allowed',     s.has('append.new-messages'));
     ok('hyphen allowed',               s.has('vault.commits-behind'));
     ok('underscore allowed',           s.has('a_b.c'));
     ok('bare "*" rejected',           !s.has('*'));
@@ -59,9 +59,9 @@ console.log('\n[suite] AppHostEvents — name validation (no wildcards, no junk)
 
 console.log('\n[suite] AppHostEvents — allows()');
 {
-    const s = AHE.parse({ host_events: { 'inbox.new-messages': true } });
-    ok('allows allowed name',         AHE.allows(s, 'inbox.new-messages') === true);
-    ok('denies unknown name',         AHE.allows(s, 'inbox.config-changed') === false);
+    const s = AHE.parse({ host_events: { 'append.new-messages': true } });
+    ok('allows allowed name',         AHE.allows(s, 'append.new-messages') === true);
+    ok('denies unknown name',         AHE.allows(s, 'append.config-changed') === false);
     ok('denies wildcard probe',       AHE.allows(s, '*') === false);
     ok('null set → false',            AHE.allows(null, 'x') === false);
 }
