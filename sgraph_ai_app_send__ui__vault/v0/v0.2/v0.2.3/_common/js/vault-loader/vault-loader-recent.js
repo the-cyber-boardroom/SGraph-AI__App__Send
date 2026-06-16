@@ -29,7 +29,11 @@
     var KEY_LEGACY_H  = 'sg-vault-history';
     var KEY_LEGACY_P  = 'sg-vault-picker:credentials';
     var KEY_MIGRATED  = 'sg-vault-recent:migrated-at';
-    var MAX_ENTRIES   = 20;
+    // Storage cap. Bounded (not unlimited) so a runaway caller can't grow localStorage
+    // without limit — but high enough to be "effectively no limit" for a human's vault
+    // list (200 small entries ≈ ~30 KB, far under the ~5 MB quota). Raised from 20 so the
+    // landing page can show the full history instead of silently dropping older vaults.
+    var MAX_ENTRIES   = 200;
 
     function _read() {
         try { return JSON.parse(localStorage.getItem(KEY_RECENT) || '[]'); }
