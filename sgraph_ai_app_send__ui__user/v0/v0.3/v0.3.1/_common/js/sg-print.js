@@ -25,20 +25,38 @@
        preview card used padding 0.8cm 1.2cm, so the PDF margins didn't match
        what the preview showed (and 1cm top read as cramped). Both now use a
        single symmetric 1.5cm so the preview is WYSIWYG with the printed output.
+
+   v1.0.4 (2026-06-15) — dialog "Margins: None" must actually work:
+     - The browser's print dialog Margins dropdown is the authoritative control
+       for the PRINTED page margin. CSS @page rules compete with that dropdown,
+       and in practice the override is fragile (Chrome/Edge/Firefox sometimes
+       keep the CSS margin even when "None" is selected). Result: users who
+       wanted edge-to-edge PDFs were stuck with the CSS @page 1.5cm margin —
+       Scale had no effect because the margin sits outside scaled content.
+     - Fix: set @page margin to 0 and let the dialog be the only source of
+       print margin. "Default" → browser default (~1 cm). "None" → 0 → genuinely
+       edge-to-edge. "Custom" → exactly the value typed.
+     - Preview vs print: the on-screen preview card keeps 1.5cm padding for
+       readability — it represents "what a typical printed page looks like with
+       the Default dialog setting" rather than predicting the user's specific
+       dialog choice. Layout / typography / line breaks stay WYSIWYG; only the
+       outer page margin now depends on the dialog.
+     - Belt-and-suspenders: html/body padding/margin explicitly zeroed in print
+       with !important so no UA or content-side rule can re-introduce them.
    ============================================================================= */
 
 var SgPrint = (function() {
     'use strict';
 
-    // The document margin, used in BOTH places so the screen preview faithfully
-    // represents the printed page: as @page margin in print, and as the preview
-    // card's padding on screen. Keep these in sync — that's the whole point.
-    var PAGE_MARGIN = '1.5cm';
+    // On-screen preview card padding — a display convenience, not a print
+    // prediction. The printed PDF's outer margin is controlled exclusively by
+    // the browser's print dialog (the Margins dropdown).
+    var PREVIEW_PADDING = '1.5cm';
 
     // ─── Print styles (A4-ready, screen preview + print media) ───────────────
     var PRINT_STYLES = [
         '*, *::before, *::after { box-sizing: border-box; }',
-        '@page { margin: ' + PAGE_MARGIN + '; }',   /* user can still override with the dialog's "Margins" control */
+        '@page { margin: 0; }',   /* the browser dialog\'s Margins dropdown is authoritative; CSS does not compete */
         'body {',
         '    font-family: "DM Sans", system-ui, -apple-system, sans-serif;',
         '    font-size: 11pt; line-height: 1.6; color: #1a1a1a; background: #fff;',
@@ -78,7 +96,7 @@ var SgPrint = (function() {
         '    .sg-print-toolbar .btn-close:hover { background: #444; color: #fff; }',
         '    .sg-print-page {',
         '        max-width: 210mm; margin: 24px auto; background: #fff;',
-        '        padding: ' + PAGE_MARGIN + '; box-shadow: 0 2px 12px rgba(0,0,0,0.15);',  /* matches @page margin so preview == print */
+        '        padding: ' + PREVIEW_PADDING + '; box-shadow: 0 2px 12px rgba(0,0,0,0.15);',  /* screen-only readability — print uses dialog margin */
         '        border-radius: 2px; min-height: 297mm;',
         '    }',
         '    /* Page break marker: dashed line on screen so authors can see it */',
@@ -90,8 +108,12 @@ var SgPrint = (function() {
         '    .md-frontmatter { display: flex !important; }',
         '}',
         '@media print {',
+        '    /* The dialog\'s Margins dropdown is the sole source of print margins. We zero',
+        '       everything inside the document with !important so no UA default or content-side',
+        '       reset can re-introduce visible borders inside the printable area. */',
+        '    html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }',
         '    .sg-print-toolbar { display: none !important; }',
-        '    .sg-print-page { max-width: none; margin: 0; padding: 0; box-shadow: none; border-radius: 0; min-height: auto; }',
+        '    .sg-print-page { max-width: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; min-height: auto !important; background: #fff !important; }',
         '    /* Page break: invisible in print but forces a new page */',
         '    .page-break { display: block; page-break-after: always; break-after: page; height: 0; border: none; }',
         '    /* md-pb-marker: becomes a zero-height page-break trigger in print */',
@@ -277,6 +299,6 @@ var SgPrint = (function() {
         printHtml:     printHtml,
         printMarkdown: printMarkdown,
         PRINT_STYLES:  PRINT_STYLES,
-        version:       '1.0.3'
+        version:       '1.0.4'
     };
 })();
