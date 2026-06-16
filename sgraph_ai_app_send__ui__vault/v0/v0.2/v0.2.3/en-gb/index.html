@@ -301,6 +301,9 @@
     .vp-vault-card__new-win { right: 2rem; }
     .vp-vault-card:hover .vp-vault-card__del,
     .vp-vault-card:hover .vp-vault-card__new-win { opacity: 1; }
+    /* Manage mode: pin the × remove buttons visible so they're discoverable
+       (and usable on touch, where there's no hover). Non-destructive. */
+    .vp-recent--managing .vp-vault-card__del { opacity: 1; color: #e06c75; }
     .vp-vault-card__del:hover { color: #e06c75; background: rgba(224,108,117,0.1); }
     .vp-vault-card__new-win:hover { color: #4ecdc4; background: rgba(78,205,196,0.08); }
     .vp-vault-card--current { border-color: rgba(78,205,196,0.4); background: var(--teal-dim); }
@@ -759,17 +762,26 @@
     }
 
     /* ── Recent vaults ────────────────────────────────────────────────── */
+    // Manage mode is a NON-destructive toggle: it just pins the per-card × remove
+    // buttons visible so the user can delete individual vaults deliberately. It does
+    // NOT clear the list. (The "manage" link used to call clear() and wipe every
+    // recent vault with no confirmation — a data-loss footgun. Removed.)
+    var _managing = false;
     function _renderRecentVaults() {
         var list    = VaultLoaderRecent.list();
         var section = document.getElementById('recentSection');
         var grid    = document.getElementById('vaultGrid');
         var mgr     = document.getElementById('manageLink');
 
-        if (list.length === 0) { section.style.display = 'none'; return; }
+        if (list.length === 0) { section.style.display = 'none'; _managing = false; return; }
         section.style.display = '';
-        if (mgr) mgr.textContent = list.length + ' vault' + (list.length !== 1 ? 's' : '') + ' · manage ›';
+        section.classList.toggle('vp-recent--managing', _managing);
+        var countTxt = list.length + ' vault' + (list.length !== 1 ? 's' : '');
+        if (mgr) mgr.textContent = _managing ? (countTxt + ' · done') : (countTxt + ' · manage ›');
 
-        grid.innerHTML = list.slice(0, 12).map(function (v) {
+        // Show every stored vault (no display cap). The list is already bounded by
+        // VaultLoaderRecent's storage cap; the page scrolls if there are many.
+        grid.innerHTML = list.map(function (v) {
             var cls = 'vp-vault-card' + (v.isCurrent ? ' vp-vault-card--current' : '');
             return '<div class="' + cls + '" data-key="' + _esc(v.key) + '">' +
                 '<div class="vp-vault-card__name">' + _esc(v.name) + '</div>' +
@@ -920,7 +932,8 @@
     document.getElementById('createLink').addEventListener('click', _startCreate);
     document.getElementById('createCtaBtn').addEventListener('click', _startCreate);
     document.getElementById('manageLink').addEventListener('click', function () {
-        VaultLoaderRecent.clear();
+        // Toggle manage mode (reveals per-card × buttons). Non-destructive — never clears.
+        _managing = !_managing;
         _renderRecentVaults();
     });
 
