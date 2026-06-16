@@ -463,6 +463,25 @@ Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-
 
 ---
 
+### SGit View — Commit Detail + Diff (2026-06-15)
+
+The `<vault-sgit-view>` History tab (`vault-sgit-view--history.js`, two-track diverged graph)
+gains a **"diff" link** on every commit row → a first-class **commit-detail screen**
+(`vault-sgit-view--commit.js`) with:
+- **Changed-files list** — set-diff of the commit's tree vs its first parent's, flattened to
+  `Map<path, content_hash>` and compared by hash. **Zero blob reads** (the hash is already in
+  the decrypted tree entry): added / modified / removed, with free byte-size deltas from tree
+  entry sizes. Sorted added→modified→removed.
+- **Per-file unified diff** — lazy (blobs read + `read_key`-decrypted only on expand), rendered
+  as `@@` hunks with +/− gutters. Binary (non-UTF-8) and over-cap (>2000 lines/side) files are
+  flagged, not diffed.
+- **Copy patch** — assembles a git-style unified diff across all changed files.
+- Diff engine is a pure, DOM-free `SgitDiff` (`sgit-diff.js`, LCS → hunks) — **18 unit tests**
+  (`test__sgit_diff.js`); commit-view runtime verified via jsdom smoke (tree-flatten → change
+  list → lazy diff → collapse, root-commit-all-added). Merge commits diff against `parents[0]`.
+  RO-token sessions (no `read_key`) can't decrypt → no diff. Loaded on `index.html` +
+  `en-gb/browse/index.html`; not in the kernel bundle.
+
 ### Other Vault UI Improvements (05/25–26)
 
 | Feature | Status | Commit |

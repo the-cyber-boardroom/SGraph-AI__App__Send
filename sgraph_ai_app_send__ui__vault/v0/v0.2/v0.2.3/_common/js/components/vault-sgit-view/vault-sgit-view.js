@@ -23,8 +23,9 @@
             super();
             this._vault          = null;
             this._commitCache    = new Map();
-            this._activeTab      = 'history';    // 'history' | 'refs' | 'tree' | 'branches' | 'status' | 'repair' | 'object'
+            this._activeTab      = 'history';    // 'history' | 'refs' | 'tree' | 'branches' | 'status' | 'repair' | 'object' | 'commit'
             this._objectViewData = null;
+            this._commitViewData = null;
         }
 
         set vault(v) { this._vault = v; }
@@ -54,6 +55,20 @@
             this.addEventListener('click', (e) => {
                 const tab = e.target.closest('.sgit-tab');
                 if (tab) { this._switchTab(tab.dataset.tab); return; }
+
+                // Commit-detail / diff entry point. Checked BEFORE .sgit-obj-link because the
+                // "diff" link carries both classes — without this, clicking it would open the
+                // raw object viewer instead of the commit diff.
+                const diffLink = e.target.closest('.sgit-commit-diff-link');
+                if (diffLink) { e.preventDefault(); this._openCommit(diffLink.dataset.id); return; }
+
+                // Commit-detail: expand/collapse a file's inline diff.
+                const fileHead = e.target.closest('.sgit-cd-file-head');
+                if (fileHead) { this._toggleFileDiff(fileHead.dataset.fidx); return; }
+
+                // Commit-detail: copy all changes as a unified patch.
+                const copyBtn = e.target.closest('.sgit-cd-copy-btn');
+                if (copyBtn) { this._copyCommitPatch(); return; }
 
                 const objLink = e.target.closest('.sgit-obj-link');
                 if (objLink) { e.preventDefault(); this._loadObject(objLink.dataset.id); return; }
@@ -85,7 +100,9 @@
         // --- Tab Switching -------------------------------------------------------
 
         _switchTab(tabId) {
-            if (tabId !== 'object') this._prevTab = tabId;
+            // 'object' and 'commit' are drill-in screens, not real tabs — don't record
+            // them as the back target, so Back returns to the list the user came from.
+            if (tabId !== 'object' && tabId !== 'commit') this._prevTab = tabId;
             this._activeTab = tabId;
 
             this.querySelectorAll('.sgit-tab').forEach(t => {
@@ -103,6 +120,7 @@
                 case 'status':   this._renderStatus(body);   break;
                 case 'repair':   this._renderRepair(body);   break;
                 case 'object':   this._renderObject(body);   break;
+                case 'commit':   this._renderCommitDetail(body); break;
             }
         }
 
@@ -318,6 +336,47 @@
         .sgit-tree-icon { flex-shrink: 0; font-size: 0.875rem; }
         .sgit-tree-name { font-family: var(--font-mono); color: var(--color-text); }
         .sgit-tree-meta { font-family: var(--font-mono); color: var(--color-text-secondary); font-size: 0.625rem; margin-left: 0.5rem; }
+
+        /* --- Commit Detail + Diff --- */
+        .sgit-cd-copy-btn { font-size: var(--text-small); padding: 0.2rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family); white-space: nowrap; }
+        .sgit-cd-copy-btn:hover { background: var(--bg-secondary); color: var(--color-text); border-color: var(--color-primary); }
+        .sgit-cd-checkout { opacity: 1; margin-left: 0; }
+        .sgit-cd-meta { margin-bottom: 0.75rem; }
+        .sgit-cd-message { font-size: var(--text-sm); color: var(--color-text); white-space: pre-wrap; word-break: break-word; margin-bottom: 0.375rem; }
+        .sgit-cd-meta-kv { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; font-size: var(--text-small); color: var(--color-text-secondary); font-family: var(--font-mono); }
+        .sgit-cd-dot { opacity: 0.5; }
+        .sgit-cd-muted { color: var(--color-text-secondary); opacity: 0.7; }
+        .sgit-cd-summary { display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: var(--text-small); margin-bottom: 0.625rem; padding-bottom: 0.625rem; border-bottom: 1px solid var(--color-border); }
+        .sgit-cd-sum { font-weight: 600; font-family: var(--font-mono); }
+        .sgit-cd-sum--added    { color: #4ECDC4; }
+        .sgit-cd-sum--modified { color: #E9C445; }
+        .sgit-cd-sum--removed  { color: #E94560; }
+
+        .sgit-cd-files { display: flex; flex-direction: column; gap: 0.25rem; }
+        .sgit-cd-file { border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden; background: var(--bg-surface); }
+        .sgit-cd-file-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.625rem; cursor: pointer; font-size: var(--text-small); }
+        .sgit-cd-file-head:hover { background: var(--bg-secondary); }
+        .sgit-cd-file-head:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+        .sgit-cd-chevron { font-size: 0.6rem; color: var(--color-text-secondary); width: 0.75rem; flex-shrink: 0; }
+        .sgit-cd-stat { font-family: var(--font-mono); font-weight: 700; width: 1rem; text-align: center; flex-shrink: 0; }
+        .sgit-cd-stat--added    { color: #4ECDC4; }
+        .sgit-cd-stat--modified { color: #E9C445; }
+        .sgit-cd-stat--removed  { color: #E94560; }
+        .sgit-cd-path { font-family: var(--font-mono); color: var(--color-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sgit-cd-size { font-family: var(--font-mono); font-size: 0.625rem; color: var(--color-text-secondary); flex-shrink: 0; }
+        .sgit-cd-filediff { border-top: 1px solid var(--color-border); }
+        .sgit-cd-diff-loading, .sgit-cd-binary, .sgit-cd-nochange { padding: 0.5rem 0.75rem; font-size: var(--text-small); color: var(--color-text-secondary); }
+
+        .sgit-difflines { font-family: var(--font-mono); font-size: 0.6875rem; line-height: 1.5; overflow-x: auto; background: var(--bg-secondary); }
+        .sgit-dl { display: flex; white-space: pre; }
+        .sgit-dl-gutter { width: 1.25rem; flex-shrink: 0; text-align: center; color: var(--color-text-secondary); opacity: 0.7; user-select: none; }
+        .sgit-dl-text { flex: 1; padding-right: 0.5rem; }
+        .sgit-dl--hunk { color: #45b7d1; background: rgba(69,183,209,0.08); }
+        .sgit-dl--add  { background: rgba(78,205,196,0.10); }
+        .sgit-dl--add  .sgit-dl-gutter { color: #4ECDC4; }
+        .sgit-dl--del  { background: rgba(233,69,96,0.10); }
+        .sgit-dl--del  .sgit-dl-gutter { color: #E94560; }
+        .sgit-dl--ctx  .sgit-dl-text { color: var(--color-text-secondary); }
     `;
 
     // Expose globally so companion modules (vault-sgit-view--*.js) can extend the prototype
