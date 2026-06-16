@@ -7,6 +7,25 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-16
+
+Brief-recovery session: 20 human brief files from 06/11 and 06/13 processed for the first time
+(missed by sessions 06/13 through 06/15 which incorrectly reported those folders as non-existent).
+Version v0.33.26 unchanged. No new EXISTS items (code verification outstanding for vault-creates-vault
+and access-key-embedded). 23+ new PROPOSED items registered.
+
+- `index.md` — Document count 649 → 669 (+20 briefs); PROPOSED count 499+ → 522+; last updated 2026-06-14 → 2026-06-16.
+- No domain `index.md` files updated (no new code-verified EXISTS items this session).
+- PROPOSED items distributed across: `ai-agents/`, `vault/`, `ui/`, `send-api/`, `tools/`, `website/`, `alchemist/` (not yet written to domain files; catalogued in master index).
+
+Master index (06/16): `team/roles/librarian/reviews/06/16/v0.33.26__master-index__briefs-11-13-june-2026.md`
+Processed: 20 new human briefs | New EXISTS items: 0 | New PROPOSED items: 23+
+
+Key open items: OQ-vault-creates-vault-1 (must be code-verified), OQ-audio-transcribe-1,
+OQ-access-key-embedded-1.
+
+---
+
 ## 2026-06-14
 
 Code-change-only session: 0 new human briefs; 1 substantive commit since the 06/13 librarian session (`c32bfed6`: sg-print WYSIWYG margin parity fix). v0.33.25 → v0.33.26.
