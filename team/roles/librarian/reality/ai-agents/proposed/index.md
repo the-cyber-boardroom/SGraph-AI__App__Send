@@ -280,3 +280,29 @@ Items below are the ai-agents-specific cross-domain entries from the NHI 2.0 ser
 | P-325 | Multi-identity agent chains | Signed, encrypted agent chains using vault inbox; per-agent identities and keys; capability limited by code — see identity/proposed P-325 | 06/04 arch-brief (multiple-identities) |
 | P-328 | Agent trust scoring and web of trust | Trust by connectivity; agent trust scores built over time; distributed identity — see identity/proposed P-328 | 06/04 arch-brief (trust-and-identity) |
 | P-332 | Skills-with-identity model | A skill bundles its own identity and permission set; joiner-mover-leaver lifecycle — see identity/proposed P-332 | 06/04 arch-brief (skills-and-permissions) |
+
+---
+
+## Archiver-Cataloguer Pattern (06/15 briefs, v0.33.27)
+
+All items below are PROPOSED — does not exist yet. Primitives are EXISTS (vault inbox, ephemeral compute, two-key model, vault CAS).
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-238 | Archiver-cataloguer generic workflow | Append to vault (two-key gating) → debounced trigger → ephemeral compute spins up → agent reads, catalogues, copies, appends, acts → result placed back in vault → ephemeral compute disappears | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-239 | Two-key-plus-authorised-keys ingestion gate | Ingestion gated by vault's accept-list of sender public keys; submitter must encrypt with vault PK and sign with sender PK; only pre-approved keys may append | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-240 | Debounced ephemeral-compute trigger | Interval or on-append trigger with debounce window to avoid multiple invocations from rapid successive uploads; per-use-case configurable | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-241 | Multi-vault chaining for cataloguer isolation | Source vault → cataloguing vault (transforms only; no full data access) → destination vault(s); prompt-injection blast radius limited to the cataloguing stage; enables multiple recipients without a single uber-vault | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-242 | Per-use-case cataloguing rules engine | Schema-based (not free-form prompt) rules defining what the agent does per use case: cataloguing, copying, appending, acting; one rules definition per deployment | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-243 | Transaction log archiving use case | Append-mode log entries → ephemeral compute → catalogued and indexed in destination vault; first use case (proves the generic loop) | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-244 | Email and agent-messaging archiving use case | Incoming EML + sidecar → catalogued `mail/` tree in vault; agent-to-agent message ingestion path | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-245 | Drag-drop file indexing (short-term and long-term modes) | Short-term: rapid indexing of dropped files in session vault; long-term: retention into Encrypted Spaces or persistent vault (depends on Encrypted Spaces PROPOSED); two distinct retention modes | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-246 | Research ingestion use case | Document drops → chunked, catalogued knowledge base in destination vault; research ingestion pipeline | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+
+## Agentic Incident-Response Service (06/15 strategy brief, v0.33.27)
+
+This is a service concept, not a build. No code deliverable until the workflow map is produced.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-247 | Agentic compromise incident-response service | "Who you gonna call" service for users whose privileged AI agents are compromised; rootkit-style threat model (access, resources, credentials, persistence); when-not-if posture; rebuild-reset-monitor remediation; aligned with security companies; SGraph offering vs separate venture open; next step is workflow map | 06/15 strategy-brief (agentic-compromise-incident-response) |
