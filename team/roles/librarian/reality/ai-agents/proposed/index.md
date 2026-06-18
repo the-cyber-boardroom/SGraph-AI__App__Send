@@ -280,3 +280,29 @@ Items below are the ai-agents-specific cross-domain entries from the NHI 2.0 ser
 | P-325 | Multi-identity agent chains | Signed, encrypted agent chains using vault inbox; per-agent identities and keys; capability limited by code — see identity/proposed P-325 | 06/04 arch-brief (multiple-identities) |
 | P-328 | Agent trust scoring and web of trust | Trust by connectivity; agent trust scores built over time; distributed identity — see identity/proposed P-328 | 06/04 arch-brief (trust-and-identity) |
 | P-332 | Skills-with-identity model | A skill bundles its own identity and permission set; joiner-mover-leaver lifecycle — see identity/proposed P-332 | 06/04 arch-brief (skills-and-permissions) |
+
+---
+
+## Archiver-Cataloguer Pattern (06/15 briefs — docs from v0.33.27)
+
+All items below are PROPOSED — does not exist yet. The append capability and ephemeral-compute primitives exist; the cataloguing pattern and multi-vault chaining are new.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-347 | Archiver-cataloguer workflow | Authorised entity appends to vault → debounced trigger → ephemeral compute given vault/comms key → agent catalogues/copies/appends/acts → result placed back in vault → compute disappears | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-348 | Two-key gating for archiver ingestion | Vault public key encrypts; sender public key signs; authorised-keys allow-list; only pre-approved entities may submit | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-349 | Multi-vault chaining for cataloguer isolation | Source vault → cataloguing vault (process/filter/index only) → destination vault(s); cataloguer cannot read destination data; enables multiple recipients; defends against prompt injection | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-350 | Archiver use case: transaction and activity logs | Servers/AWS/cloud logs appended to log vault; agent indexes, classifies, summarises; versioned auditable archive | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-351 | Archiver use case: emails and agent messaging | Email/inbox vault; agent threads, classifies, extracts, files; dovetails with email-FS-Lite inter-agent messaging | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-352 | Archiver use case: drag-and-drop file indexing | User drops files → catalogued and indexed into vault; short-term access mode and long-term storage mode | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-353 | Archiver use case: observability and usage logs | Tools' usage logs appended to observability vault; agent aggregates stats with provenance | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-354 | Archiver use case: research and document ingestion | Source documents appended to vault; agent catalogues, classifies, links to evidence; feeds agentic content website | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+
+## Semantic Graph User-Finding (06/15 briefs — v0.33.27)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-355 | Public capability graph for Audio Transcribe | Semantic graph of what the tool does and uses (models, audio, OpenRouter, workflows, live feature); shareable as a use case | 06/15 strategy-brief (finding-early-users) |
+| P-356 | Five-lens user-finding mesh | Capability + outreach + buyer + investor + partnership lenses intersected over same subject; identifies who to reach on which channel with what message | 06/15 strategy-brief (finding-early-users) |
+| P-357 | Public-to-private LinkedIn join | Public capability graph joined privately to project lead's LinkedIn data; the public-to-private flow made concrete | 06/15 strategy-brief (finding-early-users) |
+

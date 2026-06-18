@@ -227,3 +227,22 @@ All items below are PROPOSED — does not exist yet.
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
 | P-197 | MyFeeds three-primitives publishing architecture | Vault (portable, encrypted), storage substrate (server/S3/ephemeral/zip), management layer (vault-of-vaults holding keys + workflow state); hybrid static + ephemeral recommended; 8-phase delivery | doc 437 |
+
+---
+
+## SG/Relay — Vault Routing Service (06/16 briefs — implementation pack v0.32.4)
+
+All items below are PROPOSED — does not exist yet. The vault inbox foundation EXISTS (shipped v0.29.1).
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-337 | SG/Relay routing core | Content-blind stateless relay; ports-and-adapters; receive→route→dedup→fan-out→send; `Envelope` Type_Safe schema; dedup cursor; separate new service/repo | 06/16 pack doc 00, 01 |
+| P-338 | SG/Relay vault-inbox reference adapter | Maps relay adapter port to shipped `POST /vault/append` and `POST /vault/inbox` endpoints; holds append_token (public) or enum_key (outbound only) | 06/16 pack doc 02 |
+| P-339 | SG/Relay SES inbound adapter | SES receipt → S3 → S3 event → Lambda; reads `.eml`; wraps in Envelope; routes to vault inbox | 06/16 pack doc 02 |
+| P-340 | SG/Relay SES outbound adapter | Drain vault inbox → wrap → SES `send_email`; bounce handling | 06/16 pack doc 02 |
+| P-341 | SG/Relay IMAP polling adapter | Schedule-triggered; poll IMAP; wrap messages in Envelope; route to vault inbox | 06/16 pack doc 02 |
+| P-342 | SG/Relay SQS/SNS/EventBridge adapters | SQS message → Envelope → vault inbox; SNS/EventBridge variants | 06/16 pack doc 02 |
+| P-343 | SG/Relay drain client + mail/ tree population | Drains vault inbox using enum_key; populates `mail/` tree in recipient vault; implements mailbox semantics | 06/16 pack doc 04 |
+| P-344 | Vault-native inbox UX | Browser inbox/thread/compose UI rendering the `mail/` tree; drain button | 06/16 pack doc 05 |
+| P-345 | Chrome-extension bridge | Seal-on-send / open-on-receive in real webmail (Gmail, Outlook); depends on PROPOSED P-157 sealed-box client crypto | 06/16 pack doc 05 |
+| P-346 | email-fs-lite Type_Safe schema | RFC-2822-compatible `.eml` + sidecar formalised as a `Type_Safe` `Email_FS_Lite__Envelope`; currently spec-only in markdown | 06/16 pack doc 00 |

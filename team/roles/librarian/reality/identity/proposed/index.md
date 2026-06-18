@@ -158,3 +158,11 @@ The NHI 2.0 series frames the vault stack as an identity, communication, account
 | P-334 | Time-boxed risk acceptance module | Time-bounded risk acceptance records; underwriting the change; before-and-after ROI for agent deployments | 06/04 strategy-brief (risk-management) |
 | P-335 | NHI sellable deliverables catalogue | Identities-to-assets-to-risk-to-cost model; side businesses as side effects of the platform; structured catalogue of deliverables | 06/04 strategy-brief (sellable-deliverables) |
 | P-336 | NHI commercial model | No-rent model; billable units (identities, actions, policies); two markups; customised versions; value tied to users and adoption | 06/04 strategy-brief (commercial-model) |
+
+---
+
+## SG API Secrets — Key Distribution Mechanism (06/15 briefs — v0.33.27)
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-370 | SG API secrets with TTL and usage count | Distributable secrets with time-to-live (hours/days) and usage-count cap; minted from admin vault; used for OpenRouter key distribution to test users; exercises the secrets capability | 06/15 dev-brief (audio-tool-release) |
