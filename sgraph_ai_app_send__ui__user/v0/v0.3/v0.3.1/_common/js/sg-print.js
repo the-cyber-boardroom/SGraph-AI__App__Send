@@ -53,6 +53,10 @@ var SgPrint = (function() {
     // the browser's print dialog (the Margins dropdown).
     var PREVIEW_PADDING = '1.5cm';
 
+    // Single source of truth for the version. Echoed in the popup toolbar so
+    // we can tell at a glance whether a cached older copy is being served.
+    var VERSION = '1.0.5';
+
     // ─── Print styles (A4-ready, screen preview + print media) ───────────────
     var PRINT_STYLES = [
         '*, *::before, *::after { box-sizing: border-box; }',
@@ -82,6 +86,11 @@ var SgPrint = (function() {
         '    }',
         '    .sg-print-toolbar .toolbar-info { color: #bbb; flex: 1; }',
         '    .sg-print-toolbar .toolbar-info strong { color: #fff; }',
+        '    .sg-print-toolbar .toolbar-ver {',
+        '        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;',
+        '        font-size: 11px; color: #888; padding: 2px 6px; border: 1px solid #444;',
+        '        border-radius: 4px;',
+        '    }',
         '    .sg-print-toolbar button {',
         '        padding: 6px 16px; border: none; border-radius: 4px;',
         '        font-size: 13px; cursor: pointer; font-weight: 500;',
@@ -243,6 +252,10 @@ var SgPrint = (function() {
                 '</div>' +
                 '<div class="toolbar-sep"></div>' +
                 '<div class="toolbar-info">Print preview for <strong>' + escapeHtml(displayName) + '</strong></div>' +
+                /* Version stamp — a glance at the toolbar tells you whether your browser is
+                   running the latest sg-print.js or a cached older copy. (Stale copies often
+                   explain "the fix didn\'t work" — bump the version, see if it changes.) */
+                '<span class="toolbar-ver" title="sg-print.js version (helps spot stale browser/CDN cache)">v' + VERSION + '</span>' +
                 '<button class="btn-print" onclick="window.print()">Print / Save PDF</button>' +
                 '<button class="btn-close" onclick="window.close()">Close</button>' +
             '</div>' +
@@ -299,6 +312,6 @@ var SgPrint = (function() {
         printHtml:     printHtml,
         printMarkdown: printMarkdown,
         PRINT_STYLES:  PRINT_STYLES,
-        version:       '1.0.4'
+        version:       VERSION
     };
 })();
