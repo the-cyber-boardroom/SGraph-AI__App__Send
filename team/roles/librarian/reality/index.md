@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-06-14)
+## Quick Stats (as of 2026-06-17)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 545+ (+34 from June 15 & 16 briefs — P-337 to P-370) |
-| Total documents catalogued | 685 (+16 brief files from June 15 and 16, processed 2026-06-18) |
+| Open PROPOSED items (across all domains) | 570+ (+34 net-new from June 15 & 16 across two sessions: P-229 to P-252 + P-337 to P-346) |
+| Total documents catalogued | 685 (+16 brief files from June 15 and 16, fully processed 2026-06-18) |
 
 ---
 

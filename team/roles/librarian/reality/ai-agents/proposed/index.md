@@ -283,26 +283,26 @@ Items below are the ai-agents-specific cross-domain entries from the NHI 2.0 ser
 
 ---
 
-## Archiver-Cataloguer Pattern (06/15 briefs — docs from v0.33.27)
+## Archiver-Cataloguer Pattern (06/15 briefs, v0.33.27)
 
-All items below are PROPOSED — does not exist yet. The append capability and ephemeral-compute primitives exist; the cataloguing pattern and multi-vault chaining are new.
-
-| # | Feature | One-Line Description | Source |
-|---|---------|---------------------|--------|
-| P-347 | Archiver-cataloguer workflow | Authorised entity appends to vault → debounced trigger → ephemeral compute given vault/comms key → agent catalogues/copies/appends/acts → result placed back in vault → compute disappears | 06/15 arch-brief (archiver-cataloguer-pattern) |
-| P-348 | Two-key gating for archiver ingestion | Vault public key encrypts; sender public key signs; authorised-keys allow-list; only pre-approved entities may submit | 06/15 arch-brief (archiver-cataloguer-pattern) |
-| P-349 | Multi-vault chaining for cataloguer isolation | Source vault → cataloguing vault (process/filter/index only) → destination vault(s); cataloguer cannot read destination data; enables multiple recipients; defends against prompt injection | 06/15 arch-brief (archiver-cataloguer-pattern) |
-| P-350 | Archiver use case: transaction and activity logs | Servers/AWS/cloud logs appended to log vault; agent indexes, classifies, summarises; versioned auditable archive | 06/15 arch-brief (archiver-cataloguer-use-cases) |
-| P-351 | Archiver use case: emails and agent messaging | Email/inbox vault; agent threads, classifies, extracts, files; dovetails with email-FS-Lite inter-agent messaging | 06/15 arch-brief (archiver-cataloguer-use-cases) |
-| P-352 | Archiver use case: drag-and-drop file indexing | User drops files → catalogued and indexed into vault; short-term access mode and long-term storage mode | 06/15 arch-brief (archiver-cataloguer-use-cases) |
-| P-353 | Archiver use case: observability and usage logs | Tools' usage logs appended to observability vault; agent aggregates stats with provenance | 06/15 arch-brief (archiver-cataloguer-use-cases) |
-| P-354 | Archiver use case: research and document ingestion | Source documents appended to vault; agent catalogues, classifies, links to evidence; feeds agentic content website | 06/15 arch-brief (archiver-cataloguer-use-cases) |
-
-## Semantic Graph User-Finding (06/15 briefs — v0.33.27)
+All items below are PROPOSED — does not exist yet. Primitives are EXISTS (vault inbox, ephemeral compute, two-key model, vault CAS).
 
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
-| P-355 | Public capability graph for Audio Transcribe | Semantic graph of what the tool does and uses (models, audio, OpenRouter, workflows, live feature); shareable as a use case | 06/15 strategy-brief (finding-early-users) |
-| P-356 | Five-lens user-finding mesh | Capability + outreach + buyer + investor + partnership lenses intersected over same subject; identifies who to reach on which channel with what message | 06/15 strategy-brief (finding-early-users) |
-| P-357 | Public-to-private LinkedIn join | Public capability graph joined privately to project lead's LinkedIn data; the public-to-private flow made concrete | 06/15 strategy-brief (finding-early-users) |
+| P-238 | Archiver-cataloguer generic workflow | Append to vault (two-key gating) → debounced trigger → ephemeral compute spins up → agent reads, catalogues, copies, appends, acts → result placed back in vault → ephemeral compute disappears | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-239 | Two-key-plus-authorised-keys ingestion gate | Ingestion gated by vault's accept-list of sender public keys; submitter must encrypt with vault PK and sign with sender PK; only pre-approved keys may append | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-240 | Debounced ephemeral-compute trigger | Interval or on-append trigger with debounce window to avoid multiple invocations from rapid successive uploads; per-use-case configurable | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-241 | Multi-vault chaining for cataloguer isolation | Source vault → cataloguing vault (transforms only; no full data access) → destination vault(s); prompt-injection blast radius limited to the cataloguing stage; enables multiple recipients without a single uber-vault | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-242 | Per-use-case cataloguing rules engine | Schema-based (not free-form prompt) rules defining what the agent does per use case: cataloguing, copying, appending, acting; one rules definition per deployment | 06/15 arch-brief (archiver-cataloguer-pattern) |
+| P-243 | Transaction log archiving use case | Append-mode log entries → ephemeral compute → catalogued and indexed in destination vault; first use case (proves the generic loop) | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-244 | Email and agent-messaging archiving use case | Incoming EML + sidecar → catalogued `mail/` tree in vault; agent-to-agent message ingestion path | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-245 | Drag-drop file indexing (short-term and long-term modes) | Short-term: rapid indexing of dropped files in session vault; long-term: retention into Encrypted Spaces or persistent vault (depends on Encrypted Spaces PROPOSED); two distinct retention modes | 06/15 arch-brief (archiver-cataloguer-use-cases) |
+| P-246 | Research ingestion use case | Document drops → chunked, catalogued knowledge base in destination vault; research ingestion pipeline | 06/15 arch-brief (archiver-cataloguer-use-cases) |
 
+## Agentic Incident-Response Service (06/15 strategy brief, v0.33.27)
+
+This is a service concept, not a build. No code deliverable until the workflow map is produced.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-247 | Agentic compromise incident-response service | "Who you gonna call" service for users whose privileged AI agents are compromised; rootkit-style threat model (access, resources, credentials, persistence); when-not-if posture; rebuild-reset-monitor remediation; aligned with security companies; SGraph offering vs separate venture open; next step is workflow map | 06/15 strategy-brief (agentic-compromise-incident-response) |

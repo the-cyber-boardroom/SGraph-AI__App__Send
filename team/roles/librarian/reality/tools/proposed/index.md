@@ -109,6 +109,24 @@ Full content for each item is in the archived monolith: `../v0.16.26__what-exist
 
 ---
 
+## Audio Tool Distribution — Release Shell (06/15 briefs, v0.33.27)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-229 | SG API secrets with TTL and usage count | Daily OpenRouter keys distributed as SG API secrets; time-to-live (hours/days) + usage count cap; minted from admin vault; uses existing SG API secrets capability | 06/15 dev-brief (audio-transcript-tool-release) |
+| P-230 | Bring-your-own-or-early-adopter-key UI | Key acquisition choice at tool entry: enter your own OpenRouter key OR use a shared early-adopter key (the SG API secret); two-path entry point | 06/15 dev-brief (audio-transcript-tool-release) |
+| P-231 | Three-component hosting via vault-powered-websites | tools site (raw component dev) → embedding vault (themes/layouts/languages) → sgraph.ai path at `/en-gb/tools/audio-transcriber`; agent-controlled; applies vault-powered-websites pattern | 06/15 dev-brief (audio-transcript-tool-release) |
+| P-232 | Two-vault split: admin vault + observability vault | Admin vault: key minting and early-adopter key management; observability vault: append-mode usage logs (page opens, executions, country; no PII); separate vaults, separate roles | 06/15 dev-brief (audio-transcript-tool-release) |
+| P-233 | Audio tool release phase | Documentation, use cases, descriptions, observability in place on sgraph.ai; the full release, not just the tool working | 06/15 dev-brief (audio-transcript-tool-release) |
+| P-234 | Real-time transcription feature | Continuous capture mode (not just file upload); ongoing transcription as audio is captured; builds on `sg-audio-transcription` WASM component (itself PROPOSED) | 06/15 dev-brief (audio-transcribe-experience) |
+| P-235 | Self-describing JS API | JS API that describes itself for agentic support and agentic documentation; enables an agent to understand available execution flows without manual docs | 06/15 dev-brief (audio-transcribe-experience) |
+| P-236 | Four-to-six simple transcription scenarios | Defined, documented, and testable scenarios covering the key use cases for the audio transcribe tool | 06/15 dev-brief (audio-transcribe-experience) |
+| P-237 | Key acquisition UI: four user journeys | Enter your own key; create one guided (OpenRouter account creation); retrieve from password manager; use a provided SG key resolved through SG/Send | 06/15 dev-brief (openrouter-key-acquisition) |
+
+---
+
 ## TUI API — Structured Surface for Text UIs (05/17 briefs — Day 67, docs 442–443)
 
 All items below are PROPOSED — does not exist yet.
@@ -162,23 +180,3 @@ All items below are PROPOSED — does not exist yet.
 | P-188 | Scheduled Claude Code backup health-check sessions | Agentic workflow: reads backup vault JS API; alerts on stale or failed backups | doc 427 |
 | P-189 | Backblaze B2 as first multi-provider backup target | S3-compatible; $6/TB-mo; backup-focused; validates multi-provider architecture | doc 427 |
 
----
-
-## Audio Transcribe Release and UX (06/15 briefs — v0.33.27)
-
-All items below are PROPOSED — does not exist yet. The Audio Transcribe tool itself EXISTS (4 live tools on tools.sgraph.ai); items below are new capabilities, UX, and hosting work.
-
-| # | Feature | One-Line Description | Source |
-|---|---------|---------------------|--------|
-| P-358 | Real-time transcription visualisation | Live display of transcription as it is produced; described as "just added" in brief — code-verification needed before marking EXISTS | 06/15 dev-brief (audio-transcribe-experience) |
-| P-359 | Four-to-six simple Audio Transcribe scenarios | Focused components: transcribe-file, transcribe-and-chat, dictate-live, and more; each ends with a key step | 06/15 dev-brief (audio-transcribe-experience) |
-| P-360 | Dedicated page for Audio Transcribe | Own page at sgraph.ai/en-gb/tools/audio-transcriber or tools site; separate from tools list | 06/15 dev-brief (audio-transcribe-experience) |
-| P-361 | Self-describing JS API for agent-driven transcription | Agent can be handed the tool and an audio file; tool describes itself; no bespoke wiring | 06/15 dev-brief (audio-transcribe-experience) |
-| P-362 | Cost visibility per transcription | Per-transcription cost shown in UI; tied to OpenRouter billing | 06/15 dev-brief (audio-transcribe-experience) |
-| P-363 | OpenRouter key entry page with option set | Entry page offering: enter own, guided create, password manager, provided via SG/Send, evaluation key, buy-credits | 06/15 dev-brief (openrouter-key-acquisition) |
-| P-364 | Guided create-a-key flow | Agent-generated docs; links, screenshots, budget step; walks user through OpenRouter key creation from scratch | 06/15 dev-brief (openrouter-key-acquisition) |
-| P-365 | Password-manager guidance | Per-manager screenshots (LastPass, Google, AWS Secrets, others); agent-maintained content | 06/15 dev-brief (openrouter-key-acquisition) |
-| P-366 | Provided-key resolution via SG/Send | User pastes a provided key → app resolves via SG/Send → retrieves actual OpenRouter key; new resolution flow | 06/15 dev-brief (openrouter-key-acquisition) |
-| P-367 | Bring-your-own-or-early-adopter-key UI choice | Two-option UI at tool entry: enter your own key or use a shared early-adopter key (SG API secret) | 06/15 dev-brief (audio-tool-release) |
-| P-368 | Three-component Audio Transcribe hosting | tools.sgraph.ai (component dev) → vault (embed, themes, languages) → sgraph.ai/en-gb/tools path (served, agent-controlled) | 06/15 dev-brief (audio-tool-release) |
-| P-369 | Two-vault (admin + observability) split | Admin vault manages keys; separate observability vault receives append-mode usage logs (page opens, executions, country) | 06/15 dev-brief (audio-tool-release) |
