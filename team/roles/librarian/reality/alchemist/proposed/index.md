@@ -89,3 +89,22 @@ All items below are PROPOSED — does not exist yet.
 | P-195 | De-commoditising article (Wardley positioning) | Build-the-shield decision framework (5 factors); AI-era reframe (build economics dropped); shield is where operational expertise lives; external publication | doc 435 |
 | P-197 | MyFeeds website rebuild — three-primitives architecture | Vault, storage substrate (server/S3/ephemeral/zip), management layer (vault-of-vaults); hybrid static + ephemeral recommended; 8-phase delivery | doc 437 |
 | P-198 | Articles-as-vaults publishing workflow | Each article is a vault (evidence, semantic graph, source materials, multilingual, agentic provenance); website as presentation layer; our articles as canonical B2B examples | doc 438 |
+
+---
+
+## Agent Blast-Radius Company — Strategy and Business Model (06/18 series, v0.33.40)
+
+All items below are PROPOSED — does not exist yet.
+
+The June 18 series defines the company strategy for a service built around the vault technology
+and focused on agent authorisation blast-radius mapping. Items below are business/strategy in
+nature; the technical service items are in `ai-agents/proposed/` (P-353 to P-357) and
+`security/proposed/` (P-358 to P-364).
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-365 | Agent Mandate (naming the authorisation bundle) | The recommended name for the bundle of identity, credentials, and business capabilities granted to an agent; "passport" critiqued (wrong register); "Agent Mandate" recommended for clarity, authority, and accountability framing | 06/18 strategy-brief (naming-the-agent-authorisation-bundle) |
+| P-366 | Open-source-everything strategy | Everything the company does is open (code, logic, functionality, schemas); no proprietary core; the only closed line is the customer's own data and customisations; compete on execution and value, not rent extraction; adoption and stewardship of the core are the strategic prize | 06/18 strategy-brief (open-source-strategy) |
+| P-367 | Commercial model: billable units + token markup + data hook | Granular billable units (cloud hyperscaler model); markup on every token consumed (OpenRouter model); data-is-the-hook (customer's private mandate data creates stickiness); hosting tiers (shared to dedicated VPC/account); security consultant marketplace; track recurring usage and adoption, not ARR | 06/18 strategy-brief (commercial-model) |
+| P-368 | Vault strategy for blast-radius company (three roles) | Three vault roles: (1) publishing medium for website and investor deck (vault per section); (2) evidence base for per-provider blast-radius maps (GitHub, AWS, Salesforce, Claude tools, Open Claw); (3) delivery mechanism (the vault is what the customer runs to get customised analysis); MVP on existing technology | 06/18 arch-brief (vault-strategy) |
+| P-369 | Customised-analysis-as-a-service (first business model) | Give the customer a delivery vault containing customised blast-radius analysis; they run it in their environment or we run it for them; the vault is the deliverable; first revenue stream | 06/18 arch-brief (vault-strategy) |

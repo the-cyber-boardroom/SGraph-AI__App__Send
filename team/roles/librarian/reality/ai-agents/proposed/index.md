@@ -306,3 +306,21 @@ This is a service concept, not a build. No code deliverable until the workflow m
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
 | P-247 | Agentic compromise incident-response service | "Who you gonna call" service for users whose privileged AI agents are compromised; rootkit-style threat model (access, resources, credentials, persistence); when-not-if posture; rebuild-reset-monitor remediation; aligned with security companies; SGraph offering vs separate venture open; next step is workflow map | 06/15 strategy-brief (agentic-compromise-incident-response) |
+
+---
+
+## Agent Authorisation Blast-Radius Service (06/18 series, v0.33.40)
+
+All items below are PROPOSED — does not exist yet. Foundation (vault, inbox, semantic graph) EXISTS.
+
+This service maps what an agent is authorised to do (the blast radius), not what it did.
+Phase 1 works off read-only evidence. Multiple parties (agentic companies, clients, asset
+owners, regulators) must all agree on the blast radius. The service is value-proposition-first.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-353 | Agent blast-radius mapping service (phase 1) | Read-only evidence ingestion; LLM parsers consume dashboards, security reports, configs, standards; correlated into an enterprise semantic graph showing what each agent can do; serves agentic companies, clients, asset owners, and regulators | 06/18 strategy-brief (agent-authorisation-blast-radius + agent-blast-radius-service) |
+| P-354 | Multi-party risk acceptance flow | Named owners (agent developers, clients, asset owners, regulators) must all agree on the blast-radius map; mediated agreement mechanism; veto available; records are append-only signed vault entries | 06/18 strategy-brief (agent-blast-radius-service + risk-acceptance) |
+| P-355 | Enterprise semantic graph for permissions | Ontology-of-ontologies model for agent permissions; per-company ontologies; second/third/fourth-order side effects on the graph; evidence with certainty ratings; extends NHI 2.0 semantic graph work (P-329–P-331) | 06/18 strategy-brief (graphs-of-graphs + side-effects) |
+| P-356 | Proactive evidence database of agent-security scenarios | Public, open database of agent-security scenarios as vaults; each scenario covers a specific provider/agent/permission combination; CIA primitives plus graph-based deeper primitives; maintained and quality-controlled | 06/18 arch-brief (proactive-evidence-database) |
+| P-357 | Paid agent-intel feed | Subscription feed over the proactive evidence database; subscribers receive new scenario vaults via vault inbox as they are published | 06/18 arch-brief (proactive-evidence-database) |

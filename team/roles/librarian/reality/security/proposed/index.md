@@ -188,3 +188,23 @@ Batch-2 takes SG/Sentinel from a designed system (batch-1, day 68, 19 docs) to o
 |---|---------|---------------------|--------|
 | P-246 | SG/Sentinel interoperability (collaborators not competitors) | Work in front/behind/alongside other WAFs; develop-in-SG/Sentinel-export-to-existing-infra (AWS WAF, ModSecurity, Akamai, Cloudflare, GCP); consume + export rules (YARA, Sigma); bidirectional log integration (Splunk, Datadog, CloudWatch); never require removing what works | doc 486 |
 | P-247 | SG/Sentinel commercial model | SaaS; custom versions; hosted reverse-proxy service; passive mode as zero-risk on-ramp; cost comparison vs Firehose/analytics/logging; agentic-native as differentiator; designed for someone else to commercialise | doc 487 |
+
+---
+
+## Agent Authorisation Blast Radius — Permissions Model (06/18 series, v0.33.40)
+
+All items below are PROPOSED — does not exist yet.
+
+The June 18 series introduces a permissions model that complements the SBOM tradition and
+extends the NHI 2.0 work. Permissions gate exploitability: the same CVE is inert without
+the permission to weaponise it.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-358 | Agent authorisation blast-radius map | Graph-based, hyperlinked, evidence-focused map of what an agent is authorised to do; NOT what it did; captures the universe of possible actions given the current permission set; evidence with certainty ratings | 06/18 strategy-brief (agent-authorisation-blast-radius) |
+| P-359 | Permissions bill of materials (PBOM) | SBOM analogue for permissions; a declared, mappable inventory of what a system is authorised to do in the environment where it runs; carried on a semantic graph with intent, blast radius, and reachability | 06/18 arch-brief (permissions-bill-of-materials) |
+| P-360 | PBOM-SBOM compatibility (augmenting existing standards) | PBOM augments and is compatible with SBOM formats (CycloneDX, SPDX), supply-chain integrity (SLSA), controls catalogues (OSCAL), exploitability exchange (VEX), and attack taxonomies (ATT&CK); does not replace existing standards | 06/18 arch-brief (permissions-bill-of-materials) |
+| P-361 | Skills-as-code permission declaration | Every unit of execution (package, code, skill, agent, tool) carries a `permissions:` declaration; permissions compose across units; extends SKILL.md format; replaces the OAuth coarse-grant model for platform-controlled scenarios | 06/18 arch-brief (skills-as-code-permission-granularity) |
+| P-362 | Just-in-time granular permission grants beyond OAuth | Scoping grants to exactly the permission needed in the exact moment; OAuth grants in absolutes (union of all privileges); the graph world provides per-unit, moment-of-authorisation, scoped grants | 06/18 arch-brief (skills-as-code-permission-granularity) |
+| P-363 | Risk acceptance as underwriting (multi-party) | The click creates accountability; risk flows upward; named owners accept the blast-radius map; cross-linked risks (responsibility without control) must be surfaced; veto available both ways; append-only signed vault as acceptance record | 06/18 arch-brief (risk-acceptance-underwriting) |
+| P-364 | T&C blast-radius framing (alarming-by-design) | Frame the blast radius as the terms and conditions you click accept on; make them alarming; YOLO command-line agents surfaced as radioactive actions dressed as fun; explicit, public, non-repudiable | 06/18 strategy-brief (terms-and-conditions-framing) |

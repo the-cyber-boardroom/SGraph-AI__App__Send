@@ -7,6 +7,30 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-19
+
+Brief-processing session: 18 human brief files from 06/18 processed (1 day-index + 17 in
+`agentic-permissions/` subfolder). All are PROPOSED — no new code shipped on June 18.
+Version v0.33.28 (current). 17 new PROPOSED items registered (P-353 to P-369).
+
+The June 18 series is a single sustained 18-brief series on agent authorisation blast radius,
+the PBOM (permissions bill of materials), and the company/commercial strategy built around
+the vault technology. No code deliverables. Strongest single-thread investor narrative in corpus.
+
+- `index.md` — Version v0.33.26 → v0.33.28; last updated 2026-06-18 → 2026-06-19; docs 685 → 703; PROPOSED 570+ → 587+ (P-353 to P-369).
+- `ai-agents/proposed/index.md` — Added June 18 section: P-353 (blast-radius mapping service phase 1), P-354 (multi-party risk acceptance flow), P-355 (enterprise semantic graph for permissions), P-356 (proactive evidence database), P-357 (paid agent-intel feed).
+- `security/proposed/index.md` — Added June 18 section: P-358 (agent blast-radius map artefact), P-359 (PBOM), P-360 (PBOM-SBOM compatibility), P-361 (skills-as-code permission declaration), P-362 (just-in-time granular grants beyond OAuth), P-363 (risk acceptance as underwriting), P-364 (T&C blast-radius framing).
+- `alchemist/proposed/index.md` — Added June 18 section: P-365 (Agent Mandate naming), P-366 (open-source-everything strategy), P-367 (commercial model), P-368 (vault strategy three roles), P-369 (customised-analysis-as-a-service).
+
+Master index (06/19): `team/roles/librarian/reviews/06/19/v0.33.28__master-index__briefs-18-june-2026.md`
+Processed: 18 new human briefs | New EXISTS items: 0 | New PROPOSED items: 17 (P-353–P-369)
+
+Key open items: OQ-agent-mandate-name-1 (name needed before any investor materials),
+OQ-first-build-priority-1 (engineering focus for next session), OQ-pbom-scan-1 (standards
+scan blocks PBOM schema design).
+
+---
+
 ## 2026-06-16
 
 Brief-recovery session: 20 human brief files from 06/11 and 06/13 processed for the first time
