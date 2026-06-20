@@ -208,3 +208,26 @@ the permission to weaponise it.
 | P-362 | Just-in-time granular permission grants beyond OAuth | Scoping grants to exactly the permission needed in the exact moment; OAuth grants in absolutes (union of all privileges); the graph world provides per-unit, moment-of-authorisation, scoped grants | 06/18 arch-brief (skills-as-code-permission-granularity) |
 | P-363 | Risk acceptance as underwriting (multi-party) | The click creates accountability; risk flows upward; named owners accept the blast-radius map; cross-linked risks (responsibility without control) must be surfaced; veto available both ways; append-only signed vault as acceptance record | 06/18 arch-brief (risk-acceptance-underwriting) |
 | P-364 | T&C blast-radius framing (alarming-by-design) | Frame the blast radius as the terms and conditions you click accept on; make them alarming; YOLO command-line agents surfaced as radioactive actions dressed as fun; explicit, public, non-repudiable | 06/18 strategy-brief (terms-and-conditions-framing) |
+
+---
+
+## Standards, Compliance, and Supply Chain (06/19 series, v0.33.28)
+
+All items below are PROPOSED — does not exist yet.
+
+The June 19 series grounds the blast-radius work in standards, compliance, and supply-chain
+reality. The executed research confirms: augment not invent; VEX is the closest analog to
+permissions gating; the SBOM ecosystem is mature and extensible. The compliance brief introduces
+the four-angles framework and the "breached before the agent acts" principle. The supply-chain
+brief adds the multi-organisation coordination problem: permissions must propagate up and down
+the chain, inline agents are categorically more dangerous, and prompt-injection contamination
+can cross organisational boundaries.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-370 | PBOM ecosystem placement (CycloneDX BOM type or SPDX profile) | Specific implementation placement from executed research: propose PBOM as a CycloneDX BOM type or SPDX profile; wired to VEX for exploitability gating, AIBOM/SaaSBOM for agent layer, and agent-identity standards (OWASP Agentic Top 10, MCP OAuth scopes, NIST NCCoE) for authorisation semantics; multi-format output required | 06/19 research-brief (pbom-adjacent-standards) |
+| P-371 | Compliance subset graph | Relevant-controls extraction from NIST, GDPR, ISO 27001, HIPAA, EU AI Act, NIS2, DORA — only the controls the blast radius touches, interconnected as a graph; "almost a small standard of its own"; dynamic (updates when permissions change); four-angle query layer built over it | 06/19 arch-brief (compliance-standards-intersection) |
+| P-372 | Four-angles compliance module | Binary breach (cannot demonstrate compliance without knowing blast radius), checkable boxes (blast-radius knowledge produces the evidence), new-breach-once-known (knowing and not acting is itself a worse failing), compliance-recovered (privilege reduction turns specific breaches back into compliance); dynamic posture map | 06/19 arch-brief (compliance-standards-intersection) |
+| P-373 | Supply-chain permissions propagation | Up-and-down the chain: partner-provided-agent discovery (companies already run agents they are unaware of), per-member PKI key distribution, risk decisions carried in vaults at every level; vault role is propagation and trust, not data management; chain must be aware and must accept | 06/19 arch-brief (supply-chain-permissions) |
+| P-374 | Inline vs out-of-bounds agent classification | Classify agents by position in data path (inline = alters data in flight; out-of-bounds = observer), access scope, and transformation performed; prompt-injection contamination assessment for shared-data supply chains (payload at one node can reach another organisation's systems) | 06/19 arch-brief (supply-chain-permissions) |
+| P-375 | Supply-chain blast-radius compliance lens | Third-party governance: agent access can breach other parties' compliance obligations they did not take on; NIS2 and DORA make third-party oversight mandatory; third-party due-diligence mapping (which items get worse or better once known) | 06/19 arch-brief (supply-chain-permissions) |

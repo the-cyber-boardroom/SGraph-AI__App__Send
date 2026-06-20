@@ -324,3 +324,21 @@ owners, regulators) must all agree on the blast radius. The service is value-pro
 | P-355 | Enterprise semantic graph for permissions | Ontology-of-ontologies model for agent permissions; per-company ontologies; second/third/fourth-order side effects on the graph; evidence with certainty ratings; extends NHI 2.0 semantic graph work (P-329–P-331) | 06/18 strategy-brief (graphs-of-graphs + side-effects) |
 | P-356 | Proactive evidence database of agent-security scenarios | Public, open database of agent-security scenarios as vaults; each scenario covers a specific provider/agent/permission combination; CIA primitives plus graph-based deeper primitives; maintained and quality-controlled | 06/18 arch-brief (proactive-evidence-database) |
 | P-357 | Paid agent-intel feed | Subscription feed over the proactive evidence database; subscribers receive new scenario vaults via vault inbox as they are published | 06/18 arch-brief (proactive-evidence-database) |
+
+---
+
+## Assessment Template, Case Study, and Supply-Chain Graph (06/19 series, v0.33.28)
+
+All items below are PROPOSED — does not exist yet.
+
+The June 19 series converts the blast-radius concept into concrete product deliverables:
+a DPIA-extended supply-chain graph, a full assessment template simulated as if the platform
+exists, the first concrete instance of the proactive evidence database (WhatsApp), and a
+capture mechanism for in-context blast-radius mapping from real LLM interactions.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-376 | DPIA-extended supply-chain graph | Follow-the-data-then-check-for-agents: hyperlinked data-flow map with agent-access layer (accessed, modified, decided on) at every node; starts from familiar DPIA methodology; connects to P-355 (enterprise semantic graph) and P-373 (supply-chain propagation) | 06/19 arch-brief (supply-chain-permissions) |
+| P-377 | Agent permission blast-radius assessment template | Complete assessment template simulated as if the platform exists: intake (integration, mode, identity, permissions, data in reach, actions possible, other parties, environment, duration), permission graph, blast-radius view scored by reach/reversibility/parties, risk-acceptance flow (owner → boss → exec → risk owner; accept/narrow/remove), evidence vault, multi-stakeholder lens (one graph, per-party reads) | 06/19 arch-brief (assessment-template) |
+| P-378 | WhatsApp evidence vault (first proactive evidence database instance) | Three scenarios (personal/dedicated/Business) with permission maps, blast-radius scores, and real incidents: WhatsApp ban policy, documented account ban, runaway agents, GhostPairing attack (attacker mirror of same mechanism); built from public sources; first concrete instance of P-356 | 06/19 research-brief (whatsapp-case-study) |
+| P-379 | LLM interaction capture with consent | When a user interacts with an LLM on a captured path and has consented, record the interaction and map the in-context blast radius; consent is structural and must be recorded in the vault before any capture; in-context assessments reflect real interactions, not theory | 06/19 dev-brief (use-cases-user-stories, Story 8) |
