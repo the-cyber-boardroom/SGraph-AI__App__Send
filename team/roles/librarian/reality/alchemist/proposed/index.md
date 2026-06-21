@@ -108,3 +108,22 @@ nature; the technical service items are in `ai-agents/proposed/` (P-353 to P-357
 | P-367 | Commercial model: billable units + token markup + data hook | Granular billable units (cloud hyperscaler model); markup on every token consumed (OpenRouter model); data-is-the-hook (customer's private mandate data creates stickiness); hosting tiers (shared to dedicated VPC/account); security consultant marketplace; track recurring usage and adoption, not ARR | 06/18 strategy-brief (commercial-model) |
 | P-368 | Vault strategy for blast-radius company (three roles) | Three vault roles: (1) publishing medium for website and investor deck (vault per section); (2) evidence base for per-provider blast-radius maps (GitHub, AWS, Salesforce, Claude tools, Open Claw); (3) delivery mechanism (the vault is what the customer runs to get customised analysis); MVP on existing technology | 06/18 arch-brief (vault-strategy) |
 | P-369 | Customised-analysis-as-a-service (first business model) | Give the customer a delivery vault containing customised blast-radius analysis; they run it in their environment or we run it for them; the vault is the deliverable; first revenue stream | 06/18 arch-brief (vault-strategy) |
+
+---
+
+## Strategy, Product Segmentation, and Deployment Model (06/19 series, v0.33.28)
+
+All items below are PROPOSED — does not exist yet.
+
+The June 19 series adds the strategic and product layer to the June 18 business case: four
+Wardley maps placing the offering honestly in Explorer phase, feedback loops as a commercial
+incentive layer, three concrete product roles with free/paid paths, eight buildable user stories,
+and a marketplace deployment model that makes run-everywhere commercially viable.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-380 | Wardley maps for blast-radius service (four-map series) | Four Wardley maps: (1) landscape today — activities at genesis/custom-built; (2) commoditisation play — evolution arrows moving mapping/distribution/blast-radius/risk-acceptance rightward; (3) higher-order opportunities — accelerated adoption, agent-intel feed, risk underwriting, marketplace; (4) Explorer phase placement — PMF and end-to-end flows first; Wardley-beta Mermaid syntax; first pass to iterate | 06/19 strategy-brief (wardley-maps) |
+| P-381 | Feedback loops that reward fewer privileges | Incentive layer: companies that reduce permissions, secure agents, and eliminate hope-driven development improve their risk and compliance score and gain competitive advantage; built into the service's measurement layer; makes security adoption self-reinforcing | 06/19 strategy-brief (wardley-maps, Map 2) |
+| P-382 | Three-role product segmentation with per-role free/paid paths | Power user granting permissions (no surprises, not over-privileged; privacy-is-not-being-surprised); service adopter (good acquisition decision; plain-language terms); LLM-service vendor (see own reality internally first, then compete on trust); each role has free entry and a paid path to the billable units | 06/19 strategy-brief (first-cohort-of-users) |
+| P-383 | Eight Gherkin user stories with billing (the buildable product layer) | Stories 1-8 covering assess-before-granting, monitor-over-time, understand-what-I-accept, compare-services, vendor-internal-reality, vendor-publish-proof, new-endpoint-mappings, capture-LLM-interactions; each with Gherkin scenario, user-flow, success criterion, and free/paid billing; everything driven by a user story | 06/19 dev-brief (use-cases-user-stories) |
+| P-384 | Cloud-provider marketplace deployment model (run-not-maintain) | Customer runs in their environment, we maintain centrally; marketplace listing for mass deployability; customer-specific paid forks (big-customer feature demands stay in forks, open-source bits flow back to core); open-source provisioning and CI pipeline shipped to customer for genuine sovereignty; ownership moat: touch it and you own it | 06/19 arch-brief (run-everywhere) |
