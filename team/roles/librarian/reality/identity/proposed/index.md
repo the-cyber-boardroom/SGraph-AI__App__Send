@@ -159,3 +159,23 @@ The NHI 2.0 series frames the vault stack as an identity, communication, account
 | P-335 | NHI sellable deliverables catalogue | Identities-to-assets-to-risk-to-cost model; side businesses as side effects of the platform; structured catalogue of deliverables | 06/04 strategy-brief (sellable-deliverables) |
 | P-336 | NHI commercial model | No-rent model; billable units (identities, actions, policies); two markups; customised versions; value tied to users and adoption | 06/04 strategy-brief (commercial-model) |
 
+---
+
+## OpenRouter Platform Expansion (06/20 series, v0.33.30)
+
+All items below are PROPOSED — does not exist yet.
+
+OpenRouter raised a $113M Series B (CapitalG-led, ~$1.3B valuation). SGraph currently uses
+only two features (model execution + key management) of a wide platform surface. The June 20
+research brief maps the full feature set and recommends five adoption priority tiers.
+
+Note: "OpenRouter API key provisioning" (pre-NHI section, above) is simple provisioning with
+a credit cap. Items below are distinct: they cover the OAuth flow, native billing metering,
+and assessment-specific capabilities not in the earlier provisioning item.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-385 | OpenRouter OAuth (PKCE) user key acquisition | Redirect user to OpenRouter via PKCE OAuth flow; return user-controlled API key to the app; SGraph never holds user credentials; the native answer to the key-acquisition journey; complements P-299 (billing broker); key storage decision (localStorage vs vault vs session) pending Architect sign-off | 06/20 openrouter-platform |
+| P-386 | OpenRouter structured outputs + tool calling for assessment platform | Strict JSON-schema mode (`response_format.type=json_schema`) for assessment output, blast-radius map, risk-factorisation matrix, and compliance subset graph; normalised tool calling across models for vault agents; schema must be co-designed with P-391 (formal ontology); version-pin schema to avoid drift | 06/20 openrouter-platform |
+| P-388 | OpenRouter ZDR + sovereign routing | Zero-data-retention routing and sovereign-region routing per request (`provider.data_collection=deny`); must be default-on for all assessment-class requests (not opt-in); resolves no-tracking claim (parked since day index); AppSec constraint: ZDR must take priority over cost-routing | 06/20 openrouter-platform |
+
