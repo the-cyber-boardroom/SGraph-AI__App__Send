@@ -246,3 +246,11 @@ All items below are PROPOSED — does not exist yet. The vault inbox foundation 
 | P-344 | Vault-native inbox UX | Browser inbox/thread/compose UI rendering the `mail/` tree; drain button | 06/16 pack doc 05 |
 | P-345 | Chrome-extension bridge | Seal-on-send / open-on-receive in real webmail (Gmail, Outlook); depends on PROPOSED P-157 sealed-box client crypto | 06/16 pack doc 05 |
 | P-346 | email-fs-lite Type_Safe schema | RFC-2822-compatible `.eml` + sidecar formalised as a `Type_Safe` `Email_FS_Lite__Envelope`; currently spec-only in markdown | 06/16 pack doc 00 |
+
+## SG/Vault AWS Marketplace Standalone (06/21 briefs — v0.33.31)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-398 | SG/Vault AWS Marketplace standalone deployment | Separate admin FastAPI and website for deployment management; setup mode on boot (boots unconfigured, no user data required at launch — marketplace policy); storage-mode property (memory / disk EBS / S3) with least-privilege IAM role per mode attached to EC2 instance (no credentials in AMI); two-layer authorization model (FastAPI access control + usage API keys, both user-configurable); send-to-someone workflow = open FastAPI access + key required to invoke; AMI + CloudFormation one-click deploy; marketplace-branded vault page; pricing: free / BYOL / metered; open items before launch: TLS without Caddy (sidecar proxy recommended), admin auth bootstrap (first-boot random token), EBS volume lifecycle (DeletionPolicy: Snapshot) | 06/21 aws-marketplace-deployment/dev-brief |
