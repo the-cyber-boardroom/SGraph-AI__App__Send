@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-06-26 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-05-24 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -257,10 +257,10 @@ All items below are PROPOSED — does not exist yet.
 
 ---
 
-## S3-Compatible Vault Container for SG Compute (06/23 briefs — v0.33.33)
+## S3-Compatible Vault Container for SG Compute (06/23 brief — v0.33.33)
 
 All items below are PROPOSED — does not exist yet.
 
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
-| P-407 | S3-compatible vault container for SG compute | A Docker container presenting a standard S3-compatible API (boto3 / AWS CLI / any S3 SDK); the consuming service code is unchanged — only the S3 endpoint is repointed to the container; files are served from a selectable swappable backend (vault / local disk / memory); the vault backend turns the vault into a transparent drop-in S3 backend for any S3-speaking service; the AWS credential fields are reused as the container's header name and header value for compatibility; most code exists (v0.27.2 S3-compatible-API sprint); this brief specifies the Docker packaging for SG compute and the three-backend selection mechanism; key open items: which S3 operations to cover first (pin to what the target service uses); the key-to-file mapping for the vault backend; effort: small (packaging exercise) | 06/23 compute-and-storage/s3-vault-container-dev-brief |
+| P-407 | S3-compatible vault container for SG compute | Docker container presenting the same S3-compatible API as real S3 (a digital twin); existing services keep using boto3, the AWS CLI, or any S3 SDK unchanged — only the S3 endpoint is repointed at the container; files served from a selectable backend: vault (the eventual goal), local disk, or memory; AWS access key and secret fields reused as container header name and header value for transparent auth compatibility — the calling code cannot tell it is not talking to real S3; turns the vault into a drop-in transparent storage backend for the entire S3 ecosystem with no code change in consuming services; most code already exists from the v0.27.2 S3-compatible API work; this packages it as a Docker container for the SG compute service; effort: low to moderate (code mostly exists) | 06/23 compute-and-storage/s3-compatible-vault-container-brief |
