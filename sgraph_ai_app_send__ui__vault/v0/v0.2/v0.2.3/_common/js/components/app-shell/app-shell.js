@@ -135,8 +135,10 @@
                 // Save as App Mode deep-link so vault can open this file in App Mode
                 // if app-shell redirects to /en-gb/vault/ (no app.json case).
                 try { sessionStorage.setItem('sg-vault-deep-link', 'app:' + rawHash); } catch (_) {}
-                // Remove the hash — file path is now captured in sessionStorage
-                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                // Remove the hash — file path is now captured in sessionStorage.
+                // try/catch: replaceState throws in an opaque-origin frame (see the
+                // null-origin note on the address-bar scrub in _initWithKey). Best-effort.
+                try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch (_) {}
             }
             // Key always from localStorage (set by root inbox /#vault-key handler)
             var saved = '';
@@ -380,9 +382,16 @@
                 try { sessionStorage.setItem('sg-vault-key', key); localStorage.setItem('sg-vault-key', key); } catch (_) {}
             }
 
-            // Key never stays in address bar
-            if (window.history && window.history.replaceState) {
-                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            // Key never stays in address bar.
+            // EMBED / null-origin guard: in embed mode the key never was in the URL (it
+            // arrives by postMessage), so there's nothing to scrub. And critically, when
+            // the embedding parent is itself a null-origin sandbox (vault-in-vault), THIS
+            // frame is forced to an opaque origin too — and replaceState() with the resolved
+            // absolute URL throws "Domains, protocols and ports must match", which would
+            // abort _initWithKey BEFORE app-shell:ready fires and the parent never gets
+            // vault-ready. Skip in embed mode; try/catch the rest for any other opaque case.
+            if (!this._embedMode && window.history && window.history.replaceState) {
+                try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch (_) {}
             }
 
             // Build data source. Resolve the server access token (write gate): the entry-form
