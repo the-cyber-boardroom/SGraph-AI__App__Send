@@ -1,6 +1,6 @@
 # Infrastructure — Proposed Items Index
 
-**Domain:** infra/proposed/ | **Last updated:** 2026-05-24 | **Maintained by:** Librarian (daily run)
+**Domain:** infra/proposed/ | **Last updated:** 2026-06-26 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -254,3 +254,13 @@ All items below are PROPOSED — does not exist yet.
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
 | P-398 | SG/Vault AWS Marketplace standalone deployment | Separate admin FastAPI and website for deployment management; setup mode on boot (boots unconfigured, no user data required at launch — marketplace policy); storage-mode property (memory / disk EBS / S3) with least-privilege IAM role per mode attached to EC2 instance (no credentials in AMI); two-layer authorization model (FastAPI access control + usage API keys, both user-configurable); send-to-someone workflow = open FastAPI access + key required to invoke; AMI + CloudFormation one-click deploy; marketplace-branded vault page; pricing: free / BYOL / metered; open items before launch: TLS without Caddy (sidecar proxy recommended), admin auth bootstrap (first-boot random token), EBS volume lifecycle (DeletionPolicy: Snapshot) | 06/21 aws-marketplace-deployment/dev-brief |
+
+---
+
+## S3-Compatible Vault Container for SG Compute (06/23 briefs — v0.33.33)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-407 | S3-compatible vault container for SG compute | A Docker container presenting a standard S3-compatible API (boto3 / AWS CLI / any S3 SDK); the consuming service code is unchanged — only the S3 endpoint is repointed to the container; files are served from a selectable swappable backend (vault / local disk / memory); the vault backend turns the vault into a transparent drop-in S3 backend for any S3-speaking service; the AWS credential fields are reused as the container's header name and header value for compatibility; most code exists (v0.27.2 S3-compatible-API sprint); this brief specifies the Docker packaging for SG compute and the three-backend selection mechanism; key open items: which S3 operations to cover first (pin to what the target service uses); the key-to-file mapping for the vault backend; effort: small (packaging exercise) | 06/23 compute-and-storage/s3-vault-container-dev-brief |

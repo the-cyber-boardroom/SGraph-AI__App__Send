@@ -1,6 +1,6 @@
 # website/proposed — Index
 
-**Domain:** `website/` | **Last updated:** 2026-05-17
+**Domain:** `website/` | **Last updated:** 2026-06-26
 **Source:** Archived monolith `../v0.16.26__what-exists-today.md` — Sections 16 (lines 1480–1509), 17 (lines 1516–1543), 19 (lines 1640–1738)
 
 ---
@@ -140,3 +140,13 @@ All items below are PROPOSED — does not exist yet.
 | # | Feature | One-Line Description | Source |
 |---|---------|---------------------|--------|
 | P-402 | Evidence-driven mapping website | A separate website cataloging specific use cases and AI-agent incidents as worked, detective-style mappings backed by near-unquestionable public evidence; method: reverse-engineer from a real incident (e.g. Replit July 2025 production database deletion — AI Incident DB 1152) to show what access made the harm possible, then recalculate the worst case the same access allowed (deletion is often the good case; corruption/manipulation/silent alteration are worse and harder to detect); maps permission to blast radius across environments (AWS, WhatsApp, etc.) with both malicious and non-malicious intent paths; each mapping carries a confidence score and states honestly where no public evidence exists; public sources: CWE, MITRE ATT&CK, MITRE ATLAS, CISA KEV, AI Incident Database, OECD AIM; architecture: vault per environment for each mapping set (e.g. one vault for AWS, one for WhatsApp); separate community vault processing comments, upvotes, and downvotes (Stack Overflow-style) for validation by security professionals and executives; purpose: validate the market hypothesis that awareness-of-real-risks drives demand and funding; uses the 14-field mapping schema from the self-contained incident-mapping brief (06/22); starter catalog of 14 real sourced incidents spanning destruction, exfiltration, persistence, and supply chain | 06/22 market-cases-and-graph/evidence-mapping-website-dev-brief |
+
+---
+
+## Risk Mandate.ai Brand and Persona Website (06/23 briefs — v0.33.33)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-409 | Risk Mandate.ai brand website with fractal persona architecture | The Risk Mandate.ai website (riskmandate.ai / rm.ai) describes each persona (CEO, CSO, CIO, CFO, legal counsel, GRC, buying function, internal dev, agentic vendor, sales/CRO) with their focus and needs; personas modelled in the graph with fractal recurrence (every company that uses AI also sells it, so roles recur at each level of the supply chain); the site supports multilingual and multicultural customisation as a first-class feature from the start (not an afterthought); the selling-company persona has a build-and-comply double view; this website is distinct from the existing sgraph.ai website and the evidence-driven mapping website (P-402); requires: domain acquisition (riskmandate.ai, rm.ai), persona descriptions, multilingual customisation layer, graph-driven persona views; the "adding AI as a risk not a debate" document (06/23) is a practitioner content piece for this site | 06/23 risk-mandate-product-and-workflow/audience-personas-strategy-brief |
