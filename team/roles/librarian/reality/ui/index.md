@@ -552,6 +552,7 @@ Protocol (3-message handshake):
 - `_initWithKey`: localStorage/sessionStorage persistence skipped when `this._embedMode` is true
 - `_embedDeepLink`: deepLink stored on instance memory (not sessionStorage — avoids SecurityError in null-origin iframes, fix `84ba117`)
 - `_setCachedAccessKey`: early-return on `this._embedMode` (fix `159ec76`)
+- **null-origin `replaceState` guard (2026-06-15):** the "key never stays in address bar" `history.replaceState` in `_initWithKey` was unguarded. When the EMBEDDING parent is itself a null-origin sandbox (vault-in-vault — a vault HTML app embedding another vault), sandbox propagation forces THIS frame to an opaque origin, and `replaceState` to the resolved absolute URL throws "Domains, protocols and ports must match". That threw mid-`_initWithKey`, BEFORE `app-shell:ready` → `vault-ready` was never posted → the parent's handshake timed out (the vault opened but appeared to hang). Now skipped in embed mode + try/catch (matches the hash-cleanup `replaceState` in `_init` and the nav-history one). Real-origin parents were unaffected (the embedded frame got a real origin), which is why it worked in non-nested embeds.
 
 **Security properties (embed mode):**
 - Key in memory only — never touches localStorage or sessionStorage
