@@ -2287,6 +2287,55 @@
 
         // ── VFS bridge (injected into iframe) ─────────────────────────────────────────
 
+        // Source for sg.vault.embed(), injected into the app bridge. The pure src-building
+        // and sandbox-sanitisation come from the unit-tested SgEmbed module (injected verbatim
+        // via Function.toString — the shipped code IS the tested code). The handshake glue is
+        // the thin wrapper below. SECURITY: sandbox defaults to allow-scripts only; SgEmbed
+        // refuses allow-same-origin and allow-popups-to-escape-sandbox even if asked.
+        _embedHelperSrc() {
+            if (typeof SgEmbed === 'undefined' || !SgEmbed.sanitizeSandbox || !SgEmbed.buildEmbedSrc) {
+                return 'function _embedVault(){return Promise.reject(new Error("sg.vault.embed unavailable (sg-embed-helpers.js not loaded)"));}';
+            }
+            return ''
+                + 'var _sanitizeSandbox=' + SgEmbed.sanitizeSandbox.toString() + ';'
+                + 'var _buildEmbedSrc='   + SgEmbed.buildEmbedSrc.toString()   + ';'
+                + 'function _embedVault(mount,key,opts){'
+                +   'opts=opts||{};'
+                +   'if(!mount||!key)return Promise.reject(new Error("sg.vault.embed: a mount element and a vault key are required"));'
+                +   'var nullOrigin=(location.origin==="null");'
+                +   'var host=opts.host||(location.protocol+"//"+location.host);'
+                +   'var src=_buildEmbedSrc(host,nullOrigin,{surface:opts.surface,parentOrigin:location.origin});'
+                +   'var sandbox=_sanitizeSandbox(opts.sandbox);'
+                +   'var expectedFrom;try{expectedFrom=new URL(host).origin;}catch(_){expectedFrom=host;}'
+                +   'return new Promise(function(resolve,reject){'
+                +     'var iframe=document.createElement("iframe");'
+                +     'iframe.src=src;'
+                +     'iframe.setAttribute("sandbox",sandbox);'
+                +     'iframe.style.cssText=opts.style||"width:100%;height:100%;border:0;display:block";'
+                +     'if(opts.allow)iframe.setAttribute("allow",opts.allow);'
+                +     'mount.appendChild(iframe);'
+                +     'var sent=false;'
+                +     'var timer=setTimeout(function(){cleanup();reject(new Error("sg.vault.embed: handshake timed out"));},opts.timeoutMs||14000);'
+                +     'function cleanup(){clearTimeout(timer);window.removeEventListener("message",onMsg);}'
+                +     'function onMsg(e){'
+                +       'if(e.source!==iframe.contentWindow)return;'                        // pin to THIS frame
+                +       'if(e.origin!==expectedFrom&&e.origin!=="null")return;'             // host or opaque only
+                +       'var d=e.data;if(!d||typeof d!=="object")return;'
+                +       'if(d.sg==="vault-embed-ready"&&!sent){'
+                +         'sent=true;'
+                +         'var to=(e.origin&&e.origin!=="null")?e.origin:"*";'              // concrete, else "*" to this one window
+                +         'iframe.contentWindow.postMessage({sg:"vault-open",key:key,mode:opts.mode||"auto",deepLink:opts.deepLink||""},to);'
+                +       '}else if(d.sg==="vault-ready"){'
+                +         'cleanup();resolve({vaultName:d.vaultName||"",fileCount:d.fileCount|0,hasApp:!!d.hasApp,iframe:iframe});'
+                +       '}else if(d.sg==="vault-error"){'
+                +         'cleanup();reject(new Error(d.message||"vault error"));'
+                +       '}'
+                +     '}'
+                +     'window.addEventListener("message",onMsg);'
+                +   '});'
+                + '}';
+        }
+
         _buildVfsBridgeScript(currentPath) {
             // EFFECTIVE writability — match what the bridge ACTUALLY enforces (and what the
             // SG/Vault editor preview reports via send-browse). Two distinct gates:
@@ -2476,6 +2525,12 @@
                       'window.addEventListener("message",h);window.parent.postMessage(payload,"*");' +
                     '});' +
                   '}' +
+                  // sg.vault.embed() — open ANOTHER vault inside an iframe via the embed
+                  // handshake, with no key in the URL and minimal sandbox privileges. The
+                  // src-building + sandbox-sanitisation come from the unit-tested SgEmbed
+                  // module, injected verbatim here (toString) so the shipped code IS the
+                  // tested code. Default sandbox is allow-scripts only — see sg-embed-helpers.js.
+                  _embedHelperSrc() +
                   // window.sg.*
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
@@ -2488,6 +2543,11 @@
                     // sg.vault.* — create / manage child vaults. create(opts) takes an opts object
                     // (matches mount(opts)): { label, link:{path}|false, returnKey, custody, seedFrom }.
                     'vault:{' +
+                      // embed(mountEl, key, opts?) → Promise<{vaultName,fileCount,hasApp,iframe}>.
+                      // Opens another vault inside an iframe; key travels by postMessage (never
+                      // the URL/storage); sandbox defaults to allow-scripts only. opts: {host,
+                      // surface:"app"|"vault", mode, deepLink, sandbox:[...narrow tokens], timeoutMs}.
+                      'embed:_embedVault,' +
                       'create:function(opts){opts=opts||{};return _sgCmd("vault",{action:"create",label:opts.label,link:opts.link,returnKey:opts.returnKey,custody:opts.custody,seedFrom:opts.seedFrom,accessToken:opts.accessToken});},' +
                       // getKey(ref) → {key}: retrieve a custodied key to re-share (always-confirm consent).
                       'getKey:function(ref){return _sgCmd("vault",{action:"getKey",ref:ref});},' +

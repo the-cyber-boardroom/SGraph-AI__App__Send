@@ -147,6 +147,8 @@ window.sg = {
         mount   : ({prefix, ref, label}) => Promise<{mountId}>,
         unmount : (mountId)      => Promise<{ok: true}>,
         mounts  : ()             => Promise<[{mountId, prefix, label, ref}]>,
+        // Open ANOTHER vault inside an iframe in YOUR app. See "Embedding another vault".
+        embed   : (mountEl, key, opts?) => Promise<{vaultName, fileCount, hasApp, iframe}>,
     },
     // Device-local preferences for THIS app on THIS browser (NEW 2026-05-30).
     // Backed by the top-level kernel's localStorage, namespaced as
@@ -501,6 +503,62 @@ const txt = await sg.vfs.readText('subvaults/patient-alice/knee-score.json');
 
 This is the workflow that lets an app (e.g. a clinician dashboard) read across many per-user vaults
 without the user ever seeing the raw vault UI.
+
+---
+
+## Embedding another vault inside your app (`sg.vault.embed`)
+
+Sometimes you don't want to *read* another vault's files — you want to **show the whole
+other vault** (its app, its files) inside a panel in your app. A doctor console opening
+each patient's vault is the canonical case. Use **`sg.vault.embed`**:
+
+```js
+const pane = document.querySelector('#patient-pane');
+const info = await sg.vault.embed(pane, patientKey);
+// → { vaultName, fileCount, hasApp, iframe }
+```
+
+That's the whole thing. `sg.vault.embed` creates the iframe, runs the key handshake over
+`postMessage` (**the key never touches the URL or storage**), uses the **minimum sandbox
+privileges**, and resolves once the embedded vault is interactive.
+
+`key` is the full vault key (`passphrase:vault-id` — the same string that follows `#` in a
+share link). Options (all optional):
+
+| option | default | meaning |
+|---|---|---|
+| `host` | the host your app was served from | e.g. `'https://dev.vault.sgraph.ai'` |
+| `surface` | `'app'` | `'app'` runs the embedded vault's app; `'vault'` is the file browser (file-browser embed is a planned follow-on) |
+| `deepLink` | — | a file path to open inside the embedded vault |
+| `mode` | `'auto'` | `'app'` / `'vault'` / `'auto'` |
+| `sandbox` | *(none)* | extra sandbox tokens **beyond `allow-scripts`** — narrow opt-ins only (see below) |
+| `timeoutMs` | `14000` | handshake timeout |
+
+### Security — least privilege by default
+
+The embedded iframe is sandboxed with **`allow-scripts` only**. That's all the handshake
+and rendering need, and it keeps the vault in an opaque origin with no storage. The host
+**refuses** the two dangerous tokens even if you ask for them:
+
+- **`allow-same-origin`** — would dissolve the isolation boundary (the embedded vault could
+  read your app's storage/DOM). Never granted.
+- **`allow-popups-to-escape-sandbox`** — the embedded frame renders HTML apps authored by
+  *whoever shared that vault*; this token would let that content open a **full-privilege,
+  unsandboxed** window. Never granted.
+
+If a specific in-vault action needs more, add the **narrow** token for *that action* via
+`opts.sandbox` — `['downloads']` to let the embedded vault download a file, `['popups']`
+for new-tab links (they stay sandboxed), `['modals']` for `window.print()`/dialogs. Reach
+for the smallest set that works; never the escape token.
+
+### Don't hand-roll the handshake
+
+Earlier this required ~70 lines of `postMessage` plumbing plus a list of gotchas (opaque
+origins, `parent=null`, target-origin rules). `sg.vault.embed` is the platform-maintained,
+tested version of exactly that — **don't** point an iframe at `https://host/#<key>` (that's
+the entry-form flow and depends on `localStorage`, which is blocked in a sandboxed app).
+Always keep an `<a href="https://host/#<key>" target="_blank">` **Open in new tab** link as a
+fallback for environments where framing is blocked by the host's CSP.
 
 ---
 
