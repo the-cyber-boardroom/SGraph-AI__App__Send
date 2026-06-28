@@ -7,6 +7,22 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-28
+
+No new human briefs (06/25–06/28 all empty). Backlog task B-003 completed: ai-agents/proposed/index.md (408 lines) split into five topic files.
+
+- `ai-agents/proposed/index.md` — Replaced 408-line content monolith with ~65-line table of contents pointing to five topic files. No content changed — pure structural split.
+- `ai-agents/proposed/llm-components.md` — NEW: sg-llm family, agentic tool execution, multi-agent, developer experience, observable LLM orchestration tool, unified observability REPL, Bedrock CLI, observability pipeline sources, AgentCore resell products, Nova + AgentCore POC.
+- `ai-agents/proposed/agent-communication.md` — NEW: MCP gaps, sgit CLI extensions, communication vault pattern, QA stack on SG/Compute, AppSec mini-tools (P-159–P-164), vault comms demo + PKI (P-312, P-315, P-316).
+- `ai-agents/proposed/workflows.md` — NEW: Scheduled and autonomous tasks, accountant demo (P-147–P-152), archiver-cataloguer pattern (P-238–P-247), agentic incident-response service (P-247).
+- `ai-agents/proposed/skills-economy.md` — NEW: Partner integrations (P-288–P-298), skills creator economy (P-294–P-305), skills deepened June 4 (P-317–P-321), NHI 2.0 ai-agents cross-domain items (P-325, P-328, P-332).
+- `ai-agents/proposed/risk-mandate.md` — NEW: Agent blast-radius service (P-353–P-357), assessment template (P-376–P-379), Odysseus vault + formal ontology (P-387–P-393), authorization ontology + delegation (P-394–P-397), mandate architecture (P-399–P-403), Wardley maps + risk acceptance services + personal scenario (P-404–P-409).
+
+Master index (06/28): `team/roles/librarian/reviews/06/28/v0.33.33__master-index__no-new-briefs-backlog-b003-28-june.md`
+Processed: 0 new human briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Structural: B-003 ai-agents proposed split
+
+---
+
 ## 2026-06-19
 
 Brief-processing session: 18 human brief files from 06/18 processed (1 day-index + 17 in

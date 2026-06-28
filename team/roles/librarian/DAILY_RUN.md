@@ -86,12 +86,18 @@ tools proposals).
 **Why:** Tools PROPOSED is the second-largest domain. Topic files make it navigable.
 
 ### B-003 · Reality — Extract ai-agents PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-06-28)
 **What:** Expand `ai-agents/proposed/index.md` into topic files: `llm-components.md`,
 `workflows.md`, `agent-communication.md`, `task-system.md`, `code-pipeline.md`. Source:
 archived monolith sections 16 (agent communication), 19 (one-shot LLM, scheduled tasks),
 20 (feedback loop, multi-agent chat), 22–28 (various agentic proposals), 31 (task components).
 **Why:** Agentic work is growing fast. Individual topic files are needed.
+
+**Outcome:** Split into five topic files (different names from spec, matching actual content
+growth): `llm-components.md`, `agent-communication.md`, `workflows.md`, `skills-economy.md`,
+`risk-mandate.md`. The skills-economy and risk-mandate files cover large post-spec June briefs.
+The 408-line monolith is now a ~65-line TOC index. All P-numbers preserved. Pre-existing
+P-numbering discrepancy (P-404–P-410 range) documented in risk-mandate.md but not resolved.
 
 ### B-004 · Reality — Extract infra PROPOSED content into domain files
 **Status:** QUEUED
@@ -168,6 +174,7 @@ None currently active.
 | 2026-05-25 | No new briefs; code scan 24–25 May; B-008 | vault UI app.json resource injection documented; E2E test alignment noted; ROLE.md broken link fixed (project brief path) |
 | 2026-05-04 | No new briefs; backlog B-010 | Activity log updated: 33 entries added covering 04/01–05/04 |
 | 2026-05-03 | Process 04/29 late batch (4 briefs) | Docs 333–336 catalogued; infra/proposed + cli/proposed updated; master index, architect review, dev review, debrief produced |
+| 2026-06-28 | No new briefs; backlog B-003 | ai-agents/proposed 408-line monolith split into 5 topic files (llm-components, agent-communication, workflows, skills-economy, risk-mandate); TOC index; changelog + DAILY_RUN updated |
 
 ---
 
