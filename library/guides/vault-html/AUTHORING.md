@@ -45,7 +45,7 @@ Anything that goes through a JavaScript API works without modification:
 | `img.src = 'photo.png'` (assigned **from JS**) | ✅ Works | `HTMLImageElement.prototype.src` setter is patched to decrypt + serve a `blob:` |
 | `<a href="other.html">` (clicked) | ✅ Works | Click handler postMessages parent, which re-renders the iframe |
 | `<a href="other.html#section">` (clicked) | ✅ Works | Fixed 2026-05-30 — the `?query`/`#fragment` is stripped before the extension check; the fragment is forwarded and scrolled-to in the new doc |
-| `<a href="https://example.com">` (clicked) | ✅ Opens in a new tab | Fixed 2026-05-30 — the iframe sandbox got `allow-popups allow-popups-to-escape-sandbox`; the click interceptor calls `window.open(href, '_blank', 'noopener,noreferrer')` synchronously from the gesture |
+| `<a href="https://example.com">` (clicked) | ✅ Opens in a new tab | Default: a one-click host confirm opens it (no escape-sandbox). Opt into frictionless in-frame open with `permissions.externalLinks: true`. See "What the host does for you". |
 | `sg.fs.*`, `sg.vault.*`, `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*`, `sg.state.*` | ✅ Works | postMessage command protocol (see below) |
 
 If you stick to these patterns, your page just works.
@@ -326,10 +326,21 @@ Just use anchor tags. Click handling is intercepted automatically:
   the static host 403'd). Fixed 2026-05-30. The fragment is forwarded to the new srcdoc
   and applied on `DOMContentLoaded` via a postMessage from the parent. Apps don't need
   any workaround.
-- **External links** (`http://`, `https://`, protocol-relative `//`) open in a new tab
-  via `window.open(..., '_blank', 'noopener,noreferrer')`. The iframe sandbox has
-  `allow-popups allow-popups-to-escape-sandbox`, so the new window is unrestricted.
-  Don't add `target="_blank"` markup — the host handles it.
+- **External links** (`http://`, `https://`, protocol-relative `//`) open in a new tab.
+  Don't add `target="_blank"` — the host handles it. **By default** (least privilege) the
+  app frame has **no** popup/escape-sandbox capability: clicking an external link surfaces a
+  one-click **"This app wants to open `<url>` — Open ↗"** confirm on the host chrome, and the
+  host opens it. This also means the user sees where a link leads before it opens.
+  If your app opens external links often and you want the **frictionless** in-frame open
+  (no confirm), declare it:
+
+  ```json
+  { "permissions": { "externalLinks": true } }
+  ```
+
+  That grants the frame `allow-popups allow-popups-to-escape-sandbox`. Only opt in if your
+  app genuinely needs it — it's the one grant that lets the frame open an unsandboxed window,
+  so default-off is the safe posture (see "Embedding another vault" for the same principle).
 - **`mailto:` and `javascript:`** are passed through unchanged.
 - **Pure-fragment links** (`<a href="#section">`) are passed through — the browser
   scrolls within the current page without the host being involved.

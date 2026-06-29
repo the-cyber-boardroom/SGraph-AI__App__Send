@@ -139,7 +139,14 @@
                 read:          inbox.read          === true,   // fetch ciphertext
                 markProcessed: inbox.markProcessed === true,
                 purge:         inbox.purge         === true
-            }
+            },
+            // externalLinks (bool, default-deny). When TRUE the app frame is granted
+            // allow-popups + allow-popups-to-escape-sandbox so external <a href> links
+            // open as real new tabs via in-frame window.open (frictionless). When FALSE
+            // (default) the frame gets NEITHER token; external clicks are routed to the
+            // host, which opens them after a one-click user confirm (no escape-sandbox).
+            // Default-deny is the least-privilege posture: escape-sandbox is opt-in only.
+            externalLinks: (p.externalLinks === true)
         };
     }
 
