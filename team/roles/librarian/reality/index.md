@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.16 | **Last updated:** 2026-06-10 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.34 | **Last updated:** 2026-06-29 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-06-10)
+## Quick Stats (as of 2026-06-29)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,9 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 469+ (unchanged — no new briefs today) |
-| Total documents catalogued | 617 (+3 comms/debrief docs from 06/08–10 session) |
+| Open PROPOSED items (across all domains) | 639+ (+12 net-new from June 24-26: P-411 through P-422; P-412 in security/proposed) |
+| Total documents catalogued | 772 (+18 brief files from June 24-26 addendum, fully processed 2026-06-29) |
+| **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 
 ---
 

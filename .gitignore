@@ -256,3 +256,9 @@ node_modules/
 test-results/
 playwright-report/
 _sg-send_data
+
+# SG/Send vault clones (sgit working clones) — contain secrets under .sg_vault/local/
+# (vault_key, access tokens). NEVER commit these. Keep all clones under this one folder
+# so no vault id/key ever appears in tracked files.
+.vault-clones/
+**/.sg_vault/

@@ -70,7 +70,7 @@
             this._visibilityHandler = () => {
                 if (document.hidden) return;
                 this._scheduleBehindCheck(500);
-                this._scheduleInboxCheck(500);          // inbox check rides the same focus trigger (no-op unless an app opted in)
+                this._scheduleAppendCheck(500);          // append check rides the same focus trigger (no-op unless an app opted in)
             };
             document.addEventListener('visibilitychange', this._visibilityHandler);
             this._init();
@@ -90,7 +90,7 @@
             if (this._visibilityHandler) { document.removeEventListener('visibilitychange', this._visibilityHandler); this._visibilityHandler = null; }
             clearTimeout(this._autoPushTimer);
             clearTimeout(this._behindCheckTimer);
-            clearTimeout(this._inboxCheckTimer);
+            clearTimeout(this._appendCheckTimer);
             if (this._embedOpenHandler)  { window.removeEventListener('message', this._embedOpenHandler); this._embedOpenHandler = null; }
             if (this._embedReadyHandler) { this.removeEventListener('app-shell:ready', this._embedReadyHandler); this._embedReadyHandler = null; }
             if (this._vfsBridgeHandler) {
@@ -560,44 +560,44 @@
             } catch (_) { /* network errors are silent — retried on next focus */ }
         }
 
-        // ── Inbox check-on-events → host_events-gated push to the app ────────────────────
-        // Built only when the mounted app declared an inbox host_event (default-deny). Runs
+        // ── Append check-on-events → host_events-gated push to the app ────────────────────
+        // Built only when the mounted app declared an append host_event (default-deny). Runs
         // on the same quasi-events as the behind-check (focus, app open). Each emit is filtered
         // through app.json.host_events before it reaches the iframe — an app cannot receive an
         // event it didn't declare. auto_fetch is off here: apps pull ciphertext on demand via
-        // sg.inbox.fetch when they get the notification.
-        async _initInboxChecker(appJson) {
+        // sg.append.fetch when they get the notification.
+        async _initAppendChecker(appJson) {
             this._hostEvents = AppHostEvents.parse(appJson);
-            if (typeof SGInbox === 'undefined' || typeof SGInboxChecker === 'undefined' || typeof AppHostEvents === 'undefined') return;
-            var wantsInbox = AppHostEvents.allows(this._hostEvents, 'inbox.new-messages')
-                          || AppHostEvents.allows(this._hostEvents, 'inbox.error');
-            if (!wantsInbox || !this._vault) { this._inboxChecker = null; return; }
+            if (typeof SGAppend === 'undefined' || typeof SGAppendChecker === 'undefined' || typeof AppHostEvents === 'undefined') return;
+            var wantsAppend = AppHostEvents.allows(this._hostEvents, 'append.new-messages')
+                          || AppHostEvents.allows(this._hostEvents, 'append.error');
+            if (!wantsAppend || !this._vault) { this._appendChecker = null; return; }
             // Reuse the checker across re-mounts of the same vault (seen-set persists).
-            if (this._inboxChecker && this._inboxCheckerVaultId === this._vault._vaultId) {
-                this._scheduleInboxCheck(0, 'app-remount');
+            if (this._appendChecker && this._appendCheckerVaultId === this._vault._vaultId) {
+                this._scheduleAppendCheck(0, 'app-remount');
                 return;
             }
-            var inbox = await this._getInbox();
-            if (!inbox) { this._inboxChecker = null; return; }
+            var inbox = await this._getAppendClient();
+            if (!inbox) { this._appendChecker = null; return; }
             var self = this;
             var bus = { emit: function (name, payload) { self._pushHostEvent(name, payload); } };
-            this._inboxChecker = new SGInboxChecker(inbox, bus, function () {
-                return { enabled: AppHostEvents.allows(self._hostEvents, 'inbox.new-messages'), auto_fetch: false };
+            this._appendChecker = new SGAppendChecker(inbox, bus, function () {
+                return { enabled: AppHostEvents.allows(self._hostEvents, 'append.new-messages'), auto_fetch: false };
             });
-            this._inboxCheckerVaultId = this._vault._vaultId;
-            this._scheduleInboxCheck(0, 'app-open');
+            this._appendCheckerVaultId = this._vault._vaultId;
+            this._scheduleAppendCheck(0, 'app-open');
         }
 
-        _scheduleInboxCheck(delayMs, trigger) {
-            if (!this._inboxChecker) return;
+        _scheduleAppendCheck(delayMs, trigger) {
+            if (!this._appendChecker) return;
             var DEBOUNCE_MS = 1000;
-            var since = Date.now() - (this._lastInboxCheckTime || 0);
+            var since = Date.now() - (this._lastAppendCheckTime || 0);
             var wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
             var label = trigger || 'visibility';
-            clearTimeout(this._inboxCheckTimer);
-            this._inboxCheckTimer = setTimeout(() => {
-                this._lastInboxCheckTime = Date.now();
-                if (this._inboxChecker) this._inboxChecker.check(label);
+            clearTimeout(this._appendCheckTimer);
+            this._appendCheckTimer = setTimeout(() => {
+                this._lastAppendCheckTime = Date.now();
+                if (this._appendChecker) this._appendChecker.check(label);
             }, Math.max(0, wait));
         }
 
@@ -1118,29 +1118,29 @@
             } catch (_) { return false; }
         }
 
-        // Lazily build (and cache per vault) the SGInbox transport for the open vault.
+        // Lazily build (and cache per vault) the SGAppend transport client for the open vault.
         // enum_key is derived from the read_key's raw bytes (owner sessions; RO sessions
         // get a null enum_key and the read verbs fail closed). Re-derives if the vault changed.
-        async _getInbox() {
+        async _getAppendClient() {
             var vault = this._vault;
-            if (!vault || typeof SGInbox === 'undefined') return null;
-            if (this._inbox && this._inboxVaultId === vault._vaultId) return this._inbox;
+            if (!vault || typeof SGAppend === 'undefined') return null;
+            if (this._append && this._appendVaultId === vault._vaultId) return this._append;
             var sgSend   = vault._sgSend || null;
             var endpoint = (sgSend && sgSend.endpoint)
                 || (window.SG_ENDPOINT
                     || (function () { try { return sessionStorage.getItem('sg-vault-endpoint'); } catch (_) { return null; } })()
                     || 'https://dev.send.sgraph.ai');
             var rawBytes = await vault.readKeyRawBytes();
-            var enumKey  = rawBytes ? await SGInbox.deriveEnumKey(rawBytes) : null;
-            this._inbox = new SGInbox({
+            var enumKey  = rawBytes ? await SGAppend.deriveEnumKey(rawBytes) : null;
+            this._append = new SGAppend({
                 endpoint:    endpoint,
                 vaultId:     vault._vaultId,
                 enumKey:     enumKey,
                 writeKeyHex: vault.writeKeyHex,
                 accessToken: (sgSend && sgSend.token) || null
             });
-            this._inboxVaultId = vault._vaultId;
-            return this._inbox;
+            this._appendVaultId = vault._vaultId;
+            return this._append;
         }
 
         // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
@@ -1933,8 +1933,8 @@
             this._navIndex     = 0;
             this._emitNavChange();
 
-            // Start the inbox checker if this app opted into inbox host_events (no-op otherwise).
-            this._initInboxChecker(appJson);
+            // Start the append checker if this app opted into append host_events (no-op otherwise).
+            this._initAppendChecker(appJson);
         }
 
         // _page.json: render via PageLayoutRenderer.
@@ -2606,19 +2606,19 @@
                       'mount:function(opts){return _sgCmd("vault",{action:"mount",prefix:opts&&opts.prefix,ref:opts&&opts.ref,label:opts&&opts.label});},' +
                       'unmount:function(mountId){return _sgCmd("vault",{action:"unmount",mountId:mountId});},' +
                       'mounts:function(){return _sgCmd("vault",{action:"mounts"});},' +
-                      // Cross-vault peer wake — ask a mounted child to check its inbox now (C6).
+                      // Cross-vault peer wake — ask a mounted child to check its append lane now (C6).
                       'notify:function(mountId,name,payload){return _sgCmd("vault",{action:"notify",mountId:mountId,name:name,payload:payload});}' +
                     '},' +
-                    // sg.inbox.* — append-only inbox transport (six verbs, 1:1 with the server).
+                    // sg.append.* — append-only transport (six verbs, 1:1 with the server).
                     // The kernel holds the keys and attaches the gate header per verb; app.json
-                    // permissions.inbox.* decides which verbs are callable.
-                    'inbox:{' +
-                      'configure:function(o){o=o||{};return _sgCmd("inbox",{action:"configure",append_anchors:o.append_anchors});},' +
-                      'append:function(o){o=o||{};return _sgCmd("inbox",{action:"append",vault_id:o.vault_id,append_token:o.append_token,payload:o.payload});},' +
-                      'list:function(o){o=o||{};return _sgCmd("inbox",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content});},' +
-                      'fetch:function(o){o=o||{};return _sgCmd("inbox",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids});},' +
-                      'markProcessed:function(o){o=o||{};return _sgCmd("inbox",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids});},' +
-                      'purge:function(o){o=o||{};return _sgCmd("inbox",{action:"purge",folder:o.folder,inbox:o.inbox,file_ids:o.file_ids});}' +
+                    // permissions.append.* decides which verbs are callable.
+                    'append:{' +
+                      'configure:function(o){o=o||{};return _sgCmd("append",{action:"configure",append_anchors:o.append_anchors});},' +
+                      'write:function(o){o=o||{};return _sgCmd("append",{action:"write",vault_id:o.vault_id,append_token:o.append_token,payload:o.payload});},' +
+                      'list:function(o){o=o||{};return _sgCmd("append",{action:"list",inbox:o.inbox,after_file_id:o.after_file_id,limit:o.limit,include_content:o.include_content});},' +
+                      'fetch:function(o){o=o||{};return _sgCmd("append",{action:"fetch",inbox:o.inbox,file_ids:o.file_ids});},' +
+                      'markProcessed:function(o){o=o||{};return _sgCmd("append",{action:"markProcessed",inbox:o.inbox,file_ids:o.file_ids});},' +
+                      'purge:function(o){o=o||{};return _sgCmd("append",{action:"purge",folder:o.folder,inbox:o.inbox,file_ids:o.file_ids});}' +
                     '},' +
                     // sg.on / sg.off — kernel→app events (see the _sgEvtH registry above).
                     'on:_sgOn,off:_sgOff,' +
@@ -3033,31 +3033,31 @@
                         return;
                     }
 
-                    // ── inbox transport (configure / append / list / fetch / markProcessed / purge) ──
-                    // The kernel holds the keys; SGInbox attaches the gate header per verb.
-                    // app.json permissions.inbox.* decides which verbs the app may call.
-                    if (e.data.__sgCmdType === 'inbox') {
+                    // ── append transport (configure / write / list / fetch / markProcessed / purge) ──
+                    // The kernel holds the keys; SGAppend attaches the gate header per verb.
+                    // app.json permissions.append.* decides which verbs the app may call.
+                    if (e.data.__sgCmdType === 'append') {
                         var ibAct = e.data.action;
-                        var ibCap = { configure: 'inbox.configure', append: 'inbox.append', list: 'inbox.list',
-                                      fetch: 'inbox.read', markProcessed: 'inbox.markProcessed', purge: 'inbox.purge' }[ibAct];
-                        if (!ibCap) { cmdReply(false, null, 'Unknown inbox action: ' + ibAct); return; }
-                        if (!self._can(ibCap, '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('inbox.' + ibAct, { ok: false, err: 'EPERM' }); return; }
+                        var ibCap = { configure: 'append.configure', write: 'append.write', list: 'append.list',
+                                      fetch: 'append.read', markProcessed: 'append.markProcessed', purge: 'append.purge' }[ibAct];
+                        if (!ibCap) { cmdReply(false, null, 'Unknown append action: ' + ibAct); return; }
+                        if (!self._can(ibCap, '')) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('append.' + ibAct, { ok: false, err: 'EPERM' }); return; }
                         var ibData = e.data;
-                        self._getInbox().then(function (inbox) {
-                            if (!inbox) throw new Error('inbox transport unavailable');
+                        self._getAppendClient().then(function (inbox) {
+                            if (!inbox) throw new Error('append transport unavailable');
                             switch (ibAct) {
                                 case 'configure':     return inbox.configure({ append_anchors: ibData.append_anchors });
-                                case 'append':        return inbox.append({ vault_id: ibData.vault_id, append_token: ibData.append_token, payload: ibData.payload });
+                                case 'write':         return inbox.write({ vault_id: ibData.vault_id, append_token: ibData.append_token, payload: ibData.payload });
                                 case 'list':          return inbox.list({ inbox: ibData.inbox, after_file_id: ibData.after_file_id, limit: ibData.limit, include_content: ibData.include_content });
                                 case 'fetch':         return inbox.fetch({ inbox: ibData.inbox, file_ids: ibData.file_ids });
                                 case 'markProcessed': return inbox.markProcessed({ inbox: ibData.inbox, file_ids: ibData.file_ids });
                                 case 'purge':         return inbox.purge({ folder: ibData.folder, inbox: ibData.inbox, file_ids: ibData.file_ids });
                             }
                         }).then(function (r) {
-                            cmdReply(true, r); self._emitBridgeCall('inbox.' + ibAct, { ok: true });
+                            cmdReply(true, r); self._emitBridgeCall('append.' + ibAct, { ok: true });
                         }).catch(function (err) {
                             cmdReply(false, null, (err && err.message) || String(err));
-                            self._emitBridgeCall('inbox.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
+                            self._emitBridgeCall('append.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
                         });
                         return;
                     }

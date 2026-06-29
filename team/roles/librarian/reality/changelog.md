@@ -7,6 +7,134 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-29
+
+Brief-processing session: 18 human brief files from 06/24 (addendum) and 06/26 (new batch) processed. Added in commit `8f6705e7` on 2026-06-28 but not seen by the June 28 Librarian session. 12 new PROPOSED items (P-411 through P-422). 0 new EXISTS items. New version: v0.33.34.
+
+- `reality/index.md` — Version v0.33.33 → v0.33.34; last updated 2026-06-25 → 2026-06-29; PROPOSED count 627+ → 639+; total docs 754 → 772.
+- `ai-agents/proposed/risk-mandate.md` — Last updated 2026-06-28 → 2026-06-29; added June 24-26 section: P-411 (Calendly review template), P-413 (risk register as graph), P-414 (five whys as domain translator), P-415 (digital twins integration layer), P-416 (2FA demo twins as actors), P-417 (twin of anything), P-418 (world model simulation), P-419 (2FA ontology 22 nodes 35 edges), P-420 (directed edges + query engine), P-421 (paths as language + ontology of ontologies), P-422 (2FA end-to-end MVP).
+- `ai-agents/proposed/index.md` — Last updated 2026-06-28 → 2026-06-29; topic file table updated to include June 24-26 items; P-number lookup table extended (P-411–P-422).
+- `security/proposed/index.md` — Last updated 2026-05-24 → 2026-06-29; added healthcare data-protection section: P-412 (healthcare data-protection pattern — 10 principles, medical analogies, 50-min presentation).
+
+Role reviews produced:
+- `team/roles/architect/reviews/06/29/v0.33.34__architect-review__briefs-24-26-june-2026.md`
+- `team/roles/dev/reviews/06/29/v0.33.34__dev-review__briefs-24-26-june-2026.md`
+
+Master index (06/29): `team/roles/librarian/reviews/06/29/v0.33.34__master-index__briefs-24-26-june-2026.md`
+Processed: 18 new human briefs | New EXISTS items: 0 | New PROPOSED items: 12 (P-411–P-422)
+
+Key strategic context: June 26 series completes the Risk Mandate.ai architecture spec — formal 22-node/35-edge ontology, directed-edge query engine, digital twins integration layer, and a 2FA end-to-end MVP plan with 7-layer architecture, 6-phase build order, and 10 acceptance criteria. Machine-readable 2FA mappings JSON (doc 771) is immediately usable as test fixture.
+
+---
+
+## 2026-06-28
+
+No new human briefs (06/25–06/28 all empty). Backlog task B-003 completed: ai-agents/proposed/index.md (408 lines) split into five topic files.
+
+- `ai-agents/proposed/index.md` — Replaced 408-line content monolith with ~65-line table of contents pointing to five topic files. No content changed — pure structural split.
+- `ai-agents/proposed/llm-components.md` — NEW: sg-llm family, agentic tool execution, multi-agent, developer experience, observable LLM orchestration tool, unified observability REPL, Bedrock CLI, observability pipeline sources, AgentCore resell products, Nova + AgentCore POC.
+- `ai-agents/proposed/agent-communication.md` — NEW: MCP gaps, sgit CLI extensions, communication vault pattern, QA stack on SG/Compute, AppSec mini-tools (P-159–P-164), vault comms demo + PKI (P-312, P-315, P-316).
+- `ai-agents/proposed/workflows.md` — NEW: Scheduled and autonomous tasks, accountant demo (P-147–P-152), archiver-cataloguer pattern (P-238–P-247), agentic incident-response service (P-247).
+- `ai-agents/proposed/skills-economy.md` — NEW: Partner integrations (P-288–P-298), skills creator economy (P-294–P-305), skills deepened June 4 (P-317–P-321), NHI 2.0 ai-agents cross-domain items (P-325, P-328, P-332).
+- `ai-agents/proposed/risk-mandate.md` — NEW: Agent blast-radius service (P-353–P-357), assessment template (P-376–P-379), Odysseus vault + formal ontology (P-387–P-393), authorization ontology + delegation (P-394–P-397), mandate architecture (P-399–P-403), Wardley maps + risk acceptance services + personal scenario (P-404–P-409).
+
+Master index (06/28): `team/roles/librarian/reviews/06/28/v0.33.33__master-index__no-new-briefs-backlog-b003-28-june.md`
+Processed: 0 new human briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Structural: B-003 ai-agents proposed split
+
+---
+
+## 2026-06-19
+
+Brief-processing session: 18 human brief files from 06/18 processed (1 day-index + 17 in
+`agentic-permissions/` subfolder). All are PROPOSED — no new code shipped on June 18.
+Version v0.33.28 (current). 17 new PROPOSED items registered (P-353 to P-369).
+
+The June 18 series is a single sustained 18-brief series on agent authorisation blast radius,
+the PBOM (permissions bill of materials), and the company/commercial strategy built around
+the vault technology. No code deliverables. Strongest single-thread investor narrative in corpus.
+
+- `index.md` — Version v0.33.26 → v0.33.28; last updated 2026-06-18 → 2026-06-19; docs 685 → 703; PROPOSED 570+ → 587+ (P-353 to P-369).
+- `ai-agents/proposed/index.md` — Added June 18 section: P-353 (blast-radius mapping service phase 1), P-354 (multi-party risk acceptance flow), P-355 (enterprise semantic graph for permissions), P-356 (proactive evidence database), P-357 (paid agent-intel feed).
+- `security/proposed/index.md` — Added June 18 section: P-358 (agent blast-radius map artefact), P-359 (PBOM), P-360 (PBOM-SBOM compatibility), P-361 (skills-as-code permission declaration), P-362 (just-in-time granular grants beyond OAuth), P-363 (risk acceptance as underwriting), P-364 (T&C blast-radius framing).
+- `alchemist/proposed/index.md` — Added June 18 section: P-365 (Agent Mandate naming), P-366 (open-source-everything strategy), P-367 (commercial model), P-368 (vault strategy three roles), P-369 (customised-analysis-as-a-service).
+
+Master index (06/19): `team/roles/librarian/reviews/06/19/v0.33.28__master-index__briefs-18-june-2026.md`
+Processed: 18 new human briefs | New EXISTS items: 0 | New PROPOSED items: 17 (P-353–P-369)
+
+Key open items: OQ-agent-mandate-name-1 (name needed before any investor materials),
+OQ-first-build-priority-1 (engineering focus for next session), OQ-pbom-scan-1 (standards
+scan blocks PBOM schema design).
+
+---
+
+## 2026-06-16
+
+Brief-recovery session: 20 human brief files from 06/11 and 06/13 processed for the first time
+(missed by sessions 06/13 through 06/15 which incorrectly reported those folders as non-existent).
+Version v0.33.26 unchanged. No new EXISTS items (code verification outstanding for vault-creates-vault
+and access-key-embedded). 23+ new PROPOSED items registered.
+
+- `index.md` — Document count 649 → 669 (+20 briefs); PROPOSED count 499+ → 522+; last updated 2026-06-14 → 2026-06-16.
+- No domain `index.md` files updated (no new code-verified EXISTS items this session).
+- PROPOSED items distributed across: `ai-agents/`, `vault/`, `ui/`, `send-api/`, `tools/`, `website/`, `alchemist/` (not yet written to domain files; catalogued in master index).
+
+Master index (06/16): `team/roles/librarian/reviews/06/16/v0.33.26__master-index__briefs-11-13-june-2026.md`
+Processed: 20 new human briefs | New EXISTS items: 0 | New PROPOSED items: 23+
+
+Key open items: OQ-vault-creates-vault-1 (must be code-verified), OQ-audio-transcribe-1,
+OQ-access-key-embedded-1.
+
+---
+
+## 2026-06-14
+
+Code-change-only session: 0 new human briefs; 1 substantive commit since the 06/13 librarian session (`c32bfed6`: sg-print WYSIWYG margin parity fix). v0.33.25 → v0.33.26.
+
+- `ui/index.md` — Added `sg-print.js` v1.0.3 entry in the v0.3.1 section: `PAGE_MARGIN` single-constant fix, WYSIWYG screen-preview ↔ print parity, open follow-up for wide-`<pre>` overflow; last updated 06/12 → 06/14.
+- `index.md` — Version v0.33.25 → v0.33.26; last updated 2026-06-13 → 2026-06-14.
+
+Master index (06/14): `team/roles/librarian/reviews/06/14/v0.33.26__master-index__code-changes-13-june.md`
+Processed: 0 new human briefs | New EXISTS items: 1 (sg-print v1.0.3) | New PROPOSED items: 0
+
+---
+
+## 2026-06-13
+
+Code-change-only session: 0 new human briefs; 3 substantive commits since the 06/12 librarian session (2 missed from June 11, 1 new from June 12). v0.33.23 → v0.33.25.
+
+- `ui/index.md` — Added: EFBIG guard for `sg.vfs.write` (b3987ba3); `sg.app.writable` parity fix + `writableCrypto`/`writableAuth` debug state (0c34e1c9); null-origin localStorage crash fix + `VaultLoaderStorage.available()` (b3987ba3); send-browse v0.3.3 IFD overlay — Copy contents button (0c34e1c9); P-269 presigned-PUT write path (PROPOSED); open item for send-browse _write encoder 8192 chunk bug.
+- `index.md` — Version v0.33.23 → v0.33.25; last updated 2026-06-12 → 2026-06-13; PROPOSED 496+ → 499+.
+
+Master index (06/13): `team/roles/librarian/reviews/06/13/v0.33.25__master-index__code-changes-11-12-june.md`
+Processed: 0 new human briefs | New EXISTS items: 6 | New PROPOSED items: 3 (P-269 + 2 open items)
+
+---
+
+## 2026-06-12
+
+Code-change-only session: 0 new human briefs; 1 substantive commit since the 06/11 librarian session (VFS write bridge fix + privileges chip colour, v0.33.22 → v0.33.23).
+
+- `ui/index.md` — Added: VFS write bridge base64 chunking fix (chunk 8192→8190, EBADENC diagnostic); privileges chip colour update (default slate, destructive grants amber; popover rows amber not red); last updated 05/31 → 06/12
+- `index.md` — Version v0.33.22 → v0.33.23; last updated 2026-06-11 → 2026-06-12
+
+Master index (06/12): `team/roles/librarian/reviews/06/12/v0.33.23__master-index__no-new-briefs-code-11-june.md`
+Processed: 0 new human briefs | New EXISTS items: 2 (VFS write fix + privileges chip colour) | New PROPOSED items: 0
+
+---
+
+## 2026-06-11
+
+Brief-processing session: 22 new human briefs (June 8: 7 docs; June 10: 13 docs + 1 artifact); plus Librarian memo and 10 Issues-FS import documents.
+
+- `index.md` — Version v0.33.16 → v0.33.22; last updated 06/10 → 06/11; docs 617 → 649; PROPOSED 469+ → 496+.
+- **No domain-level reality updates** — all features in the June 8–10 briefs are PROPOSED and do not yet appear in domain index files (they are logged in the master index).
+- **Library additions** — `library/concepts/` created (3 foundational Issues-FS docs imported); `library/guides/agentic-setup/` (3 role coordination docs imported); `team/roles/cartographer/REFERENCE__from-issues-fs.md`, `team/roles/historian/REFERENCE__from-issues-fs.md`, `team/roles/journalist/REFERENCE__from-issues-fs.md` (role reference docs imported).
+
+Master index (06/11): `team/roles/librarian/reviews/06/11/v0.33.22__master-index__briefs-08-10-june-2026.md`
+Processed: 22 new human briefs (June 8–10) + 10 Issues-FS imports | New EXISTS items: 0 | New PROPOSED items: 27
+
+---
+
 ## 2026-06-09
 
 Brief-processing session: 20 new human briefs (06/05: 11 docs; 06/07: 9 docs); plus 6 new code commits (vault-inbox C1/C2/C3 foundation + CLI interop fix + vault refresh fix + rollback fix).

@@ -34,17 +34,17 @@
             this._autoSyncCheckPending = false;
             this._lastBehindCheckTime  = 0;
             this._behindCheckTimer     = null;
-            // Inbox check-on-events (no polling) — mirrors the behind-check machinery.
-            // Dormant until the owner enables the inbox (config.enabled), so vaults
-            // without an inbox never hit the server or surface errors.
-            this._inboxChecker         = null;
-            this._inboxConfig          = { enabled: false, auto_fetch: false };
-            this._lastInboxCheckTime   = 0;
-            this._inboxCheckTimer      = null;
+            // Append check-on-events (no polling) — mirrors the behind-check machinery.
+            // Dormant until the owner enables the append lane (config.enabled), so vaults
+            // without it never hit the server or surface errors.
+            this._appendChecker         = null;
+            this._appendConfig          = { enabled: false, auto_fetch: false };
+            this._lastAppendCheckTime   = 0;
+            this._appendCheckTimer      = null;
             this._visibilityHandler    = () => {
                 if (document.hidden) return;
                 this._scheduleBehindCheck(500);
-                this._scheduleInboxCheck(500);
+                this._scheduleAppendCheck(500);
             };
         }
 
@@ -64,7 +64,7 @@
         disconnectedCallback() {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
             clearTimeout(this._behindCheckTimer);
-            clearTimeout(this._inboxCheckTimer);
+            clearTimeout(this._appendCheckTimer);
         }
 
         // --- Render ---------------------------------------------------------------
@@ -281,11 +281,11 @@
             // Check server for upstream changes shortly after open
             this._scheduleBehindCheck(1500);
 
-            // Build the inbox checker for this vault and run one check on open. It is a
+            // Build the append checker for this vault and run one check on open. It is a
             // no-op while config.enabled is false (the default until the owner turns the
-            // inbox on in Settings — see C5), so this never touches the server for vaults
-            // that have no inbox configured.
-            await this._initInbox(vault);
+            // append on in Settings — see C5), so this never touches the server for vaults
+            // that have no append lane configured.
+            await this._initAppend(vault);
 
             // Ensure files view is active
             this._switchView('files');
@@ -300,9 +300,9 @@
             this._vaultKey  = '';
             this._accessKey = '';
             this._isROMode  = false;
-            clearTimeout(this._inboxCheckTimer);
-            this._inboxChecker = null;
-            this._inboxConfig  = { enabled: false, auto_fetch: false };
+            clearTimeout(this._appendCheckTimer);
+            this._appendChecker = null;
+            this._appendConfig  = { enabled: false, auto_fetch: false };
 
             this.querySelector('.vs-shell').style.display  = 'none';
             this.querySelector('.vs-entry').style.display   = '';
@@ -778,43 +778,43 @@
             }
         }
 
-        // --- Inbox check (check-on-events, no polling) ---------------------------------
+        // --- Append check (check-on-events, no polling) --------------------------------
 
-        // Build an SGInbox + SGInboxChecker for the open vault. enum_key is derived from
+        // Build an SGAppend + SGAppendChecker for the open vault. enum_key is derived from
         // the read_key's raw bytes (owner sessions only — RO sessions get a null enum_key
         // and the checker stays effectively idle). Config persistence + the enable toggle
         // live in Settings (C5); until then this is dormant (config.enabled = false).
-        async _initInbox(vault) {
-            this._inboxChecker = null;
-            if (typeof SGInbox === 'undefined' || typeof SGInboxChecker === 'undefined') return;
+        async _initAppend(vault) {
+            this._appendChecker = null;
+            if (typeof SGAppend === 'undefined' || typeof SGAppendChecker === 'undefined') return;
             try {
                 const sgSend   = vault._sgSend || null;
                 const endpoint = (sgSend && sgSend.endpoint) || '';
                 const rawBytes = await vault.readKeyRawBytes();
-                const enumKey  = rawBytes ? await SGInbox.deriveEnumKey(rawBytes) : null;
-                const inbox    = new SGInbox({
+                const enumKey  = rawBytes ? await SGAppend.deriveEnumKey(rawBytes) : null;
+                const inbox    = new SGAppend({
                     endpoint,
                     vaultId    : vault.vaultId,
                     enumKey,
                     writeKeyHex: vault.writeKeyHex,
                     accessToken: (sgSend && sgSend.token) || this._accessKey || null
                 });
-                this._inboxChecker = new SGInboxChecker(inbox, window.sgraphVault.events, () => this._inboxConfig);
+                this._appendChecker = new SGAppendChecker(inbox, window.sgraphVault.events, () => this._appendConfig);
                 // One check on open (no-op while disabled).
-                this._scheduleInboxCheck(0, 'vault-open');
-            } catch (_) { /* inbox is best-effort; never block vault open */ }
+                this._scheduleAppendCheck(0, 'vault-open');
+            } catch (_) { /* append is best-effort; never block vault open */ }
         }
 
-        _scheduleInboxCheck(delayMs, trigger) {
-            if (!this._inboxChecker) return;
-            const DEBOUNCE_MS = 1000;                                            // shorter floor than the behind-check: inbox list is cheap
-            const since = Date.now() - this._lastInboxCheckTime;
+        _scheduleAppendCheck(delayMs, trigger) {
+            if (!this._appendChecker) return;
+            const DEBOUNCE_MS = 1000;                                            // shorter floor than the behind-check: append list is cheap
+            const since = Date.now() - this._lastAppendCheckTime;
             const wait  = Math.max(delayMs || 0, DEBOUNCE_MS - since);
             const label = trigger || 'visibility';
-            clearTimeout(this._inboxCheckTimer);
-            this._inboxCheckTimer = setTimeout(() => {
-                this._lastInboxCheckTime = Date.now();
-                if (this._inboxChecker) this._inboxChecker.check(label);
+            clearTimeout(this._appendCheckTimer);
+            this._appendCheckTimer = setTimeout(() => {
+                this._lastAppendCheckTime = Date.now();
+                if (this._appendChecker) this._appendChecker.check(label);
             }, Math.max(0, wait));
         }
 

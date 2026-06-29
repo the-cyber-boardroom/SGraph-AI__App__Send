@@ -1,6 +1,6 @@
 # Security — Proposed Items Index
 
-**Domain:** security/proposed/ | **Last updated:** 2026-05-24 | **Maintained by:** Librarian (daily run)
+**Domain:** security/proposed/ | **Last updated:** 2026-06-29 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -188,3 +188,56 @@ Batch-2 takes SG/Sentinel from a designed system (batch-1, day 68, 19 docs) to o
 |---|---------|---------------------|--------|
 | P-246 | SG/Sentinel interoperability (collaborators not competitors) | Work in front/behind/alongside other WAFs; develop-in-SG/Sentinel-export-to-existing-infra (AWS WAF, ModSecurity, Akamai, Cloudflare, GCP); consume + export rules (YARA, Sigma); bidirectional log integration (Splunk, Datadog, CloudWatch); never require removing what works | doc 486 |
 | P-247 | SG/Sentinel commercial model | SaaS; custom versions; hosted reverse-proxy service; passive mode as zero-risk on-ramp; cost comparison vs Firehose/analytics/logging; agentic-native as differentiator; designed for someone else to commercialise | doc 487 |
+
+---
+
+## Agent Authorisation Blast Radius — Permissions Model (06/18 series, v0.33.40)
+
+All items below are PROPOSED — does not exist yet.
+
+The June 18 series introduces a permissions model that complements the SBOM tradition and
+extends the NHI 2.0 work. Permissions gate exploitability: the same CVE is inert without
+the permission to weaponise it.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-358 | Agent authorisation blast-radius map | Graph-based, hyperlinked, evidence-focused map of what an agent is authorised to do; NOT what it did; captures the universe of possible actions given the current permission set; evidence with certainty ratings | 06/18 strategy-brief (agent-authorisation-blast-radius) |
+| P-359 | Permissions bill of materials (PBOM) | SBOM analogue for permissions; a declared, mappable inventory of what a system is authorised to do in the environment where it runs; carried on a semantic graph with intent, blast radius, and reachability | 06/18 arch-brief (permissions-bill-of-materials) |
+| P-360 | PBOM-SBOM compatibility (augmenting existing standards) | PBOM augments and is compatible with SBOM formats (CycloneDX, SPDX), supply-chain integrity (SLSA), controls catalogues (OSCAL), exploitability exchange (VEX), and attack taxonomies (ATT&CK); does not replace existing standards | 06/18 arch-brief (permissions-bill-of-materials) |
+| P-361 | Skills-as-code permission declaration | Every unit of execution (package, code, skill, agent, tool) carries a `permissions:` declaration; permissions compose across units; extends SKILL.md format; replaces the OAuth coarse-grant model for platform-controlled scenarios | 06/18 arch-brief (skills-as-code-permission-granularity) |
+| P-362 | Just-in-time granular permission grants beyond OAuth | Scoping grants to exactly the permission needed in the exact moment; OAuth grants in absolutes (union of all privileges); the graph world provides per-unit, moment-of-authorisation, scoped grants | 06/18 arch-brief (skills-as-code-permission-granularity) |
+| P-363 | Risk acceptance as underwriting (multi-party) | The click creates accountability; risk flows upward; named owners accept the blast-radius map; cross-linked risks (responsibility without control) must be surfaced; veto available both ways; append-only signed vault as acceptance record | 06/18 arch-brief (risk-acceptance-underwriting) |
+| P-364 | T&C blast-radius framing (alarming-by-design) | Frame the blast radius as the terms and conditions you click accept on; make them alarming; YOLO command-line agents surfaced as radioactive actions dressed as fun; explicit, public, non-repudiable | 06/18 strategy-brief (terms-and-conditions-framing) |
+
+---
+
+## Standards, Compliance, and Supply Chain (06/19 series, v0.33.28)
+
+All items below are PROPOSED — does not exist yet.
+
+The June 19 series grounds the blast-radius work in standards, compliance, and supply-chain
+reality. The executed research confirms: augment not invent; VEX is the closest analog to
+permissions gating; the SBOM ecosystem is mature and extensible. The compliance brief introduces
+the four-angles framework and the "breached before the agent acts" principle. The supply-chain
+brief adds the multi-organisation coordination problem: permissions must propagate up and down
+the chain, inline agents are categorically more dangerous, and prompt-injection contamination
+can cross organisational boundaries.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-370 | PBOM ecosystem placement (CycloneDX BOM type or SPDX profile) | Specific implementation placement from executed research: propose PBOM as a CycloneDX BOM type or SPDX profile; wired to VEX for exploitability gating, AIBOM/SaaSBOM for agent layer, and agent-identity standards (OWASP Agentic Top 10, MCP OAuth scopes, NIST NCCoE) for authorisation semantics; multi-format output required | 06/19 research-brief (pbom-adjacent-standards) |
+| P-371 | Compliance subset graph | Relevant-controls extraction from NIST, GDPR, ISO 27001, HIPAA, EU AI Act, NIS2, DORA — only the controls the blast radius touches, interconnected as a graph; "almost a small standard of its own"; dynamic (updates when permissions change); four-angle query layer built over it | 06/19 arch-brief (compliance-standards-intersection) |
+| P-372 | Four-angles compliance module | Binary breach (cannot demonstrate compliance without knowing blast radius), checkable boxes (blast-radius knowledge produces the evidence), new-breach-once-known (knowing and not acting is itself a worse failing), compliance-recovered (privilege reduction turns specific breaches back into compliance); dynamic posture map | 06/19 arch-brief (compliance-standards-intersection) |
+| P-373 | Supply-chain permissions propagation | Up-and-down the chain: partner-provided-agent discovery (companies already run agents they are unaware of), per-member PKI key distribution, risk decisions carried in vaults at every level; vault role is propagation and trust, not data management; chain must be aware and must accept | 06/19 arch-brief (supply-chain-permissions) |
+| P-374 | Inline vs out-of-bounds agent classification | Classify agents by position in data path (inline = alters data in flight; out-of-bounds = observer), access scope, and transformation performed; prompt-injection contamination assessment for shared-data supply chains (payload at one node can reach another organisation's systems) | 06/19 arch-brief (supply-chain-permissions) |
+| P-375 | Supply-chain blast-radius compliance lens | Third-party governance: agent access can breach other parties' compliance obligations they did not take on; NIS2 and DORA make third-party oversight mandatory; third-party due-diligence mapping (which items get worse or better once known) | 06/19 arch-brief (supply-chain-permissions) |
+
+---
+
+## Healthcare Data Protection Pattern (06/24 briefs — v0.33.34)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-412 | Healthcare data-protection pattern — open-source medical PKI framework | 10 principles for a medical partner presentation: (1) client-side encryption; (2) public-key cryptography providing confidentiality + integrity + attribution; (3) sovereignty from the key, not the storage; (4) administrators blind to data; (5) versioned signed chained records with provenance; (6) three key-custody modes (patient-held / shared-via-escrow / clinician-held); (7) authorization = ability to decrypt; (8) many small keys (granular access control); (9) open source + no lock-in; (10) agentic-friendly closing note; medical analogies throughout (blinded clinical trial for encryption, sealed pathology specimen for asymmetric keys, safe-deposit box for key custody, controlled-drugs prescription for signed+encrypted, tamper-evident lab notebook for chained records); format: 50-minute presentation + LinkedIn article + 12 ChatGPT Images 2 infographic prompts (paste-ready); builds on existing vault + PKI but targeted at the healthcare vertical | 06/24 healthcare-data-protection/arch-brief + dev-brief (docs 758, 759) |

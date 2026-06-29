@@ -270,14 +270,14 @@ console.log('\n[suite] AppNavHelpers — decideMountStrategy (DEEP-LINK BUG ANCH
 
     var r1 = H.resolveFolderManifest(
         { entry: 'index.html', resources: { css: ['app.css', 'theme/x.css'], js: ['app.js'] },
-          permissions: { fs: { write: true } }, host_events: { 'inbox.new-messages': true }, title: 'Release Tester' },
+          permissions: { fs: { write: true } }, host_events: { 'append.new-messages': true }, title: 'Release Tester' },
         folder, deepPath);
     ok('RFM entry = the opened file (not folderJson.entry)', r1.entry === deepPath);
     ok('RFM relative css → folder-prefixed',     r1.resources.css[0] === 'tools/release-tester/app.css');
     ok('RFM nested relative css → folder-prefixed', r1.resources.css[1] === 'tools/release-tester/theme/x.css');
     ok('RFM relative js → folder-prefixed',      r1.resources.js[0] === 'tools/release-tester/app.js');
     ok('RFM permissions preserved verbatim',     r1.permissions && r1.permissions.fs.write === true);
-    ok('RFM host_events preserved verbatim',     r1.host_events && r1.host_events['inbox.new-messages'] === true);
+    ok('RFM host_events preserved verbatim',     r1.host_events && r1.host_events['append.new-messages'] === true);
     ok('RFM title preserved',                    r1.title === 'Release Tester');
 
     var r2 = H.resolveFolderManifest(

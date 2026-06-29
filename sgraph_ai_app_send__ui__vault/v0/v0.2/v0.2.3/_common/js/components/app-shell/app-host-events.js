@@ -2,7 +2,7 @@
    AppHostEvents — the kernel→app event allowlist  (Phase C3 — v0.33.5)
 
    The permission model has two halves:
-     • AppPermissions  — OUTBOUND capability: what the app may CALL (sg.vfs.*, sg.inbox.*).
+     • AppPermissions  — OUTBOUND capability: what the app may CALL (sg.vfs.*, sg.append.*).
      • AppHostEvents   — INBOUND capability: what the kernel may PUSH to the app (sg.on).
 
    They are deliberately separate top-level fields in app.json with distinct shapes,
@@ -22,7 +22,7 @@
        ("*" is rejected) — keeps the audit surface explicit. (An app may still subscribe
        to "*" via sg.on to observe everything it is ALREADY allowed to receive; the
        allowlist itself never contains "*".)
-     • Names must match ^[a-z][a-z0-9._-]*$ — lowercase, dotted namespaces (inbox.new-messages).
+     • Names must match ^[a-z][a-z0-9._-]*$ — lowercase, dotted namespaces (append.new-messages).
 
    Subscribing via sg.on for a name not in the allowlist is a silent no-op (never an
    error) — deliberately indistinguishable from "no such event ever fired", so a hostile
