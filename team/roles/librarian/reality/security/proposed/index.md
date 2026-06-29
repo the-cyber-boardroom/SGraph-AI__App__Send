@@ -1,6 +1,6 @@
 # Security — Proposed Items Index
 
-**Domain:** security/proposed/ | **Last updated:** 2026-05-24 | **Maintained by:** Librarian (daily run)
+**Domain:** security/proposed/ | **Last updated:** 2026-06-29 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -231,3 +231,13 @@ can cross organisational boundaries.
 | P-373 | Supply-chain permissions propagation | Up-and-down the chain: partner-provided-agent discovery (companies already run agents they are unaware of), per-member PKI key distribution, risk decisions carried in vaults at every level; vault role is propagation and trust, not data management; chain must be aware and must accept | 06/19 arch-brief (supply-chain-permissions) |
 | P-374 | Inline vs out-of-bounds agent classification | Classify agents by position in data path (inline = alters data in flight; out-of-bounds = observer), access scope, and transformation performed; prompt-injection contamination assessment for shared-data supply chains (payload at one node can reach another organisation's systems) | 06/19 arch-brief (supply-chain-permissions) |
 | P-375 | Supply-chain blast-radius compliance lens | Third-party governance: agent access can breach other parties' compliance obligations they did not take on; NIS2 and DORA make third-party oversight mandatory; third-party due-diligence mapping (which items get worse or better once known) | 06/19 arch-brief (supply-chain-permissions) |
+
+---
+
+## Healthcare Data Protection Pattern (06/24 briefs — v0.33.34)
+
+All items below are PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-412 | Healthcare data-protection pattern — open-source medical PKI framework | 10 principles for a medical partner presentation: (1) client-side encryption; (2) public-key cryptography providing confidentiality + integrity + attribution; (3) sovereignty from the key, not the storage; (4) administrators blind to data; (5) versioned signed chained records with provenance; (6) three key-custody modes (patient-held / shared-via-escrow / clinician-held); (7) authorization = ability to decrypt; (8) many small keys (granular access control); (9) open source + no lock-in; (10) agentic-friendly closing note; medical analogies throughout (blinded clinical trial for encryption, sealed pathology specimen for asymmetric keys, safe-deposit box for key custody, controlled-drugs prescription for signed+encrypted, tamper-evident lab notebook for chained records); format: 50-minute presentation + LinkedIn article + 12 ChatGPT Images 2 infographic prompts (paste-ready); builds on existing vault + PKI but targeted at the healthcare vertical | 06/24 healthcare-data-protection/arch-brief + dev-brief (docs 758, 759) |

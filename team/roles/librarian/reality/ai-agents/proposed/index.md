@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-06-28 | **Maintained by:** Librarian (B-003 split, daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-06-29 | **Maintained by:** Librarian (daily run)
 
 All items are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -17,7 +17,7 @@ The previous full index is preserved in git history on commit before this date.
 | [`agent-communication.md`](agent-communication.md) | MCP gaps, sgit CLI extensions, communication vault pattern, QA stack on SG/Compute, AppSec mini-tools, three-agent comms demo vault + PKI | P-159–P-164; P-312, P-315, P-316 |
 | [`workflows.md`](workflows.md) | Scheduled and autonomous tasks, accountant demo, archiver-cataloguer pattern, agentic incident-response service | P-147–P-152; P-238–P-247 |
 | [`skills-economy.md`](skills-economy.md) | Partner integrations (Netlify, Daytona, Convex, Pi, HeyGen), skills creator economy, ownership+maintenance model, skills deepened (06/04), NHI 2.0 agent-identity cross-domain items | P-288–P-305; P-317–P-321; P-325, P-328, P-332 |
-| [`risk-mandate.md`](risk-mandate.md) | Agent blast-radius service, assessment template, WhatsApp case study, Odysseus evidence vault, formal Agent Mandate ontology, authorization ontology + delegation, how-not-why scope + mandate architecture, Wardley map series, risk acceptance service MVP, multi-stakeholder workflow, personal scenario | P-353–P-357; P-376–P-379; P-387–P-409 |
+| [`risk-mandate.md`](risk-mandate.md) | Agent blast-radius service, assessment template, WhatsApp case study, Odysseus evidence vault, formal Agent Mandate ontology, authorization ontology + delegation, how-not-why scope + mandate architecture, Wardley map series, risk acceptance service MVP, multi-stakeholder workflow, personal scenario, Calendly review, risk register architecture, digital twins, semantic graph engine, 2FA MVP | P-353–P-357; P-376–P-379; P-387–P-422 |
 
 ---
 
@@ -42,6 +42,12 @@ The previous full index is preserved in git history on commit before this date.
 | P-394–P-397 (Authorization ontology, delegation) | `risk-mandate.md` |
 | P-399–P-403 (Observability-risk, potential/real mandate, mandate-to-operate, agent mandate graph) | `risk-mandate.md` |
 | P-404–P-409 (Wardley maps, risk acceptance MVP, multi-stakeholder workflow, agentic freelancing, personal scenario) | `risk-mandate.md` |
+| P-411 (Calendly RiskMandate review template) | `risk-mandate.md` |
+| P-412 (Healthcare data-protection pattern) | `security/proposed/index.md` |
+| P-413–P-414 (Risk register as graph, five whys as translator) | `risk-mandate.md` |
+| P-415–P-418 (Digital twins: integration layer, 2FA demo, twin-of-anything, world model) | `risk-mandate.md` |
+| P-419–P-421 (Semantic graph ontology, directed edges + query engine, paths as language) | `risk-mandate.md` |
+| P-422 (2FA end-to-end MVP) | `risk-mandate.md` |
 
 ---
 

@@ -7,6 +7,26 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-29
+
+Brief-processing session: 18 human brief files from 06/24 (addendum) and 06/26 (new batch) processed. Added in commit `8f6705e7` on 2026-06-28 but not seen by the June 28 Librarian session. 12 new PROPOSED items (P-411 through P-422). 0 new EXISTS items. New version: v0.33.34.
+
+- `reality/index.md` — Version v0.33.33 → v0.33.34; last updated 2026-06-25 → 2026-06-29; PROPOSED count 627+ → 639+; total docs 754 → 772.
+- `ai-agents/proposed/risk-mandate.md` — Last updated 2026-06-28 → 2026-06-29; added June 24-26 section: P-411 (Calendly review template), P-413 (risk register as graph), P-414 (five whys as domain translator), P-415 (digital twins integration layer), P-416 (2FA demo twins as actors), P-417 (twin of anything), P-418 (world model simulation), P-419 (2FA ontology 22 nodes 35 edges), P-420 (directed edges + query engine), P-421 (paths as language + ontology of ontologies), P-422 (2FA end-to-end MVP).
+- `ai-agents/proposed/index.md` — Last updated 2026-06-28 → 2026-06-29; topic file table updated to include June 24-26 items; P-number lookup table extended (P-411–P-422).
+- `security/proposed/index.md` — Last updated 2026-05-24 → 2026-06-29; added healthcare data-protection section: P-412 (healthcare data-protection pattern — 10 principles, medical analogies, 50-min presentation).
+
+Role reviews produced:
+- `team/roles/architect/reviews/06/29/v0.33.34__architect-review__briefs-24-26-june-2026.md`
+- `team/roles/dev/reviews/06/29/v0.33.34__dev-review__briefs-24-26-june-2026.md`
+
+Master index (06/29): `team/roles/librarian/reviews/06/29/v0.33.34__master-index__briefs-24-26-june-2026.md`
+Processed: 18 new human briefs | New EXISTS items: 0 | New PROPOSED items: 12 (P-411–P-422)
+
+Key strategic context: June 26 series completes the Risk Mandate.ai architecture spec — formal 22-node/35-edge ontology, directed-edge query engine, digital twins integration layer, and a 2FA end-to-end MVP plan with 7-layer architecture, 6-phase build order, and 10 acceptance criteria. Machine-readable 2FA mappings JSON (doc 771) is immediately usable as test fixture.
+
+---
+
 ## 2026-06-28
 
 No new human briefs (06/25–06/28 all empty). Backlog task B-003 completed: ai-agents/proposed/index.md (408 lines) split into five topic files.
