@@ -490,6 +490,16 @@ then, prefer `minimal` first.
 
 ---
 
+## Running on static storage (GitHub Pages / S3)
+
+The **same app HTML** runs against the live FastAPI backend or a 100% static file host —
+the app only talks to `window.sg` and never knows the difference. Reads are deterministic
+GETs; a static host is read-only (`sg.app.writable === false`). Set `window.SG_STATIC = true`
++ `window.SG_ENDPOINT = '<static base>'` and open the vault without a token. Full guide:
+**[HOSTING-ON-STATIC-STORAGE.md](HOSTING-ON-STATIC-STORAGE.md)**.
+
+---
+
 ## Reading other vaults (sub-vaults)
 
 A vault can link to **other vaults** (the "vault-in-vault" feature). Linked vaults are mounted into
