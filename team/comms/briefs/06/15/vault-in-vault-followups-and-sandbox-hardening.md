@@ -142,6 +142,18 @@ default"), and consider **Option D** as the long-term posture if we want externa
 navigation to be a visible, consented action. Either way, **`sg.vault.embed` already never
 grants escape** — this is purely about tightening the *host's* app frames.
 
+> **UPDATE 2026-06-15 — C **and** D shipped (they compose).** Default host app-frame
+> sandbox dropped to `allow-scripts allow-forms` (no popups, no escape). External link
+> clicks now post `{__sgOpenExternal:url}` to the host, which shows a one-click
+> "Open `<url>` ↗" confirm and opens it in the host's gesture (Option D — the safe
+> default for every app, plus an external-nav consent moment). An app that wants the
+> frictionless in-frame open declares `permissions.externalLinks: true`, which restores
+> `allow-popups allow-popups-to-escape-sandbox` and in-frame `window.open` (Option C).
+> `_promptExternalOpen` validates http/https only (rejects `javascript:`/`data:`).
+> Code: `app-permissions.js` (grant), `app-shell.js` (`_appSandbox`/`_promptExternalOpen`
+> + bridge branch + `__sgOpenExternal` handler), `app-hud.js` (`promptExternalLink` bar).
+> Kernel bundle regenerated (app-permissions.js is bundled). Browser-unverified.
+
 ### What NOT to do
 
 - Don't "fix" anything by adding `allow-same-origin` — it dissolves the whole opaque-origin

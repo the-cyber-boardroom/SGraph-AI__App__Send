@@ -78,6 +78,16 @@ Objects are stored in a content-addressable store (CAS) with opaque IDs:
 
 > **Client-side commit batching — SHIPPED (was PROPOSED here):** the `sg-vault` browser library now collapses a commit's per-object/ref `PUT`s into one `POST /api/vault/batch`. See the **"Batched commit writes"** section below for the code-verified details. The note that this was "not yet used by the browser library" predates that change.
 
+### Static-host mode — same vault app, no backend (2026-06-15)
+
+| Behaviour | Status | Evidence |
+|-----------|--------|---------|
+| **`SGSend.staticMode`** — opt-in (constructor `{staticMode}` or global `window.SG_STATIC===true`; default **false** → live behaviour byte-identical). Lets the **same** vault-app HTML run against a plain static file host (GitHub Pages / S3) instead of the FastAPI: reads are deterministic GETs (file IDs are content-hash/HMAC of the key — no list/discovery call), writes reject with `EREADONLY`. | **EXISTS** | `sg-send.js`; `test__sgsend_static_mode.js` (12, incl. non-static regression guard); kernel bundle regenerated |
+| **Batch-read fan-out** — in static mode `vaultBatch` (no `/batch` POST on a static host) fans `op:'read'` out to parallel `vaultRead` GETs and returns the **identical** `[{status,file_id,data:<b64>}]` shape, so `SGVaultObjectStore.batchLoad` (and any caller) is unchanged. A write op in a static batch → `EREADONLY`. `vaultReadLarge` skips presigned and reads directly; `vaultWrite`/`vaultDelete` → `EREADONLY`. | **EXISTS** | `sg-send.js` |
+| Read-only open (no access token) → `sg.app.writable===false`; the bridge gates writes before the transport. So static = read-only snapshot; the app HTML is unchanged. | **EXISTS** | by construction (writable tier) |
+
+Guide for the consuming team: `library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md` (GH Pages/S3 layout, `window.SG_STATIC`/`SG_ENDPOINT`, path-mirroring, cache headers, what works/doesn't). **PROPOSED follow-on:** configurable read-path template on `SGSend` so the static layout need not mirror the literal `/api/vault/read/<vaultId>/` prefix.
+
 ### Vault Round-Trip: AI-Native Access (v0.13.22)
 
 | Capability | Status | Evidence |

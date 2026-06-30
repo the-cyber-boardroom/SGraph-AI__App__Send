@@ -78,5 +78,12 @@ const pJunk = AP.parsePermissions({ permissions: { fs: 'nope', vault: 42 } });
 ok('junk block → mutations denied',      !AP.can(pJunk, 'fs.write', 'x'));
 ok('junk block → reads still default',    AP.can(pJunk, 'fs.read',  'x'));
 
+// externalLinks grant (Options C/D) — default-deny; gates escape-sandbox.
+ok('externalLinks default false (no grant)',  AP.parsePermissions(null).externalLinks === false);
+ok('externalLinks false when omitted',        AP.parsePermissions({ permissions: {} }).externalLinks === false);
+ok('externalLinks true only when ===true',    AP.parsePermissions({ permissions: { externalLinks: true } }).externalLinks === true);
+ok('externalLinks truthy-but-not-true → false (e.g. "yes")',
+    AP.parsePermissions({ permissions: { externalLinks: 'yes' } }).externalLinks === false);
+
 console.log(`\n[result] ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

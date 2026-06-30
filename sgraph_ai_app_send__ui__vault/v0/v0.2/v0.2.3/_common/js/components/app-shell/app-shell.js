@@ -1908,7 +1908,7 @@
             // localStorage / window.parent / ambient-fetch vault paths; every vault
             // access goes through the postMessage bridge (sg.*), which never needed it.
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+            iframe.sandbox     = this._appSandbox();
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
             iframe.srcdoc      = injected;
             iframe.addEventListener('load', () => {
@@ -1986,7 +1986,7 @@
 
             // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
             var iframe         = document.createElement('iframe');
-            iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+            iframe.sandbox     = this._appSandbox();
             iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
             iframe.srcdoc      = html;
             iframe.addEventListener('load', () => {
@@ -2040,7 +2040,7 @@
                 var injected  = AppFrameBootstrap.build({ kind: 'html', htmlText: htmlText, bridgeScript: bridgeScript });
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+                iframe.sandbox     = this._appSandbox();
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
                 iframe.srcdoc      = injected;
                 iframe.addEventListener('load', () => {
@@ -2081,7 +2081,7 @@
 
                 // Phase 3: null-origin frame — srcdoc, no allow-same-origin (see _mountApp).
                 var iframe         = document.createElement('iframe');
-                iframe.sandbox     = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+                iframe.sandbox     = this._appSandbox();
                 iframe.style.cssText = 'border:none;width:100%;height:100%;display:block;flex:1;';
                 iframe.srcdoc      = html;
                 iframe.addEventListener('load', () => {
@@ -2287,6 +2287,39 @@
 
         // ── VFS bridge (injected into iframe) ─────────────────────────────────────────
 
+        // The sandbox for an app iframe. Least-privilege base: allow-scripts allow-forms.
+        // allow-popups + allow-popups-to-escape-sandbox are added ONLY when the app.json
+        // grants `permissions.externalLinks` (Option C) — so the escape-sandbox token is
+        // opt-in, not default. Without it, external <a href> links are routed to the host,
+        // which opens them after a one-click user confirm (Option D, see _promptExternalOpen).
+        _appSandbox() {
+            var s = 'allow-scripts allow-forms';
+            if (this._perm && this._perm.externalLinks) s += ' allow-popups allow-popups-to-escape-sandbox';
+            return s;
+        }
+
+        // Option D: an app without the externalLinks grant posted a URL to open. Validate it
+        // (http/https only — never javascript:/data:) and surface a one-click host confirm.
+        // The actual window.open runs in the HOST's click gesture (inside the HUD button
+        // handler), so the popup is allowed without granting the iframe escape-sandbox — and
+        // the user gets to see where a vault file is sending them before it opens.
+        _promptExternalOpen(url) {
+            var safe = '';
+            try {
+                var u      = (url.indexOf('//') === 0) ? (window.location.protocol + url) : url;
+                var parsed = new URL(u, window.location.href);
+                if (parsed.protocol === 'http:' || parsed.protocol === 'https:') safe = parsed.href;
+            } catch (_) {}
+            if (!safe) return;
+            var open = function () { try { window.open(safe, '_blank', 'noopener,noreferrer'); } catch (_) {} };
+            var hud  = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (hud && typeof hud.promptExternalLink === 'function') {
+                hud.promptExternalLink(safe, open);   // open() fires inside the HUD's click gesture
+            } else {
+                open();   // no HUD (e.g. hud.mode "none") — degraded: no host gesture, popup may be blocked
+            }
+        }
+
         // Source for sg.vault.embed(), injected into the app bridge. The pure src-building
         // and sandbox-sanitisation come from the unit-tested SgEmbed module (injected verbatim
         // via Function.toString — the shipped code IS the tested code). The handshake glue is
@@ -2346,6 +2379,12 @@
             // as TRUE; the app then tried to write, the host rejected, and the user saw a
             // red "Read-only vault" error — exactly the parity bug vs the Vault UI preview.
             var writable  = !!(this._writable && this._dataSource && this._dataSource.writable);
+            // External-link handling (Options C/D). When the app has the externalLinks grant,
+            // its sandbox carries allow-popups-to-escape-sandbox, so links open in-frame via
+            // window.open (frictionless). Without it, links are posted to the host for a
+            // one-click confirm-open (no escape-sandbox). Decided at build time — the grant
+            // doesn't change during a session.
+            var extLinks  = !!(this._perm && this._perm.externalLinks);
             var vaultName = (this._vault && this._vault.name)     || '';
             var vaultId   = (this._vault && this._vault._vaultId) || '';
             var fileList  = this._dataSource ? this._dataSource.getFileList() : [];
@@ -2407,19 +2446,23 @@
                 // The ORIGINAL href (with the fragment) is forwarded so the parent can scroll
                 // to the anchor inside the new srcdoc after navigation.
                 //
-                // External links (http://, https://, //) are opened in a NEW TAB via window.open.
-                // The iframe's sandbox now includes allow-popups + allow-popups-to-escape-sandbox,
-                // so the new window is unrestricted. Doing it from inside the iframe (synchronous
-                // within the click gesture) avoids the popup-blocker hit that a postMessage round-
-                // trip to the parent would incur — postMessage is async, the gesture is lost, and
-                // window.open() in the parent would be blocked.
+                // External links (http://, https://, //). TWO paths, decided by the
+                // externalLinks grant (injected as `extLinks`):
+                //   • GRANTED (Option C): the sandbox carries allow-popups-to-escape-sandbox,
+                //     so open in-frame via window.open — synchronous within the click gesture,
+                //     so no popup-blocker hit. Frictionless.
+                //   • DEFAULT (Option D): no escape-sandbox. Post the URL to the host, which
+                //     shows a one-click "Open <url>" confirm and opens it in the HOST's gesture
+                //     (real origin) — popup allowed, and the user sees where they're going.
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");if(!a)return;' +
                   'var h=a.getAttribute("href");if(!h)return;' +
                   'if(h.startsWith("#")||h.startsWith("mailto:"))return;' +
                   'if(h.startsWith("http")||h.startsWith("//")){' +
                     'e.preventDefault();e.stopPropagation();' +
-                    'try{window.open(h,"_blank","noopener,noreferrer");}catch(_){}' +
+                    (extLinks
+                      ? 'try{window.open(h,"_blank","noopener,noreferrer");}catch(_){}'
+                      : 'try{window.parent.postMessage({__sgOpenExternal:h},"*");}catch(_){}') +
                     'return;' +
                   '}' +
                   'var hp=h.split("?")[0].split("#")[0];' +
@@ -2782,6 +2825,15 @@
                 // bridge (they call `_navBack` / `_navForward` directly on the AppShell instance).
                 if (e.data.__sgVfsNavReq) {
                     self._navigateToPath(e.data.__sgVfsNavReq, { pushHistory: true });
+                    return;
+                }
+
+                // ── External link (Option D) ──────────────────────────────────
+                // App has no externalLinks grant, so the iframe can't (and shouldn't) open a
+                // popup itself. It posts the URL here; the host shows a one-click confirm and
+                // opens it in the HOST's user gesture (real origin, no escape-sandbox needed).
+                if (e.data.__sgOpenExternal) {
+                    self._promptExternalOpen(String(e.data.__sgOpenExternal));
                     return;
                 }
 

@@ -99,6 +99,20 @@
                         <button class="hud-consent-allow" data-testid="hud-consent-allow" aria-label="Approve">Allow</button>
                     </div>
                 </div>
+                <!-- External-link confirm (Option D): an app without the externalLinks grant
+                     asked to open a URL. Shown as a full-width sibling so it works in every hud
+                     mode; the Open button click is the user gesture that lets window.open run. -->
+                <div class="hud-extlink-bar" style="display:none" role="alertdialog" aria-label="Open external link" data-testid="hud-extlink">
+                    <span class="hud-extlink-icon" aria-hidden="true">↗</span>
+                    <div class="hud-extlink-body">
+                        <span class="hud-extlink-label">This app wants to open an external site:</span>
+                        <span class="hud-extlink-url" data-testid="hud-extlink-url"></span>
+                    </div>
+                    <div class="hud-extlink-actions">
+                        <button class="hud-extlink-dismiss" data-testid="hud-extlink-dismiss">Dismiss</button>
+                        <button class="hud-extlink-open" data-testid="hud-extlink-open">Open ↗</button>
+                    </div>
+                </div>
                 <button class="hud-escape" style="display:none" title="Exit app and return to vault">×&nbsp;Exit app</button>
             `;
 
@@ -406,6 +420,30 @@
 
         // Render a consent prompt in the HUD (host chrome — the app cannot draw or dismiss this).
         // Resolves cb(true/false) only on a real user click. Called by app-shell._consent.
+        // External-link confirm (Option D). Shows the URL + an Open button; the Open click
+        // is the user gesture that lets onConfirm() call window.open without a popup block.
+        // Called by app-shell._promptExternalOpen for apps that lack the externalLinks grant.
+        promptExternalLink(url, onConfirm) {
+            const bar     = this.shadowRoot.querySelector('.hud-extlink-bar');
+            const urlEl   = this.shadowRoot.querySelector('.hud-extlink-url');
+            const openBtn = this.shadowRoot.querySelector('.hud-extlink-open');
+            const disBtn  = this.shadowRoot.querySelector('.hud-extlink-dismiss');
+            if (!bar || !urlEl || !openBtn || !disBtn) { try { onConfirm && onConfirm(); } catch (_) {} return; }
+
+            urlEl.textContent = url;
+            bar.style.display = '';
+            const done = (go) => {
+                bar.style.display = 'none';
+                openBtn.removeEventListener('click', onOpen);
+                disBtn.removeEventListener('click', onDis);
+                if (go) { try { onConfirm && onConfirm(); } catch (_) {} }   // runs inside this click gesture
+            };
+            const onOpen = () => done(true);
+            const onDis  = () => done(false);
+            openBtn.addEventListener('click', onOpen);
+            disBtn.addEventListener('click', onDis);
+        }
+
         requestConsent(verb, path, cb) {
             const bar    = this.shadowRoot.querySelector('.hud-consent-bar');
             const t      = this.shadowRoot.querySelector('.hud-consent-text');
@@ -938,6 +976,26 @@
         }
         .hud-mi:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
         .hud-debug-btn.active { color: #4ECDC4; }
+
+        /* ── External-link confirm bar (Option D) ──────────────────────────────────────── */
+        .hud-extlink-bar {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.5rem 1rem; min-height: 44px; box-sizing: border-box;
+            background: #1a2a3a; border-bottom: 1px solid #2a4a5a; color: #e2e8f0;
+        }
+        .hud-extlink-icon { flex: 0 0 auto; font-size: 1rem; color: #64a0dc; }
+        .hud-extlink-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+        .hud-extlink-label { font-size: 0.72rem; color: #aeb6c6; }
+        .hud-extlink-url { font-size: 0.82rem; color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hud-extlink-actions { flex: 0 0 auto; display: flex; gap: 0.5rem; }
+        .hud-extlink-open, .hud-extlink-dismiss {
+            font-size: 0.78rem; padding: 0.3rem 0.9rem; border-radius: 4px; cursor: pointer;
+            border: 1px solid #2a2a4a; background: transparent; white-space: nowrap; font-family: inherit;
+        }
+        .hud-extlink-open { background: #64a0dc; color: #0a0a18; border-color: #64a0dc; font-weight: 700; }
+        .hud-extlink-open:hover { background: #5590cc; }
+        .hud-extlink-dismiss { color: #8892a4; }
+        .hud-extlink-dismiss:hover { color: #e2e8f0; border-color: #4a5568; }
 
         /* ── Consent bar (full-width sibling of .hud-wrap — sovereignty: always rendered) ── */
         .hud-consent-bar {
