@@ -7,6 +7,28 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-06-30
+
+No new human briefs (06/27–06/30 all empty). 3 EXISTS items from June 29 code changes. Backlog task B-001 completed: vault/proposed/index.md (244 lines) split into six topic files.
+
+- `index.md` — Version v0.33.34 → v0.33.35; last updated 2026-06-29 → 2026-06-30; unit tests ~1960+ → ~1994+ (Python 957→977; ViV loader 335+→352+ with sg-embed-helpers).
+- `qa/index.md` — Last updated 2026-06-08 → 2026-06-30; Python count 957 → 977 (commit `66ce528`, osbot-fast-api 0.39.0 + FastAPI 0.138.1); added `test__sg_embed_helpers.js` (17 assertions) to ViV loader suite (now 352+); total headline ~1556+ → ~1994+.
+- `vault/proposed/index.md` — Replaced 244-line content monolith with ~65-line TOC linking to 6 new topic files. No content changed — pure structural split.
+- `vault/proposed/vault-architecture.md` — NEW: architecture overhaul, PKI modes 2–4, multi-remote, collaboration, simple-token future items (monolith-sourced).
+- `vault/proposed/vault-platform.md` — NEW: vault hub, publishing layer, GitHub-as-vault-projection, manager vaults, credential manager, customer workflow primitives, vault-as-operational-substrate (P-302, P-307, P-311, P-313).
+- `vault/proposed/vault-ux.md` — NEW: vault browser UI, browser VFS, SGit Web Components, demo capabilities (P-128–P-132), testing framework (P-133–P-137).
+- `vault/proposed/vault-sub-vaults.md` — NEW: sub-vaults & external resources convention (P-159–P-165, P-174); notes that P-159–P-163 and P-174 now EXISTS in ui/index.md.
+- `vault/proposed/vault-previews.md` — NEW: public vault previews (P-166–P-177 — largely EXISTS in ui/index.md), vault discovery & public keys (P-153–P-158), compliance artefacts (P-281–P-282, P-284).
+- `vault/proposed/vault-content.md` — NEW: vault chat / Talk to the vault (P-248–P-249).
+
+New EXISTS items: 3 (sg-embed-helpers module + 17 tests, AUTHORING.md guide, Python 977).
+New PROPOSED items: 0.
+
+Master index (06/30): `team/roles/librarian/reviews/06/30/v0.33.35__master-index__no-new-briefs-code-29-june.md`
+Processed: 0 new human briefs | New EXISTS items: 3 | New PROPOSED items: 0 | Structural: B-001 vault/proposed split
+
+---
+
 ## 2026-06-29
 
 Brief-processing session: 18 human brief files from 06/24 (addendum) and 06/26 (new batch) processed. Added in commit `8f6705e7` on 2026-06-28 but not seen by the June 28 Librarian session. 12 new PROPOSED items (P-411 through P-422). 0 new EXISTS items. New version: v0.33.34.
