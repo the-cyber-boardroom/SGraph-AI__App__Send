@@ -2573,7 +2573,7 @@
                   // src-building + sandbox-sanitisation come from the unit-tested SgEmbed
                   // module, injected verbatim here (toString) so the shipped code IS the
                   // tested code. Default sandbox is allow-scripts only — see sg-embed-helpers.js.
-                  _embedHelperSrc() +
+                  this._embedHelperSrc() +
                   // window.sg.*
                   'window.sg={' +
                     'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
