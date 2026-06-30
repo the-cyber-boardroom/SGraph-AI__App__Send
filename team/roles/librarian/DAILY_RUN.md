@@ -68,7 +68,7 @@ to the domain they extend — not in a central mega-file. When `proposed/index.m
 Work these when no urgent brief processing is needed. Pick **one per session**.
 
 ### B-001 · Reality — Extract vault PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-06-30)
 **What:** `vault/proposed/index.md` currently summarises the PROPOSED items. Expand into
 individual topic files: `structure-key-split.md`, `vault-architecture.md`, `vault-hub.md`,
 `vault-browser-ui.md`, `pki-modes.md`, `multi-remote.md`. Source: archived monolith
@@ -76,6 +76,14 @@ individual topic files: `structure-key-split.md`, `vault-architecture.md`, `vaul
 19 (ephemeral vault), and the remainder across sections 20–32.
 **Why:** Vault is the largest PROPOSED domain. Agents asking vault questions should not load a
 generic proposed index — they should get a targeted file.
+
+**Outcome:** Split 244-line monolith into six topic files: `vault-architecture.md`
+(overhaul + PKI + multi-remote + collab), `vault-platform.md` (hub + publishing + GitHub-as-vault
++ manager vaults + operational substrate), `vault-ux.md` (browser UI + web components + demo
++ testing framework), `vault-sub-vaults.md` (P-159–P-165), `vault-previews.md` (P-153–P-158,
+P-166–P-177, P-281–P-282, P-284), `vault-content.md` (P-248–P-249). The 244-line monolith is
+now a ~65-line TOC index. All P-numbers preserved. P-159–P-163 and P-174 are now EXISTS in
+ui/index.md; P-166–P-177 largely EXISTS in ui/index.md — both flagged in topic files.
 
 ### B-002 · Reality — Extract tools PROPOSED content into domain files
 **Status:** QUEUED
