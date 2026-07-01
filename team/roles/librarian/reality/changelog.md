@@ -7,6 +7,22 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-01
+
+No new human briefs (07/01 folder does not exist yet). 2 EXISTS items from June 30 code changes. No backlog task this session (B-002 tools PROPOSED at 182 lines — under 300-line split threshold).
+
+- `index.md` — Version v0.33.35 → v0.33.37; last updated 2026-06-30 → 2026-07-01; unit tests ~1994+ → ~2015+ (ViV loader 352+ → 373+: +12 sgsend-static-mode + 9 app-shell-bridge-build).
+- `qa/index.md` — Last updated 2026-06-30 → 2026-07-01; added `test__sgsend_static_mode.js` (12 assertions) and `test__app_shell_bridge_build.js` (9 assertions) to ViV loader suite table; suite total 352+ → 373+; total ~1994+ → ~2015+.
+- `vault/index.md` — Last updated corrected 2026-06-10 → 2026-07-01; section date corrected 2026-06-15 → 2026-06-30 (content was already added in commit `74d5444` on June 30 but date was wrong).
+
+New EXISTS items: 2 (SGSend static-host mode + 12 tests; `_buildVfsBridgeScript` bare-call fix + 9-assertion regression guard).
+New PROPOSED items: 0.
+
+Master index (07/01): `team/roles/librarian/reviews/07/01/v0.33.37__master-index__no-new-briefs-code-30-june.md`
+Processed: 0 new human briefs | New EXISTS items: 2 | New PROPOSED items: 0
+
+---
+
 ## 2026-06-30
 
 No new human briefs (06/27–06/30 all empty). 3 EXISTS items from June 29 code changes. Backlog task B-001 completed: vault/proposed/index.md (244 lines) split into six topic files.

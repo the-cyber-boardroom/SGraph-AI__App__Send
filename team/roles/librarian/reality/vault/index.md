@@ -1,6 +1,6 @@
 # vault — Reality Index
 
-**Domain:** `vault/` | **Last updated:** 2026-06-10 | **Maintained by:** Librarian (daily run)
+**Domain:** `vault/` | **Last updated:** 2026-07-01 | **Maintained by:** Librarian (daily run)
 
 The vault/SGit cryptographic storage system. This domain covers the encryption layer, the
 object storage model, the browser JS client, PKI, and the sgit CLI as it relates to vault
@@ -78,7 +78,7 @@ Objects are stored in a content-addressable store (CAS) with opaque IDs:
 
 > **Client-side commit batching — SHIPPED (was PROPOSED here):** the `sg-vault` browser library now collapses a commit's per-object/ref `PUT`s into one `POST /api/vault/batch`. See the **"Batched commit writes"** section below for the code-verified details. The note that this was "not yet used by the browser library" predates that change.
 
-### Static-host mode — same vault app, no backend (2026-06-15)
+### Static-host mode — same vault app, no backend (2026-06-30)
 
 | Behaviour | Status | Evidence |
 |-----------|--------|---------|
