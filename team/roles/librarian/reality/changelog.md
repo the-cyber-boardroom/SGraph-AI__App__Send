@@ -7,6 +7,22 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-02
+
+13 human briefs from 28 June 2026 processed (committed by Dinis Cruz on 30 June 22:51 BST, after the 06/30 session). 2 code items catalogued (static-host mode, app-shell regression fix). 25 new PROPOSED items across three themes. 12 new EXISTS tests.
+
+- `index.md` — Version v0.33.35 → v0.33.38; last updated 2026-06-30 → 2026-07-02; unit tests ~1994+ → ~2006+ (+12 static-mode); total docs 772 → 785; PROPOSED 422 → 447+.
+- `qa/index.md` — Last updated 2026-06-30 → 2026-07-02; added `test__sgsend_static_mode.js` (12 assertions, commit `74d5444`); total ~1994+ → ~2006+; app-shell regression fix (`97426c2`) noted.
+- `vault/index.md` — Already updated by commit `74d5444` itself (static-host mode section added). No change needed.
+
+New EXISTS items: 2 (static-host mode + 12 tests, app-shell regression fix — no new tests).
+New PROPOSED items: 25 (mini-sites 10, use-case program 6, ontology/NTF 9).
+
+Master index (07/02): `team/roles/librarian/reviews/07/02/v0.33.38__master-index__briefs-28-june-2026.md`
+Processed: 13 new human briefs | New EXISTS items: 2 | New PROPOSED items: 25 | Cumulative docs: 785
+
+---
+
 ## 2026-06-30
 
 No new human briefs (06/27–06/30 all empty). 3 EXISTS items from June 29 code changes. Backlog task B-001 completed: vault/proposed/index.md (244 lines) split into six topic files.
