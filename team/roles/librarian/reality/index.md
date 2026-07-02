@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.35 | **Last updated:** 2026-06-30 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.38 | **Last updated:** 2026-07-02 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -26,26 +26,26 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Security** | [`security/`](security/index.md) | Security properties, violations, AppSec | 11 verified properties |
 | **Identity** | [`identity/`](identity/index.md) | Credentials, OAuth, billing | Token auth only (rest PROPOSED) |
 | **AI Agents** | [`ai-agents/`](ai-agents/index.md) | Agentic workflows, LLM components, MCP | MCP + Claude vault access verified |
-| **QA** | [`qa/`](qa/index.md) | Tests that pass, QA infrastructure | ~602 tests, all passing |
+| **QA** | [`qa/`](qa/index.md) | Tests that pass, QA infrastructure | ~2015+ tests, all passing |
 | **Alchemist** | [`alchemist/`](alchemist/index.md) | Investor materials, Alchemist system | 3 documents |
 
 ---
 
-## Quick Stats (as of 2026-06-30)
+## Quick Stats (as of 2026-07-01)
 
 | Metric | Count |
 |--------|-------|
 | User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
-| Unit tests passing | **~1994+** (977 Python + ~167 vault-UI JS + ~352 ViV loader suite + ~78 app-shell extraction + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 from app-shell-nav-helpers inbox/folder-app.json) |
+| Unit tests passing | **~2015+** (977 Python + ~157 vault-UI JS + ~373 ViV loader suite + ~78 app-shell extraction + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 from app-shell-nav-helpers inbox/folder-app.json) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | 639+ (+12 net-new from June 24-26: P-411 through P-422; P-412 in security/proposed) |
-| Total documents catalogued | 772 (no new briefs since June 29) |
+| Open PROPOSED items (across all domains) | 664+ (+25 net-new from June 28 briefs: mini-sites deployment 10, use-case program 6, ontology/NTF 9) |
+| Total documents catalogued | 785 (+13 briefs from 28 June, processed 2026-07-02) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 
 ---

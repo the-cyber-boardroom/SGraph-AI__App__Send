@@ -1,6 +1,6 @@
 # QA — Reality Index
 
-**Domain:** qa/ | **Last updated:** 2026-06-30 | **Maintained by:** Librarian (daily run)
+**Domain:** qa/ | **Last updated:** 2026-07-02 | **Maintained by:** Librarian (daily run)
 
 This domain covers the test suite, QA infrastructure (browser automation, Playwright), and test strategy. SGraph Send uses an all-real-implementations philosophy: no mocks, no patches. The full stack starts in-memory in ~100ms.
 
@@ -8,13 +8,13 @@ This domain covers the test suite, QA infrastructure (browser automation, Playwr
 
 ## EXISTS (Code-Verified)
 
-### Test Suite: ~1994+ Tests, All Passing
+### Test Suite: ~2015+ Tests, All Passing
 
 **Strategy:** No mocks, no patches. In-memory Memory-FS stack. ~100ms startup.
 
 **Python unit tests: 977 (confirmed via commit `66ce528`, 2026-06-29 — poetry.lock update to osbot-fast-api 0.39.0 + FastAPI 0.138.1).** Up from 957 (2026-06-05). The increase reflects new tests added with the `_IncludedRouter` fix and osbot-utils 3.74.0 additions.
 
-**Total ~1994+** = 977 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~364 ViV loader suite (now 352+ with sg-embed-helpers) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite + browser integration: 8 tests + 10 app-shell-nav-helpers inbox/folder-app.json tests.
+**Total ~2015+** = 977 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~373 ViV loader suite (352+ + 12 sgsend-static-mode + 9 app-shell-bridge-build) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite + browser integration: 8 tests + 10 app-shell-nav-helpers inbox/folder-app.json tests.
 
 
 
@@ -55,7 +55,14 @@ Run with: `bash tests/unit/vault_ui/loader/run-all.sh`
 |------|-----------|---------------|
 | `test__sg_embed_helpers.js` | 17 | `SgEmbed.buildIframe()`/`buildEmbedUrl()`; sandbox enforcement (allow-scripts only; refuses allow-same-origin); opaque-origin logic; full embed handshake round-trip in Node |
 
-| **Total ViV loader suite** | **352+** | |
+**Static-host mode + bridge-build regression (added 2026-06-30, commits `74d5444`/`97426c2`):**
+
+| File | Assertions | What It Tests |
+|------|-----------|---------------|
+| `test__sgsend_static_mode.js` | 12 | `SGSend.staticMode` flag inheritance (`{staticMode}` / `window.SG_STATIC`); batch fan-out to parallel GETs (same result shape); `EREADONLY` on writes in static mode; non-static regression guard (batch still POSTs `/api/vault/batch`) |
+| `test__app_shell_bridge_build.js` | 9 | `_buildVfsBridgeScript` builds without throwing (regression guard for bare `_embedHelperSrc()` call); bridge injects embed helper + `sg.vault.embed`; Option C/D external-link paths wired correctly; `externalLinks` grant flips sandbox flags |
+
+| **Total ViV loader suite** | **373+** | |
 
 **Note:** Tests T1 and T2 (null-frame `parent.document`/`localStorage` access throws) require a real browser — Phase 3 security gate tests, not runnable in Node. Phase 3 Playwright probe suite: 30 assertions, 0 failures.
 
