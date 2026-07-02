@@ -9,17 +9,32 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ## 2026-07-02
 
-13 human briefs from 28 June 2026 processed (committed by Dinis Cruz on 30 June 22:51 BST, after the 06/30 session). 2 code items catalogued (static-host mode, app-shell regression fix). 25 new PROPOSED items across three themes. 12 new EXISTS tests.
+13 human briefs from 28 June 2026 processed (committed by Dinis Cruz on 30 June 22:51 BST, after the 06/30 session — missed by the 07/01 session which only checked the 07/01 folder). 25 new PROPOSED items across three themes.
 
-- `index.md` — Version v0.33.35 → v0.33.38; last updated 2026-06-30 → 2026-07-02; unit tests ~1994+ → ~2006+ (+12 static-mode); total docs 772 → 785; PROPOSED 422 → 447+.
-- `qa/index.md` — Last updated 2026-06-30 → 2026-07-02; added `test__sgsend_static_mode.js` (12 assertions, commit `74d5444`); total ~1994+ → ~2006+; app-shell regression fix (`97426c2`) noted.
-- `vault/index.md` — Already updated by commit `74d5444` itself (static-host mode section added). No change needed.
+- `index.md` — Version v0.33.37 → v0.33.38; last updated 2026-07-01 → 2026-07-02; total docs 772 → 785 (+13 briefs); PROPOSED 422 → 447+; test count unchanged at ~2015+ (already updated by 07/01 session).
+- `qa/index.md` — Last updated 2026-07-01 → 2026-07-02; note added re duplicate static-mode entry removed (07/01 session already added both sgsend-static-mode and bridge-build tests).
 
-New EXISTS items: 2 (static-host mode + 12 tests, app-shell regression fix — no new tests).
+New EXISTS items: 0 (code items already catalogued by 07/01 session).
 New PROPOSED items: 25 (mini-sites 10, use-case program 6, ontology/NTF 9).
 
 Master index (07/02): `team/roles/librarian/reviews/07/02/v0.33.38__master-index__briefs-28-june-2026.md`
-Processed: 13 new human briefs | New EXISTS items: 2 | New PROPOSED items: 25 | Cumulative docs: 785
+Processed: 13 new human briefs | New EXISTS items: 0 | New PROPOSED items: 25 | Cumulative docs: 785
+
+---
+
+## 2026-07-01
+
+No new human briefs (07/01 folder does not exist; briefs/06/28/ missed — 13 briefs committed by Dinis on 30 June 22:51 BST were not seen by this session). 2 EXISTS items from June 30 code changes. No backlog task this session (B-002 tools PROPOSED at 182 lines — under 300-line split threshold).
+
+- `index.md` — Version v0.33.35 → v0.33.37; last updated 2026-06-30 → 2026-07-01; unit tests ~1994+ → ~2015+ (ViV loader 352+ → 373+: +12 sgsend-static-mode + 9 app-shell-bridge-build).
+- `qa/index.md` — Last updated 2026-06-30 → 2026-07-01; added `test__sgsend_static_mode.js` (12 assertions) and `test__app_shell_bridge_build.js` (9 assertions) to ViV loader suite table; suite total 352+ → 373+; total ~1994+ → ~2015+.
+- `vault/index.md` — Last updated corrected 2026-06-10 → 2026-07-01; section date corrected 2026-06-15 → 2026-06-30 (content was already added in commit `74d5444` on June 30 but date was wrong).
+
+New EXISTS items: 2 (SGSend static-host mode + 12 tests; `_buildVfsBridgeScript` bare-call fix + 9-assertion regression guard).
+New PROPOSED items: 0.
+
+Master index (07/01): `team/roles/librarian/reviews/07/01/v0.33.37__master-index__no-new-briefs-code-30-june.md`
+Processed: 0 new human briefs | New EXISTS items: 2 | New PROPOSED items: 0
 
 ---
 
