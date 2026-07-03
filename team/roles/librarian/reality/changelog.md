@@ -7,6 +7,26 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-03
+
+13 human briefs from 30 June 2026 (9 docs) and 02 July 2026 (3 docs + 1 day-index) processed. 38 new PROPOSED items across five themes: product/black-box (7), partners/library (6), risk acceptance/appetite (8), ontology/confidence/underwriting (8), near-misses/scenarios/question-engine (9). 0 new EXISTS items.
+
+- `index.md` — Version v0.33.38 → v0.33.39; last updated 2026-07-02 → 2026-07-03; total docs 785 → 798 (+13 briefs); PROPOSED 664+ → 702+; test count unchanged at ~2015+.
+
+New EXISTS items: 0 (no code delivered in this batch — all PROPOSED).
+New PROPOSED items: 38 across five themes.
+
+Role reviews produced:
+- `team/roles/architect/reviews/07/03/v0.33.39__architect-review__briefs-30-june-02-july-2026.md`
+- `team/roles/dev/reviews/07/03/v0.33.39__dev-review__briefs-30-june-02-july-2026.md`
+
+Master index (07/03): `team/roles/librarian/reviews/07/03/v0.33.39__master-index__briefs-30-june-02-july-2026.md`
+Processed: 13 new human briefs | New EXISTS items: 0 | New PROPOSED items: 38 | Cumulative docs: 798
+
+Key architectural flags: confidence propagation operator UNSPECIFIED (blocks all confidence work); PKI attestation format needed for underwriting; accountability map schema needed for question engine. 2FA MVP (June 26) remains primary implementation priority.
+
+---
+
 ## 2026-07-02
 
 13 human briefs from 28 June 2026 processed (committed by Dinis Cruz on 30 June 22:51 BST, after the 06/30 session — missed by the 07/01 session which only checked the 07/01 folder). 25 new PROPOSED items across three themes.
