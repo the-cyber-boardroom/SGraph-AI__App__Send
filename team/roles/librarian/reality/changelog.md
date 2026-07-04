@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-04
+
+13 human briefs processed — 10 from `briefs/06/30/` (committed 2 July after the 07/02 session closed) and 3 from `briefs/07/02/` (committed 3 July). Five themes: ontology/data quality, partners/market, product definition/demo, risk acceptance psychology/appetite, and the question-engine/near-misses/"how long" trio. ~46 new PROPOSED items.
+
+- `index.md` — Version v0.33.38 → v0.33.40; last updated 2026-07-02 → 2026-07-04; total docs 785 → 798 (+13 briefs); PROPOSED 664+ → ~710+; test count unchanged at ~2015+ (no code commits since 07/02).
+
+New EXISTS items: 0.
+New PROPOSED items: ~46 (ontology/data quality 8, partners/market 10, product/demo 8, risk acceptance psychology/appetite 8, question-engine/near-misses/"how long" 12).
+
+Master index (07/04): `team/roles/librarian/reviews/07/04/v0.33.40__master-index__briefs-30-june-and-2-july-2026.md`
+Processed: 13 new human briefs | New EXISTS items: 0 | New PROPOSED items: ~46 | Cumulative docs: 798
+
+---
+
 ## 2026-07-02
 
 13 human briefs from 28 June 2026 processed (committed by Dinis Cruz on 30 June 22:51 BST, after the 06/30 session — missed by the 07/01 session which only checked the 07/01 folder). 25 new PROPOSED items across three themes.
