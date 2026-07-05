@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-05
+
+4 human briefs from `briefs/07/02/` subdirectories missed by the 07/04 Librarian session, now processed. Subdirectories: `authorization-and-maturity-model/` (2 arch briefs), `root-cause-and-accountability/accountability-paradox` (1 strategy brief), `product-roadmap/` (roadmap md + visual assets). 34 new PROPOSED items across three themes: agent authorization/closure (6), RAMM entity model + agentic overlay (10), accountability paradox patterns (5), roadmap phases 1–3 items (13). 0 new EXISTS items.
+
+- `index.md` — Version v0.33.40 → v0.33.41; last updated 2026-07-04 → 2026-07-05; PROPOSED ~710+ → ~744+; total docs 798 → 803 (+5 files: 4 text + 1 visual).
+
+New EXISTS items: 0.
+New PROPOSED items: ~34 (authorization closure, CapabilityCertificate, MomentOfAuthorization, RAMM entity classes 1–10, RAMM level predicates, Agentic RAMM overlay, RAMM OWASP submission, vault-loader library, Phase 1–3 roadmap items).
+
+Master index (07/05): `team/roles/librarian/reviews/07/05/v0.33.41__master-index__briefs-2-july-2026-missed-subdirs.md`
+Session: 4 missed briefs | New EXISTS items: 0 | New PROPOSED items: ~34 | Cumulative docs: 803
+
+---
+
 ## 2026-07-04
 
 13 human briefs processed (same batch as 07/03 — second Librarian session run on 4 July). ~46 new PROPOSED items (more detailed count than the 07/03 session). Five themes: ontology/data quality, partners/market, product definition/demo, risk acceptance psychology/appetite, and the question-engine/near-misses/"how long" trio.
