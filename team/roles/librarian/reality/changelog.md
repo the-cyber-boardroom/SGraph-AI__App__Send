@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-08
+
+9 briefs from `briefs/07/05/` across four theme folders processed. ~80 new PROPOSED items across four themes: AWS Configuration Risk Engine (27 items — engine, rating layer, IAM ontology/taxonomy), Agent-Risk Thesis and Grounded Alarm (14 items — board thesis, FUD inversion, grounded alarm term), Risk Mandate Experience Loop (14 items — two-phase, two streams, risk-reduction measure), Evidence Economy (25 items — news-backed vaults, force of proof, evidence packs as a service). 0 new EXISTS items.
+
+- `index.md` — Version v0.33.42 → v0.33.43; last updated 2026-07-06 → 2026-07-08; PROPOSED ~780+ → ~860+; total docs 810 → 820 (+10: 9 substantive briefs + 1 day-index).
+
+New EXISTS items: 0.
+New PROPOSED items: ~80 (AWS IAM engine + taxonomy + rating layer, AuthorizationClosure, CostCeiling, DamageWindow, CapabilityCertificate in AWS context, catastrophic-failure board thesis, grounded alarm, two-phase experience loop, investigate+execute streams, risk-reduction metric, news-backed evidence vaults, force-of-proof two pillars, evidence-packs-as-a-service agentic API).
+
+Master index (07/08): `team/roles/librarian/reviews/07/08/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: 9 briefs | New EXISTS items: 0 | New PROPOSED items: ~80 | Cumulative docs: 820
+
+---
+
 ## 2026-07-05
 
 4 human briefs from `briefs/07/02/` subdirectories missed by the 07/04 Librarian session, now processed. Subdirectories: `authorization-and-maturity-model/` (2 arch briefs), `root-cause-and-accountability/accountability-paradox` (1 strategy brief), `product-roadmap/` (roadmap md + visual assets). 34 new PROPOSED items across three themes: agent authorization/closure (6), RAMM entity model + agentic overlay (10), accountability paradox patterns (5), roadmap phases 1–3 items (13). 0 new EXISTS items.
