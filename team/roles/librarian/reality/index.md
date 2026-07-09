@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~835+ (+~55 net-new from 5 July: AWS engine 26, agent-risk thesis 10, experience loop 7, evidence economy 19; previously ~780+) |
-| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index, processed 2026-07-09) |
+| Open PROPOSED items (across all domains) | ~860+ (+80 net-new from 5 July: AWS IAM engine+rating+ontology 27, agent-risk thesis+grounded-alarm 14, experience-loop 14, evidence-economy 25; previously ~780+; two Librarian sessions 07/08 and 07/09 covered same briefs) |
+| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index; processed 07/08 + role reviews 07/09) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 
 ---
