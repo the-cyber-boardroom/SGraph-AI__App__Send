@@ -9,21 +9,56 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ## 2026-07-10
 
-9 human briefs from `briefs/07/05/` processed across four threads: AWS configuration risk engine (3 briefs: Python engine + browser rating layer + ontology), agent-risk thesis and communication (2 strategy briefs), Risk Mandate experience loop (1 arch brief), evidence economy (3 strategy briefs). 31 new PROPOSED items. 0 new EXISTS items.
+Third Librarian session on 5 July briefs. Additional role reviews (architect, dev) and master index produced, complementing the 07/08 and 07/09 sessions. No new PROPOSED items beyond the 07/08 count (same briefs, additional analysis angle).
 
-- `index.md` — Version v0.33.42 → v0.33.43; last updated 2026-07-06 → 2026-07-10; PROPOSED ~780+ → ~811+; total docs 810 → 820 (+10: 9 briefs + 1 day-index).
+- `index.md` — Version v0.33.44 (unchanged); last updated 2026-07-09 → 2026-07-10.
 
 New EXISTS items: 0.
-New PROPOSED items: ~31 (AWS engine 14, agent-risk thesis 5, experience loop 6, evidence economy 12).
+New PROPOSED items: 0 (same briefs as 07/08 and 07/09 sessions).
 
-Role reviews produced:
+Role reviews produced (07/10):
 - `team/roles/architect/reviews/07/10/v0.33.43__architect-review__briefs-5-july-2026.md`
 - `team/roles/dev/reviews/07/10/v0.33.43__dev-review__briefs-5-july-2026.md`
 
-Master index (07/10): `team/roles/librarian/reviews/07/10/v0.33.43__master-index__briefs-5-july-2026.md`
-Processed: 9 new human briefs + 1 day-index | New EXISTS items: 0 | New PROPOSED items: ~31 | Cumulative docs: 820
+Debrief (07/10): `team/humans/dinis_cruz/debriefs/07/10/v0.33.43__debrief__briefs-processing-5-july-2026.md`
 
-Key architectural flags: JSON schema undefined (blocks AWS engine build — immediate blocker); IAM action-to-effect table unspecified (blocks closure computation); deny/condition modelling undecided (blocks ontology code). AWS engine has 10 acceptance criteria and is the most implementable spec in the corpus to date; ready to build once blockers are resolved.
+Master index (07/10): `team/roles/librarian/reviews/07/10/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: additional role reviews + debrief | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-09
+
+Second Librarian session on same 5 July briefs. Role reviews and debrief produced (architect, dev, alchemist), building on the 07/08 master index. No new PROPOSED items beyond the 07/08 count.
+
+- `index.md` — Version v0.33.43 → v0.33.44; last updated 2026-07-08 → 2026-07-09; PROPOSED unchanged at ~860+; docs unchanged at 820.
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (same briefs as 07/08 session; role reviews add analysis, not new PROPOSED items).
+
+Role reviews produced (07/09):
+- `team/roles/architect/reviews/07/09/v0.33.44__architect-review__briefs-5-july-2026.md`
+- `team/roles/dev/reviews/07/09/v0.33.44__dev-review__briefs-5-july-2026.md`
+- `team/roles/alchemist/reviews/07/09/v0.33.44__alchemist-review__briefs-5-july-2026.md`
+
+Debrief (07/09): `team/humans/dinis_cruz/debriefs/07/09/v0.33.44__debrief__briefs-processing-5-july-2026.md`
+
+Master index (07/09): `team/roles/librarian/reviews/07/09/v0.33.44__master-index__briefs-5-july-2026.md`
+Session: role reviews + debrief | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-08
+
+9 briefs from `briefs/07/05/` across four theme folders processed. ~80 new PROPOSED items across four themes: AWS Configuration Risk Engine (27 items — engine, rating layer, IAM ontology/taxonomy), Agent-Risk Thesis and Grounded Alarm (14 items — board thesis, FUD inversion, grounded alarm term), Risk Mandate Experience Loop (14 items — two-phase, two streams, risk-reduction measure), Evidence Economy (25 items — news-backed vaults, force of proof, evidence packs as a service). 0 new EXISTS items.
+
+- `index.md` — Version v0.33.42 → v0.33.43; last updated 2026-07-06 → 2026-07-08; PROPOSED ~780+ → ~860+; total docs 810 → 820 (+10: 9 substantive briefs + 1 day-index).
+
+New EXISTS items: 0.
+New PROPOSED items: ~80 (AWS IAM engine + taxonomy + rating layer, AuthorizationClosure, CostCeiling, DamageWindow, CapabilityCertificate in AWS context, catastrophic-failure board thesis, grounded alarm, two-phase experience loop, investigate+execute streams, risk-reduction metric, news-backed evidence vaults, force-of-proof two pillars, evidence-packs-as-a-service agentic API).
+
+Master index (07/08): `team/roles/librarian/reviews/07/08/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: 9 briefs | New EXISTS items: 0 | New PROPOSED items: ~80 | Cumulative docs: 820
 
 ---
 
