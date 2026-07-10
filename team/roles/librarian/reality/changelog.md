@@ -7,6 +7,26 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-10
+
+9 human briefs from `briefs/07/05/` processed across four threads: AWS configuration risk engine (3 briefs: Python engine + browser rating layer + ontology), agent-risk thesis and communication (2 strategy briefs), Risk Mandate experience loop (1 arch brief), evidence economy (3 strategy briefs). 31 new PROPOSED items. 0 new EXISTS items.
+
+- `index.md` — Version v0.33.42 → v0.33.43; last updated 2026-07-06 → 2026-07-10; PROPOSED ~780+ → ~811+; total docs 810 → 820 (+10: 9 briefs + 1 day-index).
+
+New EXISTS items: 0.
+New PROPOSED items: ~31 (AWS engine 14, agent-risk thesis 5, experience loop 6, evidence economy 12).
+
+Role reviews produced:
+- `team/roles/architect/reviews/07/10/v0.33.43__architect-review__briefs-5-july-2026.md`
+- `team/roles/dev/reviews/07/10/v0.33.43__dev-review__briefs-5-july-2026.md`
+
+Master index (07/10): `team/roles/librarian/reviews/07/10/v0.33.43__master-index__briefs-5-july-2026.md`
+Processed: 9 new human briefs + 1 day-index | New EXISTS items: 0 | New PROPOSED items: ~31 | Cumulative docs: 820
+
+Key architectural flags: JSON schema undefined (blocks AWS engine build — immediate blocker); IAM action-to-effect table unspecified (blocks closure computation); deny/condition modelling undecided (blocks ontology code). AWS engine has 10 acceptance criteria and is the most implementable spec in the corpus to date; ready to build once blockers are resolved.
+
+---
+
 ## 2026-07-05
 
 4 human briefs from `briefs/07/02/` subdirectories missed by the 07/04 Librarian session, now processed. Subdirectories: `authorization-and-maturity-model/` (2 arch briefs), `root-cause-and-accountability/accountability-paradox` (1 strategy brief), `product-roadmap/` (roadmap md + visual assets). 34 new PROPOSED items across three themes: agent authorization/closure (6), RAMM entity model + agentic overlay (10), accountability paradox patterns (5), roadmap phases 1–3 items (13). 0 new EXISTS items.
