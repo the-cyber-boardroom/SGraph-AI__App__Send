@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.43 | **Last updated:** 2026-07-12 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.44 | **Last updated:** 2026-07-12 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,9 +44,10 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~830+ (+50 net-new from 5 July: AWS engine 17, agent-risk thesis+communication 10, experience loop 7, evidence economy 16; previously ~780+) |
-| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index, processed 2026-07-12) |
+| Open PROPOSED items (across all domains) | ~860+ (+80 net-new from 5 July: AWS IAM engine+rating+ontology 27, agent-risk thesis+grounded-alarm 14, experience-loop 14, evidence-economy 25; previously ~780+; multiple Librarian sessions 07/08–07/12 covered same briefs) |
+| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index; processed 07/08–07/12) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
+| **Latest build spec** | AWS IAM Configuration Risk Engine (Python, deterministic, context-not-configuration, JSON out) — 5 July 2026 |
 
 ---
 
