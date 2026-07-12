@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-12
+
+9 human briefs from `briefs/07/05/` across four subdirectories processed. Subdirectories: `aws-configuration-risk-engine/` (3 briefs: Python engine dev-brief + browser rating layer arch-brief + IAM ontology arch-brief), `agent-risk-thesis-and-communication/` (2 strategy briefs: catastrophic-failure board thesis + grounded alarm communication strategy), `risk-mandate-experience-loop/` (1 arch brief: two-phase map/accept loop + two streams), `evidence-economy/` (3 strategy briefs: news-backed evidence vaults + force of proof + evidence packs as a service). ~50 new PROPOSED items. 0 new EXISTS items.
+
+- `index.md` — Version v0.33.42 → v0.33.43; last updated 2026-07-06 → 2026-07-12; PROPOSED ~780+ → ~830+; total docs 810 → 820 (+10 files: 9 text + 1 day-index).
+
+New EXISTS items: 0.
+New PROPOSED items: ~50 (AWS IAM engine + ontology + rating layer, context-not-configuration principle, AuthorizationClosure node type, CostCeiling + DamageWindow node types, cost-as-blast-radius, agentic union cloud rating, board catastrophic-failure thesis, grounded-alarm term + discipline, weather-warning standard, two-phase experience loop, two acceptance actions, Investigate + Execute streams, risk-reduction measure, news-backed evidence vault, news-graph-to-risk-graph bridge, force of proof mechanism, risk-acceptor/fact-certifier split, two prices, evidence-packs-as-a-service API, legwork-not-prose pack, SG-vault-as-evidence-pack, on-demand micropayment billing).
+
+Master index (07/12): `team/roles/librarian/reviews/07/12/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: 9 substantive briefs + 1 day-index | New EXISTS items: 0 | New PROPOSED items: ~50 | Cumulative docs: 820
+
+---
+
 ## 2026-07-05
 
 4 human briefs from `briefs/07/02/` subdirectories missed by the 07/04 Librarian session, now processed. Subdirectories: `authorization-and-maturity-model/` (2 arch briefs), `root-cause-and-accountability/accountability-paradox` (1 strategy brief), `product-roadmap/` (roadmap md + visual assets). 34 new PROPOSED items across three themes: agent authorization/closure (6), RAMM entity model + agentic overlay (10), accountability paradox patterns (5), roadmap phases 1–3 items (13). 0 new EXISTS items.
