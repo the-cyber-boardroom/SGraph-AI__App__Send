@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.43 | **Last updated:** 2026-07-13 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.44 | **Last updated:** 2026-07-13 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-07-05)
+## Quick Stats (as of 2026-07-13)
 
 | Metric | Count |
 |--------|-------|
@@ -44,10 +44,11 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~840+ (+60 net-new from 5 July: AWS engine 6, rating layer 8, IAM ontology 7, catastrophic-failure thesis 5, grounded-alarm 5, experience-loop 7, evidence-vault 6, force-of-proof 8, evidence-packs 8; previously ~780+) |
-| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index, processed 2026-07-13) |
+| Open PROPOSED items (across all domains) | ~860+ (+80 net-new from 5 July: AWS IAM engine+rating+ontology 27, agent-risk thesis+grounded-alarm 14, experience-loop 14, evidence-economy 25; previously ~780+; covered across multiple Librarian sessions 07/08–07/13) |
+| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index; processed 07/08–07/13) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
+| **Latest build spec** | AWS IAM Configuration Risk Engine (Python, deterministic, context-not-configuration, JSON out) — 5 July 2026 |
 
 ---
 
