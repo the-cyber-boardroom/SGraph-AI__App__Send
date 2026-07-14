@@ -7,6 +7,23 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-14
+
+Routine daily check. No new briefs. No new dev commits. Backlog task B-004 completed: `infra/proposed/index.md` split into topic files.
+
+- `infra/proposed/index.md` — Converted from 267-line monolith to ~130-line TOC + 9 remaining small sections. Three topic files extracted.
+- `infra/proposed/vault-hosting.md` — NEW: Vault Hosting Architecture, Fargate + Container Hosts, Instance Sizing, Serverless for Agents, Multi-Cloud Deploy, On-Demand Vault Provisioning, DNS Registry for Labs, MyFeeds (docs 384, 385, 389, 399, 401, 403, 424, 425, 428, 429, 437).
+- `infra/proposed/firecracker.md` — NEW: Firecracker substrate 9 items (docs 408, 411, 412).
+- `infra/proposed/relay-and-storage.md` — NEW: SG/Relay P-337–P-346, S3 Native CLI, IAM graph, S3-compatible vault container (docs 400, 402; 06/16 pack; 06/23 brief).
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (B-004 is a structural split, not new content).
+
+Master index (07/14): `team/roles/librarian/reviews/07/14/v0.33.44__master-index__daily-check-14-july-2026.md`
+Session: no new briefs + B-004 split | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
 ## 2026-07-12
 
 Additional Librarian processing pass on the 5 July 2026 briefs (first processed 07/08-07/10; this session produced fresh role reviews at version v0.33.43 with independent analysis). Role reviews: architect, dev, alchemist. Debrief produced. Reality document last-updated date updated to 07/12.

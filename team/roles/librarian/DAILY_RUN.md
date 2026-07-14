@@ -108,11 +108,20 @@ The 408-line monolith is now a ~65-line TOC index. All P-numbers preserved. Pre-
 P-numbering discrepancy (P-404–P-410 range) documented in risk-mandate.md but not resolved.
 
 ### B-004 · Reality — Extract infra PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-07-14)
 **What:** Expand `infra/proposed/index.md` into: `ami-marketplace.md`, `ephemeral.md`,
 `observability.md`, `playwright-service.md`. Source: archived monolith sections 16
 (deploy infra), 17 (browser automation), 23 (Playwright API), 24 (QA infra), 26 (Playwright
 architecture), 27 (ephemeral infra), 31 (ephemeral vault infrastructure, VNC streaming).
+
+**Outcome:** The 267-line index was split into three topic files (topic groupings evolved from
+original spec to match actual content growth): `vault-hosting.md` (vault hosting modes,
+Fargate, container hosts, instance sizing, serverless, multi-cloud, on-demand provisioning,
+DNS labs, MyFeeds — docs 384, 385, 389, 399, 401, 403, 424, 425, 428, 429, 437),
+`firecracker.md` (microVM substrate, 9 items — docs 408, 411, 412), `relay-and-storage.md`
+(SG/Relay P-337–P-346, S3 CLI, IAM graph, S3-compatible container — docs 400, 402, 06/16 pack,
+06/23 brief). Index is now a ~130-line TOC + 9 small retained sections. All P-numbers and
+source references preserved.
 
 ### B-005 · Reality — Extract identity PROPOSED content into domain files
 **Status:** QUEUED
@@ -185,6 +194,7 @@ None currently active.
 | 2026-06-28 | No new briefs; backlog B-003 | ai-agents/proposed 408-line monolith split into 5 topic files (llm-components, agent-communication, workflows, skills-economy, risk-mandate); TOC index; changelog + DAILY_RUN updated |
 | 2026-06-29 | Process 18 briefs from 06/24 (addendum) + 06/26 (new batch) | 12 new PROPOSED items (P-411–P-422); risk register architecture, digital twins, 22-node/35-edge ontology, directed-edge query engine, 2FA MVP build plan; Calendly as first RiskMandate review; healthcare data-protection pattern (P-412 in security/proposed); Architect + Dev reviews produced; reality doc + index + changelog updated |
 | 2026-07-01 | No new briefs; code scan 30 June | 2 EXISTS items: SGSend static-host mode (12 tests, HOSTING-ON-STATIC-STORAGE.md guide); `_buildVfsBridgeScript` bare-call fix (9-assertion regression guard). vault/index.md date errors corrected. qa/index.md, index.md, changelog.md updated. B-002 tools PROPOSED at 182 lines — no split needed yet. |
+| 2026-07-14 | No new briefs; no new dev commits; B-004 | infra/proposed/index.md (267 lines) split into 3 topic files: vault-hosting.md, firecracker.md, relay-and-storage.md. Index now ~130-line TOC + 9 small sections. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
 
 ---
 
