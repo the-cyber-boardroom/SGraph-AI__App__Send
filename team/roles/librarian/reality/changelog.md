@@ -7,6 +7,20 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-16
+
+Routine daily check. No new briefs. No new dev commits. Backlog task B-009 completed: `library/docs/specs/README.md` staleness audit.
+
+- `library/docs/specs/README.md` — Added "Agent Briefing Documents (v0.1.1)" table documenting 3 previously unlisted files in `_to_process/v0.1.1/` (Claude Code brief, OpenAI Codex brief, dev-environment-workflows). Six original spec files verified present. Key Decisions section reviewed — all accurate.
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (B-009 is a documentation audit, not new content).
+
+Master index (07/16): `team/roles/librarian/reviews/07/16/v0.33.43__master-index__daily-check-16-july-2026.md`
+Session: no new briefs + B-009 audit | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
 ## 2026-07-14
 
 Routine daily check. No new briefs. No new dev commits. Backlog task B-004 completed: `infra/proposed/index.md` split into topic files.

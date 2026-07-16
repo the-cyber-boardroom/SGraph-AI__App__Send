@@ -160,9 +160,15 @@ point to `reality/index.md` instead.
 - All other 9 key references confirmed valid.
 
 ### B-009 · library/docs/specs/README.md — Staleness audit
-**Status:** QUEUED
+**Status:** DONE (2026-07-16)
 **What:** Check whether `library/docs/specs/README.md` reflects current spec documents.
 Compare against actual files in `library/docs/specs/`. Update any missing or renamed entries.
+
+**Outcome:** All 6 original spec files verified present at expected paths. Discovered unlisted
+`v0.1.1/` subdirectory with 3 agent briefing documents (Claude Code brief, OpenAI Codex brief,
+dev-environment-workflows). Added second table to README documenting these 3 documents as "Agent
+Briefing Documents (v0.1.1)". Key Decisions section reviewed — all 9 decisions still accurate.
+No renames or missing files.
 
 ### B-010 · Activity log — Bring activity-log.md current
 **Status:** DONE (2026-05-04)
@@ -194,6 +200,7 @@ None currently active.
 | 2026-06-28 | No new briefs; backlog B-003 | ai-agents/proposed 408-line monolith split into 5 topic files (llm-components, agent-communication, workflows, skills-economy, risk-mandate); TOC index; changelog + DAILY_RUN updated |
 | 2026-06-29 | Process 18 briefs from 06/24 (addendum) + 06/26 (new batch) | 12 new PROPOSED items (P-411–P-422); risk register architecture, digital twins, 22-node/35-edge ontology, directed-edge query engine, 2FA MVP build plan; Calendly as first RiskMandate review; healthcare data-protection pattern (P-412 in security/proposed); Architect + Dev reviews produced; reality doc + index + changelog updated |
 | 2026-07-01 | No new briefs; code scan 30 June | 2 EXISTS items: SGSend static-host mode (12 tests, HOSTING-ON-STATIC-STORAGE.md guide); `_buildVfsBridgeScript` bare-call fix (9-assertion regression guard). vault/index.md date errors corrected. qa/index.md, index.md, changelog.md updated. B-002 tools PROPOSED at 182 lines — no split needed yet. |
+| 2026-07-16 | No new briefs; no new dev commits; B-009 | library/docs/specs/README.md audited: all 6 spec files valid. 3 unlisted files found in v0.1.1/ subdir. README updated with Agent Briefing Documents table. changelog.md + DAILY_RUN.md updated. |
 | 2026-07-14 | No new briefs; no new dev commits; B-004 | infra/proposed/index.md (267 lines) split into 3 topic files: vault-hosting.md, firecracker.md, relay-and-storage.md. Index now ~130-line TOC + 9 small sections. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
 
 ---
