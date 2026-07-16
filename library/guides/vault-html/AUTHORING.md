@@ -611,6 +611,65 @@ vault**; reading a sub-vault's own history is a planned follow-on.
 
 ---
 
+## Device-local app state (`sg.state.*`)
+
+Your app runs in a **null-origin sandboxed iframe**, so it has **no `localStorage` of its own** —
+`window.localStorage` throws on an opaque origin. When you need to remember something small on *this*
+device (theme choice, panel widths, a "don't show this again" flag, the last tab the user was on),
+`sg.state.*` gives you a key/value store **without a vault write**. Under the hood it postMessages the
+request to the top-level kernel, which owns the real `localStorage`, reads/writes on your behalf, and
+replies — the same bridge every other `sg.*` call uses. You never touch storage directly.
+
+```js
+await sg.state.set('theme', 'dark');          // value is JSON-encoded (any JSON-serialisable value)
+await sg.state.set('layout', { cols: 3, sort: 'name' });
+
+const theme  = await sg.state.get('theme');    // → 'dark'  (null if never set)
+const layout = await sg.state.get('layout');   // → { cols: 3, sort: 'name' }
+
+const keys   = await sg.state.keys();          // → ['theme', 'layout']  (just the key part)
+await sg.state.remove('theme');
+await sg.state.clear();                         // wipes only THIS app's keys → { ok: true, removed: N }
+```
+
+**Isolation.** Every key is stored under `sg-app-state:<vaultId>:<appEntryPath>:<key>`, so state is
+scoped **per-vault and per-app-entry-path**. One vault's apps can't read another's, and `clear()`
+only removes your app's slice — it never touches other apps' state. `keys()` returns the
+un-namespaced key part, so you read back exactly what you passed to `set()`.
+
+**Limits & safety.**
+
+- **64 KiB per key** (the JSON-encoded value). It's for *preferences*, not documents — a larger value
+  is rejected with `value too large (max 64 KiB)`.
+- `vaultId` is a **derived, non-secret** identifier — the vault **key is never** written to
+  localStorage. Don't put secrets (vault keys, access tokens) in `sg.state.*`.
+- Every op is wrapped in try/catch on the host side, so a quota or parse error returns a rejected
+  promise rather than breaking the bridge.
+
+### `sg.state.*` vs `sg.fs.write('.app-state/…')` — pick the right one
+
+This is the decision that trips people up. They are **not** interchangeable:
+
+| You want state that… | Use | Persistence | Travels with the vault? |
+|---|---|---|---|
+| Is a per-device **preference** (theme, panel sizes, dismissals) | **`sg.state.*`** | Kernel `localStorage` on **this browser** | ❌ No — device-local only |
+| Should **sync across devices** and be visible to anyone opening the same vault key | **`sg.fs.write('.app-state/…')`** | A real, encrypted **vault write** (a commit) | ✅ Yes — it *is* vault content |
+
+Rule of thumb: if losing it when the user switches browsers would be **fine** (or even expected),
+use `sg.state.*`. If losing it would be a **bug**, write it into the vault. Reach for `sg.state.*`
+specifically to avoid a vault commit on every trivial UI toggle.
+
+> **Why this exists as a separate namespace.** The device-local-prefs case deliberately deviates from
+> the "everything is a vault file" doctrine: a theme toggle shouldn't create a commit. Recorded in
+> `team/comms/changelog/05/30/changelog__app-state-print-rpc.md`.
+
+**No permission grant required.** Unlike `sg.fs.*` / `sg.vault.*`, `sg.state.*` needs no `app.json`
+`permissions` entry and no consent overlay — it's sandboxed to your own namespace in device-local
+storage and can't touch the vault or other apps. It works on **read-only opens too** (share-token /
+sub-vault views), since it never writes to the vault.
+
+---
+
 ## Anti-patterns (and how to fix them)
 
 ### ❌ Declarative `<link>` for vault CSS
