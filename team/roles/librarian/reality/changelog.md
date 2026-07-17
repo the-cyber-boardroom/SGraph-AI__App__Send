@@ -7,6 +7,26 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-17
+
+Routine daily check. No new briefs. No new dev commits. Backlog task B-006 completed: broken relative link health scan across 150+ files.
+
+- `team/comms/changelog/05/09/v0.27.18__changelog__vault-html-vfs-cleanup.md` — Fixed 4 links (`../../../../library/...` → `../../../../../library/...`)
+- `team/comms/changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md` — Fixed 1 link (depth off by one)
+- `team/comms/briefs/05/12/v0.27.20__brief__readonly-sharing-and-owner-secrets-implementation.md` — Fixed 2 links (`../../../roles/...` → `../../../../roles/...`)
+- `team/comms/briefs/05/12/v0.27.20__brief__vault-sgit-performance-harness.md` — Fixed 1 link
+- `team/comms/briefs/05/12/v0.27.19__sgit-cli-reply__vault-api-interactions.md` — Fixed 1 link
+- B-011 added to DAILY_RUN.md: 10 unfixable missing companion docs in `library/guides/agentic-setup/`
+
+New EXISTS items: 0.
+New PROPOSED items: 0.
+
+Master index (07/17): `team/roles/librarian/reviews/07/17/v0.33.43__master-index__daily-check-17-july-2026.md`
+Health scan: `team/roles/librarian/reviews/07/17/v0.33.43__librarian-review__b006-broken-link-health-scan.md`
+Session: no new briefs + B-006 health scan | Links fixed: 9 | Unfixable: 10 | Cumulative docs: 820
+
+---
+
 ## 2026-07-16
 
 Routine daily check. No new briefs. No new dev commits. Backlog task B-009 completed: `library/docs/specs/README.md` staleness audit.

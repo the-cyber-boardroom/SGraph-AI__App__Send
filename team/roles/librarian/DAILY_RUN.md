@@ -131,10 +131,20 @@ source references preserved.
 manager, credits tool).
 
 ### B-006 · Health scan — Check broken relative links across team/ and library/
-**Status:** QUEUED
+**Status:** DONE (2026-07-17)
 **What:** Walk all `.md` files under `team/` and `library/`, extract relative links, verify
 each resolves to a real file. Report broken links in a health scan review file.
 **Why:** Link rot accumulates silently. Last full scan: unknown.
+
+**Outcome:** 150+ files scanned. 19 broken links found — 9 fixed (depth-off-by-one in 5 files under `team/comms/changelog/05/09/` and `team/comms/briefs/05/12/`; all were one `../` short due to being 5 levels deep in `team/comms/`). 10 unfixable: `library/guides/agentic-setup/v0_4_0__role-ecosystem-guide.md` declares 9 companion Issues-FS files that were never imported into the directory. Added B-011 for that. All critical operating docs (reality tree, ROLE.md, DAILY_RUN.md, QA_START_HERE.md, all recent debriefs) are clean.
+
+Health scan report: `team/roles/librarian/reviews/07/17/v0.33.43__librarian-review__b006-broken-link-health-scan.md`
+
+### B-011 · Import or stub missing Issues-FS companion documents
+**Status:** QUEUED
+**What:** `library/guides/agentic-setup/v0_4_0__role-ecosystem-guide.md` declares 9 companion Issues-FS documents in its "Depends On" / "See Also" sections that don't exist in the repo (e.g. `v0_4_0__issues-fs__librarian-role.md`, `v0_4_0__issues-fs__thinking-in-graphs.md`). Same for one link in `v0.1.0__role-based-coordination.md`. The files may exist in an external vault or the Issues-FS system, or may never have been authored.
+**Why:** 10 dead links in key agentic-workflow guides. The role-ecosystem-guide is a likely starting point for new agents; broken "See Also" links erode trust.
+**Action:** Either import the source files from the Issues-FS vault (if they exist), or update the "See Also" section with a note that the companion documents have not yet been committed to this repo.
 
 ### B-007 · QA_START_HERE.md — Update to reflect v0.3.1 + post-April state
 **Status:** DONE (2026-05-19)
@@ -200,6 +210,7 @@ None currently active.
 | 2026-06-28 | No new briefs; backlog B-003 | ai-agents/proposed 408-line monolith split into 5 topic files (llm-components, agent-communication, workflows, skills-economy, risk-mandate); TOC index; changelog + DAILY_RUN updated |
 | 2026-06-29 | Process 18 briefs from 06/24 (addendum) + 06/26 (new batch) | 12 new PROPOSED items (P-411–P-422); risk register architecture, digital twins, 22-node/35-edge ontology, directed-edge query engine, 2FA MVP build plan; Calendly as first RiskMandate review; healthcare data-protection pattern (P-412 in security/proposed); Architect + Dev reviews produced; reality doc + index + changelog updated |
 | 2026-07-01 | No new briefs; code scan 30 June | 2 EXISTS items: SGSend static-host mode (12 tests, HOSTING-ON-STATIC-STORAGE.md guide); `_buildVfsBridgeScript` bare-call fix (9-assertion regression guard). vault/index.md date errors corrected. qa/index.md, index.md, changelog.md updated. B-002 tools PROPOSED at 182 lines — no split needed yet. |
+| 2026-07-17 | No new briefs; no new dev commits; B-006 | 150+ files scanned for broken links. 9 depth-off-by-one links fixed in team/comms/ (changelog/05/09 ×5, briefs/05/12 ×4). 10 unfixable missing companion docs in library/guides/agentic-setup/. B-011 added. Health scan report produced. |
 | 2026-07-16 | No new briefs; no new dev commits; B-009 | library/docs/specs/README.md audited: all 6 spec files valid. 3 unlisted files found in v0.1.1/ subdir. README updated with Agent Briefing Documents table. changelog.md + DAILY_RUN.md updated. |
 | 2026-07-14 | No new briefs; no new dev commits; B-004 | infra/proposed/index.md (267 lines) split into 3 topic files: vault-hosting.md, firecracker.md, relay-and-storage.md. Index now ~130-line TOC + 9 small sections. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
 
