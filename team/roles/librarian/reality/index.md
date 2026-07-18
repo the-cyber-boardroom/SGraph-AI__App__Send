@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.43 | **Last updated:** 2026-07-18 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.44 | **Last updated:** 2026-07-18 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,9 +44,11 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~792+ (+8 net-new from 5 July: AWS IAM engine P-423, browser rating P-424, ontology P-425, action-to-capability P-426, experience loop P-427, news vaults P-428, force of proof P-429, evidence packs P-430; previously ~780+) |
-| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index, processed 2026-07-18) |
+| Open PROPOSED items (across all domains) | ~860+ (+80 net-new from 5 July: AWS IAM engine+rating+ontology 27, agent-risk thesis+grounded-alarm 14, experience-loop 14, evidence-economy 25; previously ~780+; covered across multiple Librarian sessions 07/08–07/15; P-423–P-430 formalised in risk-mandate.md 2026-07-18) |
+| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index; processed 07/08–07/15) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
+| **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
+| **Latest build spec** | AWS IAM Configuration Risk Engine (Python, deterministic, context-not-configuration, JSON out) — 5 July 2026 |
 
 ---
 
