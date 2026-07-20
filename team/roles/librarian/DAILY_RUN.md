@@ -86,12 +86,23 @@ now a ~65-line TOC index. All P-numbers preserved. P-159–P-163 and P-174 are n
 ui/index.md; P-166–P-177 largely EXISTS in ui/index.md — both flagged in topic files.
 
 ### B-002 · Reality — Extract tools PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-07-20)
 **What:** Expand `tools/proposed/index.md` into topic files: `video-editing.md`,
 `wasm-tools.md`, `audio-tools.md`, `playbooklm.md`, `browser-video.md`. Source: archived
 monolith sections 17 (video editor expansion), 22 (WASM), 23 (audio/video), 24–28 (various
 tools proposals).
 **Why:** Tools PROPOSED is the second-largest domain. Topic files make it navigable.
+
+**Outcome:** Split 183-line mixed-content index into four topic files (groupings evolved
+from original spec to match actual content): `video-editing.md` (sg-tree + Video Editor
+Expansion + video crop/overlay/capture/playback/generation), `wasm-tools.md` (sg-wasm
+lifecycle + sg-audio-transcription Whisper + Pyodide sandbox + sg-public-viewer),
+`llm-components.md` (sg-llm component family + Agentic LLM suite + One-Shot IDE +
+Composite Tools + Infographic v0.1.1 + Infographic v2 + News Report Tool),
+`platform-tools.md` (Infrastructure/IFD + Social Previews + Audio tool distribution
+P-229–237 + TUI API P-202–203 + SG/Edge TUI P-200–201 + SG Labs Admin P-196 + SG Mail
+P-175–182 + Backup P-183–189). The 183-line index is now a ~45-line TOC with a
+P-number inventory table. All P-numbers preserved in topic files.
 
 ### B-003 · Reality — Extract ai-agents PROPOSED content into domain files
 **Status:** DONE (2026-06-28)

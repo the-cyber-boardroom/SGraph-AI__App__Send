@@ -7,6 +7,23 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-20
+
+Routine daily check. No new briefs (last brief batch: July 5, 2026). No new dev commits.
+Backlog task B-002 completed: extracted tools PROPOSED content into four topic files.
+
+Files changed:
+- `tools/proposed/index.md` — converted to ~45-line TOC (was 183 lines)
+- `tools/proposed/video-editing.md` — NEW (sg-tree, Video Editor Expansion, video tools)
+- `tools/proposed/wasm-tools.md` — NEW (sg-wasm, Whisper WASM, Pyodide sandbox)
+- `tools/proposed/llm-components.md` — NEW (sg-llm family, Agentic LLM suite, Infographic v1.1+v2)
+- `tools/proposed/platform-tools.md` — NEW (P-175–189, P-196, P-200–203, P-229–237)
+
+Master index (07/20): `team/roles/librarian/reviews/07/20/v0.33.43__master-index__daily-check-20-july-2026.md`
+Session: daily check + B-002 | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
 ## 2026-07-19
 
 Additional Librarian session. No new briefs (July 5 batch already fully processed in sessions 07/08–07/18, P-423–P-430 assigned). This session produced independent role reviews (architect, dev) and a master index from a fresh context read of the July 5 briefs, and a summary debrief.
