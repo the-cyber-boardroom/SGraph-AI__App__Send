@@ -7,6 +7,23 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-21
+
+Routine daily check. No new briefs (last brief batch: July 5, 2026). No new dev commits.
+Backlog task B-005 completed: extracted identity PROPOSED content into four topic files.
+
+Files changed:
+- `identity/proposed/index.md` — converted to ~60-line TOC (was 182 lines)
+- `identity/proposed/google-oauth.md` — NEW (OAuth + Social Login, Secrets Management, P-314, P-322–P-336)
+- `identity/proposed/billing-credits.md` — NEW (Per-User Vaults, Billing Automation, Free Tier, Micropayments, Dynamic Credentials, USDC)
+- `identity/proposed/openrouter.md` — NEW (P-299, P-385, P-386, P-388)
+- `identity/proposed/email.md` — NEW (Email + Outreach, SG Mail P-165–P-170)
+
+Master index (07/21): `team/roles/librarian/reviews/07/21/v0.33.44__master-index__daily-check-21-july-2026.md`
+Session: daily check + B-005 | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
 ## 2026-07-20
 
 Routine daily check. No new briefs (last brief batch: July 5, 2026). No new dev commits.

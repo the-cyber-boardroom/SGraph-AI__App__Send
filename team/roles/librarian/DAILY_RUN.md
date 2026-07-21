@@ -135,11 +135,21 @@ DNS labs, MyFeeds — docs 384, 385, 389, 399, 401, 403, 424, 425, 428, 429, 437
 source references preserved.
 
 ### B-005 · Reality — Extract identity PROPOSED content into domain files
-**Status:** QUEUED
+**Status:** DONE (2026-07-21)
 **What:** Expand `identity/proposed/index.md` into: `google-oauth.md`, `billing-credits.md`,
 `openrouter.md`. Source: archived monolith sections 16 (revenue + LLM features), 23
 (per-user vaults, credit experiment, OpenRouter), 28 (auth MVP), 31 (Google app:data, secrets
 manager, credits tool).
+
+**Outcome:** Split 182-line mixed-content index into four topic files (four groupings vs original
+three — email content warranted its own file): `google-oauth.md` (OAuth + Social Login + Secrets
+Management + P-314 PKI Identity Envelopes + P-322–P-336 NHI 2.0 Agent Identity Platform, 20+
+items), `billing-credits.md` (Per-User Vaults/Credits + Billing Automation + Free Tier +
+Pre-Auth/Micropayments + Dynamic Credential Delivery + USDC/Agentic Commerce, 26 items),
+`openrouter.md` (P-299 LLM API Billing Broker + P-385/P-386/P-388 OpenRouter Platform
+Expansion), `email.md` (Email + Outreach + P-165–P-170 SG Mail Email Client). The 182-line
+index is now a ~60-line TOC with a P-number inventory table. All P-numbers preserved in topic
+files. Non-P-numbered items noted with doc references.
 
 ### B-006 · Health scan — Check broken relative links across team/ and library/
 **Status:** DONE (2026-07-17)
@@ -223,6 +233,7 @@ None currently active.
 | 2026-07-01 | No new briefs; code scan 30 June | 2 EXISTS items: SGSend static-host mode (12 tests, HOSTING-ON-STATIC-STORAGE.md guide); `_buildVfsBridgeScript` bare-call fix (9-assertion regression guard). vault/index.md date errors corrected. qa/index.md, index.md, changelog.md updated. B-002 tools PROPOSED at 182 lines — no split needed yet. |
 | 2026-07-17 | No new briefs; no new dev commits; B-006 | 150+ files scanned for broken links. 9 depth-off-by-one links fixed in team/comms/ (changelog/05/09 ×5, briefs/05/12 ×4). 10 unfixable missing companion docs in library/guides/agentic-setup/. B-011 added. Health scan report produced. |
 | 2026-07-16 | No new briefs; no new dev commits; B-009 | library/docs/specs/README.md audited: all 6 spec files valid. 3 unlisted files found in v0.1.1/ subdir. README updated with Agent Briefing Documents table. changelog.md + DAILY_RUN.md updated. |
+| 2026-07-21 | No new briefs; no new dev commits; B-005 | identity/proposed/index.md (182 lines) split into 4 topic files: google-oauth.md, billing-credits.md, openrouter.md, email.md. Index now ~60-line TOC. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
 | 2026-07-14 | No new briefs; no new dev commits; B-004 | infra/proposed/index.md (267 lines) split into 3 topic files: vault-hosting.md, firecracker.md, relay-and-storage.md. Index now ~130-line TOC + 9 small sections. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
 
 ---
