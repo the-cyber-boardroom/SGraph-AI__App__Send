@@ -7,6 +7,21 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-22
+
+9 human briefs from `briefs/07/05/` re-processed in an additional Librarian session (the July 5 batch has now been processed in multiple sessions: 07/08–07/15, 07/19, 07/22). This session produced independent role reviews (architect, dev, alchemist) and a master index. 0 new EXISTS items. 0 net-new PROPOSED items (all already counted from prior sessions).
+
+Role reviews produced (07/22):
+- `team/roles/architect/reviews/07/22/v0.33.43__architect-review__briefs-5-july-2026.md`
+- `team/roles/dev/reviews/07/22/v0.33.43__dev-review__briefs-5-july-2026.md`
+- `team/roles/alchemist/reviews/07/22/v0.33.43__alchemist-review__briefs-5-july-2026.md`
+
+Debrief (07/22): `team/humans/dinis_cruz/debriefs/07/22/v0.33.43__debrief__briefs-processing-5-july-2026.md`
+Master index (07/22): `team/roles/librarian/reviews/07/22/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: additional analysis pass on July 5 briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
 ## 2026-07-21
 
 Routine daily check. No new briefs (last brief batch: July 5, 2026). No new dev commits.
