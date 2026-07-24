@@ -19,6 +19,18 @@ Status is code-verified as of the date above.
 | send-browse `_write` chunk bug | `send-browse--v0.3.2.js` (user v0.3.3 tree, consumed by vault-browse-edit preview pane) still uses base64 chunk=8192 — the same padding bug fixed in `app-shell.js` at v0.33.21. Editor writes > 8 KB from the preview pane fail. Fix: 8192 → 8190. | `reality/ui/index.md` (flagged in commit `0c34e1c9`) |
 | L2 envelope `__u8` edge case | `secure-channel-envelope.js` `_canonicalParse` treats any `{__u8: "<string>"}` as bytes. Deferred to ViV Phase 6 with `{__u8b64}` tag. | `reality/ui/index.md` (ViV section) |
 | sg-print WYSIWYG follow-up | If printed output still looks scaled/shifted, cause is wide ASCII `<pre>` overflowing page width (Chrome shrink-to-fit). Needs wrap/clip/scale of wide `pre` in print media. | `reality/ui/index.md` (sg-print v1.0.3 note) |
+| Stale package-root redirect | `sgraph_ai_app_send__ui__vault/index.html` meta-redirects to **v0.2.1**, not the active v0.2.3. | Code-verified 2026-07-24 |
+| Stale page titles | v0.2.3 root app `<title>` says "v0.2.2"; `en-gb/browse/index.html` says "v0.2.1". | Code-verified 2026-07-24 |
+| Token-harness lib extraction | `en-gb/vault/token/vault-credentials.js` + `vault-hkdf.js` headers say "Phase 2 will move to `_common/js/lib/`" — never done. | Code headers, verified 2026-07-24 |
+
+### 1b. Test-infrastructure gaps (verified 2026-07-24 — see [tests.md](tests.md))
+
+| Item | Detail |
+|------|--------|
+| 6 loader unit tests not wired into `run-all.sh` | `test__ro_token_resolution`, `test__branch_index`, `test__write_batch`, `test__object_store_mem_cache`, `test__owner_secrets`, `test__app_permissions__vault_create_key` — exist and pass standalone, but `npm run test:vault-unit` skips them |
+| `test:vault-chat-unit` not CI-gated | `.github/workflows/_test-ui-vault.yml` never runs the vault-chat unit suite or the `vault-chat/*.smoke.mjs` scripts |
+| 4 e2e regression specs fully `test.skip`'d | `app_mode_html_only_relift`, `edit_preview_layout`, `iframe_bg_preserved`, `no_duplicate_app_mode_btn` |
+| Orphaned integration test | `tests/integration/vault_ui/loader/test__read_only_round_trip.js` is run by no runner |
 
 ## 2. Known Limitations (recorded, deferred)
 

@@ -115,7 +115,12 @@ All items below are PROPOSED — does not exist yet.
 
 ## Vault Chat Architecture (05/26 briefs — docs 505–506)
 
-All items below are PROPOSED — does not exist yet.
+> **UPDATE 2026-07-24 (Librarian, code-verified):** P-263/P-264 are **partially SHIPPED** —
+> Vault Chat Phases 1–4 landed mid-June (commits `adc9d0f`, `60a2f6d`, `ad8e14d`):
+> `_common/js/lib/vault-chat/` (10 files) + `<vault-chat-pane>` + `en-gb/vault/chat/` page,
+> real `sg-llm-request` transport, injection-floor fencing, context-layers inspector,
+> tools/loadout panel, `consolidate_memory`. P-265 (Commit Queue) and P-266 (Sidecar LLMs)
+> remain fully PROPOSED. See `team/roles/librarian/code-index/vault-web/features.md`.
 
 | Feature | One-Line Description | Source |
 |---------|---------------------|--------|

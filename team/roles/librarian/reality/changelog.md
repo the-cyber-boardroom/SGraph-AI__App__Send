@@ -7,6 +7,27 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-24 (Vault Web code index session)
+
+New **Vault Web code index** created at `team/roles/librarian/code-index/vault-web/`
+(index.md, files.md, features.md, tests.md, todos.md) — a per-file / per-feature / per-test
+navigation layer over `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/` (~120 files, ~37k
+lines) so agents picking up vault-web tasks know exactly what to read.
+
+Reality corrections from the code audit:
+- `ui/index.md` + `ui/proposed/index.md`: **Vault Chat Phases 1–4 SHIPPED** mid-June
+  (P-263/P-264 partially shipped; P-265/P-266 still PROPOSED).
+- `ui/index.md`: bridge namespace is `sg.append.*` (no `sg.inbox.*`); no `sg.shell.*`.
+- `vault/index.md`: pointer to the code index.
+
+New verified findings recorded in the index: 6 loader unit tests not wired into run-all.sh;
+vault-chat unit suite not CI-gated; 4 e2e regression specs fully skipped; 1 orphaned
+integration test; stale package-root redirect (v0.2.1) and stale page titles.
+
+Review: `team/roles/librarian/reviews/07/24/v0.33.44__librarian__vault-web-code-index.md`
+
+---
+
 ## 2026-07-22
 
 9 human briefs from `briefs/07/05/` re-processed in an additional Librarian session (the July 5 batch has now been processed in multiple sessions: 07/08–07/15, 07/19, 07/22). This session produced independent role reviews (architect, dev, alchemist) and a master index. 0 new EXISTS items. 0 net-new PROPOSED items (all already counted from prior sessions).

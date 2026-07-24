@@ -11,6 +11,9 @@ shared cryptographic and storage design.
 **⚠️ Active design change:** The structure key encryption split (04/28 Architect Review)
 is a four-team change. See `proposed/structure-key-split.md`.
 
+> **Code index (2026-07-24):** per-file navigation for the browser vault implementation
+> (`sgraph_ai_app_send__ui__vault/`) lives at `team/roles/librarian/code-index/vault-web/`.
+
 ---
 
 ## EXISTS (Code-Verified)

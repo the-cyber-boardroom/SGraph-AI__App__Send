@@ -248,4 +248,136 @@ stack with `app-debug-pane`; split persisted to sessionStorage). Page script for
 `app-shell:ready` → `hud.setInfo/setPrivileges/applyHudConfig` (honouring the
 `localStorage['sg-app-force-show-hud']` sovereignty override) and handles `app-debug:toggle`.
 
-<!-- SECTIONS 12+ (vault browser components, vault-chat lib, pages) appended from companion catalogue -->
+## 12. `_common/js/components/` — vault browser UI (excluding app-shell)
+
+**Event architecture:** `<vault-shell>` is the hub. Components emit composed `CustomEvent`s
+that bubble to the shell, plus the global `window.sgraphVault.events` bus
+(`shell-ready`, `vault-opened`, `vault-locked`, `tree-changed`, `vault-created`).
+
+### 12.1 Core shell composition
+
+| Component | File | Lines | Purpose | Key API / events |
+|-----------|------|-------|---------|------------------|
+| `<vault-shell>` | `vault-shell/vault-shell.js` | 1369 | Orchestrator for the whole `/vault` UI: composes header, auth, nav, shared `send-browse`, sgit-view, settings, status bar; vault lifecycle (entry→opened→lock), auto-sync (ahead/behind/append checks), RO-token mode, resizable debug pane. Publishes `window.sgraphVault.shell`. | `setAutoSync(enabled)`; listens to `vault-header-*`, `vault-nav-switch`, `vault-auth-*`, `vault-settings-*`, `vault-sgit-checkout`, `branch-switched`, `sg-link-*`, `vault-upload-request`, `visibilitychange` |
+| `<vault-header>` | `vault-header/vault-header.js` | 504 | Top bar: brand, vault name, single sync-status pill (Synced/↑N/↓N/Diverged/RO states) with action dropdown + validated access-key entry, open-app button, ⋯ overflow menu. | Setters `setVaultName`/`setReadOnly`/`setROMode`/`setAheadCount`/`setBehindCount`/`setDiverged`/`set*Busy`/`setAppJson`…; emits `vault-header-check/push/pull/refresh/lock/debug/raw/rename`, `vault-settings-access-key` (post-validation) |
+| `<vault-nav>` | `vault-nav/vault-nav.js` | 78 | Left sidebar nav (Files, SGit, Settings). | `setActive(viewId)`; emits `vault-nav-switch` |
+| `<vault-status-bar>` | `vault-status-bar/vault-status-bar.js` | 94 | Footer: file/size stats + message badge. | `updateStats(vault)`; emits `vault-status-debug` |
+| `<vault-auth>` | `vault-auth/vault-auth.js` | 92 | Inline access-key banner when a write op needs auth. | `show()`/`hide()`; emits `vault-auth-submit`/`vault-auth-cancel` |
+| `<vault-settings>` | `vault-settings/vault-settings.js` | 364 | Settings panel: rename, show vault key, hex read-key export (sgit RO access). | `setVault(vault, vaultKey, accessKey)`; emits `vault-settings-name-saved`/`-access-key` |
+| `<vault-entry>` | `vault-entry/` (js+html+css) | 358 | Open by full key or simple token (token deterministically derives vault ID `SHA-256(token)[:12]` + passphrase — the token IS the passphrase), or create new. | bus events `vault-created`/`vault-opened` |
+
+### 12.2 Editing / upload / generate / chat
+
+| Component | File | Lines | Purpose |
+|-----------|------|-------|---------|
+| vault-browse-edit (no element) | `vault-browse-edit/vault-browse-edit.js` | 1630 | IIFE that **monkey-patches `SendBrowse.prototype`** to add Edit/Save/Delete/Upload to file tabs (writable vaults only; loads after `send-browse--v0.3.2.js`). Upgrades unknown-extension UTF-8 files to editable text. |
+| `<vault-upload>` | `vault-upload/` | 210 | Encrypt-and-upload with internal queue + `_targetPath`. |
+| `<vault-generate>` | `vault-generate/vault-generate.js` | 330 | LLM infographic generation from vault files via `data-llm-bus` (`sg-llm-request`→`sg-llm-infographic`), saved back to vault. Emits `vault-generate-save`. |
+| `<vault-chat-pane>` | `vault-chat/vault-chat-pane.js` | 390 | In-vault chat UI wiring the Phase-0 stack (MemoryVfs, policies, ExecutionCenter, ChatLoop) to mock or real `<sg-llm-request>` transport; vault-aware via `window.sg` bridge. `setBridge(sg)`. |
+
+### 12.3 SGit inspector — `vault-sgit-view/` (10 files)
+
+`<vault-sgit-view>` in `vault-sgit-view.js` (385 — tab shell, routing, styles); companions
+extend `VaultSgitView.prototype` and MUST load after it. Emits `vault-sgit-checkout`,
+`branch-switched`.
+
+| File | Lines | Tab / role |
+|------|-------|-----------|
+| `vault-sgit-view--history.js` | 525 | History: commit log, two-track diverged graph (clone vs named HEAD), Published-HEAD mark, diff links |
+| `vault-sgit-view--commit.js` | 289 | Commit detail: changed-files set-diff by `content_hash` (zero blob reads) + lazy per-file unified diff + copy-patch |
+| `vault-sgit-view--repair.js` | 514 | Repair: vault health diagnostics + ref surgery (push/pull/reset/manual ref writes) from the browser |
+| `vault-sgit-view--status.js` | 219 | Status: `sgit status`+`info` equivalent |
+| `vault-sgit-view--object.js` | 163 | Object viewer: load/decrypt/render any commit/tree/blob |
+| `sgit-diff.js` | 131 | `SgitDiff` — pure LCS line-diff → unified hunks; zero DOM |
+| `vault-sgit-view--tree.js` | 109 | Tree explorer + flat entries table |
+| `vault-sgit-view--branches.js` | 106 | Branch list, current badge, Switch → `branch-switched` |
+| `vault-sgit-view--refs.js` | 59 | Vault identity, ref IDs, object-store stats |
+
+### 12.4 Sub-vaults, diff, embeds, previews, header
+
+| Component | File | Lines | Purpose |
+|-----------|------|-------|---------|
+| `<vault-subvaults-panel>` | `vault-subvaults-panel/vault-subvaults-panel.js` | 128 | `/vault` debug-pane Sub-vaults tab (analogue of `/app` Mounts): surfaces read-through `*.link.json` mounts from `shell._dataSource._mounts`. |
+| `VaultSubvaultsView` (pure) | `vault-subvaults-panel/vault-subvaults-view.js` | 122 | DOM-free view-model; status ∈ `collapsed/mounted/locked/error`. Node-tested. |
+| `VaultDiffView` (no element) | `vault-diff-view/vault-diff-view.js` | 299 | `window.VaultDiffView.open(…)` — side-by-side conflict-resolution overlay with per-line diff. |
+| `<sg-app-banner>` | `sg-app-banner/sg-app-banner.js` | 609 | App Mode banner for the `/vault` browser flow: CSS-hides shell chrome + frame-lifts the content iframe; loading overlay with `sg-app-ready` signal + 8s timeout. (The `/app` page does NOT use this.) |
+| `<sg-embed-frame>` | `sg-embed-frame/sg-embed-frame.js` | 156 | Controlled external-resource embed for `*.link.json`: **default-deny** (no bridge, no listener), click-to-load (no phone-home), sandboxed iframe with NO `allow-same-origin`. |
+| `<sg-link-card>` | `sg-link-card/sg-link-card.js` | 138 | Locked-sub-vault modal: public info via `PublicPreviewRead`, key prompt + save choice. Emits `sg-link-open`/`-open-new-window`/`-cancel`. |
+| `<sg-public-preview-card>` | `sg-public-preview-card/` | 210 | Renders the public preview + vault-key prompt for `/en-gb/app/<public-id>`. Host fetches; card renders `setState(…)`. Emits `pvp-open-vault`. |
+| `<sg-public-preview-editor>` | `sg-public-preview-editor/` | 626 | Author/publish/update/unpublish a vault's public preview; native WebP thumbnail encoding (EXIF dropped). ⚠️ Header: "Browser-verification pending". |
+| `<sg-site-header>` | `sg-site-header/v1/v1.0/v1.0.6/` | 332 | Environment-aware cross-site header (`{env.}{site.}sgraph.ai` convention). |
+
+### 12.5 Debug panels (adapted from Admin Console)
+
+| Component | File | Lines | Purpose |
+|-----------|------|-------|---------|
+| `<vault-api-logger>` | `api-logger/api-logger.js` | 247 | Records all `fetch()` calls (method colours, expandable req/resp) |
+| `<vault-events-viewer>` | `events-viewer/events-viewer.js` | 192 | Live EventBus stream with filter + pause |
+| `<vault-messages-panel>` | `messages-panel/messages-panel.js` | 122 | User-facing notification list |
+| `<vault-storage-viewer>` | `storage-viewer/storage-viewer.js` | 95 | localStorage + sessionStorage inspector |
+
+## 13. `_common/js/lib/vault-chat/` — Vault Chat library (10 files)
+
+All IIFEs on `window.VaultChat.*`. Phased architecture (Phase 0 mocks → Phase 1 real
+transport → Phase 3 kernel PoC); interfaces are the seam for swapping mocks for real
+`sg-vfs`/tool-runner. **Shipped mid-June (Phases 1–4)** — see [features.md](features.md).
+
+| File | Lines | Global | Purpose |
+|------|-------|--------|---------|
+| `chat-session.js` | 105 | `ChatSession` | Transport-independent session: config (scope/mode/loadout/budget/model), tree manifest for prompt, provenance fencing (untrusted vault content wrapped as DATA), system-prompt assembly, turn records to `/chat/history/NNNN.json` |
+| `vault-chat-loop.js` | 117 | `ChatLoop` | Agentic loop: send → tool-calls → ExecutionCenter → tool-results → resend until no-tool answer; `sendLlm` injected |
+| `execution-center.js` | 142 | `ExecutionCenter` | Single choke point: per-tool policy (AUTO/CONFIRM/DRY_RUN), harness-enforced budget ledger (preflight refuses over-cap), structured log |
+| `builtin-tools.js` | 74 | `BuiltinTools` | File tools the LLM calls against MemoryVfs; ToolResult contract; `run_code` intentionally absent |
+| `tool-policies.js` | 79 | `ToolPolicies` | Per-tool tier+mode+availability; UNAVAILABLE/OFF tools are omitted from `tools[]` (invisible, not runtime-refused) |
+| `memory-vfs.js` | 113 | `MemoryVfs` | LLM's in-context, commit-free working set; sg-vfs interface + change feed for dirty tracking |
+| `vault-flush-controller.js` | 79 | `VaultFlushController` | The ONLY component that writes to the vault: coalesces dirty set into ONE commit via `sg.vfs.writeBatch`; modes `ephemeral`/`synced`/`snapshot` |
+| `llm-bus-adapter.js` | 80 | `LlmBus` | Wraps real `<sg-llm-request>` as `sendLlm` over `[data-llm-bus]`; `createBusLlm` → `{text, toolCalls?, cost}` |
+| `mock-sg.js` | 83 | `createMockSg` | In-memory bridge stand-in (test fixture; implements `writeBatch`/`delete` + `.vault/**` exclusion) |
+| `tools/consolidate-memory.js` | 77 | (tool runner) | `consolidate_memory` lossless self-prune: summarise old `/chat/history/*` → `/chat/consolidated/`, return paths to drop from live prompt |
+
+## 14. Pages
+
+### Routing model (read this first)
+
+`/` (root `index.html`) is **the only hash inbox**: `#token` → save to localStorage →
+`location.replace('/en-gb/app')`; `#token|path` also saves a deep-link (`app:` prefix = App
+Mode) to `sessionStorage['sg-vault-deep-link']`. All other pages strip/ignore hashes — the
+vault key ALWAYS comes from localStorage, never the hash. `consumeDeepLink()` is one-shot.
+
+⚠️ **Stale artefacts (verified 2026-07-24):** the package root
+`sgraph_ai_app_send__ui__vault/index.html` meta-redirects to **v0.2.1** (not v0.2.3); the
+v0.2.3 root app's `<title>` says "v0.2.2"; `en-gb/browse/index.html` says "v0.2.1".
+
+### Production pages
+
+| Page | Path | Lines | Purpose |
+|------|------|-------|---------|
+| **Root vault app** | `index.html` | 896 | The primary vault application. Dual role: hash inbox at `/` (`runRoot`) or the app (`runVault`). Mounts `<vault-shell>`; loads vault-loader, services, i18n, SG/Send CDN browse stack (`send-browse--v0.3.2.js`, page-layout-renderer, sg-print), tools.sgraph.ai ESM (`sg-layout`, `sg-llm-*`), markdown lib, full crypto libs, adapters, and every component except vault-chat-pane. |
+| **Landing** | `en-gb/index.html` | 959 | "Open a vault." hero, decrypt-&-open input, recent-vaults grid, create-vault modal (generated recovery token + required access key). `runLanding()`. Loads vault-loader + `<sg-site-header>`. |
+| **SG/App host** | `en-gb/app/index.html` | 213 | App-shell page — see section 11.5. |
+| **Browse (older mount)** | `en-gb/browse/index.html` | 248 | v0.2.1-era alternate host of `<vault-shell>` (same stack, paths two levels up). |
+| **Public-preview tester** | `en-gb/preview/index.html` | 113 | Renders `<sg-public-preview-card>` from a public-id (production preview-render path, "tester" flavour). |
+| **Public-preview editor** | `en-gb/vault/public-preview/index.html` | 80 | Production authoring tool: `<sg-public-preview-editor>` + card + sg-layout. |
+| **Vault Chat (Phase 1)** | `en-gb/vault/chat/index.html` | 41 | `<vault-chat-pane>` + real LLM transport (`sg-llm-request` v0.1.6 with tools[]) + full vault-chat lib. Default = keyless MOCK; opt-in real OpenRouter key. |
+
+### Dev harnesses / PoC pages (noindex; NOT production)
+
+| Page | Path | Purpose |
+|------|------|---------|
+| Chat standalone harness | `en-gb/vault/chat/test/` (index + `harness.js` 139 + `mock-llm.js` 39) | Phase-0 harness: mock `window.sg` + mock LLM exercise tools, CONFIRM, budget refusal, RO degrade, flush — no vault, no key |
+| Chat kernel PoC | `en-gb/vault/chat/kernel-poc/` (index 174 + `iframe.html` 82 + `chat-app-stub.js` 67) | Phase-3 MVP: chat in a null-origin iframe over a real SecureChannel; secrets stay in parent; floor enforced at kernel boundary |
+| Markdown harness | `en-gb/vault/markdown/` (index 282 + `md-harness.js` 316) | Automated tests + live playground for the markdown lib |
+| Peek diagnostics | `en-gb/vault/peek/index.html` (1029) | Standalone diagnostic — deliberately zero `_common/` deps ("survives `_common/` regressions"); storage inspector, key inspector (never saves), server-metadata probe |
+| SGit performance harness | `en-gb/vault/sgit/` (7 files, `vault-sgit-harness.js` 1061) | Benchmark harness: `vs-*` elements, SGSend instrumentation, 6 toggleable optimisation modules, `SGVaultFast` composite, ephemeral test-vault lifecycle, scenarios |
+| Token test harness | `en-gb/vault/token/` (6 files, `vault-token-harness.js` 801) | `vt-*` elements: RO-token create/list/revoke, crypto lab (HKDF/AES inner layer), storage inspector, fetch log with token masking. "Not for production use." Note: `vault-credentials.js`/`vault-hkdf.js` headers say "Phase 2 will move to `_common/js/lib/`" — not yet done. |
+
+## 15. Misc
+
+- `_common/js/vault-i18n.js` (182) — i18n strings/helpers (`t()` used via VaultComponent).
+- `build-info.js` (generated on deploy) — build metadata loaded by the root app.
+- `_common/fonts/` — 8 font files.
+- Package root: `index.html` (meta-redirect — ⚠️ stale, points at v0.2.1), `__init__.py`
+  (`ui_name`), `favicon.ico`/`favicon.svg` at v0.2.3 root.
+- Custom-element inventory (excluding app-shell + harness `vs-`/`vt-` elements): 22 defined
+  elements + 5 non-element modules (`vault-browse-edit` prototype patch, `VaultDiffView`,
+  `VaultSubvaultsView`, `SgitDiff`, the 9 `vault-sgit-view--*` prototype extensions).
