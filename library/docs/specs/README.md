@@ -18,6 +18,18 @@
 
 ---
 
+## Agent Briefing Documents (v0.1.1)
+
+Located in `_to_process/v0.1.1/` — project onboarding materials from February 2026. Not specs, but part of the same initial document set.
+
+| # | Document | Scope |
+|---|----------|-------|
+| A | [Brief for Claude Code](../_to_process/v0.1.1/sgraph-send-brief-claude-code.md) | Onboarding brief assigning Librarian/Architect/Cartographer roles to Claude Code |
+| B | [Brief for OpenAI Codex](../_to_process/v0.1.1/sgraph-send-brief-openai-codex.md) | Onboarding brief assigning Developer/Security Reviewer/QA roles to OpenAI Codex |
+| C | [Dev Environment & Workflows](../_to_process/v0.1.1/sgraph-send-dev-environment-workflows.md) | Multi-agent team structure, role assignments, initial task allocation (Feb 2026 v1.0 DRAFT) |
+
+---
+
 ## How to Use These Documents
 
 - **For Phase 1 (MVP) work:** Use document #1 (Project Brief) as the primary reference. The Issues FS tree under `.issues/` contains the actionable breakdown.
