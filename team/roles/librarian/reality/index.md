@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.44 | **Last updated:** 2026-07-24 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.45 | **Last updated:** 2026-07-27 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-07-24)
+## Quick Stats (as of 2026-07-27)
 
 | Metric | Count |
 |--------|-------|
@@ -44,11 +44,17 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~860+ (+80 net-new from 5 July: AWS IAM engine+rating+ontology 27, agent-risk thesis+grounded-alarm 14, experience-loop 14, evidence-economy 25; previously ~780+; covered across multiple Librarian sessions 07/08–07/15; P-423–P-430 formalised in risk-mandate.md 2026-07-18) |
-| Total documents catalogued | 820 (+10 from 5 July: 9 substantive briefs + 1 day-index; processed 07/08–07/15) |
+| Open PROPOSED items (across all domains) | ~925+ (+65 net-new from 12–23 July: acceptance-machinery 9, positioning 7, architecture 5, business-case 5, fractal-registers 9, demo-mvp 11, commercial-model 7, open-source 4, posture 11, investor-response 7, freelance-productisation 9; previously ~860+; processed 2026-07-25; reviewed again 2026-07-27) |
+| Total documents catalogued | 846 (+26 from 12–23 July: 23 substantive briefs + 3 day-indexes; processed 07/25) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
-| **Latest build spec** | AWS IAM Configuration Risk Engine (Python, deterministic, context-not-configuration, JSON out) — 5 July 2026 |
+| **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
+| **Key decision** | **"We describe, we do not decide"** — posture held against investor pressure for runtime authority (2026-07-23) |
+| **Key decision** | **Market = decision-making** at every altitude of every organisation (not agent governance, not runtime authority) (2026-07-23) |
+| **Key decision** | **The message is the transformation** — inter-register communication via JSON transformation commands, not shared state (2026-07-17) |
+| **Key decision** | **"We sell the mandate to operate"** — product reframe from dashboard/register to mandate delivered vault-to-vault (2026-07-17) |
+| **Latest build spec** | Airgapped RiskMandate demo/MVP (read-only vault + local storage + persona library + risk flow upward + actionable items) — 17 July 2026 |
+| **Next build priority** | Browser-local query engine (vault-as-source-of-truth, sync by commit-id, IndexedDB) — blocks the airgapped MVP |
 
 ---
 
