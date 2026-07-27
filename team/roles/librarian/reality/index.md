@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-07-24)
+## Quick Stats (as of 2026-07-27)
 
 | Metric | Count |
 |--------|-------|
@@ -44,14 +44,17 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~913+ (+53 net-new from 12–23 July: level-ledger+discovery-node+runtime-edge-grammar+graph-wire+blueprint+licence+data-partners+depth-of-middle+register-density+capability-enum+closure-diff+scope-below-table 12, risk-mandate+fractal-registers+acceptance-interval-ladder+messaging-protocol+PKI+eventual-consistency+demo-to-prod+persona-lib+cert-of-versions+three-models+response-time-pricing+provider-deep-access+break-even 13, decision-making-TAM+capability-union+mapping-error-schema+business-risk-KPI+canonical-twins+metered-dims+delegated-authority+cross-customer-pooling+airgapped-vs-telemetry+appetite-capture+customer-voice+integration-list+containment-conditional+mandate-check+publication-decision+team-gaps+wedge-start+tool-list+shared-kit+which-tool-first+markup-passthrough+per-use-price+commodity-diff+vault-tools+tool-ownership+repos-rubric+standard-agent-roles+hours-verification+on-ramp 28; previously ~860+; processed 2026-07-27) |
-| Total documents catalogued | 846 (+26 from 12–23 July: 23 substantive briefs + 3 day-indexes; processed 2026-07-27) |
+| Open PROPOSED items (across all domains) | ~925+ (+65 net-new from 12–23 July: acceptance-machinery 9, positioning 7, architecture 5, business-case 5, fractal-registers 9, demo-mvp 11, commercial-model 7, open-source 4, posture 11, investor-response 7, freelance-productisation 9; previously ~860+; processed 2026-07-25; reviewed again 2026-07-27) |
+| Total documents catalogued | 846 (+26 from 12–23 July: 23 substantive briefs + 3 day-indexes; processed 07/25) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
+| **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
+| **Key decision** | **"We describe, we do not decide"** — posture held against investor pressure for runtime authority (2026-07-23) |
+| **Key decision** | **Market = decision-making** at every altitude of every organisation (not agent governance, not runtime authority) (2026-07-23) |
+| **Key decision** | **The message is the transformation** — inter-register communication via JSON transformation commands, not shared state (2026-07-17) |
 | **Key decision** | **"We sell the mandate to operate"** — product reframe from dashboard/register to mandate delivered vault-to-vault (2026-07-17) |
-| **Key decision** | **"We describe, we do not decide"** — posture held against investor pressure for runtime authority; authorization = what agent can already do (2026-07-23) |
-| **Key decision** | **Market = decision-making** at every altitude of every organisation (not agent governance, not risk-acceptance workflow) (2026-07-23) |
-| **Latest build spec** | Risk Mandate Demo/MVP: airgapped, pre-populated personas, read-only vault, local storage for customisation, risks flowing up — 17 July 2026 |
+| **Latest build spec** | Airgapped RiskMandate demo/MVP (read-only vault + local storage + persona library + risk flow upward + actionable items) — 17 July 2026 |
+| **Next build priority** | Browser-local query engine (vault-as-source-of-truth, sync by commit-id, IndexedDB) — blocks the airgapped MVP |
 
 ---
 
