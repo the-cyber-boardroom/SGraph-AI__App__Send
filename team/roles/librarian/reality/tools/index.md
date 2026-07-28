@@ -1,6 +1,6 @@
 # Tools — Reality Index
 
-**Domain:** tools/ | **Last updated:** 2026-04-28 | **Maintained by:** Librarian (daily run)
+**Domain:** tools/ | **Last updated:** 2026-07-28 | **Maintained by:** Librarian (daily run)
 
 This domain covers browser-based AI tools hosted at `tools.sgraph.ai` and `dev.tools.sgraph.ai`. These are standalone Web Component tools that operate client-side, with no SG/Send account required for most features. They share the same zero-dependency IFD methodology as the main Send UI.
 
@@ -84,6 +84,20 @@ These components exist and are loaded by other tools:
 - `sg-audio-transcription` — Whisper WASM two-pass transcription with timestamps (Section 19)
 - Video crop/overlay/capture tools (Section 30, doc 299-311 batch)
 - `sg-public-viewer` Web Component (Section 17, website strategy)
+
+### Browser Automation Containers (07/24 briefs — doc 863)
+
+**PROPOSED — productisation not yet launched.** The underlying containers already exist and are in daily operational use (verified: six route families, 24 step verbs, Prometheus metrics, stateful sessions, empty JS eval allowlist). What is PROPOSED is the commercial packaging and public launch.
+
+| # | Item | Status |
+|---|------|--------|
+| P-BROW-001 | **Browser automation product launch** — three tiers (simple screenshot/HTML; headless Playwright+proxy+API; VNC full watchable browser); public pricing and documentation | PROPOSED — does not exist yet |
+| P-BROW-002 | **Dedicated instance billing shape** — dedicated EC2 with provisioning/teardown API; AMI-in-customer-account deployment; neither is currently a purchasable product | PROPOSED — does not exist yet |
+| P-BROW-003 | **Proxy output as provenance artefact** — signed JSON records of proxied requests feeding the mapping-error loop; proxy exists but this evidence-feed capability does not | PROPOSED — does not exist yet |
+| P-BROW-004 | **Request-forgery and retention model** — security specification for shared browser endpoints; how abuse is prevented and what is retained | PROPOSED — does not exist yet |
+| P-BROW-005 | **One-product vs three-products packaging decision** — open; Architect assessment recommends Tier 2 as standalone, Tier 1 as loss-leader, Tier 3 as add-on | PROPOSED — decision not yet taken |
+| P-BROW-006 | **JavaScript eval allowlist policy documentation** — mechanism for customers to safely extend the empty default allowlist; prerequisite for enterprise launch | PROPOSED — does not exist yet |
+| P-BROW-007 | **Browser automation pricing and market positioning** — competitor price comparison cited; on-demand, dedicated, and AMI price points not yet set | PROPOSED — does not exist yet |
 
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 
