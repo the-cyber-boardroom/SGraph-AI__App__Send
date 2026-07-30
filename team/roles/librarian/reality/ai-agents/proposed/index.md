@@ -1,6 +1,6 @@
 # AI Agents — Proposed Items Index
 
-**Domain:** ai-agents/proposed/ | **Last updated:** 2026-07-18 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/proposed/ | **Last updated:** 2026-07-30 | **Maintained by:** Librarian (daily run)
 
 All items are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -49,6 +49,7 @@ The previous full index is preserved in git history on commit before this date.
 | P-419–P-421 (Semantic graph ontology, directed edges + query engine, paths as language) | `risk-mandate.md` |
 | P-422 (2FA end-to-end MVP) | `risk-mandate.md` |
 | P-423–P-430 (AWS risk engine, evidence economy) | `risk-mandate.md` |
+| P-AOMM-001–P-AOMM-007 (AOMM: outbound agentic risk, incident catalogue, containment ceilings) | `risk-mandate.md` |
 
 ---
 

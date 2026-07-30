@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.46 | **Last updated:** 2026-07-28 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.47 | **Last updated:** 2026-07-30 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~955+ (+30 net-new from 24 July: plug-profile 10, OSMM 8, sovereignty-bounty 5, browser-automation 7; previously ~925+; processed 2026-07-28) |
-| Total documents catalogued | 864 (+18 from 24 July: 17 substantive briefs + 1 day-index; processed 07/28) |
+| Open PROPOSED items (across all domains) | ~970+ (+15 net-new from 27 July: VNT 5, AOMM 7, COM 3; previously ~955+; processed 2026-07-30) |
+| Total documents catalogued | 870 (+6 from 27 July: 5 substantive briefs + 1 day-index; processed 07/30) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |

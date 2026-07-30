@@ -1,6 +1,6 @@
 # Alchemist — Reality Index
 
-**Domain:** alchemist/ | **Last updated:** 2026-07-28 | **Maintained by:** Librarian (daily run)
+**Domain:** alchemist/ | **Last updated:** 2026-07-30 | **Maintained by:** Librarian (daily run)
 
 This domain covers investor-facing materials, the Alchemist system (Town Planner team output), and business strategy documents. The Alchemist role translates technical output into investment and business value. Note: items in this domain are documents and strategic materials, not code features.
 
@@ -138,6 +138,16 @@ This domain covers investor-facing materials, the Alchemist system (Town Planner
 | P-SOV-003 | **Vendor-sponsored exit independence mechanism** — governance structure separating genuine no-lock-in claim from a marketing exercise the vendor scopes itself | PROPOSED — does not exist yet |
 | P-SOV-004 | **EU Data Act window positioning** — switching charges prohibited from 12 January 2027; six-month positioning window; right to switch with no proof switching works | PROPOSED — does not exist yet |
 | P-SOV-005 | **Bounty administration model** — who runs the programme, at what altitude, how difficulty is priced before the attempt | PROPOSED — does not exist yet |
+
+### First Product To Market — Commercial Kit (07/27 briefs — docs 863–865, v0.33.52)
+
+**PROPOSED — does not exist yet.** Three July 27 documents (arch brief + strategy brief + contract draft) define the commercial model for the first SGraph product and the reusable commercialisation kit it is intended to prove.
+
+| # | Item | Status |
+|---|------|--------|
+| P-COM-001 | **Reusable commercialisation kit — first instance** — token purchase + page + key provisioning, solved by not building billing: OpenRouter per-user keys with spend caps implement the markup as configuration; the test is whether the second product ships faster than the first | PROPOSED — does not exist yet |
+| P-COM-002 | **50/50 profit-share partnership model (90-day template)** — term from 1 August 2026 (90 days, auto-lapsing); 25% of Net Receipts after processor fee (not gross); 50/50 of Distributable Profit; openness removes ownership and confidentiality from the contract surface, leaving keys, passwords, financial data, and commercial terms; draft contract has 11 open points not yet settled | PROPOSED — does not exist yet |
+| P-COM-003 | **Credit minimum floor calculation** — minimum top-up set by processor fixed fee (Stripe £0.20 per domestic transaction); at £1 user receives only 59p of inference; at £5 user receives 71p; minimum purchase must be £5 at minimum (£10 preferred); memo's £1–2 suggestion is below the floor and must be revised before launch | PROPOSED — does not exist yet |
 
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 
