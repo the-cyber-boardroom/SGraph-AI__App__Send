@@ -1,6 +1,6 @@
 # AI Agents — Reality Index
 
-**Domain:** ai-agents/ | **Last updated:** 2026-05-07 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/ | **Last updated:** 2026-07-29 | **Maintained by:** Librarian (daily run)
 
 This domain covers agentic workflows, LLM components, Claude integration with vaults, MCP (Model Context Protocol), and the vault-as-communication-channel primitives. The SG/Send architecture is explicitly designed for agents as first-class users alongside humans.
 
@@ -135,6 +135,20 @@ Published 2026-05-06 by `@Email-FS (architect.spec)`. These are protocol specifi
 **PROPOSED — does not exist yet.**
 
 - **P-816: Risk Mandate experience loop** — three-phase recurring loop: Phase 1 Map (agent → assets → risks, ambiguity carried honestly as data) → Phase 2 Accept (two streams: Stream A Investigate or Stream B Execute; no-deny mechanic, every action is acceptance for an interval) → Recalibrate (both streams return to Phase 1); integrate-first role (drives existing tools and spreadsheets, builds only what is missing); single success metric: risk reduction across successive loop passes (brief 6, v0.33.44, 07/05)
+
+### Agentic Outbound Maturity Model — AOMM (07/27 briefs — docs 868-869)
+
+**PROPOSED — does not exist yet.** Proposed in response to the OpenAI/HuggingFace incident (July 2026). Companion to the plug-profile work from 24 July.
+
+| # | Item | Status |
+|---|------|--------|
+| P-AOMM-001 | **AOMM framework** — five preconditions (capability, motive, reach, freedom, silence) that must all hold for one organisation's agent to harm another; removing any one breaks the chain | PROPOSED — framework only, no implementation |
+| P-AOMM-002 | **AOMM six-level ladder** — Unaware (0) → Enumerated (1) → Bounded (2) → Observed (3) → Contained (4) → Accountable (5); conjunctive and monotone; Level 4 is the plug profile (composes with 24 Jul series) | PROPOSED — framework only |
+| P-AOMM-003 | **AOMM level predicates as computed queries** — expressing each level as a graph-native query in the manner of RAMM/OSMM; currently levels are described, not computable | PROPOSED — design only, open item |
+| P-AOMM-004 | **AOMM outbound inventory** — Level 1 prerequisite: enumeration of all agents with outbound capability (owner, credentials, reach), assessed against the five preconditions | PROPOSED — not yet done for SGraph's own estate |
+| P-AOMM-005 | **Inbound and provider-posture variants** — two sibling registers: inbound (can another org's agents reach you?) and provider posture (can providers distinguish a defender from an attacker?); neither is written yet | PROPOSED — named in brief, not developed |
+
+*Note: the AOMM correction to the lethal trifecta (removing untrusted content as a necessary condition) is grounded in the OpenAI/HuggingFace incident, July 2026, from primary sources. Budget + elapsed time are proposed as first-class containment controls at AOMM Level 2.*
 
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 

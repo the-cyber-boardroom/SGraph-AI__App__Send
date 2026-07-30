@@ -55,6 +55,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **"We sell the mandate to operate"** — product reframe from dashboard/register to mandate delivered vault-to-vault (2026-07-17) |
 | **Latest build spec** | Airgapped RiskMandate demo/MVP (read-only vault + local storage + persona library + risk flow upward + actionable items) — 17 July 2026 |
 | **Next build priority** | Browser-local query engine (vault-as-source-of-truth, sync by commit-id, IndexedDB) — blocks the airgapped MVP |
+| **Key decision** | **Voice note transcription tool** — first SGraph product going to market; 90-day partnership term from 1 Aug 2026; OpenRouter carries both inference and billing; three privacy modes (routed/restricted/browser-local); all PROPOSED (2026-07-27) |
 
 ---
 

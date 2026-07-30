@@ -1,6 +1,6 @@
 # Tools — Reality Index
 
-**Domain:** tools/ | **Last updated:** 2026-07-28 | **Maintained by:** Librarian (daily run)
+**Domain:** tools/ | **Last updated:** 2026-07-29 | **Maintained by:** Librarian (daily run)
 
 This domain covers browser-based AI tools hosted at `tools.sgraph.ai` and `dev.tools.sgraph.ai`. These are standalone Web Component tools that operate client-side, with no SG/Send account required for most features. They share the same zero-dependency IFD methodology as the main Send UI.
 
@@ -98,6 +98,22 @@ These components exist and are loaded by other tools:
 | P-BROW-005 | **One-product vs three-products packaging decision** — open; Architect assessment recommends Tier 2 as standalone, Tier 1 as loss-leader, Tier 3 as add-on | PROPOSED — decision not yet taken |
 | P-BROW-006 | **JavaScript eval allowlist policy documentation** — mechanism for customers to safely extend the empty default allowlist; prerequisite for enterprise launch | PROPOSED — does not exist yet |
 | P-BROW-007 | **Browser automation pricing and market positioning** — competitor price comparison cited; on-demand, dedicated, and AMI price points not yet set | PROPOSED — does not exist yet |
+
+### Voice Note Transcription Tool (07/27 briefs — docs 865-867)
+
+**PROPOSED — does not exist yet.** First SGraph consumer product going to market; architecture, commercial model, and contract draft all in the 27 July batch.
+
+| # | Item | Status |
+|---|------|--------|
+| P-VOICE-001 | **Voice note transcription tool — web app** — browser-based: drop in Opus/AAC audio, single pass returns transcript + analysis + debrief + optional infographic; zero-dependency IFD methodology, static hosting (GitHub Pages + S3 + CloudFront) | PROPOSED — does not exist yet |
+| P-VOICE-002 | **iOS + Android apps** — same codebase published to mobile from a single shared repo; signing keys already exist from prior SGraph work; Chrome extension deferred | PROPOSED — does not exist yet |
+| P-VOICE-003 | **OpenRouter billing integration** — per-user provisioned keys with spend caps (75% of net receipts after Stripe fee); markup is the key's credit limit, not a billing system; management key provisions inference keys via OpenRouter API | PROPOSED — does not exist yet |
+| P-VOICE-004 | **Three privacy modes** — Routed (default, any OpenRouter provider), Restricted (named providers only), Browser-local (on-device, nothing leaves; depends on `sg-audio-transcription` / `sg-wasm` which are also PROPOSED) | PROPOSED — does not exist yet |
+| P-VOICE-005 | **Auth: Google social login + local storage** — Google OAuth (previously implemented in SGraph) or localStorage (key + session, no backend required) | PROPOSED — does not exist yet |
+| P-VOICE-006 | **Key-provisioning Lambda** — single Lambda issues per-user OpenRouter keys after Stripe payment; deferred past beta (beta users get hardcoded capped key) | PROPOSED — does not exist yet (deferred) |
+| P-VOICE-007 | **Commercial partnership structure** — 90-day term from 1 Aug 2026; 50/50 profit split (not revenue); draft contract exists, 11 open points to settle before signing; minimum credit purchase £5 (set by Stripe fixed fee floor) | PROPOSED — contract draft only, not signed |
+
+*Note: the underlying `sg-llm-infographic` component (EXISTS) can be reused for the optional infographic output. The browser-local mode (P-VOICE-004) is blocked on `sg-audio-transcription` / `sg-wasm` which are separately PROPOSED.*
 
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 
