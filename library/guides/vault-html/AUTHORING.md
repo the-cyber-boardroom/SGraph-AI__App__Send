@@ -6,11 +6,14 @@ This guide is for anyone — human or AI — writing HTML files that will be sto
 > **deny-by-default** and must be declared in `app.json` `permissions`; `.vault/**` is off-limits.
 > Migrating an existing app? Read **[MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)** first.
 
-> **Verified against the live bridge (`app-shell.js`) on 2026-05-26.** Corrections from the previous
-> revision: vault-relative `fetch()` is **not** auto-routed (use `sg.vfs.read`/`readText`); only an
-> `img.src = …` assignment **from JS** is intercepted (a declarative `<img src>` in the initial HTML
-> is **not**); the ready-log-line text was updated. New: `sg.sync` / `sg.auth` / `sg.ui` / `sg.history`
-> are documented, plus reading **sub-vaults**.
+> **Verified against the live bridge (`app-shell.js` v0.2.3) on 2026-07-30.** Newly documented in
+> this revision: `sg.append.*` (renamed from `sg.inbox.*` on 2026-06-15 — the write verb is `write`),
+> `sg.on`/`sg.off` host events, the expanded `sg.vault.*` verb set (`getKey`, `setAccessToken`,
+> `openApp`, `list`, `notify`), the current `vault.create(opts)` signature, and `sg.app.context`/
+> `totalSize`. Earlier corrections retained: vault-relative `fetch()` is **not** auto-routed (use
+> `sg.vfs.read`/`readText`); only an `img.src = …` assignment **from JS** is intercepted (a
+> declarative `<img src>` in the initial HTML is **not**). `sg.sync` / `sg.auth` / `sg.ui` /
+> `sg.history` / sub-vaults are documented below.
 
 > **TL;DR.** Inside a vault iframe, you cannot write `<link rel="stylesheet" href="theme.css">` or `<script src="helper.js"></script>` against vault-relative paths. Instead, call `sg.loadCss('theme.css')` or `sg.loadJs('helper.js')` at runtime. To read data, use **`sg.vfs.readText('cities.json')`** — a plain `fetch()` of a vault path does **not** work. `<a href="other.html">` navigation and `img.src = 'photo.png'` set **from JS** work automatically.
 
@@ -46,7 +49,7 @@ Anything that goes through a JavaScript API works without modification:
 | `<a href="other.html">` (clicked) | ✅ Works | Click handler postMessages parent, which re-renders the iframe |
 | `<a href="other.html#section">` (clicked) | ✅ Works | Fixed 2026-05-30 — the `?query`/`#fragment` is stripped before the extension check; the fragment is forwarded and scrolled-to in the new doc |
 | `<a href="https://example.com">` (clicked) | ✅ Opens in a new tab | Default: a one-click host confirm opens it (no escape-sandbox). Opt into frictionless in-frame open with `permissions.externalLinks: true`. See "What the host does for you". |
-| `sg.fs.*`, `sg.vault.*`, `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*`, `sg.state.*` | ✅ Works | postMessage command protocol (see below) |
+| `sg.fs.*`, `sg.vault.*`, `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*`, `sg.state.*`, `sg.append.*`, `sg.on`/`sg.off` | ✅ Works | postMessage command protocol (see below) |
 
 If you stick to these patterns, your page just works.
 
@@ -91,11 +94,13 @@ window.sg = {
     loadCss : (path) => Promise<HTMLStyleElement>,    // load + inject CSS
     loadJs  : (path) => Promise<HTMLScriptElement>,   // load + execute JS
     app: {
+        context  : 'app',               // 'app' in the /en-gb/app/ surface ('preview' planned for the editor's inline preview)
         selfPath : 'demos/hub.html',    // path of the currently-open file
         writable : true,                // false for read-only (share-token / sub-vault) views
         vaultName: 'My Vault',
         vaultId  : 'abcd1234',
         fileCount: 12,
+        totalSize: 0,                   // reserved (currently always 0)
     },
     // History — read past commits / trees / blobs (read-only). See "Reading history".
     history: {
@@ -141,15 +146,35 @@ window.sg = {
     // cross-vault reads/writes through this kernel. Each verb is independently grantable
     // and consent-gated (vault.delete always re-confirms regardless of cache).
     vault: {
-        create  : (path, label)  => Promise<{vaultKey, path}>,
+        // create(opts) takes an opts OBJECT (matches mount(opts)):
+        //   { label, link: {path} | false, returnKey, custody, seedFrom, accessToken }
+        create  : (opts)         => Promise<{...}>,               // composed key only if returnKey
+        getKey  : (ref)          => Promise<{key}>,               // custodied key re-share (always-confirm consent)
+        setAccessToken: (ref, value) => Promise<{ok}>,            // value: 'inherit' | '<token>'
+        openApp : (ref, opts?)   => Promise<{ok}>,                // launch a vault as an app; opts: {deepLink, target}
+        list    : ()             => Promise<{vaults: [{ref_id, vault_id, label, tier}]}>,
         unlink  : (path)         => Promise<{ok: true}>,
-        delete  : (path)         => Promise<{ok: true}>,
+        delete  : (ref)          => Promise<{ok: true}>,
         mount   : ({prefix, ref, label}) => Promise<{mountId}>,
         unmount : (mountId)      => Promise<{ok: true}>,
         mounts  : ()             => Promise<[{mountId, prefix, label, ref}]>,
+        notify  : (mountId, name, payload) => Promise<{ok}>,      // wake a mounted child's append lane
         // Open ANOTHER vault inside an iframe in YOUR app. See "Embedding another vault".
         embed   : (mountEl, key, opts?) => Promise<{vaultName, fileCount, hasApp, iframe}>,
     },
+    // Append-only transport (renamed from sg.inbox.* on 2026-06-15; the write verb is `write`).
+    // Gated by app.json `permissions.append.*`. See "Receiving messages".
+    append: {
+        configure    : ({append_anchors})  => Promise<{...}>,
+        write        : ({vault_id, append_token, payload}) => Promise<{...}>,
+        list         : ({inbox, after_file_id, limit, include_content}) => Promise<{...}>,
+        fetch        : ({inbox, file_ids}) => Promise<{...}>,
+        markProcessed: ({inbox, file_ids}) => Promise<{...}>,
+        purge        : ({folder, inbox, file_ids}) => Promise<{...}>,
+    },
+    // Kernel→app events (gated by app.json `host_events` allowlist).
+    on : (name, cb) => void,     // e.g. sg.on('append.new-messages', cb) / 'append.error'
+    off: (name, cb) => void,
     // Device-local preferences for THIS app on THIS browser (NEW 2026-05-30).
     // Backed by the top-level kernel's localStorage, namespaced as
     // sg-app-state:<vaultId>:<appEntryPath>:<key>. Values are JSON-encoded, capped
@@ -667,6 +692,36 @@ specifically to avoid a vault commit on every trivial UI toggle.
 `permissions` entry and no consent overlay — it's sandboxed to your own namespace in device-local
 storage and can't touch the vault or other apps. It works on **read-only opens too** (share-token /
 sub-vault views), since it never writes to the vault.
+
+---
+
+## Receiving messages (`sg.append.*` + `sg.on`)
+
+> **Renamed 2026-06-15** (v0.32.7): this transport was previously `sg.inbox.*` with an `append`
+> verb. It is now **`sg.append.*`** and the write verb is **`write`**. Update any older app code.
+
+The append transport lets a vault receive messages/files from other agents or vaults through an
+**append-only lane** that lives outside the version-controlled commit tree (raw vault-pointer API,
+not the commit/push flow). The kernel holds the keys and attaches the gate header per verb; your
+`app.json` `permissions.append.*` grants decide which verbs your app can call. Read-only sessions
+fail closed.
+
+```js
+// Verbs (all take a single opts object — see the API block above for fields):
+await sg.append.configure({ append_anchors: [...] });
+await sg.append.write({ vault_id, append_token, payload });      // send INTO another vault's lane
+const { entries } = await sg.append.list({ limit: 20 });
+await sg.append.fetch({ file_ids: [...] });
+await sg.append.markProcessed({ file_ids: [...] });
+await sg.append.purge({ file_ids: [...] });
+
+// Event push — declare in app.json: "host_events": ["append.new-messages", "append.error"]
+sg.on('append.new-messages', (evt) => { /* {total, per_anchor, entries, new_count, trigger} */ });
+sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ });
+```
+
+The kernel's checker runs on tab focus and app open — your app does not poll; it declares the
+`host_events` allowlist, subscribes with `sg.on`, and reacts.
 
 ---
 

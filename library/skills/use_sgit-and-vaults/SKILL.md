@@ -13,6 +13,12 @@ description: >
 
 # SKILL: sgit — Zero-Knowledge Encrypted Vault Operations
 
+> **Canonical source:** `library/skills/use_sgit-and-vaults/SKILL.md` in the
+> `SGraph-AI__App__Send` repo (also published as `library/reference/sgit-skill.md` in the
+> sgraph.ai library vault). **Last verified:** 2026-07-30 against sgit-ai v0.14.27. If your
+> copy came from a manual upload, check for a newer version before trusting details —
+> notably: `share send`/`share publish` are currently disabled.
+
 ## Overview
 
 `sgit` is a CLI tool for creating and managing **encrypted vaults** — versioned, encrypted
@@ -98,6 +104,21 @@ sgit clone <vault-key> [directory]
 ```
 - Creates a new directory, downloads named branch, decrypts, checks out HEAD
 
+### Read-only clone with a read key (v0.14.27+)
+```bash
+sgit clone --read-key <64-hex> <vault-id> [directory]
+# or the shorthand:  sgit clone "<64-hex>:<vault-id>"
+```
+- Decrypt-only access — you can read everything, write nothing. The right way to consume
+  **public vaults** (e.g. the ones listed in `sgraph.ai/core/public-vaults.json`).
+- Read keys are published as **base64url** in some registries; the CLI wants **hex**. Convert:
+  ```bash
+  python3 -c "import base64,sys;print(base64.urlsafe_b64decode(sys.argv[1]+'=').hex())" <b64url-key>
+  ```
+- Variants: `sgit clone-branch` (thin: history + HEAD only), `sgit clone-headless`
+  (credentials only, no data), `sgit clone-range` (a commit range), `--sparse`
+  (structure now, file content on demand via `sgit fetch`).
+
 ---
 
 ## Branching
@@ -136,31 +157,31 @@ sgit stash drop                         # discard last stash
 
 ## Sharing & Publishing
 
-### Share a one-shot snapshot (Simple Token)
-```bash
-sgit share                              # generates a new token
-sgit share --token river-cloud-3847     # use a specific token
-```
-- Zips vault files, encrypts with token-derived key, uploads to SG/Send
-- Recipient needs only the token (no vault key) to download and decrypt
-- **No sgit installation needed on recipient side** — works via SG/Send web UI
+> **⚠️ DISABLED in current CLI (verified against sgit-ai v0.14.27):** `sgit share send` and
+> `sgit share publish` are disabled *"pending Simple Token security rework"*. Only
+> `sgit share receive` (download a transfer) still works. Until the rework ships, share
+> content by giving collaborators a **read-only clone** (`--read-key`, above) or the full
+> vault key out-of-band. The sections below describe the pre-rework behaviour and will
+> return when the feature is re-enabled.
 
-### Publish a multi-layer encrypted archive
+### Receive a transfer (still works)
 ```bash
-sgit publish                            # generates token, uploads to SG/Send
-sgit publish --token river-cloud-3847
-sgit publish --no-inner-encrypt         # outer token encryption only
+sgit share receive <token>
 ```
-- Outer layer: encrypted with Simple Token key (for transport)
-- Inner layer: encrypted with random key, wrapped with vault read-key (for at-rest)
-- Recipient needs both token AND vault key for inner contents
 
-### Export to local file
+### Share a one-shot snapshot (Simple Token) — DISABLED
 ```bash
-sgit export --output archive.zip
-sgit export --token river-cloud-3847 --output archive.zip
+sgit share send                         # [disabled] pending Simple Token security rework
 ```
-- Same as publish but writes to a local file instead of uploading
+- (When enabled) Zips vault files, encrypts with token-derived key, uploads to SG/Send;
+  recipient needs only the token — works via SG/Send web UI, no sgit install.
+
+### Publish a multi-layer encrypted archive — DISABLED
+```bash
+sgit share publish                      # [disabled] pending Simple Token security rework
+```
+- (When enabled) Outer layer: Simple Token key (transport); inner layer: random key wrapped
+  with the vault read-key (at-rest); recipient needs both token AND vault key.
 
 ---
 
@@ -209,21 +230,23 @@ mypassphrase:vault-abc123
    sgit pull
    ```
 
-7. **Share a snapshot back to a human**
-   ```bash
-   sgit share
-   # → Token: river-cloud-3847
-   ```
+7. **Hand results back to a human** — commit + push, then share the vault key (or a
+   read key for read-only access) out-of-band. (`sgit share send` snapshot tokens are
+   currently disabled — see "Sharing & Publishing".)
 
 ---
 
 ## Agentic Patterns
 
-### Stateless agent (Simple Token only, no vault key needed)
-1. Human runs `sgit share` → sends token to agent
-2. Agent downloads and decrypts snapshot via SG/Send API
-3. Agent modifies files, re-shares with a new token
-4. Human receives updated files
+### Read-only consumer agent (read key, no write access)
+1. Human (or a public registry like `sgraph.ai/core/public-vaults.json`) provides
+   `vault_id` + read key
+2. Agent runs `sgit clone --read-key <hex> <vault_id>` and reads the content
+3. Agent can never modify the vault — safe default for reference/library vaults
+
+### Stateless agent via snapshot token — CURRENTLY DISABLED
+(`sgit share send` is disabled pending the Simple Token security rework; use the
+read-only consumer pattern above instead.)
 
 ### Multi-agent collaboration
 ```

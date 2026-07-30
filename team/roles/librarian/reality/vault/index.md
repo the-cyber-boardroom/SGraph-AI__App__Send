@@ -200,15 +200,23 @@ Plan: `team/roles/dev/reviews/06/08/v0.33.5__dev-plan__vault-create-return-key.m
 
 The inbox transport, check-on-events model, and app bridge are all shipped. The **full inbox spec** (CLI support, main UI section, app methods beyond the bridge) remains PROPOSED — see the PROPOSED section.
 
+> **Rename (v0.32.7, 2026-06-15): `inbox` → `append`.** The transport was renamed across the stack —
+> lib is now `_common/js/lib/sg-append/` (`sg-append.js`, `sg-append-checker.js`), the bridge namespace
+> is **`sg.append.*`**, the write verb is **`write`** (was `append`), permission grants are
+> `permissions.append.*`, and host events are `append.new-messages` / `append.error`. Recorded in
+> `team/comms/changelog/06/15/v0.32.7__changelog__sg-inbox-client-append-url-migration.md`. The table
+> below reflects the current (post-rename) names; the C1–C4 commit ids refer to the original
+> pre-rename landing.
+
 | Component | Status | Evidence |
 |-----------|--------|---------|
-| `sg-inbox.js` — inbox transport client; reads inbox objects from vault storage via raw pointer API; `read_key` raw-bytes getter for inbox objects | **EXISTS** | C1 (`ab62be8`); `tests/unit/vault_ui/loader/test__sg_inbox_client.js` (182 assertions) |
-| `sg-inbox-checker.js` — check-on-events model; polls/checks inbox on trigger events; vault-shell triggers on receive | **EXISTS** | C2 (`7f19541`); `tests/unit/vault_ui/loader/test__sg_inbox_checker.js` (152 assertions) |
-| Host-events allowlist + `sg.on/off` event subscription API + inbox permission grants | **EXISTS** | C3 foundation (`a7a1239`); `tests/unit/vault_ui/loader/test__app_host_events.js` |
-| Kernel→app event push: `_initInboxChecker` + `_pushHostEvent` + `_scheduleInboxCheck` in `app-shell.js`; checker runs on tab focus, pushes `inbox.new-messages` / `inbox.error` gated by `app.json host_events` allowlist | **EXISTS** | C3 kernel push (`bb41013`); `sg-inbox-checker.js` loaded in `en-gb/app/index.html` |
-| `sg.inbox.*` transport bridge (request/response) in `/en-gb/app/` — verbs: `configure`, `append`, `list`, `fetch`, `markProcessed`, `purge`; `_getInbox()` per-vault transport helper; `sg.on/sg.off` event registry + `sg-event` receiver in iframe surface; RO sessions fail closed (null `enum_key`) | **EXISTS** | C4 (`a0c16c5`); `app-shell.js` `_buildVfsBridgeScript` + `_setupVfsBridgeHandlers`; `sg-inbox.js` loaded in `en-gb/app/index.html` |
+| `sg-append.js` — append transport client; reads append objects from vault storage via raw pointer API; `read_key` raw-bytes getter for append objects | **EXISTS** | C1 (`ab62be8`, as `sg-inbox.js`); `tests/unit/vault_ui/loader/test__sg_append_client.js` |
+| `sg-append-checker.js` — check-on-events model; polls/checks the append feed on trigger events; vault-shell triggers on receive | **EXISTS** | C2 (`7f19541`); `tests/unit/vault_ui/loader/test__sg_append_checker.js` |
+| Host-events allowlist + `sg.on/off` event subscription API + append permission grants | **EXISTS** | C3 foundation (`a7a1239`); `tests/unit/vault_ui/loader/test__app_host_events.js`, `test__app_permissions__append.js` |
+| Kernel→app event push: `_initAppendChecker` + `_pushHostEvent` in `app-shell.js`; checker runs on tab focus, pushes `append.new-messages` / `append.error` gated by `app.json host_events` allowlist | **EXISTS** | C3 kernel push (`bb41013`); `sg-append-checker.js` loaded in `en-gb/app/index.html` |
+| `sg.append.*` transport bridge (request/response) in `/en-gb/app/` — verbs: `configure`, `write`, `list`, `fetch`, `markProcessed`, `purge`; `_getAppendClient()` per-vault transport helper; `sg.on/sg.off` event registry + `sg-event` receiver in iframe surface; RO sessions fail closed (null `enum_key`) | **EXISTS** | C4 (`a0c16c5`); `app-shell.js` `_buildVfsBridgeScript` (~line 2612) + `_setupVfsBridgeHandlers` (`__sgCmdType === 'append'`); `sg-append.js` loaded in `en-gb/app/index.html` |
 
-The inbox transport uses the raw vault-pointer API (not the commit/push flow). Inbox objects live outside the version-controlled commit tree by design. End-to-end: app declares `permissions.inbox.*` + `host_events['inbox.new-messages']`, calls `sg.on('inbox.new-messages', cb)` — one line in app code.
+The append transport uses the raw vault-pointer API (not the commit/push flow). Append objects live outside the version-controlled commit tree by design. End-to-end: app declares `permissions.append.*` + `host_events['append.new-messages']`, calls `sg.on('append.new-messages', cb)` — one line in app code.
 
 ---
 
