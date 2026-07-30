@@ -344,13 +344,28 @@ Just use anchor tags. Click handling is intercepted automatically:
 <a href="https://example.com">External link — opens in a new tab</a>
 ```
 
+> **Exception — bare-`#` anchors and `location.hash` are BROKEN in vault apps. Do not use
+> them.** The interceptor deliberately exempts `<a href="#section">`, but the browser default
+> that then applies is wrong in a null-origin `srcdoc` frame: the fragment resolves against the
+> *inherited parent base URL* (`…/en-gb/app/`), which is a different document — so the click
+> triggers a real cross-document navigation and the iframe lands on the host entry page (the
+> vault-key screen). Assigning `location.hash` from JS does the same from the setter side.
+> **Handle in-page anchors yourself**: `e.preventDefault()` on the click, then
+> `document.getElementById(id).scrollIntoView()`. This is srcdoc spec behaviour, not a host
+> bug that will be fixed under you. (Verified 2026-07-30 — see the architect review
+> `team/roles/architect/reviews/07/30/` on the click interceptor.)
+
 **What the host does for you (so your app shouldn't reinvent these):**
 
 - **Hash anchors** — `<a href="page.html#section">` was historically broken (the `.html`
   endsWith check failed because the href ended in `#section`, the click fell through,
   the static host 403'd). Fixed 2026-05-30. The fragment is forwarded to the new srcdoc
   and applied on `DOMContentLoaded` via a postMessage from the parent. Apps don't need
-  any workaround.
+  any workaround — **with one caveat**: if the target id doesn't exist at
+  `DOMContentLoaded` (content rendered later from data), the current shell falls back to
+  assigning `location.hash`, which re-navigates the frame (see the exception box above).
+  Until that fallback is removed, don't use `page.html#id` deep links whose target renders
+  asynchronously — carry the target in an `sg.state.*` stash instead.
 - **External links** (`http://`, `https://`, protocol-relative `//`) open in a new tab.
   Don't add `target="_blank"` — the host handles it. **By default** (least privilege) the
   app frame has **no** popup/escape-sandbox capability: clicking an external link surfaces a
@@ -367,8 +382,14 @@ Just use anchor tags. Click handling is intercepted automatically:
   app genuinely needs it — it's the one grant that lets the frame open an unsandboxed window,
   so default-off is the safe posture (see "Embedding another vault" for the same principle).
 - **`mailto:` and `javascript:`** are passed through unchanged.
-- **Pure-fragment links** (`<a href="#section">`) are passed through — the browser
-  scrolls within the current page without the host being involved.
+- **Pure-fragment links** (`<a href="#section">`) are passed through to the browser default —
+  which is **broken** in a null-origin srcdoc frame (see the exception box above): it navigates
+  the iframe to the host entry page instead of scrolling. Your app must claim these clicks
+  itself (`preventDefault` + `scrollIntoView`).
+- **Query strings on vault links** (`<a href="page.html?node=42">`) are currently
+  **unsupported** — the query is not stripped before the file lookup, so the link lands on the
+  broken-link overlay. Carry cross-page state in the `#fragment` (delivered to the new doc) or
+  an `sg.state.*` stash instead.
 - **Friendly 404** — clicks pointing to files that don't exist (or are inside the
   `.vault/**` floor) land on a host-rendered "Page not found in this vault" overlay
   with a back arrow. You don't need to handle broken-link routing yourself.
