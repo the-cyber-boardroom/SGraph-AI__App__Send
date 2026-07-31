@@ -1,6 +1,6 @@
 # Tools — Proposed: Platform Tools
 
-**Domain:** tools/proposed/ | **Last updated:** 2026-07-20 | **Maintained by:** Librarian (daily run)
+**Domain:** tools/proposed/ | **Last updated:** 2026-07-30 | **Maintained by:** Librarian (daily run)
 
 All items below are PROPOSED. None have been code-verified. Do not describe any of these as existing features.
 
@@ -101,3 +101,17 @@ layer proposals.
 | P-187 | Weekly full-restore + quarterly DR drill | Full vault inventory restore to fresh AWS account; quarterly tabletop exercise | doc 427 |
 | P-188 | Scheduled Claude Code backup health-check sessions | Agentic workflow: reads backup vault JS API; alerts on stale or failed backups | doc 427 |
 | P-189 | Backblaze B2 as first multi-provider backup target | S3-compatible; $6/TB-mo; backup-focused; validates multi-provider architecture | doc 427 |
+
+---
+
+## Voice Note Transcription Tool (07/27 briefs — docs 863–864, v0.33.52)
+
+**PROPOSED — does not exist yet.** First SGraph product entering the market. Architecture brief + strategy brief + contract draft (27 July 2026). The product does one job in one pass: audio in, transcript + analysis + debrief + optional infographic out. No backend. OpenRouter handles inference and billing via per-user keys with spend caps.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-VNT-001 | Voice note transcription tool (web + iOS + Android) | WhatsApp voice memo transcription tool; one repo, three targets, two-branch CI (dev/main → dev-estate/production); no backend (static hosting on GitHub Pages / S3 + CloudFront); one-pass pipeline (audio → transcript + analysis + debrief + optional infographic); OpenRouter per-user key carries spend cap and handles billing; 90-day commercial term from 1 August 2026 | 07/27 arch-brief + strategy-brief |
+| P-VNT-002 | OpenRouter per-user key provisioning Lambda | Single Lambda function provisioning OpenRouter keys with spend caps (75% of net receipts after processor fee); deferred past beta; beta users get a hardcoded capped key embedded in client — must carry hard cap, short lifetime, easy revocation before any key ships | 07/27 arch-brief |
+| P-VNT-003 | Privacy mode selector (routed / restricted / browser-local) | Three-tier privacy UX: (1) routed default — any OpenRouter provider, cheapest, no processor guarantee; (2) restricted — named providers only, higher price; (3) browser-local — on-device model, nothing leaves device, possibly free; privacy tier and billing tier are the same selector | 07/27 arch-brief |
+| P-VNT-004 | Browser-local transcription mode | On-device speech-to-text model running entirely in browser; genuinely private (no network calls for inference); quality/hardware constraints not yet specified; possibly free tier | 07/27 arch-brief |
+| P-VNT-005 | Format detection by content (Opus/Ogg and AAC/M4A) | Client detects audio codec by content (magic bytes / codec header), not file extension; Opus in Ogg is the norm (WhatsApp native, 48kHz mono); AAC in M4A is the narrower path (iPhone app-to-app forwarding); both must be accepted; modern browsers decode both natively | 07/27 arch-brief |

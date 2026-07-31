@@ -7,6 +7,45 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-31
+
+No new briefs. Single CI version-bump commit on dev (no functional code change). No reality domain files updated.
+
+Backlog task B-011 completed:
+- `library/guides/agentic-setup/v0_4_0__role-ecosystem-guide.md` — References section and Depends On header updated: 2 wrong-filename links corrected; 7 missing companion docs annotated *(not in repo)*
+- `library/guides/agentic-setup/v0.1.0__role-based-coordination.md` — References section updated: 1 missing doc annotated *(not in repo)*
+- `team/roles/librarian/DAILY_RUN.md` — B-011 status QUEUED → DONE; COMPLETED table updated
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 870 (unchanged)
+Master index (07/31): `team/roles/librarian/reviews/07/31/v0.33.47__master-index__no-new-briefs-31-july-2026.md`
+Debrief (07/31): `team/humans/dinis_cruz/debriefs/07/31/v0.33.47__debrief__no-new-briefs-31-july-2026.md`
+
+---
+
+## 2026-07-30
+
+6 human briefs from `briefs/07/27/` processed across two threads: Voice Note Transcription Tool (first product to market) and Outbound Agentic Risk (AOMM). ~15 new PROPOSED items. 0 new EXISTS items.
+
+Files changed:
+- `tools/proposed/platform-tools.md` — Appended new section: Voice Note Transcription Tool (P-VNT-001–P-VNT-005)
+- `tools/proposed/index.md` — Updated platform-tools.md row + P-number quick-reference to include P-VNT-001–P-VNT-005
+- `ai-agents/proposed/risk-mandate.md` — Appended new section: AOMM (P-AOMM-001–P-AOMM-007)
+- `ai-agents/proposed/index.md` — Added P-AOMM range to topic file table and P-number lookup
+- `alchemist/index.md` — Added Commercial Kit section (P-COM-001–P-COM-003); last updated → 2026-07-30
+- `index.md` — Version v0.33.46 → v0.33.47; last updated 2026-07-28 → 2026-07-30; PROPOSED ~955+ → ~970+; docs 864 → 870
+
+Role reviews produced (07/30):
+- `team/roles/architect/reviews/07/30/v0.33.47__architect-review__briefs-27-july-2026.md`
+- `team/roles/dev/reviews/07/30/v0.33.47__dev-review__briefs-27-july-2026.md`
+- `team/roles/alchemist/reviews/07/30/v0.33.47__alchemist-review__briefs-27-july-2026.md`
+- `team/roles/appsec/reviews/07/30/v0.33.47__appsec-review__briefs-27-july-2026.md`
+
+Debrief (07/30): `team/humans/dinis_cruz/debriefs/07/30/v0.33.47__debrief__briefs-processing-27-july-2026.md`
+Master index (07/30): `team/roles/librarian/reviews/07/30/v0.33.47__master-index__briefs-27-july-2026.md`
+Session: 6 new briefs | New EXISTS items: 0 | New PROPOSED items: ~15 | Cumulative docs: 870
+
+---
+
 ## 2026-07-24 (Vault Web code index session)
 
 New **Vault Web code index** created at `team/roles/librarian/code-index/vault-web/`

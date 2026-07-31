@@ -162,10 +162,11 @@ each resolves to a real file. Report broken links in a health scan review file.
 Health scan report: `team/roles/librarian/reviews/07/17/v0.33.43__librarian-review__b006-broken-link-health-scan.md`
 
 ### B-011 · Import or stub missing Issues-FS companion documents
-**Status:** QUEUED
+**Status:** DONE (2026-07-31)
 **What:** `library/guides/agentic-setup/v0_4_0__role-ecosystem-guide.md` declares 9 companion Issues-FS documents in its "Depends On" / "See Also" sections that don't exist in the repo (e.g. `v0_4_0__issues-fs__librarian-role.md`, `v0_4_0__issues-fs__thinking-in-graphs.md`). Same for one link in `v0.1.0__role-based-coordination.md`. The files may exist in an external vault or the Issues-FS system, or may never have been authored.
 **Why:** 10 dead links in key agentic-workflow guides. The role-ecosystem-guide is a likely starting point for new agents; broken "See Also" links erode trust.
-**Action:** Either import the source files from the Issues-FS vault (if they exist), or update the "See Also" section with a note that the companion documents have not yet been committed to this repo.
+
+**Outcome:** 2 links had wrong filenames and were corrected to the actual files in the directory (`v0.1.0__role-based-coordination.md` and `v0.1.0__role-architecture-framework.md`). 7 documents are genuinely not in the repo — all annotated with *(not in repo — `<expected-filename>`)* so future agents can import them if/when they become available. The `v0.1.0__role-based-coordination.md` broken reference also annotated. All backlog tasks are now complete.
 
 ### B-007 · QA_START_HERE.md — Update to reflect v0.3.1 + post-April state
 **Status:** DONE (2026-05-19)
@@ -235,6 +236,7 @@ None currently active.
 | 2026-07-16 | No new briefs; no new dev commits; B-009 | library/docs/specs/README.md audited: all 6 spec files valid. 3 unlisted files found in v0.1.1/ subdir. README updated with Agent Briefing Documents table. changelog.md + DAILY_RUN.md updated. |
 | 2026-07-21 | No new briefs; no new dev commits; B-005 | identity/proposed/index.md (182 lines) split into 4 topic files: google-oauth.md, billing-credits.md, openrouter.md, email.md. Index now ~60-line TOC. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
 | 2026-07-14 | No new briefs; no new dev commits; B-004 | infra/proposed/index.md (267 lines) split into 3 topic files: vault-hosting.md, firecracker.md, relay-and-storage.md. Index now ~130-line TOC + 9 small sections. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
+| 2026-07-31 | No new briefs; CI version bump only; B-011 | 2 wrong-filename links fixed in role-ecosystem-guide (role-based-coordination, role-architecture-framework). 7 missing companion docs annotated *(not in repo)*. 1 missing link fixed in role-based-coordination. All 11 backlog tasks now DONE. |
 
 ---
 
