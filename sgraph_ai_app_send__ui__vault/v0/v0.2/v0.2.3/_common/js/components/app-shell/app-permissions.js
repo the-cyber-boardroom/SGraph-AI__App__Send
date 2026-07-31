@@ -146,7 +146,13 @@
             // (default) the frame gets NEITHER token; external clicks are routed to the
             // host, which opens them after a one-click user confirm (no escape-sandbox).
             // Default-deny is the least-privilege posture: escape-sandbox is opt-in only.
-            externalLinks: (p.externalLinks === true)
+            externalLinks: (p.externalLinks === true),
+
+            // downloads (bool, default-deny). When TRUE sg.vfs.download saves without a
+            // per-file confirm. When FALSE (default) each download surfaces a one-click
+            // HUD confirm naming the file and size. Either way the save itself runs in
+            // the HOST document (real origin) — the app frame never needs allow-downloads.
+            downloads: (p.downloads === true)
         };
     }
 

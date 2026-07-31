@@ -43,7 +43,9 @@ Anything that goes through a JavaScript API works without modification:
 
 | Pattern | Status | Why |
 |---|---|---|
-| `window.sg.vfs.read(path)` / `readText` / `list` / `write` | ✅ Works | Custom postMessage protocol — **the supported way to read/write vault data** |
+| `window.sg.vfs.read(path)` / `readText` / `list` / `write` / `download` | ✅ Works | Custom postMessage protocol — **the supported way to read/write/save vault data** |
+| `<a href="#section">` (clicked) | ✅ Works | Fixed 2026-07-31 — the interceptor scrolls in-frame (the browser default is broken in srcdoc frames). `location.hash` assignment from JS remains banned. |
+| `data-sg-native` on an anchor, or `preventDefault` in window-capture | ✅ Works | Added 2026-07-31 — sanctioned opt-out; the host never claims such clicks |
 | `sg.loadCss(path)` / `sg.loadJs(path)` | ✅ Works | loaders that read vault bytes over the bridge and inject `<style>`/`<script>` |
 | `img.src = 'photo.png'` (assigned **from JS**) | ✅ Works | `HTMLImageElement.prototype.src` setter is patched to decrypt + serve a `blob:` |
 | `<a href="other.html">` (clicked) | ✅ Works | Click handler postMessages parent, which re-renders the iframe |
@@ -87,9 +89,11 @@ Every vault HTML file gets a `<script>` injected into its `<head>` that exposes:
 window.sg = {
     vfs: {
         write   : (path, content)        => Promise<{path, size}>,   // string | Uint8Array | ArrayBuffer
-        read    : (path)                  => Promise<ArrayBuffer>,
+        read    : (path)                  => Promise<ArrayBuffer>,    // raw bytes; no read-size cap
         readText: (path)                  => Promise<string>,
         list    : (prefix)                => Promise<[{path,name,size,type}]>,
+        // Save a vault file to the user's device (host-fulfilled — see "Downloading files").
+        download: (path, opts?)           => Promise<{ok, path, filename, bytes}>,  // opts: {filename}
     },
     loadCss : (path) => Promise<HTMLStyleElement>,    // load + inject CSS
     loadJs  : (path) => Promise<HTMLScriptElement>,   // load + execute JS
@@ -344,28 +348,31 @@ Just use anchor tags. Click handling is intercepted automatically:
 <a href="https://example.com">External link — opens in a new tab</a>
 ```
 
-> **Exception — bare-`#` anchors and `location.hash` are BROKEN in vault apps. Do not use
-> them.** The interceptor deliberately exempts `<a href="#section">`, but the browser default
-> that then applies is wrong in a null-origin `srcdoc` frame: the fragment resolves against the
-> *inherited parent base URL* (`…/en-gb/app/`), which is a different document — so the click
-> triggers a real cross-document navigation and the iframe lands on the host entry page (the
-> vault-key screen). Assigning `location.hash` from JS does the same from the setter side.
-> **Handle in-page anchors yourself**: `e.preventDefault()` on the click, then
-> `document.getElementById(id).scrollIntoView()`. This is srcdoc spec behaviour, not a host
-> bug that will be fixed under you. (Verified 2026-07-30 — see the architect review
-> `team/roles/architect/reviews/07/30/` on the click interceptor.)
+> **Bare-`#` anchors now work (fixed 2026-07-31)** — the host interceptor claims
+> `<a href="#section">` clicks and scrolls in-frame (`preventDefault` + `scrollIntoView`;
+> a missing target is a safe no-op). The browser default they used to fall through to is
+> broken in a null-origin `srcdoc` frame (the fragment resolves against the *inherited parent
+> base URL*, causing a real cross-document navigation to the vault-key screen), which is also
+> why **assigning `location.hash` from JS is still BANNED** — that's srcdoc spec behaviour the
+> host cannot intercept. Scroll with `element.scrollIntoView()` instead.
+> (Analysis: architect review `team/roles/architect/reviews/07/30/` on the click interceptor.)
+
+**Opting out of the interceptor (2026-07-31):** if your app wants to handle an anchor click
+itself, either call `e.preventDefault()` in a **window-capture** listener (it runs before the
+host's document-capture handler; the host now honours `e.defaultPrevented`), or mark the anchor
+`data-sg-native` — the host will never claim clicks on such anchors (any href form, including
+`.html` and external).
 
 **What the host does for you (so your app shouldn't reinvent these):**
 
 - **Hash anchors** — `<a href="page.html#section">` was historically broken (the `.html`
   endsWith check failed because the href ended in `#section`, the click fell through,
   the static host 403'd). Fixed 2026-05-30. The fragment is forwarded to the new srcdoc
-  and applied on `DOMContentLoaded` via a postMessage from the parent. Apps don't need
-  any workaround — **with one caveat**: if the target id doesn't exist at
-  `DOMContentLoaded` (content rendered later from data), the current shell falls back to
-  assigning `location.hash`, which re-navigates the frame (see the exception box above).
-  Until that fallback is removed, don't use `page.html#id` deep links whose target renders
-  asynchronously — carry the target in an `sg.state.*` stash instead.
+  and applied on `DOMContentLoaded` via a postMessage from the parent. If the target id
+  doesn't exist yet (content rendered later from data) the scroll is a safe no-op — the
+  hazardous `location.hash` fallback that used to re-navigate the frame was removed
+  2026-07-31. Apps whose anchor targets render asynchronously should carry the target in
+  an `sg.state.*` stash and scroll after render.
 - **External links** (`http://`, `https://`, protocol-relative `//`) open in a new tab.
   Don't add `target="_blank"` — the host handles it. **By default** (least privilege) the
   app frame has **no** popup/escape-sandbox capability: clicking an external link surfaces a
@@ -382,10 +389,10 @@ Just use anchor tags. Click handling is intercepted automatically:
   app genuinely needs it — it's the one grant that lets the frame open an unsandboxed window,
   so default-off is the safe posture (see "Embedding another vault" for the same principle).
 - **`mailto:` and `javascript:`** are passed through unchanged.
-- **Pure-fragment links** (`<a href="#section">`) are passed through to the browser default —
-  which is **broken** in a null-origin srcdoc frame (see the exception box above): it navigates
-  the iframe to the host entry page instead of scrolling. Your app must claim these clicks
-  itself (`preventDefault` + `scrollIntoView`).
+- **Pure-fragment links** (`<a href="#section">`) are claimed by the interceptor and scrolled
+  in-frame (fixed 2026-07-31 — the browser default is a broken cross-document navigation in a
+  null-origin srcdoc frame). A missing target is a no-op. Your app can still take over any
+  anchor with `data-sg-native` or a window-capture `preventDefault`.
 - **Query strings on vault links** (`<a href="page.html?node=42">`) are currently
   **unsupported** — the query is not stripped before the file lookup, so the link lands on the
   broken-link overlay. Carry cross-page state in the `#fragment` (delivered to the new doc) or
@@ -743,6 +750,43 @@ sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ })
 
 The kernel's checker runs on tab focus and app open — your app does not poll; it declares the
 `host_events` allowlist, subscribes with `sg.on`, and reacts.
+
+---
+
+## Downloading files (`sg.vfs.download`) — NEW 2026-07-31
+
+The sanctioned way to put a vault file in the user's Downloads folder:
+
+```js
+await sg.vfs.download('exports/report.pdf');                          // saves as report.pdf
+await sg.vfs.download('exports/report.pdf', { filename: 'EU-AI-Act.pdf' });
+// → {ok: true, path, filename, bytes}   ·   rejects: ENOENT / EPERM / EPROTECTED /
+//   'Download not approved' (user dismissed the confirm)
+```
+
+**How it works — and why you don't need `allow-downloads`.** The bytes travel the same guarded
+read path as `sg.vfs.read` (floor → mounts → `fs.read` grant), but the `<a download>` click
+happens in the **host document** (real origin, unsandboxed). The app frame's sandbox is
+untouched. This is deliberate: a blob-URL + programmatic-anchor download **inside** the app
+frame is silently dropped by Chromium because the sandbox has no `allow-downloads` token —
+don't build that workaround, call `sg.vfs.download`.
+
+**Consent.** Same model as external links: by default each call surfaces a one-click HUD
+confirm naming the file and size ("This app wants to save a file to your device"); dismissing
+rejects the promise. Declare `"permissions": { "downloads": true }` in `app.json` for
+frictionless saves (e.g. a downloads page where saving is the whole point).
+
+**Related contracts, stated explicitly:**
+
+- `sg.vfs.read(path)` returns a raw **`ArrayBuffer`** (postMessage structured clone). There is
+  **no read-size cap** — the 3 MB `EFBIG` guard is write-only. Errors: rejection with message
+  `No such file: <path>`, or `EPERM` / `EPROTECTED` codes.
+- **Direct vault-file URLs are banned in app markup.** `<a href="/exports/x.pdf" download>` or
+  `<iframe src="/exports/x.pdf">` cannot work — vault files are encrypted objects, not URLs;
+  the href resolves against the static host and answers `AccessDenied`. For inline previews of
+  binary vault content, read the bytes over the bridge and use a blob URL
+  (`URL.createObjectURL(new Blob([buf], {type}))` → `iframe.src` / `img.src`) — blob *display*
+  works fine in-frame; it is only the *download* that needs the host.
 
 ---
 

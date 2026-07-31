@@ -62,5 +62,36 @@ console.log('\n[suite] app-shell — externalLinks grant flips the external-link
         makeShell(AppPermissions.parsePermissions(null))._appSandbox() === 'allow-scripts allow-forms');
 }
 
+console.log('\n[suite] app-shell — click-interceptor contract (architect review 07/30)');
+{
+    const src = makeShell(AppPermissions.parsePermissions(null))._buildVfsBridgeScript('index.html');
+
+    // Proposal 1: sanctioned opt-out — the guard must run before any branch claims the click.
+    ok('interceptor honours e.defaultPrevented + data-sg-native',
+        /e\.defaultPrevented\|\|a\.hasAttribute\("data-sg-native"\)/.test(src));
+
+    // Proposal 2: bare-# clicks are claimed with an in-frame scroll (browser default is a
+    // cross-document navigation in a null-origin srcdoc frame — the vault-key-screen bug).
+    ok('bare-# clicks: preventDefault + getElementById + scrollIntoView',
+        /startsWith\("#"\)\)\{'?\s*\+?\s*'e\.preventDefault\(\)/.test(src.replace(/\n/g, ''))
+        || /if\(h\.startsWith\("#"\)\)\{e\.preventDefault\(\);/.test(src));
+
+    // Proposal 3: the scroll-to-hash miss-fallback (location.hash re-navigation) is GONE.
+    ok('scroll-to-hash listener has NO location.hash fallback', !/location\.hash="#"/.test(src));
+}
+
+console.log('\n[suite] app-shell — sg.vfs.download (host-fulfilled downloads)');
+{
+    const src = makeShell(AppPermissions.parsePermissions(null))._buildVfsBridgeScript('index.html');
+    ok('bridge exposes sg.vfs.download', /download:_download/.test(src));
+    ok('download routes through _sgCmd("download")', /_sgCmd\("download"/.test(src));
+
+    const withGrant = AppPermissions.parsePermissions({ permissions: { downloads: true } });
+    ok('permissions: downloads grant parses true', withGrant.downloads === true);
+    ok('permissions: downloads defaults to deny', AppPermissions.parsePermissions(null).downloads === false);
+    ok('permissions: downloads:"yes" (non-boolean) stays deny',
+        AppPermissions.parsePermissions({ permissions: { downloads: 'yes' } }).downloads === false);
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);

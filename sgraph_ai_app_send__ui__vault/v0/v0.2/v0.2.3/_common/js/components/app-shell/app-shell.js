@@ -2320,6 +2320,19 @@
             }
         }
 
+        // Download confirm for apps without the `downloads` grant. onDecision(true|false)
+        // ALWAYS fires so the app's sg.vfs.download promise settles either way. With no HUD
+        // (hud.mode "none") we proceed — same degraded posture as _promptExternalOpen: the
+        // save still happens host-side with the file named in the browser's own download UI.
+        _promptDownload(filename, sizeLabel, onDecision) {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (hud && typeof hud.promptDownload === 'function') {
+                hud.promptDownload(filename, sizeLabel, onDecision);
+            } else {
+                try { onDecision(true); } catch (_) {}
+            }
+        }
+
         // Source for sg.vault.embed(), injected into the app bridge. The pure src-building
         // and sandbox-sanitisation come from the unit-tested SgEmbed module (injected verbatim
         // via Function.toString — the shipped code IS the tested code). The handshake glue is
@@ -2456,8 +2469,23 @@
                 //     (real origin) — popup allowed, and the user sees where they're going.
                 'document.addEventListener("click",function(e){' +
                   'var a=e.target.closest("a");if(!a)return;' +
+                  // Sanctioned opt-out: an app that already handled the click (preventDefault
+                  // from a window-capture listener) or marks the anchor app-internal
+                  // (data-sg-native) keeps it — the host must not claim it.
+                  'if(e.defaultPrevented||a.hasAttribute("data-sg-native"))return;' +
                   'var h=a.getAttribute("href");if(!h)return;' +
-                  'if(h.startsWith("#")||h.startsWith("mailto:"))return;' +
+                  // Bare-# anchors: the browser default is BROKEN in a null-origin srcdoc frame
+                  // (the fragment resolves against the inherited parent base URL → real
+                  // cross-document navigation → the host vault-key page). Claim the click and
+                  // scroll in-frame; a miss is a no-op (preventDefault still — never navigate).
+                  // No stopPropagation: app listeners still see the event if they want it.
+                  'if(h.startsWith("#")){' +
+                    'e.preventDefault();' +
+                    'var fid=h.slice(1);' +
+                    'if(fid){try{var fel=document.getElementById(fid);if(fel)fel.scrollIntoView();}catch(_){}}' +
+                    'return;' +
+                  '}' +
+                  'if(h.startsWith("mailto:"))return;' +
                   'if(h.startsWith("http")||h.startsWith("//")){' +
                     'e.preventDefault();e.stopPropagation();' +
                     (extLinks
@@ -2479,7 +2507,11 @@
                 'window.addEventListener("message",function(e){' +
                   'if(!e.data||typeof e.data.__sgVfsScrollToHash!=="string")return;' +
                   'var frag=e.data.__sgVfsScrollToHash;if(!frag)return;' +
-                  'var apply=function(){try{var el=document.getElementById(frag);if(el){el.scrollIntoView();return;}location.hash="#"+frag;}catch(_){}};' +
+                  // A miss is a NO-OP. The old fallback (location.hash="#"+frag) was a live
+                  // bug: in a null-origin srcdoc frame a hash assignment is a cross-document
+                  // navigation that re-navigates the frame to the host entry page. Apps whose
+                  // anchor targets render async should carry the target in sg.state instead.
+                  'var apply=function(){try{var el=document.getElementById(frag);if(el)el.scrollIntoView();}catch(_){}};' +
                   'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply);else apply();' +
                 '});' +
 
@@ -2549,6 +2581,12 @@
                     '});' +
                   '}' +
                   'function _readText(path){return _read(path).then(function(buf){return new TextDecoder().decode(buf);});}' +
+                  // sg.vfs.download — save a vault file to the user's device. Fulfilled by the
+                  // HOST (real origin): the parent reads the bytes and clicks an <a download>
+                  // in its own document, so the sandboxed app frame never needs allow-downloads.
+                  // Without the `downloads` grant each call surfaces a one-click HUD confirm;
+                  // dismissing rejects with ECONSENT.
+                  'function _download(path,opts){opts=opts||{};return _sgCmd("download",{action:"file",path:path,filename:opts.filename});}' +
                   // sg.vfs.list
                   'function _list(path){' +
                     'return _vfsMsg("__sgVfsListReq",{path:path||""})' +
@@ -2576,7 +2614,7 @@
                   this._embedHelperSrc() +
                   // window.sg.*
                   'window.sg={' +
-                    'vfs:{write:_write,read:_read,readText:_readText,list:_list},' +
+                    'vfs:{write:_write,read:_read,readText:_readText,list:_list,download:_download},' +
                     // sg.fs.* — mutations gated by app.json permissions (move/delete/mkdir)
                     'fs:{' +
                       'move:function(from,to){return _sgCmd("fs",{action:"move",from:from,to:to});},' +
@@ -3277,6 +3315,55 @@
                             return;
                         }
                         cmdReply(false, null, 'Unsupported git action: ' + action);
+                        return;
+                    }
+
+                    // sg.vfs.download — host-fulfilled save-to-device. The bytes travel the same
+                    // guarded read path as vfs.read (floor → mounts → fs.read grant), but the
+                    // <a download> click happens in THIS document (real origin, unsandboxed), so
+                    // the app frame needs no allow-downloads token. Consent: without the
+                    // `downloads` grant every call surfaces a one-click HUD confirm naming the
+                    // file and size; dismissing rejects with ECONSENT. The blob URL is revoked
+                    // after 60s (long enough for the save dialog, short enough not to leak).
+                    if (e.data.__sgCmdType === 'download') {
+                        var dlPath     = e.data.path || '';
+                        var dlResolved = dlPath.startsWith('/') ? dlPath.slice(1) : self._resolvePath(self._htmlDir, dlPath);
+                        if (AppPermissions.isFloor('read', dlResolved)) { cmdReply(false, null, 'Protected path'); self._emitBridgeCall('vfs.download', { path: dlResolved, ok: false, err: 'EPROTECTED' }); return; }
+                        if (!self._can('fs.read', dlResolved)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('vfs.download', { path: dlResolved, ok: false, err: 'EPERM' }); return; }
+                        // Filename: caller override or basename; never path separators/controls.
+                        var dlName = String(e.data.filename || dlResolved.split('/').pop() || 'download')
+                            .replace(/[\/\\]/g, '_').replace(/[^\x20-\x7e\u00a0-\uffff]/g, '').slice(0, 200) || 'download';
+                        var dlBytes = function () {
+                            if (self._mounts && self._mounts.resolve(dlResolved)) return self._handleVfsViv('read', { path: dlResolved });
+                            return compositeReady.then(function () { return ensureMountOpen(dlResolved); }).then(function () {
+                                var m = self._findEntryStrict(dataSource.getFileList(), dlResolved);
+                                if (!m) { var e2 = new Error('No such file: ' + dlResolved); e2.code = 'ENOENT'; throw e2; }
+                                return dataSource.getFileBytes(m.path);
+                            });
+                        };
+                        var dlRun = function () {
+                            dlBytes().then(function (buf) {
+                                var blob = new Blob([buf]);
+                                var url  = URL.createObjectURL(blob);
+                                var an   = document.createElement('a');
+                                an.href = url; an.download = dlName; an.style.display = 'none';
+                                document.body.appendChild(an); an.click(); an.remove();
+                                setTimeout(function () { try { URL.revokeObjectURL(url); } catch (_) {} }, 60000);
+                                cmdReply(true, { ok: true, path: dlResolved, filename: dlName, bytes: buf.byteLength });
+                                self._emitBridgeCall('vfs.download', { path: dlResolved, bytes: buf.byteLength, ok: true });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || 'Download failed');
+                                self._emitBridgeCall('vfs.download', { path: dlResolved, ok: false, err: (err && err.code) || (err && err.message) });
+                            });
+                        };
+                        if (self._perm && self._perm.downloads) { dlRun(); return; }
+                        // No grant → per-file confirm. Size shown when cheaply known from the list.
+                        var dlSize = '';
+                        try { var le = self._findEntryStrict(dataSource.getFileList(), dlResolved); if (le && le.size) dlSize = le.size > 1048576 ? (le.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(le.size / 1024)) + ' KB'; } catch (_) {}
+                        self._promptDownload(dlName, dlSize, function (go) {
+                            if (go) dlRun();
+                            else { cmdReply(false, null, 'Download not approved'); self._emitBridgeCall('vfs.download', { path: dlResolved, ok: false, err: 'ECONSENT' }); }
+                        });
                         return;
                     }
 

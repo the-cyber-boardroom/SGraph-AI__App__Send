@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-06-12 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-07-31 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -462,6 +462,32 @@ Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-
 **Changelog:** `team/comms/changelog/05/27/v0.27.79__changelog__app-perms-phase{1..4b}*.md`
 
 ---
+
+### App-Mode Click Interceptor Fixes + `sg.vfs.download` (2026-07-31)
+
+Shipped in `app-shell.js` / `app-hud.js` / `app-permissions.js` (bundle regenerated); unit
+pins in `tests/unit/vault_ui/loader/test__app_shell_bridge_build.js`. Follows the architect
+review `team/roles/architect/reviews/07/30/v0.33.43__review__in-app-nav-click-interceptor-proposals.md`
+(proposals 3, 1, 2 adopted; 5a/4/5b remain PROPOSED).
+
+- **Interceptor opt-out (proposal 1).** The injected click interceptor returns early when
+  `e.defaultPrevented` is set (window-capture app listeners win) or the anchor carries
+  `data-sg-native`. Applies to every branch (vault-nav and external).
+- **Bare-`#` anchors claimed (proposal 2).** `<a href="#id">` clicks are now
+  `preventDefault`-ed and scrolled in-frame (`getElementById` → `scrollIntoView`); a miss is
+  a no-op. Previously the browser default re-navigated the null-origin srcdoc frame to the
+  host entry page (vault-key screen). No `stopPropagation` — app listeners still see the event.
+- **`location.hash` miss-fallback removed (proposal 3).** The `__sgVfsScrollToHash` listener
+  no longer assigns `location.hash` when the target id is missing (that assignment was a
+  cross-document re-navigation in srcdoc frames — live bug). A miss is now a no-op.
+- **`sg.vfs.download(path, {filename?})`** — host-fulfilled save-to-device. Bytes take the
+  same guarded read path as `vfs.read` (floor → mounts → `fs.read` grant); the `<a download>`
+  click runs in the host document, so the app sandbox needs no `allow-downloads` token.
+  Consent: one-click HUD confirm per file (`app-hud.promptDownload`, reuses the extlink bar
+  with download copy; dismiss rejects `'Download not approved'`); `app.json`
+  `permissions.downloads: true` (new grant, default-deny, parsed in `app-permissions.js`)
+  makes saves frictionless. Blob URL revoked after 60 s. Filename: caller override or
+  basename, separator/control-char-sanitised, 200-char cap.
 
 ### SGit View — Commit Detail + Diff (2026-06-15)
 
