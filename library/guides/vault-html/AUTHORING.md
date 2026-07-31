@@ -783,10 +783,48 @@ frictionless saves (e.g. a downloads page where saving is the whole point).
   `No such file: <path>`, or `EPERM` / `EPROTECTED` codes.
 - **Direct vault-file URLs are banned in app markup.** `<a href="/exports/x.pdf" download>` or
   `<iframe src="/exports/x.pdf">` cannot work — vault files are encrypted objects, not URLs;
-  the href resolves against the static host and answers `AccessDenied`. For inline previews of
-  binary vault content, read the bytes over the bridge and use a blob URL
-  (`URL.createObjectURL(new Blob([buf], {type}))` → `iframe.src` / `img.src`) — blob *display*
-  works fine in-frame; it is only the *download* that needs the host.
+  the href resolves against the static host and answers `AccessDenied`. For inline **images**,
+  read the bytes over the bridge and use a blob URL (or just assign `img.src` — the bridge
+  patches it). For PDFs, see the next section — a blob iframe is NOT enough.
+
+---
+
+## Displaying PDFs inline — verified 2026-07-31
+
+The obvious pattern — `sg.vfs.read` → `Blob` → `URL.createObjectURL` → `<iframe src>` —
+**does not work in App Mode**: Chromium refuses to load its PDF viewer inside a sandboxed
+frame that lacks `allow-same-origin` (you get the grey sad-document placeholder). Verified
+empirically with the exact App Mode sandbox (`allow-scripts allow-forms`): identical markup
+renders fine unsandboxed, is blocked in-frame. This is also why the same blob-iframe pattern
+*does* work in the host's own file-preview overlay (`vault-file-preview`) — that surface runs
+at the real origin. There is no sandbox token short of `allow-same-origin` (never granted —
+it would collapse the app isolation boundary) that re-enables the viewer.
+
+What actually works, in order of preference:
+
+1. **PDF.js rendered to canvas** — the real in-frame PDF experience:
+   ```js
+   await sg.loadJs('assets/pdf.min.js');            // classic/UMD build — ESM import() 404s
+   const wsrc = await sg.vfs.readText('assets/pdf.worker.min.js');
+   pdfjsLib.GlobalWorkerOptions.workerSrc =
+       URL.createObjectURL(new Blob([wsrc], { type: 'text/javascript' }));   // blob worker
+   const data = await sg.vfs.read('docs/report.pdf');
+   const pdf  = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
+   const page = await pdf.getPage(1);
+   const vp   = page.getViewport({ scale: 1.5 });
+   canvas.width = vp.width; canvas.height = vp.height;
+   await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+   ```
+   (`new Worker('path')` against a vault path 404s — hence the blob worker; PDF.js also
+   falls back to a main-thread "fake worker" if you skip `workerSrc`.)
+2. **Pre-rasterise at build time** (`pdftoppm` / PyMuPDF → one image per page in the vault,
+   rendered via `img.src`) — zero runtime dependencies, loses text selection.
+3. **`sg.vfs.download('docs/report.pdf')`** — hand the file to the OS viewer instead of
+   rendering inline. One call, host-fulfilled (see "Downloading files").
+
+PROPOSED — does not exist yet: `sg.ui.preview(path)`, a host-fulfilled overlay that reuses
+the real-origin `vault-file-preview` component (where the blob iframe works), giving apps
+one-call inline PDF preview with no bundled renderer.
 
 ---
 
