@@ -2333,6 +2333,92 @@
             }
         }
 
+        // sg.ui.preview overlay — HOST document quick-look. Lives in host DOM (sibling of the
+        // app iframe), so the app can neither draw nor dismiss it; the user always can (✕,
+        // Escape, backdrop click). One overlay at a time: a new call replaces the current one.
+        // Rendering happens at the REAL origin, which is the whole point for PDFs — Chromium
+        // refuses its PDF viewer inside the sandboxed app frame but runs it happily here.
+        // Returns the detected kind ('pdf'|'image'|'video'|'audio'|'text'|'binary').
+        _openHostPreview(fileName, buf) {
+            this._closeHostPreview();
+            var ext  = (fileName.lastIndexOf('.') > -1 ? fileName.slice(fileName.lastIndexOf('.') + 1) : '').toLowerCase();
+            var MIME = { pdf: 'application/pdf',
+                         jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+                         webp: 'image/webp', svg: 'image/svg+xml', avif: 'image/avif', bmp: 'image/bmp', ico: 'image/x-icon',
+                         mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+                         mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4' };
+            var kind = ext === 'pdf' ? 'pdf'
+                     : /^(jpg|jpeg|png|gif|webp|svg|avif|bmp|ico)$/.test(ext) ? 'image'
+                     : /^(mp4|webm|mov)$/.test(ext) ? 'video'
+                     : /^(mp3|wav|ogg|m4a)$/.test(ext) ? 'audio'
+                     : 'text';
+            var self = this;
+            var wrap = document.createElement('div');
+            wrap.id = 'sg-host-preview';
+            wrap.setAttribute('role', 'dialog');
+            wrap.setAttribute('aria-label', 'File preview: ' + fileName);
+            wrap.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(8,10,20,.82);display:flex;flex-direction:column;';
+            var head = document.createElement('div');
+            head.style.cssText = 'display:flex;align-items:center;gap:.75rem;padding:.5rem .9rem;background:#141a2a;color:#dfe6f3;font:600 13px/1.4 system-ui,sans-serif;';
+            var title = document.createElement('span');
+            title.textContent = fileName; title.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;';
+            var close = document.createElement('button');
+            close.textContent = '✕'; close.setAttribute('aria-label', 'Close preview');
+            close.style.cssText = 'background:none;border:1px solid #3a4460;border-radius:6px;color:#dfe6f3;cursor:pointer;font-size:13px;padding:.2rem .6rem;';
+            close.addEventListener('click', function () { self._closeHostPreview(); });
+            head.appendChild(title); head.appendChild(close);
+            var body = document.createElement('div');
+            body.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:0;min-height:0;';
+            wrap.appendChild(head); wrap.appendChild(body);
+
+            var url = null;
+            try {
+                if (kind === 'text') {
+                    // Decode defensively; if it's not really text, fall through to binary notice.
+                    var txt = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+                    if (/�[\s\S]*�[\s\S]*�/.test(txt.slice(0, 2000))) { kind = 'binary'; }
+                    else {
+                        var pre = document.createElement('pre');
+                        pre.textContent = txt;
+                        pre.style.cssText = 'margin:0;padding:1rem 1.2rem;width:100%;height:100%;overflow:auto;box-sizing:border-box;background:#0d1120;color:#e2e8f0;font:12px/1.55 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word;';
+                        body.appendChild(pre);
+                    }
+                }
+                if (kind === 'pdf' || kind === 'image' || kind === 'video' || kind === 'audio') {
+                    url = URL.createObjectURL(new Blob([buf], { type: MIME[ext] || 'application/octet-stream' }));
+                    var el;
+                    if (kind === 'pdf')        { el = document.createElement('iframe'); el.style.cssText = 'width:100%;height:100%;border:0;background:#fff;'; }
+                    else if (kind === 'image') { el = document.createElement('img');    el.alt = fileName; el.style.cssText = 'max-width:96%;max-height:96%;object-fit:contain;'; }
+                    else if (kind === 'video') { el = document.createElement('video');  el.controls = true; el.style.cssText = 'max-width:96%;max-height:96%;'; }
+                    else                       { el = document.createElement('audio');  el.controls = true; }
+                    el.src = url;
+                    body.appendChild(el);
+                }
+                if (kind === 'binary') {
+                    var note = document.createElement('div');
+                    note.style.cssText = 'color:#aeb6c6;font:13px/1.6 system-ui,sans-serif;text-align:center;padding:2rem;';
+                    note.textContent = 'No inline preview for this file type — use sg.vfs.download to save it.';
+                    body.appendChild(note);
+                }
+            } catch (_) { kind = 'binary'; }
+
+            var onKey = function (ev) { if (ev.key === 'Escape') self._closeHostPreview(); };
+            wrap.addEventListener('click', function (ev) { if (ev.target === wrap || ev.target === body) self._closeHostPreview(); });
+            document.addEventListener('keydown', onKey);
+            this._hostPreview = { el: wrap, url: url, onKey: onKey };
+            document.body.appendChild(wrap);
+            return kind;
+        }
+
+        _closeHostPreview() {
+            var p = this._hostPreview;
+            if (!p) return;
+            this._hostPreview = null;
+            try { document.removeEventListener('keydown', p.onKey); } catch (_) {}
+            try { p.el.remove(); } catch (_) {}
+            if (p.url) { try { URL.revokeObjectURL(p.url); } catch (_) {} }
+        }
+
         // Source for sg.vault.embed(), injected into the app bridge. The pure src-building
         // and sandbox-sanitisation come from the unit-tested SgEmbed module (injected verbatim
         // via Function.toString — the shipped code IS the tested code). The handshake glue is
@@ -2699,7 +2785,13 @@
                       'message:function(text,type,opts){opts=opts||{};var h=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);var ttl=opts.ttl===null?null:(typeof opts.ttl==="number"?opts.ttl:3000);window.parent.postMessage({__sgUiMsg:{handle:h,text:String(text||""),msgType:type||"info",ttl:ttl}},"*");return h;},' +
                       'dismiss:function(h){window.parent.postMessage({__sgUiMsg:{handle:h,dismiss:true}},"*");},' +
                       // ask the user (on the HUD) to grant a declared-but-consent-gated verb; resolves {granted}
-                      'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});}' +
+                      'requestPermission:function(verb,path){return _sgCmd("ui",{action:"requestPermission",verb:verb,path:path});},' +
+                      // sg.ui.preview — host-rendered "quick look" overlay for a vault file.
+                      // Same permission chain as vfs.read, nothing more (consent gates effects
+                      // that outlive the page; ephemeral display of readable content is free).
+                      // PDFs render in the HOST document, where Chromium allows its PDF viewer
+                      // (blocked inside this sandboxed frame — see AUTHORING "Displaying PDFs").
+                      'preview:function(path){return _sgCmd("ui",{action:"preview",path:path});}' +
                     '},' +
                     // sg.state.* — device-local preferences (theme, panel widths, "don't show again"
                     // dismissals). Backed by the TOP-LEVEL kernel's localStorage, namespaced as
@@ -3151,6 +3243,33 @@
                             } else {
                                 cmdReply(true, { granted: true }); self._emitBridgeCall('ui.requestPermission', { verb: rVerb, ok: true, granted: true });
                             }
+                            return;
+                        }
+                        // sg.ui.preview — host-side quick-look overlay. Permission chain is
+                        // EXACTLY vfs.read's (floor → mounts → fs.read): if the app can read
+                        // the bytes, it can ask the host to display them. No grant, no
+                        // confirm — the bytes never leave the browser and the overlay is host
+                        // DOM the app can't reach (can't fake chrome, can't suppress the ✕).
+                        if (uiAct === 'preview') {
+                            var pvPath     = e.data.path || '';
+                            var pvResolved = pvPath.startsWith('/') ? pvPath.slice(1) : self._resolvePath(self._htmlDir, pvPath);
+                            if (AppPermissions.isFloor('read', pvResolved)) { cmdReply(false, null, 'Protected path'); self._emitBridgeCall('ui.preview', { path: pvResolved, ok: false, err: 'EPROTECTED' }); return; }
+                            if (!self._can('fs.read', pvResolved)) { cmdReply(false, null, 'Permission denied'); self._emitBridgeCall('ui.preview', { path: pvResolved, ok: false, err: 'EPERM' }); return; }
+                            var pvBytes = (self._mounts && self._mounts.resolve(pvResolved))
+                                ? self._handleVfsViv('read', { path: pvResolved })
+                                : compositeReady.then(function () { return ensureMountOpen(pvResolved); }).then(function () {
+                                      var m = self._findEntryStrict(dataSource.getFileList(), pvResolved);
+                                      if (!m) { var e2 = new Error('No such file: ' + pvResolved); e2.code = 'ENOENT'; throw e2; }
+                                      return dataSource.getFileBytes(m.path);
+                                  });
+                            pvBytes.then(function (buf) {
+                                var kind = self._openHostPreview(pvResolved.split('/').pop() || pvResolved, buf);
+                                cmdReply(true, { ok: true, path: pvResolved, type: kind, bytes: buf.byteLength });
+                                self._emitBridgeCall('ui.preview', { path: pvResolved, type: kind, bytes: buf.byteLength, ok: true });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || 'Preview failed');
+                                self._emitBridgeCall('ui.preview', { path: pvResolved, ok: false, err: (err && err.code) || (err && err.message) });
+                            });
                             return;
                         }
                         cmdReply(false, null, 'Unsupported ui action: ' + uiAct);

@@ -137,6 +137,10 @@ window.sg = {
         // top-level kernel's localStorage so repeated calls don't re-prompt. vault.delete
         // ALWAYS re-confirms regardless of cache.
         requestPermission: (verb, path) => Promise<{granted: boolean}>,
+        // Host-rendered "quick look" overlay for a vault file (NEW 2026-07-31). Same
+        // permission chain as vfs.read, no confirm. PDFs work here (host origin) — they
+        // are blocked in-frame. kind: 'pdf'|'image'|'video'|'audio'|'text'|'binary'.
+        preview          : (path) => Promise<{ok, path, type, bytes}>,
     },
     // Mutations against the host vault — gated by app.json `permissions.fs.*` grants
     // AND a user-consent overlay on first call per (vault, appId, verb). Reads use the
@@ -802,6 +806,19 @@ it would collapse the app isolation boundary) that re-enables the viewer.
 
 What actually works, in order of preference:
 
+0. **`sg.ui.preview(path)` — one call, host-fulfilled (NEW 2026-07-31, the default choice).**
+   ```js
+   await sg.ui.preview('docs/report.pdf');   // → {ok, path, type: 'pdf', bytes}
+   ```
+   The host reads the bytes through the vfs.read permission chain and renders a modal
+   quick-look overlay in **its own document** — real origin, so Chrome's native PDF viewer
+   works (toolbar, zoom, text selection). Also previews images, video, audio, and text.
+   No grant and no confirm: the bytes never leave the browser, and the overlay is host DOM
+   the app can't fake or suppress (user closes via ✕ / Escape / backdrop). One overlay at a
+   time — a new call replaces the current one. Errors mirror `vfs.read`
+   (`ENOENT`/`EPERM`/`EPROTECTED`). Use the options below only when the PDF must render
+   *inside your own layout* rather than as an overlay:
+
 1. **PDF.js rendered to canvas** — the real in-frame PDF experience:
    ```js
    await sg.loadJs('assets/pdf.min.js');            // classic/UMD build — ESM import() 404s
@@ -821,10 +838,6 @@ What actually works, in order of preference:
    rendered via `img.src`) — zero runtime dependencies, loses text selection.
 3. **`sg.vfs.download('docs/report.pdf')`** — hand the file to the OS viewer instead of
    rendering inline. One call, host-fulfilled (see "Downloading files").
-
-PROPOSED — does not exist yet: `sg.ui.preview(path)`, a host-fulfilled overlay that reuses
-the real-origin `vault-file-preview` component (where the blob iframe works), giving apps
-one-call inline PDF preview with no bundled renderer.
 
 ---
 

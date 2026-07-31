@@ -488,6 +488,18 @@ review `team/roles/architect/reviews/07/30/v0.33.43__review__in-app-nav-click-in
   `permissions.downloads: true` (new grant, default-deny, parsed in `app-permissions.js`)
   makes saves frictionless. Blob URL revoked after 60 s. Filename: caller override or
   basename, separator/control-char-sanitised, 200-char cap.
+- **`sg.ui.preview(path)`** (same day, follow-on) — host-rendered quick-look overlay
+  (`app-shell._openHostPreview`/`_closeHostPreview`). Permission chain is exactly
+  `vfs.read`'s (floor → mounts → `fs.read`); **no grant, no confirm** — consent gates
+  effects that outlive the page (writes/downloads/popups), not ephemeral display of
+  readable content. Renders at the REAL origin, which is what makes PDFs work: verified
+  empirically (headless-Chromium screenshot matrix, 2026-07-31) that Chromium blocks its
+  PDF viewer inside the sandboxed app frame while identical blob-iframe markup renders
+  unsandboxed. Kinds: pdf (blob iframe), image, video, audio, text (`<pre>`), binary
+  (notice → use download). Host DOM overlay (app can't draw/dismiss it; user closes via
+  ✕/Escape/backdrop), one-at-a-time, blob URL revoked on close. Returns
+  `{ok, path, type, bytes}`; errors mirror `vfs.read`. Pins in
+  `test__app_shell_bridge_build.js` (24 assertions total incl. jsdom overlay behaviour).
 
 ### SGit View — Commit Detail + Diff (2026-06-15)
 

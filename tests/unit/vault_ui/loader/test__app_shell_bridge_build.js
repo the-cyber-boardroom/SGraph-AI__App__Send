@@ -93,5 +93,29 @@ console.log('\n[suite] app-shell — sg.vfs.download (host-fulfilled downloads)'
         AppPermissions.parsePermissions({ permissions: { downloads: 'yes' } }).downloads === false);
 }
 
+console.log('\n[suite] app-shell — sg.ui.preview (host quick-look overlay)');
+{
+    const src = makeShell(AppPermissions.parsePermissions(null))._buildVfsBridgeScript('index.html');
+    ok('bridge exposes sg.ui.preview', /preview:function\(path\)/.test(src) && /_sgCmd\("ui",\{action:"preview"/.test(src));
+
+    // Behavioural: the overlay mounts in HOST DOM, renders text inline, closes cleanly.
+    if (!window.URL.createObjectURL) window.URL.createObjectURL = () => 'blob:fake';
+    if (!window.URL.revokeObjectURL) window.URL.revokeObjectURL = () => {};
+    const el   = makeShell(AppPermissions.parsePermissions(null));
+    const kind = el._openHostPreview('notes.md', new TextEncoder().encode('# hello preview').buffer);
+    const ov   = document.getElementById('sg-host-preview');
+    ok('text file → kind "text"', kind === 'text');
+    ok('overlay mounted in host document', !!ov);
+    ok('text content rendered in <pre>', !!ov && /hello preview/.test(ov.querySelector('pre')?.textContent || ''));
+
+    const kind2 = el._openHostPreview('doc.pdf', new Uint8Array([37, 80, 68, 70]).buffer);   // replaces first
+    ok('pdf file → kind "pdf" with iframe', kind2 === 'pdf'
+        && !!document.getElementById('sg-host-preview')?.querySelector('iframe'));
+    ok('one-at-a-time: only one overlay in DOM', document.querySelectorAll('#sg-host-preview').length === 1);
+
+    el._closeHostPreview();
+    ok('close removes the overlay', !document.getElementById('sg-host-preview'));
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
