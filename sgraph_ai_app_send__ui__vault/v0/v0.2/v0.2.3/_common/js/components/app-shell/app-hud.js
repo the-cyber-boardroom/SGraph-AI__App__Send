@@ -444,6 +444,41 @@
             disBtn.addEventListener('click', onDis);
         }
 
+        // Download confirm — same host-chrome bar as promptExternalLink, different copy.
+        // onDecision(true|false) ALWAYS fires (dismiss included) so the app's
+        // sg.vfs.download promise can settle instead of hanging. The confirm click is the
+        // user gesture the host's <a download> click runs inside. Called by
+        // app-shell for apps that lack the `downloads` grant.
+        promptDownload(filename, sizeLabel, onDecision) {
+            const bar     = this.shadowRoot.querySelector('.hud-extlink-bar');
+            const labelEl = this.shadowRoot.querySelector('.hud-extlink-label');
+            const urlEl   = this.shadowRoot.querySelector('.hud-extlink-url');
+            const iconEl  = this.shadowRoot.querySelector('.hud-extlink-icon');
+            const openBtn = this.shadowRoot.querySelector('.hud-extlink-open');
+            const disBtn  = this.shadowRoot.querySelector('.hud-extlink-dismiss');
+            if (!bar || !urlEl || !openBtn || !disBtn) { try { onDecision && onDecision(true); } catch (_) {} return; }
+
+            const prev = { label: labelEl && labelEl.textContent, icon: iconEl && iconEl.textContent, btn: openBtn.textContent };
+            if (labelEl) labelEl.textContent = 'This app wants to save a file to your device:';
+            if (iconEl)  iconEl.textContent  = '⬇';
+            openBtn.textContent = 'Download ⬇';
+            urlEl.textContent   = filename + (sizeLabel ? ' (' + sizeLabel + ')' : '');
+            bar.style.display   = '';
+            const done = (go) => {
+                bar.style.display = 'none';
+                if (labelEl) labelEl.textContent = prev.label;
+                if (iconEl)  iconEl.textContent  = prev.icon;
+                openBtn.textContent = prev.btn;
+                openBtn.removeEventListener('click', onGo);
+                disBtn.removeEventListener('click', onNo);
+                try { onDecision && onDecision(go); } catch (_) {}    // confirm runs inside this click gesture
+            };
+            const onGo = () => done(true);
+            const onNo = () => done(false);
+            openBtn.addEventListener('click', onGo);
+            disBtn.addEventListener('click', onNo);
+        }
+
         requestConsent(verb, path, cb) {
             const bar    = this.shadowRoot.querySelector('.hud-consent-bar');
             const t      = this.shadowRoot.querySelector('.hud-consent-text');

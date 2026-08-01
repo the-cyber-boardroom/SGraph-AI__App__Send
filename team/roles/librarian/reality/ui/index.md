@@ -1,6 +1,6 @@
 # ui — Reality Index
 
-**Domain:** `ui/` | **Last updated:** 2026-06-12 | **Maintained by:** Librarian (daily run)
+**Domain:** `ui/` | **Last updated:** 2026-07-31 | **Maintained by:** Librarian (daily run)
 
 As of v0.4.0 (May 2026), the sender and receiver UIs are split into separate packages
 (`sgraph_ai_app_send__ui__share/` and `sgraph_ai_app_send__ui__open/`). The v0.3.x user
@@ -239,7 +239,7 @@ Lightweight vault app host. Lifecycle: parse hash → open vault → read `app.j
 
 - **In-vault nav row V1 (SHIPPED 30 May 2026).** Browser-style toolbar inside the HUD: back / forward / refresh arrows + path display (with `#fragment` highlighted in teal) + copy-path button + ⋯ recent-pages menu (last 15, chronological, no dedup). The HUD never owns history; it dispatches `app-hud:nav` `{action: back|forward|reload|jump|exit, path?}` and renders state pushed back via `app-nav:change` from `<app-shell>`. Type-to-jump address-bar autocomplete is **NOT** in V1 — deferred to a follow-up. **Hash-link bug fix:** the iframe click interceptor in `app-shell._buildVfsBridgeScript` now strips `?`/`#` before its `.html`/`.htm` extension check, so `pages/x.html#section` links are intercepted instead of falling through to a 403. The fragment is forwarded and applied via `__sgVfsScrollToHash` on `DOMContentLoaded` (null-origin safe). Friendly broken-link overlay replaces the prior console-warn dead-end. **Bug fixes shipped (follow-up commits):** path-doubling fixed (`alreadyResolved:true` flag for history-entry navigations); recent-pages close-on-open fixed (one-shot outside-click listener on next event-loop turn); Home button added; editable URL bar display.
 - **`app.json` `hud.*` config schema (SHIPPED 30 May 2026; `none` mode + redesign 11 Jun 2026).** `hud.mode ∈ {full, minimal, hidden, none}` (default `full`) + `hud.show.{vaultName,appTitle,openVault,copyLink,print,debug,navBar,navArrows,navPath,navRefresh}` granular flags. `mode:"hidden"` collapses the chrome (iframe takes 100% viewport) but keeps the corner `× Exit app` pill; **`mode:"none"` (NEW)** drops the pill too — no visual clue it's a vault app, URL is the only way back (author-opt-in, e.g. patient forms). `minimal` now keeps **Open Vault** on by default (a stripped HUD still needs a visible way back). **Right-cluster redesign (11 Jun):** Copy Link / Print / Debug collapsed into a `⋯` overflow menu; the privileges chip is now a compact `🔒 N` that expands on click to a risk-tiered popover (destructive verbs — delete files/unlink/delete vaults — flagged amber, sorted last) with a "Reset granted consents" button. **Privileges chip colour semantics (11 Jun 2026):** standing chip is **slate** (informational) by default; lifts to **amber** when destructive grants (`vault.delete`, `vault.unlink`, `move`, `delete`) are held. Active-prompt red (consent bar) and error-red (activity meter `pulse-err`) are unchanged — red is reserved for those live-alert surfaces only. **File-activity meter (NEW, `show.activity`; full-default on, minimal/hidden/none off):** a compact `⇅ R N  W N` chip tallying files read (`vfs.read`/`vfs.list`) vs written (`vfs.write`/`fs.move`/`fs.delete`/`fs.mkdir`) this session, flashing green/red per op, expanding to the last 15 ops (path · size · ms · outcome). Pure consumer of the `app-debug:bridge-call` event the kernel already emits — no kernel/bridge change; transparency surface for the power-user audience. **Sovereignty rail (apps cannot suppress):** (1) the consent prompt always renders — it's now a **full-width consent bar that is a sibling of the chrome row** (`.hud-consent-bar`), so it shows even in `hidden`/`none`; message wraps (never truncates), shows the app's standing grants, focuses **Deny** by default (Esc=deny), risk-tiered colour; (2) a corner `× Exit app` pill persists in `hidden` (NOT `none`); (3) user-side override `localStorage['sg-app-force-show-hud']='1'` forces `mode:"full"`, upgrading **both** `hidden` and `none`. Resolved by `AppHudConfig.resolve(cfg)` (see below). Applied via `hud.applyHudConfig(cfg)` on `app-shell:ready`.
-- **`sg.state.*` bridge namespace (SHIPPED 30–31 May 2026).** New namespace exposed to every app frame: `sg.state.get(key)`, `sg.state.set(key, value)`, `sg.state.remove(key)`, `sg.state.list()`. Backed by kernel `localStorage` (device-local; not part of the vault; persists across vault navigations in the same app). Allows apps to store user preferences (dark mode, layout) without vault commits. Added to `app-shell.js` in Commit B alongside the print bridge-RPC fix.
+- **`sg.state.*` bridge namespace (SHIPPED 30–31 May 2026).** New namespace exposed to every app frame: `sg.state.get(key)`, `sg.state.set(key, value)`, `sg.state.remove(key)`, `sg.state.clear()`, `sg.state.keys()` (the enumerate method is `keys()`, not `list()`). Backed by kernel `localStorage` (device-local; not part of the vault; persists across vault navigations in the same app). Allows apps to store user preferences (dark mode, layout) without vault commits. Added to `app-shell.js` in Commit B alongside the print bridge-RPC fix.
 - **Print bridge-RPC (SHIPPED Commit B, 30 May 2026).** `sg.shell.print` RPC: app iframe posts its rendered HTML via `postMessage`; parent reconstructs a blob URL and invokes `window.print()`. Null-origin safe (does not read `iframe.contentDocument`). The initial Print button (Commit A) read `contentDocument` directly which throws `SecurityError` under Phase 3 null-origin frames; Commit B replaced it with this bridge-RPC path.
 - **New `<app-shell>` nav surface**: `_navigateToPath(href, {alreadyResolved, pushHistory})`, `_pushNavHistory`, `_navBack`, `_navForward`, `_navReload`, `_canNavBack`, `_canNavForward`, `_currentNavPath`, `_renderBrokenLinkOverlay(path, reason)`, `_exitApp`, `_emitNavChange`. Nav history seeded with entry path on `_mountApp`; forward stack truncated on new nav.
 
@@ -473,6 +473,44 @@ Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-
 **Changelog:** `team/comms/changelog/05/27/v0.27.79__changelog__app-perms-phase{1..4b}*.md`
 
 ---
+
+### App-Mode Click Interceptor Fixes + `sg.vfs.download` (2026-07-31)
+
+Shipped in `app-shell.js` / `app-hud.js` / `app-permissions.js` (bundle regenerated); unit
+pins in `tests/unit/vault_ui/loader/test__app_shell_bridge_build.js`. Follows the architect
+review `team/roles/architect/reviews/07/30/v0.33.43__review__in-app-nav-click-interceptor-proposals.md`
+(proposals 3, 1, 2 adopted; 5a/4/5b remain PROPOSED).
+
+- **Interceptor opt-out (proposal 1).** The injected click interceptor returns early when
+  `e.defaultPrevented` is set (window-capture app listeners win) or the anchor carries
+  `data-sg-native`. Applies to every branch (vault-nav and external).
+- **Bare-`#` anchors claimed (proposal 2).** `<a href="#id">` clicks are now
+  `preventDefault`-ed and scrolled in-frame (`getElementById` → `scrollIntoView`); a miss is
+  a no-op. Previously the browser default re-navigated the null-origin srcdoc frame to the
+  host entry page (vault-key screen). No `stopPropagation` — app listeners still see the event.
+- **`location.hash` miss-fallback removed (proposal 3).** The `__sgVfsScrollToHash` listener
+  no longer assigns `location.hash` when the target id is missing (that assignment was a
+  cross-document re-navigation in srcdoc frames — live bug). A miss is now a no-op.
+- **`sg.vfs.download(path, {filename?})`** — host-fulfilled save-to-device. Bytes take the
+  same guarded read path as `vfs.read` (floor → mounts → `fs.read` grant); the `<a download>`
+  click runs in the host document, so the app sandbox needs no `allow-downloads` token.
+  Consent: one-click HUD confirm per file (`app-hud.promptDownload`, reuses the extlink bar
+  with download copy; dismiss rejects `'Download not approved'`); `app.json`
+  `permissions.downloads: true` (new grant, default-deny, parsed in `app-permissions.js`)
+  makes saves frictionless. Blob URL revoked after 60 s. Filename: caller override or
+  basename, separator/control-char-sanitised, 200-char cap.
+- **`sg.ui.preview(path)`** (same day, follow-on) — host-rendered quick-look overlay
+  (`app-shell._openHostPreview`/`_closeHostPreview`). Permission chain is exactly
+  `vfs.read`'s (floor → mounts → `fs.read`); **no grant, no confirm** — consent gates
+  effects that outlive the page (writes/downloads/popups), not ephemeral display of
+  readable content. Renders at the REAL origin, which is what makes PDFs work: verified
+  empirically (headless-Chromium screenshot matrix, 2026-07-31) that Chromium blocks its
+  PDF viewer inside the sandboxed app frame while identical blob-iframe markup renders
+  unsandboxed. Kinds: pdf (blob iframe), image, video, audio, text (`<pre>`), binary
+  (notice → use download). Host DOM overlay (app can't draw/dismiss it; user closes via
+  ✕/Escape/backdrop), one-at-a-time, blob URL revoked on close. Returns
+  `{ok, path, type, bytes}`; errors mirror `vfs.read`. Pins in
+  `test__app_shell_bridge_build.js` (24 assertions total incl. jsdom overlay behaviour).
 
 ### SGit View — Commit Detail + Diff (2026-06-15)
 

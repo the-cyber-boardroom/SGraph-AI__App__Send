@@ -6,11 +6,14 @@ This guide is for anyone — human or AI — writing HTML files that will be sto
 > **deny-by-default** and must be declared in `app.json` `permissions`; `.vault/**` is off-limits.
 > Migrating an existing app? Read **[MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)** first.
 
-> **Verified against the live bridge (`app-shell.js`) on 2026-05-26.** Corrections from the previous
-> revision: vault-relative `fetch()` is **not** auto-routed (use `sg.vfs.read`/`readText`); only an
-> `img.src = …` assignment **from JS** is intercepted (a declarative `<img src>` in the initial HTML
-> is **not**); the ready-log-line text was updated. New: `sg.sync` / `sg.auth` / `sg.ui` / `sg.history`
-> are documented, plus reading **sub-vaults**.
+> **Verified against the live bridge (`app-shell.js` v0.2.3) on 2026-07-30.** Newly documented in
+> this revision: `sg.append.*` (renamed from `sg.inbox.*` on 2026-06-15 — the write verb is `write`),
+> `sg.on`/`sg.off` host events, the expanded `sg.vault.*` verb set (`getKey`, `setAccessToken`,
+> `openApp`, `list`, `notify`), the current `vault.create(opts)` signature, and `sg.app.context`/
+> `totalSize`. Earlier corrections retained: vault-relative `fetch()` is **not** auto-routed (use
+> `sg.vfs.read`/`readText`); only an `img.src = …` assignment **from JS** is intercepted (a
+> declarative `<img src>` in the initial HTML is **not**). `sg.sync` / `sg.auth` / `sg.ui` /
+> `sg.history` / sub-vaults are documented below.
 
 > **TL;DR.** Inside a vault iframe, you cannot write `<link rel="stylesheet" href="theme.css">` or `<script src="helper.js"></script>` against vault-relative paths. Instead, call `sg.loadCss('theme.css')` or `sg.loadJs('helper.js')` at runtime. To read data, use **`sg.vfs.readText('cities.json')`** — a plain `fetch()` of a vault path does **not** work. `<a href="other.html">` navigation and `img.src = 'photo.png'` set **from JS** work automatically.
 
@@ -40,13 +43,15 @@ Anything that goes through a JavaScript API works without modification:
 
 | Pattern | Status | Why |
 |---|---|---|
-| `window.sg.vfs.read(path)` / `readText` / `list` / `write` | ✅ Works | Custom postMessage protocol — **the supported way to read/write vault data** |
+| `window.sg.vfs.read(path)` / `readText` / `list` / `write` / `download` | ✅ Works | Custom postMessage protocol — **the supported way to read/write/save vault data** |
+| `<a href="#section">` (clicked) | ✅ Works | Fixed 2026-07-31 — the interceptor scrolls in-frame (the browser default is broken in srcdoc frames). `location.hash` assignment from JS remains banned. |
+| `data-sg-native` on an anchor, or `preventDefault` in window-capture | ✅ Works | Added 2026-07-31 — sanctioned opt-out; the host never claims such clicks |
 | `sg.loadCss(path)` / `sg.loadJs(path)` | ✅ Works | loaders that read vault bytes over the bridge and inject `<style>`/`<script>` |
 | `img.src = 'photo.png'` (assigned **from JS**) | ✅ Works | `HTMLImageElement.prototype.src` setter is patched to decrypt + serve a `blob:` |
 | `<a href="other.html">` (clicked) | ✅ Works | Click handler postMessages parent, which re-renders the iframe |
 | `<a href="other.html#section">` (clicked) | ✅ Works | Fixed 2026-05-30 — the `?query`/`#fragment` is stripped before the extension check; the fragment is forwarded and scrolled-to in the new doc |
 | `<a href="https://example.com">` (clicked) | ✅ Opens in a new tab | Default: a one-click host confirm opens it (no escape-sandbox). Opt into frictionless in-frame open with `permissions.externalLinks: true`. See "What the host does for you". |
-| `sg.fs.*`, `sg.vault.*`, `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*`, `sg.state.*` | ✅ Works | postMessage command protocol (see below) |
+| `sg.fs.*`, `sg.vault.*`, `sg.history.*`, `sg.sync.*`, `sg.auth.*`, `sg.ui.*`, `sg.state.*`, `sg.append.*`, `sg.on`/`sg.off` | ✅ Works | postMessage command protocol (see below) |
 
 If you stick to these patterns, your page just works.
 
@@ -84,18 +89,22 @@ Every vault HTML file gets a `<script>` injected into its `<head>` that exposes:
 window.sg = {
     vfs: {
         write   : (path, content)        => Promise<{path, size}>,   // string | Uint8Array | ArrayBuffer
-        read    : (path)                  => Promise<ArrayBuffer>,
+        read    : (path)                  => Promise<ArrayBuffer>,    // raw bytes; no read-size cap
         readText: (path)                  => Promise<string>,
         list    : (prefix)                => Promise<[{path,name,size,type}]>,
+        // Save a vault file to the user's device (host-fulfilled — see "Downloading files").
+        download: (path, opts?)           => Promise<{ok, path, filename, bytes}>,  // opts: {filename}
     },
     loadCss : (path) => Promise<HTMLStyleElement>,    // load + inject CSS
     loadJs  : (path) => Promise<HTMLScriptElement>,   // load + execute JS
     app: {
+        context  : 'app',               // 'app' in the /en-gb/app/ surface ('preview' planned for the editor's inline preview)
         selfPath : 'demos/hub.html',    // path of the currently-open file
         writable : true,                // false for read-only (share-token / sub-vault) views
         vaultName: 'My Vault',
         vaultId  : 'abcd1234',
         fileCount: 12,
+        totalSize: 0,                   // reserved (currently always 0)
     },
     // History — read past commits / trees / blobs (read-only). See "Reading history".
     history: {
@@ -128,6 +137,10 @@ window.sg = {
         // top-level kernel's localStorage so repeated calls don't re-prompt. vault.delete
         // ALWAYS re-confirms regardless of cache.
         requestPermission: (verb, path) => Promise<{granted: boolean}>,
+        // Host-rendered "quick look" overlay for a vault file (NEW 2026-07-31). Same
+        // permission chain as vfs.read, no confirm. PDFs work here (host origin) — they
+        // are blocked in-frame. kind: 'pdf'|'image'|'video'|'audio'|'text'|'binary'.
+        preview          : (path) => Promise<{ok, path, type, bytes}>,
     },
     // Mutations against the host vault — gated by app.json `permissions.fs.*` grants
     // AND a user-consent overlay on first call per (vault, appId, verb). Reads use the
@@ -141,15 +154,35 @@ window.sg = {
     // cross-vault reads/writes through this kernel. Each verb is independently grantable
     // and consent-gated (vault.delete always re-confirms regardless of cache).
     vault: {
-        create  : (path, label)  => Promise<{vaultKey, path}>,
+        // create(opts) takes an opts OBJECT (matches mount(opts)):
+        //   { label, link: {path} | false, returnKey, custody, seedFrom, accessToken }
+        create  : (opts)         => Promise<{...}>,               // composed key only if returnKey
+        getKey  : (ref)          => Promise<{key}>,               // custodied key re-share (always-confirm consent)
+        setAccessToken: (ref, value) => Promise<{ok}>,            // value: 'inherit' | '<token>'
+        openApp : (ref, opts?)   => Promise<{ok}>,                // launch a vault as an app; opts: {deepLink, target}
+        list    : ()             => Promise<{vaults: [{ref_id, vault_id, label, tier}]}>,
         unlink  : (path)         => Promise<{ok: true}>,
-        delete  : (path)         => Promise<{ok: true}>,
+        delete  : (ref)          => Promise<{ok: true}>,
         mount   : ({prefix, ref, label}) => Promise<{mountId}>,
         unmount : (mountId)      => Promise<{ok: true}>,
         mounts  : ()             => Promise<[{mountId, prefix, label, ref}]>,
+        notify  : (mountId, name, payload) => Promise<{ok}>,      // wake a mounted child's append lane
         // Open ANOTHER vault inside an iframe in YOUR app. See "Embedding another vault".
         embed   : (mountEl, key, opts?) => Promise<{vaultName, fileCount, hasApp, iframe}>,
     },
+    // Append-only transport (renamed from sg.inbox.* on 2026-06-15; the write verb is `write`).
+    // Gated by app.json `permissions.append.*`. See "Receiving messages".
+    append: {
+        configure    : ({append_anchors})  => Promise<{...}>,
+        write        : ({vault_id, append_token, payload}) => Promise<{...}>,
+        list         : ({inbox, after_file_id, limit, include_content}) => Promise<{...}>,
+        fetch        : ({inbox, file_ids}) => Promise<{...}>,
+        markProcessed: ({inbox, file_ids}) => Promise<{...}>,
+        purge        : ({folder, inbox, file_ids}) => Promise<{...}>,
+    },
+    // Kernel→app events (gated by app.json `host_events` allowlist).
+    on : (name, cb) => void,     // e.g. sg.on('append.new-messages', cb) / 'append.error'
+    off: (name, cb) => void,
     // Device-local preferences for THIS app on THIS browser (NEW 2026-05-30).
     // Backed by the top-level kernel's localStorage, namespaced as
     // sg-app-state:<vaultId>:<appEntryPath>:<key>. Values are JSON-encoded, capped
@@ -319,13 +352,31 @@ Just use anchor tags. Click handling is intercepted automatically:
 <a href="https://example.com">External link — opens in a new tab</a>
 ```
 
+> **Bare-`#` anchors now work (fixed 2026-07-31)** — the host interceptor claims
+> `<a href="#section">` clicks and scrolls in-frame (`preventDefault` + `scrollIntoView`;
+> a missing target is a safe no-op). The browser default they used to fall through to is
+> broken in a null-origin `srcdoc` frame (the fragment resolves against the *inherited parent
+> base URL*, causing a real cross-document navigation to the vault-key screen), which is also
+> why **assigning `location.hash` from JS is still BANNED** — that's srcdoc spec behaviour the
+> host cannot intercept. Scroll with `element.scrollIntoView()` instead.
+> (Analysis: architect review `team/roles/architect/reviews/07/30/` on the click interceptor.)
+
+**Opting out of the interceptor (2026-07-31):** if your app wants to handle an anchor click
+itself, either call `e.preventDefault()` in a **window-capture** listener (it runs before the
+host's document-capture handler; the host now honours `e.defaultPrevented`), or mark the anchor
+`data-sg-native` — the host will never claim clicks on such anchors (any href form, including
+`.html` and external).
+
 **What the host does for you (so your app shouldn't reinvent these):**
 
 - **Hash anchors** — `<a href="page.html#section">` was historically broken (the `.html`
   endsWith check failed because the href ended in `#section`, the click fell through,
   the static host 403'd). Fixed 2026-05-30. The fragment is forwarded to the new srcdoc
-  and applied on `DOMContentLoaded` via a postMessage from the parent. Apps don't need
-  any workaround.
+  and applied on `DOMContentLoaded` via a postMessage from the parent. If the target id
+  doesn't exist yet (content rendered later from data) the scroll is a safe no-op — the
+  hazardous `location.hash` fallback that used to re-navigate the frame was removed
+  2026-07-31. Apps whose anchor targets render asynchronously should carry the target in
+  an `sg.state.*` stash and scroll after render.
 - **External links** (`http://`, `https://`, protocol-relative `//`) open in a new tab.
   Don't add `target="_blank"` — the host handles it. **By default** (least privilege) the
   app frame has **no** popup/escape-sandbox capability: clicking an external link surfaces a
@@ -342,8 +393,14 @@ Just use anchor tags. Click handling is intercepted automatically:
   app genuinely needs it — it's the one grant that lets the frame open an unsandboxed window,
   so default-off is the safe posture (see "Embedding another vault" for the same principle).
 - **`mailto:` and `javascript:`** are passed through unchanged.
-- **Pure-fragment links** (`<a href="#section">`) are passed through — the browser
-  scrolls within the current page without the host being involved.
+- **Pure-fragment links** (`<a href="#section">`) are claimed by the interceptor and scrolled
+  in-frame (fixed 2026-07-31 — the browser default is a broken cross-document navigation in a
+  null-origin srcdoc frame). A missing target is a no-op. Your app can still take over any
+  anchor with `data-sg-native` or a window-capture `preventDefault`.
+- **Query strings on vault links** (`<a href="page.html?node=42">`) are currently
+  **unsupported** — the query is not stripped before the file lookup, so the link lands on the
+  broken-link overlay. Carry cross-page state in the `#fragment` (delivered to the new doc) or
+  an `sg.state.*` stash instead.
 - **Friendly 404** — clicks pointing to files that don't exist (or are inside the
   `.vault/**` floor) land on a host-rendered "Page not found in this vault" overlay
   with a back arrow. You don't need to handle broken-link routing yourself.
@@ -608,6 +665,179 @@ const blob = await sg.history.readBlob('obj-cas-imm-…');
 Use it to build a "file history" view, a diff, or a "restore previous version" button (write the
 old bytes back with `sg.vfs.write` in a writable vault). History currently covers the **current
 vault**; reading a sub-vault's own history is a planned follow-on.
+
+---
+
+## Device-local app state (`sg.state.*`)
+
+Your app runs in a **null-origin sandboxed iframe**, so it has **no `localStorage` of its own** —
+`window.localStorage` throws on an opaque origin. When you need to remember something small on *this*
+device (theme choice, panel widths, a "don't show this again" flag, the last tab the user was on),
+`sg.state.*` gives you a key/value store **without a vault write**. Under the hood it postMessages the
+request to the top-level kernel, which owns the real `localStorage`, reads/writes on your behalf, and
+replies — the same bridge every other `sg.*` call uses. You never touch storage directly.
+
+```js
+await sg.state.set('theme', 'dark');          // value is JSON-encoded (any JSON-serialisable value)
+await sg.state.set('layout', { cols: 3, sort: 'name' });
+
+const theme  = await sg.state.get('theme');    // → 'dark'  (null if never set)
+const layout = await sg.state.get('layout');   // → { cols: 3, sort: 'name' }
+
+const keys   = await sg.state.keys();          // → ['theme', 'layout']  (just the key part)
+await sg.state.remove('theme');
+await sg.state.clear();                         // wipes only THIS app's keys → { ok: true, removed: N }
+```
+
+**Isolation.** Every key is stored under `sg-app-state:<vaultId>:<appEntryPath>:<key>`, so state is
+scoped **per-vault and per-app-entry-path**. One vault's apps can't read another's, and `clear()`
+only removes your app's slice — it never touches other apps' state. `keys()` returns the
+un-namespaced key part, so you read back exactly what you passed to `set()`.
+
+**Limits & safety.**
+
+- **64 KiB per key** (the JSON-encoded value). It's for *preferences*, not documents — a larger value
+  is rejected with `value too large (max 64 KiB)`.
+- `vaultId` is a **derived, non-secret** identifier — the vault **key is never** written to
+  localStorage. Don't put secrets (vault keys, access tokens) in `sg.state.*`.
+- Every op is wrapped in try/catch on the host side, so a quota or parse error returns a rejected
+  promise rather than breaking the bridge.
+
+### `sg.state.*` vs `sg.fs.write('.app-state/…')` — pick the right one
+
+This is the decision that trips people up. They are **not** interchangeable:
+
+| You want state that… | Use | Persistence | Travels with the vault? |
+|---|---|---|---|
+| Is a per-device **preference** (theme, panel sizes, dismissals) | **`sg.state.*`** | Kernel `localStorage` on **this browser** | ❌ No — device-local only |
+| Should **sync across devices** and be visible to anyone opening the same vault key | **`sg.fs.write('.app-state/…')`** | A real, encrypted **vault write** (a commit) | ✅ Yes — it *is* vault content |
+
+Rule of thumb: if losing it when the user switches browsers would be **fine** (or even expected),
+use `sg.state.*`. If losing it would be a **bug**, write it into the vault. Reach for `sg.state.*`
+specifically to avoid a vault commit on every trivial UI toggle.
+
+> **Why this exists as a separate namespace.** The device-local-prefs case deliberately deviates from
+> the "everything is a vault file" doctrine: a theme toggle shouldn't create a commit. Recorded in
+> `team/comms/changelog/05/30/changelog__app-state-print-rpc.md`.
+
+**No permission grant required.** Unlike `sg.fs.*` / `sg.vault.*`, `sg.state.*` needs no `app.json`
+`permissions` entry and no consent overlay — it's sandboxed to your own namespace in device-local
+storage and can't touch the vault or other apps. It works on **read-only opens too** (share-token /
+sub-vault views), since it never writes to the vault.
+
+---
+
+## Receiving messages (`sg.append.*` + `sg.on`)
+
+> **Renamed 2026-06-15** (v0.32.7): this transport was previously `sg.inbox.*` with an `append`
+> verb. It is now **`sg.append.*`** and the write verb is **`write`**. Update any older app code.
+
+The append transport lets a vault receive messages/files from other agents or vaults through an
+**append-only lane** that lives outside the version-controlled commit tree (raw vault-pointer API,
+not the commit/push flow). The kernel holds the keys and attaches the gate header per verb; your
+`app.json` `permissions.append.*` grants decide which verbs your app can call. Read-only sessions
+fail closed.
+
+```js
+// Verbs (all take a single opts object — see the API block above for fields):
+await sg.append.configure({ append_anchors: [...] });
+await sg.append.write({ vault_id, append_token, payload });      // send INTO another vault's lane
+const { entries } = await sg.append.list({ limit: 20 });
+await sg.append.fetch({ file_ids: [...] });
+await sg.append.markProcessed({ file_ids: [...] });
+await sg.append.purge({ file_ids: [...] });
+
+// Event push — declare in app.json: "host_events": ["append.new-messages", "append.error"]
+sg.on('append.new-messages', (evt) => { /* {total, per_anchor, entries, new_count, trigger} */ });
+sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ });
+```
+
+The kernel's checker runs on tab focus and app open — your app does not poll; it declares the
+`host_events` allowlist, subscribes with `sg.on`, and reacts.
+
+---
+
+## Downloading files (`sg.vfs.download`) — NEW 2026-07-31
+
+The sanctioned way to put a vault file in the user's Downloads folder:
+
+```js
+await sg.vfs.download('exports/report.pdf');                          // saves as report.pdf
+await sg.vfs.download('exports/report.pdf', { filename: 'EU-AI-Act.pdf' });
+// → {ok: true, path, filename, bytes}   ·   rejects: ENOENT / EPERM / EPROTECTED /
+//   'Download not approved' (user dismissed the confirm)
+```
+
+**How it works — and why you don't need `allow-downloads`.** The bytes travel the same guarded
+read path as `sg.vfs.read` (floor → mounts → `fs.read` grant), but the `<a download>` click
+happens in the **host document** (real origin, unsandboxed). The app frame's sandbox is
+untouched. This is deliberate: a blob-URL + programmatic-anchor download **inside** the app
+frame is silently dropped by Chromium because the sandbox has no `allow-downloads` token —
+don't build that workaround, call `sg.vfs.download`.
+
+**Consent.** Same model as external links: by default each call surfaces a one-click HUD
+confirm naming the file and size ("This app wants to save a file to your device"); dismissing
+rejects the promise. Declare `"permissions": { "downloads": true }` in `app.json` for
+frictionless saves (e.g. a downloads page where saving is the whole point).
+
+**Related contracts, stated explicitly:**
+
+- `sg.vfs.read(path)` returns a raw **`ArrayBuffer`** (postMessage structured clone). There is
+  **no read-size cap** — the 3 MB `EFBIG` guard is write-only. Errors: rejection with message
+  `No such file: <path>`, or `EPERM` / `EPROTECTED` codes.
+- **Direct vault-file URLs are banned in app markup.** `<a href="/exports/x.pdf" download>` or
+  `<iframe src="/exports/x.pdf">` cannot work — vault files are encrypted objects, not URLs;
+  the href resolves against the static host and answers `AccessDenied`. For inline **images**,
+  read the bytes over the bridge and use a blob URL (or just assign `img.src` — the bridge
+  patches it). For PDFs, see the next section — a blob iframe is NOT enough.
+
+---
+
+## Displaying PDFs inline — verified 2026-07-31
+
+The obvious pattern — `sg.vfs.read` → `Blob` → `URL.createObjectURL` → `<iframe src>` —
+**does not work in App Mode**: Chromium refuses to load its PDF viewer inside a sandboxed
+frame that lacks `allow-same-origin` (you get the grey sad-document placeholder). Verified
+empirically with the exact App Mode sandbox (`allow-scripts allow-forms`): identical markup
+renders fine unsandboxed, is blocked in-frame. This is also why the same blob-iframe pattern
+*does* work in the host's own file-preview overlay (`vault-file-preview`) — that surface runs
+at the real origin. There is no sandbox token short of `allow-same-origin` (never granted —
+it would collapse the app isolation boundary) that re-enables the viewer.
+
+What actually works, in order of preference:
+
+0. **`sg.ui.preview(path)` — one call, host-fulfilled (NEW 2026-07-31, the default choice).**
+   ```js
+   await sg.ui.preview('docs/report.pdf');   // → {ok, path, type: 'pdf', bytes}
+   ```
+   The host reads the bytes through the vfs.read permission chain and renders a modal
+   quick-look overlay in **its own document** — real origin, so Chrome's native PDF viewer
+   works (toolbar, zoom, text selection). Also previews images, video, audio, and text.
+   No grant and no confirm: the bytes never leave the browser, and the overlay is host DOM
+   the app can't fake or suppress (user closes via ✕ / Escape / backdrop). One overlay at a
+   time — a new call replaces the current one. Errors mirror `vfs.read`
+   (`ENOENT`/`EPERM`/`EPROTECTED`). Use the options below only when the PDF must render
+   *inside your own layout* rather than as an overlay:
+
+1. **PDF.js rendered to canvas** — the real in-frame PDF experience:
+   ```js
+   await sg.loadJs('assets/pdf.min.js');            // classic/UMD build — ESM import() 404s
+   const wsrc = await sg.vfs.readText('assets/pdf.worker.min.js');
+   pdfjsLib.GlobalWorkerOptions.workerSrc =
+       URL.createObjectURL(new Blob([wsrc], { type: 'text/javascript' }));   // blob worker
+   const data = await sg.vfs.read('docs/report.pdf');
+   const pdf  = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
+   const page = await pdf.getPage(1);
+   const vp   = page.getViewport({ scale: 1.5 });
+   canvas.width = vp.width; canvas.height = vp.height;
+   await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+   ```
+   (`new Worker('path')` against a vault path 404s — hence the blob worker; PDF.js also
+   falls back to a main-thread "fake worker" if you skip `workerSrc`.)
+2. **Pre-rasterise at build time** (`pdftoppm` / PyMuPDF → one image per page in the vault,
+   rendered via `img.src`) — zero runtime dependencies, loses text selection.
+3. **`sg.vfs.download('docs/report.pdf')`** — hand the file to the OS viewer instead of
+   rendering inline. One call, host-fulfilled (see "Downloading files").
 
 ---
 

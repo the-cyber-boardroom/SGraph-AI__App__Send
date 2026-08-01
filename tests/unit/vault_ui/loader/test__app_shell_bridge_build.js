@@ -62,5 +62,60 @@ console.log('\n[suite] app-shell — externalLinks grant flips the external-link
         makeShell(AppPermissions.parsePermissions(null))._appSandbox() === 'allow-scripts allow-forms');
 }
 
+console.log('\n[suite] app-shell — click-interceptor contract (architect review 07/30)');
+{
+    const src = makeShell(AppPermissions.parsePermissions(null))._buildVfsBridgeScript('index.html');
+
+    // Proposal 1: sanctioned opt-out — the guard must run before any branch claims the click.
+    ok('interceptor honours e.defaultPrevented + data-sg-native',
+        /e\.defaultPrevented\|\|a\.hasAttribute\("data-sg-native"\)/.test(src));
+
+    // Proposal 2: bare-# clicks are claimed with an in-frame scroll (browser default is a
+    // cross-document navigation in a null-origin srcdoc frame — the vault-key-screen bug).
+    ok('bare-# clicks: preventDefault + getElementById + scrollIntoView',
+        /startsWith\("#"\)\)\{'?\s*\+?\s*'e\.preventDefault\(\)/.test(src.replace(/\n/g, ''))
+        || /if\(h\.startsWith\("#"\)\)\{e\.preventDefault\(\);/.test(src));
+
+    // Proposal 3: the scroll-to-hash miss-fallback (location.hash re-navigation) is GONE.
+    ok('scroll-to-hash listener has NO location.hash fallback', !/location\.hash="#"/.test(src));
+}
+
+console.log('\n[suite] app-shell — sg.vfs.download (host-fulfilled downloads)');
+{
+    const src = makeShell(AppPermissions.parsePermissions(null))._buildVfsBridgeScript('index.html');
+    ok('bridge exposes sg.vfs.download', /download:_download/.test(src));
+    ok('download routes through _sgCmd("download")', /_sgCmd\("download"/.test(src));
+
+    const withGrant = AppPermissions.parsePermissions({ permissions: { downloads: true } });
+    ok('permissions: downloads grant parses true', withGrant.downloads === true);
+    ok('permissions: downloads defaults to deny', AppPermissions.parsePermissions(null).downloads === false);
+    ok('permissions: downloads:"yes" (non-boolean) stays deny',
+        AppPermissions.parsePermissions({ permissions: { downloads: 'yes' } }).downloads === false);
+}
+
+console.log('\n[suite] app-shell — sg.ui.preview (host quick-look overlay)');
+{
+    const src = makeShell(AppPermissions.parsePermissions(null))._buildVfsBridgeScript('index.html');
+    ok('bridge exposes sg.ui.preview', /preview:function\(path\)/.test(src) && /_sgCmd\("ui",\{action:"preview"/.test(src));
+
+    // Behavioural: the overlay mounts in HOST DOM, renders text inline, closes cleanly.
+    if (!window.URL.createObjectURL) window.URL.createObjectURL = () => 'blob:fake';
+    if (!window.URL.revokeObjectURL) window.URL.revokeObjectURL = () => {};
+    const el   = makeShell(AppPermissions.parsePermissions(null));
+    const kind = el._openHostPreview('notes.md', new TextEncoder().encode('# hello preview').buffer);
+    const ov   = document.getElementById('sg-host-preview');
+    ok('text file → kind "text"', kind === 'text');
+    ok('overlay mounted in host document', !!ov);
+    ok('text content rendered in <pre>', !!ov && /hello preview/.test(ov.querySelector('pre')?.textContent || ''));
+
+    const kind2 = el._openHostPreview('doc.pdf', new Uint8Array([37, 80, 68, 70]).buffer);   // replaces first
+    ok('pdf file → kind "pdf" with iframe', kind2 === 'pdf'
+        && !!document.getElementById('sg-host-preview')?.querySelector('iframe'));
+    ok('one-at-a-time: only one overlay in DOM', document.querySelectorAll('#sg-host-preview').length === 1);
+
+    el._closeHostPreview();
+    ok('close removes the overlay', !document.getElementById('sg-host-preview'));
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
