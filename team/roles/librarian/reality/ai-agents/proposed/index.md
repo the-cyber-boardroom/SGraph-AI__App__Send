@@ -17,7 +17,7 @@ The previous full index is preserved in git history on commit before this date.
 | [`agent-communication.md`](agent-communication.md) | MCP gaps, sgit CLI extensions, communication vault pattern, QA stack on SG/Compute, AppSec mini-tools, three-agent comms demo vault + PKI | P-159–P-164; P-312, P-315, P-316 |
 | [`workflows.md`](workflows.md) | Scheduled and autonomous tasks, accountant demo, archiver-cataloguer pattern, agentic incident-response service | P-147–P-152; P-238–P-247 |
 | [`skills-economy.md`](skills-economy.md) | Partner integrations (Netlify, Daytona, Convex, Pi, HeyGen), skills creator economy, ownership+maintenance model, skills deepened (06/04), NHI 2.0 agent-identity cross-domain items | P-288–P-305; P-317–P-321; P-325, P-328, P-332 |
-| [`risk-mandate.md`](risk-mandate.md) | Agent blast-radius service, assessment template, WhatsApp case study, Odysseus evidence vault, formal Agent Mandate ontology, authorization ontology + delegation, how-not-why scope + mandate architecture, Wardley map series, risk acceptance service MVP, multi-stakeholder workflow, personal scenario, Calendly review, risk register architecture, digital twins, semantic graph engine, 2FA MVP, AWS risk engine (Python + browser + ontology), evidence economy (news vaults, force of proof, packs-as-service), experience loop | P-353–P-357; P-376–P-379; P-387–P-430 |
+| [`risk-mandate.md`](risk-mandate.md) | Agent blast-radius service, assessment template, WhatsApp case study, Odysseus evidence vault, formal Agent Mandate ontology, authorization ontology + delegation, how-not-why scope + mandate architecture, Wardley map series, risk acceptance service MVP, multi-stakeholder workflow, personal scenario, Calendly review, risk register architecture, digital twins, semantic graph engine, 2FA MVP, AWS risk engine (Python + browser + ontology), evidence economy (news vaults, force of proof, packs-as-service), experience loop, AOMM, regulation graph, three-predicate model, MVP field demo, agentic incident taxonomy | P-353–P-357; P-376–P-379; P-387–P-430; P-AOMM-001–P-AOMM-007; P-REG-001–P-REG-012; P-PRED-001–P-PRED-005; P-DEMO-001–P-DEMO-007; P-INC-001–P-INC-002 |
 
 ---
 
@@ -50,6 +50,10 @@ The previous full index is preserved in git history on commit before this date.
 | P-422 (2FA end-to-end MVP) | `risk-mandate.md` |
 | P-423–P-430 (AWS risk engine, evidence economy) | `risk-mandate.md` |
 | P-AOMM-001–P-AOMM-007 (AOMM: outbound agentic risk, incident catalogue, containment ceilings) | `risk-mandate.md` |
+| P-REG-001–P-REG-012 (Regulation graph: vault+website, customised standard, WASM engines, ontology, hooks) | `risk-mandate.md` |
+| P-PRED-001–P-PRED-005 (Three-predicate model: Confirmed/Validated/Accepted; Acceptable Level; four-quadrant classifier) | `risk-mandate.md` |
+| P-DEMO-001–P-DEMO-007 (MVP field demo: scenario library, vault-as-static-site, cost meter, persona-flick, takeaway, Black Hat demo, Wardley maps) | `risk-mandate.md` |
+| P-INC-001–P-INC-002 (Agentic incident taxonomy: five populations, living register) | `risk-mandate.md` |
 
 ---
 

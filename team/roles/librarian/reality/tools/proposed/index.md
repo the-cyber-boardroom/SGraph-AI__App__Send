@@ -15,7 +15,7 @@ This file is a table of contents. Full proposed items live in the topic files be
 | [video-editing.md](video-editing.md) | sg-tree, Video Editor Expansion, video crop/overlay/capture, Video Playback, Video Generation | none assigned |
 | [wasm-tools.md](wasm-tools.md) | sg-wasm lifecycle, sg-audio-transcription (Whisper), Pyodide sandbox, sg-public-viewer | none assigned |
 | [llm-components.md](llm-components.md) | sg-llm component family, Agentic LLM suite, One-Shot IDE, Composite Tools, Infographic v0.1.1 + v2, News Report Tool | none assigned |
-| [platform-tools.md](platform-tools.md) | Infrastructure/IFD, Social Previews, Audio tool distribution, TUI API, SG/Edge TUI, SG Labs Admin, SG Mail, Backup and Restore, Voice Note Transcription Tool | P-175–P-189, P-196, P-200–P-203, P-229–P-237, P-VNT-001–P-VNT-005 |
+| [platform-tools.md](platform-tools.md) | Infrastructure/IFD, Social Previews, Audio tool distribution, TUI API, SG/Edge TUI, SG Labs Admin, SG Mail, Backup and Restore, Voice Note Transcription Tool | P-175–P-189, P-196, P-200–P-203, P-229–P-237, P-VNT-001–P-VNT-010 |
 
 ---
 
@@ -29,7 +29,7 @@ This file is a table of contents. Full proposed items live in the topic files be
 | P-200–P-201 | SG/Edge TUI (Textual + Rich) | platform-tools.md |
 | P-202–P-203 | TUI API (structured surface) | platform-tools.md |
 | P-229–P-237 | Audio Tool Distribution (release shell + key acquisition) | platform-tools.md |
-| P-VNT-001–P-VNT-005 | Voice Note Transcription Tool (WhatsApp voice memo → transcript + analysis) | platform-tools.md |
+| P-VNT-001–P-VNT-010 | Voice Note Transcription Tool (WhatsApp voice memo → transcript + analysis; + guardrails, vaults, pre-commit hook) | platform-tools.md |
 
 *All items without P-numbers are from pre-P-numbering briefs. P-numbers were assigned
 starting from doc 435+ (05/17 session). Items from earlier sections (17–23) were catalogued

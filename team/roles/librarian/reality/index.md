@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.47 | **Last updated:** 2026-07-30 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.47 | **Last updated:** 2026-08-01 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,7 +31,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-07-28)
+## Quick Stats (as of 2026-08-01)
 
 | Metric | Count |
 |--------|-------|
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~970+ (+15 net-new from 27 July: VNT 5, AOMM 7, COM 3; previously ~955+; processed 2026-07-30) |
-| Total documents catalogued | 870 (+6 from 27 July: 5 substantive briefs + 1 day-index; processed 07/30) |
+| Open PROPOSED items (across all domains) | ~1027+ (+57 net-new from 28 July: REG 12, PRED 5, DEMO 7, INC 2, VNT-006–010 5, AOMM-006 note 1; previously ~970+; processed 2026-08-01) |
+| Total documents catalogued | 884 (+14 from 28 July: 13 substantive briefs + 1 day-index; processed 08/01) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
@@ -56,6 +56,11 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Latest build spec** | Airgapped RiskMandate demo/MVP (read-only vault + local storage + persona library + risk flow upward + actionable items) — 17 July 2026 |
 | **Next build priority** | Browser-local query engine (vault-as-source-of-truth, sync by commit-id, IndexedDB) — blocks the airgapped MVP |
 | **Key decision** | **Voice note transcription tool** — first SGraph product going to market; 90-day partnership term from 1 Aug 2026; OpenRouter carries both inference and billing; three privacy modes (routed/restricted/browser-local); all PROPOSED (2026-07-27) |
+| **Key decision** | **Accepted ≠ Acceptable** — two orthogonal primitives: Accepted = a named individual's act at a specific altitude and time; Acceptable = a business-owned threshold set by policy; Article 9 EU AI Act mandates risk management without defining acceptable (2026-07-28) |
+| **Key decision** | **Three-predicate model** — Confirmed (technical fact), Validated (compliance interpretation by GRC), Accepted (appetite judgement by business owner at altitude); the chain from a technical fact to a board decision (2026-07-28) |
+| **Key decision** | **Regulation graph = vault + website** — EU AI Act encoded via AKN4EU XML, graph starts empty and accretes as customer answers Confirm/Validate/Accept provisions; partial connection sufficient for value (2026-07-28) |
+| **Key decision** | **Air gap drawn as bespoke manual integration** — a gap has no evolution; the labour that fills it sits at genesis; map shape = evolved ends + manual middle; three Wardley maps: air-gap (sales), translation (altitudes), evidence chain (agent→board) (2026-07-28) |
+| **Time-critical** | **Black Hat USA demo** — Business Hall opens 2026-08-04; hand-the-iPad acceptance test; minimum viable demo = one scenario, offline-safe, pre-computed fixture; build window: 3 days |
 
 ---
 

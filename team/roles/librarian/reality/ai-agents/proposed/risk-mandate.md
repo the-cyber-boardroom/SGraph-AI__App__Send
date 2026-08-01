@@ -174,3 +174,65 @@ The incident grounding: OpenAI/HuggingFace incident (published 16 and 21 July 20
 | P-AOMM-005 | AOMM provider posture variant | A separate maturity model assessing whether a model provider can distinguish a defender from an attacker; the documented guardrail asymmetry — commercial guardrails blocked forensic reconstruction, which was completed on an open-weight model run locally — is the motivating case | 07/27 aomm-arch-brief |
 | P-AOMM-006 | Outbound incident catalogue | Catalogue of known cases of one organisation's agent reaching another; needs research rather than reasoning; market has strong incentives against disclosure; parked for its own research document | 07/27 aomm-arch-brief |
 | P-AOMM-007 | Default containment ceilings | Sensible starting values for spend, elapsed time, and action count by agent class; the two most underused controls in agentic estates; off-task compute spend is cheapest available anomaly signal (already metered for billing) | 07/27 aomm-arch-brief |
+
+---
+
+## Regulation Graph — EU AI Act as Evidence Layer (07/28 briefs — v0.33.53)
+
+**PROPOSED — does not exist yet.** Three architecture briefs specify the regulation graph as a vault + public website, a customised standard built from the EU AI Act (AKN4EU XML), and a per-paragraph ontology with hooks as the twin primitive. One strategy brief defines Accepted vs Acceptable as orthogonal primitives, resolving earlier terminology ambiguity.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-REG-001 | Regulation graph as vault + website (two-layer evidence layer) | Vault holds the EU AI Act graph (writable shared store); website is the public evidence layer; obligation start date ≠ liability start date — two date fields on Obligation nodes; partial connection sufficient for value; coverage measure = connected hooks / total hooks (0–1 ratio); Akoma Ntoso / AKN4EU XML is the raw source — no custom parser required | 07/28 regulation-graph-vault-and-website-brief |
+| P-REG-002 | Customised standard — starts empty, accretes with answers | Base graph contains all EU AI Act provisions; customer's graph is a projection starting with no assertions; provisions attach as answers Confirm, Validate, or Accept them; avoids pre-building one graph per customer configuration; nothing relevant claimed until the customer tells the system something | 07/28 customised-standard-brief |
+| P-REG-003 | SPARQL query engine (Oxigraph WASM, browser-local) | Oxigraph compiled to WASM; runs in browser without a backend; handles RDF triple-store queries via SPARQL; production-ready and actively maintained | 07/28 customised-standard-brief |
+| P-REG-004 | Cypher/GQL query engine (Kuzu WASM, browser-local) | Kuzu compiled to WASM; handles property-graph queries via Cypher/GQL; WASM build exists but newer — stability spike required before committing | 07/28 customised-standard-brief |
+| P-REG-005 | SQL query engine (DuckDB WASM, browser-local) | DuckDB compiled to WASM; handles SQL queries against the graph; stable WASM build, used in production by multiple external projects | 07/28 customised-standard-brief |
+| P-REG-006 | Five regulation graph scenarios | Five scenarios exercising different paths through the EU AI Act graph; doubles as demo library; specifications not yet authored | 07/28 customised-standard-brief |
+| P-REG-007 | Per-paragraph subgraph extraction pipeline | For each EU AI Act paragraph: extract provision identifier + text → build subgraph of intra-paragraph relationships → add hook nodes where graph stops and real system starts; pipeline produces the base graph from AKN4EU XML input | 07/28 every-paragraph-is-a-graph-brief |
+| P-REG-008 | Regulation graph ontology — 7 node types + 8 edge types + Acceptable Level | Node types: Provision, Definition, Requirement, Obligation, Prohibition, Control, Actor, AcceptableLevel; edge types: defines, defined_in, applies_to, triggers, exempts, references, satisfied_by, in_scope_when; all directed with named inverses; must be locked before customised standard is built | 07/28 every-paragraph-is-a-graph-brief + accepted-not-acceptable-brief |
+| P-REG-009 | Hook / twin primitive on regulation graph nodes | A hook is the node where the graph stops modelling and continues into a real system; hooks are the twin primitive for the regulation graph; coverage measure = connected hooks / total hooks; an unconnected hook is a named air gap | 07/28 every-paragraph-is-a-graph-brief |
+| P-REG-010 | Definitional gap query | A SPARQL query over the base graph that returns provisions used as targets of `defines` edges but having no `defined_in` edges — i.e., terms referenced but never formally defined in the regulation | 07/28 every-paragraph-is-a-graph-brief |
+| P-REG-011 | Regulation graph website (evidence layer, public) | Static website generated from the vault; displays the EU AI Act graph as an evidence layer; rebuilt when the vault is updated; rebuild trigger not yet specified | 07/28 regulation-graph-vault-and-website-brief |
+| P-REG-012 | Akoma Ntoso / AKN4EU encoding layer | Ingestion of the EU AI Act from its AKN4EU XML encoding; XPath traversal extracts provision identifiers and text blocks; no custom parser required; raw machine-readable text already available | 07/28 regulation-graph-vault-and-website-brief |
+
+---
+
+## Accepted vs Acceptable and Three-Predicate Model (07/28 briefs — v0.33.53)
+
+**PROPOSED — does not exist yet.** One strategy brief defines Accepted and Acceptable as orthogonal rather than synonymous, resolving earlier terminology ambiguity. Together with the three-predicate model from the MVP briefs, this defines the full evidence-to-decision chain.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-PRED-001 | Acceptable Level node — business-owned threshold | A node type owned by the business; carries the threshold below which risk is tolerated; set by policy, not by individual decision; if not set, the absence is itself a meta-risk (Article 9 EU AI Act mandates risk management without defining acceptable); must handle the case where no threshold has been set | 07/28 accepted-not-acceptable-brief |
+| P-PRED-002 | Accepted event/edge — named individual act at altitude | A directed edge (or event record) recording: the named individual, their altitude (operator/CISO/executive), the timestamp, and the specific risk item; represents a dated act of judgement against a risk at a specific point in time; distinct from the Acceptable Level (P-PRED-001) | 07/28 accepted-not-acceptable-brief |
+| P-PRED-003 | Four-quadrant operational state classifier | Given an Acceptable Level and an Accepted record, classifies into one of four quadrants: (1) accepted + inside acceptable; (2) accepted + outside acceptable; (3) not accepted + inside acceptable; (4) not accepted + outside acceptable; each quadrant requires a different response | 07/28 accepted-not-acceptable-brief |
+| P-PRED-004 | Interval measure — distance from acceptable threshold | A derived measure computing how far an accepted item sits outside the acceptable threshold; requires the threshold to be a quantified value, not just a categorical label | 07/28 accepted-not-acceptable-brief |
+| P-PRED-005 | Three-predicate model — Confirmed / Validated / Accepted at altitude | Three predicates for each risk item at each altitude: Confirmed (technical fact, owned by operator), Validated (compliance interpretation, owned by GRC), Accepted (appetite judgement, owned by business owner at altitude); 3×3 grid per risk item; the chain from a technical fact to a board decision | 07/28 scenarios-are-the-mvp-brief |
+
+---
+
+## MVP Field Demo — RiskMandate Session (07/28 briefs — v0.33.53)
+
+**PROPOSED — does not exist yet.** Four documents specify the Black Hat demo workflow (Business Hall opens 2026-08-04), the scenario-as-MVP architecture, a working-backwards PR-FAQ, and three Wardley maps. All PROPOSED — does not exist yet.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-DEMO-001 | RiskMandate scenario library — four-scenario ladder | Four scenarios in sequential dependency: (1) agent can change something, (2) nobody accepted it, (3) blast radius, (4) worst outcome unrecoverable + obligation; user cannot skip to scenario 4 without answering 1–3; this dependency is a feature, not a constraint | 07/28 scenarios-are-the-mvp-brief |
+| P-DEMO-002 | Vault-as-static-site for MVP (no backend, tablet-deployable) | Vault holds the scenario library and register logic; runs from local storage in any browser; no backend dependencies; deployable from a tablet; plural regulation from first build (additive, not retrofit) | 07/28 scenarios-are-the-mvp-brief |
+| P-DEMO-003 | Live cost meter (model usage visible during session) | Cost meter reads token counts from OpenRouter stream events and accumulates; displayed in real time as the session runs; cost is observable, not quoted | 07/28 hand-them-the-ipad-brief |
+| P-DEMO-004 | Persona-flick (altitude language switch) | Same risk register displayed in domain language of each altitude (operator/CISO/board); a UI view transformation, not a data transformation; one register, three views | 07/28 hand-them-the-ipad-brief |
+| P-DEMO-005 | Takeaway document — register with owners, provisions, per-altitude views | The product is the takeaway, not the session; contains: named accepting role per risk item, plug profile, cited regulatory provisions with source links, per-altitude view; available as document, shareable link, or vault; success signal: a second person inside the organisation opens it | 07/28 pr-faq-working-backwards-brief |
+| P-DEMO-006 | Black Hat conference demo workflow (hand-the-iPad acceptance test) | Demo workflow for Black Hat USA (Business Hall opens 2026-08-04); acceptance criterion: device changes hands during the session; 6–10 questions from memory; privacy answer in first 15 seconds; must not accuse; live cost meter; takeaway is the conversion event | 07/28 hand-them-the-ipad-brief |
+| P-DEMO-007 | Three Wardley maps — air-gap, translation, evidence chain | (1) Air-gap map: evolved ends (detection + executive need) + manual middle (genesis); the sales artefact; custom axis air-gap→file→API→event-driven; (2) Translation map: stakeholder altitudes as value chain, translation sits in genesis; (3) Evidence chain map: running agent to board decision; all three need to be built, rendered, and published | 07/28 wardley-map-airgapped-register-brief |
+
+---
+
+## Agentic Incident Taxonomy (07/28 research brief — v0.33.53)
+
+**PROPOSED — does not exist yet.** One research brief introduces a five-population taxonomy for agentic incidents, partially fulfilling P-AOMM-006 (outbound incident catalogue). Public catalogue is sparse not because incidents are rare but because attribution is hard and disclosure is optional.
+
+| # | Feature | One-Line Description | Source |
+|---|---------|---------------------|--------|
+| P-INC-001 | Five-population incident taxonomy | Five categories: (1) Autonomous agents pursuing misaligned objectives (escaped population — ONE entry: July 2026 OpenAI/HuggingFace sandbox escape); (2) Agents weaponised by adversaries (GTG-1002 state-sponsored campaign); (3) Agents as social engineering amplifiers (Check Point: 1088 prompts → 5317 commands, 9 Mexican gov agencies); (4) Agents that ignore stop instructions; (5) Agentic infrastructure as attack surface; plug failed repeatedly across known incidents | 07/28 has-it-happened-before-research-brief |
+| P-INC-002 | Living incident register / catalogue | A maintained register of known agentic incidents, separate from the AOMM maturity model; each entry carries: category (from P-INC-001 taxonomy), date, attribution confidence, plug failure mode (if any), disclosure status; updates as incidents are published; the market has strong incentives against disclosure | 07/28 has-it-happened-before-research-brief |
