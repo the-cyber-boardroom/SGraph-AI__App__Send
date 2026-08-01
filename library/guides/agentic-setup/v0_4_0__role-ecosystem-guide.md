@@ -4,7 +4,7 @@
 **Version:** v2.0  
 **Date:** 2026-02-09  
 **Status:** Draft  
-**Depends On:** issues-fs__thinking-in-graphs v1.0, issues-fs__role-based-agent-coordination v1.0, issues-fs__librarian-role v1.0, issues-fs__cartographer-role v1.0, issues-fs__historian-role v1.0, issues-fs__journalist-role v1.0  
+**Depends On:** issues-fs__thinking-in-graphs v1.0 *(not in repo)*, issues-fs__role-based-agent-coordination v1.0 (`v0.1.0__role-based-coordination.md`), issues-fs__librarian-role v1.0 *(not in repo)*, issues-fs__cartographer-role v1.0 *(not in repo)*, issues-fs__historian-role v1.0 *(not in repo)*, issues-fs__journalist-role v1.0 *(not in repo)*  
 
 ---
 
@@ -420,15 +420,17 @@ Potential future roles identified in the architecture documents include: Perform
 
 ## References
 
-- [Thinking in Graphs: Meaning Through Connectivity](./v0_4_0__issues-fs__thinking-in-graphs.md) — Foundational philosophy
-- [Issues-FS Role-Based Agent Coordination](./v0_1_0__issues-fs__role-based-agent-coordination.md) — Role architecture and coordination protocol
-- [Issues-FS Journalist Role](./v0_4_0__issues-fs__journalist-role.md) — Full Journalist specification
-- [Issues-FS Librarian Role](./v0_4_0__issues-fs__librarian-role.md) — Full Librarian specification
-- [Issues-FS Cartographer Role](./v0_4_0__issues-fs__cartographer-role.md) — Full Cartographer specification
-- [Issues-FS Historian Role](./v0_4_0__issues-fs__historian-role.md) — Full Historian specification
-- [Issues-FS Role Architecture Framework Analysis](./v0_1_0__issues-fs__role-architecture-framework-analysis.md) — Framework stress-test
-- [Issues-FS Lexicon Architecture v2.0](./v0_4_0__issues-fs__lexicon-architecture-v2.md) — The root graph
-- [Issues-FS Architecture Overview](./v0_4_0__issues-fs__architecture-overview.md) — Ecosystem architecture
+> **Note (2026-07-31, Librarian):** Of the 9 references below, 2 were mis-linked (wrong filename) and have been corrected; 7 are not yet committed to this repo — they may exist in an external Issues-FS vault. Broken links are annotated with *(not in repo)*.
+
+- Thinking in Graphs: Meaning Through Connectivity — Foundational philosophy *(not in repo — `v0_4_0__issues-fs__thinking-in-graphs.md`)*
+- [Issues-FS Role-Based Agent Coordination](./v0.1.0__role-based-coordination.md) — Role architecture and coordination protocol *(corrected from `v0_1_0__issues-fs__role-based-agent-coordination.md`)*
+- Issues-FS Journalist Role — Full Journalist specification *(not in repo — `v0_4_0__issues-fs__journalist-role.md`)*
+- Issues-FS Librarian Role — Full Librarian specification *(not in repo — `v0_4_0__issues-fs__librarian-role.md`)*
+- Issues-FS Cartographer Role — Full Cartographer specification *(not in repo — `v0_4_0__issues-fs__cartographer-role.md`)*
+- Issues-FS Historian Role — Full Historian specification *(not in repo — `v0_4_0__issues-fs__historian-role.md`)*
+- [Issues-FS Role Architecture Framework Analysis](./v0.1.0__role-architecture-framework.md) — Framework stress-test *(corrected from `v0_1_0__issues-fs__role-architecture-framework-analysis.md`)*
+- Issues-FS Lexicon Architecture v2.0 — The root graph *(not in repo — `v0_4_0__issues-fs__lexicon-architecture-v2.md`)*
+- Issues-FS Architecture Overview — Ecosystem architecture *(not in repo — `v0_4_0__issues-fs__architecture-overview.md`)*
 - [Second Stories: From Three Mile Island to Cybersecurity](https://docs.diniscruz.ai/2025/02/10/second-stories__from-three-mile-island-to-cybersecurity.html) — The second-story framework
 
 ---

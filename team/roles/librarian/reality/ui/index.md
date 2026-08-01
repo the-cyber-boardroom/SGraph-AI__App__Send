@@ -151,6 +151,17 @@ Standalone print utility; zero dependencies. Used by the SG/Vault file-viewer Pr
 
 **Package:** `sgraph_ai_app_send__ui__vault/` — distinct UI product.
 
+> **Code index (2026-07-24):** a per-file/per-feature/per-test navigation index for this
+> package is maintained at `team/roles/librarian/code-index/vault-web/` (entry: `index.md`).
+> Agents starting vault-web tasks should read it first. Code-verified corrections recorded
+> there: the app bridge namespace is **`sg.append.*`** (no `sg.inbox.*` exists), there is no
+> `sg.shell.*` namespace (print is the `__sgPrintReq` RPC), and **Vault Chat Phases 1–4
+> SHIPPED mid-June** (commits `adc9d0f`, `60a2f6d`, `ad8e14d`: real `sg-llm-request`
+> transport, in-vault chat pane/page at `en-gb/vault/chat/`, injection-floor fencing,
+> context-layers inspector, tools/loadout panel, `consolidate_memory` + fractal scope) —
+> P-263/P-264 are therefore partially shipped, with P-265/P-266 and the docs-505/506
+> remainder still open.
+
 **v0.2.1** — landing page: `en-gb/index.html` + `browse/index.html`. "Open a vault." hero,
 auto-detect input (vault key or share token), recent vaults localStorage.
 

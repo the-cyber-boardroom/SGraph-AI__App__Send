@@ -1,6 +1,6 @@
 # AI Agents — Reality Index
 
-**Domain:** ai-agents/ | **Last updated:** 2026-05-07 | **Maintained by:** Librarian (daily run)
+**Domain:** ai-agents/ | **Last updated:** 2026-07-29 | **Maintained by:** Librarian (daily run)
 
 This domain covers agentic workflows, LLM components, Claude integration with vaults, MCP (Model Context Protocol), and the vault-as-communication-channel primitives. The SG/Send architecture is explicitly designed for agents as first-class users alongside humans.
 
@@ -121,6 +121,34 @@ Published 2026-05-06 by `@Email-FS (architect.spec)`. These are protocol specifi
 
 - **P-240: SG/Sentinel in development workflow** — dev agents talk to SG/Sentinel protecting the app they build; rules = attack surface + app definition; AppSec agent reviews rules; controls agent blast radius (rules are analysable); every team (sgit, vault-web, tools) interacts with SG/Sentinel (doc 480, 05/24)
 - **P-245: Agent governance as coherent SG/Sentinel capability** — one substrate governs production agents (outbound actions controlled; sequences enforced via control-flow graphs); mediates authenticated agent-to-agent communication via PKI layer; controls development-agent blast radius (rules are analysable); serves surrogates for agent testing; sequenced as a major future surface as agentic systems proliferate (doc 485, 05/24)
+
+### AWS Configuration Risk Engine (07/05 briefs — docs 811–813)
+
+**PROPOSED — does not exist yet.** Three-part technical specification: Python core engine, browser rating layer, and shared ontology/taxonomy.
+
+- **P-811: Python AWS configuration risk engine** — context-not-configuration principle: configuration is a Fact, context makes it a Risk; IAM-first scope; digital twins for every AWS object (IAM policy, S3 bucket, EC2 permission); Node Type Formula classification (computed path-pattern query, not stored label); JSON-only output as handover contract to browser rating layer; run-anywhere (CLI or Pyodide client-side); 10 explicit acceptance criteria defined in brief (brief 1, v0.33.44, 07/05)
+- **P-812: Browser risk rating layer** — consumes JSON from Python engine; three computation modes (deterministic formulas, statistical, connected graph), all client-side; cost as per-region blast radius (EC2 vCPU quota per region); "not knowing" as first-class output (confidence band, not point score; wide band triggers get-more-data); agentic union (rate transitive closure of everything reachable, not nominal grant); damage window closed via CloudTrail → EventBridge (not billing lag); accountability graph resolution driving sign-off (brief 2, v0.33.44, 07/05)
+- **P-813: AWS IAM risk ontology and taxonomy** — 6-layer Node Type Formula taxonomy bridging AWS IAM into existing risk ontology (not replacing it); 20 directed edge types with named inverses; full worked JSON instance (24 nodes, 18 edges; public regulated S3 + over-broad EC2 role scenario); Python Type_Safe class sketches: `AWS_Config_Node`, `IAM_Principal`, `Grant`, `Authorization_Closure`, `Cost_Ceiling`, `Schema__AWS_Risk_Graph`; crosswalk bridges (declared at crosswalk points, not merges) to CIS AWS Foundations Benchmark, IAM Access Analyzer, AWS Config, OWASP, NIST, RAMM (brief 3, v0.33.44, 07/05)
+
+### Risk Mandate Experience Loop (07/05 brief — doc 816)
+
+**PROPOSED — does not exist yet.**
+
+- **P-816: Risk Mandate experience loop** — three-phase recurring loop: Phase 1 Map (agent → assets → risks, ambiguity carried honestly as data) → Phase 2 Accept (two streams: Stream A Investigate or Stream B Execute; no-deny mechanic, every action is acceptance for an interval) → Recalibrate (both streams return to Phase 1); integrate-first role (drives existing tools and spreadsheets, builds only what is missing); single success metric: risk reduction across successive loop passes (brief 6, v0.33.44, 07/05)
+
+### Agentic Outbound Maturity Model — AOMM (07/27 briefs — docs 868-869)
+
+**PROPOSED — does not exist yet.** Proposed in response to the OpenAI/HuggingFace incident (July 2026). Companion to the plug-profile work from 24 July.
+
+| # | Item | Status |
+|---|------|--------|
+| P-AOMM-001 | **AOMM framework** — five preconditions (capability, motive, reach, freedom, silence) that must all hold for one organisation's agent to harm another; removing any one breaks the chain | PROPOSED — framework only, no implementation |
+| P-AOMM-002 | **AOMM six-level ladder** — Unaware (0) → Enumerated (1) → Bounded (2) → Observed (3) → Contained (4) → Accountable (5); conjunctive and monotone; Level 4 is the plug profile (composes with 24 Jul series) | PROPOSED — framework only |
+| P-AOMM-003 | **AOMM level predicates as computed queries** — expressing each level as a graph-native query in the manner of RAMM/OSMM; currently levels are described, not computable | PROPOSED — design only, open item |
+| P-AOMM-004 | **AOMM outbound inventory** — Level 1 prerequisite: enumeration of all agents with outbound capability (owner, credentials, reach), assessed against the five preconditions | PROPOSED — not yet done for SGraph's own estate |
+| P-AOMM-005 | **Inbound and provider-posture variants** — two sibling registers: inbound (can another org's agents reach you?) and provider posture (can providers distinguish a defender from an attacker?); neither is written yet | PROPOSED — named in brief, not developed |
+
+*Note: the AOMM correction to the lethal trifecta (removing untrusted content as a necessary condition) is grounded in the OpenAI/HuggingFace incident, July 2026, from primary sources. Budget + elapsed time are proposed as first-class containment controls at AOMM Level 2.*
 
 *Full proposed items: [proposed/index.md](proposed/index.md)*
 

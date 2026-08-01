@@ -7,6 +7,375 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-07-31
+
+No new briefs. Single CI version-bump commit on dev (no functional code change). No reality domain files updated.
+
+Backlog task B-011 completed:
+- `library/guides/agentic-setup/v0_4_0__role-ecosystem-guide.md` — References section and Depends On header updated: 2 wrong-filename links corrected; 7 missing companion docs annotated *(not in repo)*
+- `library/guides/agentic-setup/v0.1.0__role-based-coordination.md` — References section updated: 1 missing doc annotated *(not in repo)*
+- `team/roles/librarian/DAILY_RUN.md` — B-011 status QUEUED → DONE; COMPLETED table updated
+
+Session: 0 new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 870 (unchanged)
+Master index (07/31): `team/roles/librarian/reviews/07/31/v0.33.47__master-index__no-new-briefs-31-july-2026.md`
+Debrief (07/31): `team/humans/dinis_cruz/debriefs/07/31/v0.33.47__debrief__no-new-briefs-31-july-2026.md`
+
+---
+
+## 2026-07-30
+
+6 human briefs from `briefs/07/27/` processed across two threads: Voice Note Transcription Tool (first product to market) and Outbound Agentic Risk (AOMM). ~15 new PROPOSED items. 0 new EXISTS items.
+
+Files changed:
+- `tools/proposed/platform-tools.md` — Appended new section: Voice Note Transcription Tool (P-VNT-001–P-VNT-005)
+- `tools/proposed/index.md` — Updated platform-tools.md row + P-number quick-reference to include P-VNT-001–P-VNT-005
+- `ai-agents/proposed/risk-mandate.md` — Appended new section: AOMM (P-AOMM-001–P-AOMM-007)
+- `ai-agents/proposed/index.md` — Added P-AOMM range to topic file table and P-number lookup
+- `alchemist/index.md` — Added Commercial Kit section (P-COM-001–P-COM-003); last updated → 2026-07-30
+- `index.md` — Version v0.33.46 → v0.33.47; last updated 2026-07-28 → 2026-07-30; PROPOSED ~955+ → ~970+; docs 864 → 870
+
+Role reviews produced (07/30):
+- `team/roles/architect/reviews/07/30/v0.33.47__architect-review__briefs-27-july-2026.md`
+- `team/roles/dev/reviews/07/30/v0.33.47__dev-review__briefs-27-july-2026.md`
+- `team/roles/alchemist/reviews/07/30/v0.33.47__alchemist-review__briefs-27-july-2026.md`
+- `team/roles/appsec/reviews/07/30/v0.33.47__appsec-review__briefs-27-july-2026.md`
+
+Debrief (07/30): `team/humans/dinis_cruz/debriefs/07/30/v0.33.47__debrief__briefs-processing-27-july-2026.md`
+Master index (07/30): `team/roles/librarian/reviews/07/30/v0.33.47__master-index__briefs-27-july-2026.md`
+Session: 6 new briefs | New EXISTS items: 0 | New PROPOSED items: ~15 | Cumulative docs: 870
+
+---
+
+## 2026-07-24 (Vault Web code index session)
+
+New **Vault Web code index** created at `team/roles/librarian/code-index/vault-web/`
+(index.md, files.md, features.md, tests.md, todos.md) — a per-file / per-feature / per-test
+navigation layer over `sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/` (~120 files, ~37k
+lines) so agents picking up vault-web tasks know exactly what to read.
+
+Reality corrections from the code audit:
+- `ui/index.md` + `ui/proposed/index.md`: **Vault Chat Phases 1–4 SHIPPED** mid-June
+  (P-263/P-264 partially shipped; P-265/P-266 still PROPOSED).
+- `ui/index.md`: bridge namespace is `sg.append.*` (no `sg.inbox.*`); no `sg.shell.*`.
+- `vault/index.md`: pointer to the code index.
+
+New verified findings recorded in the index: 6 loader unit tests not wired into run-all.sh;
+vault-chat unit suite not CI-gated; 4 e2e regression specs fully skipped; 1 orphaned
+integration test; stale package-root redirect (v0.2.1) and stale page titles.
+
+Review: `team/roles/librarian/reviews/07/24/v0.33.44__librarian__vault-web-code-index.md`
+
+---
+
+## 2026-07-22
+
+9 human briefs from `briefs/07/05/` re-processed in an additional Librarian session (the July 5 batch has now been processed in multiple sessions: 07/08–07/15, 07/19, 07/22). This session produced independent role reviews (architect, dev, alchemist) and a master index. 0 new EXISTS items. 0 net-new PROPOSED items (all already counted from prior sessions).
+
+Role reviews produced (07/22):
+- `team/roles/architect/reviews/07/22/v0.33.43__architect-review__briefs-5-july-2026.md`
+- `team/roles/dev/reviews/07/22/v0.33.43__dev-review__briefs-5-july-2026.md`
+- `team/roles/alchemist/reviews/07/22/v0.33.43__alchemist-review__briefs-5-july-2026.md`
+
+Debrief (07/22): `team/humans/dinis_cruz/debriefs/07/22/v0.33.43__debrief__briefs-processing-5-july-2026.md`
+Master index (07/22): `team/roles/librarian/reviews/07/22/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: additional analysis pass on July 5 briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-21
+
+Routine daily check. No new briefs (last brief batch: July 5, 2026). No new dev commits.
+Backlog task B-005 completed: extracted identity PROPOSED content into four topic files.
+
+Files changed:
+- `identity/proposed/index.md` — converted to ~60-line TOC (was 182 lines)
+- `identity/proposed/google-oauth.md` — NEW (OAuth + Social Login, Secrets Management, P-314, P-322–P-336)
+- `identity/proposed/billing-credits.md` — NEW (Per-User Vaults, Billing Automation, Free Tier, Micropayments, Dynamic Credentials, USDC)
+- `identity/proposed/openrouter.md` — NEW (P-299, P-385, P-386, P-388)
+- `identity/proposed/email.md` — NEW (Email + Outreach, SG Mail P-165–P-170)
+
+Master index (07/21): `team/roles/librarian/reviews/07/21/v0.33.44__master-index__daily-check-21-july-2026.md`
+Session: daily check + B-005 | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-20
+
+Routine daily check. No new briefs (last brief batch: July 5, 2026). No new dev commits.
+Backlog task B-002 completed: extracted tools PROPOSED content into four topic files.
+
+Files changed:
+- `tools/proposed/index.md` — converted to ~45-line TOC (was 183 lines)
+- `tools/proposed/video-editing.md` — NEW (sg-tree, Video Editor Expansion, video tools)
+- `tools/proposed/wasm-tools.md` — NEW (sg-wasm, Whisper WASM, Pyodide sandbox)
+- `tools/proposed/llm-components.md` — NEW (sg-llm family, Agentic LLM suite, Infographic v1.1+v2)
+- `tools/proposed/platform-tools.md` — NEW (P-175–189, P-196, P-200–203, P-229–237)
+
+Master index (07/20): `team/roles/librarian/reviews/07/20/v0.33.43__master-index__daily-check-20-july-2026.md`
+Session: daily check + B-002 | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-19
+
+Additional Librarian session. No new briefs (July 5 batch already fully processed in sessions 07/08–07/18, P-423–P-430 assigned). This session produced independent role reviews (architect, dev) and a master index from a fresh context read of the July 5 briefs, and a summary debrief.
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (July 5 briefs already counted; P-423–P-430 already in risk-mandate.md).
+
+Role reviews produced (07/19):
+- `team/roles/architect/reviews/07/19/v0.33.43__architect-review__briefs-5-july-2026.md`
+- `team/roles/dev/reviews/07/19/v0.33.43__dev-review__briefs-5-july-2026.md`
+
+Debrief (07/19): `team/humans/dinis_cruz/debriefs/07/19/v0.33.43__debrief__briefs-processing-5-july-2026.md`
+Master index (07/19): `team/roles/librarian/reviews/07/19/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: additional analysis pass on July 5 briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-17
+
+Routine daily check. No new briefs. No new dev commits. Backlog task B-006 completed: broken relative link health scan across 150+ files.
+
+- `team/comms/changelog/05/09/v0.27.18__changelog__vault-html-vfs-cleanup.md` — Fixed 4 links (`../../../../library/...` → `../../../../../library/...`)
+- `team/comms/changelog/05/09/v0.27.18__changelog__vault-html-iframe-bugs.md` — Fixed 1 link (depth off by one)
+- `team/comms/briefs/05/12/v0.27.20__brief__readonly-sharing-and-owner-secrets-implementation.md` — Fixed 2 links (`../../../roles/...` → `../../../../roles/...`)
+- `team/comms/briefs/05/12/v0.27.20__brief__vault-sgit-performance-harness.md` — Fixed 1 link
+- `team/comms/briefs/05/12/v0.27.19__sgit-cli-reply__vault-api-interactions.md` — Fixed 1 link
+- B-011 added to DAILY_RUN.md: 10 unfixable missing companion docs in `library/guides/agentic-setup/`
+
+New EXISTS items: 0.
+New PROPOSED items: 0.
+
+Master index (07/17): `team/roles/librarian/reviews/07/17/v0.33.43__master-index__daily-check-17-july-2026.md`
+Health scan: `team/roles/librarian/reviews/07/17/v0.33.43__librarian-review__b006-broken-link-health-scan.md`
+Session: no new briefs + B-006 health scan | Links fixed: 9 | Unfixable: 10 | Cumulative docs: 820
+
+---
+
+## 2026-07-16
+
+Routine daily check. No new briefs. No new dev commits. Backlog task B-009 completed: `library/docs/specs/README.md` staleness audit.
+
+- `library/docs/specs/README.md` — Added "Agent Briefing Documents (v0.1.1)" table documenting 3 previously unlisted files in `_to_process/v0.1.1/` (Claude Code brief, OpenAI Codex brief, dev-environment-workflows). Six original spec files verified present. Key Decisions section reviewed — all accurate.
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (B-009 is a documentation audit, not new content).
+
+Master index (07/16): `team/roles/librarian/reviews/07/16/v0.33.43__master-index__daily-check-16-july-2026.md`
+Session: no new briefs + B-009 audit | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-14
+
+Routine daily check. No new briefs. No new dev commits. Backlog task B-004 completed: `infra/proposed/index.md` split into topic files.
+
+- `infra/proposed/index.md` — Converted from 267-line monolith to ~130-line TOC + 9 remaining small sections. Three topic files extracted.
+- `infra/proposed/vault-hosting.md` — NEW: Vault Hosting Architecture, Fargate + Container Hosts, Instance Sizing, Serverless for Agents, Multi-Cloud Deploy, On-Demand Vault Provisioning, DNS Registry for Labs, MyFeeds (docs 384, 385, 389, 399, 401, 403, 424, 425, 428, 429, 437).
+- `infra/proposed/firecracker.md` — NEW: Firecracker substrate 9 items (docs 408, 411, 412).
+- `infra/proposed/relay-and-storage.md` — NEW: SG/Relay P-337–P-346, S3 Native CLI, IAM graph, S3-compatible vault container (docs 400, 402; 06/16 pack; 06/23 brief).
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (B-004 is a structural split, not new content).
+
+Master index (07/14): `team/roles/librarian/reviews/07/14/v0.33.44__master-index__daily-check-14-july-2026.md`
+Session: no new briefs + B-004 split | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-12
+
+Additional Librarian processing pass on the 5 July 2026 briefs (first processed 07/08-07/10; this session produced fresh role reviews at version v0.33.43 with independent analysis). Role reviews: architect, dev, alchemist. Debrief produced. Reality document last-updated date updated to 07/12.
+
+- `index.md` — Version unchanged at v0.33.44; last updated 2026-07-10 → 2026-07-12.
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (same 5 July briefs; PROPOSED items already counted in 07/08 session).
+
+Role reviews produced (07/12):
+- `team/roles/architect/reviews/07/12/v0.33.43__architect-review__briefs-5-july-2026.md`
+- `team/roles/dev/reviews/07/12/v0.33.43__dev-review__briefs-5-july-2026.md`
+- `team/roles/alchemist/reviews/07/12/v0.33.43__alchemist-review__briefs-5-july-2026.md`
+
+Debrief (07/12): `team/humans/dinis_cruz/debriefs/07/12/v0.33.43__debrief__briefs-processing-5-july-2026.md`
+
+Master index (07/12): `team/roles/librarian/reviews/07/12/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: additional analysis pass | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-11
+
+Routine daily orientation scan. No new briefs found. `briefs/07/` contains only the already-processed batches (July 2, 4, 5). No reality document updates required.
+
+- `changelog.md` — 2026-07-11 entry added (no domain files changed).
+
+New EXISTS items: 0.
+New PROPOSED items: 0.
+
+Master index (07/11): `team/roles/librarian/reviews/07/11/v0.33.43__master-index__daily-check-11-july-2026.md`
+Session: no new briefs | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-10
+
+Third Librarian session on 5 July briefs. Additional role reviews (architect, dev) and master index produced, complementing the 07/08 and 07/09 sessions. No new PROPOSED items beyond the 07/08 count (same briefs, additional analysis angle).
+
+- `index.md` — Version v0.33.44 (unchanged); last updated 2026-07-09 → 2026-07-10.
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (same briefs as 07/08 and 07/09 sessions).
+
+Role reviews produced (07/10):
+- `team/roles/architect/reviews/07/10/v0.33.43__architect-review__briefs-5-july-2026.md`
+- `team/roles/dev/reviews/07/10/v0.33.43__dev-review__briefs-5-july-2026.md`
+
+Debrief (07/10): `team/humans/dinis_cruz/debriefs/07/10/v0.33.43__debrief__briefs-processing-5-july-2026.md`
+
+Master index (07/10): `team/roles/librarian/reviews/07/10/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: additional role reviews + debrief | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-09
+
+Second Librarian session on same 5 July briefs. Role reviews and debrief produced (architect, dev, alchemist), building on the 07/08 master index. No new PROPOSED items beyond the 07/08 count.
+
+- `index.md` — Version v0.33.43 → v0.33.44; last updated 2026-07-08 → 2026-07-09; PROPOSED unchanged at ~860+; docs unchanged at 820.
+
+New EXISTS items: 0.
+New PROPOSED items: 0 (same briefs as 07/08 session; role reviews add analysis, not new PROPOSED items).
+
+Role reviews produced (07/09):
+- `team/roles/architect/reviews/07/09/v0.33.44__architect-review__briefs-5-july-2026.md`
+- `team/roles/dev/reviews/07/09/v0.33.44__dev-review__briefs-5-july-2026.md`
+- `team/roles/alchemist/reviews/07/09/v0.33.44__alchemist-review__briefs-5-july-2026.md`
+
+Debrief (07/09): `team/humans/dinis_cruz/debriefs/07/09/v0.33.44__debrief__briefs-processing-5-july-2026.md`
+
+Master index (07/09): `team/roles/librarian/reviews/07/09/v0.33.44__master-index__briefs-5-july-2026.md`
+Session: role reviews + debrief | New EXISTS items: 0 | New PROPOSED items: 0 | Cumulative docs: 820
+
+---
+
+## 2026-07-08
+
+9 briefs from `briefs/07/05/` across four theme folders processed. ~80 new PROPOSED items across four themes: AWS Configuration Risk Engine (27 items — engine, rating layer, IAM ontology/taxonomy), Agent-Risk Thesis and Grounded Alarm (14 items — board thesis, FUD inversion, grounded alarm term), Risk Mandate Experience Loop (14 items — two-phase, two streams, risk-reduction measure), Evidence Economy (25 items — news-backed vaults, force of proof, evidence packs as a service). 0 new EXISTS items.
+
+- `index.md` — Version v0.33.42 → v0.33.43; last updated 2026-07-06 → 2026-07-08; PROPOSED ~780+ → ~860+; total docs 810 → 820 (+10: 9 substantive briefs + 1 day-index).
+
+New EXISTS items: 0.
+New PROPOSED items: ~80 (AWS IAM engine + taxonomy + rating layer, AuthorizationClosure, CostCeiling, DamageWindow, CapabilityCertificate in AWS context, catastrophic-failure board thesis, grounded alarm, two-phase experience loop, investigate+execute streams, risk-reduction metric, news-backed evidence vaults, force-of-proof two pillars, evidence-packs-as-a-service agentic API).
+
+Master index (07/08): `team/roles/librarian/reviews/07/08/v0.33.43__master-index__briefs-5-july-2026.md`
+Session: 9 briefs | New EXISTS items: 0 | New PROPOSED items: ~80 | Cumulative docs: 820
+
+
+---
+
+## 2026-07-05
+
+4 human briefs from `briefs/07/02/` subdirectories missed by the 07/04 Librarian session, now processed. Subdirectories: `authorization-and-maturity-model/` (2 arch briefs), `root-cause-and-accountability/accountability-paradox` (1 strategy brief), `product-roadmap/` (roadmap md + visual assets). 34 new PROPOSED items across three themes: agent authorization/closure (6), RAMM entity model + agentic overlay (10), accountability paradox patterns (5), roadmap phases 1–3 items (13). 0 new EXISTS items.
+
+- `index.md` — Version v0.33.40 → v0.33.41; last updated 2026-07-04 → 2026-07-05; PROPOSED ~710+ → ~744+; total docs 798 → 803 (+5 files: 4 text + 1 visual).
+
+New EXISTS items: 0.
+New PROPOSED items: ~34 (authorization closure, CapabilityCertificate, MomentOfAuthorization, RAMM entity classes 1–10, RAMM level predicates, Agentic RAMM overlay, RAMM OWASP submission, vault-loader library, Phase 1–3 roadmap items).
+
+Master index (07/05): `team/roles/librarian/reviews/07/05/v0.33.41__master-index__briefs-2-july-2026-missed-subdirs.md`
+Session: 4 missed briefs | New EXISTS items: 0 | New PROPOSED items: ~34 | Cumulative docs: 803
+
+---
+
+## 2026-07-04
+
+13 human briefs processed (same batch as 07/03 — second Librarian session run on 4 July). ~46 new PROPOSED items (more detailed count than the 07/03 session). Five themes: ontology/data quality, partners/market, product definition/demo, risk acceptance psychology/appetite, and the question-engine/near-misses/"how long" trio.
+
+- `index.md` — Version v0.33.39 → v0.33.40; last updated 2026-07-03 → 2026-07-04; PROPOSED 702+ → ~710+ (refined count); docs unchanged at 798.
+
+New EXISTS items: 0.
+New PROPOSED items: ~46 (refined from 07/03 session's 38 — same items, more granular breakdown).
+
+Master index (07/04): `team/roles/librarian/reviews/07/04/v0.33.40__master-index__briefs-30-june-and-2-july-2026.md`
+Second pass: 13 briefs | New EXISTS items: 0 | Refined PROPOSED count: ~46 | Cumulative docs: 798
+
+---
+
+## 2026-07-03
+
+13 human briefs from 30 June 2026 (9 docs) and 02 July 2026 (3 docs + 1 day-index) processed. 38 new PROPOSED items across five themes: product/black-box (7), partners/library (6), risk acceptance/appetite (8), ontology/confidence/underwriting (8), near-misses/scenarios/question-engine (9). 0 new EXISTS items.
+
+- `index.md` — Version v0.33.38 → v0.33.39; last updated 2026-07-02 → 2026-07-03; total docs 785 → 798 (+13 briefs); PROPOSED 664+ → 702+; test count unchanged at ~2015+.
+
+New EXISTS items: 0 (no code delivered in this batch — all PROPOSED).
+New PROPOSED items: 38 across five themes.
+
+Role reviews produced:
+- `team/roles/architect/reviews/07/03/v0.33.39__architect-review__briefs-30-june-02-july-2026.md`
+- `team/roles/dev/reviews/07/03/v0.33.39__dev-review__briefs-30-june-02-july-2026.md`
+
+Master index (07/03): `team/roles/librarian/reviews/07/03/v0.33.39__master-index__briefs-30-june-02-july-2026.md`
+Processed: 13 new human briefs | New EXISTS items: 0 | New PROPOSED items: 38 | Cumulative docs: 798
+
+Key architectural flags: confidence propagation operator UNSPECIFIED (blocks all confidence work); PKI attestation format needed for underwriting; accountability map schema needed for question engine. 2FA MVP (June 26) remains primary implementation priority.
+
+---
+
+## 2026-07-02
+
+13 human briefs from 28 June 2026 processed (committed by Dinis Cruz on 30 June 22:51 BST, after the 06/30 session — missed by the 07/01 session which only checked the 07/01 folder). 25 new PROPOSED items across three themes.
+
+- `index.md` — Version v0.33.37 → v0.33.38; last updated 2026-07-01 → 2026-07-02; total docs 772 → 785 (+13 briefs); PROPOSED 422 → 447+; test count unchanged at ~2015+ (already updated by 07/01 session).
+- `qa/index.md` — Last updated 2026-07-01 → 2026-07-02; note added re duplicate static-mode entry removed (07/01 session already added both sgsend-static-mode and bridge-build tests).
+
+New EXISTS items: 0 (code items already catalogued by 07/01 session).
+New PROPOSED items: 25 (mini-sites 10, use-case program 6, ontology/NTF 9).
+
+Master index (07/02): `team/roles/librarian/reviews/07/02/v0.33.38__master-index__briefs-28-june-2026.md`
+Processed: 13 new human briefs | New EXISTS items: 0 | New PROPOSED items: 25 | Cumulative docs: 785
+
+---
+
+## 2026-07-01
+
+No new human briefs (07/01 folder does not exist; briefs/06/28/ missed — 13 briefs committed by Dinis on 30 June 22:51 BST were not seen by this session). 2 EXISTS items from June 30 code changes. No backlog task this session (B-002 tools PROPOSED at 182 lines — under 300-line split threshold).
+
+- `index.md` — Version v0.33.35 → v0.33.37; last updated 2026-06-30 → 2026-07-01; unit tests ~1994+ → ~2015+ (ViV loader 352+ → 373+: +12 sgsend-static-mode + 9 app-shell-bridge-build).
+- `qa/index.md` — Last updated 2026-06-30 → 2026-07-01; added `test__sgsend_static_mode.js` (12 assertions) and `test__app_shell_bridge_build.js` (9 assertions) to ViV loader suite table; suite total 352+ → 373+; total ~1994+ → ~2015+.
+- `vault/index.md` — Last updated corrected 2026-06-10 → 2026-07-01; section date corrected 2026-06-15 → 2026-06-30 (content was already added in commit `74d5444` on June 30 but date was wrong).
+
+New EXISTS items: 2 (SGSend static-host mode + 12 tests; `_buildVfsBridgeScript` bare-call fix + 9-assertion regression guard).
+New PROPOSED items: 0.
+
+Master index (07/01): `team/roles/librarian/reviews/07/01/v0.33.37__master-index__no-new-briefs-code-30-june.md`
+Processed: 0 new human briefs | New EXISTS items: 2 | New PROPOSED items: 0
+
+---
+
+## 2026-06-30
+
+No new human briefs (06/27–06/30 all empty). 3 EXISTS items from June 29 code changes. Backlog task B-001 completed: vault/proposed/index.md (244 lines) split into six topic files.
+
+- `index.md` — Version v0.33.34 → v0.33.35; last updated 2026-06-29 → 2026-06-30; unit tests ~1960+ → ~1994+ (Python 957→977; ViV loader 335+→352+ with sg-embed-helpers).
+- `qa/index.md` — Last updated 2026-06-08 → 2026-06-30; Python count 957 → 977 (commit `66ce528`, osbot-fast-api 0.39.0 + FastAPI 0.138.1); added `test__sg_embed_helpers.js` (17 assertions) to ViV loader suite (now 352+); total headline ~1556+ → ~1994+.
+- `vault/proposed/index.md` — Replaced 244-line content monolith with ~65-line TOC linking to 6 new topic files. No content changed — pure structural split.
+- `vault/proposed/vault-architecture.md` — NEW: architecture overhaul, PKI modes 2–4, multi-remote, collaboration, simple-token future items (monolith-sourced).
+- `vault/proposed/vault-platform.md` — NEW: vault hub, publishing layer, GitHub-as-vault-projection, manager vaults, credential manager, customer workflow primitives, vault-as-operational-substrate (P-302, P-307, P-311, P-313).
+- `vault/proposed/vault-ux.md` — NEW: vault browser UI, browser VFS, SGit Web Components, demo capabilities (P-128–P-132), testing framework (P-133–P-137).
+- `vault/proposed/vault-sub-vaults.md` — NEW: sub-vaults & external resources convention (P-159–P-165, P-174); notes that P-159–P-163 and P-174 now EXISTS in ui/index.md.
+- `vault/proposed/vault-previews.md` — NEW: public vault previews (P-166–P-177 — largely EXISTS in ui/index.md), vault discovery & public keys (P-153–P-158), compliance artefacts (P-281–P-282, P-284).
+- `vault/proposed/vault-content.md` — NEW: vault chat / Talk to the vault (P-248–P-249).
+
+New EXISTS items: 3 (sg-embed-helpers module + 17 tests, AUTHORING.md guide, Python 977).
+New PROPOSED items: 0.
+
+Master index (06/30): `team/roles/librarian/reviews/06/30/v0.33.35__master-index__no-new-briefs-code-29-june.md`
+Processed: 0 new human briefs | New EXISTS items: 3 | New PROPOSED items: 0 | Structural: B-001 vault/proposed split
+
+---
+
 ## 2026-06-29
 
 Brief-processing session: 18 human brief files from 06/24 (addendum) and 06/26 (new batch) processed. Added in commit `8f6705e7` on 2026-06-28 but not seen by the June 28 Librarian session. 12 new PROPOSED items (P-411 through P-422). 0 new EXISTS items. New version: v0.33.34.

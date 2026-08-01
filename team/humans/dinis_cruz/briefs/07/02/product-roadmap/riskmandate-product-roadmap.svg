@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif">
+  <defs>
+    <style>
+      .mono { font-family: 'SF Mono','JetBrains Mono',Menlo,Consolas,monospace; }
+      .eyebrow { font-size:13px; letter-spacing:2.5px; fill:#6FA3D0; }
+      .hero { font-size:43px; font-weight:800; letter-spacing:-0.4px; fill:#EAF1F8; }
+      .sub { font-size:18px; fill:#93A9C0; }
+      .rowlbl { font-size:13px; letter-spacing:2.5px; fill:#8DA6BE; }
+      .ceyebrow { font-size:12.5px; letter-spacing:1.6px; }
+      .item { font-size:14px; fill:#CBD9E7; }
+      .bandtag { font-size:13px; letter-spacing:2px; }
+      .chip { font-size:14px; fill:#DCE7F2; }
+      .fchip { font-size:13px; fill:#CFE0F0; }
+      .fgloss { font-size:11.5px; fill:#7C93AB; }
+      .foot2 { font-size:12px; letter-spacing:1.5px; fill:#5E778F; }
+    </style>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0C1826"/>
+      <stop offset="1" stop-color="#0A1420"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#173753"/>
+      <stop offset="1" stop-color="#102A41"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ground -->
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <!-- blueprint hairlines -->
+  <g stroke="#2A4C71" stroke-width="1" opacity="0.10">
+    <line x1="204" y1="0" x2="204" y2="900"/>
+    <line x1="352" y1="0" x2="352" y2="900"/>
+    <line x1="500" y1="0" x2="500" y2="900"/>
+    <line x1="648" y1="0" x2="648" y2="900"/>
+    <line x1="796" y1="0" x2="796" y2="900"/>
+    <line x1="944" y1="0" x2="944" y2="900"/>
+    <line x1="1092" y1="0" x2="1092" y2="900"/>
+    <line x1="1240" y1="0" x2="1240" y2="900"/>
+    <line x1="1388" y1="0" x2="1388" y2="900"/>
+  </g>
+
+  <!-- ============ HEADER ============ -->
+  <text x="56" y="58" class="mono eyebrow">RISKMANDATE.AI &#183; PRODUCT ROADMAP &#183; 2026</text>
+  <text x="56" y="106" class="hero">Everything ships on core we already have.</text>
+  <text x="56" y="140" class="sub">No new core technology. Every item is vault, mini-app, connector, or content work on top of what already exists.</text>
+
+  <!-- legend -->
+  <g transform="translate(1290,44)">
+    <circle cx="8" cy="8" r="5" fill="#F5B841"/>
+    <text x="22" y="12" class="mono" font-size="12.5" fill="#B9C8D8">shipped / live</text>
+    <circle cx="8" cy="30" r="5" fill="#57A8E6"/>
+    <text x="22" y="34" class="mono" font-size="12.5" fill="#B9C8D8">planned &#183; on core</text>
+  </g>
+
+  <!-- ============ PRODUCT LAYER (phase timeline) ============ -->
+  <text x="56" y="190" class="mono rowlbl">PRODUCT &#183; BY PHASE</text>
+  <g stroke="#3A5D82" stroke-width="1.4" opacity="0.7">
+    <line x1="176" y1="185" x2="1500" y2="185"/>
+    <path d="M1500 185 l-9 -5 l0 10 z" fill="#3A5D82" stroke="none"/>
+  </g>
+  <text x="1512" y="189" class="mono" font-size="12" fill="#3A5D82">TIME</text>
+
+  <!-- Card 0 : SHIPPED (amber) -->
+  <g>
+    <rect x="56" y="210" width="278" height="252" rx="10" fill="#12243A" stroke="#5A4A24" stroke-width="1.3"/>
+    <rect x="56" y="210" width="278" height="4" rx="2" fill="#F5B841"/>
+    <text x="76" y="242" class="mono ceyebrow" fill="#F5B841">SHIPPED</text>
+    <text x="258" y="242" class="mono" font-size="11.5" fill="#7C93AB">live</text>
+    <line x1="76" y1="254" x2="314" y2="254" stroke="#2A3E56" stroke-width="1"/>
+    <text x="76" y="284" class="item">riskmandate.ai website</text>
+    <text x="76" y="310" class="item">Scenario documents MVP</text>
+    <text x="76" y="336" class="item">SGraph-AI library</text>
+    <text x="76" y="362" class="item">SG/Send &#183; SGit &#183; SG/Compute</text>
+  </g>
+
+  <!-- Card 1 : E1 ENABLER -->
+  <g>
+    <rect x="358" y="210" width="278" height="252" rx="10" fill="#122840" stroke="#294D74" stroke-width="1.3"/>
+    <rect x="358" y="210" width="278" height="4" rx="2" fill="#57A8E6"/>
+    <text x="378" y="242" class="mono ceyebrow" fill="#57A8E6">E1 &#183; ENABLER</text>
+    <line x1="378" y1="254" x2="616" y2="254" stroke="#26415F" stroke-width="1"/>
+    <text x="378" y="284" class="item">Publish-to-prod pipeline</text>
+    <text x="378" y="310" class="item">Vault-loader library</text>
+    <line x1="378" y1="332" x2="616" y2="332" stroke="#26415F" stroke-width="1" opacity="0.6"/>
+    <text x="378" y="356" class="mono" font-size="12" fill="#8DB4DC">new site =</text>
+    <text x="378" y="376" class="mono" font-size="12" fill="#8DB4DC">DNS + mapping + vault</text>
+  </g>
+
+  <!-- Card 2 : PHASE 1 CONTENT -->
+  <g>
+    <rect x="660" y="210" width="278" height="252" rx="10" fill="#122840" stroke="#294D74" stroke-width="1.3"/>
+    <rect x="660" y="210" width="278" height="4" rx="2" fill="#57A8E6"/>
+    <text x="680" y="242" class="mono ceyebrow" fill="#57A8E6">PHASE 1 &#183; CONTENT</text>
+    <line x1="680" y1="254" x2="918" y2="254" stroke="#26415F" stroke-width="1"/>
+    <text x="680" y="282" class="item">The Library</text>
+    <text x="680" y="307" class="item">Use-case mini-sites</text>
+    <text x="680" y="332" class="item">Dynamic scenario survey</text>
+    <text x="680" y="357" class="item">Partner &amp; marketplace pages</text>
+    <text x="680" y="382" class="item">RAMM site + repo &#8594; OWASP</text>
+  </g>
+
+  <!-- Card 3 : PHASE 2 PRODUCT -->
+  <g>
+    <rect x="962" y="210" width="278" height="252" rx="10" fill="#122840" stroke="#294D74" stroke-width="1.3"/>
+    <rect x="962" y="210" width="278" height="4" rx="2" fill="#57A8E6"/>
+    <text x="982" y="242" class="mono ceyebrow" fill="#57A8E6">PHASE 2 &#183; PRODUCT</text>
+    <line x1="982" y1="254" x2="1220" y2="254" stroke="#26415F" stroke-width="1"/>
+    <text x="982" y="280" class="item">Register as vault graph</text>
+    <text x="982" y="303" class="item">Graph viewer</text>
+    <text x="982" y="326" class="item">Risk queue</text>
+    <text x="982" y="349" class="item">Acceptance flow (SGit)</text>
+    <text x="982" y="372" class="item">Dashboard</text>
+    <text x="982" y="395" class="item">Capability certificate</text>
+  </g>
+
+  <!-- Card 4 : PHASE 3 DEMO + MATURITY -->
+  <g>
+    <rect x="1264" y="210" width="278" height="252" rx="10" fill="#122840" stroke="#294D74" stroke-width="1.3"/>
+    <rect x="1264" y="210" width="278" height="4" rx="2" fill="#57A8E6"/>
+    <text x="1284" y="242" class="mono ceyebrow" fill="#57A8E6">PHASE 3 &#183; DEMO</text>
+    <line x1="1284" y1="254" x2="1522" y2="254" stroke="#26415F" stroke-width="1"/>
+    <text x="1284" y="284" class="item">Demo app</text>
+    <text x="1284" y="310" class="item">RAMM maturity queries</text>
+    <text x="1284" y="336" class="item">Agentic overlay</text>
+    <text x="1284" y="386" class="mono" font-size="11.5" fill="#7C93AB">composed from P1 + P2</text>
+  </g>
+
+  <!-- built-on cue -->
+  <g fill="#3E6187">
+    <path d="M799 476 l7 -10 l7 10 z"/>
+  </g>
+
+  <!-- ============ PLATFORM LAYER (Phase 4, cross-cutting) ============ -->
+  <rect x="56" y="492" width="1486" height="96" rx="10" fill="#1A2338" stroke="#6B4E8F" stroke-width="1.3"/>
+  <rect x="56" y="492" width="4" height="96" rx="2" fill="#B98BE8"/>
+  <text x="80" y="524" class="mono bandtag" fill="#C79BEC">PLATFORM &#183; PHASE 4 &#183; CROSS-CUTTING</text>
+  <text x="80" y="548" class="mono" font-size="12" fill="#8C7AA8">pull forward by commercial need</text>
+  <g>
+    <rect x="470" y="512" width="316" height="52" rx="8" fill="#221A38" stroke="#6B4E8F" stroke-width="1"/>
+    <text x="490" y="536" class="chip">On-demand billing</text>
+    <text x="490" y="554" class="mono" font-size="11" fill="#8C7AA8">usage-based, no subscription</text>
+
+    <rect x="800" y="512" width="316" height="52" rx="8" fill="#221A38" stroke="#6B4E8F" stroke-width="1"/>
+    <text x="820" y="536" class="chip">Customer-owned environments</text>
+    <text x="820" y="554" class="mono" font-size="11" fill="#8C7AA8">their cloud, their keys, air-gapped</text>
+
+    <rect x="1130" y="512" width="392" height="52" rx="8" fill="#221A38" stroke="#6B4E8F" stroke-width="1"/>
+    <text x="1150" y="536" class="chip">Security &#183; workflow &#183; GRC integrations</text>
+    <text x="1150" y="554" class="mono" font-size="11" fill="#8C7AA8">feeds in, incidents &amp; tasks out</text>
+  </g>
+
+  <!-- built-on cue -->
+  <g fill="#33547A">
+    <path d="M799 604 l7 -10 l7 10 z"/>
+  </g>
+
+  <!-- ============ CORE LAYER (foundation) ============ -->
+  <rect x="56" y="620" width="1486" height="212" rx="12" fill="url(#steel)" stroke="#28577E" stroke-width="1.4"/>
+  <rect x="58" y="622" width="1482" height="2" rx="1" fill="#2E5E86" opacity="0.8"/>
+  <text x="80" y="654" class="mono bandtag" fill="#77C0F0">CORE &#183; THE TECHNOLOGY TRACK DOES NOT CHANGE</text>
+
+  <!-- foundation chips, two rows -->
+  <g>
+    <!-- row A -->
+    <rect x="80" y="674" width="340" height="60" rx="8" fill="#12314B" stroke="#2C5679" stroke-width="1"/>
+    <text x="98" y="700" class="mono fchip">SG/Send</text>
+    <text x="98" y="720" class="fgloss">vaults &#183; PKI &#183; zero-knowledge &#183; provenance</text>
+
+    <rect x="432" y="674" width="300" height="60" rx="8" fill="#12314B" stroke="#2C5679" stroke-width="1"/>
+    <text x="450" y="700" class="mono fchip">SGit</text>
+    <text x="450" y="720" class="fgloss">versioning &#183; commit-log as audit</text>
+
+    <rect x="744" y="674" width="250" height="60" rx="8" fill="#12314B" stroke="#2C5679" stroke-width="1"/>
+    <text x="762" y="700" class="mono fchip">SG/Compute</text>
+    <text x="762" y="720" class="fgloss">agents &#183; connectors &#183; metering</text>
+
+    <rect x="1006" y="674" width="516" height="60" rx="8" fill="#12314B" stroke="#2C5679" stroke-width="1"/>
+    <text x="1024" y="700" class="mono fchip">Vault-powered mini-sites</text>
+    <text x="1024" y="720" class="fgloss">static-vault &#183; loader &#183; client-side decryption &#183; runs anywhere</text>
+
+    <!-- row B -->
+    <rect x="80" y="746" width="300" height="60" rx="8" fill="#12314B" stroke="#2C5679" stroke-width="1"/>
+    <text x="98" y="772" class="mono fchip">S3-compatible vault</text>
+    <text x="98" y="792" class="fgloss">swappable backends</text>
+
+    <rect x="392" y="746" width="360" height="60" rx="8" fill="#12314B" stroke="#2C5679" stroke-width="1"/>
+    <text x="410" y="772" class="mono fchip">Semantic graph on vaults</text>
+    <text x="410" y="792" class="fgloss">one data model for every surface</text>
+
+    <rect x="764" y="746" width="300" height="60" rx="8" fill="#12314B" stroke="#2C5679" stroke-width="1"/>
+    <text x="782" y="772" class="mono fchip">On-demand billing</text>
+    <text x="782" y="792" class="fgloss">the SG/Vault model</text>
+
+    <rect x="1076" y="746" width="446" height="60" rx="8" fill="#12314B" stroke="#2C5679" stroke-width="1"/>
+    <text x="1094" y="772" class="mono fchip">Black-box I/O contract</text>
+    <text x="1094" y="792" class="fgloss">named inputs &amp; outputs &#183; strict handover boundary</text>
+  </g>
+
+  <!-- footer -->
+  <text x="56" y="872" class="mono foot2">RISKMANDATE.AI</text>
+  <text x="1542" y="872" text-anchor="end" class="mono foot2">CORE &#8594; PLATFORM &#8594; PRODUCT &#183; NOTHING BELOW THE LINE IS REBUILT</text>
+</svg>
