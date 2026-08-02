@@ -119,6 +119,11 @@
 
                         <!-- Right-side debug pane (built lazily by _ensureDebugContent) -->
                         <div class="vs-debug-sidebar" hidden></div>
+
+                        <!-- Native LLM chat drawer — talks about the file on screen.
+                             Real origin, so it calls the provider directly via SGLlm;
+                             the key comes from .vault/llm/config.json (owner-sealed). -->
+                        <div class="vs-llm-sidebar" hidden><vault-llm-chat></vault-llm-chat></div>
                     </div>
 
                     <vault-status-bar></vault-status-bar>
@@ -142,6 +147,14 @@
             this.addEventListener('vault-header-debug',   () => this._toggleDebug());
             this.addEventListener('vault-header-raw',     () => this._showRawVault());
             this.addEventListener('vault-header-rename',  (e) => this._onVaultRename(e.detail?.name));
+
+            // Native LLM chat. Both events are dispatched on `document` by
+            // vault-browse-edit (which patches SendBrowse's file renderer), so they are
+            // listened for there rather than on this element.
+            document.addEventListener('vault-file-viewing', (e) => {
+                this.querySelector('vault-llm-chat')?.setContextFile(e.detail || null);
+            });
+            document.addEventListener('vault-llm-open', () => this._toggleLlmChat(true));
 
             // Nav events
             this.addEventListener('vault-nav-switch', (e) => {
@@ -253,6 +266,8 @@
 
             // Wire settings
             this.querySelector('vault-settings')?.setVault(vault, vaultKey, this._accessKey);
+            // Wire the native LLM chat (resolves its own key/policy from .vault/llm/)
+            this.querySelector('vault-llm-chat')?.setVault(vault);
 
             // Hand the live vault to the embedded Public-preview editor — no re-open, no
             // localStorage race. Set the access token on the shared sgSend so publish/delete work.
@@ -1033,6 +1048,18 @@
 
         static get _DBG_KEYS() { return { open: 'vault-debug-open', width: 'vault-debug-width', tab: 'vault-debug-tab' }; }
 
+        // Show/hide the native LLM chat drawer. The panel resolves its own availability
+        // from .vault/llm/config.json (setVault) and renders the reason when it can't
+        // run — an always-present entry point beats a button that mysteriously vanishes.
+        _toggleLlmChat(forceOpen) {
+            const bar  = this.querySelector('.vs-llm-sidebar');
+            const chat = this.querySelector('vault-llm-chat');
+            if (!bar || !chat) return;
+            const show = (forceOpen === true) ? true : bar.hidden;
+            bar.hidden = !show;
+            if (show) { chat.open(); } else { chat.close(); }
+        }
+
         // Build the sidebar content once (tab bar + lazily-instantiated panes).
         _ensureDebugContent() {
             const sidebar = this.querySelector('.vs-debug-sidebar');
@@ -1333,6 +1360,14 @@
             border-left: 1px solid var(--color-border); background: var(--bg-surface);
         }
         .vs-debug-sidebar[hidden] { display: none; }
+        /* LLM chat drawer — same geometry as the debug pane, its own toggle. */
+        .vs-llm-sidebar {
+            flex: 0 0 380px; min-width: 300px; position: relative;
+            display: flex; overflow: hidden;
+            border-left: 1px solid var(--color-border); background: var(--bg-surface);
+        }
+        .vs-llm-sidebar[hidden] { display: none; }
+        .vs-llm-sidebar vault-llm-chat { flex: 1; min-width: 0; }
         .vs-debug-handle {
             position: absolute; left: 0; top: 0; width: 6px; height: 100%;
             cursor: col-resize; z-index: 5; background: transparent;
