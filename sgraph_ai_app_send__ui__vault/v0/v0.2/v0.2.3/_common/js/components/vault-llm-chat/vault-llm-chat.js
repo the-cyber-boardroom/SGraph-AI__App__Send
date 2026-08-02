@@ -57,6 +57,7 @@
                 '<div class="vlc-panel" hidden>' +
                   '<div class="vlc-head">' +
                     '<span class="vlc-title">Ask about this file</span>' +
+                    '<select class="vlc-model-sel" title="Model" hidden></select>' +
                     '<span class="vlc-model"></span>' +
                     '<span class="vlc-cost"></span>' +
                     '<button class="vlc-x" aria-label="Close">✕</button>' +
@@ -71,6 +72,10 @@
                 '</div>';
 
             this.shadowRoot.querySelector('.vlc-x').addEventListener('click', () => this.close());
+            this.shadowRoot.querySelector('.vlc-model-sel').addEventListener('change', (e) => {
+                this._model = e.target.value || null;
+                this._renderHead();
+            });
             this.shadowRoot.querySelector('.vlc-form').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if (this._busy) { this._stop(); return; }
@@ -83,12 +88,57 @@
         }
 
         async setVault(vault) {
-            this._vault = vault;
+            this._vault   = vault;
             this._session = null;
+            this._models  = null;
+            this._model   = null;
             if (!vault) return;
             try { this._session = await SGLlmVault.open(vault); } catch (_) { this._session = null; }
+            if (this._session && this._session.ok) this._model = this._session.model || null;
             this._renderHead();
             this._renderStatus();
+        }
+
+        // Model list, fetched once and filtered by the admin's allow-list. Lazy: only on
+        // first open, so merely having a key configured costs no network.
+        async _ensureModels() {
+            if (this._models) return this._models;
+            const s = this._session;
+            if (!s || !s.ok) return [];
+            this._models = [];                       // set first: prevents a re-entrant refetch
+            try {
+                const all = await s.client.models();
+                this._models = all.map((m) => m && m.id)
+                                  .filter((id) => id && SGLlmConfig.modelAllowed(s.policy, id))
+                                  .sort();
+            } catch (_) { this._models = []; }
+            return this._models;
+        }
+
+        async _refreshModels() {
+            const s = this._session;
+            if (!s || !s.ok) return;
+            const ids = await this._ensureModels();
+            const sel = this.shadowRoot.querySelector('.vlc-model-sel');
+
+            // Resolve a model even when the admin left `models.default` empty — that is
+            // exactly the state that used to send {model:null} and earn a remote 404.
+            const chosen = this._model || SGLlmConfig.pickModel(s.policy, ids);
+            const autoPicked = !this._model && !s.model && !!chosen;
+            this._model = chosen;
+
+            if (sel && ids.length) {
+                sel.innerHTML = ids.map((id) =>
+                    '<option value="' + esc(id) + '"' + (id === chosen ? ' selected' : '') + '>' + esc(id) + '</option>').join('');
+                sel.hidden = false;
+            }
+            if (!chosen) {
+                this._setStatus('No usable model — the vault\'s allow-list matches nothing available on this key.', 'warn');
+            } else if (autoPicked) {
+                // Never switch models silently: say which one, and where to make it stick.
+                this._setStatus('Using ' + chosen + ' (no default set — choose one in Settings → AI models to make it permanent).', 'info');
+            }
+            this._renderHead();
         }
 
         // Called whenever the vault UI renders a file. Text-ish files become context;
@@ -102,6 +152,7 @@
 
         open()   { this.shadowRoot.querySelector('.vlc-panel').hidden = false;
                    this._renderHead(); this._renderStatus();
+                   this._refreshModels();                       // lazy: first open only
                    setTimeout(() => this.shadowRoot.querySelector('.vlc-in')?.focus(), 0); }
         close()  { this.shadowRoot.querySelector('.vlc-panel').hidden = true; }
         toggle() { const p = this.shadowRoot.querySelector('.vlc-panel');
@@ -111,7 +162,10 @@
         _renderHead() {
             const m = this.shadowRoot.querySelector('.vlc-model');
             const c = this.shadowRoot.querySelector('.vlc-cost');
-            if (m) m.textContent = (this._session && this._session.ok && this._session.model) || '';
+            const sel = this.shadowRoot.querySelector('.vlc-model-sel');
+            // The <select> is the model display once it is populated; the text span is the
+            // fallback for the pre-fetch moment (and when /models is unreachable).
+            if (m) m.textContent = (sel && !sel.hidden) ? '' : (this._model || '');
             if (c) c.textContent = this._calls ? ('~$' + this._cost.toFixed(4) + ' · ' + this._calls + ' calls') : '';
         }
 
@@ -125,6 +179,13 @@
                     ? '<span class="vlc-dim"> · binary, not sent as context</span>'
                     : '<span class="vlc-dim"> · ' + n.toLocaleString() + ' chars' +
                       (n > MAX_CONTEXT_CHARS ? ' (truncated to ' + MAX_CONTEXT_CHARS.toLocaleString() + ')' : '') + '</span>');
+        }
+
+        _setStatus(msg, type) {
+            const el = this.shadowRoot.querySelector('.vlc-status');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.className   = 'vlc-status' + (type ? ' vlc-status--' + type : '');
         }
 
         _renderStatus() {
@@ -170,6 +231,15 @@
             if (!this.isAvailable()) { this._renderStatus(); return; }
 
             const s = this._session;
+            // Resolve a model before spending a turn. Without this the request went out as
+            // {model:null} and OpenRouter answered `404 No endpoints found for .`
+            if (!this._model) {
+                await this._refreshModels();
+                if (!this._model) {
+                    this._push('err', 'No model selected. Set a default in Settings → AI models, or widen the allowed-models list.');
+                    return;
+                }
+            }
             const limits = SGLlmConfig.limitsFor(s.policy, null);
             if (limits.maxCallsPerSession && this._calls >= limits.maxCallsPerSession) {
                 this._push('err', 'Session call limit reached (' + limits.maxCallsPerSession + '). Raise it in Settings → AI models.');
@@ -201,7 +271,7 @@
             let acc = '', last = 0;
             try {
                 const res = await s.client.chat(
-                    { model: s.model, messages: msgs, maxTokens: limits.maxTokensPerCall || undefined },
+                    { model: this._model, messages: msgs, maxTokens: limits.maxTokensPerCall || undefined },
                     (delta, all) => {
                         acc = all;
                         const now = Date.now();

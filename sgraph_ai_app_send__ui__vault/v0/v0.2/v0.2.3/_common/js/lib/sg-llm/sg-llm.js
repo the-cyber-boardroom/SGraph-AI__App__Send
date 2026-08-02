@@ -181,6 +181,15 @@
     SGLlm.prototype.chat = async function (req, onToken, signal) {
         var q = req || {};
         if (!this.apiKey) throw Object.assign(new Error('no LLM key configured'), { code: 'ENOKEY' });
+        // Fail LOCALLY and legibly. Sending {model:null} upstream returns
+        // `404 No endpoints found for .` — a confusing remote error for what is really a
+        // local misconfiguration (no default model set in .vault/llm/config.json and none
+        // chosen in the UI).
+        if (!q.model || typeof q.model !== 'string') {
+            throw Object.assign(
+                new Error('no model selected — pick one in the chat panel, or set a default in Settings → AI models'),
+                { code: 'EMODEL' });
+        }
 
         var body = {
             model   : q.model,

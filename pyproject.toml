@@ -23,6 +23,9 @@ osbot-fast-api-serverless      = "*"
 mgraph-ai-service-cache        = "*"
 mgraph-ai-service-cache-client = "*"
 fastapi-mcp                    = "*"
+# See requirements-test.txt: fastapi-mcp 0.4.0 declares `mcp>=1.12.0` with no upper bound but
+# calls Server() positionally; mcp 2.0.0 made those args keyword-only. Pin until upstream fixes.
+mcp                            = "<2"
 
 [build-system]
 requires = ["poetry-core>=1.9.1"]

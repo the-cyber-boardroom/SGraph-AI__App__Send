@@ -89,10 +89,35 @@ console.log('\n[suite] vault-llm-chat — unavailability is explained, not silen
     ok('EREADONLY shows its message', /owner-sealed/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
 
     el._session = { ok: true, model: 'anthropic/x', policy: SGLlmConfig.parse({}) };
+    el._model   = 'anthropic/x';        // set by setVault/_refreshModels in the real flow
     el._renderStatus(); el._renderHead();
     ok('available → status clears', el.shadowRoot.querySelector('.vlc-status').textContent === '');
-    ok('available → model is shown', el.shadowRoot.querySelector('.vlc-model').textContent === 'anthropic/x');
+    ok('available → the active model is shown', el.shadowRoot.querySelector('.vlc-model').textContent === 'anthropic/x');
     ok('isAvailable() true once a session resolves', el.isAvailable() === true);
+}
+
+console.log('\n[suite] vault-llm-chat — model selection (regression: model:null → upstream 404)');
+{
+    const el = mount();
+    const sel = el.shadowRoot.querySelector('.vlc-model-sel');
+    ok('a model picker exists', !!sel);
+    ok('picker is hidden until models are known', sel.hidden === true);
+
+    // A vault whose config has NO default model — the exact state from the bug report.
+    el._session = { ok: true, model: null, policy: SGLlmConfig.parse({ models: { allow: ['*'] } }), client: {
+        models: async () => [{ id: 'anthropic/claude-x' }, { id: 'zz/other' }]
+    } };
+    await el._refreshModels();
+    ok('a model is resolved despite no configured default', el._model === 'anthropic/claude-x');
+    ok('picker is revealed and populated', sel.hidden === false && sel.options.length === 2);
+    ok('picker selects the resolved model', sel.value === 'anthropic/claude-x');
+    ok('auto-pick is announced, not silent',
+        /no default set/i.test(el.shadowRoot.querySelector('.vlc-status').textContent));
+
+    // Changing the picker changes the model used for the next call.
+    sel.value = 'zz/other';
+    sel.dispatchEvent(new window.Event('change'));
+    ok('changing the picker updates the active model', el._model === 'zz/other');
 }
 
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');

@@ -135,8 +135,9 @@
                                 <span>Anyone who can open this vault — including read-only holders, who can then also <em>extract</em> the key and spend it elsewhere.</span>
                             </label>
 
-                            <label class="vset-sublabel">Default model</label>
-                            <input class="vset-input vset-llm-model" type="text" placeholder="anthropic/claude-sonnet-4">
+                            <label class="vset-sublabel">Default model <span class="vset-hint vset-hint--warn vset-llm-nodefault" style="display:none">— not set; the chat panel will auto-pick one</span></label>
+                            <input class="vset-input vset-llm-model" type="text" list="vset-llm-models" placeholder="press Test to list available models">
+                            <datalist id="vset-llm-models"></datalist>
 
                             <label class="vset-sublabel">Allowed models (comma-separated; <code>*</code> or <code>vendor/*</code>)</label>
                             <input class="vset-input vset-llm-allow" type="text" placeholder="*">
@@ -434,6 +435,10 @@
             root.querySelectorAll('.vset-llm-tier').forEach((r) => { r.checked = (r.value === policy.keyTier); });
 
             const configured = !!(policy.key || policy.keySealed);
+            // Surface the empty-default state: it is legal (the chat panel auto-picks) but
+            // it is also the condition that used to fail as an opaque upstream 404.
+            const nd = root.querySelector('.vset-llm-nodefault');
+            if (nd) nd.style.display = (configured && !policy.models['default']) ? '' : 'none';
             const keyEl = root.querySelector('.vset-llm-key');
             if (keyEl) keyEl.placeholder = configured
                 ? (policy.key ? SGLlmConfig.redact(policy.key) + ' — stored (shared)' : 'stored (owner-sealed) — enter a new key to replace')
@@ -566,8 +571,15 @@
                 const resp = await fetch(endpoint + '/models', { headers: { Authorization: 'Bearer ' + key } });
                 if (!resp.ok) { this._setLlmStatus('✗ Rejected by OpenRouter (' + resp.status + ')', 'error'); return; }
                 const data = await resp.json();
-                const n    = (data && Array.isArray(data.data)) ? data.data.length : 0;
-                this._setLlmStatus('✓ Key valid · ' + n + ' models available', 'ok');
+                const list = (data && Array.isArray(data.data)) ? data.data : [];
+                // Populate the datalist so setting a default model is a pick, not a guess —
+                // an empty default is what produced the {model:null} → upstream 404.
+                const dl = root.querySelector('#vset-llm-models');
+                if (dl) {
+                    dl.innerHTML = list.map((m) => m && m.id).filter(Boolean).sort()
+                        .map((id) => '<option value="' + id.replace(/"/g, '&quot;') + '"></option>').join('');
+                }
+                this._setLlmStatus('✓ Key valid · ' + list.length + ' models available (type in Default model to filter)', 'ok');
             } catch (err) {
                 this._setLlmStatus('✗ Check failed: ' + (err.message || err), 'error');
             } finally {

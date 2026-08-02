@@ -85,5 +85,28 @@ ok('externalLinks true only when ===true',    AP.parsePermissions({ permissions:
 ok('externalLinks truthy-but-not-true → false (e.g. "yes")',
     AP.parsePermissions({ permissions: { externalLinks: 'yes' } }).externalLinks === false);
 
+// llm grants (sg.llm.*) — booleans, default-deny. These declare INTENT only; the real
+// capability is the intersection with the vault admin's .vault/llm/config.json.
+const pNoLlm  = AP.parsePermissions(null);
+const pLlm    = AP.parsePermissions({ permissions: { llm: { chat: true, models: true } } });
+ok('llm.chat denied with no permissions block',   !AP.can(pNoLlm, 'llm.chat',   ''));
+ok('llm.chat granted when declared',               AP.can(pLlm,   'llm.chat',   ''));
+ok('llm.models granted when declared',             AP.can(pLlm,   'llm.models', ''));
+ok('llm.usage denied when not declared',          !AP.can(pLlm,   'llm.usage',  ''));
+ok('unknown llm verb denied',                     !AP.can(pLlm,   'llm.destroy', ''));
+ok('llm truthy-but-not-true → false',
+    AP.parsePermissions({ permissions: { llm: { chat: 'yes' } } }).llm.chat === false);
+ok('junk llm block → all denied',
+    AP.parsePermissions({ permissions: { llm: 'nope' } }).llm.chat === false);
+// A limit an app author sets is not a limit — the manifest must not carry spend caps.
+ok('llm block exposes only the three verbs (no app-set limits)',
+    Object.keys(AP.parsePermissions({ permissions: { llm: { chat: true, maxCostPerSession: 999 } } }).llm)
+        .sort().join(',') === 'chat,models,usage');
+
+// network — the CSP escape hatch. Default-deny: app frames get connect-src blob: data:.
+ok('network default false',                 AP.parsePermissions(null).network === false);
+ok('network true only when ===true',        AP.parsePermissions({ permissions: { network: true } }).network === true);
+ok('network truthy-but-not-true → false',   AP.parsePermissions({ permissions: { network: 1 } }).network === false);
+
 console.log(`\n[result] ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

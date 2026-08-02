@@ -62,6 +62,30 @@ console.log('\n[suite] SGLlm — parseSseData');
     ok('non-stream message content is read as a delta', n.delta === 'full');
 }
 
+console.log('\n[suite] SGLlm — chat() refuses to send a null model');
+{
+    // Regression: {model:null} used to reach OpenRouter, which replied
+    // `404 No endpoints found for .` — a remote error for a local misconfiguration.
+    const c = new L({ apiKey: 'sk-or-test' });
+    const call = async (model) => {
+        try { await c.chat({ model, messages: [{ role: 'user', content: 'hi' }] }); return null; }
+        catch (e) { return e; }
+    };
+    const run = async () => {
+        const eNull = await call(null);
+        ok('null model rejects locally', !!eNull && eNull.code === 'EMODEL');
+        ok('…with an actionable message', /Settings|pick one/i.test(eNull.message), eNull && eNull.message);
+        ok('undefined model rejects', (await call(undefined)).code === 'EMODEL');
+        ok('empty-string model rejects', (await call('')).code === 'EMODEL');
+        ok('non-string model rejects', (await call(42)).code === 'EMODEL');
+        // No key is still reported first — the more fundamental misconfiguration.
+        const noKey = new L({ apiKey: '' });
+        let e2; try { await noKey.chat({ model: 'a/b', messages: [] }); } catch (e) { e2 = e; }
+        ok('missing key reports ENOKEY, not EMODEL', e2 && e2.code === 'ENOKEY');
+    };
+    await run();
+}
+
 console.log('\n[suite] SGLlm — cost: estimate vs authoritative');
 {
     const price = { prompt: 0.001, completion: 0.002 };
