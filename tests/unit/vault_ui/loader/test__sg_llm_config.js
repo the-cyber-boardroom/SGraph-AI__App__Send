@@ -68,6 +68,33 @@ console.log('\n[suite] SGLlmConfig — model allow-list');
         C.defaultModel(C.parse({ models: { allow: ['anthropic/*'], 'default': 'openai/x' } })) === null);
 }
 
+console.log('\n[suite] SGLlmConfig — pickModel (regression: default:null → {model:null} → upstream 404)');
+{
+    const ids = ['zz/last', 'openai/gpt-4o-mini', 'anthropic/claude-x', 'aaa/first'];
+
+    // THE BUG: a saved config with models.default = null used to flow straight through to
+    // the request body as model:null, and OpenRouter answered "No endpoints found for .".
+    const noDefault = C.parse({ models: { allow: ['*'] } });
+    ok('config with no default still yields a model', C.pickModel(noDefault, ids) !== null);
+    ok('…and prefers a known vendor over alphabetical', C.pickModel(noDefault, ids) === 'anthropic/claude-x');
+
+    const withDefault = C.parse({ models: { allow: ['*'], 'default': 'openai/gpt-4o-mini' } });
+    ok('a configured default wins', C.pickModel(withDefault, ids) === 'openai/gpt-4o-mini');
+
+    // A default the admin later disallowed must not be resurrected.
+    const stale = C.parse({ models: { allow: ['anthropic/*'], 'default': 'openai/gpt-4o-mini' } });
+    ok('a default outside the allow-list is not used', C.pickModel(stale, ids) === 'anthropic/claude-x');
+
+    const narrow = C.parse({ models: { allow: ['zz/*'] } });
+    ok('falls back to the first allowed id when no vendor matches', C.pickModel(narrow, ids) === 'zz/last');
+
+    ok('no available ids + a valid default → the default (list may be unreachable)',
+        C.pickModel(withDefault, []) === 'openai/gpt-4o-mini');
+    ok('nothing allowed and nothing available → null (caller must show an error)',
+        C.pickModel(C.parse({ models: { allow: ['nope/*'] } }), ids) === null);
+    ok('junk availableIds does not throw', C.pickModel(noDefault, null) === null);
+}
+
 console.log('\n[suite] SGLlmConfig — limits and per-app overrides');
 {
     const p = C.parse({ limits: { maxCostPerSession: 5, maxCallsPerSession: 50 },

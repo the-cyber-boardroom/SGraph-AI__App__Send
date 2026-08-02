@@ -169,6 +169,33 @@
         return v.slice(0, 6) + '…' + v.slice(-4);
     }
 
+    // Choose a model when the admin left `models.default` empty. Order:
+    //   1. the configured default, if it is allowed
+    //   2. the first allowed id matching a PREFERRED vendor prefix (stable across model
+    //      renames — we match the vendor, never a version)
+    //   3. the first allowed id at all
+    // Returns null only when nothing is allowed/available. Callers should SHOW which
+    // model was auto-picked rather than choosing silently.
+    var PREFERRED = ['anthropic/', 'openai/', 'google/', 'meta-llama/', 'mistralai/'];
+
+    function pickModel(policy, availableIds) {
+        var p   = parse(policy);
+        var ids = Array.isArray(availableIds) ? availableIds.filter(function (i) { return typeof i === 'string' && i; }) : [];
+        var allowed = ids.filter(function (id) { return modelAllowed(p, id); });
+
+        var dflt = p.models['default'];
+        if (dflt && modelAllowed(p, dflt)) {
+            // Honour the configured default even if the /models list is unavailable.
+            if (!allowed.length || allowed.indexOf(dflt) > -1) return dflt;
+        }
+        for (var v = 0; v < PREFERRED.length; v++) {
+            for (var i = 0; i < allowed.length; i++) {
+                if (allowed[i].indexOf(PREFERRED[v]) === 0) return allowed[i];
+            }
+        }
+        return allowed.length ? allowed[0] : null;
+    }
+
     function summarise(policy) {
         var p = parse(policy);
         var configured = !!(p.key || p.keySealed);
@@ -186,10 +213,12 @@
         SCHEMA          : SCHEMA,
         DEFAULT_ENDPOINT: DEFAULT_ENDPOINT,
         DEFAULT_LIMITS  : DEFAULT_LIMITS,
+        PREFERRED       : PREFERRED,
         parse           : parse,
         serialize       : serialize,
         modelAllowed    : modelAllowed,
         defaultModel    : defaultModel,
+        pickModel       : pickModel,
         limitsFor       : limitsFor,
         looksLikeKey    : looksLikeKey,
         redact          : redact,
