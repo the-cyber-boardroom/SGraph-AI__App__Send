@@ -108,6 +108,7 @@
         var fs    = (p.fs    && typeof p.fs    === 'object') ? p.fs    : {};
         var vault = (p.vault && typeof p.vault === 'object') ? p.vault : {};
         var append = (p.append && typeof p.append === 'object') ? p.append : {};
+        var llm    = (p.llm    && typeof p.llm    === 'object') ? p.llm    : {};
         return {
             consent: _consentPolicy(p.consent),
             fs: {
@@ -152,7 +153,26 @@
             // per-file confirm. When FALSE (default) each download surfaces a one-click
             // HUD confirm naming the file and size. Either way the save itself runs in
             // the HOST document (real origin) — the app frame never needs allow-downloads.
-            downloads: (p.downloads === true)
+            downloads: (p.downloads === true),
+
+            // LLM access (sg.llm.*) — all booleans, default-deny. These declare INTENT
+            // only. The capability is the INTERSECTION of this and the vault admin's
+            // `.vault/llm/config.json` (key, allowed models, spend caps): an app that
+            // declares chat in a vault with no key gets ENOKEY, and a configured vault
+            // grants nothing to an app that didn't declare it. Deliberately NO limits
+            // here — a cap the app author sets is not a cap.
+            llm: {
+                chat  : llm.chat   === true,
+                models: llm.models === true,
+                usage : llm.usage  === true
+            },
+
+            // network (bool, default-deny) — the CSP escape hatch. App frames are served
+            // with `connect-src blob: data:` (no network hosts), so the postMessage bridge
+            // is the only way out. TRUE omits that restriction for apps that genuinely
+            // need to call a third-party API directly; the HUD then shows a standing
+            // "direct network access" indicator so it is never silent.
+            network: (p.network === true)
         };
     }
 
@@ -198,6 +218,9 @@
         }
         if (grp === 'append') {
             return !!(perm.append && perm.append[act] === true);   // all booleans, default-deny
+        }
+        if (grp === 'llm') {
+            return !!(perm.llm && perm.llm[act] === true);         // all booleans, default-deny
         }
         return false;
     }
