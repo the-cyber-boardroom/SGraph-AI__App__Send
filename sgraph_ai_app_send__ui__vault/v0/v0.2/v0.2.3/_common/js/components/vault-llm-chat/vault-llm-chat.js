@@ -1,34 +1,57 @@
 /* =================================================================================
    SGraph Vault — native LLM chat panel
 
-   "Talk to the file you're looking at." Runs at the REAL origin inside the vault UI,
-   so it calls OpenRouter directly through SGLlm — no bridge, no sandbox, no
-   postMessage streaming. The credential comes from `.vault/llm/config.json` via
-   SGLlmVault (owner-sealed by default; a read-only session simply cannot open it).
+   "Talk to the files you've picked." Runs at the REAL origin inside the vault UI, so
+   it calls OpenRouter directly through SGLlm — no bridge, no sandbox, no postMessage
+   streaming. The credential comes from `.vault/llm/config.json` via SGLlmVault
+   (owner-sealed by default; a read-only session simply cannot open it).
 
    Deliberately NOT an agent: no tools, no vault writes, no autonomous loop. It reads
-   the file you are viewing and talks about it. Tool-using agents remain app-side
-   (the SG/Vault Workbench is the reference); this is the always-there, zero-setup
-   surface that every vault gets.
+   the files you attached and talks about them. Tool-using agents remain app-side (the
+   SG/Vault Workbench is the reference); this is the always-there, zero-setup surface.
+
+   CONTEXT IS AN EXPLICIT SET, NOT "whatever is on screen". The previous version tracked
+   the file being viewed and silently swapped context underneath the conversation —
+   which broke outright once a file's tab was already open (send-browse's _openFileTab
+   returns early on an existing tab, so nothing re-announced the file and the context
+   went stale without saying so). Files are now ADDED by an explicit "Add to chat"
+   action, listed as removable chips, and the set can be empty (a plain chat).
+
+   Mounted as an sg-layout panel by vault-shell, so it is movable/resizable like every
+   other pane. It therefore does NOT manage its own visibility — the layout does.
 
    API:
      setVault(vault)                    — wire/refresh availability
-     setContextFile({path, text})       — the file currently being viewed
-     toggle() / open() / close()
+     addContextFile({path,text,type})   — attach a file (dedup by path)
+     removeContextFile(path) / clearContextFiles()
+     contextFiles()                     — current set (copy)
+     setContextFile({path,text})        — records the file being VIEWED (for the
+                                          empty-state hint only; never auto-attaches)
+     focusInput() / open() / close()
 
-   Requires: SGLlm, SGLlmConfig, SGLlmVault, VaultHelpers (optional).
+   Requires: SGLlm, SGLlmConfig, SGLlmVault, VaultLlmLog.
    ================================================================================= */
 
 (function () {
     'use strict';
 
-    var MAX_CONTEXT_CHARS = 24000;
+    var MAX_CONTEXT_CHARS = 24000;   // total budget across ALL attached files
+    var MIN_PER_FILE      = 1500;    // never shave a file below this before dropping it
+    var MAX_FILES         = 20;
     var MAX_HISTORY_MSGS  = 20;
 
-    var SYSTEM = 'You are a helpful assistant embedded in an encrypted SGraph vault. ' +
-        'The user is viewing a file from that vault; its content is provided to you as context. ' +
-        'Answer about the file directly and concisely. If the context is marked TRUNCATED, say so ' +
-        'rather than implying you have read the whole file. You cannot modify the vault.';
+    var SYSTEM_WITH_FILES =
+        'You are a helpful assistant embedded in an encrypted SGraph vault. ' +
+        'The user has attached one or more files from that vault; their contents are provided as context. ' +
+        'Answer about those files directly and concisely. When several files are attached, be explicit about ' +
+        'which file you are referring to. If a file is marked TRUNCATED, say so rather than implying you have ' +
+        'read the whole thing. You cannot modify the vault.';
+
+    var SYSTEM_NO_FILES =
+        'You are a helpful assistant embedded in an encrypted SGraph vault. ' +
+        'No vault files are attached to this conversation, so answer from general knowledge. ' +
+        'If the user asks about vault content, tell them to attach a file with "Add to chat". ' +
+        'You cannot modify the vault.';
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -43,7 +66,8 @@
             this.attachShadow({ mode: 'open' });
             this._vault   = null;
             this._session = null;      // { ok, client, policy, model }
-            this._ctx     = null;      // { path, text }
+            this._files   = [];        // [{ path, text, type, chars }] — the explicit context set
+            this._viewing = null;      // last file rendered by the browser (hint only)
             this._history = [];
             this._busy    = false;
             this._abort   = null;
@@ -52,26 +76,32 @@
         }
 
         connectedCallback() {
+            if (this._built) return;                       // sg-layout re-slots on every re-render
+            this._built = true;
             this.shadowRoot.innerHTML =
                 '<style>' + VaultLlmChat.styles + '</style>' +
-                '<div class="vlc-panel" hidden>' +
+                '<div class="vlc-panel">' +
                   '<div class="vlc-head">' +
-                    '<span class="vlc-title">Ask about this file</span>' +
+                    '<span class="vlc-title">AI Chat</span>' +
                     '<select class="vlc-model-sel" title="Model" hidden></select>' +
                     '<span class="vlc-model"></span>' +
-                    '<span class="vlc-cost"></span>' +
-                    '<button class="vlc-x" aria-label="Close">✕</button>' +
+                    '<span class="vlc-cost" title="Session spend — click for the request ledger"></span>' +
+                    '<button class="vlc-reqs" type="button" title="Requests &amp; cost ledger">&#129534;</button>' +
+                    '<button class="vlc-x" type="button" aria-label="Close">&#10005;</button>' +
                   '</div>' +
                   '<div class="vlc-ctx"></div>' +
                   '<div class="vlc-log" role="log" aria-live="polite"></div>' +
                   '<div class="vlc-status"></div>' +
                   '<form class="vlc-form">' +
-                    '<textarea class="vlc-in" rows="2" placeholder="Ask about this file…"></textarea>' +
+                    '<textarea class="vlc-in" rows="2" placeholder="Ask anything — attach files with &quot;Add to chat&quot;…"></textarea>' +
                     '<button class="vlc-send" type="submit">Send</button>' +
                   '</form>' +
                 '</div>';
 
             this.shadowRoot.querySelector('.vlc-x').addEventListener('click', () => this.close());
+            this.shadowRoot.querySelector('.vlc-reqs').addEventListener('click', () => {
+                this.dispatchEvent(new CustomEvent('vault-llm-requests-open', { bubbles: true, composed: true }));
+            });
             this.shadowRoot.querySelector('.vlc-model-sel').addEventListener('change', (e) => {
                 this._model = e.target.value || null;
                 this._renderHead();
@@ -85,6 +115,17 @@
             this.shadowRoot.querySelector('.vlc-in').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!this._busy) this._send(); }
             });
+            // Chip removal + clear-all (delegated: chips are re-rendered constantly).
+            this.shadowRoot.querySelector('.vlc-ctx').addEventListener('click', (e) => {
+                const del = e.target.closest('[data-del]');
+                if (del) { this.removeContextFile(del.getAttribute('data-del')); return; }
+                if (e.target.closest('.vlc-clear')) this.clearContextFiles();
+                if (e.target.closest('.vlc-add-viewing') && this._viewing) this.addContextFile(this._viewing);
+            });
+
+            this._renderCtx();
+            this._renderHead();
+            this._renderStatus();
         }
 
         async setVault(vault) {
@@ -141,44 +182,102 @@
             this._renderHead();
         }
 
-        // Called whenever the vault UI renders a file. Text-ish files become context;
-        // binaries are noted but not sent (there is nothing useful to send).
-        setContextFile(ctx) {
-            this._ctx = ctx && ctx.path ? ctx : null;
+        // ── context set ──────────────────────────────────────────────────────────
+        // Explicit, additive, de-duplicated by path. Re-adding a path REPLACES its text,
+        // so "Add to chat" on a file you just edited refreshes the copy the model sees.
+        addContextFile(f) {
+            if (!f || !f.path) return { added: false, reason: 'nofile' };
+            if (this._files.length >= MAX_FILES && !this._files.some((x) => x.path === f.path)) {
+                this._setStatus('Attachment limit reached (' + MAX_FILES + ' files). Remove one first.', 'warn');
+                return { added: false, reason: 'limit' };
+            }
+            const rec = {
+                path : f.path,
+                text : (f.text == null) ? null : String(f.text),
+                type : f.type || null,
+                chars: (f.text == null) ? 0 : String(f.text).length
+            };
+            const i = this._files.findIndex((x) => x.path === rec.path);
+            const replaced = i >= 0;
+            if (replaced) this._files[i] = rec; else this._files.push(rec);
             this._renderCtx();
+            if (rec.text == null) {
+                this._setStatus('"' + rec.path + '" is binary — attached as a filename only, its bytes are not sent.', 'info');
+            } else {
+                this._setStatus('');
+            }
+            return { added: true, replaced: replaced };
+        }
+
+        removeContextFile(path) {
+            const n = this._files.length;
+            this._files = this._files.filter((x) => x.path !== path);
+            if (this._files.length !== n) this._renderCtx();
+        }
+
+        clearContextFiles() { this._files = []; this._renderCtx(); }
+
+        contextFiles() { return this._files.map((f) => ({ path: f.path, type: f.type, chars: f.chars })); }
+
+        // The file currently on screen. Recorded ONLY so the empty state can offer a
+        // one-click "add the file you're looking at" — it never attaches by itself.
+        setContextFile(ctx) {
+            this._viewing = (ctx && ctx.path) ? ctx : null;
+            if (!this._files.length) this._renderCtx();
         }
 
         isAvailable() { return !!(this._session && this._session.ok); }
 
-        open()   { this.shadowRoot.querySelector('.vlc-panel').hidden = false;
-                   this._renderHead(); this._renderStatus();
-                   this._refreshModels();                       // lazy: first open only
-                   setTimeout(() => this.shadowRoot.querySelector('.vlc-in')?.focus(), 0); }
-        close()  { this.shadowRoot.querySelector('.vlc-panel').hidden = true; }
-        toggle() { const p = this.shadowRoot.querySelector('.vlc-panel');
-                   if (p.hidden) this.open(); else this.close(); }
+        // Visibility belongs to sg-layout now; open() just readies + focuses.
+        open() {
+            this._renderHead(); this._renderStatus();
+            this._refreshModels();                       // lazy: first open only
+            this.focusInput();
+        }
+        focusInput() { setTimeout(() => this.shadowRoot.querySelector('.vlc-in')?.focus(), 0); }
+        close() { this.dispatchEvent(new CustomEvent('vault-llm-close', { bubbles: true, composed: true })); }
 
         // ── rendering ────────────────────────────────────────────────────────────
         _renderHead() {
             const m = this.shadowRoot.querySelector('.vlc-model');
             const c = this.shadowRoot.querySelector('.vlc-cost');
             const sel = this.shadowRoot.querySelector('.vlc-model-sel');
+            if (!m || !c) return;
             // The <select> is the model display once it is populated; the text span is the
             // fallback for the pre-fetch moment (and when /models is unreachable).
-            if (m) m.textContent = (sel && !sel.hidden) ? '' : (this._model || '');
-            if (c) c.textContent = this._calls ? ('~$' + this._cost.toFixed(4) + ' · ' + this._calls + ' calls') : '';
+            m.textContent = (sel && !sel.hidden) ? '' : (this._model || '');
+            c.textContent = this._calls ? ('~$' + this._cost.toFixed(4) + ' · ' + this._calls + ' calls') : '';
         }
 
         _renderCtx() {
             const el = this.shadowRoot.querySelector('.vlc-ctx');
             if (!el) return;
-            if (!this._ctx) { el.innerHTML = '<span class="vlc-dim">No file selected — open a file to ask about it.</span>'; return; }
-            const n = (this._ctx.text || '').length;
-            el.innerHTML = '<span class="vlc-chip">📄 ' + esc(this._ctx.path) + '</span>' +
-                (this._ctx.text == null
-                    ? '<span class="vlc-dim"> · binary, not sent as context</span>'
-                    : '<span class="vlc-dim"> · ' + n.toLocaleString() + ' chars' +
-                      (n > MAX_CONTEXT_CHARS ? ' (truncated to ' + MAX_CONTEXT_CHARS.toLocaleString() + ')' : '') + '</span>');
+
+            if (!this._files.length) {
+                el.innerHTML =
+                    '<span class="vlc-dim">No files attached — this is a plain chat. ' +
+                    'Open a file and click <strong>➕ Add to chat</strong> to give the model context.</span>' +
+                    (this._viewing
+                        ? ' <button class="vlc-mini vlc-add-viewing" type="button">➕ Add ' + esc(this._viewing.path) + '</button>'
+                        : '');
+                return;
+            }
+
+            const total = this._files.reduce((n, f) => n + f.chars, 0);
+            const over  = total > MAX_CONTEXT_CHARS;
+            el.innerHTML =
+                this._files.map((f) =>
+                    '<span class="vlc-chip' + (f.text == null ? ' vlc-chip--bin' : '') + '">' +
+                        '📄 ' + esc(f.path) +
+                        '<span class="vlc-chip__n">' + (f.text == null ? 'binary' : f.chars.toLocaleString()) + '</span>' +
+                        '<button class="vlc-chip__x" type="button" data-del="' + esc(f.path) + '" ' +
+                                'title="Remove from chat" aria-label="Remove ' + esc(f.path) + '">✕</button>' +
+                    '</span>').join('') +
+                '<span class="vlc-dim vlc-ctxsum"> ' + this._files.length + ' file' + (this._files.length > 1 ? 's' : '') +
+                    ' · ' + total.toLocaleString() + ' chars' +
+                    (over ? ' <span class="vlc-warn">(trimmed to ' + MAX_CONTEXT_CHARS.toLocaleString() + ' total)</span>' : '') +
+                '</span>' +
+                '<button class="vlc-mini vlc-clear" type="button" title="Remove all attached files">clear all</button>';
         }
 
         _setStatus(msg, type) {
@@ -223,6 +322,21 @@
             if (this._abort) { try { this._abort.abort(); } catch (_) {} }
         }
 
+        // Every attached file rides as its own system message, sharing one character
+        // budget. Splitting evenly (rather than first-come-first-served) means adding a
+        // huge file cannot silently starve the small one you actually asked about; each
+        // slice is labelled TRUNCATED by buildFileContext so the model never pretends.
+        _contextMessages() {
+            const withText = this._files.filter((f) => f.text != null);
+            if (!withText.length) return [];
+            let per = Math.floor(MAX_CONTEXT_CHARS / withText.length);
+            if (per < MIN_PER_FILE) per = MIN_PER_FILE;
+            return withText.map((f) => ({
+                role: 'system',
+                content: SGLlm.buildFileContext({ path: f.path, content: f.text, maxChars: per }).text
+            }));
+        }
+
         // ── the call ─────────────────────────────────────────────────────────────
         async _send() {
             const inEl = this.shadowRoot.querySelector('.vlc-in');
@@ -254,14 +368,19 @@
             this._push('user', q);
             this._history.push({ role: 'user', content: q });
 
-            // Context rides as a system message each turn: the user may switch files
-            // mid-conversation and the model must always see the CURRENT one.
-            const msgs = [{ role: 'system', content: SYSTEM }];
-            if (this._ctx && this._ctx.text != null) {
-                const c = SGLlm.buildFileContext({ path: this._ctx.path, content: this._ctx.text, maxChars: MAX_CONTEXT_CHARS });
-                msgs.push({ role: 'system', content: c.text });
-            }
+            const ctxMsgs = this._contextMessages();
+            const msgs = [{ role: 'system', content: ctxMsgs.length ? SYSTEM_WITH_FILES : SYSTEM_NO_FILES }];
+            msgs.push.apply(msgs, ctxMsgs);
             msgs.push.apply(msgs, this._history.slice(-MAX_HISTORY_MSGS));
+
+            // Ledger entry is created at SEND time so an in-flight or failed call is
+            // still visible in the requests pane (and so cost can never be silently lost).
+            const rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
+                model      : this._model,
+                files      : this._files.map((f) => f.path),
+                promptChars: msgs.reduce((n, m) => n + (typeof m.content === 'string' ? m.content.length : 0), 0),
+                status     : 'pending'
+            });
 
             const bubble = this._push('bot', '');
             bubble.classList.add('vlc-msg--streaming');
@@ -292,22 +411,47 @@
 
                 this._calls++;
                 this._accrue(res);
+                if (rec) VaultLlmLog.update(rec.key, this._ledgerPatch(res));
+
                 // Authoritative cost lands a beat later; refresh the pill when it does.
                 s.client.reconcileCost(res).then((upgraded) => {
-                    if (upgraded) { this._recost(res); this._renderHead(); }
+                    if (upgraded) {
+                        this._recost(res);
+                        this._renderHead();
+                        if (rec) VaultLlmLog.update(rec.key, this._ledgerPatch(res));
+                    }
                 });
             } catch (err) {
                 bubble.classList.remove('vlc-msg--streaming');
-                if (err && err.name === 'AbortError') { bubble.textContent = (acc || '') + '\n— stopped —'; }
+                const aborted = err && err.name === 'AbortError';
+                if (aborted) { bubble.textContent = (acc || '') + '\n— stopped —'; }
                 else {
                     bubble.remove();
                     this._push('err', (err && err.message) || 'Request failed');
                 }
+                if (rec) VaultLlmLog.update(rec.key, {
+                    status: aborted ? 'aborted' : 'error',
+                    error : aborted ? null : ((err && err.message) || 'Request failed')
+                });
             } finally {
                 this._abort = null;
                 this._setBusy(false);
                 this._renderHead();
             }
+        }
+
+        _ledgerPatch(res) {
+            const eff = SGLlm.effectiveCost(res);
+            return {
+                id        : res.id || null,
+                model     : res.model || this._model,
+                status    : res.aborted ? 'aborted' : 'ok',
+                usage     : res.usage || {},
+                cost      : (eff.value != null) ? eff.value : null,
+                costSource: eff.source,
+                estimated : eff.estimated,
+                latencyMs : res.latencyMs || null
+            };
         }
 
         _accrue(res) {
@@ -326,27 +470,50 @@
     }
 
     VaultLlmChat.styles = `
-        :host { display: block; }
+        :host { display: block; height: 100%; min-height: 0; }
         .vlc-panel {
             display: flex; flex-direction: column; height: 100%;
             background: var(--bg-secondary, #131a2b); color: var(--color-text, #e2e8f0);
-            border-left: 1px solid var(--color-border, #24304a); box-sizing: border-box;
+            box-sizing: border-box; min-height: 0;
         }
-        .vlc-panel[hidden] { display: none; }
         .vlc-head {
             display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem;
             border-bottom: 1px solid var(--color-border, #24304a);
         }
         .vlc-title { font-weight: 700; font-size: .82rem; }
+        .vlc-model-sel {
+            font-family: var(--font-mono, monospace); font-size: .66rem; max-width: 11rem;
+            background: var(--bg-primary, #0d1120); color: inherit;
+            border: 1px solid var(--color-border, #24304a); border-radius: 4px; padding: .1rem .2rem;
+        }
         .vlc-model { font-family: var(--font-mono, monospace); font-size: .68rem; color: var(--color-text-secondary, #9aa4bf); }
         .vlc-cost  { margin-left: auto; font-family: var(--font-mono, monospace); font-size: .68rem; color: var(--color-text-secondary, #9aa4bf); }
-        .vlc-x { background: none; border: none; color: inherit; cursor: pointer; font-size: .8rem; opacity: .7; }
-        .vlc-x:hover { opacity: 1; }
-        .vlc-ctx { padding: .4rem .75rem; font-size: .7rem; border-bottom: 1px solid var(--color-border, #24304a); }
-        .vlc-chip {
-            font-family: var(--font-mono, monospace); background: rgba(78,205,196,.12);
-            color: #4ecdc4; border-radius: 4px; padding: .1rem .4rem;
+        .vlc-reqs, .vlc-x { background: none; border: none; color: inherit; cursor: pointer; font-size: .8rem; opacity: .7; padding: 0 .1rem; }
+        .vlc-reqs:hover, .vlc-x:hover { opacity: 1; }
+        .vlc-ctx {
+            padding: .4rem .75rem; font-size: .7rem; border-bottom: 1px solid var(--color-border, #24304a);
+            display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; max-height: 6.5rem; overflow-y: auto;
         }
+        .vlc-chip {
+            display: inline-flex; align-items: center; gap: .3rem;
+            font-family: var(--font-mono, monospace); background: rgba(78,205,196,.12);
+            color: #4ecdc4; border-radius: 4px; padding: .1rem .2rem .1rem .4rem; max-width: 100%;
+        }
+        .vlc-chip--bin { background: rgba(233,196,69,.12); color: #E9C445; }
+        .vlc-chip__n { opacity: .65; font-size: .62rem; }
+        .vlc-chip__x {
+            background: none; border: none; color: inherit; cursor: pointer;
+            font-size: .62rem; opacity: .6; padding: 0 .15rem; line-height: 1;
+        }
+        .vlc-chip__x:hover { opacity: 1; color: #ff6b6b; }
+        .vlc-mini {
+            background: none; border: 1px solid var(--color-border, #24304a); border-radius: 4px;
+            color: var(--color-text-secondary, #9aa4bf); cursor: pointer; font: inherit; font-size: .64rem;
+            padding: .1rem .35rem;
+        }
+        .vlc-mini:hover { color: var(--color-text, #e2e8f0); border-color: #4ecdc4; }
+        .vlc-ctxsum { margin-left: auto; }
+        .vlc-warn { color: #E9C445; }
         .vlc-dim { color: var(--color-text-secondary, #9aa4bf); }
         .vlc-log { flex: 1; overflow-y: auto; padding: .75rem; display: flex; flex-direction: column; gap: .5rem; min-height: 0; }
         .vlc-msg { white-space: pre-wrap; word-break: break-word; font-size: .8rem; line-height: 1.5; padding: .45rem .6rem; border-radius: 8px; max-width: 92%; }
@@ -356,6 +523,7 @@
         .vlc-msg--streaming::after { content: '▍'; opacity: .6; }
         .vlc-status { padding: 0 .75rem; font-size: .72rem; min-height: 0; }
         .vlc-status--warn { color: #E9C445; padding: .4rem .75rem; }
+        .vlc-status--info { color: var(--color-text-secondary, #9aa4bf); padding: .4rem .75rem; }
         .vlc-form { display: flex; gap: .4rem; padding: .5rem .75rem .75rem; border-top: 1px solid var(--color-border, #24304a); }
         .vlc-in {
             flex: 1; resize: none; font: inherit; font-size: .78rem; padding: .4rem .5rem;
