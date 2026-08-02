@@ -62,6 +62,29 @@
                         <p class="vset-hint">Raw AES-256 key (hex). Pass to <code>sgit clone</code> for read-only access without the vault passphrase.</p>
                     </div>
 
+                    <!-- Read-only access always needs BOTH the read key and the vault id;
+                         copying them separately is the usual source of "it doesn't work". -->
+                    <div class="vset-section">
+                        <label class="vset-label">Read-only access (share these together)</label>
+                        <div class="vset-row">
+                            <input class="vset-input vset-vaultid-input" type="text" readonly placeholder="Loading…">
+                            <button class="vset-btn vset-copy-vaultid">Copy ID</button>
+                        </div>
+                        <div class="vset-row vset-row--stacked">
+                            <input class="vset-input vset-rokey-input" type="text" readonly placeholder="Loading…">
+                            <button class="vset-btn vset-btn--primary vset-copy-rokey">Copy both</button>
+                        </div>
+                        <div class="vset-row vset-row--stacked">
+                            <input class="vset-input vset-roclone-input" type="text" readonly placeholder="Loading…">
+                            <button class="vset-btn vset-copy-roclone">Copy command</button>
+                        </div>
+                        <p class="vset-hint">
+                            <code>readkey:vaultid</code> is the single value <code>sgit clone</code> accepts for
+                            read-only access — recipients can read every file but cannot write.
+                            <strong>Not a secret-safe share:</strong> a reader sees all vault content.
+                        </p>
+                    </div>
+
                     <div class="vset-section">
                         <label class="vset-label">Access Key</label>
                         <div class="vset-row">
@@ -81,6 +104,55 @@
                             <button class="vset-btn vset-btn--primary vset-open-token-mgr">Manage read-only tokens ↗</button>
                         </div>
                         <p class="vset-hint">Opens the Token Manager in a new tab. Your vault will be pre-loaded automatically.</p>
+                    </div>
+
+                    <!-- AI / LLM access. Policy + credential live at .vault/llm/config.json,
+                         which is inside the permission floor: no vault app can read it via
+                         the bridge under any grant. The kernel reads it to service sg.llm.*. -->
+                    <div class="vset-section vset-llm-section">
+                        <label class="vset-label">AI models (OpenRouter)</label>
+                        <p class="vset-hint">
+                            Lets vault apps call LLMs through <code>sg.llm.*</code> without ever seeing your key.
+                            Apps must also declare <code>permissions.llm</code> in their <code>app.json</code> —
+                            capability is the intersection of what you allow here and what the app asks for.
+                        </p>
+                        <div class="vset-row">
+                            <input class="vset-input vset-llm-key" type="password" placeholder="sk-or-v1-… (OpenRouter API key)" autocomplete="off">
+                            <button class="vset-btn vset-llm-test" title="Validate the key against OpenRouter">Test</button>
+                            <button class="vset-btn vset-btn--primary vset-llm-save">Save</button>
+                            <button class="vset-btn vset-llm-clear" title="Remove LLM access from this vault">Clear</button>
+                        </div>
+                        <div class="vset-llm-status"></div>
+
+                        <div class="vset-llm-adv" style="display:none">
+                            <label class="vset-sublabel">Who can use the key</label>
+                            <label class="vset-toggle-label">
+                                <input class="vset-llm-tier" type="radio" name="llmtier" value="owner" checked>
+                                <span>Owner only — sealed with the vault's write key. Read-only holders cannot use <em>or extract</em> it. <strong>Recommended.</strong></span>
+                            </label>
+                            <label class="vset-toggle-label">
+                                <input class="vset-llm-tier" type="radio" name="llmtier" value="shared">
+                                <span>Anyone who can open this vault — including read-only holders, who can then also <em>extract</em> the key and spend it elsewhere.</span>
+                            </label>
+
+                            <label class="vset-sublabel">Default model</label>
+                            <input class="vset-input vset-llm-model" type="text" placeholder="anthropic/claude-sonnet-4">
+
+                            <label class="vset-sublabel">Allowed models (comma-separated; <code>*</code> or <code>vendor/*</code>)</label>
+                            <input class="vset-input vset-llm-allow" type="text" placeholder="*">
+
+                            <label class="vset-sublabel">Spend caps per session</label>
+                            <div class="vset-row">
+                                <input class="vset-input vset-llm-cost" type="number" min="0" step="0.10" placeholder="1.00" title="Max cost per session (USD)">
+                                <input class="vset-input vset-llm-calls" type="number" min="0" step="10" placeholder="200" title="Max calls per session">
+                            </div>
+                            <p class="vset-hint vset-hint--warn">
+                                Caps here prevent accidents, not abuse — anyone who can use the key can also spend it
+                                outside this app. Mint a <strong>budget-capped, rotatable</strong> key at OpenRouter and
+                                treat that limit as the real one.
+                            </p>
+                        </div>
+                        <button class="vset-json-toggle vset-llm-adv-toggle">(advanced)</button>
                     </div>
 
                     <div class="vset-section">
@@ -139,16 +211,28 @@
 
             // Export read key as hex for display
             const rkInput = root.querySelector('.vset-readkey-input');
-            if (rkInput && this._vault._readKey) {
+            let   readHex = '';
+            if (this._vault._readKey) {
                 try {
                     const raw    = await crypto.subtle.exportKey('raw', this._vault._readKey);
                     const bytes  = new Uint8Array(raw);
-                    const hex    = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-                    rkInput.value = hex;
-                } catch (_) {
-                    rkInput.value = '(unavailable)';
-                }
+                    readHex      = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                } catch (_) { readHex = ''; }
             }
+            if (rkInput) rkInput.value = readHex || '(unavailable)';
+
+            // Read-only share block: the id alone is useless and the key alone is useless —
+            // `readkey:vaultid` is the one value sgit accepts, so give it as a single copy.
+            const vaultId  = this._vault._vaultId || '';
+            const idInput  = root.querySelector('.vset-vaultid-input');
+            const roInput  = root.querySelector('.vset-rokey-input');
+            const clInput  = root.querySelector('.vset-roclone-input');
+            if (idInput) idInput.value = vaultId || '(unavailable)';
+            const combined = (readHex && vaultId) ? `${readHex}:${vaultId}` : '';
+            if (roInput) roInput.value = combined || '(unavailable)';
+            if (clInput) clInput.value = combined ? `sgit clone "${combined}"` : '(unavailable)';
+
+            await this._refreshLlm();
 
             const accessInput = root.querySelector('.vset-access-input');
             if (accessInput) accessInput.value = this._accessKey || '';
@@ -178,6 +262,13 @@
                 if (e.target.closest('.vset-copy-key'))        return this._copyWithFlash('.vset-copy-key', '.vset-key-input');
                 if (e.target.closest('.vset-copy-url'))        return this._copyWithFlash('.vset-copy-url', '.vset-url-input');
                 if (e.target.closest('.vset-copy-readkey'))    return this._copyWithFlash('.vset-copy-readkey', '.vset-readkey-input');
+                if (e.target.closest('.vset-copy-vaultid'))    return this._copyWithFlash('.vset-copy-vaultid', '.vset-vaultid-input');
+                if (e.target.closest('.vset-copy-rokey'))      return this._copyWithFlash('.vset-copy-rokey', '.vset-rokey-input');
+                if (e.target.closest('.vset-copy-roclone'))    return this._copyWithFlash('.vset-copy-roclone', '.vset-roclone-input');
+                if (e.target.closest('.vset-llm-adv-toggle'))  return this._toggleLlmAdvanced(e);
+                if (e.target.closest('.vset-llm-save'))        return this._saveLlm();
+                if (e.target.closest('.vset-llm-clear'))       return this._clearLlm();
+                if (e.target.closest('.vset-llm-test'))        return this._testLlm();
                 if (e.target.closest('.vset-save-access'))     return this._saveAccess();
                 if (e.target.closest('.vset-clear-access'))    return this._clearAccess();
                 if (e.target.closest('.vset-validate-access')) return this._validateAccess();
@@ -286,6 +377,211 @@
             el.className = 'vset-access-status' + (type ? ' vset-access-status--' + type : '');
         }
 
+        // ── AI / LLM settings (.vault/llm/config.json) ───────────────────────────────
+        // `.vault` is a LAZY sub-tree after open (every top-level folder starts
+        // _loaded:false), so listFolder('/.vault') returns [] until it is expanded —
+        // the same trap that made embedded access tokens look absent (vault-shell.js).
+        async _ensureVaultSubtree() {
+            const v = this._vault;
+            if (!v) return false;
+            try {
+                if (v.needsLoading && v.needsLoading('/.vault')) await v.loadSubTreeOnDemand('/.vault');
+            } catch (_) { /* absent — created on first save */ }
+            return true;
+        }
+
+        async _readLlmConfig() {
+            const v = this._vault;
+            if (!v) return null;
+            await this._ensureVaultSubtree();
+            try {
+                const top = v.listFolder('/.vault') || [];
+                if (!top.some((e) => e.name === 'llm' && e.type === 'folder')) return null;
+                const inner = v.listFolder('/.vault/llm') || [];
+                if (!inner.some((e) => e.name === 'config.json')) return null;
+                const bytes = await v.getFile('/.vault/llm', 'config.json');
+                return JSON.parse(new TextDecoder().decode(bytes));
+            } catch (_) { return null; }
+        }
+
+        async _writeLlmConfig(obj) {
+            const v = this._vault;
+            if (!v) throw new Error('no vault');
+            if (!v.writable) throw new Error('Read-only vault — an access key and the vault passphrase are needed to change AI settings');
+            await this._ensureVaultSubtree();
+            if (!v._findNode('/.vault'))     await v.createFolder('/.vault');
+            if (!v._findNode('/.vault/llm')) await v.createFolder('/.vault/llm');
+            const data    = new TextEncoder().encode(JSON.stringify(obj, null, 2));
+            const listed  = v.listFolder('/.vault/llm') || [];
+            const exists  = listed.some((e) => e.name === 'config.json');
+            if (exists) await v.updateFile('/.vault/llm', 'config.json', data);
+            else        await v.addFile('/.vault/llm', 'config.json', data);
+        }
+
+        async _refreshLlm() {
+            const root = this.shadowRoot;
+            const sec  = root.querySelector('.vset-llm-section');
+            if (!sec) return;
+            const raw    = await this._readLlmConfig();
+            const policy = SGLlmConfig.parse(raw || {});
+            this._llmPolicy = policy;
+
+            const setVal = (sel, val) => { const el = root.querySelector(sel); if (el) el.value = val; };
+            setVal('.vset-llm-model', policy.models['default'] || '');
+            setVal('.vset-llm-allow', (policy.models.allow || ['*']).join(', '));
+            setVal('.vset-llm-cost',  policy.limits.maxCostPerSession);
+            setVal('.vset-llm-calls', policy.limits.maxCallsPerSession);
+            root.querySelectorAll('.vset-llm-tier').forEach((r) => { r.checked = (r.value === policy.keyTier); });
+
+            const configured = !!(policy.key || policy.keySealed);
+            const keyEl = root.querySelector('.vset-llm-key');
+            if (keyEl) keyEl.placeholder = configured
+                ? (policy.key ? SGLlmConfig.redact(policy.key) + ' — stored (shared)' : 'stored (owner-sealed) — enter a new key to replace')
+                : 'sk-or-v1-… (OpenRouter API key)';
+
+            if (!configured) {
+                this._setLlmStatus('Not configured — vault apps cannot call LLMs.', 'info');
+            } else if (policy.keyTier === 'owner') {
+                this._setLlmStatus('✓ Key stored, owner-sealed — read-only holders cannot use or extract it.', 'ok');
+            } else {
+                this._setLlmStatus('⚠ Key stored in shared tier — anyone who can open this vault can use AND extract it.', 'warn');
+            }
+        }
+
+        _toggleLlmAdvanced(e) {
+            const el = this.shadowRoot.querySelector('.vset-llm-adv');
+            if (!el) return;
+            const hidden = el.style.display === 'none';
+            el.style.display = hidden ? '' : 'none';
+            const btn = e.target.closest('.vset-llm-adv-toggle');
+            if (btn) btn.textContent = hidden ? '(hide advanced)' : '(advanced)';
+        }
+
+        _llmFormPolicy() {
+            const root = this.shadowRoot;
+            const val  = (sel) => (root.querySelector(sel)?.value ?? '').trim();
+            const tier = root.querySelector('.vset-llm-tier:checked')?.value || 'owner';
+            const allow = val('.vset-llm-allow').split(',').map((s) => s.trim()).filter(Boolean);
+            return SGLlmConfig.parse({
+                keyTier: tier,
+                models : { allow: allow.length ? allow : ['*'], 'default': val('.vset-llm-model') || null },
+                limits : {
+                    maxCostPerSession : Number(val('.vset-llm-cost'))  || undefined,
+                    maxCallsPerSession: Number(val('.vset-llm-calls')) || undefined
+                }
+            });
+        }
+
+        async _saveLlm() {
+            const root  = this.shadowRoot;
+            const keyEl = root.querySelector('.vset-llm-key');
+            const typed = (keyEl?.value || '').trim();
+            const prev  = this._llmPolicy || SGLlmConfig.parse({});
+            const form  = this._llmFormPolicy();
+
+            // No new key typed → we are only re-saving policy. That requires an existing
+            // credential, and a tier change needs the raw key (we cannot re-seal what we
+            // cannot read in a shared→owner move without it).
+            if (!typed && !(prev.key || prev.keySealed)) {
+                this._setLlmStatus('Enter an OpenRouter key first.', 'warn'); return;
+            }
+            if (typed && !SGLlmConfig.looksLikeKey(typed)) {
+                this._setLlmStatus('That does not look like an OpenRouter key (expected sk-or-…).', 'error'); return;
+            }
+            if (!typed && prev.keyTier !== form.keyTier) {
+                this._setLlmStatus('Re-enter the key to move it between tiers.', 'warn'); return;
+            }
+
+            const btn = root.querySelector('.vset-llm-save');
+            if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+            try {
+                const out = SGLlmConfig.serialize(form);
+                if (form.keyTier === 'shared') {
+                    out.key = typed || prev.key;
+                    delete out.keySealed;
+                } else {
+                    if (typed) {
+                        // Seal with the OWNER key (derived from the vault write key). An
+                        // ro-token session has no write key → cannot derive → cannot open.
+                        const wk = this._vault && this._vault.writeKeyHex;
+                        if (!wk) throw new Error('owner-sealing needs a writable vault (open with the vault key, not a read-only token)');
+                        const oKey = await SGVaultOwnerSecrets.deriveKey(wk);
+                        out.keySealed = await SGVaultOwnerSecrets.seal(oKey, { key: typed });
+                    } else {
+                        out.keySealed = prev.keySealed;
+                    }
+                    delete out.key;
+                }
+                await this._writeLlmConfig(out);
+                if (keyEl) keyEl.value = '';                     // never leave a key in the DOM
+                window.sgraphVault.messages.success('AI settings saved to .vault/llm/config.json');
+                await this._refreshLlm();
+            } catch (err) {
+                this._setLlmStatus('✗ Save failed: ' + (err.message || err), 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+            }
+        }
+
+        async _clearLlm() {
+            const v = this._vault;
+            if (!v) return;
+            const btn = this.shadowRoot.querySelector('.vset-llm-clear');
+            if (btn) { btn.disabled = true; }
+            try {
+                await this._ensureVaultSubtree();
+                const listed = v.listFolder('/.vault/llm') || [];
+                if (listed.some((e) => e.name === 'config.json')) {
+                    await v.removeFile('/.vault/llm', 'config.json');
+                }
+                const keyEl = this.shadowRoot.querySelector('.vset-llm-key');
+                if (keyEl) keyEl.value = '';
+                window.sgraphVault.messages.success('AI settings cleared — sg.llm.* is now unavailable in this vault');
+                await this._refreshLlm();
+            } catch (err) {
+                this._setLlmStatus('✗ Clear failed: ' + (err.message || err), 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        // Validate against OpenRouter from the REAL origin (this page), never from an app frame.
+        async _testLlm() {
+            const root  = this.shadowRoot;
+            const typed = (root.querySelector('.vset-llm-key')?.value || '').trim();
+            const prev  = this._llmPolicy || SGLlmConfig.parse({});
+            const key   = typed || prev.key;    // owner-sealed keys are not re-read here
+            if (!key) {
+                this._setLlmStatus(prev.keySealed
+                    ? 'Key is owner-sealed — paste it again to re-test.'
+                    : 'Enter a key to test.', 'warn');
+                return;
+            }
+            const btn = root.querySelector('.vset-llm-test');
+            const orig = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = '…'; }
+            this._setLlmStatus('Checking…', 'info');
+            try {
+                const endpoint = (this._llmPolicy && this._llmPolicy.endpoint) || SGLlmConfig.DEFAULT_ENDPOINT;
+                const resp = await fetch(endpoint + '/models', { headers: { Authorization: 'Bearer ' + key } });
+                if (!resp.ok) { this._setLlmStatus('✗ Rejected by OpenRouter (' + resp.status + ')', 'error'); return; }
+                const data = await resp.json();
+                const n    = (data && Array.isArray(data.data)) ? data.data.length : 0;
+                this._setLlmStatus('✓ Key valid · ' + n + ' models available', 'ok');
+            } catch (err) {
+                this._setLlmStatus('✗ Check failed: ' + (err.message || err), 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = orig; }
+            }
+        }
+
+        _setLlmStatus(msg, type) {
+            const el = this.shadowRoot.querySelector('.vset-llm-status');
+            if (!el) return;
+            el.textContent = msg;
+            el.className = 'vset-llm-status' + (type ? ' vset-access-status--' + type : '');
+        }
+
         _openTokenManager() {
             const base = window.location.pathname.split('/en-gb/')[0];
             window.open(base + '/en-gb/vault/token/', '_blank');
@@ -324,6 +620,16 @@
             color: var(--color-text); outline: none; box-sizing: border-box;
         }
         .vset-row { display: flex; gap: var(--space-2); }
+        .vset-row--stacked { margin-top: var(--space-2); }
+        .vset-sublabel {
+            display: block; font-size: var(--text-xs, 0.75rem); font-weight: 600;
+            color: var(--color-text-secondary); margin: var(--space-3) 0 var(--space-1);
+        }
+        .vset-llm-adv { margin-top: var(--space-3); }
+        .vset-llm-adv .vset-toggle-label { display: flex; gap: var(--space-2); align-items: flex-start; margin-bottom: var(--space-2); }
+        .vset-llm-adv .vset-toggle-label span { font-size: var(--text-sm); color: var(--color-text-secondary); line-height: 1.5; }
+        .vset-llm-status { font-size: var(--text-sm); margin-top: var(--space-2); min-height: 1.2em; }
+        .vset-llm-adv-toggle { margin-top: var(--space-2); }
         .vset-row input { flex: 1; }
         .vset-btn {
             padding: 0.5rem 0.75rem; font-size: var(--text-sm); border-radius: var(--radius-sm);

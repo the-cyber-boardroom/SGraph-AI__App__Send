@@ -474,6 +474,38 @@ Plan: `team/roles/dev/reviews/05/27/v0.27.79__dev-plan__app-iframe-capabilities-
 
 ---
 
+### Native LLM chat in the Vault UI — "Ask about this file" (2026-08-02)
+
+Host-native chat panel in `/en-gb/vault/`. Runs at the **real origin**, so it calls the
+provider directly through `SGLlm` — no bridge, no sandbox, no postMessage streaming. The
+transport is deliberately the same engine the kernel will use to service the PROPOSED
+`sg.llm.*` for app frames.
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| `_common/js/lib/sg-llm/sg-llm.js` — `SGLlm` transport: `chat()` (OpenRouter, SSE streaming, abort → partial kept + costed), `models()`, `reconcileCost()`. Pure statics: `sseLines` / `parseSseData` / `estimateCost` / `effectiveCost` / `pricingFromModels` / `buildFileContext` / `redactMessages` | **EXISTS** | `tests/unit/vault_ui/loader/test__sg_llm.js` (40 assertions) |
+| Two Workbench production bugs fixed by construction: the **decoder tail is flushed** after the read loop (a final `usage` frame with no trailing newline was being lost → silent `cost:null`), and a **mid-stream `data:{"error":…}` is surfaced** (was ignored → empty reply, no explanation) | **EXISTS** | pinned in `test__sg_llm.js` |
+| `_common/js/lib/sg-llm/sg-llm-vault.js` — `SGLlmVault.open(vault)` resolves `.vault/llm/config.json` → a configured `SGLlm`. Unseals the owner tier via `SGVaultOwnerSecrets`; an ro-token session gets `EREADONLY` **cryptographically** (no write key → cannot derive). Returns `{ok, client, policy, model, reason}` — never throws for "unavailable here" | **EXISTS** | `sg-llm-vault.js` |
+| `<vault-llm-chat>` — drawer panel: streaming transcript (~16fps throttle), Send/Stop, per-session cost + call pills, context chip for the current file, states for `ENOKEY` / `EREADONLY`. **Not an agent**: no tools, no vault writes, no autonomous loop | **EXISTS** | `vault-llm-chat.js`; `tests/unit/vault_ui/loader/test__vault_llm_chat.js` (19 assertions, jsdom mount smoke) |
+| Context wiring: `vault-browse-edit.js` (which patches `SendBrowse.prototype._renderFileContent`) dispatches `vault-file-viewing` `{path, type, text\|null}` on every file render and adds an **✨ Ask AI** button to the file action bar dispatching `vault-llm-open`; `vault-shell.js` listens for both, mounts `.vs-llm-sidebar`, and calls `setVault` in the same fan-out as `vault-settings` | **EXISTS** | `vault-browse-edit.js`, `vault-shell.js` `_toggleLlmChat` |
+| Context is capped at 24 000 chars and the truncation is stated **inside the text the model sees** (`buildFileContext`) so it cannot silently summarise a partial file; binaries are named but not sent; session spend/call caps from the policy are enforced before each call | **EXISTS** | `sg-llm.js`, `vault-llm-chat.js` `_send` |
+
+### Vault Settings — AI (OpenRouter) config + read-only share block (2026-08-02)
+
+Admin surface for the PROPOSED `sg.llm.*` capability (plan:
+`team/roles/architect/reviews/08/02/v0.33.43__architect-review__sg-llm-kernel-capability-plan.md`).
+The **bridge verbs themselves do not exist yet** — this ships only the configuration UI and its
+policy module.
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| `_common/js/lib/sg-llm/sg-llm-config.js` — pure policy module: `parse` / `serialize` / `modelAllowed` (`*` and `vendor/*` globs) / `defaultModel` / `limitsFor` (per-app override) / `looksLikeKey` / `redact` / `summarise`. Safe-by-default: junk or absent config → `keyTier:'owner'`, allow-`*`, default limits; the two key tiers are mutually exclusive on parse | **EXISTS** | `tests/unit/vault_ui/loader/test__sg_llm_config.js` (38 assertions) |
+| **Vault Settings → "AI models (OpenRouter)"** — key entry (password field, cleared from the DOM after save), *Test* (validates against `GET /models` from the real origin), *Save*, *Clear*; advanced block: key tier, default model, allow-list, per-session cost/call caps | **EXISTS** | `vault-settings.js` `_saveLlm`/`_clearLlm`/`_testLlm`/`_refreshLlm` |
+| Config persisted at **`.vault/llm/config.json`** — inside the permission floor, so no app can read it via the bridge under any grant (`AppPermissions.isFloor`). Written through `SGVault.addFile`/`updateFile` from the real origin; `.vault` lazy sub-tree expanded first (`_ensureVaultSubtree`) | **EXISTS** | `vault-settings.js` `_readLlmConfig`/`_writeLlmConfig` |
+| **Key tiers** — `owner` (default): key sealed via `SGVaultOwnerSecrets.deriveKey(vault.writeKeyHex)`, so an ro-token session (no write key) can neither use nor extract it; `shared` (opt-in): key stored in clear in the same file, usable *and extractable* by any opener | **EXISTS** | `vault-settings.js` `_saveLlm`; `sg-vault-owner-secrets.js` |
+| **Vault Settings → "Read-only access (share these together)"** — vault id, the combined `readkey:vaultid` value (the single form `sgit clone` accepts), and a ready-to-paste `sgit clone "…"` command, each with its own copy button | **EXISTS** | `vault-settings.js` `refresh()` + `.vset-copy-vaultid`/`-rokey`/`-roclone` |
+| `sg-vault-owner-secrets.js` + `sg-llm/sg-llm-config.js` added to the script sets of `v0.2.3/index.html` and `en-gb/browse/index.html` | **EXISTS** | both pages |
+
 ### App-Mode Click Interceptor Fixes + `sg.vfs.download` (2026-07-31)
 
 Shipped in `app-shell.js` / `app-hud.js` / `app-permissions.js` (bundle regenerated); unit
