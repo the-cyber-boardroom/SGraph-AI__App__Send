@@ -72,7 +72,33 @@
             var openAsAppLink = _makeAppLink('↗ Open as App', _appHref);
             _addTip(openAsAppLink, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
             bar.appendChild(openAsAppLink);
+
+            // Ask AI — opens the native chat panel with THIS file as context. The button
+            // is always rendered; the panel itself reports when no key is configured
+            // (better than a mystery-missing button).
+            var askBtn = _makeBtn('✨ Ask AI');
+            _addTip(askBtn, 'Ask about this file using the vault\'s configured AI model');
+            askBtn.addEventListener('click', function () {
+                document.dispatchEvent(new CustomEvent('vault-llm-open', { bubbles: true }));
+            });
+            bar.appendChild(askBtn);
         }
+
+        // Announce what is on screen so the chat panel can use it as context. Text-ish
+        // content is decoded here (the bytes are already in hand); binaries announce a
+        // null body so the panel can say "binary, not sent" instead of shipping noise.
+        try {
+            var _isText = (type === 'text' || type === 'markdown' || type === 'code' || type === 'csv' ||
+                           type === 'html' || type === 'json' || _isLikelyText(bytes));
+            document.dispatchEvent(new CustomEvent('vault-file-viewing', {
+                bubbles: true,
+                detail: {
+                    path: (fileName || '').replace(/^\//, ''),
+                    type: type,
+                    text: _isText ? new TextDecoder('utf-8', { fatal: false }).decode(bytes) : null
+                }
+            }));
+        } catch (_) { /* context is a nicety — never break rendering for it */ }
 
         // Only add edit/write controls if dataSource is writable
         if (!this.dataSource || !this.dataSource.writable) return;
