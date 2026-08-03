@@ -358,7 +358,10 @@
             this._setStatus('Transcribing…', 'info');
             try {
                 const audio = await SGVoice.stop(session);
-                const out  = await SGVoice.transcribeWith(this._session, audio, { model: this._model });
+                // No model passed on purpose: the composer's picker chooses the model that
+                // ANSWERS, which is rarely one that accepts audio. SGVoice picks a
+                // transcription model; the answer still comes from `this._model`.
+                const out  = await SGVoice.transcribeWith(this._session, audio, {});
                 // Trim here too rather than trusting the caller's contract: a whitespace-only
                 // reply would otherwise send an empty message and spend a second call on it.
                 const text = String((out && out.text) || '').trim();

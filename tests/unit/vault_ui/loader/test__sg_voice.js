@@ -299,5 +299,70 @@ console.log('\n[suite] cancel() — releases the device, not just the transcript
     })());
 }
 
+console.log('\n[suite] the transcription model is chosen from audio-capable models only');
+{
+    /* Shipped bug: transcribeWith fell back to `session.model` — the vault's CHAT model.
+       The chat panel additionally passed its own picker's choice, so a voice note went to
+       anthropic/claude-3-haiku and OpenRouter answered:
+           404 {"error":{"message":"No endpoints found that support input audio"}}
+       A model that answers questions is not a model that hears them. */
+    ok('the default is an audio-capable model',  V.isAudioModel(V.DEFAULT_AUDIO_MODEL));
+    ok('…and it is Gemini 3.5 Flash',            V.DEFAULT_AUDIO_MODEL === 'google/gemini-3.5-flash');
+    ok('gpt-audio is on the list',               V.isAudioModel('openai/gpt-audio'));
+    ok('voxtral is on the list',                 V.isAudioModel('mistralai/voxtral-small-24b-2507'));
+    ok('the model that caused the 404 is NOT',   V.isAudioModel('anthropic/claude-3-haiku') === false);
+    ok('no chat-only model sneaks in',
+        !V.AUDIO_MODELS.some((m) => m.indexOf('anthropic/') === 0));
+    ok('the dedicated-STT ids are excluded (we use the chat input_audio path)',
+        !V.isAudioModel('openai/whisper-large-v3') && !V.isAudioModel('openai/gpt-4o-transcribe'));
+    ok('unknown ids are not audio models',       V.isAudioModel('who/knows') === false);
+    ok('null is not an audio model',             V.isAudioModel(null) === false);
+
+    // The resolution path, end to end, through the real transcribeWith.
+    globalThis.SGLlmConfig = {
+        limitsFor: () => ({ maxCallsPerSession: 0, maxCostPerSession: 0, maxTokensPerCall: 8000 }),
+        modelAllowed: (policy, id) => !policy || !policy.deny || policy.deny.indexOf(id) === -1
+    };
+    globalThis.SGLlm = { effectiveCost: () => ({ value: 0, source: 'estimated', estimated: true }) };
+
+    let asked = null;
+    const session = {
+        ok: true, policy: {}, model: 'anthropic/claude-3-haiku',      // the chat model
+        client: {
+            chat: async (req) => { asked = req; return { id: 'x', model: req.model, content: ' hi ', usage: {} }; },
+            reconcileCost: async () => null
+        }
+    };
+    const audio = { data: 'AAAA', format: 'm4a', bytes: 4 };
+
+    const out = await V.transcribeWith(session, audio, {});
+    ok('the vault chat model is NOT used for transcription',
+        asked.model !== 'anthropic/claude-3-haiku', asked.model);
+    ok('…the audio default is used instead', asked.model === 'google/gemini-3.5-flash');
+    ok('the audio really is attached',
+        asked.messages[0].content.some((c) => c.type === 'input_audio'));
+    ok('the transcript is trimmed', out.text === 'hi');
+
+    // An explicit audio-capable model is still honoured (sg.llm.listen({model})).
+    await V.transcribeWith(session, audio, { model: 'openai/gpt-audio' });
+    ok('an explicit audio model is honoured', asked.model === 'openai/gpt-audio');
+
+    // An explicit non-audio model fails HERE, with a reason — OpenRouter's 404 names no
+    // model and leaves the user nothing to act on.
+    let err = null;
+    try { await V.transcribeWith(session, audio, { model: 'anthropic/claude-3-haiku' }); }
+    catch (e) { err = e; }
+    ok('an explicit non-audio model is refused',    err && err.code === 'EMODEL');
+    ok('…and the message names the model',          /claude-3-haiku/.test(err.message));
+    ok('…and suggests one that works',              /gemini-3\.5-flash/.test(err.message));
+
+    // The vault's allow-list still wins over our default — it is a security control.
+    err = null;
+    try { await V.transcribeWith({ ...session, policy: { deny: ['google/gemini-3.5-flash'] } }, audio, {}); }
+    catch (e) { err = e; }
+    ok('a vault allow-list that excludes it refuses', err && err.code === 'EMODEL');
+    ok('…and says where to change it',                /models\.allow/.test(err.message));
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
