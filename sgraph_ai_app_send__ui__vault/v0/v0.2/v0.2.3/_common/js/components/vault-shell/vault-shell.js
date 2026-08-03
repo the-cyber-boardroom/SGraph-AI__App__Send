@@ -120,10 +120,17 @@
                         <!-- Right-side debug pane (built lazily by _ensureDebugContent) -->
                         <div class="vs-debug-sidebar" hidden></div>
 
-                        <!-- Native LLM chat drawer — talks about the file on screen.
-                             Real origin, so it calls the provider directly via SGLlm;
-                             the key comes from .vault/llm/config.json (owner-sealed). -->
-                        <div class="vs-llm-sidebar" hidden><vault-llm-chat></vault-llm-chat></div>
+                        <!-- Native LLM chat + request ledger. Both are mounted as
+                             sg-layout panels (movable/resizable like every other pane)
+                             the moment send-browse's layout exists; this container is
+                             only the fallback host for when it doesn't (Settings view,
+                             layout still upgrading). Real origin, so the provider is
+                             called directly via SGLlm; the key comes from
+                             .vault/llm/config.json (owner-sealed). -->
+                        <div class="vs-llm-sidebar" hidden>
+                            <vault-llm-chat></vault-llm-chat>
+                            <vault-llm-requests hidden></vault-llm-requests>
+                        </div>
                     </div>
 
                     <vault-status-bar></vault-status-bar>
@@ -154,7 +161,18 @@
             document.addEventListener('vault-file-viewing', (e) => {
                 this.querySelector('vault-llm-chat')?.setContextFile(e.detail || null);
             });
-            document.addEventListener('vault-llm-open', () => this._toggleLlmChat(true));
+            document.addEventListener('vault-llm-open', () => this._openLlmChat());
+            // "Add to chat" from a file's action bar: attach the file, then reveal the
+            // panel. Opening is a side effect of adding — you should see what you attached.
+            document.addEventListener('vault-llm-add-file', (e) => {
+                this._openLlmChat().then((chat) => {
+                    if (chat && e.detail) chat.addContextFile(e.detail);
+                });
+            });
+            this.addEventListener('vault-header-llm',          () => this._openLlmChat());
+            this.addEventListener('vault-llm-close',           () => this._closeLlmPanel('chat'));
+            this.addEventListener('vault-llm-requests-open',   () => this._openLlmRequests());
+            this.addEventListener('vault-llm-requests-close',  () => this._closeLlmPanel('requests'));
 
             // Nav events
             this.addEventListener('vault-nav-switch', (e) => {
@@ -482,6 +500,10 @@
                 try { await dataSource.scan(); } catch (err) { console.warn('[vault-shell] sub-vault scan failed:', err && err.message); }
             }
 
+            // The AI panels live INSIDE send-browse's sg-layout, which this wipe destroys.
+            // Park them first (keeping transcript + attached files), re-mount them after.
+            const _llmOpen = this._detachLlmPanels();
+
             filesView.innerHTML = '';
 
             const browse = document.createElement('send-browse');
@@ -521,6 +543,8 @@
             }
 
             filesView.appendChild(browse);
+
+            this._reattachLlmPanels(_llmOpen);
         }
 
         _onTreeChanged() {
@@ -1048,16 +1072,134 @@
 
         static get _DBG_KEYS() { return { open: 'vault-debug-open', width: 'vault-debug-width', tab: 'vault-debug-tab' }; }
 
-        // Show/hide the native LLM chat drawer. The panel resolves its own availability
-        // from .vault/llm/config.json (setVault) and renders the reason when it can't
-        // run — an always-present entry point beats a button that mysteriously vanishes.
-        _toggleLlmChat(forceOpen) {
-            const bar  = this.querySelector('.vs-llm-sidebar');
-            const chat = this.querySelector('vault-llm-chat');
-            if (!bar || !chat) return;
-            const show = (forceOpen === true) ? true : bar.hidden;
-            bar.hidden = !show;
-            if (show) { chat.open(); } else { chat.close(); }
+        // ── AI panels (chat + request ledger) ────────────────────────────────────
+        //
+        // Both are real sg-layout panels: draggable, resizable, closable from the tab
+        // bar, exactly like the tree and file panes. send-browse owns the layout
+        // (`_sgLayout`), so these mount into it. When the layout is not available —
+        // Settings view, or the custom element still upgrading — they fall back to the
+        // fixed right-hand sidebar rather than refusing to open. The panel resolves its
+        // own availability from .vault/llm/config.json (setVault) and renders the reason
+        // when it can't run: an always-present entry point beats a vanishing button.
+
+        // Resolve send-browse's layout once it is upgraded and built. Returns null if it
+        // never appears (~1s), which is the signal to use the sidebar fallback.
+        async _sgLayoutReady() {
+            try {
+                if (window.customElements && customElements.whenDefined) {
+                    await customElements.whenDefined('sg-layout');
+                }
+            } catch (_) { /* not fatal — poll below settles it either way */ }
+            for (let i = 0; i < 60; i++) {
+                const L = this._browse && this._browse._sgLayout;
+                if (L && typeof L.addPanel === 'function') return L;
+                await new Promise((r) => requestAnimationFrame(r));
+            }
+            return null;
+        }
+
+        _llmEl(kind) {
+            return this.querySelector(kind === 'requests' ? 'vault-llm-requests' : 'vault-llm-chat');
+        }
+
+        // Closing from sg-layout's own tab × must not leave us believing the panel is
+        // still open (the next open would then no-op and nothing would appear). Bound
+        // ONCE per layout — sg-layout's bus has no off-by-handler for our closure, so
+        // re-binding on every open would leak a listener per open/close cycle.
+        _watchPanelClose(layout) {
+            if (!layout || layout.__vsLlmCloseBound) return;
+            try {
+                layout.events.on('panel:closed', (d) => {
+                    if (!d || !this._llmPanels) return;
+                    Object.keys(this._llmPanels).forEach((kind) => {
+                        if (this._llmPanels[kind].id === d.id) {
+                            delete this._llmPanels[kind];
+                            this._parkLlmEl(kind);
+                        }
+                    });
+                });
+                layout.__vsLlmCloseBound = true;
+            } catch (_) { /* no bus → the ✕ inside the panel still works */ }
+        }
+
+        // Mount `el` as an sg-layout panel, or reveal the sidebar fallback. Idempotent:
+        // if the panel is already mounted it is simply focused.
+        async _showLlmPanel(kind, title) {
+            const el = this._llmEl(kind);
+            if (!el) return null;
+            this._llmPanels = this._llmPanels || {};                 // { kind: {id, layout} }
+
+            const open = this._llmPanels[kind];
+            if (open && open.layout && open.layout.isConnected && el.isConnected) {
+                try { open.layout.focusPanel && open.layout.focusPanel(open.id); } catch (_) {}
+                return el;
+            }
+
+            const layout = await this._sgLayoutReady();
+            if (layout) {
+                el.hidden = false;
+                // addPanel only assigns el.slot — the element must already be a light-DOM
+                // child of the layout for that slot to project.
+                layout.appendChild(el);
+                const id = layout.addPanel({ el: el, title: title });
+                this._llmPanels[kind] = { id: id, layout: layout };
+                this._watchPanelClose(layout);
+            } else {
+                // Fallback: the fixed sidebar.
+                const bar = this.querySelector('.vs-llm-sidebar');
+                if (!bar) return null;
+                if (el.parentNode !== bar) bar.appendChild(el);
+                el.hidden = false;
+                bar.hidden = false;
+                this._llmPanels[kind] = { id: null, layout: null };
+            }
+            return el;
+        }
+
+        // Return an element to the fallback sidebar (detached from view) so it survives a
+        // layout teardown with its transcript and attached files intact.
+        _parkLlmEl(kind) {
+            const el  = this._llmEl(kind);
+            const bar = this.querySelector('.vs-llm-sidebar');
+            if (!el || !bar) return;
+            if (el.parentNode !== bar) bar.appendChild(el);
+            el.hidden = true;
+            if (Array.from(bar.children).every((c) => c.hidden)) bar.hidden = true;
+        }
+
+        async _openLlmChat() {
+            const el = await this._showLlmPanel('chat', 'AI Chat');
+            if (el) el.open();
+            return el;
+        }
+
+        async _openLlmRequests() {
+            return this._showLlmPanel('requests', 'AI Requests');
+        }
+
+        _closeLlmPanel(kind) {
+            const rec = this._llmPanels && this._llmPanels[kind];
+            if (rec && rec.layout && rec.id) {
+                try { rec.layout.removePanel(rec.id); } catch (_) {}
+            }
+            if (this._llmPanels) delete this._llmPanels[kind];
+            this._parkLlmEl(kind);
+        }
+
+        // A browse remount destroys the layout (and every panel in it). Park the AI
+        // elements in the sidebar FIRST so they are not garbage-collected with it, then
+        // re-mount whichever were open once the new layout exists.
+        _detachLlmPanels() {
+            const open = Object.keys(this._llmPanels || {});
+            this._llmPanels = {};
+            open.forEach((k) => this._parkLlmEl(k));
+            return open;
+        }
+
+        _reattachLlmPanels(kinds) {
+            if (!kinds || !kinds.length) return;
+            if (kinds.indexOf('chat') >= 0)     this._openLlmChat();
+            if (kinds.indexOf('requests') >= 0) this._openLlmRequests();
         }
 
         // Build the sidebar content once (tab bar + lazily-instantiated panes).
@@ -1360,14 +1502,18 @@
             border-left: 1px solid var(--color-border); background: var(--bg-surface);
         }
         .vs-debug-sidebar[hidden] { display: none; }
-        /* LLM chat drawer — same geometry as the debug pane, its own toggle. */
+        /* AI drawer — the FALLBACK host only. Normally the chat and request panes live
+           inside send-browse's sg-layout (draggable/resizable); this fixed drawer is used
+           when no layout exists yet. Same geometry as the debug pane. */
         .vs-llm-sidebar {
             flex: 0 0 380px; min-width: 300px; position: relative;
-            display: flex; overflow: hidden;
+            display: flex; flex-direction: column; overflow: hidden;
             border-left: 1px solid var(--color-border); background: var(--bg-surface);
         }
         .vs-llm-sidebar[hidden] { display: none; }
-        .vs-llm-sidebar vault-llm-chat { flex: 1; min-width: 0; }
+        .vs-llm-sidebar > *[hidden] { display: none; }
+        .vs-llm-sidebar vault-llm-chat,
+        .vs-llm-sidebar vault-llm-requests { flex: 1; min-width: 0; min-height: 0; }
         .vs-debug-handle {
             position: absolute; left: 0; top: 0; width: 6px; height: 100%;
             cursor: col-resize; z-index: 5; background: transparent;

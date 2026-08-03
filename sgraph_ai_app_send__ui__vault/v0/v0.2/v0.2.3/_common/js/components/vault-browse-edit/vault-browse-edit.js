@@ -46,6 +46,21 @@
 
         var _ext0 = (fileName || '').split('.').pop().toLowerCase();
 
+        // Decode ONCE, here, while the bytes for THIS render are in scope. Both the
+        // "Add to chat" button and the viewing announcement below close over the result,
+        // so what the chat receives is always the file whose button was clicked — it can
+        // never drift to whatever was rendered last. (The old flow relied on a global
+        // "currently viewing" event, which send-browse does not re-fire when a tab is
+        // already open — _openFileTab returns early on an existing tab — so the chat
+        // silently kept the first file it ever saw.)
+        var _ctxPath = (fileName || '').replace(/^\//, '');
+        var _ctxText = null;
+        try {
+            var _isText = (type === 'text' || type === 'markdown' || type === 'code' || type === 'csv' ||
+                           type === 'html' || type === 'json' || _isLikelyText(bytes));
+            if (_isText) _ctxText = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+        } catch (_) { _ctxText = null; }
+
         // App Mode: available for all file types on all vaults (writable or not).
         // Opens the file via /en-gb/app#path in a NEW TAB.
         // Hash = file path (NOT vault key — key comes from localStorage set by /#vault-key).
@@ -73,30 +88,29 @@
             _addTip(openAsAppLink, 'Open as App — right-click to Copy Link\nor Ctrl+click to open in new tab');
             bar.appendChild(openAsAppLink);
 
-            // Ask AI — opens the native chat panel with THIS file as context. The button
-            // is always rendered; the panel itself reports when no key is configured
-            // (better than a mystery-missing button).
-            var askBtn = _makeBtn('✨ Ask AI');
-            _addTip(askBtn, 'Ask about this file using the vault\'s configured AI model');
-            askBtn.addEventListener('click', function () {
-                document.dispatchEvent(new CustomEvent('vault-llm-open', { bubbles: true }));
+            // Add to chat — attaches THIS file to the AI chat's context set and opens the
+            // chat panel. Additive by design: the chat holds many files at once, so this
+            // is "add", not "ask". The button is always rendered; the panel itself reports
+            // when no key is configured (better than a mystery-missing button).
+            var addBtn = _makeBtn('➕ Add to chat');
+            _addTip(addBtn, 'Attach this file to the AI chat (adds to any files already attached)');
+            addBtn.addEventListener('click', function () {
+                document.dispatchEvent(new CustomEvent('vault-llm-add-file', {
+                    bubbles: true,
+                    detail: { path: _ctxPath, type: type, text: _ctxText }
+                }));
             });
-            bar.appendChild(askBtn);
+            bar.appendChild(addBtn);
         }
 
-        // Announce what is on screen so the chat panel can use it as context. Text-ish
-        // content is decoded here (the bytes are already in hand); binaries announce a
-        // null body so the panel can say "binary, not sent" instead of shipping noise.
+        // Announce what is on screen. The chat records this ONLY to offer a one-click
+        // "add the file you're looking at" in its empty state — it never auto-attaches,
+        // because a context that swaps itself underneath a conversation is worse than no
+        // context at all. Binaries announce a null body (nothing useful to send).
         try {
-            var _isText = (type === 'text' || type === 'markdown' || type === 'code' || type === 'csv' ||
-                           type === 'html' || type === 'json' || _isLikelyText(bytes));
             document.dispatchEvent(new CustomEvent('vault-file-viewing', {
                 bubbles: true,
-                detail: {
-                    path: (fileName || '').replace(/^\//, ''),
-                    type: type,
-                    text: _isText ? new TextDecoder('utf-8', { fatal: false }).decode(bytes) : null
-                }
+                detail: { path: _ctxPath, type: type, text: _ctxText }
             }));
         } catch (_) { /* context is a nicety — never break rendering for it */ }
 

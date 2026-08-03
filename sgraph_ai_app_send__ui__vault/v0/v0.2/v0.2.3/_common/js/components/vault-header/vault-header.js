@@ -61,6 +61,7 @@
                             <div class="vh-menu vh-sync-menu" style="display:none"></div>
                         </div>
                         <button class="vh-open-app-btn" style="display:none" title="Open app">&#9654; Open App</button>
+                        <button class="vh-llm-btn" type="button" title="AI Chat — ask about the files you attach">&#10024; AI Chat</button>
                         <div class="vh-overflow">
                             <button class="vh-overflow-btn" type="button" title="More" aria-haspopup="true" aria-expanded="false">&#8943;</button>
                             <div class="vh-menu vh-overflow-menu" style="display:none">
@@ -89,6 +90,7 @@
                 if (e.target.closest('.vh-mi--debug')) { this._closeMenus(); this._emit('vault-header-debug'); }
                 if (e.target.closest('.vh-mi--raw'))   { e.preventDefault(); this._closeMenus(); this._emit('vault-header-raw'); }
 
+                if (e.target.closest('.vh-llm-btn'))      this._emit('vault-header-llm');
                 if (e.target.closest('.vh-open-app-btn')) this._openApp();
                 if (e.target.closest('.vh-vault-name') && !e.target.closest('input')) this._startNameEdit();
             });
@@ -483,6 +485,15 @@
             font-weight: 700; white-space: nowrap;
         }
         .vh-open-app-btn:hover { background: var(--color-primary-hover, #3dbdb5); border-color: var(--color-primary-hover, #3dbdb5); }
+
+        /* --- AI Chat (secondary) — the top-level way in, independent of any open file --- */
+        .vh-llm-btn {
+            font-size: var(--text-small); padding: 0.3rem 0.6rem; border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border); background: transparent;
+            color: var(--color-text-secondary); cursor: pointer; font-family: var(--font-family);
+            white-space: nowrap;
+        }
+        .vh-llm-btn:hover { color: var(--color-text); border-color: var(--color-primary); }
 
         /* --- Overflow --- */
         .vh-overflow { position: relative; }
