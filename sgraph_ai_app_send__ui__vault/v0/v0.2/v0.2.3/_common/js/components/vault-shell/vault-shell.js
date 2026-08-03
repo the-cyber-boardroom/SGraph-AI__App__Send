@@ -1107,89 +1107,26 @@
             return null;
         }
 
-        // A HARD REFERENCE, not a fresh querySelector each time.
-        //
-        // sg-layout detaches the element BEFORE it announces the close — `_closeTab` calls
-        // `this.removeChild(tab.el)` and only then emits `panel:closed`. So by the time our
-        // handler runs the element is out of the document, a querySelector finds nothing,
-        // parking silently no-ops, and the element is orphaned: every later lookup returns
-        // null and the panel can never be reopened. That was the "close the chat and the
-        // AI Chat button stops working" bug.
-        //
-        // A live element in our own subtree still wins, so a shell re-render that builds a
-        // fresh <vault-llm-chat> replaces the stale reference rather than resurrecting it.
-        _llmEl(kind) {
-            const tag = (kind === 'requests') ? 'vault-llm-requests' : 'vault-llm-chat';
-            this._llmEls = this._llmEls || {};
-            const live = this.querySelector(tag);
-            if (live) { this._llmEls[kind] = live; return live; }
-            return this._llmEls[kind] || null;
-        }
-
-        // Closing from sg-layout's own tab × must not leave us believing the panel is
-        // still open (the next open would then no-op and nothing would appear). Bound
-        // ONCE per layout — sg-layout's bus has no off-by-handler for our closure, so
-        // re-binding on every open would leak a listener per open/close cycle.
-        _watchPanelClose(layout) {
-            if (!layout || layout.__vsLlmCloseBound) return;
-            try {
-                layout.events.on('panel:closed', (d) => {
-                    if (!d || !this._llmPanels) return;
-                    Object.keys(this._llmPanels).forEach((kind) => {
-                        if (this._llmPanels[kind].id === d.id) {
-                            delete this._llmPanels[kind];
-                            this._parkLlmEl(kind);
-                        }
-                    });
+        // The panel bookkeeping lives in LlmPanels because /app needs exactly the same
+        // thing, and the one subtlety in it — sg-layout detaches an element BEFORE
+        // announcing the close, so the handler must hold a hard reference rather than
+        // re-query — is invisible enough that a second copy would get it wrong again.
+        _llmPanelHost() {
+            if (!this.__llmHost) {
+                this.__llmHost = LlmPanels.create({
+                    host     : this,
+                    sidebar  : () => this.querySelector('.vs-llm-sidebar'),
+                    getLayout: () => this._sgLayoutReady()
                 });
-                layout.__vsLlmCloseBound = true;
-            } catch (_) { /* no bus → the ✕ inside the panel still works */ }
-        }
-
-        // Mount `el` as an sg-layout panel, or reveal the sidebar fallback. Idempotent:
-        // if the panel is already mounted it is simply focused.
-        async _showLlmPanel(kind, title) {
-            const el = this._llmEl(kind);
-            if (!el) return null;
-            this._llmPanels = this._llmPanels || {};                 // { kind: {id, layout} }
-
-            const open = this._llmPanels[kind];
-            if (open && open.layout && open.layout.isConnected && el.isConnected) {
-                try { open.layout.focusPanel && open.layout.focusPanel(open.id); } catch (_) {}
-                return el;
+                this._llmPanels = this.__llmHost.panels;      // live alias, never reassigned
             }
-
-            const layout = await this._sgLayoutReady();
-            if (layout) {
-                el.hidden = false;
-                // addPanel only assigns el.slot — the element must already be a light-DOM
-                // child of the layout for that slot to project.
-                layout.appendChild(el);
-                const id = layout.addPanel({ el: el, title: title });
-                this._llmPanels[kind] = { id: id, layout: layout };
-                this._watchPanelClose(layout);
-            } else {
-                // Fallback: the fixed sidebar.
-                const bar = this.querySelector('.vs-llm-sidebar');
-                if (!bar) return null;
-                if (el.parentNode !== bar) bar.appendChild(el);
-                el.hidden = false;
-                bar.hidden = false;
-                this._llmPanels[kind] = { id: null, layout: null };
-            }
-            return el;
+            return this.__llmHost;
         }
 
-        // Return an element to the fallback sidebar (detached from view) so it survives a
-        // layout teardown with its transcript and attached files intact.
-        _parkLlmEl(kind) {
-            const el  = this._llmEl(kind);
-            const bar = this.querySelector('.vs-llm-sidebar');
-            if (!el || !bar) return;
-            if (el.parentNode !== bar) bar.appendChild(el);
-            el.hidden = true;
-            if (Array.from(bar.children).every((c) => c.hidden)) bar.hidden = true;
-        }
+        _llmEl(kind)                { return this._llmPanelHost().el(kind); }
+        _watchPanelClose(layout)    { return this._llmPanelHost().watch(layout); }
+        async _showLlmPanel(k, t)   { return this._llmPanelHost().show(k, t); }
+        _parkLlmEl(kind)            { return this._llmPanelHost().park(kind); }
 
         async _openLlmChat() {
             const el = await this._showLlmPanel('chat', 'AI Chat');
@@ -1201,24 +1138,12 @@
             return this._showLlmPanel('requests', 'AI Requests');
         }
 
-        _closeLlmPanel(kind) {
-            const rec = this._llmPanels && this._llmPanels[kind];
-            if (rec && rec.layout && rec.id) {
-                try { rec.layout.removePanel(rec.id); } catch (_) {}
-            }
-            if (this._llmPanels) delete this._llmPanels[kind];
-            this._parkLlmEl(kind);
-        }
+        _closeLlmPanel(kind) { return this._llmPanelHost().close(kind); }
 
         // A browse remount destroys the layout (and every panel in it). Park the AI
         // elements in the sidebar FIRST so they are not garbage-collected with it, then
         // re-mount whichever were open once the new layout exists.
-        _detachLlmPanels() {
-            const open = Object.keys(this._llmPanels || {});
-            this._llmPanels = {};
-            open.forEach((k) => this._parkLlmEl(k));
-            return open;
-        }
+        _detachLlmPanels() { return this._llmPanelHost().detachAll(); }
 
         _reattachLlmPanels(kinds) {
             if (!kinds || !kinds.length) return;

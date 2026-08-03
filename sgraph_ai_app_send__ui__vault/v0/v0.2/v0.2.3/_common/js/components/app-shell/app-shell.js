@@ -471,6 +471,11 @@
                 detail: {
                     vaultName: vaultName, appTitle: appTitle, vaultKey: this._vaultKey,
                     isRO: effectiveRO, perm: this._perm,
+                    // The open vault, for host chrome at the REAL origin that needs it —
+                    // the AI Chat panel on /app resolves its key from .vault/llm through
+                    // this. Safe on this event: the embed forwarder below copies named
+                    // fields into its postMessage, so nothing here crosses an origin.
+                    vault: this._vault,
                     hudCfg: (appJson && appJson.hud) || null   // see AppHud._resolveHudCfg
                 }
             }));

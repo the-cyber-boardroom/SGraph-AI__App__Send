@@ -61,6 +61,12 @@
     <script src="/_common/js/lib/sg-llm/sg-llm.js"></script>
     <script src="/_common/js/lib/sg-llm/sg-llm-vault.js"></script>
     <script src="/_common/js/lib/sg-llm/vault-llm-log.js"></script>
+    <!-- AI Chat as HOST CHROME. It runs at the real origin (this page), so it holds the
+         vault key and the microphone directly — the sandboxed app frame sees neither.
+         LlmPanels is the shared mount/park bookkeeping, identical to /vault's. -->
+    <script src="/_common/js/lib/sg-llm/llm-panels.js"></script>
+    <script src="/_common/js/components/vault-llm-chat/vault-llm-chat.js"></script>
+    <script src="/_common/js/components/vault-llm-requests/vault-llm-requests.js"></script>
     <!-- Voice: host-side mic capture. Lazily imports sg-audio + sg-audio-decode
          from the SG/Tools CDN (CORS *) — we do not reimplement recording. -->
     <script src="/_common/js/lib/sg-voice/sg-voice.js"></script>
@@ -141,11 +147,31 @@
         app-hud { display: block; width: 100%; }
         /* Hide the sg-layout stack chrome on the app page — panels need no title bar */
         #app-layout { --sgl-panel-header-height: 0px; }
+        /* #llm-host is normally an invisible parking bay (the panels live in the layout).
+           It only becomes visible on the no-layout fallback path, where it has to be a
+           usable column rather than an unstyled block dumped under the app. */
+        #llm-host[hidden] { display: none; }
+        #llm-host {
+            position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw);
+            z-index: 20; display: flex; flex-direction: column;
+            border-left: 1px solid #24304a; background: #0d1120;
+        }
+        #llm-host > * { flex: 1; min-height: 0; }
+        #llm-host > *[hidden] { display: none; }
     </style>
 </head>
 <body>
     <div id="hud-host"><app-hud id="app-hud"></app-hud></div>
     <div id="layout-host"><sg-layout id="app-layout"></sg-layout></div>
+
+    <!-- The AI panels live here until they are mounted into #app-layout, and come back
+         here when closed. They must be REAL light-DOM elements that survive being
+         un-panelled: the chat carries the transcript, the attached files and the cost
+         pills, so closing the panel must move it out of sight, never destroy it. -->
+    <div id="llm-host" hidden>
+        <vault-llm-chat></vault-llm-chat>
+        <vault-llm-requests hidden></vault-llm-requests>
+    </div>
 
     <script>
     (function () {
@@ -210,6 +236,47 @@
             }
         });
 
+        // ── AI Chat as host chrome ────────────────────────────────────────────────
+        // Same panels as /vault, same mount/park bookkeeping (LlmPanels), mounted into
+        // THIS page's layout. They run at the real origin, so the chat holds the vault
+        // key and the microphone directly — the sandboxed app frame is not involved and
+        // never sees either. An app does not have to ask for anything, or know this
+        // exists, for the user to get it.
+        var _llm = LlmPanels.create({
+            host     : document.getElementById('llm-host'),
+            sidebar  : function () { return document.getElementById('llm-host'); },
+            getLayout: function () {
+                return customElements.whenDefined('sg-layout').then(function () {
+                    var l = document.getElementById('app-layout');
+                    return (l && typeof l.addPanel === 'function') ? l : null;
+                });
+            }
+        });
+
+        function _openLlm(kind, title) {
+            return Promise.resolve(_llm.show(kind, title)).then(function (el) {
+                // The chat needs the vault to resolve .vault/llm; app-shell hands it over
+                // on ready. Re-set on every open so a re-keyed or switched vault is picked
+                // up rather than the panel talking to a stale one.
+                if (el && _vault && typeof el.setVault === 'function') el.setVault(_vault);
+                if (el && typeof el.open === 'function') el.open();
+                return el;
+            });
+        }
+
+        var _vault = null;
+        document.addEventListener('app-shell:ready', function (e) {
+            _vault = (e.detail && e.detail.vault) || null;
+            var chat = _llm.el('chat');
+            if (chat && _vault && typeof chat.setVault === 'function') chat.setVault(_vault);
+        });
+
+        document.addEventListener('app-hud:llm',            function () { _openLlm('chat', '\u2728 AI Chat'); });
+        document.addEventListener('vault-llm-open',         function () { _openLlm('chat', '\u2728 AI Chat'); });
+        document.addEventListener('vault-llm-close',        function () { _llm.close('chat'); });
+        document.addEventListener('vault-llm-requests-open',  function () { _openLlm('requests', 'AI Requests'); });
+        document.addEventListener('vault-llm-requests-close', function () { _llm.close('requests'); });
+
         // Debug pane expand/collapse
         document.addEventListener('app-debug:toggle', function (e) {
             var layout = document.getElementById('app-layout');
@@ -219,7 +286,15 @@
             _layoutCfg = Object.assign({}, _layoutCfg, {
                 sizes: open ? [1 - split, split] : [1.0, 0.0]
             });
+            // setLayout() rebuilds the tree from _layoutCfg and unmounts everything not in
+            // it — which includes any AI panel added with addPanel(). Park them first or
+            // the transcript is destroyed by toggling the debug pane, then put back the
+            // ones that were open.
+            var reopen = _llm.detachAll();
             layout.setLayout(_layoutCfg);
+            reopen.forEach(function (kind) {
+                _openLlm(kind, kind === 'requests' ? 'AI Requests' : '\u2728 AI Chat');
+            });
             try {
                 sessionStorage.setItem('app-debug-open',  open ? '1' : '0');
                 sessionStorage.setItem('app-debug-split', String(split));

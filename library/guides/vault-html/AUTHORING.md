@@ -487,6 +487,7 @@ declare how much of this chrome they want via `app.json`:
       "print":      true,
       "debug":      true,
       "activity":   true,
+      "llm":        true,
       "navBar":     true,
       "navArrows":  true,
       "navPath":    true,
@@ -520,6 +521,17 @@ declare how much of this chrome they want via `app.json`:
 
 `hud.show.*` granular flags override the per-mode defaults. Set to `false` to hide;
 omit to use the default.
+
+**`llm` — the AI Chat button** (`full`-default on, `minimal`/`hidden`/`none` off).
+A `✨ AI` button in the top row that opens the host's own AI Chat panel beside your app —
+the same panel the vault file browser has, voice input included. It is **host chrome, not
+your app**: it runs at the real origin, so it holds the vault key and the microphone
+directly and your frame never sees either. You do not need `permissions.llm.*` for it, and
+you cannot read the conversation. Turn it off with `"llm": false` if a chat button would
+confuse your app's own UI; turn it on in `minimal` with `"llm": true`.
+
+(If you want AI *inside* your app rather than beside it, that's `sg.llm.chat()` /
+`sg.llm.listen()` — those do need grants. See "Talking to a model".)
 
 **`activity` — the file-activity meter** (`full`-default on, `minimal`/`hidden`/`none` off).
 A compact `⇅ R N  W N` chip in the top row that tallies the files this app has **read**
