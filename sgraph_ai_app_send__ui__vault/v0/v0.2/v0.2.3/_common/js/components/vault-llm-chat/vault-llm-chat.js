@@ -717,19 +717,25 @@
         .vlc-status { padding: 0 .75rem; font-size: .72rem; min-height: 0; }
         .vlc-status--warn { color: #E9C445; padding: .4rem .75rem; }
         .vlc-status--info { color: var(--color-text-secondary, #9aa4bf); padding: .4rem .75rem; }
-        /* A live microphone is the one state in this panel that must never be missed. */
-        .vlc-status--rec  { color: #ff9b9b; padding: .4rem .75rem; font-weight: 600; }
+        /* A live microphone is the one state in this panel that must never be missed — but
+           it is a GOOD state, and this panel already spends red on failure (.vlc-msg--err,
+           .vlc-status--warn). Alarm colours for "working as intended" read as something
+           going wrong. Recording uses the panel's accent teal and earns its visibility from
+           weight, a filled chip and a slow pulse instead. */
+        .vlc-status--rec  { color: #4ecdc4; padding: .4rem .75rem; font-weight: 600; }
         .vlc-mic {
             padding: .4rem .55rem; border-radius: 6px; cursor: pointer; font-size: .8rem;
             background: transparent; color: var(--color-text-secondary, #9aa4bf);
             border: 1px solid var(--color-border, #24304a); font-family: inherit; white-space: nowrap;
         }
         .vlc-mic:hover { color: var(--color-text, #e2e8f0); border-color: #4ecdc4; }
+        /* Tinted rather than solid: the Send button beside it is solid teal, and two solid
+           teal blocks side by side stop reading as two different things. */
         .vlc-mic--rec {
-            background: #ff6b6b; border-color: #ff6b6b; color: #fff; font-weight: 700;
-            animation: vlc-rec-pulse 1.1s ease-in-out infinite;
+            background: rgba(78,205,196,.16); border-color: #4ecdc4; color: #4ecdc4; font-weight: 700;
+            animation: vlc-rec-pulse 1.6s ease-in-out infinite;
         }
-        @keyframes vlc-rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+        @keyframes vlc-rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: .72; } }
         .vlc-form { display: flex; gap: .4rem; padding: .5rem .75rem .75rem; border-top: 1px solid var(--color-border, #24304a); }
         .vlc-in {
             flex: 1; resize: none; font: inherit; font-size: .78rem; padding: .4rem .5rem;

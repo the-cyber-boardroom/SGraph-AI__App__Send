@@ -1107,8 +1107,23 @@
             return null;
         }
 
+        // A HARD REFERENCE, not a fresh querySelector each time.
+        //
+        // sg-layout detaches the element BEFORE it announces the close — `_closeTab` calls
+        // `this.removeChild(tab.el)` and only then emits `panel:closed`. So by the time our
+        // handler runs the element is out of the document, a querySelector finds nothing,
+        // parking silently no-ops, and the element is orphaned: every later lookup returns
+        // null and the panel can never be reopened. That was the "close the chat and the
+        // AI Chat button stops working" bug.
+        //
+        // A live element in our own subtree still wins, so a shell re-render that builds a
+        // fresh <vault-llm-chat> replaces the stale reference rather than resurrecting it.
         _llmEl(kind) {
-            return this.querySelector(kind === 'requests' ? 'vault-llm-requests' : 'vault-llm-chat');
+            const tag = (kind === 'requests') ? 'vault-llm-requests' : 'vault-llm-chat';
+            this._llmEls = this._llmEls || {};
+            const live = this.querySelector(tag);
+            if (live) { this._llmEls[kind] = live; return live; }
+            return this._llmEls[kind] || null;
         }
 
         // Closing from sg-layout's own tab × must not leave us believing the panel is

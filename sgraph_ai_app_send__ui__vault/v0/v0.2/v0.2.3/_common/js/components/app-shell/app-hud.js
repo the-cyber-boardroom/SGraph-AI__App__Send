@@ -1019,25 +1019,29 @@
         /* Voice capture bar. Red IS right here — unlike a published release, a live
            microphone is a state the user must never overlook. Full-width sibling row so
            it survives every hud mode, matching the consent bar. */
+        /* Teal, not red. The HUD spends red on failure (.hud-msg--error, .hud-act-e,
+           .hud-consent-deny), so a red bar for a working microphone reads as an alarm.
+           Visibility comes from the full-width bar, the pulsing dot and the words — none
+           of which need an error colour to be impossible to miss. */
         .hud-rec-bar {
             display: none; align-items: center; gap: 0.6rem; flex-wrap: wrap;
             padding: 0.5rem 0.9rem; font-size: 0.8rem;
-            background: rgba(255,107,107,0.12); border-bottom: 1px solid rgba(255,107,107,0.35);
-            color: #ffdada;
+            background: rgba(78,205,196,0.12); border-bottom: 1px solid rgba(78,205,196,0.4);
+            color: #cdf3f0;
         }
         .hud-rec-dot {
-            width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #ff6b6b;
-            animation: hud-rec-pulse 1.1s ease-in-out infinite; flex-shrink: 0;
+            width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #4ecdc4;
+            animation: hud-rec-pulse 1.6s ease-in-out infinite; flex-shrink: 0;
         }
         .hud-rec-dot--busy { background: #E9C445; }
-        @keyframes hud-rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+        @keyframes hud-rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
         .hud-rec-label { flex: 1; min-width: 10rem; }
         .hud-rec-time { font-family: var(--font-mono, monospace); opacity: 0.85; }
         .hud-rec-stop, .hud-rec-cancel {
             font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer;
             font-family: inherit; white-space: nowrap;
         }
-        .hud-rec-stop   { background: #ff6b6b; border: 1px solid #ff6b6b; color: #fff; font-weight: 700; }
+        .hud-rec-stop   { background: #4ecdc4; border: 1px solid #4ecdc4; color: #0d1120; font-weight: 700; }
         .hud-rec-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.25); color: inherit; }
         .hud-rec-cancel:hover { border-color: #fff; }
 

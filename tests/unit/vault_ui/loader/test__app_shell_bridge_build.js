@@ -52,6 +52,60 @@ console.log('\n[suite] app-shell — _buildVfsBridgeScript builds without throwi
         /__sgOpenExternal/.test(src || '') && !/window\.open\(h,/.test(src || ''));
 }
 
+console.log('\n[suite] app-shell — an app error is attributed to the APP, not the vault');
+{
+    /* An unlabelled "Uncaught SyntaxError: …" on vault chrome reads as a fault in the
+       vault. It cost a real debugging session pointed at the wrong codebase: the throw
+       came from a boot loader inside a vault app, and nothing on screen said so. */
+    const el  = makeShell(AppPermissions.parsePermissions(null));
+    const src = el._buildVfsBridgeScript('tools/dash.html');
+
+    // The injected bridge is a <script> STRING — a typo in it fails only in a browser.
+    const body = src.replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    let perr = null;
+    try { new Function(body); } catch (e) { perr = e; }
+    ok('the injected bridge still parses', perr === null, perr && perr.message);
+
+    ok('the frame logs errors under a greppable [vault-app] prefix', /\[vault-app\]/.test(src));
+    ok('…naming the file that is running',   /tools\/dash\.html/.test(src));
+    ok('…and saying it is not the platform', /not the vault platform/.test(src));
+    ok('the error frame carries appPath so the host need not guess', /appPath:/.test(src));
+    ok('unhandled rejections go through the same labelling',
+        /unhandledrejection/.test(src) && /_sgAppErr\("Unhandled rejection/.test(src));
+
+    // Host side: drive the real message handler with the frame's error.
+    const frame = { contentWindow: {} };
+    el._setupVfsBridgeHandlers(frame, {
+        getFileList: () => [], writable: false,
+        readFile: async () => new Uint8Array(0)
+    });
+    const errs = [];
+    const realErr = console.error;
+    console.error = (m) => errs.push(String(m));
+    try {
+        el._vfsBridgeHandler({
+            source: frame.contentWindow,
+            data: { type: 'sg-app-error', message: 'Uncaught SyntaxError: missing ) after argument list', appPath: 'tools/dash.html' }
+        });
+    } finally { console.error = realErr; }
+
+    ok('the recorded error names the app file',
+        /tools\/dash\.html/.test(el._lastIframeError), el._lastIframeError);
+    ok('…and still carries the original message',
+        /missing \) after argument list/.test(el._lastIframeError));
+    ok('the host also logs it, attributed', errs.some((m) => /\[vault-app\]/.test(m)));
+    ok('…saying whose code threw',          errs.some((m) => /not the vault platform/.test(m)));
+
+    // A frame that reports no path must still be attributed — fall back to what is running.
+    el._buildVfsBridgeScript('other/page.html');
+    console.error = () => {};
+    try {
+        el._vfsBridgeHandler({ source: frame.contentWindow, data: { type: 'sg-app-error', message: 'boom' } });
+    } finally { console.error = realErr; }
+    ok('a path-less report falls back to the running file',
+        /other\/page\.html/.test(el._lastIframeError), el._lastIframeError);
+}
+
 console.log('\n[suite] app-shell — externalLinks grant flips the external-link path');
 {
     const el  = makeShell(AppPermissions.parsePermissions({ permissions: { externalLinks: true } }));

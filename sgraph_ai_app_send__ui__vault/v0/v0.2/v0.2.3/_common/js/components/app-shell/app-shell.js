@@ -2781,6 +2781,9 @@
             // "" for root-level "index.html"). Injected into the bridge so the img.src patch can
             // resolve relative image paths to absolute vault paths before sending to the parent.
             var htmlDir   = currentPath.includes('/') ? currentPath.substring(0, currentPath.lastIndexOf('/') + 1) : '';
+            // Which vault file is running. Held so an uncaught error can be attributed to the
+            // APP rather than reading as a fault in the vault itself — see _onAppError.
+            this._appPath = currentPath;
 
             return '<script>(function(){' +
 
@@ -2788,8 +2791,14 @@
                 // the parent can no longer reach in to inject window.onerror; instead the
                 // frame self-reports uncaught errors OUT over postMessage (null-origin safe).
                 // The parent handler routes {type:"sg-app-error"} to the HUD. See probe P5.
-                'window.onerror=function(m,s,l,c){try{window.parent.postMessage({type:"sg-app-error",message:String(m)+(l?" (line "+l+(c?":"+c:"")+")":"")},"*");}catch(_){}return false;};' +
-                'window.addEventListener("unhandledrejection",function(e){try{var r=e&&e.reason;window.parent.postMessage({type:"sg-app-error",message:"Unhandled rejection: "+String((r&&r.message)||r)},"*");}catch(_){}});' +
+                // The frame also logs it itself, prefixed, because the browser's own uncaught
+                // error line says nothing about WHOSE code threw — and a syntax error in an
+                // app's script reads exactly like a fault in the vault to anyone debugging.
+                'function _sgAppErr(msg){try{console.error("[vault-app] " + ' + JSON.stringify(currentPath) +
+                  ' + " — this error is from the APP\'s own JavaScript, not the vault platform:\\n" + msg);}catch(_){}' +
+                  'try{window.parent.postMessage({type:"sg-app-error",message:msg,appPath:' + JSON.stringify(currentPath) + '},"*");}catch(_){}}' +
+                'window.onerror=function(m,s,l,c){_sgAppErr(String(m)+(l?" (line "+l+(c?":"+c:"")+")":""));return false;};' +
+                'window.addEventListener("unhandledrejection",function(e){var r=e&&e.reason;_sgAppErr("Unhandled rejection: "+String((r&&r.message)||r));});' +
 
                 // Kernel→app event channel (sg.on / sg.off). The kernel postMessages
                 // {type:"sg-event",name,payload} ONLY for events this app declared in
@@ -4177,8 +4186,17 @@
                 // as a persistent error toast (ttl null). Replaces the old same-origin
                 // contentWindow.onerror injection which is dead under null-origin.
                 if (e.data.type === 'sg-app-error') {
-                    self._lastIframeError = String(e.data.message || 'App error');
-                    self._emitVaultEvent('app-error', { label: 'App error', message: self._lastIframeError });
+                    // Attribute it. An unlabelled "Uncaught SyntaxError: …" on vault chrome
+                    // reads as a fault in the vault, and the first hour of debugging goes to
+                    // the wrong codebase. The app's own file name is the whole fix.
+                    var eRaw  = String(e.data.message || 'App error');
+                    var eFile = String(e.data.appPath || self._appPath || '') || 'app';
+                    self._lastIframeError = 'App code (' + eFile + '): ' + eRaw;
+                    try {
+                        console.error('[vault-app] ' + eFile + ' — thrown by the APP\'s own JavaScript, ' +
+                                      'not the vault platform:\n' + eRaw);
+                    } catch (_) {}
+                    self._emitVaultEvent('app-error', { label: 'App error', message: self._lastIframeError, path: eFile });
                     var ehud = document.getElementById('app-hud') || document.querySelector('app-hud');
                     if (ehud && typeof ehud.showMessage === 'function') {
                         ehud.showMessage('sg-app-error', self._lastIframeError, 'error', null);
