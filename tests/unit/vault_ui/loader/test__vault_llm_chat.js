@@ -287,11 +287,12 @@ console.log('\n[suite] vault-llm-chat — voice input (the surface you can actua
     ok('no device says why', /No microphone/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
 
     // Happy path: record → stop → transcribe → the text is SENT as a chat message.
-    let stopped = 0, sent = null;
+    let stopped = 0, cancelled = 0, sent = null;
     globalThis.SGVoice = window.SGVoice = {
         available: () => ({ ok: true, reason: null }),
         start: async () => ({ fake: 'session' }),
         stop: async () => { stopped++; return { data: 'AAAA', format: 'm4a', bytes: 10, durationMs: 1200 }; },
+        cancel: async () => { cancelled++; },
         transcribeWith: async () => ({ text: 'what is risk four', model: 'm', id: 'g', cost: {} })
     };
     el._send = function () { sent = this.shadowRoot.querySelector('.vlc-in').value; };
@@ -308,11 +309,14 @@ console.log('\n[suite] vault-llm-chat — voice input (the surface you can actua
     ok('the transcript is placed in the input', el.shadowRoot.querySelector('.vlc-in').value === 'what is risk four');
     ok('…and sent as a chat message', sent === 'what is risk four');
 
-    // Cancel must release the device, not merely hide the UI.
-    stopped = 0;
+    // Cancel must release the device, not merely hide the UI — and it goes through
+    // cancel(), not stop(): stop() assembles and returns the audio, which for a cancelled
+    // take is work nobody asked for on bytes nobody wanted.
+    stopped = 0; cancelled = 0;
     await el.toggleVoice();
     await el._stopVoice(true);
-    ok('cancelling still stops the recorder (releases the mic)', stopped === 1);
+    ok('cancelling releases the mic', cancelled === 1);
+    ok('…without assembling the discarded audio', stopped === 0);
     ok('cancelling sends nothing', sent === 'what is risk four');
 
     // An empty transcript must not send an empty message.

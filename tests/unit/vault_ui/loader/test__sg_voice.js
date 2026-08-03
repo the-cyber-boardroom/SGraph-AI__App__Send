@@ -133,5 +133,171 @@ console.log('\n[suite] available() — reports WHY, and never throws');
     ok('…with no reason', V.available().reason === null);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   start()/stop() against a stand-in that enforces the REAL SG/Tools contract.
+
+   These exist because of a bug that reached a user's browser: `core/sg-audio` is a
+   SEGMENT recorder — `startRecording()` throws "onSegment callback is required" if you
+   omit the callback, and `stopRecording()` resolves to `undefined`, delivering every byte
+   through that callback instead. SGVoice originally called `startRecording({})` and read a
+   blob off `stopRecording()`'s return value, so recording could never start and, had it
+   started, stopping would have failed too.
+
+   Nothing about that is visible by reading SGVoice alone, and a dynamic import() of a CDN
+   URL cannot run in Node. So the fake below is copied from the real module's source —
+   including its guard — and the tests assert we satisfy it.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+function fakeAudio(segments) {
+    const state = { opts: null, tracksStopped: 0, stopCalls: 0 };
+    const mod = {
+        // Verbatim shape of core/sg-audio v0.1.0 startRecording/stopRecording.
+        async startRecording(opts = {}) {
+            if (!opts.onSegment) throw new Error('onSegment callback is required');
+            state.opts = opts;
+            const session = {
+                mimeType: opts.mimeType || 'audio/webm;codecs=opus',
+                stopped:  false,
+                segmentIndex: 0,
+                stream: { getTracks: () => [{ stop() { state.tracksStopped++; } }] },
+                _onSegment: opts.onSegment
+            };
+            state.session = session;
+            return session;
+        },
+        async stopRecording(session) {
+            state.stopCalls++;
+            if (session.stopped) return;                 // the real early-return
+            session.stopped = true;
+            (segments || []).forEach((bytes, i) => session._onSegment({
+                index: i + 1,
+                blob: new Blob([new Uint8Array(bytes)], { type: session.mimeType }),
+                mimeType: session.mimeType, startTimeMs: 0, durationMs: 1000
+            }));
+            session.stream.getTracks().forEach((t) => t.stop());
+        }
+    };
+    return { state, mod };
+}
+
+function fakeDecode() {
+    const state = { calls: 0 };
+    return { state, mod: {
+        async blobToWav(blob) {
+            state.calls++;
+            const u = new Uint8Array(await blob.arrayBuffer());
+            return new Blob([u, new Uint8Array([9, 9])], { type: 'audio/wav' });   // marker bytes
+        }
+    } };
+}
+
+console.log('\n[suite] start() — honours the segment-recorder contract');
+{
+    globalThis.window.isSecureContext = true;
+    Object.defineProperty(globalThis, 'navigator', {
+        configurable: true, value: { mediaDevices: { getUserMedia() {} } }
+    });
+    globalThis.MediaRecorder = function () {};
+
+    const a = fakeAudio([[1, 2, 3]]);
+    V.__setModules({ audio: a.mod, decode: fakeDecode().mod });
+
+    let sess = null, err = null;
+    try { sess = await V.start(); } catch (e) { err = e; }
+
+    ok('start() no longer throws "onSegment callback is required"',
+        err === null, err && err.message);
+    ok('…because it passes an onSegment callback', typeof a.state.opts.onSegment === 'function');
+    ok('…and a segment duration',                  a.state.opts.segmentDurationMs > 0);
+    ok('the take is one long segment, not 30s slices', a.state.opts.segmentDurationMs >= 60000);
+    ok('a chunk buffer travels with the session',  Array.isArray(sess.sgChunks));
+    ok('…and a start timestamp for the duration',  typeof sess.sgStartMs === 'number');
+
+    // Two panels can hold two microphones; neither may collect the other's audio.
+    const s2 = await V.start();
+    ok('two sessions do not share a chunk buffer', sess.sgChunks !== s2.sgChunks);
+}
+
+console.log('\n[suite] stop() — reads audio from the segments, not the return value');
+{
+    // stopRecording() resolves to undefined. Reading a blob off it is the original bug.
+    const a = fakeAudio([[1, 2, 3, 4, 5]]);
+    const d = fakeDecode();
+    V.__setModules({ audio: a.mod, decode: d.mod });
+
+    const sess = await V.start({ mimeType: 'audio/mp4' });        // the iPad path
+    const out  = await V.stop(sess);
+
+    ok('stop() returns a payload at all',      out && typeof out.data === 'string');
+    ok('…carrying the recorded bytes',         out.bytes === 5);
+    ok('…base64-encoded',                      Buffer.from(out.data, 'base64').length === 5);
+    ok('…round-tripping exactly', (() => {
+        const b = Buffer.from(out.data, 'base64');
+        return [1, 2, 3, 4, 5].every((v, i) => b[i] === v);
+    })());
+    ok('iPad m4a is sent as-is',               out.format === 'm4a');
+    ok('…with NO conversion call',             d.state.calls === 0);
+    ok('a duration is reported',               typeof out.durationMs === 'number');
+}
+
+console.log('\n[suite] stop() — Chrome webm is converted, and segments are joined in order');
+{
+    const a = fakeAudio([[1, 2], [3, 4], [5, 6]]);
+    const d = fakeDecode();
+    V.__setModules({ audio: a.mod, decode: d.mod });
+
+    const sess = await V.start();                                  // defaults to audio/webm
+    const out  = await V.stop(sess);
+
+    ok('webm forces exactly one conversion', d.state.calls === 1);
+    ok('…and the payload is reported as wav', out.format === 'wav' && out.mimeType === 'audio/wav');
+    ok('every segment reached the decoder in order', (() => {
+        const b = Buffer.from(out.data, 'base64');
+        return [1, 2, 3, 4, 5, 6, 9, 9].every((v, i) => b[i] === v);   // 9,9 = the fake's marker
+    })());
+}
+
+console.log('\n[suite] stop() — a silent take fails loudly instead of billing a call');
+{
+    const a = fakeAudio([]);                    // recorder produced nothing
+    const d = fakeDecode();
+    V.__setModules({ audio: a.mod, decode: d.mod });
+
+    const sess = await V.start();
+    let err = null;
+    try { await V.stop(sess); } catch (e) { err = e; }
+
+    ok('zero bytes throws',                 err !== null);
+    ok('…with a code the UI can branch on', err && err.code === 'ENOAUDIO');
+    ok('…and never reaches the decoder',    d.state.calls === 0);
+}
+
+console.log('\n[suite] cancel() — releases the device, not just the transcript');
+{
+    const a = fakeAudio([[1, 2, 3]]);
+    V.__setModules({ audio: a.mod, decode: fakeDecode().mod });
+
+    const sess = await V.start();
+    await V.cancel(sess);
+
+    ok('the microphone tracks are stopped', a.state.tracksStopped > 0);
+    ok('the captured audio is discarded',   sess.sgChunks.length === 0);
+
+    // sg-audio's stopRecording() returns early for an already-stopped session WITHOUT
+    // touching the tracks — so cancelling after a stop must still release them itself.
+    const b = fakeAudio([[7]]);
+    V.__setModules({ audio: b.mod, decode: fakeDecode().mod });
+    const s2 = await b.mod.startRecording({ onSegment() {} });
+    s2.stopped = true;
+    const before = b.state.tracksStopped;
+    await V.cancel(s2);
+    ok('cancelling an already-stopped session still releases the mic',
+        b.state.tracksStopped > before);
+
+    ok('cancel(null) is a no-op, not a crash', await (async () => {
+        try { await V.cancel(null); return true; } catch (_) { return false; }
+    })());
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);

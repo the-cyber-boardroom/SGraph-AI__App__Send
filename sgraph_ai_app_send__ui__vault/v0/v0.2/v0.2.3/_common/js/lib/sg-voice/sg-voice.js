@@ -31,6 +31,7 @@
      SGVoice.available()           → { ok, reason }
      SGVoice.start()               → session
      SGVoice.stop(session)         → { data, format, bytes, mimeType, durationMs }
+     SGVoice.cancel(session)       → release the microphone, discard the audio
    ================================================================================= */
 
 (function () {
@@ -95,6 +96,13 @@
         return _mods;
     }
 
+    // Test seam. The interesting part of start()/stop() is whether we honour the SG/Tools
+    // contract, and that is exactly the part a dynamic import() of a CDN URL makes
+    // untestable in Node. Injecting a stand-in that enforces the SAME contract is the only
+    // way to catch a signature mismatch before a user does — which is how the
+    // "onSegment callback is required" failure reached the browser.
+    function __setModules(m) { _mods = m; }
+
     function available() {
         try {
             if (!window.isSecureContext)                       return { ok: false, reason: 'EINSECURE' };
@@ -109,36 +117,82 @@
         }
     }
 
+    // `core/sg-audio` is a SEGMENT recorder, not a one-shot one: it is built for long
+    // captures that must survive device loss, so it REQUIRES an `onSegment` callback and
+    // `stopRecording()` resolves to nothing — every byte arrives through that callback.
+    //
+    // A voice memo wants the opposite shape: one take, one blob, transcribed immediately.
+    // So we adapt rather than fork — collect the segments ourselves and hand back a single
+    // blob. The timeslice is deliberately long: with one `dataavailable` per take there is
+    // no reassembly to get wrong. (When a take does run past it, concatenating the chunks
+    // in arrival order is what MediaRecorder's timeslice mode is defined to produce.)
+    var SEGMENT_MS = 600000;                                    // 10 min
+
     async function start(opts) {
+        opts = opts || {};
         var av = available();
         if (!av.ok) throw Object.assign(new Error('Microphone unavailable'), { code: av.reason });
         var m = await _load();
-        return m.audio.startRecording(opts || {});
+
+        var chunks = [];
+        var session = await m.audio.startRecording({
+            segmentDurationMs: opts.segmentDurationMs || SEGMENT_MS,
+            mimeType         : opts.mimeType || undefined,
+            onSegment        : function (seg) { if (seg && seg.blob && seg.blob.size) chunks.push(seg.blob); },
+            onError          : opts.onError || null
+        });
+        // Hung off the session rather than kept in module state: two panels can hold two
+        // microphones (app frame + chat panel) and neither should collect the other's audio.
+        session.sgChunks  = chunks;
+        session.sgStartMs = Date.now();
+        return session;
     }
 
     // Stop → bytes OpenRouter will accept. Converts only when it has to: an iPad's m4a
     // goes straight through, Chrome's webm gets decoded to WAV.
     async function stop(session) {
-        var m   = await _load();
-        var rec = await m.audio.stopRecording(session);
-        var blob = rec && (rec.blob || rec);
-        var mime = (rec && rec.mimeType) || (blob && blob.type) || '';
-        var fmt  = formatFor(mime);
+        var m = await _load();
+        var chunks  = (session && session.sgChunks) || [];
+        var startMs = (session && session.sgStartMs) || null;
 
+        await m.audio.stopRecording(session);       // resolves only after the final segment
+
+        var mime = (session && session.mimeType) || (chunks[0] && chunks[0].type) || '';
+        var blob = new Blob(chunks, { type: mime });
+        var durationMs = startMs ? (Date.now() - startMs) : null;
+
+        // Say so plainly instead of billing a transcription call on zero bytes — the usual
+        // cause is a tap so short the recorder never produced a segment.
+        if (!blob.size) throw Object.assign(new Error('No audio was captured'), { code: 'ENOAUDIO' });
+
+        var fmt = formatFor(mime);
         if (!fmt || !isSendable(fmt)) {
             blob = await m.decode.blobToWav(blob, { hintName: 'recording' });
             fmt  = 'wav';
             mime = 'audio/wav';
         }
-        var buf = await blob.arrayBuffer();
-        var u8  = new Uint8Array(buf);
+        var u8 = new Uint8Array(await blob.arrayBuffer());
         return {
             data      : bytesToBase64(u8),
             format    : fmt,
             bytes     : u8.length,
             mimeType  : mime,
-            durationMs: (rec && rec.durationMs) || null
+            durationMs: durationMs
         };
+    }
+
+    // Cancelling must release the DEVICE, not just drop the transcript — a tab quietly
+    // holding the microphone open is worse than the bug the user was cancelling out of.
+    // The tracks are stopped again here because sg-audio's stopRecording() returns early
+    // for an already-stopped session without touching them.
+    async function cancel(session) {
+        if (!session) return;
+        try {
+            var m = await _load();
+            await m.audio.stopRecording(session);
+        } catch (_) { /* fall through to the direct release below */ }
+        try { session.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (_) {}
+        session.sgChunks = [];
     }
 
     // Transcribe captured audio using an ALREADY-RESOLVED SGLlmVault session, so both
@@ -215,8 +269,8 @@
     var API = {
         TOOLS_BASE: TOOLS_BASE, SENDABLE: SENDABLE, DEFAULT_PROMPT: DEFAULT_PROMPT,
         formatFor: formatFor, isSendable: isSendable, bytesToBase64: bytesToBase64,
-        audioPart: audioPart, available: available, start: start, stop: stop,
-        transcribeWith: transcribeWith
+        audioPart: audioPart, available: available, start: start, stop: stop, cancel: cancel,
+        transcribeWith: transcribeWith, __setModules: __setModules
     };
 
     globalThis.SGVoice = API;

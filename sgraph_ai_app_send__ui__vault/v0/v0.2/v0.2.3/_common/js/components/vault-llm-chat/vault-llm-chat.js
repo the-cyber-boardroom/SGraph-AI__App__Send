@@ -351,7 +351,7 @@
             if (cancelled) {
                 // Releasing the device matters more than the transcript — never leave the
                 // microphone open just because the user changed their mind.
-                try { await SGVoice.stop(session); } catch (_) {}
+                try { await SGVoice.cancel(session); } catch (_) {}
                 this._setStatus('');
                 return;
             }
