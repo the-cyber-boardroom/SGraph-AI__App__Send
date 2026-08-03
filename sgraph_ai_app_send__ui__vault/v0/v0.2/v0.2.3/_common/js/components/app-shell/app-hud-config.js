@@ -31,7 +31,7 @@
     // Per-mode defaults for the show.* flags.
     var DEFAULTS_FULL = {
         vaultName:  true,  appTitle:  true,  openVault:  true,  copyLink: true,
-        print:      true,  debug:     true,  activity:   true,
+        print:      true,  debug:     true,  activity:   true,  llm:      true,
         navBar:     true,  navArrows: true,  navPath:    true,  navRefresh: true,
         navHome:    true
     };
@@ -40,8 +40,11 @@
         // openVault stays ON in minimal: a stripped HUD still needs a visible way back
         // to the vault file browser (otherwise the user must know to edit the URL).
         // activity (the read/write meter) is a power-user surface — off in minimal.
+        // llm (the AI Chat button) is off in minimal for the same reason as activity —
+        // it is host chrome, not app UI. An app that wants it in a stripped HUD opts in
+        // with show:{llm:true}.
         vaultName:  true,  appTitle:  true,  openVault:  true,  copyLink: false,
-        print:      false, debug:     false, activity:   false,
+        print:      false, debug:     false, activity:   false,  llm:     false,
         navBar:     false, navArrows: false, navPath:    false, navRefresh: false,
         navHome:    false
     };

@@ -46,6 +46,7 @@
                         </div>
                         <div class="hud-right">
                             <a class="hud-vault-link" data-hud-el="openVault" href="#" style="display:none" title="Open the vault file browser">&#8612; Open Vault</a>
+                            <button class="hud-llm-btn" data-hud-el="llm" type="button" title="AI Chat — ask about this vault, by text or voice">&#10024; AI</button>
                             <div class="hud-privs-wrap" style="display:none">
                                 <button class="hud-privs-chip" type="button" aria-haspopup="true" aria-expanded="false" title="What this app is allowed to do"></button>
                                 <div class="hud-privs-pop" style="display:none"></div>
@@ -134,6 +135,11 @@
                 if (e.target.closest('.hud-rec-stop'))   { this._recOpts && this._recOpts.onStop   && this._recOpts.onStop();   return; }
                 if (e.target.closest('.hud-rec-cancel')) { this._recOpts && this._recOpts.onCancel && this._recOpts.onCancel(); return; }
                 // ⋯ overflow menu + privileges popover (expand-on-click).
+                // AI Chat — host chrome, not app UI. It runs at the real origin, so it holds
+                // the vault key and the microphone directly; the app frame never sees either.
+                if (e.target.closest('.hud-llm-btn')) {
+                    return this.dispatchEvent(new CustomEvent('app-hud:llm', { bubbles: true, composed: true }));
+                }
                 if (e.target.closest('.hud-more-btn'))     { e.stopPropagation(); return this._toggleMore(); }
                 if (e.target.closest('.hud-privs-chip'))   { e.stopPropagation(); return this._togglePrivsPop(); }
                 if (e.target.closest('.hud-privs-reset'))  { return this._resetConsents(); }
@@ -1011,6 +1017,12 @@
             border: 1px solid #2a2a4a; white-space: nowrap;
         }
         .hud-vault-link:hover { color: #4ECDC4; border-color: #4ECDC4; }
+        .hud-llm-btn {
+            font-size: 0.75rem; color: #8892a4; background: transparent; cursor: pointer;
+            padding: 0.2rem 0.5rem; border-radius: 4px; font-family: inherit;
+            border: 1px solid #2a2a4a; white-space: nowrap;
+        }
+        .hud-llm-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
         .hud-ro-badge {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(100,160,220,0.12); color: #64a0dc;

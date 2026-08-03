@@ -31,6 +31,8 @@ global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
 
 const base = 'sgraph_ai_app_send__ui__vault/v0/v0.2/v0.2.3/_common/js/';
 const load = (f) => new Function(readFileSync(base + f, 'utf8')).call(window);
+load('lib/sg-llm/llm-panels.js');
+global.LlmPanels = window.LlmPanels = globalThis.LlmPanels;
 load('components/vault-shell/vault-shell.js');
 
 // `_sgLayoutReady` awaits customElements.whenDefined('sg-layout') — without a definition
