@@ -852,8 +852,13 @@ class SendBrowse extends SendComponent {
                     'var bytes;' +
                     'if(typeof content==="string"){bytes=new TextEncoder().encode(content);}' +
                     'else{bytes=content instanceof Uint8Array?content:new Uint8Array(content);}' +
-                    // chunked btoa avoids call-stack overflow on large files
-                    'var b64="",chunk=8192;' +
+                    // Chunked btoa avoids a call-stack overflow on large files. The size MUST
+                    // be a multiple of 3: each slice is base64-encoded SEPARATELY, so a slice
+                    // whose length is not divisible by 3 emits '=' padding in the MIDDLE of the
+                    // concatenated string, and atob() rejects '=' anywhere but the end. 8192 % 3
+                    // == 2, which silently corrupted every write over 8 KB (same bug fixed in
+                    // app-shell at v0.33.21). 8190 = 3*2730.
+                    'var b64="",chunk=8190;' +
                     'for(var i=0;i<bytes.length;i+=chunk){' +
                       'b64+=btoa(String.fromCharCode.apply(null,bytes.subarray(i,i+chunk)));' +
                     '}' +
