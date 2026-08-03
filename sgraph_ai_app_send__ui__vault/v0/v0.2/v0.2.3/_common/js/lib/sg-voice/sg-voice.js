@@ -141,10 +141,82 @@
         };
     }
 
+    // Transcribe captured audio using an ALREADY-RESOLVED SGLlmVault session, so both
+    // surfaces that offer voice — the app bridge (sg.llm.listen) and the vault's own chat
+    // panel — share one implementation of the model policy, the spend caps and the ledger
+    // entry. Two copies of "is this within budget" is how a cap silently stops meaning
+    // anything.
+    var DEFAULT_PROMPT =
+        'Transcribe the spoken audio verbatim. Reply with the transcript text only — ' +
+        'no preamble, no commentary, no quotation marks. If there is no intelligible ' +
+        'speech, reply with an empty string.';
+
+    async function transcribeWith(session, audio, opts) {
+        opts = opts || {};
+        if (!session || !session.ok) {
+            throw Object.assign(new Error((session && session.message) || 'AI not available for this vault'),
+                                { code: (session && session.reason) || 'ENOKEY' });
+        }
+        var limits = SGLlmConfig.limitsFor(session.policy, opts.appId || null);
+        var totals = (globalThis.VaultLlmLog) ? VaultLlmLog.totals() : { calls: 0, totalCost: 0 };
+        if (limits.maxCallsPerSession && totals.calls >= limits.maxCallsPerSession) {
+            throw Object.assign(new Error('Session call limit reached'), { code: 'EBUDGET' });
+        }
+        if (limits.maxCostPerSession && totals.totalCost >= limits.maxCostPerSession) {
+            throw Object.assign(new Error('Session spend cap reached'), { code: 'EBUDGET' });
+        }
+        var model = opts.model || session.model || null;
+        if (model && !SGLlmConfig.modelAllowed(session.policy, model)) {
+            throw Object.assign(new Error('Model not allowed: ' + model), { code: 'EMODEL' });
+        }
+        if (!model) throw Object.assign(new Error('No model configured for transcription'), { code: 'EMODEL' });
+
+        var prompt = opts.prompt || DEFAULT_PROMPT;
+        var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
+            model: model, files: [], status: 'pending', promptChars: prompt.length
+        });
+
+        var res;
+        try {
+            res = await session.client.chat({
+                model: model,
+                messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, audioPart(audio)] }],
+                maxTokens: limits.maxTokensPerCall || undefined
+            });
+        } catch (err) {
+            if (rec) VaultLlmLog.update(rec.key, { status: 'error', error: (err && err.message) || 'failed' });
+            throw err;
+        }
+
+        var eff = SGLlm.effectiveCost(res);
+        if (rec) {
+            VaultLlmLog.update(rec.key, {
+                id: res.id || null, model: res.model || model, status: 'ok', usage: res.usage || {},
+                cost: (eff.value != null) ? eff.value : null, costSource: eff.source,
+                estimated: eff.estimated, latencyMs: res.latencyMs || null
+            });
+            session.client.reconcileCost(res).then(function (up) {
+                if (!up) return;
+                var e2 = SGLlm.effectiveCost(res);
+                VaultLlmLog.update(rec.key, { cost: e2.value, costSource: e2.source, estimated: e2.estimated, usage: res.usage || {} });
+            });
+        }
+        return {
+            text      : (res.content || '').trim(),
+            model     : res.model,
+            id        : res.id,
+            durationMs: audio.durationMs || null,
+            bytes     : audio.bytes,
+            format    : audio.format,
+            cost      : { value: eff.value, source: eff.source, estimated: eff.estimated }
+        };
+    }
+
     var API = {
-        TOOLS_BASE: TOOLS_BASE, SENDABLE: SENDABLE,
+        TOOLS_BASE: TOOLS_BASE, SENDABLE: SENDABLE, DEFAULT_PROMPT: DEFAULT_PROMPT,
         formatFor: formatFor, isSendable: isSendable, bytesToBase64: bytesToBase64,
-        audioPart: audioPart, available: available, start: start, stop: stop
+        audioPart: audioPart, available: available, start: start, stop: stop,
+        transcribeWith: transcribeWith
     };
 
     globalThis.SGVoice = API;

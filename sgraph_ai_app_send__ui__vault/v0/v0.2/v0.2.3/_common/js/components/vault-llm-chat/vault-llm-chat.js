@@ -106,6 +106,7 @@
                   '<div class="vlc-status"></div>' +
                   '<form class="vlc-form">' +
                     '<textarea class="vlc-in" rows="2" placeholder="Ask anything — attach files with &quot;Add to chat&quot;…"></textarea>' +
+                    '<button class="vlc-mic" type="button" title="Ask by voice">&#127908;</button>' +
                     '<button class="vlc-send" type="submit">Send</button>' +
                   '</form>' +
                 '</div>';
@@ -115,6 +116,7 @@
                 this.dispatchEvent(new CustomEvent('vault-llm-requests-open', { bubbles: true, composed: true }));
             });
             this.shadowRoot.querySelector('.vlc-params').addEventListener('click', () => this.toggleParams());
+            this.shadowRoot.querySelector('.vlc-mic').addEventListener('click', () => this.toggleVoice());
             ['.vlc-p-temp', '.vlc-p-topp', '.vlc-p-maxtok'].forEach((s) => {
                 this.shadowRoot.querySelector(s).addEventListener('change', () => this._readParams());
             });
@@ -306,6 +308,85 @@
             parts.push('max ' + (p.maxTokens != null ? p.maxTokens : (cap || 'provider default')));
             note.textContent = (clamped ? 'capped by policy · ' : '') + parts.join(' · ');
             note.className = 'vlc-dim vlc-p-note' + (clamped ? ' vlc-warn' : '');
+        }
+
+        // ── voice input ──────────────────────────────────────────────────────────
+        // This panel runs at the REAL origin (it is vault chrome, not a sandboxed app
+        // frame), so it can hold the microphone directly — no bridge needed. Transcription
+        // goes through the SAME SGVoice.transcribeWith used by sg.llm.listen, so budget,
+        // model policy and the request ledger are identical on both surfaces.
+        async toggleVoice() {
+            if (this._recording) return this._stopVoice(false);
+            if (typeof SGVoice === 'undefined') { this._setStatus('Voice capture is not loaded on this page.', 'warn'); return; }
+            if (!this.isAvailable()) { this._renderStatus(); return; }
+
+            const av = SGVoice.available();
+            if (!av.ok) {
+                this._setStatus(av.reason === 'EINSECURE'
+                    ? 'Voice needs a secure (https) page.'
+                    : 'No microphone available on this device or browser.', 'warn');
+                return;
+            }
+            try {
+                this._recSession = await SGVoice.start();
+            } catch (err) {
+                // Most often the browser permission prompt was dismissed.
+                this._setStatus('Could not start recording: ' + ((err && err.message) || err), 'warn');
+                return;
+            }
+            this._recording  = true;
+            this._recStarted = Date.now();
+            this._renderMic();
+            this._recTimer = setInterval(() => this._renderMic(), 500);
+        }
+
+        async _stopVoice(cancelled) {
+            if (!this._recording) return;
+            this._recording = false;
+            clearInterval(this._recTimer);
+            const session = this._recSession;
+            this._recSession = null;
+            this._renderMic();
+
+            if (cancelled) {
+                // Releasing the device matters more than the transcript — never leave the
+                // microphone open just because the user changed their mind.
+                try { await SGVoice.stop(session); } catch (_) {}
+                this._setStatus('');
+                return;
+            }
+            this._setStatus('Transcribing…', 'info');
+            try {
+                const audio = await SGVoice.stop(session);
+                const out  = await SGVoice.transcribeWith(this._session, audio, { model: this._model });
+                // Trim here too rather than trusting the caller's contract: a whitespace-only
+                // reply would otherwise send an empty message and spend a second call on it.
+                const text = String((out && out.text) || '').trim();
+                if (!text) { this._setStatus('Nothing was heard — try again closer to the mic.', 'warn'); return; }
+                this._setStatus('');
+                const inEl = this.shadowRoot.querySelector('.vlc-in');
+                inEl.value = text;              // visible before it goes, so a misheard word is obvious
+                this._send();
+            } catch (err) {
+                this._setStatus('Voice failed: ' + ((err && err.message) || err), 'warn');
+            }
+        }
+
+        _renderMic() {
+            const btn = this.shadowRoot.querySelector('.vlc-mic');
+            if (!btn) return;
+            btn.classList.toggle('vlc-mic--rec', this._recording);
+            if (!this._recording) {
+                btn.innerHTML = '&#127908;';
+                btn.title = 'Ask by voice';
+                if (!this._busy) this._setStatus('');
+                return;
+            }
+            const secs = Math.floor((Date.now() - this._recStarted) / 1000);
+            btn.textContent = '■ ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+            btn.title = 'Stop and send';
+            // The mic being live is never left to a small icon state alone.
+            this._setStatus('● Recording — your microphone is on. Tap ■ to stop and send.', 'rec');
         }
 
         // Visibility belongs to sg-layout now; open() just readies + focuses.
@@ -633,6 +714,19 @@
         .vlc-status { padding: 0 .75rem; font-size: .72rem; min-height: 0; }
         .vlc-status--warn { color: #E9C445; padding: .4rem .75rem; }
         .vlc-status--info { color: var(--color-text-secondary, #9aa4bf); padding: .4rem .75rem; }
+        /* A live microphone is the one state in this panel that must never be missed. */
+        .vlc-status--rec  { color: #ff9b9b; padding: .4rem .75rem; font-weight: 600; }
+        .vlc-mic {
+            padding: .4rem .55rem; border-radius: 6px; cursor: pointer; font-size: .8rem;
+            background: transparent; color: var(--color-text-secondary, #9aa4bf);
+            border: 1px solid var(--color-border, #24304a); font-family: inherit; white-space: nowrap;
+        }
+        .vlc-mic:hover { color: var(--color-text, #e2e8f0); border-color: #4ecdc4; }
+        .vlc-mic--rec {
+            background: #ff6b6b; border-color: #ff6b6b; color: #fff; font-weight: 700;
+            animation: vlc-rec-pulse 1.1s ease-in-out infinite;
+        }
+        @keyframes vlc-rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
         .vlc-form { display: flex; gap: .4rem; padding: .5rem .75rem .75rem; border-top: 1px solid var(--color-border, #24304a); }
         .vlc-in {
             flex: 1; resize: none; font: inherit; font-size: .78rem; padding: .4rem .5rem;

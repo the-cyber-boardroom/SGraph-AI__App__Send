@@ -263,6 +263,76 @@ console.log('\n[suite] vault-llm-chat — a stale "no key" session re-resolves o
     ok('an available session is not re-resolved', resolves === before);
 }
 
+console.log('\n[suite] vault-llm-chat — voice input (the surface you can actually test)');
+{
+    const el = mount();
+    const mic = el.shadowRoot.querySelector('.vlc-mic');
+    ok('a mic button exists in the composer', !!mic);
+    ok('it is not recording to start with', !mic.classList.contains('vlc-mic--rec'));
+
+    // No SGVoice loaded on the page at all → say so, do not throw.
+    const savedVoice = globalThis.SGVoice;
+    globalThis.SGVoice = undefined; window.SGVoice = undefined;
+    el._session = { ok: true, model: 'm', policy: SGLlmConfig.parse({}) };
+    await el.toggleVoice();
+    ok('a page without the voice module explains itself',
+        /not loaded/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
+
+    // No microphone (the insecure-context / no-device case).
+    globalThis.SGVoice = window.SGVoice = { available: () => ({ ok: false, reason: 'EINSECURE' }) };
+    await el.toggleVoice();
+    ok('an insecure page says why', /secure \(https\)/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
+    globalThis.SGVoice.available = () => ({ ok: false, reason: 'ENOMIC' });
+    await el.toggleVoice();
+    ok('no device says why', /No microphone/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
+
+    // Happy path: record → stop → transcribe → the text is SENT as a chat message.
+    let stopped = 0, sent = null;
+    globalThis.SGVoice = window.SGVoice = {
+        available: () => ({ ok: true, reason: null }),
+        start: async () => ({ fake: 'session' }),
+        stop: async () => { stopped++; return { data: 'AAAA', format: 'm4a', bytes: 10, durationMs: 1200 }; },
+        transcribeWith: async () => ({ text: 'what is risk four', model: 'm', id: 'g', cost: {} })
+    };
+    el._send = function () { sent = this.shadowRoot.querySelector('.vlc-in').value; };
+
+    await el.toggleVoice();
+    ok('recording starts', el._recording === true);
+    ok('the mic button shows the recording state', mic.classList.contains('vlc-mic--rec'));
+    ok('the live microphone is stated in words, not just an icon',
+        /Recording — your microphone is on/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
+
+    await el.toggleVoice();          // second tap = stop & send
+    ok('recording stops', el._recording === false);
+    ok('the recorder was stopped', stopped === 1);
+    ok('the transcript is placed in the input', el.shadowRoot.querySelector('.vlc-in').value === 'what is risk four');
+    ok('…and sent as a chat message', sent === 'what is risk four');
+
+    // Cancel must release the device, not merely hide the UI.
+    stopped = 0;
+    await el.toggleVoice();
+    await el._stopVoice(true);
+    ok('cancelling still stops the recorder (releases the mic)', stopped === 1);
+    ok('cancelling sends nothing', sent === 'what is risk four');
+
+    // An empty transcript must not send an empty message.
+    sent = null;
+    globalThis.SGVoice.transcribeWith = async () => ({ text: '   ', model: 'm' });
+    await el.toggleVoice();
+    await el.toggleVoice();
+    ok('silence does not send an empty message', sent === null);
+    ok('…and says nothing was heard', /Nothing was heard/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
+
+    // A failed transcription surfaces rather than vanishing.
+    globalThis.SGVoice.transcribeWith = async () => { throw Object.assign(new Error('Session spend cap reached'), { code: 'EBUDGET' }); };
+    await el.toggleVoice();
+    await el.toggleVoice();
+    ok('a failure is reported to the user', /Voice failed: Session spend cap/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
+    ok('and recording is not left stuck on', el._recording === false);
+
+    globalThis.SGVoice = window.SGVoice = savedVoice;
+}
+
 console.log('\n[suite] vault-llm-chat — model selection (regression: model:null → upstream 404)');
 {
     const el = mount();

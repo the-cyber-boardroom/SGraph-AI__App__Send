@@ -1394,52 +1394,15 @@
             });
         }
 
+        // Delegates to SGVoice.transcribeWith so the app bridge and the vault's own chat
+        // panel share ONE implementation of model policy, spend caps and the ledger entry.
         async _transcribe(audio, opts) {
             var s = await this._llmSession();
-            if (!s || !s.ok) throw Object.assign(new Error((s && s.message) || 'LLM not available'), { code: (s && s.reason) || 'ENOKEY' });
-
-            var limits = SGLlmConfig.limitsFor(s.policy, this._appId || null);
-            var tot    = this._llmTotals();
-            if (limits.maxCallsPerSession && tot.calls >= limits.maxCallsPerSession) {
-                throw Object.assign(new Error('Session call limit reached'), { code: 'EBUDGET' });
-            }
-            if (limits.maxCostPerSession && tot.totalCost >= limits.maxCostPerSession) {
-                throw Object.assign(new Error('Session spend cap reached'), { code: 'EBUDGET' });
-            }
-            var model = opts.model || s.model || null;
-            if (model && !SGLlmConfig.modelAllowed(s.policy, model)) {
-                throw Object.assign(new Error('Model not allowed: ' + model), { code: 'EMODEL' });
-            }
-            if (!model) throw Object.assign(new Error('No model configured for transcription'), { code: 'EMODEL' });
-
-            var prompt = opts.prompt ||
-                'Transcribe the spoken audio verbatim. Reply with the transcript text only — ' +
-                'no preamble, no commentary, no quotation marks. If there is no intelligible ' +
-                'speech, reply with an empty string.';
-
-            var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
-                model: model, files: [], status: 'pending', promptChars: prompt.length
+            return SGVoice.transcribeWith(s, audio, {
+                model : opts.model,
+                prompt: opts.prompt,
+                appId : this._appId || null
             });
-
-            var res = await s.client.chat({
-                model: model,
-                messages: [{ role: 'user', content: [ { type: 'text', text: prompt }, SGVoice.audioPart(audio) ] }],
-                maxTokens: limits.maxTokensPerCall || undefined
-            });
-
-            if (rec) VaultLlmLog.update(rec.key, this._llmLedgerPatch(res, model));
-            s.client.reconcileCost(res).then((up) => { if (up && rec) VaultLlmLog.update(rec.key, this._llmLedgerPatch(res, model)); });
-
-            var eff = SGLlm.effectiveCost(res);
-            return {
-                text      : (res.content || '').trim(),
-                model     : res.model,
-                id        : res.id,
-                durationMs: audio.durationMs || null,
-                bytes     : audio.bytes,
-                format    : audio.format,
-                cost      : { value: eff.value, source: eff.source, estimated: eff.estimated }
-            };
         }
 
         _llmLedgerPatch(res, fallbackModel) {
