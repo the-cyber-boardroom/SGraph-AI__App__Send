@@ -1,12 +1,12 @@
 ---
 name: vault-html-app
-description: Build a polished, self-contained HTML application that lives inside an SG/Send vault and renders from index.html — a photo gallery, strategy microsite, dashboard, report, journal, or any single-page experience. Use this whenever the user wants to create a vault app, build an HTML app for a vault, make a website inside a vault, render a page from a vault, or auto-open a vault as an app — even when they only describe the content (gallery, report, microsite, slide deck, form, presentation) without saying "app". Covers the authoring contract all vault HTML must follow, the data-plus-app project shape that works, the patterns that survive both the SG/App host and the vault browser preview, the sgit commit-and-push workflow, and cross-references the canonical window.sg API reference (library/guides/vault-html/AUTHORING.md) and the sg-playwright screenshot guide.
+description: Build a polished, self-contained HTML application that lives inside an SG/Send vault and renders from index.html — a photo gallery, strategy microsite, dashboard, report, journal, or any single-page experience. Use this whenever the user wants to create a vault app, build an HTML app for a vault, make a website inside a vault, render a page from a vault, or auto-open a vault as an app — even when they only describe the content (gallery, report, microsite, slide deck, form, presentation) without saying "app". Covers the authoring contract all vault HTML must follow, the data-plus-app project shape that works, the patterns that survive both the SG/App host and the vault browser preview, the sgit commit-and-push workflow, calling an LLM from inside a vault app via sg.llm.* without ever holding an API key, and cross-references the canonical window.sg API reference (library/guides/vault-html/AUTHORING.md) and the sg-playwright screenshot guide.
 ---
 
 # Building HTML Apps That Live Inside an SG/Vault
 
 > **Canonical source:** `library/skills/create-vault-apps/SKILL.md` in the
-> `SGraph-AI__App__Send` repo. **Last verified:** 2026-07-30 against app-shell v0.2.3 and
+> `SGraph-AI__App__Send` repo. **Last verified:** 2026-08-02 against app-shell v0.2.3 and
 > sgit-ai v0.14.27. If your copy of this skill came from anywhere else (a vault, a manual
 > upload), check the repo for a newer version before trusting details.
 
@@ -21,7 +21,7 @@ This file is the agent-facing **how-to** — patterns, traps, sample skeletons. 
 `app-shell`/`app-hud` source code:
 
 - **`library/guides/vault-html/AUTHORING.md`** — the full `window.sg.*` runtime API,
-  every namespace (`vfs`, `fs`, `vault`, `history`, `sync`, `auth`, `ui`, `state`,
+  every namespace (`vfs`, `fs`, `vault`, `history`, `sync`, `auth`, `ui`, `state`, `llm`,
   `loadCss`/`loadJs`, `app`), what the host does automatically (nav, hash anchors,
   external links, friendly 404, print, consent overlays), and the `app.json`
   `hud.{mode, show.*}` config schema for the chrome.
@@ -97,11 +97,12 @@ to ship redundant UI that ages out of sync with the platform. As of 2026-05-30:
 | **Static-host / read-only mode** | `SGSend.staticMode` (`window.SG_STATIC === true`) — vault served from GitHub Pages / S3 with no backend | Reads work identically; every write rejects with `{code:'EREADONLY'}`. Check `sg.app.writable` and degrade gracefully. See `library/guides/vault-html/HOSTING-ON-STATIC-STORAGE.md`. |
 | **File downloads** — save a vault file to the user's device | `sg.vfs.download(path, {filename?})` (NEW 2026-07-31) — host-fulfilled: the save happens in the host document, so the app sandbox never needs `allow-downloads` | Don't build blob-URL + programmatic-anchor downloads in-frame (Chromium silently drops them — no `allow-downloads` token). Default: one-click HUD confirm per file; `"permissions": {"downloads": true}` for frictionless. Direct hrefs to vault paths (`<a href="/exports/x.pdf" download>`) can never work — vault files aren't URLs. |
 | **In-page anchors** — `<a href="#section">` | Host interceptor scrolls in-frame (fixed 2026-07-31) | Just write the anchor. Never assign `location.hash` from JS (srcdoc frames re-navigate). Opt out of interception with `data-sg-native` or window-capture `preventDefault` if your app routes clicks itself. |
+| **Calling an LLM** — chat/summarise/extract, streaming | `sg.llm.{available,models,chat,cancel,usage}` (NEW 2026-08-02) — the vault's key stays in the HOST; your frame never sees it | Requires `"llm": {"chat": true}` in `app.json` `permissions`. **Always call `sg.llm.available()` first** and degrade on `ENOKEY`/`EPERM`/`EREADONLY` — unlike other namespaces this depends on runtime state (key configured? budget left?). Host clamps `maxTokens`, filters `models()` by the vault allow-list, enforces spend caps (`EBUDGET`), and raises the consent prompt. Costs are labelled `estimated` — render those with `~`. See AUTHORING.md "Calling an LLM". |
 | **File preview (incl. PDFs)** — quick-look overlay | `sg.ui.preview(path)` (NEW 2026-07-31) — host-rendered at the real origin, so Chrome's native PDF viewer works (it is BLOCKED inside the app sandbox — don't build blob-iframe PDF previews in-frame) | One call, no grant, no confirm (same permission chain as `vfs.read`). Previews pdf/image/video/audio/text. For a PDF inside your own layout, bundle PDF.js to canvas — see AUTHORING.md "Displaying PDFs inline". |
 
 > **Permissions are deny-by-default.** All mutation namespaces (`sg.vfs.write`, `sg.fs.*`,
-> `sg.vault.*`, `sg.append.*`) must be declared in `app.json` `permissions` or they throw
-> `EPERM`; `.vault/**` is always off-limits (`EPROTECTED`). See
+> `sg.vault.*`, `sg.append.*`, `sg.llm.*`) must be declared in `app.json` `permissions` or they
+> throw `EPERM`; `.vault/**` is always off-limits (`EPROTECTED`). See
 > `library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md`.
 
 ### Heads-up: `fetch()` of vault paths is NOT patched

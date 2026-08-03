@@ -1143,6 +1143,61 @@
             return this._append;
         }
 
+        // ── sg.llm.* host helpers ──────────────────────────────────────────────────────
+        // The app frame never sees any of this: the key, the policy and the running bill
+        // all live on this side of the postMessage boundary.
+
+        // Resolve (and cache per vault) the vault's LLM session. Cached because
+        // SGLlmVault.open unseals the owner secret — repeating that per call would be
+        // both slow and pointless. Re-resolves when the vault changes.
+        async _llmSession() {
+            var vault = this._vault;
+            if (!vault) return { ok: false, reason: 'ENOKEY' };
+            // Cache first: an already-resolved session is valid regardless of whether the
+            // resolver script is still reachable, and re-unsealing per call would be waste.
+            if (this._llmSess && this._llmSessVaultId === vault._vaultId) return this._llmSess;
+            if (typeof SGLlmVault === 'undefined') return { ok: false, reason: 'ENOKEY' };
+            try { this._llmSess = await SGLlmVault.open(vault); }
+            catch (_) { this._llmSess = { ok: false, reason: 'EPROTO' }; }
+            this._llmSessVaultId = vault._vaultId;
+            return this._llmSess;
+        }
+
+        // Session accounting comes from the SHARED ledger, so an app's spend and the vault
+        // UI's own chat spend are one number — the budget means nothing if each surface
+        // counts only itself.
+        _llmTotals() {
+            if (globalThis.VaultLlmLog) return VaultLlmLog.totals();
+            return { calls: 0, totalCost: 0, billedCost: 0, estimatedCost: 0, promptTokens: 0, completionTokens: 0 };
+        }
+
+        _llmLedgerPatch(res, fallbackModel) {
+            var eff = SGLlm.effectiveCost(res);
+            return {
+                id        : res.id || null,
+                model     : res.model || fallbackModel,
+                status    : res.aborted ? 'aborted' : 'ok',
+                usage     : res.usage || {},
+                cost      : (eff.value != null) ? eff.value : null,
+                costSource: eff.source,
+                estimated : eff.estimated,
+                latencyMs : res.latencyMs || null
+            };
+        }
+
+        // "This app is calling an LLM" — shown once per app session. An app spending the
+        // user's money in the background with no visible sign is precisely what the HUD
+        // exists to prevent; repeating it on every token would be noise, so it is one
+        // notice plus the permanent activity/ledger surfaces.
+        _llmNotify(model) {
+            if (this._llmNotified) return;
+            this._llmNotified = true;
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (hud && typeof hud.showMessage === 'function') {
+                try { hud.showMessage('llm', 'This app is calling an AI model (' + model + ') with your vault\'s key.', 'info', 6000); } catch (_) {}
+            }
+        }
+
         // Consent cache key — scoped by (vault, app identity, verb) so a different app in the same
         // vault never inherits a prior app's consent (A4). Single source of truth for _can-layered
         // consent and the HUD chip/panel.
@@ -2692,6 +2747,35 @@
                       'window.addEventListener("message",h);window.parent.postMessage(payload,"*");' +
                     '});' +
                   '}' +
+                  // sg.llm.chat — streaming chat WITHOUT the app ever seeing the key.
+                  // One request → N delta frames → one terminal reply. Three rules from the
+                  // plan (§4.1) are load-bearing here:
+                  //   1. deltas carry only the INCREMENT (O(n) total, not O(n²));
+                  //   2. the terminal reply is authoritative — an app that ignores onToken
+                  //      still gets the full `content`;
+                  //   3. coalescing happens in the kernel, not here.
+                  // The returned promise carries `.requestId` so sg.llm.cancel(id) can abort
+                  // a call that is still streaming.
+                  'function _llmChat(req,onToken){' +
+                    'req=req||{};' +
+                    'var id=(Math.random()*1e9|0).toString(36)+Date.now().toString(36);' +
+                    'var p=new Promise(function(res,rej){' +
+                      'function h(e){' +
+                        'if(!e.data)return;' +
+                        'if(e.data.__sgLlmDelta===id){if(onToken){try{onToken(e.data.delta,e.data.acc);}catch(_){}}return;}' +
+                        'if(e.data.__sgCmdReply!==id)return;' +
+                        'window.removeEventListener("message",h);' +
+                        'if(e.data.ok)res(e.data.result);else{var er=new Error(e.data.err||"LLM call failed");er.code=e.data.code||null;rej(er);}' +
+                      '}' +
+                      'window.addEventListener("message",h);' +
+                      'window.parent.postMessage({__sgCmdType:"llm",action:"chat",__sgCmdId:id,' +
+                        'messages:req.messages||[],model:req.model||null,maxTokens:req.maxTokens||null,' +
+                        'temperature:(req.temperature==null?null:req.temperature),topP:(req.topP==null?null:req.topP),' +
+                        'stream:req.stream!==false},"*");' +
+                    '});' +
+                    'p.requestId=id;' +
+                    'return p;' +
+                  '}' +
                   // sg.vault.embed() — open ANOTHER vault inside an iframe via the embed
                   // handshake, with no key in the URL and minimal sandbox privileges. The
                   // src-building + sandbox-sanitisation come from the unit-tested SgEmbed
@@ -2809,6 +2893,18 @@
                       'remove:function(key){return _sgCmd("state",{action:"remove",key:String(key||"")});},' +
                       'clear:function(){return _sgCmd("state",{action:"clear"});},' +
                       'keys:function(){return _sgCmd("state",{action:"keys"});}' +
+                    '},' +
+                    // sg.llm.* — call an LLM with the vault's key, which stays in the HOST.
+                    // available() is NOT optional: unlike every other namespace, LLM depends on
+                    // runtime state (is a key configured? static host? budget spent?), so an app
+                    // must be able to degrade BEFORE it renders a chat UI. models() is
+                    // policy-filtered, so a picker an app builds is automatically correct.
+                    'llm:{' +
+                      'available:function(){return _sgCmd("llm",{action:"available"});},' +
+                      'models:function(){return _sgCmd("llm",{action:"models"});},' +
+                      'usage:function(){return _sgCmd("llm",{action:"usage"});},' +
+                      'chat:_llmChat,' +
+                      'cancel:function(id){return _sgCmd("llm",{action:"cancel",id:id});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -3133,8 +3229,11 @@
                 if (e.data.__sgCmdType) {
                     var cmdId  = e.data.__sgCmdId;
                     var cmdSrc = e.source;
-                    function cmdReply(ok, result, errMsg) {
-                        try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null }, '*'); } catch (_) {}
+                    // `code` is optional and carries a machine-readable error class
+                    // (EPERM / ECONSENT / ENOKEY / EBUDGET / EMODEL / EABORT / EPROTO) so an
+                    // app can branch on the reason instead of string-matching a message.
+                    function cmdReply(ok, result, errMsg, code) {
+                        try { cmdSrc.postMessage({ __sgCmdReply: cmdId, ok: ok, result: result || null, err: errMsg || null, code: code || null }, '*'); } catch (_) {}
                     }
                     var vault    = self._vault;
                     var endpoint = (window.SG_ENDPOINT
@@ -3188,6 +3287,197 @@
                         }).catch(function (err) {
                             cmdReply(false, null, (err && err.message) || String(err));
                             self._emitBridgeCall('append.' + ibAct, { ok: false, err: (err && err.code) || (err && err.message) || 'error' });
+                        });
+                        return;
+                    }
+
+                    // ── sg.llm.* — the key never crosses the boundary ─────────────
+                    // THE chokepoint: permission → consent → budget → call. The app frame
+                    // sends messages and receives text; the credential, the policy and the
+                    // accounting all stay in the host. Deliberately reuses SGLlm/SGLlmVault
+                    // unchanged (they were built DOM-free and bridge-free for exactly this)
+                    // and VaultLlmLog, so an app's spend lands in the SAME ledger the vault
+                    // UI's own chat writes to — one bill per session, not two.
+                    if (e.data.__sgCmdType === 'llm') {
+                        var lAct = e.data.action;
+                        var lCap = { available: null, models: 'llm.models', usage: 'llm.usage',
+                                     chat: 'llm.chat', cancel: 'llm.chat' }[lAct];
+                        if (lCap === undefined) { cmdReply(false, null, 'Unknown llm action: ' + lAct); return; }
+
+                        // available() is ungated ON PURPOSE: an app must be able to discover it
+                        // cannot use the LLM (no grant, no key) in order to degrade gracefully.
+                        // It leaks nothing a denied call would not already reveal.
+                        if (lCap && !self._can(lCap, '')) {
+                            cmdReply(false, null, 'Permission denied', 'EPERM');
+                            self._emitBridgeCall('llm.' + lAct, { ok: false, err: 'EPERM' });
+                            return;
+                        }
+
+                        if (lAct === 'cancel') {
+                            var cRec = self._llmInflight && self._llmInflight[e.data.id];
+                            if (cRec) { try { cRec.abort.abort(); } catch (_) {} }
+                            cmdReply(true, { cancelled: !!cRec });
+                            self._emitBridgeCall('llm.cancel', { ok: true, found: !!cRec });
+                            return;
+                        }
+
+                        self._llmSession().then(function (s) {
+                            if (lAct === 'available') {
+                                var av = { ok: !!(s && s.ok), reason: (s && s.ok) ? null : ((s && s.reason) || 'ENOKEY') };
+                                if (s && s.ok) {
+                                    var lim = SGLlmConfig.limitsFor(s.policy, self._appId || null);
+                                    var t   = self._llmTotals();
+                                    av.model     = s.model || null;
+                                    av.remaining = {
+                                        calls: lim.maxCallsPerSession ? Math.max(0, lim.maxCallsPerSession - t.calls) : null,
+                                        cost : lim.maxCostPerSession  ? Math.max(0, lim.maxCostPerSession  - t.totalCost) : null
+                                    };
+                                }
+                                // A grant-less app gets ok:false/EPERM rather than a lie about the key.
+                                if (av.ok && !self._can('llm.chat', '')) { av.ok = false; av.reason = 'EPERM'; }
+                                cmdReply(true, av);
+                                self._emitBridgeCall('llm.available', { ok: true, available: av.ok, reason: av.reason });
+                                return;
+                            }
+                            if (!s || !s.ok) {
+                                cmdReply(false, null, (s && s.message) || 'LLM not available for this vault', (s && s.reason) || 'ENOKEY');
+                                self._emitBridgeCall('llm.' + lAct, { ok: false, err: (s && s.reason) || 'ENOKEY' });
+                                return;
+                            }
+
+                            if (lAct === 'models') {
+                                return s.client.models().then(function (all) {
+                                    var ids = (all || []).filter(function (m) {
+                                        return m && m.id && SGLlmConfig.modelAllowed(s.policy, m.id);
+                                    }).map(function (m) {
+                                        return { id: m.id, name: m.name || m.id, pricing: m.pricing || null,
+                                                 context: (m.context_length || (m.top_provider && m.top_provider.context_length)) || null };
+                                    });
+                                    cmdReply(true, ids);
+                                    self._emitBridgeCall('llm.models', { ok: true, n: ids.length });
+                                });
+                            }
+
+                            if (lAct === 'usage') {
+                                var ul = SGLlmConfig.limitsFor(s.policy, self._appId || null);
+                                var ut = self._llmTotals();
+                                cmdReply(true, {
+                                    calls: ut.calls, promptTokens: ut.promptTokens, completionTokens: ut.completionTokens,
+                                    cost: ut.totalCost, billed: ut.billedCost, estimated: ut.estimatedCost,
+                                    remaining: {
+                                        calls: ul.maxCallsPerSession ? Math.max(0, ul.maxCallsPerSession - ut.calls) : null,
+                                        cost : ul.maxCostPerSession  ? Math.max(0, ul.maxCostPerSession  - ut.totalCost) : null
+                                    }
+                                });
+                                self._emitBridgeCall('llm.usage', { ok: true });
+                                return;
+                            }
+
+                            // ── chat ──────────────────────────────────────────────
+                            // Consent first: an app calling out to a paid third party with the
+                            // user's key is exactly the class of act the consent bar exists for.
+                            return self._consent('llm.chat', '').then(function (granted) {
+                                if (!granted) {
+                                    cmdReply(false, null, 'User declined', 'ECONSENT');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'ECONSENT' });
+                                    return;
+                                }
+                                var limits = SGLlmConfig.limitsFor(s.policy, self._appId || null);
+                                var tot    = self._llmTotals();
+                                // Budget enforced HERE — the panel enforcing caps on itself does
+                                // nothing for an app calling through the bridge.
+                                if (limits.maxCallsPerSession && tot.calls >= limits.maxCallsPerSession) {
+                                    cmdReply(false, null, 'Session call limit reached (' + limits.maxCallsPerSession + ')', 'EBUDGET');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EBUDGET' });
+                                    return;
+                                }
+                                if (limits.maxCostPerSession && tot.totalCost >= limits.maxCostPerSession) {
+                                    cmdReply(false, null, 'Session spend cap reached ($' + limits.maxCostPerSession + ')', 'EBUDGET');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EBUDGET' });
+                                    return;
+                                }
+                                var model = e.data.model || s.model || null;
+                                if (model && !SGLlmConfig.modelAllowed(s.policy, model)) {
+                                    cmdReply(false, null, 'Model not allowed by this vault: ' + model, 'EMODEL');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EMODEL', model: model });
+                                    return;
+                                }
+                                if (!model) {
+                                    cmdReply(false, null, 'No model selected and no default configured', 'EMODEL');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EMODEL' });
+                                    return;
+                                }
+                                // maxTokens is CLAMPED, never trusted: the app asks, the policy decides.
+                                var maxTok = e.data.maxTokens || limits.maxTokensPerCall || undefined;
+                                if (maxTok && limits.maxTokensPerCall && maxTok > limits.maxTokensPerCall) {
+                                    maxTok = limits.maxTokensPerCall;
+                                }
+
+                                var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
+                                    model: model, files: [], status: 'pending',
+                                    promptChars: (e.data.messages || []).reduce(function (n, m) {
+                                        return n + (typeof m.content === 'string' ? m.content.length : 0); }, 0)
+                                });
+
+                                self._llmNotify(model);
+                                var abort = new AbortController();
+                                self._llmInflight = self._llmInflight || {};
+                                self._llmInflight[cmdId] = { abort: abort };
+
+                                // Coalesce deltas in the KERNEL (~50ms): a postMessage per token is
+                                // the obvious performance trap. The tail is always flushed before
+                                // the terminal reply so no text is lost.
+                                var pend = '', acc = '', timer = null;
+                                var flush = function () {
+                                    if (timer) { clearTimeout(timer); timer = null; }
+                                    if (!pend) return;
+                                    try { cmdSrc.postMessage({ __sgLlmDelta: cmdId, delta: pend, acc: acc }, '*'); } catch (_) {}
+                                    pend = '';
+                                };
+                                var onTok = function (delta, all) {
+                                    acc = all; pend += delta;
+                                    if (!timer) timer = setTimeout(flush, 50);
+                                };
+
+                                var t0 = Date.now();
+                                return s.client.chat({
+                                    model: model, messages: e.data.messages || [], maxTokens: maxTok,
+                                    temperature: (e.data.temperature == null) ? undefined : e.data.temperature,
+                                    topP       : (e.data.topP        == null) ? undefined : e.data.topP,
+                                    stream     : e.data.stream !== false
+                                }, onTok, abort.signal).then(function (res) {
+                                    flush();
+                                    delete self._llmInflight[cmdId];
+                                    if (rec) VaultLlmLog.update(rec.key, self._llmLedgerPatch(res, model));
+                                    var eff = SGLlm.effectiveCost(res);
+                                    cmdReply(true, {
+                                        content: res.content, model: res.model, finishReason: res.finish,
+                                        usage: { promptTokens: (res.usage && res.usage.prompt_tokens) || 0,
+                                                 completionTokens: (res.usage && res.usage.completion_tokens) || 0 },
+                                        cost: { value: eff.value, source: eff.source, estimated: eff.estimated },
+                                        id: res.id, aborted: !!res.aborted
+                                    });
+                                    self._emitBridgeCall('llm.chat', { ok: true, model: res.model, ms: Date.now() - t0 });
+                                    // Authoritative cost lands a beat later — upgrade the ledger.
+                                    s.client.reconcileCost(res).then(function (up) {
+                                        if (up && rec) VaultLlmLog.update(rec.key, self._llmLedgerPatch(res, model));
+                                    });
+                                }).catch(function (err) {
+                                    flush();
+                                    delete self._llmInflight[cmdId];
+                                    var aborted = err && err.name === 'AbortError';
+                                    if (rec) VaultLlmLog.update(rec.key, {
+                                        status: aborted ? 'aborted' : 'error',
+                                        error : aborted ? null : ((err && err.message) || 'failed')
+                                    });
+                                    cmdReply(false, null, (err && err.message) || 'LLM call failed',
+                                             aborted ? 'EABORT' : ((err && err.code) || 'EPROTO'));
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: (err && err.code) || 'EPROTO' });
+                                });
+                            });
+                        }).catch(function (err) {
+                            cmdReply(false, null, (err && err.message) || 'LLM error', (err && err.code) || 'EPROTO');
+                            self._emitBridgeCall('llm.' + lAct, { ok: false, err: (err && err.message) || 'error' });
                         });
                         return;
                     }
