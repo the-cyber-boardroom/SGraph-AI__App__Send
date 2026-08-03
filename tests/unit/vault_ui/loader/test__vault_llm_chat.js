@@ -193,6 +193,76 @@ console.log('\n[suite] vault-llm-chat — unavailability is explained, not silen
     ok('isAvailable() true once a session resolves', el.isAvailable() === true);
 }
 
+console.log('\n[suite] vault-llm-chat — request parameters (temp / top-p / max tokens)');
+{
+    const el = mount();
+    el._session = { ok: true, model: 'm', policy: SGLlmConfig.parse({ limits: { maxTokensPerCall: 4000 } }) };
+
+    const bar = el.shadowRoot.querySelector('.vlc-parambar');
+    ok('a params bar exists', !!bar);
+    ok('it is collapsed by default', bar.hidden === true);
+    el.toggleParams();
+    ok('the ⚙ button reveals it', bar.hidden === false);
+
+    ok('params default to null (provider/policy defaults, not a hard-coded 0.7)',
+        el._params.temperature === null && el._params.topP === null && el._params.maxTokens === null);
+    ok('the policy cap is shown as the max-token placeholder',
+        el.shadowRoot.querySelector('.vlc-p-maxtok').placeholder === '4000');
+
+    const set = (sel, v) => {
+        const i = el.shadowRoot.querySelector(sel);
+        i.value = String(v);
+        i.dispatchEvent(new window.Event('change'));
+    };
+    set('.vlc-p-temp', 0.2);
+    set('.vlc-p-topp', 0.9);
+    set('.vlc-p-maxtok', 1500);
+    ok('temperature is captured', el._params.temperature === 0.2);
+    ok('top-p is captured', el._params.topP === 0.9);
+    ok('max tokens is captured', el._params.maxTokens === 1500);
+    ok('the effective values are summarised', /temp 0\.2/.test(el.shadowRoot.querySelector('.vlc-p-note').textContent));
+
+    // A per-session control must never be a way around the vault's own ceiling.
+    set('.vlc-p-maxtok', 999999);
+    ok('max tokens is CLAMPED to the vault policy', el._params.maxTokens === 4000);
+    ok('the clamp is stated, not silent', /capped by policy/.test(el.shadowRoot.querySelector('.vlc-p-note').textContent));
+
+    set('.vlc-p-temp', '');
+    ok('a blank field means "provider default", not 0', el._params.temperature === null);
+
+    el.resetParams();
+    ok('reset clears every override',
+        el._params.temperature === null && el._params.topP === null && el._params.maxTokens === null);
+    ok('reset clears the inputs too', el.shadowRoot.querySelector('.vlc-p-maxtok').value === '');
+}
+
+console.log('\n[suite] vault-llm-chat — a stale "no key" session re-resolves on open');
+{
+    const el = mount();
+    let resolves = 0;
+    // A vault whose key only becomes readable on the SECOND resolve — the shape of both
+    // "key added in Settings since open" and the lazy-subtree bug.
+    el._vault = { marker: 'v' };
+    el.setVault = async function (v) {
+        resolves++;
+        this._vault = v;
+        this._session = (resolves > 1) ? { ok: true, model: 'm', policy: SGLlmConfig.parse({}) }
+                                       : { ok: false, reason: 'ENOKEY', policy: SGLlmConfig.parse({}) };
+    };
+    await el.setVault(el._vault);
+    ok('starts unavailable', el.isAvailable() === false);
+    el.open();
+    await new Promise((r) => setTimeout(r, 0));
+    ok('open() re-resolved availability', resolves === 2);
+    ok('the panel is now usable without a page reload', el.isAvailable() === true);
+
+    // …and it must NOT re-resolve on every open once it is working (no wasted work).
+    const before = resolves;
+    el.open();
+    await new Promise((r) => setTimeout(r, 0));
+    ok('an available session is not re-resolved', resolves === before);
+}
+
 console.log('\n[suite] vault-llm-chat — model selection (regression: model:null → upstream 404)');
 {
     const el = mount();

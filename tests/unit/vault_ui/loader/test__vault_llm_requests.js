@@ -112,6 +112,40 @@ console.log('\n[suite] vault-llm-requests — file attribution and escaping');
     el.remove();
 }
 
+console.log('\n[suite] vault-llm-requests — clearing confirms INLINE, never via window.confirm');
+{
+    Log.clear();
+    // If the component reaches for a native dialog, this throws and the suite fails.
+    const realConfirm = window.confirm;
+    window.confirm = global.confirm = () => { throw new Error('window.confirm must not be used'); };
+
+    const el = mount();
+    Log.add({ model: 'm' });
+    const bar = el.shadowRoot.querySelector('.vlr-confirm');
+    ok('an inline confirm bar exists', !!bar);
+    ok('it is hidden until asked for', bar.hidden === true);
+
+    let threw = null;
+    try { el.shadowRoot.querySelector('.vlr-clear').dispatchEvent(new window.Event('click', { bubbles: true })); }
+    catch (e) { threw = e; }
+    ok('clicking Clear does not call window.confirm', !threw, threw && threw.message);
+    ok('clicking Clear reveals the inline bar', bar.hidden === false);
+    ok('the ledger is NOT cleared yet', Log.list().length === 1);
+    ok('the bar explains that spend is not undone', /not undone/.test(bar.textContent));
+
+    el.shadowRoot.querySelector('.vlr-confirm-no').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok('Cancel hides the bar', bar.hidden === true);
+    ok('Cancel keeps the ledger', Log.list().length === 1);
+
+    el.shadowRoot.querySelector('.vlr-clear').dispatchEvent(new window.Event('click', { bubbles: true }));
+    el.shadowRoot.querySelector('.vlr-confirm-yes').dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok('confirming clears the ledger', Log.list().length === 0);
+    ok('the bar closes afterwards', bar.hidden === true);
+
+    window.confirm = global.confirm = realConfirm;
+    el.remove();
+}
+
 console.log('\n[suite] vault-llm-requests — live updates only while mounted');
 {
     Log.clear();

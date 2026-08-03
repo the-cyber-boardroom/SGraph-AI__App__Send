@@ -63,6 +63,11 @@
                         '<button class="vlr-btn vlr-clear" type="button" title="Clear the session ledger">Clear</button>' +
                         '<button class="vlr-x" type="button" aria-label="Close">&#10005;</button>' +
                       '</div>' +
+                      '<div class="vlr-confirm" hidden>' +
+                        '<span>Clear the ledger? Spend already incurred is not undone — this only clears the local record.</span>' +
+                        '<button class="vlr-btn vlr-confirm-yes" type="button">Clear</button>' +
+                        '<button class="vlr-btn vlr-confirm-no"  type="button">Cancel</button>' +
+                      '</div>' +
                       '<div class="vlr-totals"></div>' +
                       '<div class="vlr-body"></div>' +
                     '</div>';
@@ -72,10 +77,18 @@
                 });
                 this.shadowRoot.querySelector('.vlr-csv').addEventListener('click', () => this._copy(VaultLlmLog.toCsv(), '.vlr-csv'));
                 this.shadowRoot.querySelector('.vlr-json').addEventListener('click', () => this._copy(VaultLlmLog.toJSON(), '.vlr-json'));
+                // Inline confirmation, not window.confirm(): a native dialog steals focus
+                // from the whole page, cannot be styled to match the panel, and reads as a
+                // browser-level alarm for what is a local, reversible-by-doing-nothing act.
+                const bar = this.shadowRoot.querySelector('.vlr-confirm');
                 this.shadowRoot.querySelector('.vlr-clear').addEventListener('click', () => {
-                    if (confirm('Clear the request ledger for this session? Spend already incurred is not undone — this only clears the local record.')) {
-                        VaultLlmLog.clear();
-                    }
+                    bar.hidden = !bar.hidden;
+                    if (!bar.hidden) this.shadowRoot.querySelector('.vlr-confirm-no').focus();
+                });
+                this.shadowRoot.querySelector('.vlr-confirm-no').addEventListener('click', () => { bar.hidden = true; });
+                this.shadowRoot.querySelector('.vlr-confirm-yes').addEventListener('click', () => {
+                    bar.hidden = true;
+                    VaultLlmLog.clear();
                 });
                 // Copy one generation id — the handle you paste into a billing lookup.
                 this.shadowRoot.querySelector('.vlr-body').addEventListener('click', (e) => {
@@ -205,6 +218,15 @@
         .vlr-btn:hover { color: var(--color-text, #e2e8f0); border-color: #4ecdc4; }
         .vlr-x { background: none; border: none; color: inherit; cursor: pointer; font-size: .8rem; opacity: .7; }
         .vlr-x:hover { opacity: 1; }
+        .vlr-confirm {
+            display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+            padding: .5rem .75rem; font-size: .68rem;
+            background: rgba(233,196,69,.10); border-bottom: 1px solid var(--color-border, #24304a);
+        }
+        .vlr-confirm[hidden] { display: none; }
+        .vlr-confirm span { flex: 1; min-width: 12rem; }
+        .vlr-confirm-yes { border-color: #ff6b6b; color: #ff9b9b; }
+        .vlr-confirm-yes:hover { border-color: #ff6b6b; color: #ff6b6b; }
         .vlr-totals { padding: .5rem .75rem; border-bottom: 1px solid var(--color-border, #24304a); }
         .vlr-totals:empty { display: none; }
         .vlr-tot { display: flex; align-items: baseline; gap: .5rem; font-size: .7rem; }

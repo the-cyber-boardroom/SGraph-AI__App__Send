@@ -19,17 +19,29 @@
     var FOLDER = '/.vault/llm';
     var FILE   = 'config.json';
 
-    // `.vault` is a LAZY sub-tree after open — listFolder returns [] until expanded.
-    async function _ensureSubtree(vault) {
-        try {
-            if (vault.needsLoading && vault.needsLoading('/.vault')) await vault.loadSubTreeOnDemand('/.vault');
-        } catch (_) { /* absent */ }
+    // Sub-trees are LAZY after open, and `loadSubTreeOnDemand` expands exactly ONE
+    // level: expanding `/.vault` inserts `llm` as another unloaded folder, so
+    // `listFolder('/.vault/llm')` still returns [] and the config reads as absent.
+    // That is the bug that made a vault with a perfectly good `.vault/llm/config.json`
+    // report ENOKEY ("No AI key configured") until the user happened to click the
+    // folder open in the tree. Walk EVERY segment, not just the first.
+    async function _ensureSubtree(vault, path) {
+        var parts = String(path || '').split('/').filter(Boolean);
+        var walked = '';
+        for (var i = 0; i < parts.length; i++) {
+            walked += '/' + parts[i];
+            try {
+                if (vault.needsLoading && vault.needsLoading(walked)) {
+                    await vault.loadSubTreeOnDemand(walked);
+                }
+            } catch (_) { /* absent or not lazy — the listFolder below settles it */ }
+        }
     }
 
     // Raw config object, or null when the vault has no LLM configuration.
     async function readConfig(vault) {
         if (!vault) return null;
-        await _ensureSubtree(vault);
+        await _ensureSubtree(vault, FOLDER);
         try {
             var top = vault.listFolder('/.vault') || [];
             if (!top.some(function (e) { return e.name === 'llm' && e.type === 'folder'; })) return null;

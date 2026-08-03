@@ -73,6 +73,7 @@
             this._abort   = null;
             this._cost    = 0;
             this._calls   = 0;
+            this._params  = { temperature: null, topP: null, maxTokens: null };  // null = provider/policy default
         }
 
         connectedCallback() {
@@ -86,8 +87,19 @@
                     '<select class="vlc-model-sel" title="Model" hidden></select>' +
                     '<span class="vlc-model"></span>' +
                     '<span class="vlc-cost" title="Session spend — click for the request ledger"></span>' +
+                    '<button class="vlc-params" type="button" title="Request parameters">&#9881;</button>' +
                     '<button class="vlc-reqs" type="button" title="Requests &amp; cost ledger">&#129534;</button>' +
                     '<button class="vlc-x" type="button" aria-label="Close">&#10005;</button>' +
+                  '</div>' +
+                  '<div class="vlc-parambar" hidden>' +
+                    '<label title="Sampling temperature. Blank = the provider\'s own default.">temp' +
+                      '<input class="vlc-p-temp" type="number" min="0" max="2" step="0.1" placeholder="default"></label>' +
+                    '<label title="Nucleus sampling. Blank = the provider\'s own default.">top-p' +
+                      '<input class="vlc-p-topp" type="number" min="0" max="1" step="0.05" placeholder="default"></label>' +
+                    '<label title="Max tokens in the reply. Capped by the vault policy (Settings → AI models).">max tok' +
+                      '<input class="vlc-p-maxtok" type="number" min="1" step="100"></label>' +
+                    '<button class="vlc-mini vlc-p-reset" type="button" title="Back to the vault policy defaults">reset</button>' +
+                    '<span class="vlc-dim vlc-p-note"></span>' +
                   '</div>' +
                   '<div class="vlc-ctx"></div>' +
                   '<div class="vlc-log" role="log" aria-live="polite"></div>' +
@@ -102,6 +114,11 @@
             this.shadowRoot.querySelector('.vlc-reqs').addEventListener('click', () => {
                 this.dispatchEvent(new CustomEvent('vault-llm-requests-open', { bubbles: true, composed: true }));
             });
+            this.shadowRoot.querySelector('.vlc-params').addEventListener('click', () => this.toggleParams());
+            ['.vlc-p-temp', '.vlc-p-topp', '.vlc-p-maxtok'].forEach((s) => {
+                this.shadowRoot.querySelector(s).addEventListener('change', () => this._readParams());
+            });
+            this.shadowRoot.querySelector('.vlc-p-reset').addEventListener('click', () => this.resetParams());
             this.shadowRoot.querySelector('.vlc-model-sel').addEventListener('change', (e) => {
                 this._model = e.target.value || null;
                 this._renderHead();
@@ -228,10 +245,81 @@
 
         isAvailable() { return !!(this._session && this._session.ok); }
 
+        // ── request parameters ───────────────────────────────────────────────────
+        // Per-session overrides on top of the vault policy. Blank means "the provider's
+        // own default" — deliberately NOT a hard-coded 0.7, because silently pinning a
+        // temperature is the kind of invisible behaviour change that makes two vaults
+        // answer differently for no stated reason. maxTokens is CLAMPED to the policy:
+        // a per-session control must never be a way around the vault's spend ceiling.
+        _policyMaxTokens() {
+            const s = this._session;
+            if (!s || !s.policy) return null;
+            const l = SGLlmConfig.limitsFor(s.policy, null);
+            return l.maxTokensPerCall || null;
+        }
+
+        _readParams() {
+            const num = (sel) => {
+                const raw = (this.shadowRoot.querySelector(sel).value || '').trim();
+                if (raw === '') return null;
+                const n = Number(raw);
+                return isFinite(n) ? n : null;
+            };
+            const cap = this._policyMaxTokens();
+            let maxTok = num('.vlc-p-maxtok');
+            let clamped = false;
+            if (maxTok != null && cap && maxTok > cap) { maxTok = cap; clamped = true; }
+            if (maxTok != null && maxTok < 1) maxTok = 1;
+
+            this._params = {
+                temperature: num('.vlc-p-temp'),
+                topP       : num('.vlc-p-topp'),
+                maxTokens  : maxTok
+            };
+            this._renderParams(clamped);
+        }
+
+        resetParams() {
+            this._params = { temperature: null, topP: null, maxTokens: null };
+            this.shadowRoot.querySelector('.vlc-p-temp').value   = '';
+            this.shadowRoot.querySelector('.vlc-p-topp').value   = '';
+            this.shadowRoot.querySelector('.vlc-p-maxtok').value = '';
+            this._renderParams(false);
+        }
+
+        toggleParams(force) {
+            const bar = this.shadowRoot.querySelector('.vlc-parambar');
+            bar.hidden = (force === undefined) ? !bar.hidden : !force;
+            if (!bar.hidden) this._renderParams(false);
+        }
+
+        _renderParams(clamped) {
+            const p    = this._params || {};
+            const cap  = this._policyMaxTokens();
+            const note = this.shadowRoot.querySelector('.vlc-p-note');
+            const box  = this.shadowRoot.querySelector('.vlc-p-maxtok');
+            if (box && !box.value && cap) box.placeholder = String(cap);   // show what will be sent
+            if (!note) return;
+            const parts = [];
+            if (p.temperature != null) parts.push('temp ' + p.temperature);
+            if (p.topP        != null) parts.push('top-p ' + p.topP);
+            parts.push('max ' + (p.maxTokens != null ? p.maxTokens : (cap || 'provider default')));
+            note.textContent = (clamped ? 'capped by policy · ' : '') + parts.join(' · ');
+            note.className = 'vlc-dim vlc-p-note' + (clamped ? ' vlc-warn' : '');
+        }
+
         // Visibility belongs to sg-layout now; open() just readies + focuses.
         open() {
+            // Availability is resolved once, at vault-open. If it failed then — the config
+            // was unreadable, or a key has been added in Settings since — re-resolve now.
+            // Otherwise a vault that DOES have a key keeps insisting it has none until a
+            // full page reload, which is exactly how the lazy-subtree bug presented.
+            if (this._vault && !this.isAvailable()) {
+                this.setVault(this._vault).then(() => this._refreshModels());
+            } else {
+                this._refreshModels();                   // lazy: first open only
+            }
             this._renderHead(); this._renderStatus();
-            this._refreshModels();                       // lazy: first open only
             this.focusInput();
         }
         focusInput() { setTimeout(() => this.shadowRoot.querySelector('.vlc-in')?.focus(), 0); }
@@ -389,8 +477,15 @@
 
             let acc = '', last = 0;
             try {
+                const p = this._params || {};
                 const res = await s.client.chat(
-                    { model: this._model, messages: msgs, maxTokens: limits.maxTokensPerCall || undefined },
+                    {
+                        model      : this._model,
+                        messages   : msgs,
+                        maxTokens  : p.maxTokens || limits.maxTokensPerCall || undefined,
+                        temperature: (p.temperature != null) ? p.temperature : undefined,
+                        topP       : (p.topP        != null) ? p.topP        : undefined
+                    },
                     (delta, all) => {
                         acc = all;
                         const now = Date.now();
@@ -488,8 +583,22 @@
         }
         .vlc-model { font-family: var(--font-mono, monospace); font-size: .68rem; color: var(--color-text-secondary, #9aa4bf); }
         .vlc-cost  { margin-left: auto; font-family: var(--font-mono, monospace); font-size: .68rem; color: var(--color-text-secondary, #9aa4bf); }
-        .vlc-reqs, .vlc-x { background: none; border: none; color: inherit; cursor: pointer; font-size: .8rem; opacity: .7; padding: 0 .1rem; }
-        .vlc-reqs:hover, .vlc-x:hover { opacity: 1; }
+        .vlc-params, .vlc-reqs, .vlc-x { background: none; border: none; color: inherit; cursor: pointer; font-size: .8rem; opacity: .7; padding: 0 .1rem; }
+        .vlc-params:hover, .vlc-reqs:hover, .vlc-x:hover { opacity: 1; }
+        .vlc-parambar {
+            display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+            padding: .4rem .75rem; font-size: .66rem;
+            border-bottom: 1px solid var(--color-border, #24304a);
+            color: var(--color-text-secondary, #9aa4bf);
+        }
+        .vlc-parambar[hidden] { display: none; }
+        .vlc-parambar label { display: inline-flex; align-items: center; gap: .25rem; }
+        .vlc-parambar input {
+            width: 4.5rem; font: inherit; font-size: .66rem; padding: .1rem .25rem;
+            background: var(--bg-primary, #0d1120); color: var(--color-text, #e2e8f0);
+            border: 1px solid var(--color-border, #24304a); border-radius: 4px;
+        }
+        .vlc-p-note { margin-left: auto; font-family: var(--font-mono, monospace); }
         .vlc-ctx {
             padding: .4rem .75rem; font-size: .7rem; border-bottom: 1px solid var(--color-border, #24304a);
             display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; max-height: 6.5rem; overflow-y: auto;

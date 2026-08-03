@@ -19,6 +19,7 @@ node tests/unit/vault_ui/loader/test__sgsend_access_token.js
 node tests/unit/vault_ui/loader/test__sgsend_static_mode.js
 node tests/unit/vault_ui/loader/test__sg_llm_config.js
 node tests/unit/vault_ui/loader/test__sg_llm.js
+node tests/unit/vault_ui/loader/test__sg_llm_vault.js
 node tests/unit/vault_ui/loader/test__vault_llm_log.js
 node tests/unit/vault_ui/loader/test__vault_llm_chat.js
 node tests/unit/vault_ui/loader/test__vault_llm_requests.js

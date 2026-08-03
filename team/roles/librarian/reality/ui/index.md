@@ -508,6 +508,25 @@ Five reported items (2 bugs, 3 features). Changelog:
 tokeniser); ledger persistence across reloads (deliberately session-only: persisting it would
 be vault state and needs an owner-tier decision); cost caps spanning panels.
 
+#### Key-resolution fix + request params (2026-08-02, third pass)
+
+Changelog: `team/comms/changelog/08/02/v0.33.47__changelog__llm-key-lazy-subtree-fix-and-request-params.md`
+
+| Component | Status | Evidence |
+|-----------|--------|---------|
+| **BUG FIXED — a configured key read as `ENOKEY`.** `loadSubTreeOnDemand` expands exactly ONE level, so expanding `/.vault` left `llm` unloaded and `listFolder('/.vault/llm')` returned `[]` → config read as absent. `SGLlmVault._ensureSubtree(vault, path)` now walks **every** segment. Only reproduced on a **fresh open** (in the session that wrote the config the node was already in memory), which is why it looked intermittent. Same class as the embedded-access-token lazy bug, nested-folder case | **EXISTS** | `sg-llm-vault.js`; `tests/unit/vault_ui/loader/test__sg_llm_vault.js` (17 assertions; verified failing against the pre-fix file) |
+| Chat re-resolves availability on `open()` when the session is not `ok` (a key added in Settings no longer needs a page reload); an already-ok session is **not** re-resolved | **EXISTS** | `vault-llm-chat.js` `open()` |
+| **Request params bar** (`⚙`): temperature, top-p, max tokens. Blank = the provider's own default (no hard-coded 0.7). **max tokens is clamped to `limits.maxTokensPerCall`** and the clamp is stated — a per-session control is not a route around the vault ceiling | **EXISTS** | `vault-llm-chat.js` `_readParams`/`_renderParams`; `test__vault_llm_chat.js` |
+| `SGLlm.chat` gains **`topP`** (`top_p`); `temperature`/`topP`/`maxTokens` verified to reach the wire, and omitted params are **absent** rather than sent as `null` | **EXISTS** | `sg-llm.js`; `test__sg_llm.js` (+7) |
+| Ledger **Clear** confirms **inline** (no `window.confirm`) — the test substitutes a throwing `window.confirm`, so a regression to a native dialog fails the suite | **EXISTS** | `vault-llm-requests.js`; `test__vault_llm_requests.js` (+10) |
+
+**`sg.llm.*` (app-facing) — still NOT BUILT.** `permissions.llm` `{chat,models,usage}` and
+`permissions.network` **are** parsed (`app-permissions.js:164`) but nothing consumes them: there
+is no `__sgCmdType:'llm'` handler in `app-shell.js`, no SSE-over-postMessage frames, no
+`sg.llm.available()`, no consent/HUD indicator, no CSP egress lockdown, and no kernel-side budget
+enforcement (caps are enforced by the chat panel on itself). Phase 4 (minted credentials) is
+likewise unbuilt, so sharing a vault still shares a key. See the changelog's §4 table.
+
 ### Vault Settings — AI (OpenRouter) config + read-only share block (2026-08-02)
 
 Admin surface for the PROPOSED `sg.llm.*` capability (plan:
