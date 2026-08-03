@@ -766,6 +766,28 @@ The kernel's checker runs on tab focus and app open — your app does not poll; 
 
 ---
 
+## Your app may be running as a published release — NEW 2026-08-02
+
+A vault can publish **named releases** (`.vault/releases.json`), and a viewer can pin to one from
+the HUD or via a link (`#key|@v1-2`). When that happens your app is mounted from that **commit**,
+not from HEAD: its `app.json`, its resources and every `sg.vfs.read` come from that version.
+
+You do not need to do anything for this to work — but two consequences matter:
+
+1. **A pinned mount is read-only, for everyone including the vault owner.** `sg.app.writable` is
+   `false`, and writes reject with `EPINNED`. (Committing on top of an old tree would fork the
+   branch, so this is a safety rule, not a missing feature.) If your app writes, you already have
+   to handle `writable === false` — this is one more reason it happens.
+2. **You cannot detect or override which version you are.** That is deliberate:
+   `.vault/**` is inside the permission floor, so an app cannot read the release map, and which
+   version is running is the host's decision, not the versioned code's. Don't build version logic
+   that assumes it is always the newest.
+
+The practical upshot for authors: **write apps that degrade cleanly to read-only**, and put any
+"what's new" copy in the content rather than in code that assumes it is running at HEAD.
+
+---
+
 ## Calling an LLM (`sg.llm.*`) — NEW 2026-08-02
 
 Your app can call a language model **without ever holding an API key**. The key lives in

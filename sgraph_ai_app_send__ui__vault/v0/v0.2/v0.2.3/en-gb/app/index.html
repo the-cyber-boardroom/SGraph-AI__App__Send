@@ -65,7 +65,10 @@
     <script src="/_common/js/lib/sg-append/sg-append-checker.js"></script>
 
     <!-- VaultDataSource — file I/O adapter (no UI dependency) -->
+    <!-- Release channels: pure resolver + the read-only "vault at one commit" source. -->
+    <script src="/_common/js/lib/sg-releases/sg-releases.js"></script>
     <script src="/_common/js/adapters/vault-data-source.js"></script>
+    <script src="/_common/js/adapters/pinned-data-source.js"></script>
     <!-- Sub-vaults: link reader + composite, so apps can read inner-vault data via sg.vfs -->
     <script src="/_common/js/lib/links/vault-links.js"></script>
     <script src="/_common/js/adapters/composite-data-source.js"></script>
@@ -180,6 +183,12 @@
             }
             if (hud && typeof hud.setPrivileges === 'function') {
                 hud.setPrivileges(e.detail.perm);
+            }
+            // Release picker + "not the latest version" pill. No-op unless the vault
+            // publishes .vault/releases.json.
+            var shellEl = document.querySelector('app-shell');
+            if (hud && typeof hud.setReleases === 'function' && shellEl) {
+                hud.setReleases(shellEl._releases || null, shellEl._release || null);
             }
             // Apply the app.json hud.* config (mode + show.* flags). Idempotent — safe to
             // call before setInfo. The user-side force-show-hud override is read here so

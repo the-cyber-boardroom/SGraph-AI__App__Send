@@ -55,6 +55,26 @@
         } catch (_) { return ''; }
     }
 
+    // Pull an `@release-name` segment out of the pipe-separated tail and stash it for
+    // app-shell. Returns the remaining deep-link so the two features compose:
+    // `#key|@v1-2|app:index.html` pins a version AND opens a file.
+    var _RELEASE_PIN_KEY = 'sg-vault-release-pin';
+    function _extractReleasePin(deep) {
+        if (!deep) return deep;
+        var parts = String(deep).split('|');
+        var kept  = [], pin = '';
+        for (var i = 0; i < parts.length; i++) {
+            var p = parts[i].trim();
+            if (p.charAt(0) === '@' && p.length > 1) { pin = p.slice(1); }
+            else if (p) { kept.push(p); }
+        }
+        try {
+            if (pin) sessionStorage.setItem(_RELEASE_PIN_KEY, pin);
+            else     sessionStorage.removeItem(_RELEASE_PIN_KEY);
+        } catch (_) {}
+        return kept.join('|');
+    }
+
     function _saveDeepLink(raw) {
         // raw is everything AFTER the first | in the hash (already decoded).
         // app: prefix = open in App Mode. Plain path = open file tab only.
@@ -77,6 +97,11 @@
             var pipeIdx = raw.indexOf('|');
             var token   = (pipeIdx === -1 ? raw : raw.slice(0, pipeIdx)).toLowerCase().trim();
             var deep    = pipeIdx === -1 ? '' : raw.slice(pipeIdx + 1).trim();
+            // Release pin: an `@name` segment anywhere after the key selects a published
+            // release (`/#key|@v1-2`, `/#key|@v1-2|app:index.html`). Extracted here so a
+            // pinned link is stable on ANY device — a pin that lived only in localStorage
+            // would die on a new laptop or cleared storage, mid-demo.
+            deep = _extractReleasePin(deep);
             if (token) VaultLoaderStorage.setCurrentKey(token);
             _saveDeepLink(deep);
             // Redirect to app page with NO hash — key is now in localStorage.
