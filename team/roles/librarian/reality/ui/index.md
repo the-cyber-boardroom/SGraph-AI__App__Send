@@ -520,12 +520,37 @@ Changelog: `team/comms/changelog/08/02/v0.33.47__changelog__llm-key-lazy-subtree
 | `SGLlm.chat` gains **`topP`** (`top_p`); `temperature`/`topP`/`maxTokens` verified to reach the wire, and omitted params are **absent** rather than sent as `null` | **EXISTS** | `sg-llm.js`; `test__sg_llm.js` (+7) |
 | Ledger **Clear** confirms **inline** (no `window.confirm`) — the test substitutes a throwing `window.confirm`, so a regression to a native dialog fails the suite | **EXISTS** | `vault-llm-requests.js`; `test__vault_llm_requests.js` (+10) |
 
-**`sg.llm.*` (app-facing) — still NOT BUILT.** `permissions.llm` `{chat,models,usage}` and
-`permissions.network` **are** parsed (`app-permissions.js:164`) but nothing consumes them: there
-is no `__sgCmdType:'llm'` handler in `app-shell.js`, no SSE-over-postMessage frames, no
-`sg.llm.available()`, no consent/HUD indicator, no CSP egress lockdown, and no kernel-side budget
-enforcement (caps are enforced by the chat panel on itself). Phase 4 (minted credentials) is
-likewise unbuilt, so sharing a vault still shares a key. See the changelog's §4 table.
+#### `sg.llm.*` app bridge — Phase 1 + kernel accounting (2026-08-02)
+
+Changelog: `team/comms/changelog/08/02/v0.33.47__changelog__sg-llm-bridge-phase-1.md`
+How-to brief: `team/comms/briefs/08/02/v0.33.47__brief__sg-llm-capability-how-to-use.md`
+
+Vault apps can call an LLM through the host; **the key never enters the app frame**. Served by
+`/en-gb/app/` (`app-shell.js`), reusing `SGLlm`/`SGLlmVault`/`VaultLlmLog` unchanged.
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| `sg.llm.{available,models,usage,chat,cancel}` injected into the app bridge | **EXISTS** | `app-shell.js` `_buildVfsBridgeScript` (`_llmChat`) |
+| Host chokepoint, in order: **permission → consent → budget → model policy → call**. `EPERM` / `ECONSENT` / `EBUDGET` / `EMODEL` / `ENOKEY` / `EREADONLY` / `EABORT` / `EPROTO` returned as `err.code` | **EXISTS** | `app-shell.js` `__sgCmdType:'llm'` branch; `tests/unit/vault_ui/loader/test__app_shell_llm_bridge.js` (45 assertions) |
+| `available()` is **ungated by design** so an app can degrade before rendering a chat UI; reports `EPERM` honestly instead of lying about the key | **EXISTS** | same test |
+| **Budget enforced host-side from the SHARED ledger** — an app's spend and the vault chat panel's spend are one bill; `maxTokens` is **clamped** to policy, never trusted; `models()` is policy-filtered | **EXISTS** | same test (over-budget case counts another surface's spend) |
+| Streaming: `{__sgLlmDelta,delta,acc}` × N + terminal reply; coalesced ~50 ms in the host, **tail always flushed**; deltas carry only the increment; terminal reply is authoritative | **EXISTS** | same test (deltas < 1/token, concatenate to the full reply) |
+| `cancel(id)` aborts the fetch; settles `EABORT` with partial text; the aborted call is **still recorded and costed** | **EXISTS** | same test |
+| HUD notice on first LLM call per app session | **EXISTS** | `_llmNotify` |
+| **The API key appears in neither the injected bridge source, any delta frame, nor the reply** | **EXISTS** | pinned by three assertions in the same test |
+| Docs: AUTHORING.md "Calling an LLM" + `llm` in the `window.sg` block; `create-vault-apps` SKILL.md capability row | **EXISTS** | `library/guides/vault-html/AUTHORING.md`, `library/skills/create-vault-apps/SKILL.md` |
+
+**Still NOT BUILT (PROPOSED):**
+- **CSP egress lockdown (plan §7)** — app frames are not served with a restrictive `connect-src`,
+  so an app can still reach a provider directly with its *own* key. The bridge protects the
+  **vault's** key; it is not yet a boundary against all egress. This is the gap between a
+  convenience and a guarantee.
+- **Phase 4 minted credentials** — the vault still stores a real key, so sharing a vault shares
+  the ability to spend it.
+- **ViV kernel parity** — `/en-gb/app/` only; nested kernels (`kernel-app-handlers.js`) do not
+  relay `sg.llm.*`.
+- Per-app limit overrides are read (`limitsFor(policy, appId)`) but no UI writes them.
+- `permissions.network` is parsed but still unused.
 
 ### Vault Settings — AI (OpenRouter) config + read-only share block (2026-08-02)
 

@@ -195,6 +195,15 @@ window.sg = {
         clear : ()           => Promise<{ok: true, removed}>,    // only this app's keys
         keys  : ()           => Promise<string[]>,               // un-namespaced (just the key part)
     },
+    // Call an LLM with the VAULT'S key — which never enters your frame (NEW 2026-08-02).
+    // Requires `permissions.llm.*` in app.json. See "Calling an LLM" below.
+    llm: {
+        available: ()               => Promise<{ok, reason?, model?, remaining?}>,
+        models   : ()               => Promise<[{id, name, pricing, context}]>,   // policy-filtered
+        usage    : ()               => Promise<{calls, promptTokens, completionTokens, cost, remaining}>,
+        chat     : (req, onToken?)  => Promise<{content, model, finishReason, usage, cost, id, aborted}>,
+        cancel   : (requestId)      => Promise<{cancelled}>,
+    },
 };
 ```
 
@@ -754,6 +763,118 @@ sg.on('append.error',        (evt) => { /* {code, message, http?, trigger} */ })
 
 The kernel's checker runs on tab focus and app open — your app does not poll; it declares the
 `host_events` allowlist, subscribes with `sg.on`, and reacts.
+
+---
+
+## Calling an LLM (`sg.llm.*`) — NEW 2026-08-02
+
+Your app can call a language model **without ever holding an API key**. The key lives in
+`.vault/llm/config.json` (inside the permission floor — your app cannot read it), and the host
+makes the call on your behalf. You send messages and receive text.
+
+### 1. Declare the grants
+
+Default-deny, like every other capability. In `app.json`:
+
+```json
+{
+  "entry": "index.html",
+  "permissions": {
+    "llm": { "chat": true, "models": true, "usage": true }
+  }
+}
+```
+
+`chat` is the one that spends money; `models` and `usage` are read-only. Grant only what you use.
+
+### 2. Check availability BEFORE you render a chat UI
+
+`sg.llm.available()` is not optional politeness. Unlike other namespaces, LLM access depends on
+*runtime* state: whether the vault has a key configured, whether this is a read-only session,
+whether the budget is spent. Ask first, then decide what to draw.
+
+```js
+const a = await sg.llm.available();
+if (!a.ok) {
+    // 'ENOKEY'  — no key configured for this vault (tell the user: Settings → AI models)
+    // 'EPERM'   — this app wasn't granted permissions.llm.chat
+    // 'EREADONLY' — owner-sealed key, and this is a read-only session
+    showFallbackUI(a.reason);
+    return;
+}
+console.log('ready:', a.model, 'remaining:', a.remaining);   // {calls, cost} — null = uncapped
+```
+
+### 3. Chat, with streaming
+
+```js
+const res = await sg.llm.chat(
+    { messages: [{ role: 'user', content: 'Summarise this vault in one line.' }] },
+    (delta, acc) => { out.textContent = acc; }        // optional — called as text arrives
+);
+console.log(res.content, res.usage, res.cost, res.id);
+```
+
+Three properties worth relying on:
+
+- **The terminal reply is authoritative.** An app that ignores `onToken` entirely still gets the
+  complete `content`. Deltas are a UX affordance, never the source of truth.
+- **Deltas carry only the increment** (`delta`), plus the running `acc` for convenience. The host
+  coalesces them on a ~50 ms timer, so you get readable chunks rather than a postMessage per token.
+- **`cost` is labelled**: `{value, source, estimated}`. `estimated: true` means it was computed
+  from token counts × list price, not billed. Render estimates with a `~`. Never show one as a bill.
+
+Optional request fields: `model`, `maxTokens`, `temperature`, `topP`, `stream: false`.
+
+### 4. Cancel a call in flight
+
+The promise carries the request id:
+
+```js
+const p = sg.llm.chat({ messages }, onToken);
+stopBtn.onclick = () => sg.llm.cancel(p.requestId);
+try { await p; } catch (e) { if (e.code === 'EABORT') { /* partial text is already rendered */ } }
+```
+
+### 5. Show what it costs
+
+```js
+const u = await sg.llm.usage();
+meter.textContent = `${u.calls} calls · $${u.cost.toFixed(4)} · ${u.remaining.cost ?? '∞'} left`;
+```
+
+`usage()` reports the **whole session**, including calls made by the vault UI's own chat panel —
+one bill per session, not one per surface.
+
+### What the host does that you don't have to
+
+| Concern | Who handles it |
+|---|---|
+| Holding the API key | Host. It is never in your frame, your bundle, or any message you receive. |
+| Which models you may use | Host — `models()` is already filtered by the vault's allow-list, so a picker you build from it is automatically correct. |
+| Spend caps | Host. `maxCostPerSession` / `maxCallsPerSession` are enforced before the call; you get `EBUDGET`. |
+| `maxTokens` | Host **clamps** it to the vault policy. Asking for more is not an error, it is just capped. |
+| Consent | Host. The first `chat()` raises a HUD prompt the user must accept; declining gives you `ECONSENT`. |
+| Cost reconciliation | Host, two-source (stream `usage.cost`, then the authoritative `/generation` lookup). |
+
+### Error codes
+
+`EPERM` (no grant) · `ECONSENT` (user declined) · `ENOKEY` (no key configured) ·
+`EREADONLY` (owner-sealed key, read-only session) · `EBUDGET` (cap reached) ·
+`EMODEL` (model not in the allow-list, or none selected) · `EABORT` (cancelled) ·
+`EPROTO` (upstream failure). They arrive as `err.code`, so branch on that rather than on message text.
+
+### What this is not
+
+There is no tool-calling loop. `sg.llm.chat` is a **reader**: it takes messages and returns text.
+If you want the model to act on the vault, *your app* decides what to do with the reply and calls
+`sg.vfs.*` / `sg.fs.*` itself — under the grants you already declared. That separation is
+deliberate: the LLM never gets ambient authority over the vault.
+
+> **Honest limitation.** The key still lives in the vault, so sharing a vault key still shares the
+> credential with anyone who can open it. Short-lived minted credentials are planned (Phase 4) and
+> would remove that; until then, treat a vault with an AI key configured as a vault that carries a
+> secret.
 
 ---
 
