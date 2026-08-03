@@ -86,6 +86,37 @@ console.log('\n[suite] SGLlm — chat() refuses to send a null model');
     await run();
 }
 
+console.log('\n[suite] SGLlm — request params reach the wire');
+{
+    // The chat panel exposes temperature / top-p / max-tokens; they are worthless if the
+    // transport drops them. Capture the outgoing body instead of trusting the shape.
+    const realFetch = globalThis.fetch;
+    let sent = null;
+    globalThis.fetch = async (url, init) => {
+        sent = JSON.parse(init.body);
+        return {
+            ok: true, headers: { get: () => 'application/json' },
+            json: async () => ({ id: 'x', choices: [{ message: { content: 'ok' } }], usage: {} })
+        };
+    };
+    const c = new L({ apiKey: 'sk-or-test' });
+    await c.chat({ model: 'a/b', messages: [{ role: 'user', content: 'hi' }],
+                   temperature: 0.2, topP: 0.9, maxTokens: 1500 });
+    ok('temperature is sent', sent.temperature === 0.2);
+    ok('top-p is sent as top_p', sent.top_p === 0.9);
+    ok('maxTokens is sent as max_tokens', sent.max_tokens === 1500);
+    ok('usage accounting is always requested', sent.usage && sent.usage.include === true);
+
+    // Omitted params must be ABSENT, not null — a null temperature is a real value to
+    // some providers and would silently change behaviour.
+    sent = null;
+    await c.chat({ model: 'a/b', messages: [] });
+    ok('omitted temperature is absent from the body', !('temperature' in sent));
+    ok('omitted top_p is absent from the body', !('top_p' in sent));
+    ok('omitted max_tokens is absent from the body', !('max_tokens' in sent));
+    globalThis.fetch = realFetch;
+}
+
 console.log('\n[suite] SGLlm — cost: estimate vs authoritative');
 {
     const price = { prompt: 0.001, completion: 0.002 };

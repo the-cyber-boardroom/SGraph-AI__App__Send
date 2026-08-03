@@ -199,6 +199,7 @@
         };
         if (q.maxTokens)   body.max_tokens = q.maxTokens;
         if (q.temperature != null) body.temperature = q.temperature;
+        if (q.topP        != null) body.top_p       = q.topP;
         if (q.tools)       body.tools = q.tools;          // passed through; kernel never dispatches
 
         var t0 = Date.now(), r;
