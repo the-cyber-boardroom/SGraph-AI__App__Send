@@ -28,6 +28,7 @@ node tests/unit/vault_ui/loader/test__base64_chunk_guard.js
 node tests/unit/vault_ui/loader/test__send_browse_split.js
 node tests/unit/vault_ui/loader/test__vault_llm_log.js
 node tests/unit/vault_ui/loader/test__vault_llm_chat.js
+node tests/unit/vault_ui/loader/test__vault_shell_llm_panels.js
 node tests/unit/vault_ui/loader/test__vault_llm_requests.js
 node tests/unit/vault_ui/loader/test__vault_browse_edit__add_to_chat.js
 node tests/unit/vault_ui/loader/test__app_permissions.js
