@@ -25,6 +25,7 @@ node tests/unit/vault_ui/loader/test__sg_llm.js
 node tests/unit/vault_ui/loader/test__sg_llm_vault.js
 node tests/unit/vault_ui/loader/test__sg_voice.js
 node tests/unit/vault_ui/loader/test__base64_chunk_guard.js
+node tests/unit/vault_ui/loader/test__send_browse_split.js
 node tests/unit/vault_ui/loader/test__vault_llm_log.js
 node tests/unit/vault_ui/loader/test__vault_llm_chat.js
 node tests/unit/vault_ui/loader/test__vault_llm_requests.js
