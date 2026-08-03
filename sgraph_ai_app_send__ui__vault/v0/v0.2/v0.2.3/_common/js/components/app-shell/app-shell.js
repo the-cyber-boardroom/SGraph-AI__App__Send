@@ -1371,7 +1371,7 @@
                         // Still stop the recorder — cancelling must release the mic, not
                         // just hide the bar. A tab quietly holding the mic open is worse
                         // than the original problem.
-                        SGVoice.stop(rec).catch(function () {});
+                        SGVoice.cancel(rec).catch(function () {});
                         if (hud && hud.hideRecording) hud.hideRecording();
                         reject(Object.assign(new Error('Cancelled'), { code: 'EABORT' }));
                         return;
