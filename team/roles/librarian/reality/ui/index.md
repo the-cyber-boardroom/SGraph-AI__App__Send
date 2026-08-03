@@ -520,6 +520,35 @@ Changelog: `team/comms/changelog/08/02/v0.33.47__changelog__llm-key-lazy-subtree
 | `SGLlm.chat` gains **`topP`** (`top_p`); `temperature`/`topP`/`maxTokens` verified to reach the wire, and omitted params are **absent** rather than sent as `null` | **EXISTS** | `sg-llm.js`; `test__sg_llm.js` (+7) |
 | Ledger **Clear** confirms **inline** (no `window.confirm`) — the test substitutes a throwing `window.confirm`, so a regression to a native dialog fails the suite | **EXISTS** | `vault-llm-requests.js`; `test__vault_llm_requests.js` (+10) |
 
+### Release channels — "pin a version" (2026-08-03)
+
+Changelog: `team/comms/changelog/08/03/v0.33.47__changelog__vault-release-channels.md`
+Spec: `team/roles/architect/reviews/08/02/v0.33.47__architect-spec__vault-release-channels.md`
+
+A vault can publish named releases; a viewer pins to one from the HUD or a link. Pushing new work
+no longer changes what an existing holder of the link sees. Nothing is copied — SGit objects are
+immutable and content-addressed, so a release *is* the same objects.
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| `.vault/releases.json` — `{schema, default, allowLive, releases:[{name,commit,label,notes,created}]}`. Inside the permission floor → apps cannot read or tamper. **Absent file ⇒ no behaviour change and no HUD chrome** | **EXISTS** | `sg-releases.js`; `tests/unit/vault_ui/loader/test__sg_releases.js` (47 assertions) |
+| Resolution **url > stored > default > live**. Stored is written only by an **explicit** choice (an unpinned vault reloads to latest); `default` binds other viewers but **not the owner** | **EXISTS** | `SGReleases.resolve`; same test |
+| An unknown **URL** pin → live **with a visible warning**; a stale **stored** pin falls through quietly | **EXISTS** | same test |
+| Names are **free text and semver-ish**, unique case-insensitively, addressable by name **or slug** (`#key\|@black-hat-demo`, `#key\|@v1-2`) | **EXISTS** | `SGReleases.find`/`slug` |
+| `PinnedVaultDataSource` — the vault at ONE commit. `getFileList()`/`getFileBytes()` from `_flattenCommitTree`/`readFileAt`; `warm()` pre-loads so `getFileList()` stays **synchronous**; intermediate folder rows synthesised | **EXISTS** | `pinned-data-source.js`; `test__pinned_data_source.js` (27 assertions) |
+| **Pinned is read-only for everyone including the owner** — `writable:false`, mutations reject `EPINNED` (distinct from `EREADONLY`). Committing on an old tree would fork the branch | **EXISTS** | same test |
+| Pinned mount pins the WHOLE app — its `app.json`, resources and every `sg.vfs.read` — because resolution happens **before** `_readAppJson()` | **EXISTS** | `app-shell.js` `_applyRelease` (called at line ~427, before `_readAppJson`) |
+| **The release map is read at HEAD, always** — only content is pinned. Reading it at the pinned commit would freeze the release list to what that version knew, with no way back | **EXISTS** | `_readReleases` (walks the lazy `.vault` sub-tree first) |
+| **Auto-sync suppressed while pinned** — `_checkBehind` no longer fast-forwards/remounts a pinned viewer (which would yank someone onto HEAD mid-demo); surfaces "a newer version has been published" passively instead | **EXISTS** | `app-shell.js` `_checkBehind` early branch |
+| URL grammar `#key\|@name`, composing with `app:` deep links in either order; bare `@` ignored | **EXISTS** | `vault-loader-routing.js` `_extractReleasePin`; `test__routing_decisions.js` (+9) |
+| HUD picker (Live + releases) + **amber `⏱ <name>` pill** whenever not on the latest version; both render only when releases exist | **EXISTS** | `app-hud.js` `setReleases`; `app-hud:release-change` → `switchRelease` |
+
+**NOT built (PROPOSED):** a "publish as release" action (releases are authored by editing
+`.vault/releases.json` today — the SGit history view is the natural home); `/vault` browser parity
+(picker is `/en-gb/app/` only); sub-vault children are **not** pinned (a linked child has its own
+HEAD). **GC note:** there is no garbage collection today — when one is built, pinned commits must
+be roots or a published release could be collected out from under a live link.
+
 #### `sg.llm.*` app bridge — Phase 1 + kernel accounting (2026-08-02)
 
 Changelog: `team/comms/changelog/08/02/v0.33.47__changelog__sg-llm-bridge-phase-1.md`

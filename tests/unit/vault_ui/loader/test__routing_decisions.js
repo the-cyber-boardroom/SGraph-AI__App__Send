@@ -187,3 +187,86 @@ suite('VaultLoaderRouting.runPeek — strips hash', ({ test, before, after }) =>
         assert.equal(mock.location.replaced, null, 'no redirect');
     });
 });
+
+// ---------------------------------------------------------------------------
+// Release pins — `@name` in the hash tail.
+//
+// The pin belongs in the LINK, not just localStorage: a pin held only in one
+// browser dies on a new laptop or cleared storage — mid-demo, which is the exact
+// failure release channels exist to prevent. These pin the grammar so that a
+// pinned link keeps working, and keeps composing with deep links.
+// ---------------------------------------------------------------------------
+suite('VaultLoaderRouting.runRoot — release pins', ({ test, before, after }) => {
+    let mock, origLocation, origHistory;
+    const PIN_KEY = 'sg-vault-release-pin';
+    before(() => {
+        clearVaultStorage();
+        origLocation = global.location;
+        origHistory  = global.history;
+        mock = makeMockNav();
+        installMock(mock);
+    });
+    after(() => {
+        restoreMock(origLocation, origHistory);
+        VaultLoader.storage.clearCurrentKey();
+        try { sessionStorage.removeItem(PIN_KEY); } catch (_) {}
+    });
+
+    const run = (hash) => {
+        clearVaultStorage();
+        try { sessionStorage.removeItem(PIN_KEY); } catch (_) {}
+        mock.location.hash = hash;
+        VaultLoader.routing.runRoot();
+    };
+    const pin  = () => { try { return sessionStorage.getItem(PIN_KEY); } catch (_) { return null; } };
+    const deep = () => VaultLoader.routing.consumeDeepLink();
+
+    test('a bare key stores no pin', () => {
+        run('#apple-river-1234');
+        assert.equal(pin(), null);
+    });
+
+    test('@name is extracted as the release pin', () => {
+        run('#apple-river-1234|@v1-2');
+        assert.equal(pin(), 'v1-2');
+        assert.equal(VaultLoader.storage.getCurrentKey(), 'apple-river-1234');
+    });
+
+    test('the pin is NOT left in the deep link', () => {
+        run('#apple-river-1234|@v1-2');
+        assert.equal(deep(), '');
+    });
+
+    test('a pin composes with an app: deep link', () => {
+        run('#apple-river-1234|@v1-2|app:index.html');
+        assert.equal(pin(), 'v1-2');
+        assert.equal(deep(), 'app:index.html');
+    });
+
+    test('order does not matter', () => {
+        run('#apple-river-1234|app:index.html|@black-hat-demo');
+        assert.equal(pin(), 'black-hat-demo');
+        assert.equal(deep(), 'app:index.html');
+    });
+
+    test('a free-text release slug survives', () => {
+        run('#apple-river-1234|@old-pilot');
+        assert.equal(pin(), 'old-pilot');
+    });
+
+    test('a plain deep link still stores no pin', () => {
+        run('#apple-river-1234|docs/README.md');
+        assert.equal(pin(), null);
+        assert.equal(deep(), 'docs/README.md');
+    });
+
+    test('a bare @ is ignored rather than pinning to nothing', () => {
+        run('#apple-river-1234|@');
+        assert.equal(pin(), null);
+    });
+
+    test('the redirect target is unchanged', () => {
+        run('#apple-river-1234|@v1-2');
+        assert.equal(mock.location.replaced, '/en-gb/app');
+    });
+});

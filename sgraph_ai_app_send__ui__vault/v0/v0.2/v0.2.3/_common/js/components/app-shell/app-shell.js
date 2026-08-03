@@ -64,6 +64,9 @@
                 if (action === 'exit')    this._exitApp();
             };
             document.addEventListener('app-hud:nav', this._navHudHandler);
+            // Release picker → re-mount at the chosen version.
+            this._relHudHandler = (ev) => { this.switchRelease((ev.detail && ev.detail.name) || 'live'); };
+            document.addEventListener('app-hud:release-change', this._relHudHandler);
             // Auto-sync parity with /vault: re-check the published head when the tab regains
             // focus, so an app left open picks up code/data another session pushed. Debounced
             // in _scheduleBehindCheck. Gated by the shared 'sg-vault-autosync' flag.
@@ -87,6 +90,7 @@
             if (this._resetConsentsHandler) { document.removeEventListener('app-hud:reset-consents', this._resetConsentsHandler); this._resetConsentsHandler = null; }
             if (this._printHandler) { document.removeEventListener('app-hud:print', this._printHandler); this._printHandler = null; }
             if (this._navHudHandler) { document.removeEventListener('app-hud:nav', this._navHudHandler); this._navHudHandler = null; }
+            if (this._relHudHandler) { document.removeEventListener('app-hud:release-change', this._relHudHandler); this._relHudHandler = null; }
             if (this._visibilityHandler) { document.removeEventListener('visibilitychange', this._visibilityHandler); this._visibilityHandler = null; }
             clearTimeout(this._autoPushTimer);
             clearTimeout(this._behindCheckTimer);
@@ -416,6 +420,11 @@
             this._dataSource = new VaultDataSource(vault, accessKey);
             if (accessKey) this._writable = true;
             await this._dataSource.loadAllSubTrees();
+
+            // ── Release channels ──────────────────────────────────────────────────
+            // Resolve BEFORE app.json is read, so a pinned open reads THAT version's
+            // manifest (entry, resources, permissions, hud config) and not HEAD's.
+            await this._applyRelease();
             this._t.treeLoaded = performance.now();
             this._emitVaultEvent('tree-loaded', { label: 'File tree loaded', fileCount: this._dataSource.getFileList().filter(function(f){return !f.dir;}).length, ms: Math.round(this._t.treeLoaded - this._t.vaultOpened) });
 
@@ -541,6 +550,23 @@
 
         async _checkBehind() {
             if (!this._vault) return;
+            // Pinned to a published release: auto-sync must NOT drag the viewer forward.
+            // Silently remounting someone mid-demo onto HEAD is the exact failure release
+            // channels exist to prevent. Keep checking, but surface it passively instead.
+            if (this._release && !this._release.live) {
+                try {
+                    var named = await this._vault._refManager.readRef(this._vault._refFileId);
+                    if (named && named !== this._vault._namedHeadId) {
+                        this._vault._namedHeadId = named;
+                        var hudN = document.getElementById('app-hud') || document.querySelector('app-hud');
+                        if (hudN && typeof hudN.showMessage === 'function') {
+                            hudN.showMessage('release-newer', 'A newer version has been published. You are viewing "' +
+                                (this._release.label || this._release.name) + '".', 'info', 6000);
+                        }
+                    }
+                } catch (_) {}
+                return;
+            }
             this._lastBehindCheckTime = Date.now();
             try {
                 var liveNamed = await this._vault._refManager.readRef(this._vault._refFileId);
@@ -1141,6 +1167,153 @@
             });
             this._appendVaultId = vault._vaultId;
             return this._append;
+        }
+
+        // ── Release channels ("pin a version") ─────────────────────────────────────────
+        //
+        // A vault already holds every version of itself; this is the selection layer.
+        // Config: `.vault/releases.json` (inside the permission floor → an app can neither
+        // read nor tamper with it, which is exactly the requirement: which version you are
+        // running is the host's decision, not the versioned code's).
+
+        // The release MAP is read at HEAD, always. Only the CONTENT gets pinned — reading
+        // the map at the pinned commit would freeze the release list to whatever that old
+        // version knew about, with no way back to anything newer.
+        async _readReleases() {
+            var vault = this._vault;
+            if (!vault || typeof SGReleases === 'undefined') return null;
+            try {
+                // `.vault` is lazy and loadSubTreeOnDemand expands ONE level per call —
+                // the same trap that made a configured LLM key read as ENOKEY.
+                if (vault.needsLoading && vault.needsLoading('/.vault')) {
+                    await vault.loadSubTreeOnDemand('/.vault');
+                }
+                var listed = vault.listFolder('/.vault') || [];
+                if (!listed.some(function (e) { return e.name === SGReleases.FILE; })) return null;
+                var bytes = await vault.getFile('/.vault', SGReleases.FILE);
+                var cfg   = SGReleases.parse(JSON.parse(new TextDecoder().decode(bytes)));
+                return SGReleases.hasReleases(cfg) ? cfg : null;
+            } catch (_) { return null; }        // absent or corrupt → the vault opens normally
+        }
+
+        _releaseStoreKey() {
+            return 'sg-vault-release:' + ((this._vault && this._vault._vaultId) || this._vaultKey || '');
+        }
+
+        // Only ever written by an EXPLICIT selection. A vault nobody pinned therefore opens
+        // on the latest version after a reload, which is what "no news is good news" should
+        // mean here. Same kernel-localStorage tier as sg.state.* (device-local, not vault state).
+        _readStoredRelease() {
+            try { return localStorage.getItem(this._releaseStoreKey()) || null; } catch (_) { return null; }
+        }
+        _writeStoredRelease(name) {
+            try {
+                if (name) localStorage.setItem(this._releaseStoreKey(), name);
+                else      localStorage.removeItem(this._releaseStoreKey());
+            } catch (_) {}
+        }
+
+        // Consumed once, like the deep link: a pinned URL decides THIS open.
+        _consumeReleasePin() {
+            if (this._releasePinFromUrl !== undefined && this._releasePinFromUrl !== null) {
+                var v = this._releasePinFromUrl;
+                this._releasePinFromUrl = null;
+                return v;
+            }
+            try {
+                var raw = sessionStorage.getItem('sg-vault-release-pin') || '';
+                sessionStorage.removeItem('sg-vault-release-pin');
+                return raw || null;
+            } catch (_) { return null; }
+        }
+
+        // Resolve → (maybe) swap the data source for a read-only view of that commit.
+        async _applyRelease() {
+            this._releases = await this._readReleases();
+            this._release  = null;
+            if (!this._releases) return;
+
+            var isOwner = !!this._writable;          // has the access token → can push
+            var res = SGReleases.resolve({
+                config   : this._releases,
+                urlPin   : this._consumeReleasePin(),
+                storedPin: this._readStoredRelease(),
+                isOwner  : isOwner
+            });
+            this._release = res;
+
+            if (res.error) {
+                // A link asked for something that no longer exists. Say so — silently
+                // serving different content than the link requested is precisely the
+                // failure this feature exists to prevent.
+                var hud0 = document.getElementById('app-hud') || document.querySelector('app-hud');
+                if (hud0 && typeof hud0.showMessage === 'function') {
+                    try { hud0.showMessage('release', res.error, 'warn', 8000); } catch (_) {}
+                }
+            }
+            if (res.live) return;                    // nothing to swap
+
+            try {
+                var pinned = new PinnedVaultDataSource(this._vault, res.commit, { name: res.name, label: res.label });
+                await pinned.warm();                 // sync getFileList() afterwards
+                this._dataSource = pinned;
+                this._writable   = false;            // pinned is read-only for EVERYONE, owner included
+            } catch (err) {
+                this._release = { live: true, name: null, commit: null, label: null, source: 'live',
+                                  error: 'Could not load release "' + res.name + '" — showing the latest version.' };
+                this._emitVaultEvent('release-failed', { label: 'Release load failed', name: res.name, err: (err && err.message) || '' });
+            }
+        }
+
+        // Switch release at runtime (from the HUD picker). Re-opens the vault view rather
+        // than patching state in place, so every downstream consumer sees one consistent
+        // world. An explicit choice — including choosing Live — is remembered.
+        async switchRelease(name) {
+            if (!this._releases) return;
+            var live = !name || String(name).toLowerCase() === 'live';
+            this._writeStoredRelease(live ? 'live' : name);
+            this._releasePinFromUrl = live ? 'live' : name;
+            this._updateReleaseInUrl(live ? null : name);
+            try {
+                // Re-derive the data source from the live vault, then re-resolve.
+                this._writable   = !!(this._vault && this._vault._sgSend && this._vault._sgSend.token);
+                this._dataSource = new VaultDataSource(this._vault, this._accessKeyForDataSource());
+                await this._dataSource.loadAllSubTrees();
+                await this._applyRelease();
+                var appJson = await this._readAppJson();
+                this._appJson = appJson;
+                this._perm    = AppPermissions.parsePermissions(appJson);
+                await this._continue(appJson);
+                this._announceRelease();
+            } catch (err) {
+                this._showError('Could not switch release', (err && err.message) || String(err));
+            }
+        }
+
+        _accessKeyForDataSource() {
+            try { return (this._vault && this._vault._sgSend && this._vault._sgSend.token) || null; } catch (_) { return null; }
+        }
+
+        // Keep the pin in the address bar so the link a user copies carries the version.
+        // A pinned link is the whole point: a pin held only in this browser dies on a new
+        // laptop or cleared storage — mid-demo, which is the failure being designed against.
+        _updateReleaseInUrl(name) {
+            try {
+                var key = this._vaultKey || '';
+                if (!key || this._embedMode) return;
+                var base = window.location.origin + '/#' + key;
+                var url  = name ? (base + '|@' + SGReleases.slug(name)) : base;
+                history.replaceState(null, '', url);
+            } catch (_) { /* null-origin / opaque — the picker still works */ }
+        }
+
+        // Tell the HUD what to show. Also the "gentle visual clue" for a non-latest view.
+        _announceRelease() {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            if (!hud || typeof hud.setReleases !== 'function') return;
+            try {
+                hud.setReleases(this._releases, this._release);
+            } catch (_) {}
         }
 
         // ── sg.llm.* host helpers ──────────────────────────────────────────────────────

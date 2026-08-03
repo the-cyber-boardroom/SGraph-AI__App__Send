@@ -55,6 +55,10 @@
                                 <div class="hud-activity-pop" style="display:none"></div>
                             </div>
                             <span class="hud-ro-badge" style="display:none">👁 Read-only</span>
+                            <div class="hud-rel-wrap" style="display:none">
+                                <select class="hud-rel-sel" title="Version of this app"></select>
+                            </div>
+                            <span class="hud-rel-badge" style="display:none" title="You are viewing a published release, not the latest version"></span>
                             <div class="hud-more-wrap" data-hud-el="more">
                                 <button class="hud-more-btn" type="button" aria-haspopup="true" aria-expanded="false" title="More actions">&#8943;</button>
                                 <div class="hud-more-panel" style="display:none">
@@ -116,6 +120,16 @@
                 <button class="hud-escape" style="display:none" title="Exit app and return to vault">×&nbsp;Exit app</button>
             `;
 
+            // Release picker. The HUD never owns which version is running — it emits the
+            // request and app-shell re-mounts, same contract as the nav row.
+            this.shadowRoot.addEventListener('change', (e) => {
+                if (e.target.closest('.hud-rel-sel')) {
+                    this.dispatchEvent(new CustomEvent('app-hud:release-change', {
+                        detail: { name: e.target.value }, bubbles: true, composed: true
+                    }));
+                }
+            });
+
             this.shadowRoot.addEventListener('click', (e) => {
                 // ⋯ overflow menu + privileges popover (expand-on-click).
                 if (e.target.closest('.hud-more-btn'))     { e.stopPropagation(); return this._toggleMore(); }
@@ -174,6 +188,44 @@
         }
 
         // Called by page script with vault/app metadata.
+        // ── Release channels ─────────────────────────────────────────────────────
+        // Rendered ONLY when the vault publishes releases (`.vault/releases.json`), so a
+        // vault that never opted in gains no chrome at all. The picker is host chrome by
+        // design: which version is running is not a decision the versioned app gets to make.
+        setReleases(config, current) {
+            const wrap  = this.shadowRoot.querySelector('.hud-rel-wrap');
+            const sel   = this.shadowRoot.querySelector('.hud-rel-sel');
+            const badge = this.shadowRoot.querySelector('.hud-rel-badge');
+            if (!wrap || !sel || !badge) return;
+
+            if (!config || !config.releases || !config.releases.length) {
+                wrap.style.display = 'none'; badge.style.display = 'none';
+                return;
+            }
+            const live = !current || current.live;
+            const opts = [];
+            if (config.allowLive !== false) {
+                opts.push('<option value="live"' + (live ? ' selected' : '') + '>Live (latest)</option>');
+            }
+            config.releases.forEach((r) => {
+                const text = r.label ? (r.label + ' · ' + r.name) : r.name;
+                const on   = !live && current && current.name === r.name;
+                opts.push('<option value="' + AppHud._escapeHtml(r.name) + '"' + (on ? ' selected' : '') + '>' + AppHud._escapeHtml(text) + '</option>');
+            });
+            sel.innerHTML = opts.join('');
+            wrap.style.display = '';
+
+            // The gentle clue: a calm amber pill whenever this is NOT the latest version.
+            // Someone who cannot edit, or who is demoing an older build, must be able to
+            // see why at a glance — without it, "the app is broken" is the natural reading.
+            if (live) {
+                badge.style.display = 'none';
+            } else {
+                badge.textContent   = '⏱ ' + (current.label || current.name);
+                badge.style.display = '';
+            }
+        }
+
         setInfo(vaultName, appTitle, vaultKey, isRO) {
             this._vaultKey = vaultKey;
             this._vaultName = vaultName;
@@ -910,6 +962,22 @@
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(100,160,220,0.12); color: #64a0dc;
             border: 1px solid rgba(100,160,220,0.25); white-space: nowrap;
+        }
+        /* Release picker + "not the latest version" pill. Amber, not red: viewing a
+           published release is a deliberate, safe state — informational, not an error.
+           Red stays reserved for the consent prompt and live failures. */
+        .hud-rel-wrap { display: inline-flex; }
+        .hud-rel-sel {
+            font-size: 0.72rem; padding: 0.12rem 0.3rem; border-radius: 4px; max-width: 12rem;
+            background: #12121f; color: #c8c8d8; border: 1px solid #2a2a4a;
+            font-family: inherit; cursor: pointer;
+        }
+        .hud-rel-sel:hover { border-color: #4ECDC4; color: #fff; }
+        .hud-rel-badge {
+            font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
+            background: rgba(233,196,69,0.12); color: #E9C445;
+            border: 1px solid rgba(233,196,69,0.3); white-space: nowrap;
+            max-width: 14rem; overflow: hidden; text-overflow: ellipsis;
         }
         /* ── Privileges chip (compact 🔒 N) + expandable popover ─────────────────────── */
         .hud-privs-wrap { position: relative; display: inline-flex; }
