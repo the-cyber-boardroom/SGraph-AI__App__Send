@@ -61,6 +61,9 @@
     <script src="/_common/js/lib/sg-llm/sg-llm.js"></script>
     <script src="/_common/js/lib/sg-llm/sg-llm-vault.js"></script>
     <script src="/_common/js/lib/sg-llm/vault-llm-log.js"></script>
+    <!-- Voice: host-side mic capture. Lazily imports sg-audio + sg-audio-decode
+         from the SG/Tools CDN (CORS *) — we do not reimplement recording. -->
+    <script src="/_common/js/lib/sg-voice/sg-voice.js"></script>
     <script src="/_common/js/lib/sg-append/sg-append.js"></script>
     <script src="/_common/js/lib/sg-append/sg-append-checker.js"></script>
 

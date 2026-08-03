@@ -583,6 +583,28 @@ Vault apps can call an LLM through the host; **the key never enters the app fram
 | **The API key appears in neither the injected bridge source, any delta frame, nor the reply** | **EXISTS** | pinned by three assertions in the same test |
 | Docs: AUTHORING.md "Calling an LLM" + `llm` in the `window.sg` block; `create-vault-apps` SKILL.md capability row | **EXISTS** | `library/guides/vault-html/AUTHORING.md`, `library/skills/create-vault-apps/SKILL.md` |
 
+#### `sg.llm.listen()` — voice input (2026-08-03)
+
+Changelog: `team/comms/changelog/08/03/v0.33.47__changelog__sg-llm-listen-voice-input.md`
+
+| Capability | Status | Evidence |
+|------------|--------|---------|
+| `sg.llm.listen({maxMs?,model?,prompt?})` → `{text, model, id, durationMs, bytes, format, cost}` — host records, transcribes, returns text. **Audio never enters the app frame** | **EXISTS** | `app-shell.js` `listen` action + `_recordAndTranscribe`/`_transcribe`; `tests/unit/vault_ui/loader/test__app_shell_llm_bridge.js` (63 assertions) |
+| **Capture is host-side by necessity and by design** — a null-origin app frame has no `navigator.mediaDevices` (SG/Tools' guide documents the same constraint and assigns capture to the embedder). Host chrome means an app cannot open a mic invisibly | **EXISTS** | `sg-voice.js`, `app-hud.js` `showRecording` |
+| Red recording bar — full-width sibling of the chrome row (consent-bar slot), so it renders in **every** `hud.mode` incl. `hidden`/`none`; live timer, Stop & send, Cancel. **Cancel releases the microphone**, not just the bar | **EXISTS** | `app-hud.js` `showRecording`/`setRecordingBusy`/`hideRecording` |
+| `permissions.llm.listen` — **its own grant, never implied by `llm.chat`**; **consent per use** by default (tunable via `permissions.consent["llm.listen"]`) | **EXISTS** | `app-permissions.js`; `test__app_permissions.js` (+4) |
+| Reuses SG/Tools `core/sg-audio` (`getBestMimeType`) + `core/sg-audio-decode` (`blobToWav`) by lazy `import()` — **we do not implement recording or audio decoding**. iPad records `m4a` → sent as-is; Chrome records `webm` (not accepted by OpenRouter) → transcoded to WAV | **EXISTS** | `sg-voice.js`; `test__sg_voice.js` (43 assertions) |
+| Transcription goes through the **same** `SGLlm` client, model allow-list, spend caps and `VaultLlmLog` — voice spend is not a separate untracked bill | **EXISTS** | `_transcribe` |
+| **Mic button in the native vault chat panel** (`/vault` → AI Chat composer) — tap to record, tap ■ to stop; transcript lands in the input and is sent. Runs at the REAL origin so it holds the mic directly (no bridge). Recording state stated in words, not just an icon. Cancel releases the device. Empty/whitespace transcript never sends | **EXISTS** | `vault-llm-chat.js` `toggleVoice`/`_stopVoice`/`_renderMic`; `test__vault_llm_chat.js` (92 assertions) |
+| Both surfaces share `SGVoice.transcribeWith(session, audio)` — one implementation of model policy, spend caps and the ledger entry (two copies of a budget check is how a cap stops meaning anything) | **EXISTS** | `sg-voice.js`; `app-shell._transcribe` delegates |
+| Base64 chunked at **8190** (not 8192 — `8192 % 3 === 2` emits `=` padding mid-string; the same bug shipped once at v0.33.21) | **EXISTS** | `SGVoice.bytesToBase64`; boundary cases in `test__sg_voice.js` |
+| **Audio redacted from the provenance log** — `redactMessages` now handles `input_audio` (it only knew `image_url`), keeping `format` for diagnosis | **EXISTS** | `sg-llm.js`; bridge test |
+
+**Limits:** **not verified on a real iPad** (format logic is unit-tested; no device run yet).
+Runtime dependency on `dev.tools.sgraph.ai` for the two audio modules (override via
+`window.SG_TOOLS_BASE`), so voice does not work in `SGSend.staticMode`. No streaming/partial
+transcript — one take, one result.
+
 **Still NOT BUILT (PROPOSED):**
 - **CSP egress lockdown (plan §7)** — app frames are not served with a restrictive `connect-src`,
   so an app can still reach a provider directly with its *own* key. The bridge protects the

@@ -161,10 +161,14 @@
             // declares chat in a vault with no key gets ENOKEY, and a configured vault
             // grants nothing to an app that didn't declare it. Deliberately NO limits
             // here — a cap the app author sets is not a cap.
+            // `listen` (microphone) is its OWN grant, never implied by `chat`: recording a
+            // room is a categorically different act from sending text, and an app that can
+            // talk to a model should not thereby be able to open a microphone.
             llm: {
                 chat  : llm.chat   === true,
                 models: llm.models === true,
-                usage : llm.usage  === true
+                usage : llm.usage  === true,
+                listen: llm.listen === true
             },
 
             // network (bool, default-deny) — the CSP escape hatch. App frames are served

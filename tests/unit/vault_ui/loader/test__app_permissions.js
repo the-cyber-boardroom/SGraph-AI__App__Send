@@ -99,9 +99,15 @@ ok('llm truthy-but-not-true → false',
 ok('junk llm block → all denied',
     AP.parsePermissions({ permissions: { llm: 'nope' } }).llm.chat === false);
 // A limit an app author sets is not a limit — the manifest must not carry spend caps.
-ok('llm block exposes only the three verbs (no app-set limits)',
+ok('llm block exposes only the declared verbs (no app-set limits)',
     Object.keys(AP.parsePermissions({ permissions: { llm: { chat: true, maxCostPerSession: 999 } } }).llm)
-        .sort().join(',') === 'chat,models,usage');
+        .sort().join(',') === 'chat,listen,models,usage');
+// The microphone is a separate grant on purpose: recording a room is categorically
+// different from sending text, so `chat` must never imply `listen`.
+ok('listen default-denies',                     AP.parsePermissions({ permissions: { llm: { chat: true } } }).llm.listen === false);
+ok('listen granted only when ===true',          AP.parsePermissions({ permissions: { llm: { listen: true } } }).llm.listen === true);
+ok('chat does not imply listen',               !AP.can(AP.parsePermissions({ permissions: { llm: { chat: true } } }), 'llm.listen', ''));
+ok('listen does not imply chat',               !AP.can(AP.parsePermissions({ permissions: { llm: { listen: true } } }), 'llm.chat', ''));
 
 // network — the CSP escape hatch. Default-deny: app frames get connect-src blob: data:.
 ok('network default false',                 AP.parsePermissions(null).network === false);
