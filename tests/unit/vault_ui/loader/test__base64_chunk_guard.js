@@ -9,14 +9,16 @@
    padding of its own. Concatenating then puts '=' in the MIDDLE of the string, and atob()
    accepts '=' only at the end — so the payload fails to decode, or decodes truncated.
 
-   8192 % 3 === 2. Every write over 8 KB was silently corrupted:
+   8192 % 3 === 2. Every write over 8 KB broke, in three separate files:
      - app-shell.js `sg.vfs.write`        — found + fixed at v0.33.21
      - send-browse--v0.3.2.js (user tree) — the vault preview's bridge; fixed 2026-08-03
      - send-browse--v0.3.3.js (open tree) — same code, same bug; fixed 2026-08-03
 
-   The failure mode is nasty because it is silent and PERSISTENT: the corruption is written
-   into the vault, so the file stays broken long after the encoder is fixed. A JS file
-   damaged this way fails to parse forever after ("missing ) after argument list").
+   What actually happens (verified, not assumed): the parent-side handler wraps its atob()
+   in a try/catch and replies { err: 'Bad encoding' }. So the write FAILS LOUDLY — it does
+   not write corrupted bytes. The practical effect was still bad: **no write over 8 KB was
+   possible from the /vault preview pane at all**, which is the kind of ceiling that pushes
+   app authors into splitting files into parts to get under it.
 
    This test greps the shipped UI trees rather than importing anything, because the encoders
    live inside giant injected-bridge STRING literals that cannot be imported. A source-level
