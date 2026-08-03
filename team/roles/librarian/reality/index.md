@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.47 | **Last updated:** 2026-08-01 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.47 | **Last updated:** 2026-08-03 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -44,8 +44,8 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
 | Active tools (tools.sgraph.ai) | 4 |
 | sgit CLI commands | 20+ |
-| Open PROPOSED items (across all domains) | ~1027+ (+57 net-new from 28 July: REG 12, PRED 5, DEMO 7, INC 2, VNT-006–010 5, AOMM-006 note 1; previously ~970+; processed 2026-08-01) |
-| Total documents catalogued | 884 (+14 from 28 July: 13 substantive briefs + 1 day-index; processed 08/01) |
+| Open PROPOSED items (across all domains) | ~1040+ (+13 net-new from 31 July: P-ACT-001–013 in alchemist/; previously ~1027+; processed 2026-08-03) |
+| Total documents catalogued | 910 (+26 from 31 July: 25 substantive briefs + 1 day-index; processed 08/03) |
 | **Key decision** | **Risk Mandate.ai** adopted as product name (resolves OQ-company-name-1, 2026-06-25) |
 | **Key decision** | **Grounded alarm** adopted as the Risk Mandate communication strategy term (replaces FUD framing, 2026-07-05) |
 | **Key decision** | **The grant is the mandate** — authorization is the union of what the agent can already do; "never-in-line" (2026-07-23) |
@@ -61,6 +61,11 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Regulation graph = vault + website** — EU AI Act encoded via AKN4EU XML, graph starts empty and accretes as customer answers Confirm/Validate/Accept provisions; partial connection sufficient for value (2026-07-28) |
 | **Key decision** | **Air gap drawn as bespoke manual integration** — a gap has no evolution; the labour that fills it sits at genesis; map shape = evolved ends + manual middle; three Wardley maps: air-gap (sales), translation (altitudes), evidence chain (agent→board) (2026-07-28) |
 | **Time-critical** | **Black Hat USA demo** — Business Hall opens 2026-08-04; hand-the-iPad acceptance test; minimum viable demo = one scenario, offline-safe, pre-computed fixture; build window: 3 days |
+| **Key decision** | **Vault authors, repo publishes** — clear text in a public repository is the enabling condition for verification as differentiator; vault stays authoring environment; publishing to encrypted vault abandoned in favour of public repo; split-by-path resolves two-store conflict (2026-07-31) |
+| **Key decision** | **Consolidation = customisation** — EU AI Act consolidation and per-customer organisational customisation are the same graph operation; one engine serves both (2026-07-31) |
+| **Key decision** | **Amendment is the subscription** — Standards-as-a-Service: open artefact, recurring revenue from re-derivation as instrument amends; cost scales with change not size (2026-07-31) |
+| **Key decision** | **Accountability manufactures demand for evidence** — three primitives (risk-as-fact, named person, visible upward) produce self-correction; three failure conditions: guessable reviewer, prior commitment, undiscriminated information (2026-07-31) |
+| **Key legal fact** | **EU AI Act transparency obligations (Article 50) are now live** — in force from 2 August 2026; Annex III standalone high-risk obligations deferred to 2 December 2027; Regulation 2026/1744 in force 27 July 2026 |
 
 ---
 

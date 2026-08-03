@@ -153,6 +153,35 @@ This domain covers investor-facing materials, the Alchemist system (Town Planner
 
 ---
 
+### Canonical AI Act Engine — EU Regulation Graph (07/31 briefs — docs 1–10, v0.33.54)
+
+**PROPOSED — does not exist yet.** Twenty-five July 31 documents develop the product around building and publishing a canonical version of the EU AI Act. No code implementation exists.
+
+| ID | Item | Status |
+|----|------|--------|
+| P-ACT-001 | **EU AI Act canonical version engine** — paragraph-as-file (confirmed Feb corpus position), amendment as native graph operation (substitute/insert/delete), computed projection rather than stored merged text; one engine for consolidation and per-customer customisation | PROPOSED — does not exist yet |
+| P-ACT-002 | **Provision identifier scheme** — positional hash (stable across content changes) + content hash (changes with amendment); must survive amendment; to be built on existing legal identifier work (AKN4EU XML), not invented | PROPOSED — does not exist yet |
+| P-ACT-003 | **Amendment node type in graph schema** — Amendment { operation, source_instrument, target_provision, replacement_content, effective_date }; edges: amends, substitutes, inserts, deletes, repealed_by, effective_from, references | PROPOSED — does not exist yet |
+| P-ACT-004 | **Repealed-not-deleted rule** — schema-enforced; a repealed provision is marked repealed_from:<date>, never removed; required for audit trail and point-in-time queries | PROPOSED — does not exist yet |
+| P-ACT-005 | **Point-in-time provision query** — "what did Article X say on date Y?" parameterised by date; requires four application-date windows from Regulation 2026/1744 | PROPOSED — does not exist yet |
+| P-ACT-006 | **Hash tree provision folder structure** — each provision is a folder with text.md, index.json (content hash + positional hash), derivation.json, analysis/; hash tree is the diff mechanism for amendment detection, analysis caching, and deployment delta (one structure, three uses) | PROPOSED — does not exist yet |
+| P-ACT-007 | **Vault-to-repo two-pass CI pipeline** — Job 1: read-only vault key, fetch hash-tree delta, commit to public repo; Job 2: on-commit trigger, build and publish live site; no vault credentials in Job 2; split-by-path enforced in pipeline | PROPOSED — does not exist yet |
+| P-ACT-008 | **Split-by-path ownership** — generated files (text.md, index.json, derivation.json, analysis/) flow vault→repo; contributed files (issues/, comments/, corrections/) flow repo→vault; a correction is a proposal, not an edit to published text | PROPOSED — does not exist yet |
+| P-ACT-009 | **"Talk to the Act" chat interface** — chat grounded in provisions rather than blank prompt; "what changed between version X and Y" as the unique question only this artefact can answer; version-diff as second product on the kit | PROPOSED — does not exist yet |
+| P-ACT-010 | **Standards-as-a-Service commercial model** — open artefact (CC BY 4.0), consortium funding ($10–20k per instrument or crowd-funded by 5–7 organisations); amendment is the recurring subscription revenue (re-derivation cost scales with change not size); three-role peer review (mapper/reviewer/approver) validated by incumbent market (100k mandates, $10k+/yr enterprise access) | PROPOSED — does not exist yet |
+| P-ACT-011 | **Shared conversations as examples / MCP export** — curated shared conversations as the entry examples (not a blank prompt); export protocol via MCP server rather than thread export | PROPOSED — does not exist yet |
+| P-ACT-012 | **Non-functional requirements maintenance service** — maintains what vibe-coded teams built (version control, reliability, resilience, security, backups, consistency, explainability, documentation); commercial trigger at ~90-day mission-critical transition; target supplier: displaced software services firms whose code-reading skill is the scarce asset | PROPOSED — does not exist yet |
+| P-ACT-013 | **Black Hat design pack** — multi-agent agentic session using existing 10-role ecosystem to produce a field-workflow design pack; vault-first review then repo publication; four design variations as experiment; mark executed vs written code; Librarian not optional | PROPOSED — does not exist yet |
+
+**Key facts established (grounded in public sources, 31 July 2026):**
+- Regulation (EU) 2026/1744 (Digital Omnibus on AI) adopted 8 July 2026, published 24 July, **in force 27 July 2026**
+- No consolidated version of the AI Act exists on the Union's legal portal as of 31 July 2026
+- Transparency obligations (Article 50) apply from **2 August 2026** — now live as of today (03 August 2026)
+- Annex III standalone high-risk obligations deferred to **2 December 2027** (was 2 August 2026)
+- Article 10(5) amended: extended legal basis for processing special category data for bias detection
+
+---
+
 ## Sub-files
 
 *Currently all content is in this index. When this file exceeds ~300 lines, sub-files will be created.*
