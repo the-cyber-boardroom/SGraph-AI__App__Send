@@ -131,6 +131,8 @@
             });
 
             this.shadowRoot.addEventListener('click', (e) => {
+                if (e.target.closest('.hud-rec-stop'))   { this._recOpts && this._recOpts.onStop   && this._recOpts.onStop();   return; }
+                if (e.target.closest('.hud-rec-cancel')) { this._recOpts && this._recOpts.onCancel && this._recOpts.onCancel(); return; }
                 // ⋯ overflow menu + privileges popover (expand-on-click).
                 if (e.target.closest('.hud-more-btn'))     { e.stopPropagation(); return this._toggleMore(); }
                 if (e.target.closest('.hud-privs-chip'))   { e.stopPropagation(); return this._togglePrivsPop(); }
@@ -188,6 +190,57 @@
         }
 
         // Called by page script with vault/app metadata.
+        // ── Voice capture bar ────────────────────────────────────────────────────
+        // A full-width sibling of the chrome row (same structural slot as the consent
+        // bar), so it shows in EVERY hud mode including `hidden`/`none`. An app must not
+        // be able to run the microphone without the user seeing it — that is the whole
+        // reason capture lives on host chrome rather than in the app frame.
+        //
+        // `onStop`/`onCancel` are supplied by app-shell; the HUD owns no audio.
+        showRecording(opts) {
+            opts = opts || {};
+            this._recOpts = opts;
+            var bar = this.shadowRoot.querySelector('.hud-rec-bar');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.className = 'hud-rec-bar';
+                var host = this.shadowRoot.querySelector('.hud') || this.shadowRoot;
+                host.appendChild(bar);
+            }
+            this._recStart = Date.now();
+            var render = () => {
+                var secs = Math.floor((Date.now() - this._recStart) / 1000);
+                var mm = String(Math.floor(secs / 60)).padStart(2, '0');
+                var ss = String(secs % 60).padStart(2, '0');
+                bar.innerHTML =
+                    '<span class="hud-rec-dot"></span>' +
+                    '<span class="hud-rec-label">Recording — your microphone is on</span>' +
+                    '<span class="hud-rec-time">' + mm + ':' + ss + '</span>' +
+                    '<button class="hud-rec-stop" type="button">■ Stop &amp; send</button>' +
+                    '<button class="hud-rec-cancel" type="button">Cancel</button>';
+            };
+            render();
+            clearInterval(this._recTimer);
+            this._recTimer = setInterval(render, 1000);
+            bar.style.display = 'flex';
+            setTimeout(() => { this.shadowRoot.querySelector('.hud-rec-stop')?.focus(); }, 0);
+        }
+
+        setRecordingBusy(text) {
+            var bar = this.shadowRoot.querySelector('.hud-rec-bar');
+            if (!bar) return;
+            clearInterval(this._recTimer);
+            bar.innerHTML = '<span class="hud-rec-dot hud-rec-dot--busy"></span>' +
+                            '<span class="hud-rec-label">' + AppHud._escapeHtml(text || 'Transcribing…') + '</span>';
+        }
+
+        hideRecording() {
+            clearInterval(this._recTimer);
+            var bar = this.shadowRoot.querySelector('.hud-rec-bar');
+            if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
+            this._recOpts = null;
+        }
+
         // ── Release channels ─────────────────────────────────────────────────────
         // Rendered ONLY when the vault publishes releases (`.vault/releases.json`), so a
         // vault that never opted in gains no chrome at all. The picker is host chrome by
@@ -963,6 +1016,31 @@
             background: rgba(100,160,220,0.12); color: #64a0dc;
             border: 1px solid rgba(100,160,220,0.25); white-space: nowrap;
         }
+        /* Voice capture bar. Red IS right here — unlike a published release, a live
+           microphone is a state the user must never overlook. Full-width sibling row so
+           it survives every hud mode, matching the consent bar. */
+        .hud-rec-bar {
+            display: none; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+            padding: 0.5rem 0.9rem; font-size: 0.8rem;
+            background: rgba(255,107,107,0.12); border-bottom: 1px solid rgba(255,107,107,0.35);
+            color: #ffdada;
+        }
+        .hud-rec-dot {
+            width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #ff6b6b;
+            animation: hud-rec-pulse 1.1s ease-in-out infinite; flex-shrink: 0;
+        }
+        .hud-rec-dot--busy { background: #E9C445; }
+        @keyframes hud-rec-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+        .hud-rec-label { flex: 1; min-width: 10rem; }
+        .hud-rec-time { font-family: var(--font-mono, monospace); opacity: 0.85; }
+        .hud-rec-stop, .hud-rec-cancel {
+            font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer;
+            font-family: inherit; white-space: nowrap;
+        }
+        .hud-rec-stop   { background: #ff6b6b; border: 1px solid #ff6b6b; color: #fff; font-weight: 700; }
+        .hud-rec-cancel { background: transparent; border: 1px solid rgba(255,255,255,0.25); color: inherit; }
+        .hud-rec-cancel:hover { border-color: #fff; }
+
         /* Release picker + "not the latest version" pill. Amber, not red: viewing a
            published release is a deliberate, safe state — informational, not an error.
            Red stays reserved for the consent prompt and live failures. */

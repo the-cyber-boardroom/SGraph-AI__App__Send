@@ -143,6 +143,16 @@
                     var u = (p.image_url && p.image_url.url) || '';
                     return { type: 'image_url', image_url: { url: '[image omitted · ~' + Math.round(u.length / 1024) + ' KB]' } };
                 }
+                // Same rule for audio: a voice recording is base64 in the message body and
+                // would otherwise dump tens of thousands of characters into a log the user
+                // is invited to read (and paste into a bug report).
+                if (p && p.type === 'input_audio') {
+                    var a = (p.input_audio && p.input_audio.data) || '';
+                    return { type: 'input_audio', input_audio: {
+                        data  : '[audio omitted · ~' + Math.round(a.length / 1024) + ' KB]',
+                        format: (p.input_audio && p.input_audio.format) || null
+                    } };
+                }
                 return p;
             });
             return { role: m.role, content: parts };

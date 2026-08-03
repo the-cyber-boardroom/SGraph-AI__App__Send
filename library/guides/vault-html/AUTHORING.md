@@ -203,6 +203,8 @@ window.sg = {
         usage    : ()               => Promise<{calls, promptTokens, completionTokens, cost, remaining}>,
         chat     : (req, onToken?)  => Promise<{content, model, finishReason, usage, cost, id, aborted}>,
         cancel   : (requestId)      => Promise<{cancelled}>,
+        // Host-owned microphone → text. Requires `permissions.llm.listen`. See "Voice input".
+        listen   : (opts?)          => Promise<{text, model, id, durationMs, bytes, format, cost}>,
     },
 };
 ```
@@ -885,6 +887,47 @@ one bill per session, not one per surface.
 `EREADONLY` (owner-sealed key, read-only session) · `EBUDGET` (cap reached) ·
 `EMODEL` (model not in the allow-list, or none selected) · `EABORT` (cancelled) ·
 `EPROTO` (upstream failure). They arrive as `err.code`, so branch on that rather than on message text.
+
+### Voice input (`sg.llm.listen`) — NEW 2026-08-03
+
+Speak instead of type. One call: the **host** opens the microphone, shows a red recording bar
+with a Stop button, transcribes with the vault's key, and hands you back text.
+
+```json
+{ "permissions": { "llm": { "chat": true, "listen": true } } }
+```
+
+```js
+micBtn.onclick = async () => {
+    try {
+        const { text } = await sg.llm.listen();     // opts: {maxMs, model, prompt}
+        input.value = text;                          // then send it as a normal chat message
+    } catch (e) {
+        if (e.code === 'ECONSENT') return;           // user declined — not an error worth showing
+        if (e.code === 'ENOMIC')   showTypeInstead();
+    }
+};
+```
+
+**`listen` is a separate grant and is never implied by `chat`.** Recording a room is a
+categorically different act from sending text, so an app that can talk to a model does not
+thereby get a microphone. It also **asks for consent every time** by default (tune with
+`permissions.consent["llm.listen"]` if you are building a kiosk).
+
+**Your frame never touches audio.** A sandboxed app frame has no `navigator.mediaDevices` at
+all, so capture happens in the host — which is also why the recording indicator is on host
+chrome where the user can always see it. You receive `{text, durationMs, bytes, format, cost}`
+and nothing else; the recording itself never crosses into your frame.
+
+The transcription is an ordinary paid call: it counts against the vault's spend caps, appears in
+the request ledger, and its cost is labelled `estimated` like any other.
+
+Extra error codes: `ENOMIC` (no microphone / sandboxed / permission refused by the browser),
+`EINSECURE` (not HTTPS), `EABORT` (user pressed Cancel).
+
+> **iPad note.** This works on iPad Safari — the host records `audio/mp4`, which OpenRouter
+> accepts as `m4a` with no conversion. Desktop Chrome records `webm`, which is *not* accepted, so
+> the host transcodes to WAV automatically. You do not need to care which happened.
 
 ### What this is not
 

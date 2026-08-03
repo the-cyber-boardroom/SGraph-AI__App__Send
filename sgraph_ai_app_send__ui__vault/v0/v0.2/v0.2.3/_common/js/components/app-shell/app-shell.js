@@ -1344,6 +1344,104 @@
             return { calls: 0, totalCost: 0, billedCost: 0, estimatedCost: 0, promptTokens: 0, completionTokens: 0 };
         }
 
+        // ── sg.llm.listen — host-owned microphone → text ───────────────────────────
+        // Capture happens HERE, at the real origin, because a null-origin app frame has no
+        // `navigator.mediaDevices` at all (the SG/Tools guide documents the same constraint
+        // and assigns capture to the embedder). Recording on host chrome is also what makes
+        // the red bar unavoidable — an app cannot open a microphone invisibly.
+        //
+        // The audio is transcribed through the SAME SGLlm client, model policy, budget and
+        // ledger as every other call, so voice spend is not a separate untracked bill.
+        async _recordAndTranscribe(session, opts) {
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            var self = this;
+            var maxMs = Math.min(Math.max(opts.maxMs || 120000, 5000), 300000);
+
+            var rec = await SGVoice.start();                 // throws {code} if unavailable
+            var settled = false;
+
+            return await new Promise(function (resolve, reject) {
+                var timer = setTimeout(function () { finish(false); }, maxMs);
+
+                function finish(cancelled) {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    if (cancelled) {
+                        // Still stop the recorder — cancelling must release the mic, not
+                        // just hide the bar. A tab quietly holding the mic open is worse
+                        // than the original problem.
+                        SGVoice.stop(rec).catch(function () {});
+                        if (hud && hud.hideRecording) hud.hideRecording();
+                        reject(Object.assign(new Error('Cancelled'), { code: 'EABORT' }));
+                        return;
+                    }
+                    if (hud && hud.setRecordingBusy) hud.setRecordingBusy('Transcribing…');
+                    SGVoice.stop(rec)
+                        .then(function (audio) { return self._transcribe(audio, opts); })
+                        .then(function (out) { if (hud && hud.hideRecording) hud.hideRecording(); resolve(out); })
+                        .catch(function (err) { if (hud && hud.hideRecording) hud.hideRecording(); reject(err); });
+                }
+
+                if (hud && hud.showRecording) {
+                    hud.showRecording({ onStop: function () { finish(false); },
+                                        onCancel: function () { finish(true); } });
+                } else {
+                    // No HUD (embed / minimal host): never record without a visible stop —
+                    // fall back to a short fixed take rather than an open microphone.
+                    setTimeout(function () { finish(false); }, Math.min(maxMs, 15000));
+                }
+            });
+        }
+
+        async _transcribe(audio, opts) {
+            var s = await this._llmSession();
+            if (!s || !s.ok) throw Object.assign(new Error((s && s.message) || 'LLM not available'), { code: (s && s.reason) || 'ENOKEY' });
+
+            var limits = SGLlmConfig.limitsFor(s.policy, this._appId || null);
+            var tot    = this._llmTotals();
+            if (limits.maxCallsPerSession && tot.calls >= limits.maxCallsPerSession) {
+                throw Object.assign(new Error('Session call limit reached'), { code: 'EBUDGET' });
+            }
+            if (limits.maxCostPerSession && tot.totalCost >= limits.maxCostPerSession) {
+                throw Object.assign(new Error('Session spend cap reached'), { code: 'EBUDGET' });
+            }
+            var model = opts.model || s.model || null;
+            if (model && !SGLlmConfig.modelAllowed(s.policy, model)) {
+                throw Object.assign(new Error('Model not allowed: ' + model), { code: 'EMODEL' });
+            }
+            if (!model) throw Object.assign(new Error('No model configured for transcription'), { code: 'EMODEL' });
+
+            var prompt = opts.prompt ||
+                'Transcribe the spoken audio verbatim. Reply with the transcript text only — ' +
+                'no preamble, no commentary, no quotation marks. If there is no intelligible ' +
+                'speech, reply with an empty string.';
+
+            var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
+                model: model, files: [], status: 'pending', promptChars: prompt.length
+            });
+
+            var res = await s.client.chat({
+                model: model,
+                messages: [{ role: 'user', content: [ { type: 'text', text: prompt }, SGVoice.audioPart(audio) ] }],
+                maxTokens: limits.maxTokensPerCall || undefined
+            });
+
+            if (rec) VaultLlmLog.update(rec.key, this._llmLedgerPatch(res, model));
+            s.client.reconcileCost(res).then((up) => { if (up && rec) VaultLlmLog.update(rec.key, this._llmLedgerPatch(res, model)); });
+
+            var eff = SGLlm.effectiveCost(res);
+            return {
+                text      : (res.content || '').trim(),
+                model     : res.model,
+                id        : res.id,
+                durationMs: audio.durationMs || null,
+                bytes     : audio.bytes,
+                format    : audio.format,
+                cost      : { value: eff.value, source: eff.source, estimated: eff.estimated }
+            };
+        }
+
         _llmLedgerPatch(res, fallbackModel) {
             var eff = SGLlm.effectiveCost(res);
             return {
@@ -3077,7 +3175,13 @@
                       'models:function(){return _sgCmd("llm",{action:"models"});},' +
                       'usage:function(){return _sgCmd("llm",{action:"usage"});},' +
                       'chat:_llmChat,' +
-                      'cancel:function(id){return _sgCmd("llm",{action:"cancel",id:id});}' +
+                      'cancel:function(id){return _sgCmd("llm",{action:"cancel",id:id});},' +
+                      // listen() → {text,...}. The HOST opens the microphone (this frame has
+                      // no `navigator.mediaDevices`), shows a red recording bar with Stop, and
+                      // transcribes with the vault's key. You get text back and nothing else —
+                      // the audio never enters this frame.
+                      'listen:function(opts){opts=opts||{};return _sgCmd("llm",{action:"listen",' +
+                        'maxMs:opts.maxMs||null,model:opts.model||null,prompt:opts.prompt||null});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -3474,7 +3578,7 @@
                     if (e.data.__sgCmdType === 'llm') {
                         var lAct = e.data.action;
                         var lCap = { available: null, models: 'llm.models', usage: 'llm.usage',
-                                     chat: 'llm.chat', cancel: 'llm.chat' }[lAct];
+                                     chat: 'llm.chat', cancel: 'llm.chat', listen: 'llm.listen' }[lAct];
                         if (lCap === undefined) { cmdReply(false, null, 'Unknown llm action: ' + lAct); return; }
 
                         // available() is ungated ON PURPOSE: an app must be able to discover it
@@ -3483,6 +3587,38 @@
                         if (lCap && !self._can(lCap, '')) {
                             cmdReply(false, null, 'Permission denied', 'EPERM');
                             self._emitBridgeCall('llm.' + lAct, { ok: false, err: 'EPERM' });
+                            return;
+                        }
+
+                        // listen: consent EVERY time by default. A microphone is not a
+                        // capability to grant once and forget — `permissions.consent.llm.listen`
+                        // can relax it for a kiosk, but the default is per-use.
+                        if (lAct === 'listen') {
+                            if (typeof SGVoice === 'undefined') {
+                                cmdReply(false, null, 'Voice capture unavailable in this host', 'ENOMIC');
+                                return;
+                            }
+                            var vAv = SGVoice.available();
+                            if (!vAv.ok) {
+                                cmdReply(false, null, 'Microphone unavailable (' + vAv.reason + ')', vAv.reason);
+                                self._emitBridgeCall('llm.listen', { ok: false, err: vAv.reason });
+                                return;
+                            }
+                            var lOpts = { maxMs: e.data.maxMs, model: e.data.model, prompt: e.data.prompt };
+                            self._consent('llm.listen', '').then(function (granted) {
+                                if (!granted) {
+                                    cmdReply(false, null, 'User declined', 'ECONSENT');
+                                    self._emitBridgeCall('llm.listen', { ok: false, err: 'ECONSENT' });
+                                    return;
+                                }
+                                return self._recordAndTranscribe(null, lOpts).then(function (out) {
+                                    cmdReply(true, out);
+                                    self._emitBridgeCall('llm.listen', { ok: true, ms: out.durationMs, bytes: out.bytes });
+                                });
+                            }).catch(function (err) {
+                                cmdReply(false, null, (err && err.message) || 'Recording failed', (err && err.code) || 'EPROTO');
+                                self._emitBridgeCall('llm.listen', { ok: false, err: (err && err.code) || 'error' });
+                            });
                             return;
                         }
 

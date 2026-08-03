@@ -278,6 +278,74 @@ console.log('\n[suite] no key configured → an honest reason, not a crash');
     ok('chat refuses with ENOKEY', r.ok === false && r.code === 'ENOKEY', 'code=' + r.code);
 }
 
+console.log('\n[suite] sg.llm.listen — the microphone is its own grant');
+{
+    // No SGVoice in this host at all → an honest ENOMIC, not a crash.
+    const frame = makeFrame();
+    const el = makeShell();                      // grants chat/models/usage, NOT listen
+    setup(el, frame);
+    const r = await send(frame, { __sgCmdType: 'llm', action: 'listen' });
+    ok('listen is refused without its own grant', r.ok === false && r.code === 'EPERM', 'code=' + r.code);
+    ok('…even though chat IS granted', el._can('llm.chat', '') === true);
+    ok('the chat grant does not imply listen', el._can('llm.listen', '') === false);
+
+    const el2 = makeShell({ grant: { permissions: { llm: { chat: true, listen: true } } } });
+    ok('an explicit listen grant is honoured', el2._can('llm.listen', '') === true);
+
+    // Granted, but the host has no microphone (the sandbox / insecure-context case).
+    const frame2 = makeFrame();
+    setup(el2, frame2);
+    globalThis.SGVoice = { available: () => ({ ok: false, reason: 'ENOMIC' }) };
+    window.SGVoice = globalThis.SGVoice;
+    const r2 = await send(frame2, { __sgCmdType: 'llm', action: 'listen' });
+    ok('an unavailable mic reports ENOMIC', r2.ok === false && r2.code === 'ENOMIC', 'code=' + r2.code);
+    ok('…rather than a generic failure', /Microphone unavailable/.test(r2.err || ''));
+
+    // Granted + available, but the user declines the per-use consent.
+    const frame3 = makeFrame();
+    const el3 = makeShell({ grant: { permissions: { llm: { chat: true, listen: true } } }, consent: false });
+    setup(el3, frame3);
+    globalThis.SGVoice = { available: () => ({ ok: true, reason: null }) };
+    window.SGVoice = globalThis.SGVoice;
+    let recorded = 0;
+    el3._recordAndTranscribe = async () => { recorded++; return { text: 'x' }; };
+    const r3 = await send(frame3, { __sgCmdType: 'llm', action: 'listen' });
+    ok('a declined prompt refuses', r3.ok === false && r3.code === 'ECONSENT', 'code=' + r3.code);
+    ok('the microphone was never opened', recorded === 0);
+
+    // The happy path: text comes back, and only text.
+    const frame4 = makeFrame();
+    const el4 = makeShell({ grant: { permissions: { llm: { chat: true, listen: true } } } });
+    setup(el4, frame4);
+    el4._recordAndTranscribe = async () => ({ text: 'hello from the ipad', model: 'm', id: 'gen-v',
+                                              durationMs: 2100, bytes: 4096, format: 'm4a',
+                                              cost: { value: 0.0002, source: 'estimate', estimated: true } });
+    const r4 = await send(frame4, { __sgCmdType: 'llm', action: 'listen' });
+    ok('listen resolves with the transcript', r4.ok === true && r4.result.text === 'hello from the ipad');
+    ok('the format used is reported', r4.result.format === 'm4a');
+    ok('cost is labelled like every other call', r4.result.cost.estimated === true);
+    ok('NO audio payload is returned to the frame',
+        JSON.stringify(r4).indexOf('input_audio') === -1 && !('data' in r4.result));
+}
+
+console.log('\n[suite] audio never leaks into the provenance log');
+{
+    // redactMessages is what the debug/provenance surfaces render. Base64 audio would
+    // otherwise dump tens of thousands of characters into a log users are invited to read.
+    const big = 'A'.repeat(50000);
+    const out = SGLlm.redactMessages([
+        { role: 'user', content: [ { type: 'text', text: 'transcribe' },
+                                   { type: 'input_audio', input_audio: { data: big, format: 'm4a' } } ] }
+    ]);
+    const part = out[0].content[1];
+    ok('the audio part survives structurally', part.type === 'input_audio');
+    ok('the base64 payload is gone', part.input_audio.data.indexOf('AAAA') === -1);
+    ok('…replaced by a size note', /audio omitted/.test(part.input_audio.data));
+    ok('the format is kept for diagnosis', part.input_audio.format === 'm4a');
+    ok('text parts are untouched', out[0].content[0].text === 'transcribe');
+    ok('the redacted copy is far smaller', JSON.stringify(out).length < 500);
+}
+
 console.log('\n[suite] unknown actions are rejected, not silently ignored');
 {
     const frame = makeFrame();
