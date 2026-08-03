@@ -101,9 +101,13 @@
                                 <div class="vs-view vs-view-settings" style="display:none">
                                     <div class="vs-stabs">
                                         <button class="vs-stab vs-stab--active" data-stab="settings">Vault Settings</button>
+                                        <button class="vs-stab" data-stab="versions">Versions</button>
                                         <button class="vs-stab" data-stab="preview">Public preview</button>
                                     </div>
                                     <div class="vs-spane" data-spane="settings"><vault-settings></vault-settings></div>
+                                    <!-- Publish/manage named releases (.vault/releases.json). Authoring lives
+                                         here; the /app HUD picker is the consuming surface. -->
+                                    <div class="vs-spane" data-spane="versions" style="display:none"><vault-releases-editor></vault-releases-editor></div>
                                     <div class="vs-spane" data-spane="preview" style="display:none">
                                         <div class="vs-pvp-split">
                                             <div class="vs-pvp-edit"><sg-public-preview-editor embedded></sg-public-preview-editor></div>
@@ -286,6 +290,11 @@
             this.querySelector('vault-settings')?.setVault(vault, vaultKey, this._accessKey);
             // Wire the native LLM chat (resolves its own key/policy from .vault/llm/)
             this.querySelector('vault-llm-chat')?.setVault(vault);
+            // Versions tab. Writable == owner: a read-only opener still SEES published
+            // versions and their share links, but cannot publish or remove.
+            this.querySelector('vault-releases-editor')?.setContext({
+                vault: vault, vaultKey: vaultKey, writable: !!this._accessKey
+            });
 
             // Hand the live vault to the embedded Public-preview editor — no re-open, no
             // localStorage race. Set the access token on the shared sgSend so publish/delete work.

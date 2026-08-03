@@ -543,11 +543,25 @@ immutable and content-addressed, so a release *is* the same objects.
 | URL grammar `#key\|@name`, composing with `app:` deep links in either order; bare `@` ignored | **EXISTS** | `vault-loader-routing.js` `_extractReleasePin`; `test__routing_decisions.js` (+9) |
 | HUD picker (Live + releases) + **amber `⏱ <name>` pill** whenever not on the latest version; both render only when releases exist | **EXISTS** | `app-hud.js` `setReleases`; `app-hud:release-change` → `switchRelease` |
 
-**NOT built (PROPOSED):** a "publish as release" action (releases are authored by editing
-`.vault/releases.json` today — the SGit history view is the natural home); `/vault` browser parity
-(picker is `/en-gb/app/` only); sub-vault children are **not** pinned (a linked child has its own
-HEAD). **GC note:** there is no garbage collection today — when one is built, pinned commits must
-be roots or a published release could be collected out from under a live link.
+**Authoring — Settings → Versions (2026-08-03).** `<vault-releases-editor>` is a third Settings
+tab in `/vault`, peer to Public preview: publish a commit under a name (picker fed by
+`vault.logCommits({limit:40})`), edit name/label/notes, remove, set/clear the default, toggle
+`allowLive`, and copy the pinned share link per release. Writes `.vault/releases.json` then
+pushes. Owner-only by construction (the file is inside the permission floor and writing needs a
+writable session); a read-only opener still sees the list and the share links. Removal confirms
+**inline** (no `window.confirm`). A **rename carries the `default` with it**, and removing a
+release **clears a default that referenced it** — otherwise the default silently points at a name
+that no longer exists and every new viewer drops to Live. Uniqueness is enforced at write time
+because the parser keeps the first duplicate (a second "v1.2" would look like the publish did
+nothing). Share links are built from the **name**, not the label, so relabelling never breaks an
+existing link. Evidence: `vault-releases-editor.js`;
+`tests/unit/vault_ui/loader/test__vault_releases_editor.js` (44 assertions).
+
+**NOT built (PROPOSED):** `/vault` browser parity for *viewing* a pinned version (the picker is
+`/en-gb/app/` only — Settings authors releases, the app HUD consumes them); sub-vault children are
+**not** pinned (a linked child has its own HEAD). **GC note:** there is no garbage collection
+today — when one is built, pinned commits must be roots or a published release could be collected
+out from under a live link.
 
 #### `sg.llm.*` app bridge — Phase 1 + kernel accounting (2026-08-02)
 
