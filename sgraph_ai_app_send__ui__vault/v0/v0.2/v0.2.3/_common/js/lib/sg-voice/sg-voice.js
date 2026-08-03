@@ -41,6 +41,29 @@
     var MOD_AUDIO  = '/core/sg-audio/v0/v0.1/v0.1.0/sg-audio.js';
     var MOD_DECODE = '/core/sg-audio-decode/v0/v0.1/v0.1.0/sg-audio-decode.js';
 
+    // Audio-capable models. **A chat model is not a transcription model** — most have no
+    // audio endpoint at all and OpenRouter answers `404 No endpoints found that support
+    // input audio`. That is exactly what shipped: the chat panel handed its own picker's
+    // model (anthropic/claude-3-haiku) to a voice call, so every transcription 404'd.
+    //
+    // Mirrored from SG/Tools' curated list rather than imported, because this must be
+    // usable before any dynamic import() resolves and it is a policy list, not a library:
+    //   tools/…/en-gb/audio-transcribe/api/audio-models.js (ids verified against
+    //   OpenRouter's live catalogue 2026-06-14). Only chat `input_audio` models appear —
+    //   the dedicated-STT ids there go through /audio/transcriptions, which we do not use.
+    var AUDIO_MODELS = [
+        'google/gemini-3.5-flash',
+        'google/gemini-3.1-flash-lite',
+        'google/gemini-3-flash-preview',
+        'google/gemini-3.1-flash-lite-preview',
+        'openai/gpt-audio',
+        'openai/gpt-audio-mini',
+        'mistralai/voxtral-small-24b-2507'
+    ];
+    var DEFAULT_AUDIO_MODEL = 'google/gemini-3.5-flash';        // cheapest fast audio-in model
+
+    function isAudioModel(id) { return AUDIO_MODELS.indexOf(String(id || '')) > -1; }
+
     // OpenRouter accepts these directly (mirrors sg-audio-decode's OR_SUPPORTED).
     // NOTE the absentee: `webm`. Chrome's default recording container is not on this
     // list, which is exactly why the decode step exists rather than being optional.
@@ -219,11 +242,19 @@
         if (limits.maxCostPerSession && totals.totalCost >= limits.maxCostPerSession) {
             throw Object.assign(new Error('Session spend cap reached'), { code: 'EBUDGET' });
         }
-        var model = opts.model || session.model || null;
-        if (model && !SGLlmConfig.modelAllowed(session.policy, model)) {
-            throw Object.assign(new Error('Model not allowed: ' + model), { code: 'EMODEL' });
+        // NOTE the absence of `session.model`. Falling back to the vault's chat model is
+        // what produced the 404 — transcription picks from the audio list or nothing.
+        var model = opts.model || DEFAULT_AUDIO_MODEL;
+        if (!isAudioModel(model)) {
+            // Fail here with the reason rather than letting OpenRouter answer 404 — its
+            // message names no model and gives the user nothing to act on.
+            throw Object.assign(new Error('Model does not accept audio input: ' + model +
+                                          ' (try ' + DEFAULT_AUDIO_MODEL + ')'), { code: 'EMODEL' });
         }
-        if (!model) throw Object.assign(new Error('No model configured for transcription'), { code: 'EMODEL' });
+        if (!SGLlmConfig.modelAllowed(session.policy, model)) {
+            throw Object.assign(new Error('Model not allowed by this vault: ' + model +
+                                          ' — add it to models.allow in Settings → AI'), { code: 'EMODEL' });
+        }
 
         var prompt = opts.prompt || DEFAULT_PROMPT;
         var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
@@ -268,6 +299,8 @@
 
     var API = {
         TOOLS_BASE: TOOLS_BASE, SENDABLE: SENDABLE, DEFAULT_PROMPT: DEFAULT_PROMPT,
+        AUDIO_MODELS: AUDIO_MODELS, DEFAULT_AUDIO_MODEL: DEFAULT_AUDIO_MODEL,
+        isAudioModel: isAudioModel,
         formatFor: formatFor, isSendable: isSendable, bytesToBase64: bytesToBase64,
         audioPart: audioPart, available: available, start: start, stop: stop, cancel: cancel,
         transcribeWith: transcribeWith, __setModules: __setModules

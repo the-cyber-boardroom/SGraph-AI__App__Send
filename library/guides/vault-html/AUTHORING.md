@@ -922,6 +922,15 @@ and nothing else; the recording itself never crosses into your frame.
 The transcription is an ordinary paid call: it counts against the vault's spend caps, appears in
 the request ledger, and its cost is labelled `estimated` like any other.
 
+**Leave `model` alone unless you know the model hears.** Transcription does **not** use the
+vault's chat model — most chat models have no audio endpoint and OpenRouter answers
+`404 No endpoints found that support input audio`. `listen()` defaults to
+`google/gemini-3.5-flash`; passing a model that does not accept audio is refused up front with
+`EMODEL` and a message naming one that does. Currently accepted:
+`google/gemini-3.5-flash`, `google/gemini-3.1-flash-lite`, `google/gemini-3-flash-preview`,
+`google/gemini-3.1-flash-lite-preview`, `openai/gpt-audio`, `openai/gpt-audio-mini`,
+`mistralai/voxtral-small-24b-2507`. The vault's `models.allow` list still applies on top.
+
 Extra error codes: `ENOMIC` (no microphone / sandboxed / permission refused by the browser),
 `EINSECURE` (not HTTPS), `EABORT` (user pressed Cancel).
 
