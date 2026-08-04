@@ -580,15 +580,50 @@
                 // If we have unpushed local commits, this is divergence — surface, don't clobber.
                 var ahead = await this._vault.getAheadCount();
                 if (ahead > 0) { this._surfaceUnpushed('diverged'); return; }
-                // Clean behind → fast-forward the view and remount so the new code renders.
-                // _remountCurrent replays the SAME mount the user is looking at (the opened
-                // "as an app" file / folder manifest), expanding lazy sub-trees first — the old
-                // path re-ran _continue with the stale root app.json + a consumed deep-link, so it
-                // remounted the DEFAULT app (or 404'd the entry on the now-lazy sub-tree).
+                // Clean behind → OFFER the update; do not apply it.
+                //
+                // This used to fast-forward and remount immediately. Remounting replaces the
+                // app frame, so anything the running app held that was not written to the
+                // vault — a half-filled form, an unsaved editor buffer — went with it. A
+                // background check must not be able to discard the user's work; the pinned
+                // -release branch above already had this right, and now the live path does too.
+                this._pendingUpdateHead = liveNamed;
+                var hudU = document.getElementById('app-hud') || document.querySelector('app-hud');
+                if (hudU && typeof hudU.showUpdate === 'function') {
+                    var selfU = this;
+                    hudU.showUpdate('New version available', function () { selfU.applyPendingUpdate(); });
+                } else if (hudU && typeof hudU.showMessage === 'function') {
+                    // No update chip in this HUD build — say it rather than apply it silently.
+                    hudU.showMessage('update-available',
+                        'New version available — reload the page to load it.', 'info', null);
+                }
+                this._emitVaultEvent('update-available', { label: 'New version available', head: liveNamed });
+            } catch (_) { /* network errors are silent — retried on next focus */ }
+        }
+
+        // What the auto-pull used to do without asking. _remountCurrent replays the SAME
+        // mount the user is looking at (the opened "as an app" file / folder manifest),
+        // expanding lazy sub-trees first — the older path re-ran _continue with a stale root
+        // app.json and a consumed deep-link, so it remounted the DEFAULT app (or 404'd the
+        // entry on the now-lazy sub-tree).
+        async applyPendingUpdate() {
+            if (!this._vault) return false;
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            try {
                 await this._syncViewToPublishedHead(this._vault);
                 try { await this._remountCurrent(); } catch (_) {}
-                this._emitVaultEvent('auto-pull', { label: 'View synced to published head', head: liveNamed });
-            } catch (_) { /* network errors are silent — retried on next focus */ }
+                this._pendingUpdateHead = null;
+                if (hud && hud.hideUpdate) hud.hideUpdate();
+                this._emitVaultEvent('auto-pull', { label: 'View synced to published head',
+                                                    head: this._vault._namedHeadId });
+                return true;
+            } catch (err) {
+                if (hud && hud.showMessage) {
+                    hud.showMessage('update-failed', 'Could not load the new version: ' +
+                                    ((err && err.message) || 'failed'), 'error', 6000);
+                }
+                return false;
+            }
         }
 
         // ── Append check-on-events → host_events-gated push to the app ────────────────────
