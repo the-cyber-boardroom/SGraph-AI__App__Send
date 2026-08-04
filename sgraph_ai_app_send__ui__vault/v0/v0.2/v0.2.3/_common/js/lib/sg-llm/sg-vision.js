@@ -48,6 +48,7 @@
     // Fallback only. See the header: the catalogue is the real source.
     var KNOWN_VISION = [
         'google/gemini-3.5-flash', 'google/gemini-3.1-flash-lite', 'google/gemini-3-flash-preview',
+        'anthropic/claude-sonnet-5', 'anthropic/claude-opus-5',
         'anthropic/claude-sonnet-4', 'anthropic/claude-opus-4', 'openai/gpt-5', 'openai/gpt-5-mini'
     ];
 

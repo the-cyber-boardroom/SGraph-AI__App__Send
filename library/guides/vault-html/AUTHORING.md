@@ -203,6 +203,8 @@ window.sg = {
         usage    : ()               => Promise<{calls, promptTokens, completionTokens, cost, remaining}>,
         chat     : (req, onToken?)  => Promise<{content, model, finishReason, usage, cost, id, aborted}>,
         cancel   : (requestId)      => Promise<{cancelled}>,
+        // imagePart(blob|bytes|dataURL) → an image_url content part, encoded in-frame.
+        // Host checks the model can actually read images. See "Send an image".
         // Host-owned microphone → text. Requires `permissions.llm.listen`. See "Voice input".
         // listenStop()/listenCancel() end a take from your own UI; listening() → {recording}.
         listen   : (opts?)          => Promise<{text, model, id, durationMs, bytes, format, cost}>,
@@ -883,6 +885,45 @@ meter.textContent = `${u.calls} calls · $${u.cost.toFixed(4)} · ${u.remaining.
 `usage()` reports the **whole session**, including calls made by the vault UI's own chat panel —
 one bill per session, not one per surface.
 
+### 6. Send an image (a screenshot, a chart, a scan) — NEW 2026-08-03
+
+A message's `content` can be an array of parts instead of a string:
+
+```js
+const part = await sg.llm.imagePart(blobOrBytes);          // or a data: URL you already have
+const res  = await sg.llm.chat({
+    messages: [{ role: 'user', content: [
+        { type: 'text', text: 'What is wrong in this screenshot?' },
+        part
+    ] }]
+});
+```
+
+**Use `sg.llm.imagePart()` rather than encoding it yourself.** It runs in your frame (no host
+round trip — the bytes are already yours) and chunks base64 at **8190, not 8192**. `8192 % 3
+=== 2`, so a 8192-sized chunk emits `=` padding mid-string and `atob()` rejects it; this
+codebase has shipped that exact bug three times. It accepts a `Blob`/`File`, a `Uint8Array`, an
+`ArrayBuffer`, or passes a `data:` URL straight through.
+
+Accepted types: **png, jpeg, webp, gif**. Not svg — it is a scriptable document, not a bitmap,
+and no provider takes it.
+
+**The model must be able to read images**, and the host checks before spending the call:
+
+- capability is read from the **live model catalogue** (`architecture.modality` /
+  `input_modalities`), not a hard-coded list, so a new vision model works the day it ships;
+- a model that cannot see gets you `EMODEL` **naming the model**, instead of a provider error
+  that names nothing;
+- note that `text->image` is an image *generator*, not a reader — it is correctly refused.
+
+The host also caps the total image payload (`EIMGSIZE`). That ceiling is not yours to raise: it
+is spending the vault's key.
+
+Images appear in the request ledger as their own count, never folded into the character total —
+`sg.llm.usage()` and the AI Requests pane both stay honest about what the expensive calls were.
+
+> **Not a new grant.** An image is an ordinary `chat()` call under `permissions.llm.chat`.
+
 ### What the host does that you don't have to
 
 | Concern | Who handles it |
@@ -892,13 +933,16 @@ one bill per session, not one per surface.
 | Spend caps | Host. `maxCostPerSession` / `maxCallsPerSession` are enforced before the call; you get `EBUDGET`. |
 | `maxTokens` | Host **clamps** it to the vault policy. Asking for more is not an error, it is just capped. |
 | Consent | Host. The first `chat()` raises a HUD prompt the user must accept; declining gives you `ECONSENT`. |
+| Whether the model can read an image | Host, from the live catalogue. You get `EMODEL` naming the model, not a provider error naming nothing. |
+| Image size ceiling | Host (`EIMGSIZE`). It is spending the vault's key, so the limit is not the app's to set. |
 | Cost reconciliation | Host, two-source (stream `usage.cost`, then the authoritative `/generation` lookup). |
 
 ### Error codes
 
 `EPERM` (no grant) · `ECONSENT` (user declined) · `ENOKEY` (no key configured) ·
 `EREADONLY` (owner-sealed key, read-only session) · `EBUDGET` (cap reached) ·
-`EMODEL` (model not in the allow-list, or none selected) · `EABORT` (cancelled) ·
+`EMODEL` (model not in the allow-list, none selected, or it cannot read the image/audio you
+sent) · `EABORT` (cancelled) · `EIMGSIZE` (image payload over the host ceiling) ·
 `EPROTO` (upstream failure). They arrive as `err.code`, so branch on that rather than on message text.
 
 ### Voice input (`sg.llm.listen`) — NEW 2026-08-03
