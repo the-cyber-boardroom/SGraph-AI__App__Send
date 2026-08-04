@@ -62,6 +62,10 @@
             status     : r.status || 'pending',        // pending | ok | error | aborted
             files      : Array.isArray(r.files) ? r.files.slice() : [],
             promptChars: _num(r.promptChars) || 0,
+            // Images are their own count, never folded into promptChars: a screenshot and
+            // a paragraph cost nothing alike, and a base64 blob added to a char total
+            // would make every image call look like a novel.
+            images     : _num(r.images) || 0,
             usage      : r.usage || {},
             cost       : _num(r.cost),
             costSource : r.costSource || null,

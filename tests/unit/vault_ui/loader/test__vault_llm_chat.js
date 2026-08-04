@@ -26,9 +26,11 @@ const load = (f) => new Function(readFileSync(base + f, 'utf8')).call(window);
 load('lib/sg-llm/sg-llm-config.js');
 load('lib/sg-llm/sg-llm.js');
 load('lib/sg-llm/vault-llm-log.js');
+load('lib/sg-llm/sg-vision.js');
 global.SGLlmConfig  = window.SGLlmConfig  = globalThis.SGLlmConfig;
 global.SGLlm        = window.SGLlm        = globalThis.SGLlm;
 global.VaultLlmLog  = window.VaultLlmLog  = globalThis.VaultLlmLog;
+global.SGVision     = window.SGVision     = globalThis.SGVision;
 load('components/vault-llm-chat/vault-llm-chat.js');
 
 let pass = 0, fail = 0;
@@ -359,6 +361,139 @@ console.log('\n[suite] vault-llm-chat — model selection (regression: model:nul
     sel.value = 'zz/other';
     sel.dispatchEvent(new window.Event('change'));
     ok('changing the picker updates the active model', el._model === 'zz/other');
+}
+
+console.log('\n[suite] vault-llm-chat — pasted screenshots');
+{
+    /* A screenshot is the fastest way to ask "what is wrong with this?". Two things here
+       are easy to get wrong and expensive when you do:
+         1. claiming the paste event when the clipboard holds TEXT would break typing;
+         2. leaving the image attached would silently re-send (and re-bill) it every turn. */
+    const el = mount();
+
+    // A tiny real PNG so readImage() has something to measure.
+    const PNG = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64');
+    const fakeFile = (type = 'image/png', name = 'shot.png') => ({
+        type, name,
+        arrayBuffer: async () => PNG.buffer.slice(PNG.byteOffset, PNG.byteOffset + PNG.byteLength)
+    });
+
+    await el.addImages([fakeFile()]);
+    ok('an image attaches',                 el.images().length === 1);
+    ok('…with its size',                    el.images()[0].bytes > 0);
+    ok('a thumbnail chip is rendered',      !!el.shadowRoot.querySelector('.vlc-chip--img img.vlc-thumb'));
+    ok('the thumbnail is a data: URL',
+        /^data:image\/png;base64,/.test(el.shadowRoot.querySelector('.vlc-thumb').getAttribute('src')));
+    // Surprising otherwise: unlike a file, an image is for the NEXT message only.
+    ok('the one-message lifetime is STATED', /next message only/.test(ctxText(el)));
+
+    const x = el.shadowRoot.querySelector('[data-delimg="0"]');
+    ok('each image chip has a remove control', !!x);
+    x.dispatchEvent(new window.Event('click', { bubbles: true }));
+    ok('clicking it removes the image',     el.images().length === 0);
+
+    // Images render alongside files, not instead of them.
+    await el.addImages([fakeFile()]);
+    el.addContextFile({ path: 'notes.md', text: 'hello' });
+    ok('images and files coexist',
+        el.images().length === 1 && el.contextFiles().length === 1);
+    ok('both are visible in the context bar',
+        /notes\.md/.test(ctxText(el)) && !!el.shadowRoot.querySelector('.vlc-chip--img'));
+
+    // A non-image file is refused with a reason, not silently dropped.
+    const el2 = mount();
+    await el2.addImages([fakeFile('application/pdf', 'report.pdf')]);
+    ok('a pdf is refused',                  el2.images().length === 0);
+    ok('…and says why',
+        /image type/i.test(el2.shadowRoot.querySelector('.vlc-status').textContent));
+
+    // The cap.
+    const el3 = mount();
+    await el3.addImages(Array.from({ length: SGVision.MAX_IMAGES + 3 }, () => fakeFile()));
+    ok('the per-message image cap holds',   el3.images().length === SGVision.MAX_IMAGES);
+    ok('…and says so',                      /limit/i.test(el3.shadowRoot.querySelector('.vlc-status').textContent));
+}
+
+console.log('\n[suite] vault-llm-chat — an image only goes to a model that can see it');
+{
+    /* The failure this prevents: OpenRouter answers a text-only model with an error that
+       names nothing, exactly as it did for audio. Warn locally, where the model picker is
+       one click away — and warn BEFORE spending the call. */
+    const el = mount();
+    el._modelMeta = [
+        { id: 'seer/one',  architecture: { modality: 'text+image->text' } },
+        { id: 'blind/one', architecture: { modality: 'text->text' } }
+    ];
+    el._session = { ok: true, policy: SGLlmConfig.parse({ models: { allow: ['*'] } }) };
+
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const f = { type: 'image/png', name: 's.png',
+                arrayBuffer: async () => PNG.buffer.slice(PNG.byteOffset, PNG.byteOffset + PNG.byteLength) };
+
+    el._model = 'blind/one';
+    await el.addImages([f]);
+    const warn = el.shadowRoot.querySelector('.vlc-status').textContent;
+    ok('a text-only model is called out on attach', /cannot read images/.test(warn), warn);
+    ok('…naming the model',                          /blind\/one/.test(warn));
+    ok('…and suggesting one that works',             /seer\/one/.test(warn));
+    ok('the image is NOT discarded (switch model, keep the image)', el.images().length === 1);
+
+    el._model = 'seer/one';
+    ok('a vision model passes the check',            el._warnIfModelCannotSee() === true);
+
+    // No model chosen yet is not a failure — _send resolves one first.
+    el._model = null;
+    ok('no model yet is not treated as incapable',   el._warnIfModelCannotSee() === true);
+}
+
+console.log('\n[suite] vault-llm-chat — the outgoing message and the ledger');
+{
+    const el = mount();
+    el._modelMeta = [{ id: 'seer/one', architecture: { modality: 'text+image->text' } }];
+    el._model = 'seer/one';
+
+    let sent = null;
+    el._session = {
+        ok: true,
+        policy: SGLlmConfig.parse({ models: { allow: ['*'] }, limits: {} }),
+        client: {
+            chat: async (req) => { sent = req; return { content: 'ok', model: 'seer/one', usage: {}, id: 'g1' }; },
+            reconcileCost: async () => false
+        }
+    };
+    VaultLlmLog.clear();
+
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    await el.addImages([{ type: 'image/png', name: 's.png',
+                          arrayBuffer: async () => PNG.buffer.slice(PNG.byteOffset, PNG.byteOffset + PNG.byteLength) }]);
+    el.shadowRoot.querySelector('.vlc-in').value = 'what is wrong here?';
+    await el._send();
+
+    const user = sent.messages[sent.messages.length - 1];
+    ok('the user message became multimodal',   Array.isArray(user.content));
+    ok('…text first',                          user.content[0].type === 'text' && /what is wrong/.test(user.content[0].text));
+    ok('…then the image part',                 user.content[1].type === 'image_url');
+    ok('…as a data: URL',                      /^data:image\/png;base64,/.test(user.content[1].image_url.url));
+
+    ok('the image is cleared after sending',   el.images().length === 0);
+    ok('the transcript shows what was sent',
+        !!el.shadowRoot.querySelector('.vlc-msg--user .vlc-msg__imgs img'));
+
+    const row = VaultLlmLog.list()[0];
+    ok('the ledger records the image count',   row.images === 1);
+    // The bug this closes: `typeof content === 'string'` scored an image message as ZERO,
+    // so the priciest call in the pane read as the cheapest.
+    ok('promptChars is not zero for an image message', row.promptChars > 0);
+    ok('…and is not inflated by the base64',    row.promptChars < 1000);
+
+    // A text-only turn must stay a plain string — no gratuitous one-element part arrays.
+    sent = null;
+    el.shadowRoot.querySelector('.vlc-in').value = 'and now?';
+    await el._send();
+    const user2 = sent.messages[sent.messages.length - 1];
+    ok('a text-only message stays a plain string', typeof user2.content === 'string');
 }
 
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');

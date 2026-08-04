@@ -188,7 +188,14 @@
                             'title="' + esc(e.costSource || (e.status === 'pending' ? 'in flight' : 'no price reported')) + '">' + costTxt + '</td>' +
                         '<td class="vlr-r vlr-dim">' + (e.latencyMs != null ? e.latencyMs : '—') + '</td>' +
                         '<td class="vlr-files" title="' + esc(e.files.join('\n')) + '">' +
-                            (e.files.length ? esc(e.files.length === 1 ? e.files[0].split('/').pop() : e.files.length + ' files') : '<span class="vlr-dim">none</span>') +
+                            // An image call carries no file paths, so a bare "none" would
+                            // read as "this call had no input" for the most expensive rows
+                            // in the table.
+                            (e.files.length
+                                ? esc(e.files.length === 1 ? e.files[0].split('/').pop() : e.files.length + ' files')
+                                : (e.images ? esc('🖼 ' + e.images + ' image' + (e.images > 1 ? 's' : ''))
+                                            : '<span class="vlr-dim">none</span>')) +
+                            (e.files.length && e.images ? esc(' + ' + e.images + ' 🖼') : '') +
                         '</td>' +
                     '</tr>' +
                     (e.error ? '<tr class="vlr-errrow"><td colspan="8">' + esc(e.error) + '</td></tr>' : '');

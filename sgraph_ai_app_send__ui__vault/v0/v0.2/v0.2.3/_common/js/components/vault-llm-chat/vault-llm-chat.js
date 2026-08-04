@@ -67,6 +67,7 @@
             this._vault   = null;
             this._session = null;      // { ok, client, policy, model }
             this._files   = [];        // [{ path, text, type, chars }] — the explicit context set
+            this._images  = [];        // [{ data, mime, bytes, name }] — pasted/dropped screenshots
             this._viewing = null;      // last file rendered by the browser (hint only)
             this._history = [];
             this._busy    = false;
@@ -105,7 +106,7 @@
                   '<div class="vlc-log" role="log" aria-live="polite"></div>' +
                   '<div class="vlc-status"></div>' +
                   '<form class="vlc-form">' +
-                    '<textarea class="vlc-in" rows="2" placeholder="Ask anything — attach files with &quot;Add to chat&quot;…"></textarea>' +
+                    '<textarea class="vlc-in" rows="2" placeholder="Ask anything — paste a screenshot, or attach files with &quot;Add to chat&quot;…"></textarea>' +
                     '<button class="vlc-mic" type="button" title="Ask by voice">&#127908;</button>' +
                     '<button class="vlc-send" type="submit">Send</button>' +
                   '</form>' +
@@ -117,6 +118,35 @@
             });
             this.shadowRoot.querySelector('.vlc-params').addEventListener('click', () => this.toggleParams());
             this.shadowRoot.querySelector('.vlc-mic').addEventListener('click', () => this.toggleVoice());
+
+            // Paste a screenshot straight into the composer. The clipboard also carries a
+            // text/plain flavour for most copies, so we only claim the event when it
+            // actually holds image FILES — otherwise pasting text would stop working.
+            const inEl = this.shadowRoot.querySelector('.vlc-in');
+            inEl.addEventListener('paste', (e) => {
+                if (typeof SGVision === 'undefined') return;
+                const imgs = SGVision.imagesFromEvent(e);
+                if (!imgs.length) return;                  // ordinary text paste — leave it alone
+                e.preventDefault();
+                this.addImages(imgs);
+            });
+            // Drop anywhere on the panel: aiming at a small textarea is a needless chore.
+            const panel = this.shadowRoot.querySelector('.vlc-panel');
+            panel.addEventListener('dragover', (e) => {
+                if (typeof SGVision === 'undefined') return;
+                if (!Array.from((e.dataTransfer && e.dataTransfer.types) || []).includes('Files')) return;
+                e.preventDefault();
+                panel.classList.add('vlc-panel--drop');
+            });
+            panel.addEventListener('dragleave', () => panel.classList.remove('vlc-panel--drop'));
+            panel.addEventListener('drop', (e) => {
+                panel.classList.remove('vlc-panel--drop');
+                if (typeof SGVision === 'undefined') return;
+                const imgs = SGVision.imagesFromEvent(e);
+                if (!imgs.length) return;
+                e.preventDefault();
+                this.addImages(imgs);
+            });
             ['.vlc-p-temp', '.vlc-p-topp', '.vlc-p-maxtok'].forEach((s) => {
                 this.shadowRoot.querySelector(s).addEventListener('change', () => this._readParams());
             });
@@ -136,6 +166,8 @@
             });
             // Chip removal + clear-all (delegated: chips are re-rendered constantly).
             this.shadowRoot.querySelector('.vlc-ctx').addEventListener('click', (e) => {
+                const delImg = e.target.closest('[data-delimg]');
+                if (delImg) { this.removeImage(Number(delImg.getAttribute('data-delimg'))); return; }
                 const del = e.target.closest('[data-del]');
                 if (del) { this.removeContextFile(del.getAttribute('data-del')); return; }
                 if (e.target.closest('.vlc-clear')) this.clearContextFiles();
@@ -168,10 +200,12 @@
             this._models = [];                       // set first: prevents a re-entrant refetch
             try {
                 const all = await s.client.models();
-                this._models = all.map((m) => m && m.id)
-                                  .filter((id) => id && SGLlmConfig.modelAllowed(s.policy, id))
-                                  .sort();
-            } catch (_) { this._models = []; }
+                // Keep the RAW entries too: `architecture.modality` is where "can this model
+                // read an image?" actually lives, and reading it beats maintaining a list
+                // that goes stale every time a provider ships a model.
+                this._modelMeta = all.filter((m) => m && m.id && SGLlmConfig.modelAllowed(s.policy, m.id));
+                this._models = this._modelMeta.map((m) => m.id).sort();
+            } catch (_) { this._models = []; this._modelMeta = null; }
             return this._models;
         }
 
@@ -226,6 +260,52 @@
                 this._setStatus('');
             }
             return { added: true, replaced: replaced };
+        }
+
+        // ── images ───────────────────────────────────────────────────────────────
+        // Attached to the NEXT message only, then cleared. A screenshot is a thing you are
+        // asking about now, not standing context like a file — leaving it attached would
+        // re-send (and re-bill) it on every subsequent turn without the user noticing.
+        async addImages(files) {
+            if (typeof SGVision === 'undefined') { this._setStatus('Image support is not loaded on this page.', 'warn'); return; }
+            const list = Array.from(files || []);
+            for (const f of list) {
+                if (this._images.length >= SGVision.MAX_IMAGES) {
+                    this._setStatus('Image limit reached (' + SGVision.MAX_IMAGES + ' per message).', 'warn');
+                    break;
+                }
+                try {
+                    this._images.push(await SGVision.readImage(f));
+                } catch (err) {
+                    this._setStatus((err && err.message) || 'Could not read that image.', 'warn');
+                }
+            }
+            this._renderCtx();
+            this._warnIfModelCannotSee();
+            this.focusInput();
+        }
+
+        removeImage(i) {
+            if (i >= 0 && i < this._images.length) { this._images.splice(i, 1); this._renderCtx(); }
+        }
+
+        clearImages() { this._images = []; this._renderCtx(); }
+
+        images() { return this._images.map((im) => ({ name: im.name, mime: im.mime, bytes: im.bytes })); }
+
+        // Say it BEFORE the send, not after the provider does. A text-only model answers an
+        // image with a 400 that names nothing — the same failure mode that made voice look
+        // broken. Warn, don't block: the user can switch model from the picker right here.
+        _warnIfModelCannotSee() {
+            if (!this._images.length || typeof SGVision === 'undefined') return true;
+            const m = this._model;
+            if (!m) return true;                       // nothing chosen yet — _send resolves one
+            if (SGVision.supportsImages(m, this._modelMeta)) return true;
+            const alt = SGVision.visionModelsIn(this._modelMeta).filter(
+                (id) => !this._session || SGLlmConfig.modelAllowed(this._session.policy, id)).slice(0, 3);
+            this._setStatus(m + ' cannot read images.' +
+                (alt.length ? ' Try ' + alt.join(', ') + '.' : ' Pick a vision model in the picker above.'), 'warn');
+            return false;
         }
 
         removeContextFile(path) {
@@ -425,19 +505,36 @@
             const el = this.shadowRoot.querySelector('.vlc-ctx');
             if (!el) return;
 
+            // Image chips carry a thumbnail: a screenshot is identified by what it LOOKS
+            // like, and "pasted-image.png ✕" tells the user nothing about which one it is.
+            const imgHtml = this._images.map((im, i) =>
+                '<span class="vlc-chip vlc-chip--img" title="' + esc(im.name) + '">' +
+                    '<img class="vlc-thumb" alt="" src="' + esc(SGVision.dataUrl(im)) + '">' +
+                    '<span class="vlc-chip__n">' + Math.max(1, Math.round(im.bytes / 1024)) + ' KB</span>' +
+                    '<button class="vlc-chip__x" type="button" data-delimg="' + i + '" ' +
+                            'title="Remove this image" aria-label="Remove image ' + (i + 1) + '">✕</button>' +
+                '</span>').join('');
+            // Stated, because it is genuinely surprising otherwise: the image goes with the
+            // NEXT message and is then gone, unlike a file which stays attached.
+            const imgNote = this._images.length
+                ? '<span class="vlc-dim vlc-ctxsum"> ' + this._images.length + ' image' +
+                  (this._images.length > 1 ? 's' : '') + ' · sent with your next message only</span>'
+                : '';
+
             if (!this._files.length) {
-                el.innerHTML =
+                el.innerHTML = imgHtml + (this._images.length ? imgNote :
                     '<span class="vlc-dim">No files attached — this is a plain chat. ' +
-                    'Open a file and click <strong>➕ Add to chat</strong> to give the model context.</span>' +
+                    'Open a file and click <strong>➕ Add to chat</strong> to give the model context, ' +
+                    'or paste a screenshot.</span>' +
                     (this._viewing
                         ? ' <button class="vlc-mini vlc-add-viewing" type="button">➕ Add ' + esc(this._viewing.path) + '</button>'
-                        : '');
+                        : ''));
                 return;
             }
 
             const total = this._files.reduce((n, f) => n + f.chars, 0);
             const over  = total > MAX_CONTEXT_CHARS;
-            el.innerHTML =
+            el.innerHTML = imgHtml + imgNote +
                 this._files.map((f) =>
                     '<span class="vlc-chip' + (f.text == null ? ' vlc-chip--bin' : '') + '">' +
                         '📄 ' + esc(f.path) +
@@ -474,11 +571,26 @@
             el.className = 'vlc-status vlc-status--warn';
         }
 
-        _push(role, text) {
+        _push(role, text, images) {
             const log = this.shadowRoot.querySelector('.vlc-log');
             const div = document.createElement('div');
             div.className = 'vlc-msg vlc-msg--' + role;
             div.textContent = text;
+            // The transcript shows what was actually sent. A message that reads "what is
+            // wrong here?" with no picture above it is a transcript that lies about the
+            // conversation — and about what the call was billed for.
+            if (images && images.length) {
+                const strip = document.createElement('div');
+                strip.className = 'vlc-msg__imgs';
+                images.forEach((im) => {
+                    const t = document.createElement('img');
+                    t.className = 'vlc-thumb vlc-thumb--sent';
+                    t.alt = im.name || 'attached image';
+                    t.src = SGVision.dataUrl(im);
+                    strip.appendChild(t);
+                });
+                div.appendChild(strip);
+            }
             log.appendChild(div);
             log.scrollTop = log.scrollHeight;
             return div;
@@ -536,9 +648,25 @@
                 return;
             }
 
+            // An image on a model that cannot see it earns a provider error naming nothing.
+            // Refuse here, where the model picker is one click away.
+            if (this._images.length && !this._warnIfModelCannotSee()) return;
+
             inEl.value = '';
-            this._push('user', q);
-            this._history.push({ role: 'user', content: q });
+            this._push('user', q, this._images);
+
+            // Multimodal only when there is actually an image: a plain string content is what
+            // every provider handles best, and wrapping every message in a one-element part
+            // array for no reason is a gratuitous difference.
+            const outgoing = this._images.length
+                ? { role: 'user', content: [{ type: 'text', text: q }].concat(this._images.map(SGVision.imagePart)) }
+                : { role: 'user', content: q };
+            this._history.push(outgoing);
+            // Cleared BEFORE the await: the image belongs to the message just sent, and a
+            // second send while the first is in flight must not re-attach (and re-bill) it.
+            const sentImages = this._images.length;
+            this._images = [];
+            this._renderCtx();
 
             const ctxMsgs = this._contextMessages();
             const msgs = [{ role: 'system', content: ctxMsgs.length ? SYSTEM_WITH_FILES : SYSTEM_NO_FILES }];
@@ -547,10 +675,16 @@
 
             // Ledger entry is created at SEND time so an in-flight or failed call is
             // still visible in the requests pane (and so cost can never be silently lost).
+            // promptChars counted through SGVision because the old `typeof content ===
+            // 'string'` test scored an image-bearing message as ZERO — the most expensive
+            // calls in the ledger reading as the cheapest.
+            const pc = (typeof SGVision !== 'undefined') ? SGVision.promptChars(msgs)
+                                                         : { chars: 0, images: 0 };
             const rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
                 model      : this._model,
                 files      : this._files.map((f) => f.path),
-                promptChars: msgs.reduce((n, m) => n + (typeof m.content === 'string' ? m.content.length : 0), 0),
+                promptChars: pc.chars,
+                images     : sentImages,
                 status     : 'pending'
             });
 
@@ -714,6 +848,15 @@
         .vlc-msg--bot  { align-self: flex-start; background: rgba(255,255,255,.05); }
         .vlc-msg--err  { align-self: stretch; background: rgba(255,107,107,.12); color: #ff9b9b; font-size: .74rem; }
         .vlc-msg--streaming::after { content: '▍'; opacity: .6; }
+        .vlc-msg__imgs { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .35rem; }
+        .vlc-thumb {
+            width: 34px; height: 34px; object-fit: cover; border-radius: 4px;
+            border: 1px solid var(--color-border, #24304a); display: block;
+        }
+        .vlc-thumb--sent { width: 92px; height: auto; max-height: 120px; object-fit: contain; }
+        .vlc-chip--img { padding-left: .25rem; }
+        /* Drop target feedback — the whole panel, not a small textarea. */
+        .vlc-panel--drop { outline: 2px dashed #4ecdc4; outline-offset: -4px; }
         .vlc-status { padding: 0 .75rem; font-size: .72rem; min-height: 0; }
         .vlc-status--warn { color: #E9C445; padding: .4rem .75rem; }
         .vlc-status--info { color: var(--color-text-secondary, #9aa4bf); padding: .4rem .75rem; }

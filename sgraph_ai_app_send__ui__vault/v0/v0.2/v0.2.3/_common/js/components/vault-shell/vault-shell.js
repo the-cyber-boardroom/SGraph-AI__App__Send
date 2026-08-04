@@ -30,7 +30,10 @@
             this._pendingAction = null;
             this._syncState     = { ahead: 0, behind: 0, diverged: false };
             this._isROMode      = false;     // true when vault opened via ro-token (no passphrase, no write key)
-            this._autoSyncEnabled = true;   // overridden from localStorage in _initAutoSync()
+            this._autoSyncEnabled = true;   // auto-PUSH of local commits (safe: it only preserves)
+            // auto-PULL is OFF by default. It used to remount the browse view under the
+            // user and destroyed unsaved editor work. See _checkAndAutoSync.
+            this._autoPullEnabled = false;
             this._autoSyncCheckPending = false;
             this._lastBehindCheckTime  = 0;
             this._behindCheckTimer     = null;
@@ -902,7 +905,16 @@
                 return
             }
 
-            // --- Auto-pull: check for upstream changes and merge if cleanly behind --
+            // --- New upstream content: NOTIFY, never auto-apply ---------------------
+            //
+            // This used to merge and then call _mountBrowse(), which tears down the browse
+            // view and every panel in it. It did that under whatever the user was doing —
+            // and it destroyed unsaved work in an open editor. A background task must not
+            // be able to discard something the user typed and has not saved.
+            //
+            // Detection stays; applying becomes a click. The "N new commits · Sync now →"
+            // banner already exists and already runs the same pull, so the notice is not
+            // new UI — it is the UI that was being skipped past.
             let liveNamedHead
             try {
                 liveNamedHead = await this._vault._refManager.readRef(this._vault._refFileId)
@@ -910,8 +922,16 @@
 
             if (!liveNamedHead || liveNamedHead === this._vault._namedHeadId) return
 
-            // We are cleanly behind — safe to auto-pull
-            window.sgraphVault.messages.info('Syncing vault\u2026')
+            this._vault._namedHeadId = liveNamedHead
+            await this._refreshSyncState()          // renders the "Sync now →" banner
+
+            // Opt-in escape hatch for kiosks/demos with no editing. OFF by default and
+            // deliberately not exposed in Settings: a switch whose worst case is "silently
+            // loses what you were typing" should be hard to reach on purpose.
+            if (!this._autoPullEnabled) {
+                window.sgraphVault.messages.info('New version available \u2014 click "Sync now" to load it')
+                return
+            }
             try {
                 const autoSyncPrevHead = this._vault._headCommitId
                 const result = await this._vault.merge(liveNamedHead)
@@ -943,10 +963,21 @@
             try { localStorage.setItem('sg-vault-autosync', String(enabled)) } catch (_) {}
         }
 
+        setAutoPull(enabled) {
+            this._autoPullEnabled = !!enabled
+            try { localStorage.setItem('sg-vault-autopull', String(!!enabled)) } catch (_) {}
+        }
+
         _initAutoSync() {
             try {
                 const stored = localStorage.getItem('sg-vault-autosync')
                 this._autoSyncEnabled = stored === null ? true : stored === 'true'
+                // Note the asymmetry, and that it is deliberate: auto-push defaults ON
+                // because its failure mode is "your commits are safely on the branch".
+                // Auto-pull defaults OFF because its failure mode was "your unsaved edits
+                // are gone". Absent key → OFF, so a fresh browser never auto-pulls.
+                const pull = localStorage.getItem('sg-vault-autopull')
+                this._autoPullEnabled = pull === 'true'
             } catch (_) {}
         }
 

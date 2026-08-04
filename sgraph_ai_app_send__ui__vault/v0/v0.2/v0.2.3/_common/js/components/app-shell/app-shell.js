@@ -580,15 +580,50 @@
                 // If we have unpushed local commits, this is divergence — surface, don't clobber.
                 var ahead = await this._vault.getAheadCount();
                 if (ahead > 0) { this._surfaceUnpushed('diverged'); return; }
-                // Clean behind → fast-forward the view and remount so the new code renders.
-                // _remountCurrent replays the SAME mount the user is looking at (the opened
-                // "as an app" file / folder manifest), expanding lazy sub-trees first — the old
-                // path re-ran _continue with the stale root app.json + a consumed deep-link, so it
-                // remounted the DEFAULT app (or 404'd the entry on the now-lazy sub-tree).
+                // Clean behind → OFFER the update; do not apply it.
+                //
+                // This used to fast-forward and remount immediately. Remounting replaces the
+                // app frame, so anything the running app held that was not written to the
+                // vault — a half-filled form, an unsaved editor buffer — went with it. A
+                // background check must not be able to discard the user's work; the pinned
+                // -release branch above already had this right, and now the live path does too.
+                this._pendingUpdateHead = liveNamed;
+                var hudU = document.getElementById('app-hud') || document.querySelector('app-hud');
+                if (hudU && typeof hudU.showUpdate === 'function') {
+                    var selfU = this;
+                    hudU.showUpdate('New version available', function () { selfU.applyPendingUpdate(); });
+                } else if (hudU && typeof hudU.showMessage === 'function') {
+                    // No update chip in this HUD build — say it rather than apply it silently.
+                    hudU.showMessage('update-available',
+                        'New version available — reload the page to load it.', 'info', null);
+                }
+                this._emitVaultEvent('update-available', { label: 'New version available', head: liveNamed });
+            } catch (_) { /* network errors are silent — retried on next focus */ }
+        }
+
+        // What the auto-pull used to do without asking. _remountCurrent replays the SAME
+        // mount the user is looking at (the opened "as an app" file / folder manifest),
+        // expanding lazy sub-trees first — the older path re-ran _continue with a stale root
+        // app.json and a consumed deep-link, so it remounted the DEFAULT app (or 404'd the
+        // entry on the now-lazy sub-tree).
+        async applyPendingUpdate() {
+            if (!this._vault) return false;
+            var hud = document.getElementById('app-hud') || document.querySelector('app-hud');
+            try {
                 await this._syncViewToPublishedHead(this._vault);
                 try { await this._remountCurrent(); } catch (_) {}
-                this._emitVaultEvent('auto-pull', { label: 'View synced to published head', head: liveNamed });
-            } catch (_) { /* network errors are silent — retried on next focus */ }
+                this._pendingUpdateHead = null;
+                if (hud && hud.hideUpdate) hud.hideUpdate();
+                this._emitVaultEvent('auto-pull', { label: 'View synced to published head',
+                                                    head: this._vault._namedHeadId });
+                return true;
+            } catch (err) {
+                if (hud && hud.showMessage) {
+                    hud.showMessage('update-failed', 'Could not load the new version: ' +
+                                    ((err && err.message) || 'failed'), 'error', 6000);
+                }
+                return false;
+            }
         }
 
         // ── Append check-on-events → host_events-gated push to the app ────────────────────
@@ -1419,6 +1454,35 @@
                 prompt: opts.prompt,
                 appId : this._appId || null
             });
+        }
+
+        // Size + shape of any image parts in an outgoing message set. Kept host-side so the
+        // ceiling is not something a frame can talk its way past.
+        _llmCountImages(messages) {
+            var pc = (typeof SGVision !== 'undefined')
+                ? SGVision.promptChars(messages)
+                : { chars: 0, images: 0 };
+            var bytes = 0;
+            var arr = Array.isArray(messages) ? messages : [];
+            for (var i = 0; i < arr.length; i++) {
+                var c = arr[i] && arr[i].content;
+                if (!Array.isArray(c)) continue;
+                for (var j = 0; j < c.length; j++) {
+                    var p = c[j];
+                    if (p && p.type === 'image_url') {
+                        var u = (p.image_url && p.image_url.url) || '';
+                        // base64 is 4 chars per 3 bytes; close enough for a ceiling check and
+                        // it never needs to decode a payload just to measure it.
+                        bytes += Math.floor(String(u).length * 0.75);
+                    }
+                }
+            }
+            return { chars: pc.chars, images: pc.images, bytes: bytes };
+        }
+
+        _llmMaxImageBytes() {
+            return (typeof SGVision !== 'undefined') ? (SGVision.MAX_BYTES * SGVision.MAX_IMAGES)
+                                                     : (16 * 1024 * 1024);
         }
 
         _llmLedgerPatch(res, fallbackModel) {
@@ -3177,7 +3241,25 @@
                       // error. The host bar keeps its own Stop/Cancel regardless.
                       'listenStop:function(){return _sgCmd("llm",{action:"listenStop"});},' +
                       'listenCancel:function(){return _sgCmd("llm",{action:"listenCancel"});},' +
-                      'listening:function(){return _sgCmd("llm",{action:"listening"});}' +
+                      'listening:function(){return _sgCmd("llm",{action:"listening"});},' +
+                      // imagePart(blobOrBytes, mime?) → the content part to drop into a
+                      // message's `content` array. Runs IN THIS FRAME (no host round trip):
+                      // it is pure encoding, and the bytes are already yours.
+                      //
+                      // The chunk is 8190, not 8192. 8192 % 3 === 2, so every non-final
+                      // slice emits "=" padding mid-string and atob() rejects that — a bug
+                      // this codebase has shipped three times. Use this rather than writing
+                      // it again.
+                      'imagePart:async function(src,mime){' +
+                        'var u,m=mime||"";' +
+                        'if(src&&typeof src.arrayBuffer==="function"){u=new Uint8Array(await src.arrayBuffer());m=m||src.type||"image/png";}' +
+                        'else if(src instanceof Uint8Array){u=src;}' +
+                        'else if(src instanceof ArrayBuffer){u=new Uint8Array(src);}' +
+                        'else if(typeof src==="string"){return{type:"image_url",image_url:{url:src}};}' +
+                        'else{throw new Error("imagePart: pass a Blob/File, bytes, or a data: URL");}' +
+                        'var c=8190,o="";for(var i=0;i<u.length;i+=c){o+=String.fromCharCode.apply(null,u.subarray(i,i+c));}' +
+                        'return{type:"image_url",image_url:{url:"data:"+(m||"image/png")+";base64,"+btoa(o)}};' +
+                      '}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -3670,6 +3752,7 @@
 
                             if (lAct === 'models') {
                                 return s.client.models().then(function (all) {
+                                    self._llmModelMeta = all || null;     // vision capability lives here
                                     var ids = (all || []).filter(function (m) {
                                         return m && m.id && SGLlmConfig.modelAllowed(s.policy, m.id);
                                     }).map(function (m) {
@@ -3736,10 +3819,47 @@
                                     maxTok = limits.maxTokensPerCall;
                                 }
 
+                                // Images: validated HERE, before the call. An image sent to a
+                                // text-only model comes back as a provider error naming nothing,
+                                // which is the exact failure that made voice look broken. And an
+                                // unbounded data: URL from a frame is an unbounded bill, so the
+                                // size ceiling is the host's to enforce, not the app's to respect.
+                                var vCount = self._llmCountImages(e.data.messages);
+                                var visionGate = Promise.resolve(true);
+                                if (vCount.images) {
+                                    if (vCount.bytes > self._llmMaxImageBytes()) {
+                                        cmdReply(false, null, 'Image payload too large (' +
+                                                 Math.round(vCount.bytes / 1024) + ' KB)', 'EIMGSIZE');
+                                        self._emitBridgeCall('llm.chat', { ok: false, err: 'EIMGSIZE' });
+                                        return;
+                                    }
+                                    // Fetch the catalogue rather than fall back to a short
+                                    // hard-coded list: refusing a model that CAN see, because
+                                    // our list has not heard of it, is the worse error.
+                                    visionGate = (self._llmModelMeta ? Promise.resolve(self._llmModelMeta)
+                                                                     : s.client.models().then(function (all) {
+                                                                           self._llmModelMeta = all || null;
+                                                                           return self._llmModelMeta;
+                                                                       }).catch(function () { return null; })
+                                    ).then(function (meta) {
+                                        return typeof SGVision === 'undefined' ||
+                                               SGVision.supportsImages(model, meta);
+                                    });
+                                }
+                                return visionGate.then(function (canSee) {
+                                if (!canSee) {
+                                    cmdReply(false, null, 'Model cannot read images: ' + model, 'EMODEL');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EMODEL', model: model });
+                                    return;
+                                }
+
                                 var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
                                     model: model, files: [], status: 'pending',
-                                    promptChars: (e.data.messages || []).reduce(function (n, m) {
-                                        return n + (typeof m.content === 'string' ? m.content.length : 0); }, 0)
+                                    images: vCount.images,
+                                    // Counted through SGVision: the old `typeof content ===
+                                    // 'string'` test scored an image-bearing message as ZERO,
+                                    // so the priciest calls looked like the cheapest.
+                                    promptChars: vCount.chars
                                 });
 
                                 self._llmNotify(model);
@@ -3797,6 +3917,7 @@
                                              aborted ? 'EABORT' : ((err && err.code) || 'EPROTO'));
                                     self._emitBridgeCall('llm.chat', { ok: false, err: (err && err.code) || 'EPROTO' });
                                 });
+                                });          // ← visionGate
                             });
                         }).catch(function (err) {
                             cmdReply(false, null, (err && err.message) || 'LLM error', (err && err.code) || 'EPROTO');

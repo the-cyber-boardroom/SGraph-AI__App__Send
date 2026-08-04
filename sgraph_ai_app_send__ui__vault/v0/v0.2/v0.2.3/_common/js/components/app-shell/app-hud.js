@@ -60,6 +60,8 @@
                                 <select class="hud-rel-sel" title="Version of this app"></select>
                             </div>
                             <span class="hud-rel-badge" style="display:none" title="You are viewing a published release, not the latest version"></span>
+                            <button class="hud-update-btn" style="display:none" type="button"
+                                    title="Someone published new content. Click to load it — anything unsaved in the app will be lost.">&#8635; <span class="hud-update-text">New version available</span></button>
                             <div class="hud-more-wrap" data-hud-el="more">
                                 <button class="hud-more-btn" type="button" aria-haspopup="true" aria-expanded="false" title="More actions">&#8943;</button>
                                 <div class="hud-more-panel" style="display:none">
@@ -137,6 +139,10 @@
                 // ⋯ overflow menu + privileges popover (expand-on-click).
                 // AI Chat — host chrome, not app UI. It runs at the real origin, so it holds
                 // the vault key and the microphone directly; the app frame never sees either.
+                if (e.target.closest('.hud-update-btn')) {
+                    if (this._onUpdate) this._onUpdate();
+                    return;
+                }
                 if (e.target.closest('.hud-llm-btn')) {
                     return this.dispatchEvent(new CustomEvent('app-hud:llm', { bubbles: true, composed: true }));
                 }
@@ -283,6 +289,25 @@
                 badge.textContent   = '⏱ ' + (current.label || current.name);
                 badge.style.display = '';
             }
+        }
+
+        // A NOTICE, not an action. The host used to fast-forward and remount the app frame
+        // the moment someone else published — taking any unsaved state in the running app
+        // with it. Detection is worth keeping; applying is the user's call, and the tooltip
+        // says plainly what clicking costs.
+        showUpdate(text, onApply) {
+            this._onUpdate = onApply || null;
+            var btn = this.shadowRoot && this.shadowRoot.querySelector('.hud-update-btn');
+            if (!btn) return;
+            var label = btn.querySelector('.hud-update-text');
+            if (label && text) label.textContent = text;
+            btn.style.display = '';
+        }
+
+        hideUpdate() {
+            this._onUpdate = null;
+            var btn = this.shadowRoot && this.shadowRoot.querySelector('.hud-update-btn');
+            if (btn) btn.style.display = 'none';
         }
 
         setInfo(vaultName, appTitle, vaultKey, isRO) {
@@ -1023,6 +1048,14 @@
             border: 1px solid #2a2a4a; white-space: nowrap;
         }
         .hud-llm-btn:hover { color: #4ECDC4; border-color: #4ECDC4; }
+        /* Amber: this is an offer that costs something to accept, not an error and not a
+           neutral chip. It has to be seen without reading as "something broke". */
+        .hud-update-btn {
+            font-size: 0.75rem; color: #E9C445; background: rgba(233,196,69,0.10); cursor: pointer;
+            padding: 0.2rem 0.5rem; border-radius: 4px; font-family: inherit;
+            border: 1px solid rgba(233,196,69,0.45); white-space: nowrap;
+        }
+        .hud-update-btn:hover { background: rgba(233,196,69,0.2); border-color: #E9C445; }
         .hud-ro-badge {
             font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;
             background: rgba(100,160,220,0.12); color: #64a0dc;
