@@ -204,6 +204,7 @@ window.sg = {
         chat     : (req, onToken?)  => Promise<{content, model, finishReason, usage, cost, id, aborted}>,
         cancel   : (requestId)      => Promise<{cancelled}>,
         // Host-owned microphone → text. Requires `permissions.llm.listen`. See "Voice input".
+        // listenStop()/listenCancel() end a take from your own UI; listening() → {recording}.
         listen   : (opts?)          => Promise<{text, model, id, durationMs, bytes, format, cost}>,
     },
 };
@@ -933,6 +934,32 @@ and nothing else; the recording itself never crosses into your frame.
 
 The transcription is an ordinary paid call: it counts against the vault's spend caps, appears in
 the request ledger, and its cost is labelled `estimated` like any other.
+
+### Driving the take from your own UI
+
+`listen()` stays pending until the take ends. By default the **host's** bar ends it (Stop &
+send / Cancel) or `maxMs` expires — but an app that renders its own record button needs its own
+stop, so:
+
+```js
+const p = sg.llm.listen({ maxMs: 120000 });     // do NOT await yet — you need the stop path
+myStopBtn.onclick   = () => sg.llm.listenStop();      // → p resolves with the transcript
+myCancelBtn.onclick = () => sg.llm.listenCancel();    // → p rejects with EABORT, mic released
+const { text } = await p;
+```
+
+- The transcript comes back through the **original `listen()` promise** — stopping does not
+  open a second channel to read.
+- Both resolve `{stopped:false}` when nothing is recording, so calling stop defensively (on
+  unmount, on a route change) is safe and needs no error handling.
+- `sg.llm.listening()` → `{recording}` if you need to render button state.
+- All three sit behind the **same `llm.listen` grant** and raise **no consent prompt** — ending
+  a take you already started is strictly less authority than starting one, and nobody should
+  have to approve stopping.
+- **The host's own Stop/Cancel stay on the bar.** An app gaining a stop button must not cost
+  the user theirs.
+- A second `listen()` while one is running is refused with `EBUSY` rather than opening a second
+  microphone.
 
 **Leave `model` alone unless you know the model hears.** Transcription does **not** use the
 vault's chat model — most chat models have no audio endpoint and OpenRouter answers

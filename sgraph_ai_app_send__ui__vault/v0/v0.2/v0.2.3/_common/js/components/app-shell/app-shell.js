@@ -1362,15 +1362,26 @@
             var self = this;
             var maxMs = Math.min(Math.max(opts.maxMs || 120000, 5000), 300000);
 
+            // One microphone, one take. Without this a second listen() would open a second
+            // recorder over the first — two live mics, two bars, and the first take's Stop
+            // pointing at a session nobody can reach.
+            if (this._listenFinish) throw Object.assign(new Error('Already recording'), { code: 'EBUSY' });
+
             var rec = await SGVoice.start();                 // throws {code} if unavailable
             var settled = false;
 
             return await new Promise(function (resolve, reject) {
                 var timer = setTimeout(function () { finish(false); }, maxMs);
 
+                // Published so the APP can drive the take too (sg.llm.listenStop /
+                // listenCancel). The host's own bar keeps its buttons either way — an app
+                // gaining a stop button must not cost the user theirs.
+                self._listenFinish = finish;
+
                 function finish(cancelled) {
                     if (settled) return;
                     settled = true;
+                    if (self._listenFinish === finish) self._listenFinish = null;
                     clearTimeout(timer);
                     if (cancelled) {
                         // Still stop the recorder — cancelling must release the mic, not
@@ -3158,7 +3169,15 @@
                       // transcribes with the vault's key. You get text back and nothing else —
                       // the audio never enters this frame.
                       'listen:function(opts){opts=opts||{};return _sgCmd("llm",{action:"listen",' +
-                        'maxMs:opts.maxMs||null,model:opts.model||null,prompt:opts.prompt||null});}' +
+                        'maxMs:opts.maxMs||null,model:opts.model||null,prompt:opts.prompt||null});},' +
+                      // Drive the take from your own UI: listen() stays pending and resolves
+                      // with the transcript when you call listenStop(). listenCancel() releases
+                      // the mic and makes listen() reject with EABORT. Both resolve
+                      // {stopped:false} when nothing is recording — stopping twice is not an
+                      // error. The host bar keeps its own Stop/Cancel regardless.
+                      'listenStop:function(){return _sgCmd("llm",{action:"listenStop"});},' +
+                      'listenCancel:function(){return _sgCmd("llm",{action:"listenCancel"});},' +
+                      'listening:function(){return _sgCmd("llm",{action:"listening"});}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -3555,7 +3574,12 @@
                     if (e.data.__sgCmdType === 'llm') {
                         var lAct = e.data.action;
                         var lCap = { available: null, models: 'llm.models', usage: 'llm.usage',
-                                     chat: 'llm.chat', cancel: 'llm.chat', listen: 'llm.listen' }[lAct];
+                                     chat: 'llm.chat', cancel: 'llm.chat', listen: 'llm.listen',
+                                     // Ending a take you already started needs no NEW authority —
+                                     // it is strictly less than starting one. Same grant, and no
+                                     // consent prompt: nobody should have to approve stopping.
+                                     listenStop: 'llm.listen', listenCancel: 'llm.listen',
+                                     listening: 'llm.listen' }[lAct];
                         if (lCap === undefined) { cmdReply(false, null, 'Unknown llm action: ' + lAct); return; }
 
                         // available() is ungated ON PURPOSE: an app must be able to discover it
@@ -3566,6 +3590,19 @@
                             self._emitBridgeCall('llm.' + lAct, { ok: false, err: 'EPERM' });
                             return;
                         }
+
+                        // Ending a take the app started. The result travels back through the
+                        // ORIGINAL listen() promise — an app that stops gets its transcript
+                        // where it already asked for it, not through a second channel.
+                        if (lAct === 'listenStop' || lAct === 'listenCancel') {
+                            var fin = self._listenFinish;
+                            if (!fin) { cmdReply(true, { stopped: false, recording: false }); return; }
+                            fin(lAct === 'listenCancel');
+                            cmdReply(true, { stopped: true, recording: false });
+                            self._emitBridgeCall('llm.' + lAct, { ok: true });
+                            return;
+                        }
+                        if (lAct === 'listening') { cmdReply(true, { recording: !!self._listenFinish }); return; }
 
                         // listen: consent EVERY time by default. A microphone is not a
                         // capability to grant once and forget — `permissions.consent.llm.listen`
