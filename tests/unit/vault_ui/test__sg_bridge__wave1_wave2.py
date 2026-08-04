@@ -241,9 +241,35 @@ class test__sg_bridge__wave2__cache_invalidation(TestCase):
         assert 'sg-vault-synced' in chunk
 
     def test__shell_dispatches_vault_synced_on_auto_sync(self):
-        idx   = self.shell.index('async _checkAndAutoSync()')
-        chunk = self.shell[idx:idx+2200]
+        # Sliced to the END OF THE METHOD, not a magic char count. A fixed 2200-char window
+        # broke when explanatory comments were added ahead of the dispatch — the dispatch was
+        # still there, the window had simply stopped reaching it. A source test that fails
+        # because a comment grew is a false alarm, and false alarms get ignored.
+        chunk = self._method('async _checkAndAutoSync()')
         assert 'sg-vault-synced' in chunk
+
+    def test__auto_sync_does_not_apply_the_update_by_default(self):
+        """Auto-pull used to merge + _mountBrowse() the moment a background check saw a new
+        head, discarding unsaved editor work (real data loss, 2026-08-03). Detection stays;
+        applying is a click. The dispatch above must therefore stay BEHIND the opt-in gate —
+        without this assertion, re-introducing the auto-apply would leave that test green."""
+        chunk = self._method('async _checkAndAutoSync()')
+        assert '_autoPullEnabled' in chunk, 'auto-pull is no longer gated'
+        assert chunk.index('_autoPullEnabled') < chunk.index('this._vault.merge('), \
+            'the merge must sit behind the opt-in gate'
+        assert chunk.index('_autoPullEnabled') < chunk.index('await this._mountBrowse()'), \
+            'the remount must sit behind the opt-in gate'
+        # A fresh browser has no localStorage key and must NOT auto-pull.
+        assert 'this._autoPullEnabled = false' in self.shell
+
+    def _method(self, signature):
+        """Source of one method: from its signature to the start of the next one at the same
+        indent. Blunt, but it does not go stale every time a comment is edited."""
+        import re
+        start = self.shell.index(signature)
+        m     = re.search(r'\n        (?:async )?[A-Za-z_][A-Za-z0-9_]*\(', self.shell[start + len(signature):])
+        end   = start + len(signature) + m.start() if m else len(self.shell)
+        return self.shell[start:end]
 
     def test__vault_synced_event_carries_prev_and_new_head(self):
         # Every dispatch site must include prevHead and newHead
