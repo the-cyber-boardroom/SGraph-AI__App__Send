@@ -154,6 +154,13 @@
             this.shadowRoot.querySelector('.vlc-model-sel').addEventListener('change', (e) => {
                 this._model = e.target.value || null;
                 this._renderHead();
+                // The auto-pick notice ("Using X — no default set") names a model that is no
+                // longer in use the instant the picker changes. Leaving it up is a status
+                // line that contradicts the control right above it.
+                this._setStatus('');
+                // …and re-check: switching TO a text-only model with an image attached must
+                // say so now, not at send time.
+                this._warnIfModelCannotSee();
             });
             this.shadowRoot.querySelector('.vlc-form').addEventListener('submit', (e) => {
                 e.preventDefault();

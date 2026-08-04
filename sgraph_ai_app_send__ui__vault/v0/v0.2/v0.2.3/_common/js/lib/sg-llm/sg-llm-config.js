@@ -176,6 +176,25 @@
     //   3. the first allowed id at all
     // Returns null only when nothing is allowed/available. Callers should SHOW which
     // model was auto-picked rather than choosing silently.
+    // Named models, tried IN ORDER before the vendor fallback below.
+    //
+    // Why this list exists: the caller passes an alphabetically sorted id list, so matching
+    // on the vendor prefix alone picked `anthropic/claude-3-haiku` — the oldest and weakest
+    // model in the catalogue — because "3" sorts before "opus" and "sonnet". A vault with no
+    // configured default silently got the worst answers available, and (since haiku is not
+    // a vision model) could not read a pasted screenshot either.
+    //
+    // These are exact ids, so a rename simply drops through to the vendor fallback rather
+    // than pinning a model that no longer exists.
+    var PREFERRED_MODELS = [
+        'anthropic/claude-sonnet-5',
+        'anthropic/claude-opus-5',
+        'anthropic/claude-sonnet-4',
+        'google/gemini-3.5-flash',
+        'openai/gpt-5'
+    ];
+
+    // Vendor fallback, when none of the named models are on this key.
     var PREFERRED = ['anthropic/', 'openai/', 'google/', 'meta-llama/', 'mistralai/'];
 
     function pickModel(policy, availableIds) {
@@ -187,6 +206,9 @@
         if (dflt && modelAllowed(p, dflt)) {
             // Honour the configured default even if the /models list is unavailable.
             if (!allowed.length || allowed.indexOf(dflt) > -1) return dflt;
+        }
+        for (var k = 0; k < PREFERRED_MODELS.length; k++) {
+            if (allowed.indexOf(PREFERRED_MODELS[k]) > -1) return PREFERRED_MODELS[k];
         }
         for (var v = 0; v < PREFERRED.length; v++) {
             for (var i = 0; i < allowed.length; i++) {
@@ -214,6 +236,7 @@
         DEFAULT_ENDPOINT: DEFAULT_ENDPOINT,
         DEFAULT_LIMITS  : DEFAULT_LIMITS,
         PREFERRED       : PREFERRED,
+        PREFERRED_MODELS: PREFERRED_MODELS,
         parse           : parse,
         serialize       : serialize,
         modelAllowed    : modelAllowed,

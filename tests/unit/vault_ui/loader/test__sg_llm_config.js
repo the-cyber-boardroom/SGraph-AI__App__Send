@@ -93,6 +93,41 @@ console.log('\n[suite] SGLlmConfig — pickModel (regression: default:null → {
     ok('nothing allowed and nothing available → null (caller must show an error)',
         C.pickModel(C.parse({ models: { allow: ['nope/*'] } }), ids) === null);
     ok('junk availableIds does not throw', C.pickModel(noDefault, null) === null);
+
+    /* THE SECOND BUG, found in use: the caller passes an ALPHABETICALLY SORTED id list, so
+       matching only on the vendor prefix picked `anthropic/claude-3-haiku` — "3" sorts
+       before "opus" and "sonnet", so a vault with no configured default silently got the
+       oldest, weakest model on the key. It could not read a pasted screenshot either, haiku
+       not being a vision model. Named models are now tried first. */
+    const real = ['anthropic/claude-3-haiku', 'anthropic/claude-opus-5', 'anthropic/claude-sonnet-5',
+                  'google/gemini-3.5-flash', 'openai/gpt-5'].sort();
+    ok('a real catalogue picks sonnet-5, not the alphabetically-first haiku',
+        C.pickModel(noDefault, real) === 'anthropic/claude-sonnet-5', C.pickModel(noDefault, real));
+    ok('…and the named list is ordered, opus after sonnet',
+        C.PREFERRED_MODELS.indexOf('anthropic/claude-sonnet-5') < C.PREFERRED_MODELS.indexOf('anthropic/claude-opus-5'));
+
+    // Only the weak model plus a good non-anthropic one: the named list must beat the
+    // vendor order, or we are back to haiku.
+    ok('a named model from ANOTHER vendor beats a weak anthropic one',
+        C.pickModel(noDefault, ['anthropic/claude-3-haiku', 'google/gemini-3.5-flash'].sort())
+            === 'google/gemini-3.5-flash');
+
+    // The named list must never override what an admin actually configured, or the
+    // Settings page becomes advisory.
+    ok('an explicit default still wins over the named list',
+        C.pickModel(C.parse({ models: { allow: ['*'], 'default': 'anthropic/claude-3-haiku' } }), real)
+            === 'anthropic/claude-3-haiku');
+    ok('…and the allow-list still wins over the named list',
+        C.pickModel(C.parse({ models: { allow: ['google/*'] } }), real) === 'google/gemini-3.5-flash');
+
+    // A rename must degrade to the vendor fallback, not pin a dead id.
+    ok('none of the named models available → vendor fallback',
+        C.pickModel(noDefault, ['anthropic/claude-7-future', 'zz/other'].sort()) === 'anthropic/claude-7-future');
+
+    // Every named default should be able to read a screenshot — the chat panel accepts
+    // pasted images, and a default that cannot see them is a bad default.
+    ok('the top named default is a vision model',
+        C.PREFERRED_MODELS[0] === 'anthropic/claude-sonnet-5');
 }
 
 console.log('\n[suite] SGLlmConfig — limits and per-app overrides');
