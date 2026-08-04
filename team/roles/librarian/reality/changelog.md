@@ -7,6 +7,23 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-04
+
+No new briefs. Single CI version-bump commit since 08/03 voice session (no functional code change since then). This session documented the send-browse v0.3.3 file split (commit `c7b9015`, 2026-08-03) which had been missed by the 08/03 librarian session.
+
+Files changed:
+- `reality/index.md` — Version v0.33.47 → v0.33.52; last updated → 2026-08-04; test count ~2015+ → ~2800+; Black Hat entry updated (Business Hall opened today)
+- `reality/ui/index.md` — send-browse v0.3.3 file split documented (c7b9015, 4 files); base64 chunk open item marked FIXED (1089596)
+- `reality/qa/index.md` — Last updated → 2026-08-04; test count ~2015+ → ~2800+; 16 new test files table added (LLM/voice/releases/send-browse-split, 08/02–08/03)
+- `reality/changelog.md` — 2026-08-04 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — COMPLETED table updated
+
+Session: 0 new briefs | New EXISTS items: 1 (send-browse v0.3.3 file split — structural, no behaviour change) | Open items resolved: 1 (base64 chunk bug — FIXED 2026-08-03) | Cumulative docs: 910 (unchanged)
+Master index (08/04): `team/roles/librarian/reviews/08/04/v0.33.52__master-index__no-new-briefs-04-aug-2026.md`
+Debrief (08/04): `team/humans/dinis_cruz/debriefs/08/04/v0.33.52__debrief__daily-check-04-aug-2026.md`
+
+---
+
 ## 2026-07-31
 
 No new briefs. Single CI version-bump commit on dev (no functional code change). No reality domain files updated.

@@ -87,6 +87,17 @@ Self-contained receiver tree with the same inlining discipline as the share tree
 | View (full) | `en-gb/open/view/index.html` | Full-name URL alias |
 | Browse | `en-gb/open/browse/index.html` | sg-layout file explorer (folder tree, multi-pane) |
 
+**`send-browse--v0.3.3.js` file split (2026-08-03, commit `c7b9015`).** The 1841-line file was split into four files along responsibility seams. No behaviour change — bodies are byte-identical to removed regions; load order enforced by `en-gb/open/browse/index.html`.
+
+| File | Lines | Responsibility |
+|------|-------|----------------|
+| `send-browse--v0.3.3.js` | 1494 | SendBrowse component (main) |
+| `send-browse--parsers.js` | 135 | CSV + EML parsers (pure) |
+| `send-browse--paths.js` | 99 | Path resolution + VFS path validation (pure) |
+| `send-browse--dom.js` | 146 | Tree navigation, iframe preview, tab-bar CSS |
+
+Guard: `tests/unit/vault_ui/loader/test__send_browse_split.js` (97 assertions) — verifies that all four files load and expose the same public API surface as the pre-split monolith.
+
 ---
 
 ### User UI Legacy — v0.3.x
@@ -126,7 +137,7 @@ Standalone print utility; zero dependencies. Used by the SG/Vault file-viewer Pr
 
 **v0.3.3** — IFD overlay on v0.3.0 + v0.3.1 + v0.3.2. File: `v0.3.3/_common/js/components/send-download/send-browse--v0.3.2.js` (12 Jun 2026, commit `0c34e1c9`).
 - **Copy contents button** — `⎘ Copy` action added to send-browse's file viewer toolbar, next to Save / Locate. Shown for textual file types only (code, text, markdown, csv, HTML source). Uses `navigator.clipboard` with `textarea + execCommand` fallback for insecure contexts; flashes "✓ Copied" for 1.6 s. Binary types (images, video, PDF, archives) deliberately excluded. Picked up by vault-browse-edit everywhere it renders a file.
-- **Open item:** `_write` encoder in this file still uses chunk=8192 (same base64 padding bug fixed in `app-shell.js` at v0.33.21). Only affects editor writes from the preview pane > 8 KB. Flagged in commit `0c34e1c9`; tracked for a follow-up small commit.
+- ~~**Open item:** `_write` encoder chunk=8192 bug~~ — **FIXED 2026-08-03** (commit `1089596`). `send-browse--v0.3.2.js` (user v0.3.3) now chunks at 8190. See `send-browse--v0.3.3.js` (open v0.4.0) entry below and PROPOSED section for full detail.
 
 #### Pages (v0.3.x tree)
 
