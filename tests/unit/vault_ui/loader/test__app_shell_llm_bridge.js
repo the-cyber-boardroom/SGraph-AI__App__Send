@@ -32,6 +32,7 @@ const load  = (p) => new Function(readFileSync(p, 'utf8')).call(window);
 load(lbase + 'sg-llm-config.js'); global.SGLlmConfig = window.SGLlmConfig = globalThis.SGLlmConfig;
 load(lbase + 'sg-llm.js');        global.SGLlm       = window.SGLlm       = globalThis.SGLlm;
 load(lbase + 'vault-llm-log.js'); global.VaultLlmLog = window.VaultLlmLog = globalThis.VaultLlmLog;
+load(lbase + 'sg-vision.js');     global.SGVision    = window.SGVision    = globalThis.SGVision;
 load(cbase + 'sg-embed-helpers.js'); global.SgEmbed        = window.SgEmbed        = globalThis.SgEmbed;
 load(cbase + 'app-permissions.js');  global.AppPermissions = window.AppPermissions = globalThis.AppPermissions;
 load(cbase + 'app-shell.js');
@@ -404,6 +405,89 @@ console.log('\n[suite] one microphone at a time');
     ok('…with EBUSY',                       r.code === 'EBUSY', 'code=' + r.code);
     ok('…and no second microphone opened',  started === 0);
     ok('the first take is untouched',       typeof el._listenFinish === 'function');
+}
+
+console.log('\n[suite] sg.llm.chat — images are validated HOST-side');
+{
+    /* An app can put an image_url part in a message. Two things must not be the app's to
+       decide: whether the model can read it (a provider error names nothing — the audio
+       404 all over again), and how many bytes leave on the vault's key. */
+    const PNG_URL = 'data:image/png;base64,' + 'A'.repeat(400);
+    const withImage = (text) => ([{ role: 'user', content: [
+        { type: 'text', text: text || 'what is this?' },
+        { type: 'image_url', image_url: { url: PNG_URL } }
+    ] }]);
+
+    const CAT = [
+        { id: 'seer/one',  architecture: { modality: 'text+image->text' } },
+        { id: 'blind/one', architecture: { modality: 'text->text' } }
+    ];
+
+    // A model that CAN see: the call goes out, image part intact.
+    let asked = null;
+    const el = makeShell({ grant: { permissions: { llm: { chat: true } } },
+                           chat: async (req) => { asked = req; return { content: 'ok', model: 'seer/one', usage: {}, id: 'g' }; },
+                           models: async () => CAT });
+    const frame = makeFrame();
+    setup(el, frame);
+    Log.clear();
+
+    const okRes = await send(frame, { __sgCmdType: 'llm', action: 'chat', model: 'seer/one',
+                                      messages: withImage(), stream: false });
+    ok('a vision model is allowed through',   okRes.ok === true, okRes.err);
+    ok('the image part reaches the client',
+        Array.isArray(asked.messages[0].content) && asked.messages[0].content[1].type === 'image_url');
+
+    // The ledger: this was the "priciest call reads as the cheapest" bug.
+    const row = Log.list()[0];
+    ok('the ledger counts the image',         row.images === 1);
+    ok('…and the TEXT chars, not the base64', row.promptChars > 0 && row.promptChars < 200);
+
+    // A model that cannot see is refused HERE, naming the model.
+    asked = null;
+    const blind = await send(frame, { __sgCmdType: 'llm', action: 'chat', model: 'blind/one',
+                                      messages: withImage(), stream: false });
+    ok('a text-only model is refused',        blind.ok === false && blind.code === 'EMODEL');
+    ok('…naming the model',                   /blind\/one/.test(blind.err || ''));
+    ok('…and the call never went out',        asked === null);
+
+    // No catalogue cached yet → fetch one rather than guess from the short fallback list.
+    let fetched = 0;
+    const el2 = makeShell({ grant: { permissions: { llm: { chat: true } } },
+                            chat: async (req) => ({ content: 'ok', model: req.model, usage: {}, id: 'g' }),
+                            models: async () => { fetched++; return CAT; } });
+    const f2 = makeFrame();
+    setup(el2, f2);
+    const r2 = await send(f2, { __sgCmdType: 'llm', action: 'chat', model: 'seer/one',
+                                messages: withImage(), stream: false });
+    ok('an unknown-to-the-fallback model is looked up, not guessed', r2.ok === true, r2.err);
+    ok('…by fetching the catalogue once',     fetched === 1);
+
+    // A text-only call must not pay for that lookup.
+    fetched = 0;
+    el2._llmModelMeta = null;
+    await send(f2, { __sgCmdType: 'llm', action: 'chat', model: 'seer/one',
+                     messages: [{ role: 'user', content: 'no image here' }], stream: false });
+    ok('a text-only call does not fetch the catalogue', fetched === 0);
+
+    // The size ceiling is the host's, not the app's to respect.
+    const huge = [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,' + 'A'.repeat(40 * 1024 * 1024) } } ] }];
+    const big = await send(frame, { __sgCmdType: 'llm', action: 'chat', model: 'seer/one',
+                                    messages: huge, stream: false });
+    ok('an oversized image payload is refused', big.ok === false && big.code === 'EIMGSIZE');
+}
+
+console.log('\n[suite] sg.llm.imagePart — apps do not reimplement the base64 bug');
+{
+    const src = makeShell()._buildVfsBridgeScript('index.html');
+    ok('the bridge exposes imagePart',   /imagePart:async function/.test(src));
+    // 8192 % 3 === 2 → '=' padding mid-string → atob() rejects it. Shipped three times.
+    ok('it chunks at 8190, not 8192',    /var c=8190/.test(src) && !/var c=8192/.test(src));
+    ok('it accepts a Blob',              /typeof src\.arrayBuffer==="function"/.test(src));
+    ok('…and raw bytes',                 /src instanceof Uint8Array/.test(src));
+    ok('…and passes a data: URL through', /typeof src==="string"/.test(src));
+    ok('it builds the image_url shape',  /type:"image_url"/.test(src));
 }
 
 console.log('\n[suite] audio never leaks into the provenance log');

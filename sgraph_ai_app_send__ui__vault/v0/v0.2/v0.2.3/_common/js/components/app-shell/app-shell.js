@@ -1421,6 +1421,35 @@
             });
         }
 
+        // Size + shape of any image parts in an outgoing message set. Kept host-side so the
+        // ceiling is not something a frame can talk its way past.
+        _llmCountImages(messages) {
+            var pc = (typeof SGVision !== 'undefined')
+                ? SGVision.promptChars(messages)
+                : { chars: 0, images: 0 };
+            var bytes = 0;
+            var arr = Array.isArray(messages) ? messages : [];
+            for (var i = 0; i < arr.length; i++) {
+                var c = arr[i] && arr[i].content;
+                if (!Array.isArray(c)) continue;
+                for (var j = 0; j < c.length; j++) {
+                    var p = c[j];
+                    if (p && p.type === 'image_url') {
+                        var u = (p.image_url && p.image_url.url) || '';
+                        // base64 is 4 chars per 3 bytes; close enough for a ceiling check and
+                        // it never needs to decode a payload just to measure it.
+                        bytes += Math.floor(String(u).length * 0.75);
+                    }
+                }
+            }
+            return { chars: pc.chars, images: pc.images, bytes: bytes };
+        }
+
+        _llmMaxImageBytes() {
+            return (typeof SGVision !== 'undefined') ? (SGVision.MAX_BYTES * SGVision.MAX_IMAGES)
+                                                     : (16 * 1024 * 1024);
+        }
+
         _llmLedgerPatch(res, fallbackModel) {
             var eff = SGLlm.effectiveCost(res);
             return {
@@ -3177,7 +3206,25 @@
                       // error. The host bar keeps its own Stop/Cancel regardless.
                       'listenStop:function(){return _sgCmd("llm",{action:"listenStop"});},' +
                       'listenCancel:function(){return _sgCmd("llm",{action:"listenCancel"});},' +
-                      'listening:function(){return _sgCmd("llm",{action:"listening"});}' +
+                      'listening:function(){return _sgCmd("llm",{action:"listening"});},' +
+                      // imagePart(blobOrBytes, mime?) → the content part to drop into a
+                      // message's `content` array. Runs IN THIS FRAME (no host round trip):
+                      // it is pure encoding, and the bytes are already yours.
+                      //
+                      // The chunk is 8190, not 8192. 8192 % 3 === 2, so every non-final
+                      // slice emits "=" padding mid-string and atob() rejects that — a bug
+                      // this codebase has shipped three times. Use this rather than writing
+                      // it again.
+                      'imagePart:async function(src,mime){' +
+                        'var u,m=mime||"";' +
+                        'if(src&&typeof src.arrayBuffer==="function"){u=new Uint8Array(await src.arrayBuffer());m=m||src.type||"image/png";}' +
+                        'else if(src instanceof Uint8Array){u=src;}' +
+                        'else if(src instanceof ArrayBuffer){u=new Uint8Array(src);}' +
+                        'else if(typeof src==="string"){return{type:"image_url",image_url:{url:src}};}' +
+                        'else{throw new Error("imagePart: pass a Blob/File, bytes, or a data: URL");}' +
+                        'var c=8190,o="";for(var i=0;i<u.length;i+=c){o+=String.fromCharCode.apply(null,u.subarray(i,i+c));}' +
+                        'return{type:"image_url",image_url:{url:"data:"+(m||"image/png")+";base64,"+btoa(o)}};' +
+                      '}' +
                     '}' +
                   '};' +
                   'window.sgVault={writeFile:_write,readFile:_readText,listFiles:function(){return _list("");},writable:window.sg.app.writable,selfPath:window.sg.app.selfPath};' +
@@ -3670,6 +3717,7 @@
 
                             if (lAct === 'models') {
                                 return s.client.models().then(function (all) {
+                                    self._llmModelMeta = all || null;     // vision capability lives here
                                     var ids = (all || []).filter(function (m) {
                                         return m && m.id && SGLlmConfig.modelAllowed(s.policy, m.id);
                                     }).map(function (m) {
@@ -3736,10 +3784,47 @@
                                     maxTok = limits.maxTokensPerCall;
                                 }
 
+                                // Images: validated HERE, before the call. An image sent to a
+                                // text-only model comes back as a provider error naming nothing,
+                                // which is the exact failure that made voice look broken. And an
+                                // unbounded data: URL from a frame is an unbounded bill, so the
+                                // size ceiling is the host's to enforce, not the app's to respect.
+                                var vCount = self._llmCountImages(e.data.messages);
+                                var visionGate = Promise.resolve(true);
+                                if (vCount.images) {
+                                    if (vCount.bytes > self._llmMaxImageBytes()) {
+                                        cmdReply(false, null, 'Image payload too large (' +
+                                                 Math.round(vCount.bytes / 1024) + ' KB)', 'EIMGSIZE');
+                                        self._emitBridgeCall('llm.chat', { ok: false, err: 'EIMGSIZE' });
+                                        return;
+                                    }
+                                    // Fetch the catalogue rather than fall back to a short
+                                    // hard-coded list: refusing a model that CAN see, because
+                                    // our list has not heard of it, is the worse error.
+                                    visionGate = (self._llmModelMeta ? Promise.resolve(self._llmModelMeta)
+                                                                     : s.client.models().then(function (all) {
+                                                                           self._llmModelMeta = all || null;
+                                                                           return self._llmModelMeta;
+                                                                       }).catch(function () { return null; })
+                                    ).then(function (meta) {
+                                        return typeof SGVision === 'undefined' ||
+                                               SGVision.supportsImages(model, meta);
+                                    });
+                                }
+                                return visionGate.then(function (canSee) {
+                                if (!canSee) {
+                                    cmdReply(false, null, 'Model cannot read images: ' + model, 'EMODEL');
+                                    self._emitBridgeCall('llm.chat', { ok: false, err: 'EMODEL', model: model });
+                                    return;
+                                }
+
                                 var rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
                                     model: model, files: [], status: 'pending',
-                                    promptChars: (e.data.messages || []).reduce(function (n, m) {
-                                        return n + (typeof m.content === 'string' ? m.content.length : 0); }, 0)
+                                    images: vCount.images,
+                                    // Counted through SGVision: the old `typeof content ===
+                                    // 'string'` test scored an image-bearing message as ZERO,
+                                    // so the priciest calls looked like the cheapest.
+                                    promptChars: vCount.chars
                                 });
 
                                 self._llmNotify(model);
@@ -3797,6 +3882,7 @@
                                              aborted ? 'EABORT' : ((err && err.code) || 'EPROTO'));
                                     self._emitBridgeCall('llm.chat', { ok: false, err: (err && err.code) || 'EPROTO' });
                                 });
+                                });          // ← visionGate
                             });
                         }).catch(function (err) {
                             cmdReply(false, null, (err && err.message) || 'LLM error', (err && err.code) || 'EPROTO');
