@@ -328,6 +328,84 @@ console.log('\n[suite] sg.llm.listen — the microphone is its own grant');
         JSON.stringify(r4).indexOf('input_audio') === -1 && !('data' in r4.result));
 }
 
+console.log('\n[suite] the APP can end a take it started — not only the host bar');
+{
+    /* Reported from a working PoC: the app rendered its own Stop button, called the host,
+       and the recording bar kept counting. It was not the app's bug — `sg.llm.listen()`
+       started a take only the HOST's Stop/Cancel (or maxMs) could end, so there was nothing
+       real for an app-side button to call. An app that may open a microphone must be able
+       to close it. */
+    const el    = makeShell({ grant: { permissions: { llm: { chat: true, listen: true } } } });
+    const frame = makeFrame();
+    setup(el, frame);
+
+    ok('the bridge exposes listenStop/listenCancel/listening',
+        /listenStop:function/.test(el._buildVfsBridgeScript('index.html')) &&
+        /listenCancel:function/.test(el._buildVfsBridgeScript('index.html')) &&
+        /listening:function/.test(el._buildVfsBridgeScript('index.html')));
+
+    // Nothing recording: stopping is a no-op, not an error. An app should be able to call
+    // stop defensively (on unmount, on a route change) without handling a rejection.
+    const idle = await send(frame, { __sgCmdType: 'llm', action: 'listenStop' });
+    ok('stopping when idle succeeds',        idle.ok === true);
+    ok('…and reports nothing was stopped',   idle.result.stopped === false);
+    const q0 = await send(frame, { __sgCmdType: 'llm', action: 'listening' });
+    ok('listening() reports not recording',  q0.result.recording === false);
+
+    // A take in flight: the real _recordAndTranscribe publishes its finish handle.
+    let finishedWith = null;
+    el._listenFinish = (cancelled) => { finishedWith = cancelled; el._listenFinish = null; };
+    const q1 = await send(frame, { __sgCmdType: 'llm', action: 'listening' });
+    ok('listening() reports recording',      q1.result.recording === true);
+
+    const stopped = await send(frame, { __sgCmdType: 'llm', action: 'listenStop' });
+    ok('listenStop ends the take',           stopped.ok === true && stopped.result.stopped === true);
+    ok('…as a STOP, not a cancel (the transcript is wanted)', finishedWith === false);
+
+    // Cancel is the other button, and must stay distinguishable from stop.
+    finishedWith = null;
+    el._listenFinish = (cancelled) => { finishedWith = cancelled; el._listenFinish = null; };
+    const cancelled = await send(frame, { __sgCmdType: 'llm', action: 'listenCancel' });
+    ok('listenCancel ends the take',         cancelled.ok === true && cancelled.result.stopped === true);
+    ok('…as a CANCEL (mic released, no transcript)', finishedWith === true);
+
+    // Same grant as listen, and no NEW authority: ending a take is strictly less than
+    // starting one. But an app with no microphone grant at all still gets nothing.
+    const elNo = makeShell();                    // chat/models/usage, no listen
+    const fNo  = makeFrame();
+    setup(elNo, fNo);
+    elNo._listenFinish = () => { throw new Error('must not be reachable'); };
+    const denied = await send(fNo, { __sgCmdType: 'llm', action: 'listenStop' });
+    ok('listenStop needs the listen grant',  denied.ok === false && denied.code === 'EPERM');
+    const deniedQ = await send(fNo, { __sgCmdType: 'llm', action: 'listening' });
+    ok('so does listening()',                deniedQ.ok === false && deniedQ.code === 'EPERM');
+
+    // Unknown verbs must still be rejected — the capability map is the allow-list.
+    const bogus = await send(frame, { __sgCmdType: 'llm', action: 'listenWhatever' });
+    ok('an unknown llm action is still refused', bogus.ok === false);
+}
+
+console.log('\n[suite] one microphone at a time');
+{
+    /* Without this, a second listen() opens a second recorder over the first: two live
+       mics, two bars, and the first take's stop handle overwritten and unreachable. */
+    const el    = makeShell({ grant: { permissions: { llm: { chat: true, listen: true } } } });
+    const frame = makeFrame();
+    setup(el, frame);
+
+    el._listenFinish = () => {};                 // a take already in flight
+    let started = 0;
+    globalThis.SGVoice = { available: () => ({ ok: true, reason: null }),
+                           start: async () => { started++; return {}; } };
+    window.SGVoice = globalThis.SGVoice;
+
+    const r = await send(frame, { __sgCmdType: 'llm', action: 'listen' });
+    ok('a second listen is refused',        r.ok === false);
+    ok('…with EBUSY',                       r.code === 'EBUSY', 'code=' + r.code);
+    ok('…and no second microphone opened',  started === 0);
+    ok('the first take is untouched',       typeof el._listenFinish === 'function');
+}
+
 console.log('\n[suite] audio never leaks into the provenance log');
 {
     // redactMessages is what the debug/provenance surfaces render. Base64 audio would
