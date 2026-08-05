@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.52 | **Last updated:** 2026-08-04 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.53 | **Last updated:** 2026-08-05 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -38,7 +38,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
-| Unit tests passing | **~2800+** (977 Python + ~157 vault-UI JS + ~780+ ViV loader suite (373+ base + ~400 new from LLM/voice/releases/send-browse-split sessions 08/02–08/03: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 38, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 93, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 79) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers) |
+| Unit tests passing | **~2950+** (977 Python + ~157 vault-UI JS + ~930+ ViV loader suite (373+ base + ~400 new from LLM/voice/releases/send-browse-split sessions 08/02–08/03: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 53, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 122, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 96; +08/05: sg_vision 62, no_auto_reload 27) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
@@ -60,7 +60,7 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 | **Key decision** | **Three-predicate model** — Confirmed (technical fact), Validated (compliance interpretation by GRC), Accepted (appetite judgement by business owner at altitude); the chain from a technical fact to a board decision (2026-07-28) |
 | **Key decision** | **Regulation graph = vault + website** — EU AI Act encoded via AKN4EU XML, graph starts empty and accretes as customer answers Confirm/Validate/Accept provisions; partial connection sufficient for value (2026-07-28) |
 | **Key decision** | **Air gap drawn as bespoke manual integration** — a gap has no evolution; the labour that fills it sits at genesis; map shape = evolved ends + manual middle; three Wardley maps: air-gap (sales), translation (altitudes), evidence chain (agent→board) (2026-07-28) |
-| **Black Hat USA** | **Business Hall opened 2026-08-04 (today).** Voice feature shipped 2026-08-03 (mic button in vault chat + AI Chat on SG/App, three bugs fixed). iPad run not yet verified (unit-tested). |
+| **Black Hat USA** | **Business Hall opened 2026-08-04.** Voice + screenshot-in-chat shipped 2026-08-03/08/05. Vision capability detection live from OpenRouter catalogue. iPad run not yet verified (unit-tested). |
 | **Key decision** | **Vault authors, repo publishes** — clear text in a public repository is the enabling condition for verification as differentiator; vault stays authoring environment; publishing to encrypted vault abandoned in favour of public repo; split-by-path resolves two-store conflict (2026-07-31) |
 | **Key decision** | **Consolidation = customisation** — EU AI Act consolidation and per-customer organisational customisation are the same graph operation; one engine serves both (2026-07-31) |
 | **Key decision** | **Amendment is the subscription** — Standards-as-a-Service: open artefact, recurring revenue from re-derivation as instrument amends; cost scales with change not size (2026-07-31) |
