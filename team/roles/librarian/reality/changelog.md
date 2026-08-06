@@ -7,6 +7,23 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ---
 
+## 2026-08-06
+
+Four code changes shipped 2026-08-04 (after the 08/04 daily check), catalogued today.
+CI version bump: v0.33.52 → v0.33.53.
+
+Files changed:
+- `reality/index.md` — Version v0.33.52 → v0.33.53; last updated → 2026-08-06; test count ~2800+ → ~2945+; Black Hat note updated
+- `reality/ui/index.md` — "Last updated" date corrected to 2026-08-04 (7 EXISTS rows were already added in-commit: 4 from 22061eb image paste, 1 from cf5b76e auto-sync fix, 2 from 2d651b4 model default fix)
+- `reality/changelog.md` — 2026-08-06 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — COMPLETED table updated
+
+Session: 0 new briefs | New EXISTS items: 7 (image paste, vision detection, sg.llm.imagePart, ledger fix, auto-sync protection, model default, picker notice fix) | Net tests: +144 | Cumulative docs: 910 (unchanged)
+Master index (08/06): `team/roles/librarian/reviews/08/06/v0.33.53__master-index__code-changes-04-aug-2026.md`
+Debrief (08/06): `team/humans/dinis_cruz/debriefs/08/06/v0.33.53__debrief__code-changes-04-aug-2026.md`
+
+---
+
 ## 2026-08-04
 
 No new briefs. Single CI version-bump commit since 08/03 voice session (no functional code change since then). This session documented the send-browse v0.3.3 file split (commit `c7b9015`, 2026-08-03) which had been missed by the 08/03 librarian session.

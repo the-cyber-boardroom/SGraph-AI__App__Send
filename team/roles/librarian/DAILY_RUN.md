@@ -238,6 +238,7 @@ None currently active.
 | 2026-07-14 | No new briefs; no new dev commits; B-004 | infra/proposed/index.md (267 lines) split into 3 topic files: vault-hosting.md, firecracker.md, relay-and-storage.md. Index now ~130-line TOC + 9 small sections. All P-numbers preserved. changelog.md + DAILY_RUN.md updated. |
 | 2026-07-31 | No new briefs; CI version bump only; B-011 | 2 wrong-filename links fixed in role-ecosystem-guide (role-based-coordination, role-architecture-framework). 7 missing companion docs annotated *(not in repo)*. 1 missing link fixed in role-based-coordination. All 11 backlog tasks now DONE. |
 | 2026-08-04 | No new briefs; send-browse file split documented; test count updated to ~2800+ | send-browse--v0.3.3.js split into 4 files catalogued in ui/index.md; qa/index.md updated to ~2800+; base64 chunk open item marked FIXED (commit 1089596); 5 reality files updated; master index + debrief produced |
+| 2026-08-06 | No new briefs; 4 post-daily-check code changes from 08/04 catalogued | 7 new EXISTS items (image paste, sg.llm.imagePart, SGVision, ledger fix, auto-sync data-loss fix, claude-sonnet-5 default, picker notice); test count ~2800+ → ~2945+ (+144); reality/index.md + ui/index.md + changelog updated; master index + debrief produced |
 
 ---
 
