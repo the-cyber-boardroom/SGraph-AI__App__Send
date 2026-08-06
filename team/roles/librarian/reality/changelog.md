@@ -9,18 +9,33 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ## 2026-08-06
 
-Four code changes shipped 2026-08-04 (after the 08/04 daily check), catalogued today.
-CI version bump: v0.33.52 → v0.33.53.
+Four code changes shipped 2026-08-04 (after the 08/04 daily check), catalogued today (addendum to 08/05 session which covered the same commits). This session adds the 08/06 master index and debrief with deeper commit detail, and merges the 08/05 session's reality/qa/index.md updates.
 
 Files changed:
-- `reality/index.md` — Version v0.33.52 → v0.33.53; last updated → 2026-08-06; test count ~2800+ → ~2945+; Black Hat note updated
-- `reality/ui/index.md` — "Last updated" date corrected to 2026-08-04 (7 EXISTS rows were already added in-commit: 4 from 22061eb image paste, 1 from cf5b76e auto-sync fix, 2 from 2d651b4 model default fix)
+- `reality/index.md` — Last updated → 2026-08-06; test count corrected to ~2950+; Black Hat note updated with all 08/04 fixes
+- `reality/ui/index.md` — "Last updated" date corrected to 2026-08-04 (7 EXISTS rows were already added in-commit)
 - `reality/changelog.md` — 2026-08-06 entry added (this entry)
 - `team/roles/librarian/DAILY_RUN.md` — COMPLETED table updated
 
-Session: 0 new briefs | New EXISTS items: 7 (image paste, vision detection, sg.llm.imagePart, ledger fix, auto-sync protection, model default, picker notice fix) | Net tests: +144 | Cumulative docs: 910 (unchanged)
+Session: 0 new briefs | New EXISTS items: 7 (image paste, vision detection, sg.llm.imagePart, ledger fix, auto-sync protection, model default, picker notice fix) | Cumulative docs: 910 (unchanged)
 Master index (08/06): `team/roles/librarian/reviews/08/06/v0.33.53__master-index__code-changes-04-aug-2026.md`
 Debrief (08/06): `team/humans/dinis_cruz/debriefs/08/06/v0.33.53__debrief__code-changes-04-aug-2026.md`
+
+---
+
+## 2026-08-05
+
+No new briefs. Four code commits since the 08/04 librarian session: screenshot-in-chat + `sg.llm.imagePart()`, auto-pull disabled fix, model default fix (sonnet-5), and auto-sync source test pin. Version bumped to v0.33.53 by CI. The developer already patched `reality/ui/index.md` with 7 lines covering the new features (screenshots, auto-pull fix); this session updates master stats to match.
+
+Files changed:
+- `reality/index.md` — Version v0.33.52 → v0.33.53; last updated → 2026-08-05; test count ~2800+ → ~2950+; Black Hat note updated
+- `reality/qa/index.md` — Last updated → 2026-08-05; test count ~2800+ → ~2950+; ViV suite ~780+ → ~930+; two new test file rows (sg_vision 62, no_auto_reload 27); three updated counts (vault_llm_chat 93→122, app_shell_llm_bridge 79→96, sg_llm_config 38→53)
+- `reality/changelog.md` — 2026-08-05 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — COMPLETED table updated
+
+Session: 0 new briefs | New EXISTS items: 3 (screenshot-in-chat, sg.llm.imagePart() app bridge, auto-pull-disabled-by-default) | New PROPOSED items: 0 | Cumulative docs: 910 (unchanged)
+Master index (08/05): `team/roles/librarian/reviews/08/05/v0.33.53__master-index__no-new-briefs-05-aug-2026.md`
+Debrief (08/05): `team/humans/dinis_cruz/debriefs/08/05/v0.33.53__debrief__daily-check-05-aug-2026.md`
 
 ---
 
