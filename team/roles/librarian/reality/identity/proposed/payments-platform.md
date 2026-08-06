@@ -14,9 +14,18 @@ arch briefs of 6 August 2026 (v0.33.56 — "token-gateway", "vault-architecture-
 "payments-not-a-billing-system") and reviewed by the Architect:
 
 - **Token gateway in the request path** (metering forces in-line; distinct from the
-  governance product's never-in-line posture). Gateway plane proposed on the
-  container/long-running deployment pattern (streaming does not fit the Python/Mangum
-  Lambda house stack); billing plane on the house `Serverless__Fast_API` Lambda pattern.
+  governance product's never-in-line posture). Gateway plane is a plain FastAPI app,
+  dual-deployable: LWA-on-Lambda (AWS Lambda Web Adapter gives Python response streaming)
+  or container/long-running, chosen on measured streaming economics; billing plane on the
+  house `Serverless__Fast_API` (Mangum) Lambda pattern.
+- **Chat-completions compatibility contract** — the gateway's inline LLM surface is
+  OpenAI/OpenRouter wire-compatible (`POST /v1/chat/completions`, SSE streaming), so
+  consumers (including the vault UI's `sg.llm.*` host via its `SGLlm` client) work with
+  only a base-URL + key swap and cannot tell the gateway from a provider endpoint. The
+  payments platform is separate from, and invisible to, the current vault features.
+- **Pattern source:** `the-cyber-boardroom/MGraph-AI__Service__LLMs` (pre-vault LLM
+  service) carries provider/routing/caching patterns to reuse; vault storage is expected
+  to simplify its storage layer.
 - **Append-and-settle ledger** — no reservations; unit-typed usage events (tokens first,
   vault storage size next) appended under unique keys; balance derived by fold + snapshot;
   negative balances with per-customer thresholds; credit events carry
