@@ -15,6 +15,7 @@ This is a table-of-contents index. Topic files hold the full content.
 | [`google-oauth.md`](google-oauth.md) | OAuth + Social Login, Secrets Management, PKI Identity Envelopes (P-314), NHI 2.0 Agent Identity Platform (P-322–P-336) | P-314, P-322–P-336 |
 | [`billing-credits.md`](billing-credits.md) | Per-User Vaults + Credits, Billing Automation, Free Tier Identity, Pre-Auth + Micropayments, Dynamic Credential Delivery, USDC + Agentic Commerce | (no P-numbers — doc refs) |
 | [`openrouter.md`](openrouter.md) | LLM API Billing Broker (P-299), OpenRouter Platform Expansion (P-385, P-386, P-388) | P-299, P-385, P-386, P-388 |
+| [`payments-platform.md`](payments-platform.md) | Payments/metering platform at payments.sgraph.ai (token gateway, append-and-settle ledger, four-vault structure, credential records) — from the 6 Aug 2026 arch briefs; includes pending correction to the 27 Jul OpenRouter-resale decision | (no P-numbers yet) |
 | [`email.md`](email.md) | Email + Outreach, SG Mail Email Client (P-165–P-170) | P-165–P-170 |
 
 ---
