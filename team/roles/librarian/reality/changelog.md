@@ -9,18 +9,49 @@ that date in `team/roles/librarian/reviews/MM/DD/`.
 
 ## 2026-08-07
 
-No new briefs. 4 functional commits (+ CI bump) since 08/04 session: screenshot paste in vault chat (SGVision), sync safety fix (auto-apply → click-to-apply, fixes reported data loss), PREFERRED_MODELS list (default to claude-sonnet-5), and no-auto-reload contract test. Version: v0.33.53.
+No new briefs. Reality documents updated to reflect 3 new EXISTS items (SGVision, sync-safety, PREFERRED_MODELS) catalogued across sessions 08/05–08/07. Date and test count brought current to today.
 
 Files changed:
-- `reality/index.md` — Version v0.33.52 → v0.33.53; last updated → 2026-08-07; Quick Stats date + test count ~2800+ → ~2950+
-- `reality/qa/index.md` — Last updated → 2026-08-07; test count ~2800+ → ~2950+; ViV suite ~780+ → ~930+; sg_llm_config 38→53, vault_llm_chat 93→122, app_shell_llm_bridge 79→96; new section with sg_vision (62), no_auto_reload (27)
-- `reality/ui/index.md` — Screenshot paste/vision rows added (commit cf5b76e, 5 lines); PREFERRED_MODELS row added (commit 2d651b4, 2 lines) — updated by commits themselves
+- `reality/index.md` — Last updated → 2026-08-07
+- `reality/qa/index.md` — Last updated → 2026-08-07
 - `reality/changelog.md` — 2026-08-07 entry added (this entry)
 - `team/roles/librarian/DAILY_RUN.md` — COMPLETED table updated
 
-Session: 0 new briefs | New EXISTS items: 3 (SGVision, sync-safety, PREFERRED_MODELS) | Open items resolved: 0 | Cumulative docs: 910 (unchanged)
+Session: 0 new briefs | New EXISTS items: 0 (all already catalogued 08/05–08/06) | Open items resolved: 0 | Cumulative docs: 910 (unchanged)
 Master index (08/07): `team/roles/librarian/reviews/08/07/v0.33.53__master-index__code-changes-04-07-aug-2026.md`
 Debrief (08/07): `team/humans/dinis_cruz/debriefs/08/07/v0.33.53__debrief__daily-check-07-aug-2026.md`
+
+---
+
+## 2026-08-06
+
+Four code changes shipped 2026-08-04 (after the 08/04 daily check), catalogued today (addendum to 08/05 session which covered the same commits). This session adds the 08/06 master index and debrief with deeper commit detail, and merges the 08/05 session's reality/qa/index.md updates.
+
+Files changed:
+- `reality/index.md` — Last updated → 2026-08-06; test count corrected to ~2950+; Black Hat note updated with all 08/04 fixes
+- `reality/ui/index.md` — "Last updated" date corrected to 2026-08-04 (7 EXISTS rows were already added in-commit)
+- `reality/changelog.md` — 2026-08-06 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — COMPLETED table updated
+
+Session: 0 new briefs | New EXISTS items: 7 (image paste, vision detection, sg.llm.imagePart, ledger fix, auto-sync protection, model default, picker notice fix) | Cumulative docs: 910 (unchanged)
+Master index (08/06): `team/roles/librarian/reviews/08/06/v0.33.53__master-index__code-changes-04-aug-2026.md`
+Debrief (08/06): `team/humans/dinis_cruz/debriefs/08/06/v0.33.53__debrief__code-changes-04-aug-2026.md`
+
+---
+
+## 2026-08-05
+
+No new briefs. Four code commits since the 08/04 librarian session: screenshot-in-chat + `sg.llm.imagePart()`, auto-pull disabled fix, model default fix (sonnet-5), and auto-sync source test pin. Version bumped to v0.33.53 by CI. The developer already patched `reality/ui/index.md` with 7 lines covering the new features (screenshots, auto-pull fix); this session updates master stats to match.
+
+Files changed:
+- `reality/index.md` — Version v0.33.52 → v0.33.53; last updated → 2026-08-05; test count ~2800+ → ~2950+; Black Hat note updated
+- `reality/qa/index.md` — Last updated → 2026-08-05; test count ~2800+ → ~2950+; ViV suite ~780+ → ~930+; two new test file rows (sg_vision 62, no_auto_reload 27); three updated counts (vault_llm_chat 93→122, app_shell_llm_bridge 79→96, sg_llm_config 38→53)
+- `reality/changelog.md` — 2026-08-05 entry added (this entry)
+- `team/roles/librarian/DAILY_RUN.md` — COMPLETED table updated
+
+Session: 0 new briefs | New EXISTS items: 3 (screenshot-in-chat, sg.llm.imagePart() app bridge, auto-pull-disabled-by-default) | New PROPOSED items: 0 | Cumulative docs: 910 (unchanged)
+Master index (08/05): `team/roles/librarian/reviews/08/05/v0.33.53__master-index__no-new-briefs-05-aug-2026.md`
+Debrief (08/05): `team/humans/dinis_cruz/debriefs/08/05/v0.33.53__debrief__daily-check-05-aug-2026.md`
 
 ---
 
