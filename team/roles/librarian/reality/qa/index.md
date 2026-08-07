@@ -1,6 +1,6 @@
 # QA — Reality Index
 
-**Domain:** qa/ | **Last updated:** 2026-08-04 | **Maintained by:** Librarian (daily run)
+**Domain:** qa/ | **Last updated:** 2026-08-07 | **Maintained by:** Librarian (daily run)
 
 This domain covers the test suite, QA infrastructure (browser automation, Playwright), and test strategy. SGraph Send uses an all-real-implementations philosophy: no mocks, no patches. The full stack starts in-memory in ~100ms.
 
@@ -8,13 +8,13 @@ This domain covers the test suite, QA infrastructure (browser automation, Playwr
 
 ## EXISTS (Code-Verified)
 
-### Test Suite: ~2800+ Tests, All Passing
+### Test Suite: ~2950+ Tests, All Passing
 
 **Strategy:** No mocks, no patches. In-memory Memory-FS stack. ~100ms startup.
 
 **Python unit tests: 977 (confirmed via commit `66ce528`, 2026-06-29 — poetry.lock update to osbot-fast-api 0.39.0 + FastAPI 0.138.1).** Up from 957 (2026-06-05). The increase reflects new tests added with the `_IncludedRouter` fix and osbot-utils 3.74.0 additions.
 
-**Total ~2800+** = 977 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~780+ ViV loader suite (373+ base + ~400 new from LLM/voice/releases/send-browse-split sessions 08/02–08/03; see table below) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite + browser integration: 8 tests + 10 app-shell-nav-helpers inbox/folder-app.json tests.
+**Total ~2950+** = 977 Python + ~157 vault-UI JS (sub-vaults/public-previews/app-perms/VaultSubvaultsView) + ~930+ ViV loader suite (373+ base + ~400 from LLM/voice/releases/send-browse-split sessions 08/02–08/03 + ~150 from vision/sync-safety/model-default sessions 08/04–08/07; see table below) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite + browser integration: 8 tests + 10 app-shell-nav-helpers inbox/folder-app.json tests.
 
 
 
@@ -68,13 +68,13 @@ Run with: `bash tests/unit/vault_ui/loader/run-all.sh`
 
 | File | Assertions | What It Tests |
 |------|-----------|---------------|
-| `test__sg_llm_config.js` | 38 | `SGLlmConfig`: parse/serialize/modelAllowed (`*`+glob)/defaultModel/limitsFor/looksLikeKey/redact/summarise; safe-by-default; two key tiers mutually exclusive |
+| `test__sg_llm_config.js` | 53 | `SGLlmConfig`: parse/serialize/modelAllowed (`*`+glob)/defaultModel/limitsFor/looksLikeKey/redact/summarise; safe-by-default; two key tiers mutually exclusive; PREFERRED_MODELS list; pickModel tries named models before vendor-prefix fallback |
 | `test__sg_llm.js` | 40 | `SGLlm`: chat SSE streaming; decoder-tail flush; mid-stream error surfacing; topP/temperature/maxTokens wired; omitted params absent from wire; two Workbench production bugs pinned |
 | `test__sg_llm_vault.js` | 17 | `SGLlmVault.open()`: config absent → ENOKEY; ro-token → EREADONLY cryptographically; lazy sub-tree bug (loadSubTreeOnDemand one-level limit) verified failing pre-fix |
 | `test__sg_voice.js` | 86 | `SGVoice`: segment recorder adaptation; one-take collect; cancel releases mic; ENOAUDIO on silent take; bytesToBase64 at 8190 (base64 chunk invariant); AUDIO_MODELS/DEFAULT_AUDIO_MODEL/isAudioModel; transcribeWith cost+ledger |
 | `test__base64_chunk_guard.js` | 88 | Repo-wide invariant: every chunked base64 encoder uses size divisible by 3; fails with file:line if violated; covers both send-browse files and app-shell bridge |
 | `test__vault_llm_log.js` | 35 | `VaultLlmLog`: entry created at send time; billedCost/estimatedCost separate buckets; reconcile MOVES (no double-count); 500-entry ring cap; CSV/JSON export |
-| `test__vault_llm_chat.js` | 93 | `<vault-llm-chat>`: multi-file context (addContextFile dedup, removeContextFile, 20-file cap); shared 24 000-char budget; no-file first-class state; params bar clamp; mic button (toggleVoice/stopVoice/renderMic); inline Clear confirm (no window.confirm) |
+| `test__vault_llm_chat.js` | 122 | `<vault-llm-chat>`: multi-file context (addContextFile dedup, removeContextFile, 20-file cap); shared 24 000-char budget; no-file first-class state; params bar clamp; mic button (toggleVoice/stopVoice/renderMic); inline Clear confirm (no window.confirm); addImages/removeImage; _warnIfModelCannotSee; per-turn-only image chip semantics |
 | `test__vault_llm_requests.js` | 29 | `<vault-llm-requests>`: per-call table; ~ prefix for estimates; inline Clear confirm (throwing window.confirm fails test on regression) |
 | `test__vault_browse_edit__add_to_chat.js` | 13 | Second-file context bug: action-bar button closes over bytes at its own render, not the global vault-file-viewing event; dedup by path |
 | `test__vault_shell_llm_panels.js` | 28 | `LlmPanels` panel-reopen: verified failing pre-fix (sg-layout detaches before panel:closed); hard element reference; park/detach; shared by /vault and /app |
@@ -82,10 +82,19 @@ Run with: `bash tests/unit/vault_ui/loader/run-all.sh`
 | `test__sg_releases.js` | 47 | `SGReleases`: `.vault/releases.json` schema; resolution url>stored>default>live; unknown URL pin → live + warning; stale stored pin → fallthrough; slug/case-insensitive uniqueness |
 | `test__pinned_data_source.js` | 27 | `PinnedVaultDataSource`: getFileList synchronous after warm(); writable:false; mutations reject EPINNED; intermediate folder rows synthesised |
 | `test__vault_releases_editor.js` | 44 | `<vault-releases-editor>`: rename carries default; remove clears orphaned default; uniqueness enforced at write; share links built from name not label; inline confirm (no window.confirm) |
-| `test__app_shell_llm_bridge.js` | 79 | sg.llm.* bridge: permission→consent→budget→model→call chokepoint; EPERM/ECONSENT/EBUDGET/EMODEL/ENOKEY/EREADONLY/EABORT; available() ungated; budget shared with vault chat; streaming deltas; cancel EABORT; key never in bridge source/delta/reply; sg.llm.listen()/listenStop()/listenCancel()/listening(); EBUSY for concurrent listen; llm.listen grant separate from llm.chat |
+| `test__app_shell_llm_bridge.js` | 96 | sg.llm.* bridge: permission→consent→budget→model→call chokepoint; EPERM/ECONSENT/EBUDGET/EMODEL/ENOKEY/EREADONLY/EABORT; available() ungated; budget shared with vault chat; streaming deltas; cancel EABORT; key never in bridge source/delta/reply; sg.llm.listen()/listenStop()/listenCancel()/listening(); EBUSY for concurrent listen; llm.listen grant separate from llm.chat; sg.llm.imagePart(); _llmCountImages/_llmMaxImageBytes host-side enforcement |
 | `test__send_browse_split.js` | 97 | send-browse--v0.3.3.js file split: all four files load; public API surface identical to pre-split monolith; load order enforced |
 
 | **Total ViV loader suite (08/04 state)** | **~780+** | |
+
+**Vision, sync-safety, and model-default (added 2026-08-04 to 2026-08-07):**
+
+| File | Assertions | What It Tests |
+|------|-----------|---------------|
+| `test__sg_vision.js` | 62 | `SGVision`: supportsImages/modalityAllowsImages; live-catalogue parsing; generator vs. reader distinction (text→image is NOT a reader); fallback fetch when no catalogue cached; promptChars image count separate from char total |
+| `test__no_auto_reload.js` | 27 | Sync-safety contract: background update check must NOT auto-apply; `_checkAndAutoSync` renders banner/HUD chip rather than merging; auto-pull default OFF; auto-push unaffected; ordering asserted from source so the contract survives future refactors |
+
+| **Total ViV loader suite (08/07 state)** | **~930+** | |
 
 **Note:** Tests T1 and T2 (null-frame `parent.document`/`localStorage` access throws) require a real browser — Phase 3 security gate tests, not runnable in Node. Phase 3 Playwright probe suite: 30 assertions, 0 failures.
 

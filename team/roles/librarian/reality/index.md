@@ -1,6 +1,6 @@
 # Reality — Master Index
 
-**Version:** v0.33.52 | **Last updated:** 2026-08-04 | **Maintained by:** Librarian (daily run)
+**Version:** v0.33.53 | **Last updated:** 2026-08-07 | **Maintained by:** Librarian (daily run)
 **Structure:** Domain tree — each domain has its own directory with `index.md` and `proposed/`
 
 This file is the entry point. Read it to find the right domain, then go to that domain's
@@ -31,14 +31,14 @@ are labelled PROPOSED. Claimed features that are not in any index DO NOT EXIST.
 
 ---
 
-## Quick Stats (as of 2026-08-04)
+## Quick Stats (as of 2026-08-07)
 
 | Metric | Count |
 |--------|-------|
 | User Lambda API endpoints | 32 unique (40 route paths) + `/api/info/sgraph` (Routes__Info__SGraph.py) |
 | Admin Lambda API endpoints | 51 unique (61 route paths) |
 | Total API endpoints | **83+** |
-| Unit tests passing | **~2800+** (977 Python + ~157 vault-UI JS + ~780+ ViV loader suite (373+ base + ~400 new from LLM/voice/releases/send-browse-split sessions 08/02–08/03: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 38, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 93, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 79) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers) |
+| Unit tests passing | **~2950+** (977 Python + ~157 vault-UI JS + ~930+ ViV loader suite (373+ base + ~400 from LLM/voice/releases/send-browse-split 08/02–08/03: sg_releases 47, pinned_data_source 27, vault_releases_editor 44, sg_llm_config 38, sg_llm 40, sg_llm_vault 17, sg_voice 86, base64_chunk_guard 88, send_browse_split 97, vault_llm_log 35, vault_llm_chat 93, vault_shell_llm_panels 28, app_page_llm_panels 46, vault_llm_requests 29, vault_browse_edit__add_to_chat 13, app_shell_llm_bridge 79; + ~150 from vision/sync-safety/model-default 08/04–08/07: sg_vision 62, no_auto_reload 27, sg_llm_config 53→+15, vault_llm_chat 122→+29, app_shell_llm_bridge 96→+17) + ~78 app-shell JS + 37 embed-protocol + ~334 inbox/write-batch/owner-secrets suite; browser integration: 8 tests; +10 app-shell-nav-helpers) |
 | Deployment targets | **7** (Lambda, Docker, Fargate, GCP, EC2, AMI, CLI) |
 | Website pages | 21 |
 | Browser UIs | **7** (share v0.4, open v0.4, admin, workspace, vault browser, vault app /en-gb/app; user v0.3.x legacy) |
