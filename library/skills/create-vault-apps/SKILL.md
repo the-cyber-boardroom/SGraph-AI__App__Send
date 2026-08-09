@@ -51,6 +51,14 @@ This is the part you cannot skip. Vault HTML runs inside an iframe loaded from a
 2. **No `<script src="…">` against vault files.** Inline all JS, or use `window.sg.loadJs(path)`.
 
 > Note on what's verified: in all three apps this session I **inlined** all CSS and JS, and that is the path I can vouch for. The `window.sg.loadCss` / `loadJs` alternatives come from the vault's AUTHORING.md guide and are the documented mechanism, but I did not exercise them — prefer inlining unless you have a reason to load lazily, and verify the `sg.*` calls if you do.
+>
+> **Verified against source (2026-08-09): `loadCss`/`loadJs` require no separate grant.** Both are
+> `_readText(path)` under the hood — the identical bridge call `sg.vfs.readText` makes — plus a DOM
+> injection step. There is no `load` permission verb; they ride `fs.read`, which is default-allow
+> today. If one of them fails, the promise rejects with `ENOENT` (bad path, or the file was written
+> locally but never `sgit commit` + `sgit push`ed) or a script error — not `EPERM`. See
+> AUTHORING.md §2 and `MIGRATING-TO-THE-PERMISSION-MODEL.md` for the forward-looking `fs.read`
+> deny-by-default flip, which will apply to these loaders too since they share the verb.
 3. **No `<img src="…">` in markup against vault files.** Set `img.src = '…'` from JS once the bridge is up. (A `MutationObserver` does intercept `<img>` markup in the SG/App host, but it is not guaranteed in the vault-browser preview — set `src` from JS to be safe everywhere.)
 4. **No `<iframe src>`, no `<source src>`, no CSS `@import`, no ESM `import`, no `new Worker()` against vault files.** These all run too early.
 5. **`fetch('something.json')` does NOT work** — `window.fetch` is **not** patched; a vault-relative fetch resolves against the iframe's opaque origin and 404s. Load data with `await sg.vfs.readText('content.json')` (or `.read` for binary). Plain `fetch` is only useful as the first hop of a fallback chain that catches the failure and uses an inlined copy (see below, and the "Heads-up" section).
@@ -107,6 +115,17 @@ to ship redundant UI that ages out of sync with the platform. As of 2026-05-30:
 > `sg.vault.*`, `sg.append.*`, `sg.llm.*`) must be declared in `app.json` `permissions` or they
 > throw `EPERM`; `.vault/**` is always off-limits (`EPROTECTED`). See
 > `library/guides/vault-html/MIGRATING-TO-THE-PERMISSION-MODEL.md`.
+>
+> **Reads — including `sg.loadCss`/`sg.loadJs` — are the one exception, and only for now.**
+> `sg.vfs.read`/`readText`/`list` and both loaders share a single `fs.read` grant that is
+> **default-allow** today (no `app.json` declaration needed). It is planned to flip to
+> deny-by-default in a later phase, so scope it explicitly if you want the app to keep working
+> unchanged after that flip:
+> ```json
+> { "permissions": { "fs": { "read": ["theme.css", "app-src/"] } } }
+> ```
+> Grant syntax is **not glob** — a trailing `/` means "this path and everything under it" (folder
+> prefix), no trailing slash means an exact file. `"app-src/**"` is not valid; use `"app-src/"`.
 
 ### Heads-up: `fetch()` of vault paths is NOT patched
 
@@ -391,6 +410,7 @@ getData().then(build).catch(err => {
 | Drop cap appears on every intro paragraph instead of just the first | Your selector is `.intro p::first-letter` rather than `.intro p:first-of-type::first-letter`. |
 | Emojis render as boxes in collages or stamped images | The server-side font (DejaVu) lacks the glyph. Draw the shape in SVG or skip the emoji. |
 | `sgit push` says "no access token configured" even with `--token X` | On older sgit versions only `sgit push --token X` worked. Current sgit (v0.14.27+) accepts both positions; `sgit update` if you hit this. |
+| App renders blank or unstyled after `sg.loadCss`/`sg.loadJs` | **Usually not a permission problem** — `fs.read` (which these loaders use) is default-allow today. Check the console for the actual rejection: `ENOENT` means the path is wrong or the file was written locally but never `sgit commit` + `sgit push`ed; a thrown script error means the loaded JS itself failed. Always chain `.catch(err => console.error(...))` on the load promise so the real code surfaces instead of a silent spinner. |
 
 ## The medium is the argument
 

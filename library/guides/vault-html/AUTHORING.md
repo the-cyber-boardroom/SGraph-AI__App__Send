@@ -302,6 +302,29 @@ Notes:
 - Use chained `.then` for assets that depend on each other (e.g. `app.js` depends on `chart-lib.js` already being on the page).
 - The loaders inject `<style>` / `<script>` elements into `document.head` with a `data-sg-loaded="<path>"` attribute, so you can inspect them in DevTools.
 
+> **Permission model: `loadCss`/`loadJs` are NOT a separate grant.** Internally both loaders are
+> `_readText(path)` (the exact same bridge call as `sg.vfs.readText`) plus a DOM-injection step —
+> there is no `load` verb in `app.json` `permissions`. They are gated by **`fs.read`**, same as any
+> other read. Today `fs.read` is **default-allow** (`READ_DEFAULT = true` in `app-permissions.js`),
+> so a plain app.json with no `permissions` block at all can call `sg.loadCss`/`sg.loadJs` without
+> declaring anything — they will not throw `EPERM`. **But `fs.read` is planned to flip to
+> deny-by-default** (see [MIGRATING-TO-THE-PERMISSION-MODEL.md](MIGRATING-TO-THE-PERMISSION-MODEL.md)
+> "What's coming"), and `loadCss`/`loadJs` will flip with it since they share the verb. To be safe
+> against that flip, declare read access explicitly now:
+> ```json
+> { "permissions": { "fs": { "read": true } } }
+> ```
+> or scope it to just the assets you load (trailing `/` = folder prefix, no slash = exact file):
+> ```json
+> { "permissions": { "fs": { "read": ["theme.css", "chart-lib.js", "app.js"] } } }
+> ```
+> **If a load fails today, it is not a permission problem.** With reads still default-allow, a
+> rejected `sg.loadCss`/`sg.loadJs` promise is almost always `ENOENT` (typo'd path, or the file was
+> written locally but never `sgit commit` + `sgit push`ed so the published vault doesn't have it
+> yet) or a syntax error thrown while executing the injected script — not `EPERM`. Always attach a
+> `.catch` (as above) so a failure surfaces in the console with its real code instead of a silent
+> blank/unstyled page.
+
 ### 3. Reading data files at runtime
 
 Use `sg.vfs.readText` (or `sg.vfs.read` for binary). **Do not use `fetch()` for vault paths — it is
