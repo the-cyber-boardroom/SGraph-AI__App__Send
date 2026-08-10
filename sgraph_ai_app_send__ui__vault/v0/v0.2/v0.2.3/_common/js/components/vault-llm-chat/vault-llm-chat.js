@@ -6,9 +6,12 @@
    streaming. The credential comes from `.vault/llm/config.json` via SGLlmVault
    (owner-sealed by default; a read-only session simply cannot open it).
 
-   Deliberately NOT an agent: no tools, no vault writes, no autonomous loop. It reads
-   the files you attached and talks about them. Tool-using agents remain app-side (the
-   SG/Vault Workbench is the reference); this is the always-there, zero-setup surface.
+   TOOLS ARE OPT-IN AND COMMITTED (B1, 2026-08-06). By default this is still not an
+   agent — no tools, no writes; the model sees only attached files and pasted images.
+   Enabling a group in the 🔧 bar commits a grant to /.vault/llm/tools.json (that file's
+   history is the privilege audit log) and turns on a bounded tool loop: READ-tier tools
+   only, results fenced as untrusted data, every round on the VaultLlmLog ledger, and
+   `.vault/**` structurally unreachable — including the grants file itself.
 
    CONTEXT IS AN EXPLICIT SET, NOT "whatever is on screen". The previous version tracked
    the file being viewed and silently swapped context underneath the conversation —
@@ -29,7 +32,8 @@
                                           empty-state hint only; never auto-attaches)
      focusInput() / open() / close()
 
-   Requires: SGLlm, SGLlmConfig, SGLlmVault, VaultLlmLog.
+   Requires: SGLlm, SGLlmConfig, SGLlmVault, VaultLlmLog. Optional: SGLlmTools (the 🔧
+   bar renders a not-loaded note without it), SGVision, SGVoice.
    ================================================================================= */
 
 (function () {
@@ -75,6 +79,7 @@
             this._cost    = 0;
             this._calls   = 0;
             this._params  = { temperature: null, topP: null, maxTokens: null };  // null = provider/policy default
+            this._grants  = null;      // parsed .vault/llm/tools.json — null until loaded; all-off by default
         }
 
         connectedCallback() {
@@ -89,6 +94,7 @@
                     '<span class="vlc-model"></span>' +
                     '<span class="vlc-cost" title="Session spend — click for the request ledger"></span>' +
                     '<button class="vlc-params" type="button" title="Request parameters">&#9881;</button>' +
+                    '<button class="vlc-tools" type="button" title="Vault tools — what the model may do here">&#128295;</button>' +
                     '<button class="vlc-reqs" type="button" title="Requests &amp; cost ledger">&#129534;</button>' +
                     '<button class="vlc-x" type="button" aria-label="Close">&#10005;</button>' +
                   '</div>' +
@@ -102,6 +108,7 @@
                     '<button class="vlc-mini vlc-p-reset" type="button" title="Back to the vault policy defaults">reset</button>' +
                     '<span class="vlc-dim vlc-p-note"></span>' +
                   '</div>' +
+                  '<div class="vlc-toolbar" hidden></div>' +
                   '<div class="vlc-ctx"></div>' +
                   '<div class="vlc-log" role="log" aria-live="polite"></div>' +
                   '<div class="vlc-status"></div>' +
@@ -117,6 +124,7 @@
                 this.dispatchEvent(new CustomEvent('vault-llm-requests-open', { bubbles: true, composed: true }));
             });
             this.shadowRoot.querySelector('.vlc-params').addEventListener('click', () => this.toggleParams());
+            this.shadowRoot.querySelector('.vlc-tools').addEventListener('click', () => this.toggleTools());
             this.shadowRoot.querySelector('.vlc-mic').addEventListener('click', () => this.toggleVoice());
 
             // Paste a screenshot straight into the composer. The clipboard also carries a
@@ -191,8 +199,15 @@
             this._session = null;
             this._models  = null;
             this._model   = null;
+            this._grants  = null;
             if (!vault) return;
             try { this._session = await SGLlmVault.open(vault); } catch (_) { this._session = null; }
+            // Grants load lazily and never block the chat: a vault with no tools.json is
+            // simply a chat with no tools — today's behaviour, verbatim.
+            if (typeof SGLlmTools !== 'undefined') {
+                SGLlmTools.loadGrants(vault).then((g) => { this._grants = g; this._renderTools(); })
+                                            .catch(() => { this._grants = SGLlmTools.parseGrants(null); });
+            }
             if (this._session && this._session.ok) this._model = this._session.model || null;
             this._renderHead();
             this._renderStatus();
@@ -628,6 +643,164 @@
             }));
         }
 
+        // One LLM request: its own ledger entry, its own streaming bubble, its own cost
+        // accrual. The tool loop calls this per round, so nothing about a tool-using turn
+        // is invisible in the requests pane.
+        async _chatOnce(msgs, tools, meta) {
+            const s      = this._session;
+            const limits = SGLlmConfig.limitsFor(s.policy, null);
+            const pc     = (typeof SGVision !== 'undefined') ? SGVision.promptChars(msgs)
+                                                             : { chars: 0, images: 0 };
+            const rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
+                model      : this._model,
+                files      : (meta && meta.files) || [],
+                promptChars: pc.chars,
+                images     : (meta && meta.images) || 0,
+                status     : 'pending'
+            });
+
+            const bubble = this._push('bot', '');
+            bubble.classList.add('vlc-msg--streaming');
+            let acc = '', last = 0;
+            try {
+                const p = this._params || {};
+                const res = await s.client.chat(
+                    {
+                        model      : this._model,
+                        messages   : msgs,
+                        tools      : (tools && tools.length) ? tools : undefined,
+                        maxTokens  : p.maxTokens || limits.maxTokensPerCall || undefined,
+                        temperature: (p.temperature != null) ? p.temperature : undefined,
+                        topP       : (p.topP        != null) ? p.topP        : undefined
+                    },
+                    (delta, all) => {
+                        acc = all;
+                        const now = Date.now();
+                        if (now - last > 60) {          // ~16fps — same cadence the Workbench settled on
+                            last = now;
+                            bubble.textContent = acc;
+                            const log = this.shadowRoot.querySelector('.vlc-log');
+                            log.scrollTop = log.scrollHeight;
+                        }
+                    },
+                    this._abort.signal);
+
+                if (res.toolCalls && res.toolCalls.length && !res.content && !acc) {
+                    // A pure tool round has no prose — the chips are its transcript.
+                    bubble.remove();
+                } else {
+                    bubble.textContent = res.content || acc || '(empty reply)';
+                    bubble.classList.remove('vlc-msg--streaming');
+                    if (res.aborted) bubble.textContent = (bubble.textContent || '') + '\n— stopped —';
+                }
+                if (res.warning) this._push('err', 'Upstream warning: ' + res.warning);
+
+                this._calls++;
+                this._accrue(res);
+                if (rec) VaultLlmLog.update(rec.key, this._ledgerPatch(res));
+                s.client.reconcileCost(res).then((upgraded) => {
+                    if (upgraded) {
+                        this._recost(res);
+                        this._renderHead();
+                        if (rec) VaultLlmLog.update(rec.key, this._ledgerPatch(res));
+                    }
+                });
+                return res;
+            } catch (err) {
+                bubble.classList.remove('vlc-msg--streaming');
+                const aborted = err && err.name === 'AbortError';
+                if (aborted) { bubble.textContent = (acc || '') + '\n— stopped —'; }
+                else         { bubble.remove(); }
+                if (rec) VaultLlmLog.update(rec.key, {
+                    status: aborted ? 'aborted' : 'error',
+                    error : aborted ? null : ((err && err.message) || 'Request failed')
+                });
+                throw err;
+            }
+        }
+
+        // Dispatch each tool call and render it as a chip WHILE it runs — pic2's rule:
+        // no invisible actions. Returns the tool-result messages for the next round.
+        async _runTools(toolCalls) {
+            const strip = document.createElement('div');
+            strip.className = 'vlc-msg vlc-msg--tools';
+            this.shadowRoot.querySelector('.vlc-log').appendChild(strip);
+
+            const out = [];
+            for (const tc of toolCalls) {
+                const row  = document.createElement('div');
+                row.className = 'vlc-tool-row';
+                const argHint = (tc.args && typeof tc.args.path === 'string') ? ' ' + tc.args.path : '';
+                row.textContent = '🔧 ' + tc.name + argHint + ' …';
+                strip.appendChild(row);
+
+                const r = await SGLlmTools.dispatch(tc, { vault: this._vault, grants: this._grants });
+                row.textContent = '🔧 ' + tc.name + argHint + (r.ok ? ' ✓' : ' ✗ ' + (r.error || r.code));
+                row.classList.add(r.ok ? 'vlc-tool-row--ok' : 'vlc-tool-row--err');
+
+                out.push({
+                    role: 'tool', tool_call_id: tc.id,
+                    content: JSON.stringify(r.ok ? r.result : { error: r.error, code: r.code })
+                });
+            }
+            const log = this.shadowRoot.querySelector('.vlc-log');
+            log.scrollTop = log.scrollHeight;
+            return out;
+        }
+
+        // ── the 🔧 tools bar ─────────────────────────────────────────────────────
+        toggleTools(force) {
+            const bar = this.shadowRoot.querySelector('.vlc-toolbar');
+            if (!bar) return;
+            bar.hidden = (force === undefined) ? !bar.hidden : !force;
+            if (!bar.hidden) this._renderTools();
+        }
+
+        _renderTools() {
+            const bar = this.shadowRoot.querySelector('.vlc-toolbar');
+            if (!bar || bar.hidden) return;
+            if (typeof SGLlmTools === 'undefined') { bar.innerHTML = '<span class="vlc-dim">Tools are not loaded on this page.</span>'; return; }
+            if (!this._grants) { bar.innerHTML = '<span class="vlc-dim">Loading grants…</span>'; return; }
+
+            const writable = !!(this._vault && this._vault.writable);
+            const rows = SGLlmTools.GROUP_NAMES.map((name) => {
+                const g     = this._grants.groups[name] || { enabled: false, allow: [], deny: [] };
+                const scope = (g.allow.length ? ' · only ' + g.allow.join(', ') : '') +
+                              (g.deny.length  ? ' · never ' + g.deny.join(', ')  : '');
+                return '<label class="vlc-tool-grp" title="Adds ~' + SGLlmTools.tokenWeight(this._grants, name) + ' tokens to every request while enabled">' +
+                    '<input type="checkbox" data-grp="' + esc(name) + '"' + (g.enabled ? ' checked' : '') + (writable ? '' : ' disabled') + '>' +
+                    '<span class="vlc-tool-name">' + esc(name) + '</span>' +
+                    '<span class="vlc-dim">READ · ~' + SGLlmTools.tokenWeight(this._grants, name) + ' tok/req' + esc(scope) + '</span>' +
+                '</label>';
+            }).join('');
+            bar.innerHTML = rows +
+                '<span class="vlc-dim vlc-tool-note">' +
+                (writable
+                    ? 'Grants are saved to ' + esc(SGLlmTools.TOOLS_PATH) + ' — every change is a commit (that history is the audit log).'
+                    : 'Read-only vault — grants can be seen here but changing them needs the write key.') +
+                '</span>';
+
+            bar.querySelectorAll('input[data-grp]').forEach((cb) => {
+                cb.addEventListener('change', () => this._setGroupEnabled(cb.getAttribute('data-grp'), cb.checked, cb));
+            });
+        }
+
+        async _setGroupEnabled(name, enabled, cb) {
+            const g = this._grants && this._grants.groups[name];
+            if (!g) return;
+            const before = g.enabled;
+            g.enabled = !!enabled;
+            try {
+                await SGLlmTools.saveGrants(this._vault, this._grants);
+                this._setStatus((enabled ? 'Enabled' : 'Disabled') + ' "' + name + '" — committed to ' + SGLlmTools.TOOLS_PATH + '.', 'info');
+            } catch (err) {
+                // The grant did not land — the UI must not claim authority the vault refused.
+                g.enabled = before;
+                if (cb) cb.checked = before;
+                this._setStatus('Could not save the grant: ' + ((err && err.message) || err), 'warn');
+            }
+        }
+
         // ── the call ─────────────────────────────────────────────────────────────
         async _send() {
             const inEl = this.shadowRoot.querySelector('.vlc-in');
@@ -680,79 +853,55 @@
             msgs.push.apply(msgs, ctxMsgs);
             msgs.push.apply(msgs, this._history.slice(-MAX_HISTORY_MSGS));
 
-            // Ledger entry is created at SEND time so an in-flight or failed call is
-            // still visible in the requests pane (and so cost can never be silently lost).
-            // promptChars counted through SGVision because the old `typeof content ===
-            // 'string'` test scored an image-bearing message as ZERO — the most expensive
-            // calls in the ledger reading as the cheapest.
-            const pc = (typeof SGVision !== 'undefined') ? SGVision.promptChars(msgs)
-                                                         : { chars: 0, images: 0 };
-            const rec = (globalThis.VaultLlmLog || null) && VaultLlmLog.add({
-                model      : this._model,
-                files      : this._files.map((f) => f.path),
-                promptChars: pc.chars,
-                images     : sentImages,
-                status     : 'pending'
-            });
+            // tools[] only when a committed grant enables something — a disabled group is
+            // OMITTED, so the default chat pays zero tokens for machinery it never uses.
+            const tools = (typeof SGLlmTools !== 'undefined' && this._grants && SGLlmTools.anyEnabled(this._grants))
+                ? SGLlmTools.compileTools(this._grants) : null;
+            if (tools && tools.length) {
+                msgs[0] = { role: 'system', content: msgs[0].content + '\n\n' + SGLlmTools.SYSTEM_TOOLS_NOTE };
+            }
 
-            const bubble = this._push('bot', '');
-            bubble.classList.add('vlc-msg--streaming');
             this._abort = new AbortController();
             this._setBusy(true);
-
-            let acc = '', last = 0;
             try {
-                const p = this._params || {};
-                const res = await s.client.chat(
-                    {
-                        model      : this._model,
-                        messages   : msgs,
-                        maxTokens  : p.maxTokens || limits.maxTokensPerCall || undefined,
-                        temperature: (p.temperature != null) ? p.temperature : undefined,
-                        topP       : (p.topP        != null) ? p.topP        : undefined
-                    },
-                    (delta, all) => {
-                        acc = all;
-                        const now = Date.now();
-                        if (now - last > 60) {          // ~16fps — same cadence the Workbench settled on
-                            last = now;
-                            bubble.textContent = acc;
-                            const log = this.shadowRoot.querySelector('.vlc-log');
-                            log.scrollTop = log.scrollHeight;
-                        }
-                    },
-                    this._abort.signal);
-
-                bubble.textContent = res.content || acc || '(empty reply)';
-                bubble.classList.remove('vlc-msg--streaming');
-                if (res.content) this._history.push({ role: 'assistant', content: res.content });
-                if (res.aborted) bubble.textContent = (bubble.textContent || '') + '\n— stopped —';
-                if (res.warning) this._push('err', 'Upstream warning: ' + res.warning);
-
-                this._calls++;
-                this._accrue(res);
-                if (rec) VaultLlmLog.update(rec.key, this._ledgerPatch(res));
-
-                // Authoritative cost lands a beat later; refresh the pill when it does.
-                s.client.reconcileCost(res).then((upgraded) => {
-                    if (upgraded) {
-                        this._recost(res);
-                        this._renderHead();
-                        if (rec) VaultLlmLog.update(rec.key, this._ledgerPatch(res));
+                // The loop: send → (tool calls) → dispatch each → tool results → resend,
+                // until a round returns prose. Each round is its OWN ledger entry — the
+                // requests pane shows what actually happened, call by call.
+                let msgsWork = msgs;
+                let meta     = { files: this._files.map((f) => f.path), images: sentImages };
+                let rounds   = 0;
+                for (;;) {
+                    const res = await this._chatOnce(msgsWork, tools, meta);
+                    if (!res.toolCalls || !res.toolCalls.length) {
+                        // Only the FINAL prose joins the conversation history. Tool
+                        // exchanges are per-turn plumbing: fenced file bodies re-sent on
+                        // every later turn would balloon both the context and the bill.
+                        if (res.content) this._history.push({ role: 'assistant', content: res.content });
+                        break;
                     }
-                });
+                    rounds++;
+                    const outcome = await this._runTools(res.toolCalls);
+                    msgsWork = msgsWork.concat([{
+                        role: 'assistant', content: res.content || '',
+                        tool_calls: res.toolCalls.map((tc) => ({
+                            id: tc.id, type: 'function',
+                            'function': { name: tc.name, arguments: tc.argsRaw || JSON.stringify(tc.args || {}) }
+                        }))
+                    }], outcome);
+                    if (rounds >= SGLlmTools.MAX_ITERATIONS) {
+                        // One final round WITHOUT tools[]: the model must land the answer
+                        // from what it has, not silently drop mid-investigation.
+                        const fin = await this._chatOnce(msgsWork, null, { files: [], images: 0 });
+                        if (fin.content) this._history.push({ role: 'assistant', content: fin.content });
+                        this._setStatus('Tool limit reached (' + SGLlmTools.MAX_ITERATIONS + ' rounds) — answered with what was gathered.', 'warn');
+                        break;
+                    }
+                    meta = { files: [], images: 0 };
+                }
             } catch (err) {
-                bubble.classList.remove('vlc-msg--streaming');
-                const aborted = err && err.name === 'AbortError';
-                if (aborted) { bubble.textContent = (acc || '') + '\n— stopped —'; }
-                else {
-                    bubble.remove();
+                if (!(err && err.name === 'AbortError')) {
                     this._push('err', (err && err.message) || 'Request failed');
                 }
-                if (rec) VaultLlmLog.update(rec.key, {
-                    status: aborted ? 'aborted' : 'error',
-                    error : aborted ? null : ((err && err.message) || 'Request failed')
-                });
             } finally {
                 this._abort = null;
                 this._setBusy(false);
@@ -855,6 +1004,15 @@
         .vlc-msg--bot  { align-self: flex-start; background: rgba(255,255,255,.05); }
         .vlc-msg--err  { align-self: stretch; background: rgba(255,107,107,.12); color: #ff9b9b; font-size: .74rem; }
         .vlc-msg--streaming::after { content: '▍'; opacity: .6; }
+        .vlc-msg--tools { align-self: stretch; background: transparent; padding: 0 .2rem; }
+        .vlc-tool-row { font-size: .72rem; font-family: var(--font-mono, monospace); color: var(--color-text-secondary, #9aa4bf); padding: .1rem 0; }
+        .vlc-tool-row--ok  { color: #4ecdc4; }
+        .vlc-tool-row--err { color: #E9C445; }
+        .vlc-toolbar { display: flex; flex-direction: column; gap: .25rem; padding: .4rem .75rem; border-bottom: 1px solid var(--color-border, #24304a); }
+        .vlc-toolbar[hidden] { display: none; }
+        .vlc-tool-grp { display: flex; align-items: center; gap: .45rem; font-size: .74rem; cursor: pointer; }
+        .vlc-tool-name { font-weight: 700; }
+        .vlc-tool-note { padding-top: .2rem; }
         .vlc-msg__imgs { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .35rem; }
         .vlc-thumb {
             width: 34px; height: 34px; object-fit: cover; border-radius: 4px;

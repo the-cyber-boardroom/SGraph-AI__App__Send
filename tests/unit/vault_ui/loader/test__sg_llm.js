@@ -173,5 +173,80 @@ console.log('\n[suite] SGLlm — redaction keeps logs shareable');
     ok('image bytes are gone', out[1].content[1].image_url.url.indexOf('AAAA') === -1);
 }
 
+console.log('\n[suite] tool_calls survive the transport (the gap the tool loop needed)');
+{
+    /* Verified gap (architect review 08/06): tools[] went UP but tool_calls were dropped
+       on the way back in BOTH paths, which is why every tool loop in the codebase used a
+       different client. These drive the real chat() against a fake fetch. */
+    const sse = (frames) => ({
+        ok: true,
+        headers: { get: () => 'text/event-stream' },
+        body: {
+            getReader() {
+                const chunks = frames.map((f) => new TextEncoder().encode('data: ' + JSON.stringify(f) + '\n'));
+                let i = 0;
+                return { read: async () => (i < chunks.length ? { done: false, value: chunks[i++] } : { done: true }) };
+            }
+        }
+    });
+    const jsonRes = (body) => ({ ok: true, headers: { get: () => 'application/json' }, json: async () => body });
+
+    const realFetch = globalThis.fetch;
+
+    // Streamed: fragments arrive split across frames and must be re-assembled by index.
+    globalThis.fetch = async () => sse([
+        { id: 'g1', choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_a', 'function': { name: 'read_', arguments: '' } }] } }] },
+        { choices: [{ delta: { tool_calls: [{ index: 0, 'function': { name: 'file', arguments: '{"pa' } }] } }] },
+        { choices: [{ delta: { tool_calls: [{ index: 0, 'function': { arguments: 'th":"a.md"}' } }] } }] },
+        { choices: [{ delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 5, completion_tokens: 2 } }
+    ]);
+    let res = await new L({ apiKey: 'sk-or-x' }).chat({ model: 'm', messages: [], tools: [{}] });
+    ok('streamed fragments reassemble by index', res.toolCalls && res.toolCalls.length === 1);
+    ok('…the split NAME concatenates',           res.toolCalls[0].name === 'read_file');
+    ok('…the split ARGUMENTS parse',             res.toolCalls[0].args && res.toolCalls[0].args.path === 'a.md');
+    ok('…the id survives',                       res.toolCalls[0].id === 'call_a');
+    ok('…finish says tool_calls',                res.finish === 'tool_calls');
+
+    // Non-stream JSON path.
+    globalThis.fetch = async () => jsonRes({
+        id: 'g2', choices: [{ message: { content: 'and', tool_calls: [
+            { id: 'c1', 'function': { name: 'get_costs', arguments: '{}' } } ] }, finish_reason: 'tool_calls' }]
+    });
+    res = await new L({ apiKey: 'sk-or-x' }).chat({ model: 'm', messages: [], stream: false });
+    ok('the JSON path surfaces tool_calls too', res.toolCalls && res.toolCalls[0].name === 'get_costs');
+    ok('…alongside any content',                res.content === 'and');
+
+    // Malformed arguments: args null, argsRaw kept — the caller replies with an error
+    // tool-result instead of crashing the panel.
+    globalThis.fetch = async () => jsonRes({
+        choices: [{ message: { tool_calls: [{ 'function': { name: 't', arguments: '{broken' } }] } }]
+    });
+    res = await new L({ apiKey: 'sk-or-x' }).chat({ model: 'm', messages: [], stream: false });
+    ok('malformed args → args null, not a throw', res.toolCalls[0].args === null);
+    ok('…with the raw string kept for diagnosis', res.toolCalls[0].argsRaw === '{broken');
+    ok('…and a synthesised id when the route omitted one', /^call_/.test(res.toolCalls[0].id));
+
+    // No tools in play → the field is null, so `if (res.toolCalls)` reads naturally.
+    globalThis.fetch = async () => jsonRes({ choices: [{ message: { content: 'plain' } }] });
+    res = await new L({ apiKey: 'sk-or-x' }).chat({ model: 'm', messages: [], stream: false });
+    ok('a plain reply has toolCalls === null', res.toolCalls === null);
+
+    globalThis.fetch = realFetch;
+}
+
+console.log('\n[suite] redaction — tool traffic cannot flood the provenance log');
+{
+    const big = 'y'.repeat(50000);
+    const out = L.redactMessages([
+        { role: 'assistant', content: '', tool_calls: [{ id: 'c1', 'function': { name: 'read_file', arguments: '{"path":"' + 'z'.repeat(500) + '"}' } }] },
+        { role: 'tool', tool_call_id: 'c1', content: big }
+    ]);
+    ok('a tool result is truncated for the log', out[1].content.length < 500);
+    ok('…but keeps its correlation id',          out[1].tool_call_id === 'c1');
+    ok('…and states the original size',          /50000 chars/.test(out[1].content));
+    ok('assistant tool_calls keep the NAME',     out[0].tool_calls[0]['function'].name === 'read_file');
+    ok('…with arguments capped',                 out[0].tool_calls[0]['function'].arguments.length <= 201);
+}
+
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
