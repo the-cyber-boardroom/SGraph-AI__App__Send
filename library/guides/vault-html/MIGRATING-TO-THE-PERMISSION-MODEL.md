@@ -65,6 +65,7 @@ Verb → permission key:
 | Bridge call | Permission | Notes |
 |---|---|---|
 | `sg.vfs.read` / `list` | `fs.read` | default-allow today |
+| `sg.loadCss` / `sg.loadJs` | `fs.read` | **not a separate verb** — both loaders are `_readText(path)` (identical bridge call to `sg.vfs.readText`) plus a DOM-injection step, so they ride the same `fs.read` grant and the same default-allow-today. See AUTHORING.md §2. |
 | `sg.vfs.write` | `fs.write` | **declare this to migrate a writable app** |
 | `sg.fs.move(from,to)` | `fs.move` | needs the grant on **both** paths |
 | `sg.fs.delete(path)` | `fs.delete` | |
@@ -119,7 +120,10 @@ If your app was reaching into `.vault/` for anything, it must stop — surface t
 
 - **Reads will become deny-by-default** in a later step (uniform model). To be safe **now**, apps that
   read at runtime should already declare `fs.read` (e.g. `"read": true` or a scoped array). Apps that
-  only declare writes today will need `fs.read` added before that flip.
+  only declare writes today will need `fs.read` added before that flip. **This includes `sg.loadCss`
+  / `sg.loadJs`** — they are not a distinct permission, so an app that only loads CSS/JS at runtime
+  (and never calls `sg.vfs.read`/`readText` directly) still needs `fs.read` declared, or its loaders
+  will start throwing `EPERM` the day this flips.
 - **`vault.delete`** (server-side destroy) is deferred — it needs an owner-secret credential store and
   AppSec sign-off. Use `vault.unlink` (reversible) until then.
 
