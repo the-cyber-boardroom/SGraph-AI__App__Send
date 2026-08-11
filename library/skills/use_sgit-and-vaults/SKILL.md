@@ -157,6 +157,13 @@ sgit stash drop                         # discard last stash
 
 ## Sharing & Publishing
 
+> **Publishing a whole vault to a GitHub repo** (as a backup/collaboration medium, or to serve
+> its app from GitHub Pages) is a different thing from the `sgit share` commands below — it's a
+> `git`-level operation on the `.sg_vault/{local,bare,work}` layout, not an sgit subcommand. See
+> **`library/guides/vault-html/PUBLISHING-SGIT-VAULT-TO-GITHUB.md`** for the `.gitignore` boundary
+> that keeps `local/vault_key` out of the repo, the plaintext-working-tree-plus-encrypted-`bare/`
+> pattern, and the GitHub Pages hosting follow-on.
+
 > **⚠️ DISABLED in current CLI (verified against sgit-ai v0.14.27):** `sgit share send` and
 > `sgit share publish` are disabled *"pending Simple Token security rework"*. Only
 > `sgit share receive` (download a transfer) still works. Until the rework ships, share
