@@ -27,10 +27,12 @@ load('lib/sg-llm/sg-llm-config.js');
 load('lib/sg-llm/sg-llm.js');
 load('lib/sg-llm/vault-llm-log.js');
 load('lib/sg-llm/sg-vision.js');
+load('lib/sg-llm/sg-llm-tools.js');
 global.SGLlmConfig  = window.SGLlmConfig  = globalThis.SGLlmConfig;
 global.SGLlm        = window.SGLlm        = globalThis.SGLlm;
 global.VaultLlmLog  = window.VaultLlmLog  = globalThis.VaultLlmLog;
 global.SGVision     = window.SGVision     = globalThis.SGVision;
+global.SGLlmTools   = window.SGLlmTools   = globalThis.SGLlmTools;
 load('components/vault-llm-chat/vault-llm-chat.js');
 
 let pass = 0, fail = 0;
@@ -494,6 +496,141 @@ console.log('\n[suite] vault-llm-chat — the outgoing message and the ledger');
     await el._send();
     const user2 = sent.messages[sent.messages.length - 1];
     ok('a text-only message stays a plain string', typeof user2.content === 'string');
+}
+
+console.log('\n[suite] the 🔧 tools bar — off by default, committed on change');
+{
+    const el = mount();
+    ok('the head has a tools button', !!el.shadowRoot.querySelector('.vlc-tools'));
+    ok('the bar starts hidden',       el.shadowRoot.querySelector('.vlc-toolbar').hidden === true);
+
+    // Grants loaded, everything off (the default), writable vault.
+    el._vault  = { writable: true };
+    el._grants = SGLlmTools.parseGrants(null);
+    el.toggleTools(true);
+    const bar = el.shadowRoot.querySelector('.vlc-toolbar');
+    ok('both groups render',                  bar.querySelectorAll('input[data-grp]').length === 2);
+    ok('…unchecked by default',               Array.from(bar.querySelectorAll('input')).every((c) => !c.checked));
+    ok('the token weight is stated',          /tok\/req/.test(bar.textContent));
+    ok('the commit-as-audit-log is stated',   /tools\.json/.test(bar.textContent) && /commit/.test(bar.textContent));
+
+    // Toggling saves through SGLlmTools.saveGrants — and reverts if the save fails.
+    let saved = null;
+    const realSave = SGLlmTools.saveGrants;
+    SGLlmTools.saveGrants = async (vault, grants) => { saved = JSON.parse(JSON.stringify(SGLlmTools.serializeGrants(grants))); };
+    const cb = bar.querySelector('input[data-grp="files.read"]');
+    cb.checked = true;
+    cb.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    ok('enabling a group saves the grants',   saved && saved['files.read'].enabled === true);
+    ok('…and says it was committed',          /committed/i.test(el.shadowRoot.querySelector('.vlc-status').textContent));
+
+    SGLlmTools.saveGrants = async () => { throw Object.assign(new Error('Read-only vault'), { code: 'EREADONLY' }); };
+    cb.checked = false;
+    cb.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    ok('a failed save REVERTS the grant (the UI never claims refused authority)',
+        el._grants.groups['files.read'].enabled === true && cb.checked === true);
+    SGLlmTools.saveGrants = realSave;
+
+    // Read-only vault: visible, locked, and says why.
+    const ro = mount();
+    ro._vault  = { writable: false };
+    ro._grants = SGLlmTools.parseGrants({ 'files.read': { enabled: true } });
+    ro.toggleTools(true);
+    const roBar = ro.shadowRoot.querySelector('.vlc-toolbar');
+    ok('read-only: toggles are disabled',     Array.from(roBar.querySelectorAll('input')).every((c) => c.disabled));
+    ok('…the granted state is still shown',   roBar.querySelector('input[data-grp="files.read"]').checked === true);
+    ok('…and the reason is stated',           /write key/.test(roBar.textContent));
+}
+
+console.log('\n[suite] the tool loop — send → dispatch → resend, all on the ledger');
+{
+    const el = mount();
+    el._model  = 'm/tool';
+    el._vault  = {
+        writable: true,
+        listFolder: (p) => (p === '/' ? [{ name: 'plan.md', type: 'file', size: 9 }] : null),
+        getFile: async () => new TextEncoder().encode('THE PLAN!')
+    };
+    el._grants = SGLlmTools.parseGrants({ 'files.read': { enabled: true } });
+
+    // A scripted client: round 1 returns a tool call, round 2 answers.
+    const seen = [];
+    el._session = {
+        ok: true, policy: SGLlmConfig.parse({ models: { allow: ['*'] } }),
+        client: {
+            chat: async (req) => {
+                seen.push(req);
+                if (seen.length === 1) return { content: '', toolCalls: [{ id: 'c1', name: 'read_file', args: { path: 'plan.md' }, argsRaw: '{"path":"plan.md"}' }], model: 'm/tool', usage: {}, id: 'g1' };
+                return { content: 'The plan says THE PLAN!', toolCalls: null, model: 'm/tool', usage: {}, id: 'g2' };
+            },
+            reconcileCost: async () => false
+        }
+    };
+    VaultLlmLog.clear();
+    el.shadowRoot.querySelector('.vlc-in').value = 'what does the plan say?';
+    await el._send();
+
+    ok('two LLM calls were made',            seen.length === 2);
+    ok('round 1 carried tools[]',            Array.isArray(seen[0].tools) && seen[0].tools.length > 0);
+    ok('the system prompt teaches the fence rule', /UNTRUSTED DATA/.test(seen[0].messages[0].content));
+    const msgs2 = seen[1].messages;
+    const asst  = msgs2.find((m) => m.role === 'assistant' && m.tool_calls);
+    const toolm = msgs2.find((m) => m.role === 'tool');
+    ok('round 2 includes the assistant tool_calls message', !!asst && asst.tool_calls[0]['function'].name === 'read_file');
+    ok('…and the tool RESULT, correlated by id', !!toolm && toolm.tool_call_id === 'c1');
+    ok('…with the file content FENCED inside it', /BEGIN UNTRUSTED DATA/.test(toolm.content));
+
+    ok('the tool call is visible in the transcript', (() => {
+        const row = el.shadowRoot.querySelector('.vlc-tool-row');
+        return !!row && /read_file/.test(row.textContent) && /✓/.test(row.textContent);
+    })());
+    ok('the final answer rendered', Array.from(el.shadowRoot.querySelectorAll('.vlc-msg--bot'))
+        .some((b) => /The plan says/.test(b.textContent)));
+    ok('EVERY round is on the ledger (2 entries)', VaultLlmLog.list().length === 2);
+    ok('only the final prose joined the history', el._history.filter((m) => m.role === 'assistant').length === 1 &&
+        !el._history.some((m) => m.role === 'tool'));
+
+    // No grants → no tools[] — today's behaviour, verbatim.
+    const plain = mount();
+    plain._model = 'm'; plain._grants = SGLlmTools.parseGrants(null);
+    let plainReq = null;
+    plain._session = { ok: true, policy: SGLlmConfig.parse({ models: { allow: ['*'] } }),
+        client: { chat: async (req) => { plainReq = req; return { content: 'hi', toolCalls: null, model: 'm', usage: {}, id: 'g' }; },
+                  reconcileCost: async () => false } };
+    plain.shadowRoot.querySelector('.vlc-in').value = 'hello';
+    await plain._send();
+    ok('no grants → no tools[] in the request', plainReq.tools === undefined);
+    ok('…and no fence lecture in the system prompt', !/UNTRUSTED DATA/.test(plainReq.messages[0].content));
+}
+
+console.log('\n[suite] the tool loop terminates — a looping model cannot spend forever');
+{
+    const el = mount();
+    el._model  = 'm/loop';
+    el._vault  = { writable: true, listFolder: () => [], getFile: async () => new Uint8Array(0) };
+    el._grants = SGLlmTools.parseGrants({ 'files.read': { enabled: true } });
+    let calls = 0;
+    el._session = {
+        ok: true, policy: SGLlmConfig.parse({ models: { allow: ['*'] } }),
+        client: {
+            chat: async (req) => {
+                calls++;
+                // Tool-less final round → must answer in prose.
+                if (!req.tools) return { content: 'best effort answer', toolCalls: null, model: 'm/loop', usage: {}, id: 'g' + calls };
+                return { content: '', toolCalls: [{ id: 'c' + calls, name: 'exists', args: { path: 'x' }, argsRaw: '{}' }], model: 'm/loop', usage: {}, id: 'g' + calls };
+            },
+            reconcileCost: async () => false
+        }
+    };
+    VaultLlmLog.clear();
+    el.shadowRoot.querySelector('.vlc-in').value = 'loop forever';
+    await el._send();
+    ok('the loop stops at the iteration cap', calls === SGLlmTools.MAX_ITERATIONS + 1, 'calls=' + calls);
+    ok('…with a final TOOL-LESS round so an answer still lands',
+        Array.from(el.shadowRoot.querySelectorAll('.vlc-msg--bot')).some((b) => /best effort/.test(b.textContent)));
+    ok('…and the cap is stated to the user', /Tool limit reached/.test(el.shadowRoot.querySelector('.vlc-status').textContent));
 }
 
 console.log('\n' + (fail === 0 ? '✓' : '✗') + ' ' + pass + ' passed, ' + fail + ' failed');

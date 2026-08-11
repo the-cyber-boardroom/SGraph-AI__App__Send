@@ -23,6 +23,7 @@ node tests/unit/vault_ui/loader/test__vault_releases_editor.js
 node tests/unit/vault_ui/loader/test__sg_llm_config.js
 node tests/unit/vault_ui/loader/test__sg_llm.js
 node tests/unit/vault_ui/loader/test__sg_llm_vault.js
+node tests/unit/vault_ui/loader/test__sg_llm_tools.js
 node tests/unit/vault_ui/loader/test__sg_voice.js
 node tests/unit/vault_ui/loader/test__sg_vision.js
 node tests/unit/vault_ui/loader/test__no_auto_reload.js

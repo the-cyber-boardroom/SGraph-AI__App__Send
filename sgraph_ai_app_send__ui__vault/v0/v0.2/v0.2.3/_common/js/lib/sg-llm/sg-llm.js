@@ -68,9 +68,15 @@
         if (ch) {
             var d = ch.delta && ch.delta.content;
             if (typeof d === 'string' && d) out.delta = d;
+            // Tool-call FRAGMENTS: streamed as {index, id?, function:{name?, arguments?}}
+            // where `arguments` arrives as string pieces that must be concatenated per
+            // index. Dropping these was the transport gap that made every tool loop in
+            // the codebase use a different client.
+            if (ch.delta && Array.isArray(ch.delta.tool_calls)) out.toolCallDeltas = ch.delta.tool_calls;
             if (ch.finish_reason) out.finish = ch.finish_reason;
             // Non-stream shape (some routes ignore stream:true)
             if (!out.delta && ch.message && typeof ch.message.content === 'string') out.delta = ch.message.content;
+            if (ch.message && Array.isArray(ch.message.tool_calls)) out.toolCallsWhole = ch.message.tool_calls;
         }
         if (j.usage) out.usage = j.usage;
         return out;
@@ -137,6 +143,23 @@
         var arr = Array.isArray(messages) ? messages : [];
         return arr.map(function (m) {
             if (!m) return m;
+            // A tool RESULT can be a whole fenced file — truncate it for the log, keep the
+            // correlation id. An assistant message that carries tool_calls keeps the names
+            // (the interesting part) with arguments capped.
+            if (m.role === 'tool') {
+                var body = String(m.content == null ? '' : m.content);
+                return { role: 'tool', tool_call_id: m.tool_call_id || null,
+                         content: body.length > 400 ? body.slice(0, 400) + ' …[' + body.length + ' chars]' : body };
+            }
+            if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
+                return { role: 'assistant', content: (typeof m.content === 'string') ? m.content : '',
+                         tool_calls: m.tool_calls.map(function (t) {
+                             var a = (t && t.function && t.function.arguments) || '';
+                             return { id: (t && t.id) || null,
+                                      function: { name: (t && t.function && t.function.name) || '',
+                                                  arguments: a.length > 200 ? a.slice(0, 200) + '…' : a } };
+                         }) };
+            }
             if (typeof m.content === 'string') return { role: m.role, content: m.content };
             var parts = (Array.isArray(m.content) ? m.content : [m.content]).map(function (p) {
                 if (p && p.type === 'image_url') {
@@ -228,7 +251,21 @@
         }
 
         var content = '', usage = null, id = null, finish = null, model = q.model, aborted = false, streamErr = null;
+        var toolAcc = [];        // by stream index: { id, name, args: growing JSON string }
         var ct = (r.headers && r.headers.get) ? (r.headers.get('content-type') || '') : '';
+
+        var applyToolFrags = function (frags) {
+            for (var f = 0; f < frags.length; f++) {
+                var frag = frags[f] || {};
+                var ix   = (typeof frag.index === 'number') ? frag.index : toolAcc.length;
+                var slot = toolAcc[ix] || (toolAcc[ix] = { id: null, name: '', args: '' });
+                if (frag.id) slot.id = frag.id;
+                if (frag.function) {
+                    if (frag.function.name)      slot.name += frag.function.name;
+                    if (frag.function.arguments) slot.args += frag.function.arguments;
+                }
+            }
+        };
 
         var apply = function (ev) {
             if (!ev) return;
@@ -240,6 +277,14 @@
             if (ev.delta) {
                 content += ev.delta;
                 if (onToken) { try { onToken(ev.delta, content); } catch (_) {} }
+            }
+            if (ev.toolCallDeltas) applyToolFrags(ev.toolCallDeltas);
+            if (ev.toolCallsWhole) {
+                toolAcc = ev.toolCallsWhole.map(function (t) {
+                    return { id: (t && t.id) || null,
+                             name: (t && t.function && t.function.name) || '',
+                             args: (t && t.function && t.function.arguments) || '' };
+                });
             }
         };
 
@@ -262,6 +307,13 @@
                 var j  = await r.json();
                 var m0 = (j.choices && j.choices[0]) || {};
                 content = (m0.message && m0.message.content) || '';
+                if (m0.message && Array.isArray(m0.message.tool_calls)) {
+                    toolAcc = m0.message.tool_calls.map(function (t) {
+                        return { id: (t && t.id) || null,
+                                 name: (t && t.function && t.function.name) || '',
+                                 args: (t && t.function && t.function.arguments) || '' };
+                    });
+                }
                 usage   = j.usage || null;
                 id      = j.id || null;
                 finish  = m0.finish_reason || null;
@@ -275,8 +327,22 @@
 
         if (streamErr && !content) throw Object.assign(new Error(String(streamErr)), { code: 'EPROTO' });
 
+        // Normalise accumulated tool calls. `args` is PARSED (null when the JSON is
+        // malformed — the caller replies with an error tool-result rather than crashing);
+        // `argsRaw` is kept for diagnostics. Ids are synthesised when a route omits them,
+        // because the tool-result message needs a tool_call_id to correlate.
+        var toolCalls = [];
+        for (var ti = 0; ti < toolAcc.length; ti++) {
+            var tc = toolAcc[ti];
+            if (!tc || !tc.name) continue;
+            var parsedArgs = null;
+            try { parsedArgs = tc.args ? JSON.parse(tc.args) : {}; } catch (_) { parsedArgs = null; }
+            toolCalls.push({ id: tc.id || ('call_' + ti), name: tc.name, args: parsedArgs, argsRaw: tc.args });
+        }
+
         var out = {
             content : content,
+            toolCalls: toolCalls.length ? toolCalls : null,
             model   : model,
             finish  : aborted ? 'aborted' : finish,
             usage   : usage || {},
