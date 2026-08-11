@@ -152,7 +152,7 @@ index is now a ~60-line TOC with a P-number inventory table. All P-numbers prese
 files. Non-P-numbered items noted with doc references.
 
 ### B-012 · Update `.claude/explorer/CLAUDE.md` — stale reality and debrief references
-**Status:** OPEN
+**Status:** DONE (2026-08-09)
 **What:** `.claude/explorer/CLAUDE.md` still references the archived reality monolith
 (`reality/v0.16.26__what-exists-today.md`) directly, instead of the current domain tree entry
 point (`reality/index.md`). The "Key References" table also lists stale pointers for "Latest
@@ -252,6 +252,7 @@ None currently active.
 | 2026-08-04 | No new briefs; send-browse file split documented; test count updated to ~2800+ | send-browse--v0.3.3.js split into 4 files catalogued in ui/index.md; qa/index.md updated to ~2800+; base64 chunk open item marked FIXED (commit 1089596); 5 reality files updated; master index + debrief produced |
 | 2026-08-05 | No new briefs; vision/screenshot + auto-pull-off commits; test count updated to ~2950+ | 3 new EXISTS items (screenshots, sg.llm.imagePart(), auto-pull-off). developer already patched ui/index.md (7 lines). Updated: index.md v0.33.53, qa/index.md ViV suite ~780+→~930+, changelog. +150 assertions (+sg_vision 62, +no_auto_reload 27, vault_llm_chat 93→122, app_shell_llm_bridge 79→96, sg_llm_config 38→53). Master index + debrief produced |
 | 2026-08-06 | No new briefs; addendum to 08/05 session with deeper commit-level detail | 7 EXISTS items detailed (image paste, SGVision, sg.llm.imagePart, ledger fix, auto-sync data-loss fix, claude-sonnet-5 default, picker notice); index.md last-updated + Black Hat note updated; changelog 08/06 + 08/05 merged; master index + debrief produced |
+| 2026-08-09 | No new briefs; no new commits; B-012 completed — explorer/CLAUDE.md stale references fixed | reality path → index.md; 3 stale debrief/index pointers updated; index.md + qa/index.md → 2026-08-09; master index + debrief produced |
 | 2026-08-08 | No new briefs; no new commits; date/last-updated brought current; B-012 added | index.md + qa/index.md updated to 2026-08-08; master index + debrief produced |
 | 2026-08-11 | 26 new briefs (02 Aug + 06 Aug); 5 new code commits; 1 standing decision corrected; 11 new PROPOSED items | Master index, Dev review, AppSec review, 6 reality files updated, changelog, debrief produced; OpenRouter resale prohibition annotated in index.md |
 | 2026-08-07 | No new briefs; date/last-updated brought current to today | qa/index.md + index.md "Last updated" updated to 2026-08-07; master index + debrief produced |
